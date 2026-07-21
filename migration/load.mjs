@@ -65,14 +65,30 @@ if (count > 0 && !WIPE) die('guard', new Error(`vendors table already has ${coun
 
 if (WIPE) {
   console.log('wiping previously migrated data…');
-  // reverse dependency order; org-scoped only
+  // reverse dependency order; org-scoped only. Deletes are batched by id —
+  // single-statement deletes of 100k+ rows hit Supabase's statement timeout.
   for (const t of ['po_attachments', 'po_items', 'purchase_orders', 'guide_entries',
                    'item_order_days', 'item_locations', 'shop_sections',
                    'vendor_item_location_prices', 'price_history', 'par_history',
                    'vendor_items', 'inventory_items', 'vendor_locations', 'vendors',
                    'reminders', 'purchase_requests']) {
-    const { error } = await db.from(t).delete().eq('org_id', ORG);
-    if (error) die(`wipe ${t}`, error);
+    if (t === 'vendor_item_location_prices') {
+      // composite PK, tiny table — one statement is fine
+      const { error } = await db.from(t).delete().eq('org_id', ORG);
+      if (error) die(`wipe ${t}`, error);
+      continue;
+    }
+    let total = 0;
+    for (;;) {
+      const { data: ids, error: selErr } = await db.from(t).select('id').eq('org_id', ORG).limit(1000);
+      if (selErr) die(`wipe ${t} (select)`, selErr);
+      if (!ids.length) break;
+      const { error } = await db.from(t).delete().in('id', ids.map((r) => r.id));
+      if (error) die(`wipe ${t}`, error);
+      total += ids.length;
+      process.stdout.write(`\rwipe ${t}: ${total}   `);
+    }
+    if (total) console.log();
   }
 }
 

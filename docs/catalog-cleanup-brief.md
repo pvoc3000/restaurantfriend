@@ -1,68 +1,77 @@
-# Build brief: Catalog admin + Cleanup queue
+# Build brief: Catalog admin + Cleanup queue — v2
 
-**Context:** Migration is loaded (80 vendors, 790 items, 2,888 vendor items, 1,237
-item-location rows, full PO history). `Catalog-Audit.xlsx` found 465 active
-item/location rows whose ordering math is broken. This brief covers the screens
-Mark needs to fix them — the "web catalog admin" phase from docs/master-plan.md.
-Read docs/purchasing-spec.md §4.1/§4.5-4.8 first; follow CLAUDE.md conventions.
+**v2 changes (2026-07-21, after schema 003):** multi-favorite plan rows are now
+real (§A below) — the guide and editors must handle them; and the cleanup queue
+gains PO-history-driven triage (§B) so Mark can bulk-deactivate dead catalog
+instead of "fixing" it. If v1 of this brief is already built, §A and §B are the
+delta. Read docs/purchasing-spec.md + CLAUDE.md first; migration 003
+(`supabase/migrations/003_multi_favorites.sql`) documents the new semantics.
 
-## Priority 1 — Cleanup page (`/cleanup`)
+## A. Multi-favorite plan rows (schema 003)
 
-A queue that computes the problem list **live from the database** (do NOT import
-the audit spreadsheet — same checks, fresh data, count burns down as Mark works):
+`item_order_days` is now unique on (item_location, weekday, **vendor_item**) —
+an item can have several favorited vendor items on the same weekday. The data
+loaded this way: 10,462 plan rows, ~2,370 day-groups with >1 line. Two intents:
 
-For every active `item_locations` row (joined to active `inventory_items`), flag:
+- multi-vendor sourcing (same need, pick source on the fly — "Soap, Hand" from
+  Restaurant Depot / Unified Paper)
+- pack-size variants (CS + EA of the same product; 3-gal + 1.5-gal ice cream)
 
-1. `default_vendor_item_id is null` → **"No default vendor item"**
-2. default vendor item exists but `vendor_items.is_active = false` (or its vendor
-   is inactive) → **"Default vendor item inactive"**
-3. default vendor item has `package_content is null` → **"No package content"**
-4. default vendor item has `price is null or price = 0` → **"No price"**
-5. `default_par is null` → **"No par"** (lowest priority — some items genuinely
-   have no par; provide a "no par needed" dismissal that just leaves it null and
-   remembers dismissal, e.g. a `cleanup_dismissed` flag in `item_locations.note`
-   is NOT acceptable — add a proper `par_not_needed boolean default false` column
-   via a new migration if dismissal is wanted, or simply let Mark ignore the tab)
+Consequences for UI:
 
-UI: tabs or filter chips per problem type with counts; table rows = item name,
-location, category, default vendor (if any), the specific problem; clicking a row
-opens the fix affordance **inline or in a drawer** — never navigate away from the
-queue. Fixing one problem re-evaluates the row (it may have two problems).
+1. **Order guide (when built): group lines by inventory item.** Item header row
+   (name, section, item par); one child line per plan row (vendor, description,
+   package, price, qty box). `v_order_guide` already emits one row per plan row.
+2. **`par_qty` on a plan row = per-LINE par** (rare; item-level
+   `item_locations.default_par` is the group total). Don't sum line pars into
+   the item par — they're overrides for specific lines only.
+3. **Favorites editor** (item detail, per location): the item's vendor items in
+   a weekday × vendor-item grid of checkboxes mirroring FMP's favorites row;
+   writes plan rows. Include "all days" toggle per vendor item.
+4. **Splitting guidance** (help text on the favorites editor, one line): if the
+   variants are substitutes (either one fills the need) keep one item with
+   multiple favorites; if they're distinct needs (flavors each deserving their
+   own par/on-hand, e.g. San Pellegrino flavors) split into separate items.
+   A "split" helper is NOT required for v1 — Mark will split by hand: create
+   item, repoint vendor item, set par.
 
-## Priority 2 — the fix affordances the queue needs
+## B. Cleanup queue: add last-ordered triage
 
-1. **Assign default vendor item** (fixes #1, #2): searchable picker of the item's
-   vendor items (show vendor name, description, package, price, active badge);
-   option to search ALL vendor items and link one to this item; writes
-   `item_locations.default_vendor_item_id`. Also offer "deactivate this item
-   here" (`item_locations.is_active = false`) and "deactivate item everywhere"
-   (`inventory_items.is_active = false`) — many of the 237 are dead items.
-2. **Package content editor** (fixes #3): on the vendor item — inputs for
-   amount × size + unit with live math preview ("1 × 50 lbs = 50 lbs per BAG →
-   $0.43/lb"), writes `vendor_items.package_content` (numeric, in the inventory
-   item's `base_unit`). Show the item's base_unit prominently; warn if the
-   entered unit family can't convert to it.
-3. **Price editor** (fixes #4): plain numeric edit on `vendor_items.price`
-   (the DB trigger logs price_history automatically — no extra work).
-4. **Par editor** (fixes #5): numeric par in base units on
-   `item_locations.default_par`; show the FMP-era par text if helpful — it's
-   gone from the DB (deliberately), so just leave a free-text placeholder like
-   "e.g. 100 (lbs)".
+The queue's biggest waste-of-time risk is Mark hand-fixing items he stopped
+ordering years ago. PO history is loaded — use it:
 
-## Priority 3 — general catalog admin (grow from the above)
+1. Add a **"Last ordered"** column to the cleanup queue and items list:
+   `max(purchase_orders.order_date)` over the item's vendor items' po_items at
+   that location (one query/view, not N+1 — consider a small SQL view
+   `v_item_last_ordered(item_location_id, last_order_date)`).
+2. Add filter chips: **never ordered** (37 active rows) · **2+ years** (143) ·
+   **1-2 years** (80) · **within a year** (650).
+3. Add **bulk select + "Deactivate selected"** (sets `item_locations.is_active
+   = false`; separate action for `inventory_items.is_active = false` when the
+   item is inactive at ALL locations — offer as a follow-up prompt).
+4. Suggested flow shown in the UI: triage stale rows first, then fix what's
+   left. The queue counts should visibly shrink.
 
-- Items list (search, category filter, active filter) → item detail with its
-  vendor items and per-location rows.
-- Vendor items list per vendor (extends existing vendor pages).
-- Keep bulk-ness in mind: multi-select + "deactivate selected" on the items list
-  is the single highest-value bulk action for cleanup.
+## C. Cleanup queue checks (unchanged from v1)
+
+Live-computed per active item_location (joined to active inventory_items):
+no default vendor item · default VI inactive (or its vendor inactive) ·
+default VI missing package_content · default VI price null/0 · default_par
+null (lowest priority, ignorable). Fix affordances inline/drawer: default-VI
+picker (searchable, with deactivate shortcuts), package-content editor with
+live math preview and unit-family warning, price edit (trigger logs history),
+par edit in base units.
+
+## D. General catalog admin (unchanged from v1)
+
+Items list (search/category/active/last-ordered) → item detail (vendor items,
+per-location rows, favorites editor). Vendor items per vendor. Multi-select
+deactivate on the items list.
 
 ## Rules
 
-- All writes go through supabase-js with RLS as the signed-in user (owner) — no
-  service_role in the web app, ever.
-- Location context matters: the cleanup queue is **per current location** by
-  default with an "all locations" toggle (same item may be broken at DF01 but
-  fine at DF02).
-- No new tables needed. If you find yourself wanting one, stop and flag it.
-- Update CLAUDE.md's status section when this ships.
+- All writes via supabase-js as the signed-in user under RLS — never service_role.
+- Cleanup queue is per current location with an "all locations" toggle.
+- No new tables without flagging it first. Small SQL views are fine (add as a
+  numbered migration).
+- Update CLAUDE.md status when shipped.
