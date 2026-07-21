@@ -27,7 +27,7 @@ migration/             FMP → Postgres import scripts (coming soon)
 ## 2. First-time git setup (run once, in Terminal)
 
 ```bash
-cd "/Users/mark/Developer/Claude/DF Operations/restaurantfriend"
+cd "/Users/mark/Developer/Claude/DF Operations/Restaurant Friend"
 git init
 git add .
 git commit -m "Initial schema + docs"
@@ -35,6 +35,8 @@ git branch -M main
 git remote add origin https://github.com/pvoc3000/restaurantfriend.git
 git push -u origin main
 ```
+
+✅ Done — repo is live at https://github.com/pvoc3000/restaurantfriend
 
 (If git asks who you are first:
 `git config --global user.name "Mark Trombino"` and

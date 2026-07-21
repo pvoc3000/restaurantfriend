@@ -1,0 +1,97 @@
+# restaurantfriend — project brief for Claude Code
+
+Multi-location restaurant operations platform replacing a 13-year-old FileMaker
+Pro solution ("DF Operations") for Donut Friend (donutfriend.com), module by
+module. **First module: Purchasing** (order guide → POs → receiving).
+The owner/developer is Mark: fluent in SwiftUI (built "Empty Basket"), new to
+web/TS/SQL — explain non-obvious choices briefly; prefer boring, conventional
+solutions over clever ones.
+
+**Read `docs/purchasing-spec.md` before designing or changing any purchasing
+feature.** `docs/master-plan.md` has the overall roadmap.
+
+## Stack & state
+
+- **Supabase** hosted project `kltxioacvneshbyhxtaj` (Postgres + Auth + Storage
+  + Edge Functions). Schema `supabase/migrations/001_initial_schema.sql` is
+  APPLIED to the hosted DB. One org (Donut Friend), 6 locations seeded
+  (DF01, DF02 active; EVENT is virtual). Mark has an auth user + `org_members`
+  owner row.
+- **Web app** (`web/`, to be scaffolded): Next.js (App Router) + TypeScript +
+  Tailwind + `@supabase/supabase-js` + `@supabase/ssr`. This is the POWER TOOL —
+  it replaces FMP's desktop layouts: dense, inline-editable tables, bulk
+  operations, keyboard-friendly. Not a mobile-first marketing site.
+- **SwiftUI iPad/iPhone app**: phase 5, NOT yet. Do not create an Xcode project.
+
+## Build sequence (locked — do not reorder)
+
+1. ✅ Schema + RLS applied
+2. Web skeleton: auth (email/password), org/location context, vendor list page
+3. FMP → Postgres migration scripts (`migration/`), then web catalog admin
+   (vendors, vendor items, inventory items, pars, shop sections) used to clean
+   migrated data
+4. Web order guide + PO generation/processing + receiving (real Monday orders)
+5. SwiftUI floor app (only after 4 is proven in real use)
+
+## Non-negotiable design rules
+
+1. **Multi-tenant-ready**: every table has `org_id`; all queries flow through
+   RLS (org-scoped policies exist). Never bypass RLS from the web app; the
+   `service_role` key is for local migration scripts only and must never appear
+   in `web/` or in git.
+2. **Zero business hardcoding**: business names, billing entity, PO number
+   format, email templates, terminology live in `orgs.settings` /
+   `locations.settings` jsonb — never in code. (The old system hardcoded
+   "The Donut Friend Team" into a script; we don't.)
+3. **Location context**: the user is always "working at" one active location
+   (persisted per user in `org_members.last_active_location_id`); every
+   location-scoped screen filters by it; switching is a 2-tap header control.
+4. **The order guide is the VIEW `v_order_guide`** — never materialize it into
+   a table, never cache-and-sync. This rule exists because the FMP version did
+   the opposite and it was the single worst source of bugs and slowness.
+5. **Units discipline**: pars and on-hand counts are in the inventory item's
+   `base_unit` (lbs, each…); order quantities are in PACKAGES of the chosen
+   vendor item; `vendor_items.package_content` converts. Suggested qty =
+   `ceil((par − on_hand) / package_content)` — always editable, never forced.
+6. Price resolution: `vendor_item_location_prices` override → `vendor_items.price`.
+   Price and par changes are logged automatically by DB triggers — don't log in
+   app code.
+
+## Conventions
+
+- Weekdays: ISO smallint, 1 = Monday … 7 = Sunday (all ordering currently
+  happens Monday; don't foreground the day dimension in UI).
+- Roles: owner / admin / purchaser / staff (in `org_members.role`).
+  Staff can create purchase requests + guide entries; catalog/PO writes need
+  purchaser+.
+- Guide quantity three-state (from FMP, deliberately preserved): entered (>0),
+  explicitly zeroed (0), untouched (null). Render distinctly (green/red/neutral).
+- Secrets: `web/.env.local` only (gitignored). `NEXT_PUBLIC_SUPABASE_URL` =
+  https://kltxioacvneshbyhxtaj.supabase.co, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+  from Supabase Studio → Settings → API. Ask Mark to paste it; never commit it.
+- Git: small commits, plain messages. Mark reviews on GitHub.
+
+## Domain cheat-sheet (why screens look the way they do)
+
+- The order guide walks the physical shop: grouped by `shop_sections`
+  (sort_order, e.g. "31 Storage - R1 S1"), item headers show par, vendor items
+  nested with pack + unit price ($/oz comparison matters — pack sizes differ).
+- Favorites = the plan row's default vendor item; highlighted, overridable
+  per-line in the moment. The real vendor decision is basket-level: a **vendor
+  totals bar** shows each vendor's running subtotal vs its minimum
+  (`vendor_locations.minimum_order`); an under-minimum vendor simply gets no PO
+  that week (flour is deliberately "ballast" to hit Bakemark's $900 minimum).
+- PO processing by vendor `order_type`: email_po → PDF emailed (edge function,
+  later), online → open vendor URL, in_person → shopping list sorted by shop
+  section. PO PDF spec: docs/purchasing-spec.md §4.9 (no totals on the
+  vendor-facing document — intentional).
+- Receiving: per-line qty_received, invoice photo → Storage, and a one-tap
+  "invoice price differs → update catalog?" flow.
+- Vendors include non-food suppliers (landlord, plumber) — `order_type: none`.
+
+## What NOT to build (deliberately killed or deferred)
+
+Killed: location transfers/packing lists, PO_Type taxonomy, most legacy
+reports, standalone inventory-count UI. Deferred to v2+: order suggestions,
+minimum helper, invoice OCR, spend dashboard, collaborative ordering, offline.
+When in doubt whether a feature belongs, check the spec's kill list or ask Mark.
