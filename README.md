@@ -57,14 +57,16 @@ If anything errors, copy the error text back to me — do not retry with edits.
 ## 4. Create your login (once)
 
 1. Studio sidebar → **Authentication** → **Users** → **Add user** →
-   email `trombino@mac.com` + a password (save it in your password manager).
+   email `mark@donutfriend.com` + a password (save it in your password manager).
+   Use a work address, not a personal one — Studio has no UI to change it later
+   (it takes an Auth Admin API call with the service_role key).
 2. SQL Editor → new query → run:
 
 ```sql
 insert into org_members (org_id, user_id, role, display_name)
 select o.id, u.id, 'owner', 'Mark'
 from orgs o, auth.users u
-where o.name = 'Donut Friend' and u.email = 'trombino@mac.com';
+where o.name = 'Donut Friend' and u.email = 'mark@donutfriend.com';
 ```
 
 That row is what the RLS policies key off — it makes you an owner of the org.
