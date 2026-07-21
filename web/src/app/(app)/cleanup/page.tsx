@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { computeProblems, type CleanupRow, type ProblemKind } from "@/lib/cleanup";
+import { staleBucket, type StaleBucket } from "@/lib/lastOrdered";
 import { CleanupQueue } from "@/components/cleanup/CleanupQueue";
 
 const SELECT = `
-  id, location_id, default_par, default_vendor_item_id,
+  id, location_id, default_par, default_vendor_item_id, inventory_item_id,
   inventory_items!inner ( id, name, category, base_unit ),
   vendor_items ( id, description, brand, package_desc, package_content, price, is_active,
                  vendors ( id, name, is_active ) )
@@ -13,6 +14,8 @@ const SELECT = `
 export type QueueItem = CleanupRow & {
   location_code: string;
   problems: ProblemKind[];
+  last_order_date: string | null;
+  stale: StaleBucket;
 };
 
 export default async function CleanupPage({
@@ -67,21 +70,43 @@ export default async function CleanupPage({
     }
   }
 
+  // Last-ordered dates (brief §B), one query over the view — not N+1. Degrades
+  // gracefully if migration 004 isn't applied yet: no dates, chips just read 0.
+  const lastOrderedByIl = new Map<string, string | null>();
+  if (targetIds.length > 0) {
+    const { data: lo, error: loErr } = await supabase
+      .from("v_item_last_ordered")
+      .select("item_location_id, last_order_date")
+      .in("location_id", targetIds);
+    if (loErr) {
+      console.warn("v_item_last_ordered unavailable (apply migration 004):", loErr.message);
+    } else {
+      for (const r of lo ?? [])
+        lastOrderedByIl.set(r.item_location_id, r.last_order_date);
+    }
+  }
+
+  const today = new Date();
+
   // Only rows with at least one problem enter the queue.
   const items: QueueItem[] = [];
   for (const row of rows) {
     const problems = computeProblems(row);
     if (problems.length === 0) continue;
+    const last_order_date = lastOrderedByIl.get(row.id) ?? null;
     items.push({
       ...row,
       location_code: codeById.get(row.location_id) ?? "?",
       problems,
+      last_order_date,
+      stale: staleBucket(last_order_date, today),
     });
   }
 
   return (
     <CleanupQueue
       items={items}
+      orgId={session.membership.org_id}
       allLocations={allLocations}
       activeLocationCode={session.activeLocation?.code ?? null}
     />

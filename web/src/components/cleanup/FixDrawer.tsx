@@ -6,6 +6,7 @@ import { PROBLEM_LABEL } from "@/lib/cleanup";
 import { UNIT_OPTIONS, packageContent, unitFamily } from "@/lib/units";
 import type { QueueItem } from "@/app/(app)/cleanup/page";
 import { AssignVendorItem } from "./AssignVendorItem";
+import { FavoritesEditor } from "./FavoritesEditor";
 
 function Section({
   title,
@@ -24,11 +25,13 @@ function Section({
 
 export function FixDrawer({
   item,
+  orgId,
   resolved,
   onClose,
   onChanged,
 }: {
   item: QueueItem | null;
+  orgId: string;
   resolved: boolean;
   onClose: () => void;
   onChanged: () => void;
@@ -118,6 +121,17 @@ export function FixDrawer({
                 />
               </Section>
             )}
+
+            {/* Multi-favorite plan rows (brief §A) — orthogonal to the
+                problem checks, shown for any opened item. */}
+            <Section title="Favorites (this location)">
+              <FavoritesEditor
+                itemLocationId={item.id}
+                inventoryItemId={item.inventory_item_id}
+                orgId={orgId}
+                onChanged={onChanged}
+              />
+            </Section>
           </div>
         )}
       </aside>

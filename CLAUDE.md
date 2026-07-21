@@ -36,13 +36,24 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 3. 🚧 FMP → Postgres migration scripts (`migration/`) ✅ loaded; web catalog
    admin in progress. Shipped: `/cleanup` queue (live from DB, per-location +
    all-locations, 5 problem checks, burn-down) with inline fix editors (assign
-   default vendor item, package content w/ unit conversion, price, par). Next:
-   general catalog admin (items list + detail, bulk deactivate — brief P3).
+   default vendor item, package content w/ unit conversion, price, par);
+   multi-favorite plan-row grid editor (schema 003); last-ordered triage
+   (view `v_item_last_ordered`, per-location, staleness chips, bulk-deactivate
+   with "inactive everywhere" follow-up). Next: general catalog admin (items
+   list + detail as a standalone surface — brief §D; the favorites editor
+   currently only reachable via the cleanup drawer, i.e. for broken rows).
 4. Web order guide + PO generation/processing + receiving (real Monday orders)
 5. SwiftUI floor app (only after 4 is proven in real use)
 
-The cleanup work is specced in `docs/catalog-cleanup-brief.md`. Cleanup checks
-live in `web/src/lib/cleanup.ts`; unit conversion in `web/src/lib/units.ts`.
+The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
+multi-favorites + §B last-ordered triage). Cleanup checks live in
+`web/src/lib/cleanup.ts`; unit conversion in `web/src/lib/units.ts`;
+last-ordered buckets in `web/src/lib/lastOrdered.ts`. Schema: migration 003
+makes `item_order_days` unique per (item, weekday, **vendor_item**) — multiple
+favorites per day (multi-vendor sourcing / pack-size variants), so the guide
+groups lines by inventory item and `par_qty` on a plan row is a PER-LINE par.
+Migration 004 adds the last-ordered view (per-location semantics: "last ordered
+AT this location").
 
 ## Non-negotiable design rules
 

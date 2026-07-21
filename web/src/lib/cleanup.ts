@@ -30,6 +30,7 @@ export const PROBLEM_LABEL: Record<ProblemKind, string> = {
 export type CleanupRow = {
   id: string; // item_locations.id
   location_id: string;
+  inventory_item_id: string;
   default_par: number | null;
   default_vendor_item_id: string | null;
   inventory_items: {
