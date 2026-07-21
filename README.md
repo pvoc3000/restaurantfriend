@@ -54,6 +54,10 @@ git push -u origin main
 
 If anything errors, copy the error text back to me — do not retry with edits.
 
+Later migrations run the same way: open the numbered file, paste, Run.
+`002_member_self_service.sql` adds `set_my_member_profile()` — the location
+switcher calls it, so the web app needs it applied.
+
 ## 4. Create your login (once)
 
 1. Studio sidebar → **Authentication** → **Users** → **Add user** →
