@@ -1,0 +1,8 @@
+@import "tailwindcss";
+
+/* Dense power-tool UI: light only for now, system fonts (no webfont fetch). */
+html {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial,
+    sans-serif;
+  color-scheme: light;
+}
