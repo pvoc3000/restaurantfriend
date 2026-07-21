@@ -64,6 +64,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 - Roles: owner / admin / purchaser / staff (in `org_members.role`).
   Staff can create purchase requests + guide entries; catalog/PO writes need
   purchaser+.
+- RLS filters ROWS, not COLUMNS. When the rule is "a user may change *this
+  field* on their own row", write a `security definer` function naming those
+  columns (see `set_my_member_profile`, migration 002) — a self-update policy
+  would also let staff edit their own `role`. Such a function bypasses RLS, so
+  its body must re-check what RLS would have. Every new public-schema function
+  is executable by `anon` via Supabase's default privileges, and revoking from
+  `PUBLIC` does NOT undo that: `revoke all on function … from anon` by name.
 - Guide quantity three-state (from FMP, deliberately preserved): entered (>0),
   explicitly zeroed (0), untouched (null). Render distinctly (green/red/neutral).
 - Secrets: `web/.env.local` only (gitignored). `NEXT_PUBLIC_SUPABASE_URL` =
