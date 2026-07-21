@@ -6,6 +6,7 @@ import type { AppSession } from "@/lib/session";
 const NAV = [
   { href: "/", label: "Home" },
   { href: "/vendors", label: "Vendors" },
+  { href: "/cleanup", label: "Cleanup" },
 ];
 
 export function AppHeader({ session }: { session: AppSession }) {

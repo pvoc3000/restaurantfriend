@@ -17,21 +17,32 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   APPLIED to the hosted DB. One org (Donut Friend), 6 locations seeded
   (DF01, DF02 active; EVENT is virtual). Mark has an auth user + `org_members`
   owner row.
-- **Web app** (`web/`, to be scaffolded): Next.js (App Router) + TypeScript +
+- **Web app** (`web/`, scaffolded): Next.js 16 (App Router) + TypeScript +
   Tailwind + `@supabase/supabase-js` + `@supabase/ssr`. This is the POWER TOOL —
   it replaces FMP's desktop layouts: dense, inline-editable tables, bulk
-  operations, keyboard-friendly. Not a mobile-first marketing site.
+  operations, keyboard-friendly. Not a mobile-first marketing site. Auth +
+  location context live; `/vendors` and `/cleanup` shipped. (Note: Next 16
+  renamed the middleware convention — session refresh lives in `web/src/proxy.ts`.)
+- **Migration** (`migration/`): FMP data is LOADED to the hosted DB — 80 vendors,
+  790 items, 2,888 vendor items, 1,237 item-locations, full PO history. Loader
+  is `migration/load.mjs` (service_role, local only). Transformed JSON lives
+  OUTSIDE the repo (`../../FMP Export/transformed/`, has account numbers).
 - **SwiftUI iPad/iPhone app**: phase 5, NOT yet. Do not create an Xcode project.
 
 ## Build sequence (locked — do not reorder)
 
 1. ✅ Schema + RLS applied
-2. Web skeleton: auth (email/password), org/location context, vendor list page
-3. FMP → Postgres migration scripts (`migration/`), then web catalog admin
-   (vendors, vendor items, inventory items, pars, shop sections) used to clean
-   migrated data
+2. ✅ Web skeleton: auth (email/password), org/location context, vendor list
+3. 🚧 FMP → Postgres migration scripts (`migration/`) ✅ loaded; web catalog
+   admin in progress. Shipped: `/cleanup` queue (live from DB, per-location +
+   all-locations, 5 problem checks, burn-down) with inline fix editors (assign
+   default vendor item, package content w/ unit conversion, price, par). Next:
+   general catalog admin (items list + detail, bulk deactivate — brief P3).
 4. Web order guide + PO generation/processing + receiving (real Monday orders)
 5. SwiftUI floor app (only after 4 is proven in real use)
+
+The cleanup work is specced in `docs/catalog-cleanup-brief.md`. Cleanup checks
+live in `web/src/lib/cleanup.ts`; unit conversion in `web/src/lib/units.ts`.
 
 ## Non-negotiable design rules
 
