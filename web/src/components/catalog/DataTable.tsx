@@ -160,17 +160,24 @@ export function DataTable<T>({
                         index === 0 && expand ? (
                           <span className="flex min-w-0 items-center gap-1.5">
                             {expandable ? (
+                              // A bordered box rather than a bare glyph: it
+                              // reads as a control at a glance and gives a
+                              // real click target.
                               <button
                                 type="button"
                                 onClick={() => toggleOpen(key)}
                                 aria-expanded={isOpen}
                                 aria-label={isOpen ? "Collapse row" : "Expand row"}
-                                className="shrink-0 rounded px-0.5 text-xs text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+                                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[10px] leading-none transition-colors ${
+                                  isOpen
+                                    ? "border-neutral-400 bg-neutral-200 text-neutral-900"
+                                    : "border-neutral-300 bg-white text-neutral-600 hover:border-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+                                }`}
                               >
-                                {isOpen ? "▾" : "▸"}
+                                {isOpen ? "▼" : "▶"}
                               </button>
                             ) : (
-                              <span aria-hidden className="w-3 shrink-0" />
+                              <span aria-hidden className="w-5 shrink-0" />
                             )}
                             <span className="min-w-0 shrink-0 truncate">{cell}</span>
                             {/* A summary that returns nothing renders nothing —
