@@ -3,6 +3,7 @@
 // Defaults are omitted from the query string to keep the bare /items URL clean.
 
 import { STALE_ORDER, type StaleBucket } from "./lastOrdered";
+import { withFrom } from "./breadcrumbs";
 
 export type ActiveFilter = "active" | "inactive" | "all";
 export type StaleFilter = StaleBucket | "any";
@@ -86,11 +87,9 @@ export function itemsHref(filters: ItemFilters): string {
 }
 
 /**
- * Item detail carries the list's filters through so its back link can restore
- * them — the browser Back button works either way, but the in-page link is the
- * one people actually click.
+ * Item detail records the filtered list as its breadcrumb, so the trail leads
+ * back to the exact view you left rather than to a reset list.
  */
 export function itemDetailHref(id: string, filters: ItemFilters): string {
-  const query = itemFiltersToQuery(filters);
-  return query ? `/items/${id}?${query}` : `/items/${id}`;
+  return withFrom(`/items/${id}`, { href: itemsHref(filters), label: "Inventory" });
 }

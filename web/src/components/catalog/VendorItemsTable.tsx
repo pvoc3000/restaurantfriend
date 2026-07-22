@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { unitPriceLabel, type CatalogVendorItem } from "@/lib/catalog";
+import { unitPrice, unitPriceLabel, type CatalogVendorItem } from "@/lib/catalog";
+import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
+import { DataTable, type DataColumn } from "./DataTable";
 
 // On the vendor screen each row belongs to a different inventory item, so the
 // query embeds the item; on the item screen that column is redundant.
@@ -13,7 +15,8 @@ export type VendorItemWithItem = CatalogVendorItem & {
 
 /**
  * Inline-editable vendor-item grid, shared by item detail (all vendors for one
- * item) and vendor detail (all items for one vendor).
+ * item) and vendor detail (all items for one vendor). Sorting and column
+ * resizing come from DataTable, same as every other list.
  *
  * Price edits go straight to vendor_items.price — the DB trigger writes the
  * price history, so nothing is logged here (CLAUDE.md rule 6). package_content
@@ -26,184 +29,193 @@ export function VendorItemsTable({
   showVendor = false,
   showItem = false,
   scroll = false,
+  from,
 }: {
   vendorItems: VendorItemWithItem[];
   baseUnit?: string;
   showVendor?: boolean;
   showItem?: boolean;
-  /**
-   * Give the table its own scroll pane with a sticky header, so a vendor with
-   * hundreds of items doesn't push its own config off the top of the screen.
-   */
+  /** Own scroll pane with a sticky header — for vendors with hundreds of items. */
   scroll?: boolean;
+  /** Where links out of this table should return to. */
+  from?: Crumb;
 }) {
-  if (vendorItems.length === 0) {
-    return (
-      <p className="text-sm text-neutral-600">
-        No vendor items yet. The cleanup drawer&apos;s vendor-item picker can link
-        an existing one to this item.
-      </p>
-    );
-  }
+  const unitFor = (vi: VendorItemWithItem) =>
+    vi.inventory_items?.base_unit ?? baseUnit ?? "unit";
 
-  // The pane takes what's left of the viewport under the header and per-location
-  // config, with a floor so it stays usable on a short window. 27rem is what
-  // sits above it for a typical vendor; one with many locations can still leave
-  // the page itself slightly scrollable, which is harmless — the wheel over the
-  // pane always scrolls the pane.
-  const wrapper = scroll
-    ? "max-h-[calc(100vh-27rem)] min-h-64 overflow-auto rounded border border-neutral-200"
-    : "overflow-x-auto";
+  const link = (href: string) => (from ? withFrom(href, from) : href);
 
-  // A sticky row inside border-collapse loses its bottom border as it detaches,
-  // so the divider is drawn with an inset shadow on the cells instead.
-  const headCell = scroll
-    ? "sticky top-0 z-10 bg-white px-2 py-1 font-medium shadow-[inset_0_-1px_0_#d4d4d4]"
-    : "px-2 py-1 font-medium";
+  const columns: DataColumn<VendorItemWithItem>[] = [
+    ...(showVendor
+      ? [
+          {
+            key: "vendor",
+            label: "Vendor",
+            width: 150,
+            sortValue: (vi: VendorItemWithItem) => vi.vendors?.name ?? null,
+            render: (vi: VendorItemWithItem) => (
+              <>
+                {vi.vendors ? (
+                  <Link
+                    href={link(`/vendors/${vi.vendors.id}`)}
+                    className="text-blue-700 hover:underline"
+                  >
+                    {vi.vendors.name}
+                  </Link>
+                ) : (
+                  "—"
+                )}
+                {vi.vendors && !vi.vendors.is_active && (
+                  <span className="ml-1 rounded bg-neutral-200 px-1 text-xs text-neutral-600">
+                    vendor inactive
+                  </span>
+                )}
+              </>
+            ),
+          },
+        ]
+      : []),
+    ...(showItem
+      ? [
+          {
+            key: "item",
+            label: "Item",
+            width: 170,
+            sortValue: (vi: VendorItemWithItem) => vi.inventory_items?.name ?? null,
+            render: (vi: VendorItemWithItem) =>
+              vi.inventory_items ? (
+                <Link
+                  href={link(`/items/${vi.inventory_items.id}`)}
+                  className="text-blue-700 hover:underline"
+                >
+                  {vi.inventory_items.name}
+                </Link>
+              ) : (
+                <span className="text-amber-700">unlinked</span>
+              ),
+          },
+        ]
+      : []),
+    {
+      key: "product_id",
+      label: "Product ID",
+      width: 110,
+      sortValue: (vi) => vi.product_id,
+      render: (vi) => (
+        <InlineValue table="vendor_items" id={vi.id} column="product_id" value={vi.product_id} />
+      ),
+    },
+    {
+      key: "brand",
+      label: "Brand",
+      width: 110,
+      sortValue: (vi) => vi.brand,
+      render: (vi) => (
+        <InlineValue table="vendor_items" id={vi.id} column="brand" value={vi.brand} />
+      ),
+    },
+    {
+      key: "description",
+      label: "Description",
+      width: 260,
+      sortValue: (vi) => vi.description,
+      render: (vi) => (
+        <InlineValue table="vendor_items" id={vi.id} column="description" value={vi.description} />
+      ),
+    },
+    {
+      key: "package_desc",
+      label: "Pack",
+      width: 80,
+      sortValue: (vi) => vi.package_desc,
+      render: (vi) => (
+        <InlineValue table="vendor_items" id={vi.id} column="package_desc" value={vi.package_desc} />
+      ),
+    },
+    {
+      key: "package_content",
+      label: "Content",
+      width: 90,
+      align: "right",
+      sortValue: (vi) => (vi.package_content === null ? null : Number(vi.package_content)),
+      render: (vi) => (
+        <InlineValue
+          table="vendor_items"
+          id={vi.id}
+          column="package_content"
+          value={vi.package_content}
+          kind="number"
+          align="right"
+        />
+      ),
+    },
+    {
+      key: "price",
+      label: "Price",
+      width: 90,
+      align: "right",
+      sortValue: (vi) => (vi.price === null ? null : Number(vi.price)),
+      render: (vi) => (
+        <InlineValue
+          table="vendor_items"
+          id={vi.id}
+          column="price"
+          value={vi.price}
+          kind="number"
+          align="right"
+        />
+      ),
+    },
+    {
+      key: "unit_price",
+      label: "Unit price",
+      width: 100,
+      align: "right",
+      // Sorts on the number, not the formatted string, so $9 < $10.
+      sortValue: (vi) => unitPrice(vi),
+      render: (vi) => (
+        <span className="text-neutral-500">{unitPriceLabel(vi, unitFor(vi))}</span>
+      ),
+    },
+    {
+      key: "notes",
+      label: "Notes",
+      width: 150,
+      sortValue: (vi) => vi.notes,
+      render: (vi) => (
+        <InlineValue table="vendor_items" id={vi.id} column="notes" value={vi.notes} />
+      ),
+    },
+    {
+      key: "is_active",
+      label: "Active",
+      width: 80,
+      sortValue: (vi) => (vi.is_active ? 0 : 1),
+      render: (vi) => (
+        <ActiveToggle
+          table="vendor_items"
+          id={vi.id}
+          active={vi.is_active}
+          label="Vendor item active"
+        />
+      ),
+    },
+  ];
 
   return (
-    <div className={wrapper}>
-      <table className="min-w-full border-collapse text-sm">
-        <thead>
-          <tr
-            className={`text-left text-neutral-600 ${
-              scroll ? "" : "border-b border-neutral-300"
-            }`}
-          >
-            {showVendor && <th className={headCell}>Vendor</th>}
-            {showItem && <th className={headCell}>Item</th>}
-            <th className={headCell}>Product ID</th>
-            <th className={headCell}>Brand</th>
-            <th className={headCell}>Description</th>
-            <th className={headCell}>Pack</th>
-            <th className={`${headCell} text-right`}>Content</th>
-            <th className={`${headCell} text-right`}>Price</th>
-            <th className={`${headCell} text-right`}>Unit price</th>
-            <th className={headCell}>Notes</th>
-            <th className={headCell}>Active</th>
-          </tr>
-        </thead>
-        <tbody>
-          {vendorItems.map((vi) => {
-            // Unit price is per the ITEM's base unit, which differs per row on
-            // the vendor screen.
-            const unit = vi.inventory_items?.base_unit ?? baseUnit ?? "unit";
-            return (
-              <tr
-                key={vi.id}
-                className={`border-b border-neutral-100 hover:bg-neutral-50 ${
-                  vi.is_active ? "" : "text-neutral-400"
-                }`}
-              >
-                {showVendor && (
-                  <td className="px-2 py-1">
-                    {vi.vendors ? (
-                      <Link
-                        href={`/vendors/${vi.vendors.id}`}
-                        className="text-blue-700 hover:underline"
-                      >
-                        {vi.vendors.name}
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                    {vi.vendors && !vi.vendors.is_active && (
-                      <span className="ml-1 rounded bg-neutral-200 px-1 text-xs text-neutral-600">
-                        vendor inactive
-                      </span>
-                    )}
-                  </td>
-                )}
-                {showItem && (
-                  <td className="px-2 py-1">
-                    {vi.inventory_items ? (
-                      <Link
-                        href={`/items/${vi.inventory_items.id}`}
-                        className="text-blue-700 hover:underline"
-                      >
-                        {vi.inventory_items.name}
-                      </Link>
-                    ) : (
-                      <span className="text-amber-700">unlinked</span>
-                    )}
-                  </td>
-                )}
-                <td className="px-2 py-1 text-neutral-600">
-                  <InlineValue
-                    table="vendor_items"
-                    id={vi.id}
-                    column="product_id"
-                    value={vi.product_id}
-                  />
-                </td>
-                <td className="px-2 py-1 text-neutral-600">
-                  <InlineValue
-                    table="vendor_items"
-                    id={vi.id}
-                    column="brand"
-                    value={vi.brand}
-                  />
-                </td>
-                <td className="px-2 py-1">
-                  <InlineValue
-                    table="vendor_items"
-                    id={vi.id}
-                    column="description"
-                    value={vi.description}
-                  />
-                </td>
-                <td className="px-2 py-1 text-neutral-600">
-                  <InlineValue
-                    table="vendor_items"
-                    id={vi.id}
-                    column="package_desc"
-                    value={vi.package_desc}
-                  />
-                </td>
-                <td className="px-2 py-1 text-right">
-                  <InlineValue
-                    table="vendor_items"
-                    id={vi.id}
-                    column="package_content"
-                    value={vi.package_content}
-                    kind="number"
-                    align="right"
-                  />
-                </td>
-                <td className="px-2 py-1 text-right">
-                  <InlineValue
-                    table="vendor_items"
-                    id={vi.id}
-                    column="price"
-                    value={vi.price}
-                    kind="number"
-                    align="right"
-                  />
-                </td>
-                <td className="px-2 py-1 text-right tabular-nums text-neutral-500">
-                  {unitPriceLabel(vi, unit)}
-                </td>
-                <td className="max-w-48 px-2 py-1 text-neutral-600">
-                  <InlineValue
-                    table="vendor_items"
-                    id={vi.id}
-                    column="notes"
-                    value={vi.notes}
-                  />
-                </td>
-                <td className="px-2 py-1">
-                  <ActiveToggle
-                    table="vendor_items"
-                    id={vi.id}
-                    active={vi.is_active}
-                    label="Vendor item active"
-                  />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      rows={vendorItems}
+      columns={columns}
+      rowKey={(vi) => vi.id}
+      storageKey={`rf.vendorItems.columnWidths.v1${showItem ? ".byVendor" : ".byItem"}`}
+      rowClassName={(vi) => (vi.is_active ? "" : "text-neutral-400")}
+      scroll={scroll}
+      empty={
+        <p className="text-sm text-neutral-600">
+          No vendor items yet. The cleanup drawer&apos;s vendor-item picker can link
+          an existing one to this item.
+        </p>
+      }
+    />
   );
 }

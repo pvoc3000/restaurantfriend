@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
@@ -8,7 +7,9 @@ import {
   type CatalogItem,
   type CatalogVendorItem,
 } from "@/lib/catalog";
-import { itemsHref, parseItemFilters, type RawSearchParams } from "@/lib/itemFilters";
+import type { RawSearchParams } from "@/lib/itemFilters";
+import { currentQuery, parseTrail } from "@/lib/breadcrumbs";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ItemFields } from "@/components/catalog/ItemFields";
 import { ItemLocationRows } from "@/components/catalog/ItemLocationRows";
 import { VendorItemsTable } from "@/components/catalog/VendorItemsTable";
@@ -33,9 +34,11 @@ export default async function ItemDetailPage({
   searchParams: Promise<RawSearchParams>;
 }) {
   const { id } = await params;
-  // The list's filters ride along in the query string so "← Inventory" returns to
-  // the same filtered view instead of resetting to everything.
-  const backHref = itemsHref(parseItemFilters(await searchParams));
+  // The trail follows the route actually taken — reaching this item from a
+  // vendor's item list must lead back to that vendor, not to the Inventory list.
+  const rawParams = await searchParams;
+  const trail = parseTrail(rawParams, { href: "/items", label: "Inventory" });
+  const queryString = currentQuery(rawParams);
   const session = await getAppSession();
   const supabase = await createClient();
 
@@ -67,11 +70,7 @@ export default async function ItemDetailPage({
 
   return (
     <div className="space-y-6">
-      <div className="text-sm">
-        <Link href={backHref} className="text-blue-700 hover:underline">
-          ← Inventory
-        </Link>
-      </div>
+      <Breadcrumbs trail={trail} current={row.name} />
 
       <ItemFields item={row} />
 
@@ -106,6 +105,7 @@ export default async function ItemDetailPage({
             vendorItems={(vendorItems ?? []) as unknown as CatalogVendorItem[]}
             baseUnit={row.base_unit}
             showVendor
+            from={{ href: `/items/${id}${queryString}`, label: row.name }}
           />
         )}
       </section>

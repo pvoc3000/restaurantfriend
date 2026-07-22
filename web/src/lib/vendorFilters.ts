@@ -5,6 +5,7 @@
 
 import type { RawSearchParams } from "./itemFilters";
 import type { SortDir } from "./tableSort";
+import { withFrom } from "./breadcrumbs";
 
 export type ActiveFilter = "active" | "inactive" | "all";
 
@@ -73,7 +74,10 @@ export function vendorsHref(filters: VendorFilters): string {
   return query ? `/vendors?${query}` : "/vendors";
 }
 
+/**
+ * Vendor detail records the filtered list as its breadcrumb, so the trail leads
+ * back to the exact view you left rather than to a reset list.
+ */
 export function vendorDetailHref(id: string, filters: VendorFilters): string {
-  const query = vendorFiltersToQuery(filters);
-  return query ? `/vendors/${id}?${query}` : `/vendors/${id}`;
+  return withFrom(`/vendors/${id}`, { href: vendorsHref(filters), label: "Vendors" });
 }

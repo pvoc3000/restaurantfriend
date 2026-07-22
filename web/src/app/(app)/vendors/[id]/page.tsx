@@ -1,22 +1,15 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { money, VENDOR_ITEM_SELECT } from "@/lib/catalog";
+import { VENDOR_ITEM_SELECT } from "@/lib/catalog";
 import type { RawSearchParams } from "@/lib/itemFilters";
-import { parseVendorFilters, vendorsHref } from "@/lib/vendorFilters";
+import { currentQuery, parseTrail } from "@/lib/breadcrumbs";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { VendorLocationsTable } from "@/components/catalog/VendorLocationsTable";
 import {
   VendorItemsTable,
   type VendorItemWithItem,
 } from "@/components/catalog/VendorItemsTable";
-
-// ISO weekdays, 1 = Monday (CLAUDE.md).
-const DAY_LABELS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
-
-function days(list: number[] | null) {
-  if (!list || list.length === 0) return "—";
-  return [...list].sort((a, b) => a - b).map((d) => DAY_LABELS[d - 1] ?? d).join(" ");
-}
 
 type VendorLocationRow = {
   location_id: string;
@@ -45,9 +38,11 @@ export default async function VendorDetailPage({
   searchParams: Promise<RawSearchParams>;
 }) {
   const { id } = await params;
-  // The list's filters ride along in the query string so "← Vendors" returns to
-  // the same filtered view instead of resetting to everything.
-  const backHref = vendorsHref(parseVendorFilters(await searchParams));
+  // The trail follows the route actually taken (the list's filters ride along
+  // inside the recorded href), falling back to the section for a pasted URL.
+  const rawParams = await searchParams;
+  const trail = parseTrail(rawParams, { href: "/vendors", label: "Vendors" });
+  const queryString = currentQuery(rawParams);
   const session = await getAppSession();
   const supabase = await createClient();
 
@@ -80,14 +75,12 @@ export default async function VendorDetailPage({
 
   const v = vendor as unknown as Vendor;
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
+  // Links out of this page come back here, with the trail so far intact.
+  const here = { href: `/vendors/${id}${queryString}`, label: v.name };
 
   return (
     <div className="space-y-6">
-      <div className="text-sm">
-        <Link href={backHref} className="text-blue-700 hover:underline">
-          ← Vendors
-        </Link>
-      </div>
+      <Breadcrumbs trail={trail} current={v.name} />
 
       <div className="flex flex-wrap items-baseline gap-3">
         <h1 className="text-xl font-semibold">{v.name}</h1>
@@ -111,55 +104,11 @@ export default async function VendorDetailPage({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
           Per-location config
         </h2>
-        {v.vendor_locations.length === 0 ? (
-          <p className="text-sm text-neutral-600">
-            Not configured at any location yet.
-          </p>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border-collapse text-sm">
-              <thead>
-                <tr className="border-b border-neutral-300 text-left text-neutral-600">
-                  <th className="px-2 py-1 font-medium">Location</th>
-                  <th className="px-2 py-1 font-medium">Account</th>
-                  <th className="px-2 py-1 font-medium text-right">Minimum</th>
-                  <th className="px-2 py-1 font-medium">Order days</th>
-                  <th className="px-2 py-1 font-medium">Delivery days</th>
-                  <th className="px-2 py-1 font-medium">Active</th>
-                </tr>
-              </thead>
-              <tbody>
-                {v.vendor_locations.map((vl) => (
-                  <tr key={vl.location_id} className="border-b border-neutral-100">
-                    <td className="px-2 py-1">
-                      {codeById.get(vl.location_id) ?? "—"}
-                      {vl.location_id === session.activeLocation?.id && (
-                        <span className="ml-1.5 rounded bg-blue-100 px-1 text-xs text-blue-800">
-                          here
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-2 py-1 text-neutral-600">
-                      {vl.account_number ?? "—"}
-                    </td>
-                    <td className="px-2 py-1 text-right tabular-nums text-neutral-600">
-                      {money(vl.minimum_order)}
-                    </td>
-                    <td className="px-2 py-1 tabular-nums text-neutral-600">
-                      {days(vl.order_days)}
-                    </td>
-                    <td className="px-2 py-1 tabular-nums text-neutral-600">
-                      {days(vl.delivery_days)}
-                    </td>
-                    <td className="px-2 py-1 text-neutral-600">
-                      {vl.is_active ? "yes" : "no"}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <VendorLocationsTable
+          rows={v.vendor_locations}
+          codeById={Object.fromEntries(codeById)}
+          activeLocationId={session.activeLocation?.id ?? null}
+        />
       </section>
 
       <section className="space-y-2">
@@ -178,6 +127,7 @@ export default async function VendorDetailPage({
             vendorItems={(vendorItems ?? []) as unknown as VendorItemWithItem[]}
             showItem
             scroll
+            from={here}
           />
         )}
       </section>
