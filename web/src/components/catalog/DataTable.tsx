@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useState, type ReactNode } from "react";
 import { makeComparator, nextSortDir, type SortDir, type SortValue } from "@/lib/tableSort";
 import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
 import { ColumnHeader } from "./ColumnHeader";
@@ -37,6 +37,7 @@ export function DataTable<T>({
   scroll = false,
   maxHeightClass,
   empty,
+  expand,
 }: {
   rows: T[];
   columns: DataColumn<T>[];
@@ -48,6 +49,17 @@ export function DataTable<T>({
   scroll?: boolean;
   maxHeightClass?: string;
   empty?: ReactNode;
+  /**
+   * Makes rows expandable: a chevron joins the first cell, and `render` fills a
+   * full-width panel below the row. `summary` shows what's inside without
+   * opening it — a disclosure that looks identical on every row tells you
+   * nothing about which ones are worth a click.
+   */
+  expand?: {
+    render: (row: T) => ReactNode;
+    summary?: (row: T) => ReactNode;
+    canExpand?: (row: T) => boolean;
+  };
 }) {
   const defaultWidths = useMemo<ColumnWidths>(
     () => Object.fromEntries(columns.map((c) => [c.key, c.width])),
@@ -60,6 +72,16 @@ export function DataTable<T>({
   const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(
     defaultSort ? { key: defaultSort.key, dir: defaultSort.dir ?? "asc" } : null
   );
+  const [open, setOpen] = useState<Set<string>>(new Set());
+
+  function toggleOpen(key: string) {
+    setOpen((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
 
   const sorted = useMemo(() => {
     if (!sort) return rows;
@@ -117,25 +139,75 @@ export function DataTable<T>({
             </tr>
           </thead>
           <tbody>
-            {sorted.map((row) => (
-              <tr
-                key={rowKey(row)}
-                className={`border-b border-neutral-100 hover:bg-neutral-50 ${
-                  rowClassName?.(row) ?? ""
-                }`}
-              >
-                {columns.map((col) => (
-                  <td
-                    key={col.key}
-                    className={`px-2 py-1 ${col.wrap ? "" : "truncate"} ${
-                      col.align === "right" ? "text-right tabular-nums" : ""
+            {sorted.map((row) => {
+              const key = rowKey(row);
+              const expandable = expand !== undefined && (expand.canExpand?.(row) ?? true);
+              const isOpen = expandable && open.has(key);
+
+              return (
+                <Fragment key={key}>
+                  <tr
+                    className={`border-b border-neutral-100 hover:bg-neutral-50 ${
+                      rowClassName?.(row) ?? ""
                     }`}
                   >
-                    {col.render(row)}
-                  </td>
-                ))}
-              </tr>
-            ))}
+                    {columns.map((col, index) => {
+                      const cell = col.render(row);
+                      // The chevron and summary ride in the first cell so the
+                      // disclosure reads as part of the row's identity rather
+                      // than as another column.
+                      const content =
+                        index === 0 && expand ? (
+                          <span className="flex min-w-0 items-center gap-1.5">
+                            {expandable ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleOpen(key)}
+                                aria-expanded={isOpen}
+                                aria-label={isOpen ? "Collapse row" : "Expand row"}
+                                className="shrink-0 rounded px-0.5 text-xs text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+                              >
+                                {isOpen ? "▾" : "▸"}
+                              </button>
+                            ) : (
+                              <span aria-hidden className="w-3 shrink-0" />
+                            )}
+                            <span className="min-w-0 shrink-0 truncate">{cell}</span>
+                            {/* A summary that returns nothing renders nothing —
+                                no placeholder eating the row's width. */}
+                            {expand.summary?.(row) && (
+                              <span className="min-w-0 truncate text-xs text-neutral-400">
+                                {expand.summary(row)}
+                              </span>
+                            )}
+                          </span>
+                        ) : (
+                          cell
+                        );
+
+                      return (
+                        <td
+                          key={col.key}
+                          className={`px-2 py-1 ${col.wrap ? "" : "truncate"} ${
+                            col.align === "right" ? "text-right tabular-nums" : ""
+                          }`}
+                        >
+                          {content}
+                        </td>
+                      );
+                    })}
+                  </tr>
+
+                  {isOpen && expand && (
+                    <tr className="border-b border-neutral-100 bg-neutral-50">
+                      <td colSpan={columns.length} className="px-2 py-3">
+                        {expand.render(row)}
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>

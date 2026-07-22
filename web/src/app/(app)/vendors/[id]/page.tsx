@@ -20,6 +20,9 @@ type VendorLocationRow = {
   order_days: number[] | null;
   delivery_days: number[] | null;
   is_active: boolean;
+  sales_rep: string | null;
+  rep_phone: string | null;
+  rep_email: string | null;
 };
 
 type Vendor = {
@@ -58,7 +61,8 @@ export default async function VendorDetailPage({
         .select(
           `id, name, vendor_type, order_type, url, is_active,
            vendor_locations ( id, location_id, account_number, minimum_order,
-                              order_days, delivery_days, is_active )`
+                              order_days, delivery_days, is_active,
+                              sales_rep, rep_phone, rep_email )`
         )
         .eq("id", id)
         .maybeSingle(),

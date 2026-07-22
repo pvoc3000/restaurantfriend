@@ -21,7 +21,23 @@ export type VendorLocationRow = {
   order_days: number[] | null;
   delivery_days: number[] | null;
   is_active: boolean;
+  sales_rep: string | null;
+  rep_phone: string | null;
+  rep_email: string | null;
 };
+
+/**
+ * Rep fields live behind the disclosure; this is what you see without opening.
+ * Nothing is shown when there's no rep — a "none" on every row would cost the
+ * width that makes the summary useful on the rows that do have one.
+ */
+function repSummary(row: VendorLocationRow) {
+  // Falls back to the email: plenty of migrated rows have only that, and a row
+  // with contact details must never look empty from the outside.
+  const parts = [row.sales_rep, row.rep_phone].filter(Boolean);
+  if (parts.length === 0 && row.rep_email) return row.rep_email;
+  return parts.length > 0 ? parts.join(" · ") : null;
+}
 
 /**
  * A vendor's per-location config — account, minimum and days for each shop.
@@ -41,7 +57,8 @@ export function VendorLocationsTable({
     {
       key: "location",
       label: "Location",
-      width: 130,
+      // Wide enough for the code, the "here" badge and the rep summary.
+      width: 250,
       sortValue: (r) => codeById[r.location_id] ?? null,
       render: (r) => (
         <>
@@ -139,6 +156,43 @@ export function VendorLocationsTable({
       rowKey={(r) => r.location_id}
       storageKey="rf.vendorLocations.columnWidths.v1"
       defaultSort={{ key: "location" }}
+      expand={{
+        summary: repSummary,
+        render: (r) => (
+          <dl className="grid max-w-md grid-cols-[6rem_1fr] gap-x-4 gap-y-1 text-sm">
+            <dt className="py-0.5 text-neutral-500">Sales rep</dt>
+            <dd>
+              <InlineValue
+                table="vendor_locations"
+                id={r.id}
+                column="sales_rep"
+                value={r.sales_rep}
+                placeholder="none"
+              />
+            </dd>
+            <dt className="py-0.5 text-neutral-500">Phone</dt>
+            <dd>
+              <InlineValue
+                table="vendor_locations"
+                id={r.id}
+                column="rep_phone"
+                value={r.rep_phone}
+                placeholder="none"
+              />
+            </dd>
+            <dt className="py-0.5 text-neutral-500">Email</dt>
+            <dd>
+              <InlineValue
+                table="vendor_locations"
+                id={r.id}
+                column="rep_email"
+                value={r.rep_email}
+                placeholder="none"
+              />
+            </dd>
+          </dl>
+        ),
+      }}
       empty={
         <p className="text-sm text-neutral-600">Not configured at any location yet.</p>
       }
