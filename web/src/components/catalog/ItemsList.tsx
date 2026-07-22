@@ -11,6 +11,7 @@ import {
   itemFiltersToQuery,
   type ActiveFilter,
   type ItemFilters,
+  type SortKey,
   type StaleFilter,
 } from "@/lib/itemFilters";
 import type { ItemRow } from "@/app/(app)/items/page";
@@ -20,6 +21,37 @@ const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
   { key: "inactive", label: "Inactive" },
   { key: "all", label: "All" },
 ];
+
+/**
+ * What each sortable column sorts on. Sections sort by their numeric
+ * sort_order, not the display name, so the list follows the physical walk order
+ * of the shop rather than alphabet.
+ */
+function sortValue(item: ItemRow, key: SortKey): string | number | null {
+  const il = item.inventory_item_locations[0] ?? null;
+  const vi = il?.vendor_items ?? null;
+  switch (key) {
+    case "name":
+      return item.name;
+    case "category":
+      return item.category;
+    case "section":
+      return il?.shop_sections?.sort_order ?? null;
+    case "par":
+      return il?.default_par === null || il?.default_par === undefined
+        ? null
+        : Number(il.default_par);
+    case "unit":
+      return item.base_unit;
+    case "vendor":
+      return vi?.vendors?.name ?? null;
+    case "price":
+      return vi?.price === null || vi?.price === undefined ? null : Number(vi.price);
+    case "last":
+      // YYYY-MM-DD sorts chronologically as a string.
+      return item.last_order_date;
+  }
+}
 
 /**
  * The general catalog list (brief §D) — search / category / active /
@@ -74,6 +106,61 @@ export function ItemsList({
       );
     });
   }, [items, filters]);
+
+  // Empty cells sink to the bottom in BOTH directions — flipping the sort to
+  // find the biggest par shouldn't fill the top with items that have no par.
+  const sorted = useMemo(() => {
+    const dir = filters.dir === "asc" ? 1 : -1;
+    return [...visible].sort((a, b) => {
+      const va = sortValue(a, filters.sort);
+      const vb = sortValue(b, filters.sort);
+      if (va === null && vb === null) return a.name.localeCompare(b.name);
+      if (va === null) return 1;
+      if (vb === null) return -1;
+      const primary =
+        typeof va === "number" && typeof vb === "number"
+          ? va - vb
+          : String(va).localeCompare(String(vb), undefined, { numeric: true });
+      // Name is the tiebreaker so equal values keep a stable, readable order.
+      return (primary === 0 ? a.name.localeCompare(b.name) : primary) * dir;
+    });
+  }, [visible, filters.sort, filters.dir]);
+
+  function toggleSort(key: SortKey) {
+    update(
+      filters.sort === key
+        ? { dir: filters.dir === "asc" ? "desc" : "asc" }
+        : { sort: key, dir: "asc" }
+    );
+  }
+
+  // A plain function, not a nested component: <Foo/> defined inside a render
+  // would be a new component type each pass and remount the header every time.
+  function sortHeader(label: string, key: SortKey, align: "left" | "right" = "left") {
+    const on = filters.sort === key;
+    const arrow = on ? (filters.dir === "asc" ? "▲" : "▼") : "";
+    return (
+      <th
+        className={`px-2 py-1 font-medium ${align === "right" ? "text-right" : ""}`}
+        aria-sort={on ? (filters.dir === "asc" ? "ascending" : "descending") : "none"}
+      >
+        <button
+          type="button"
+          onClick={() => toggleSort(key)}
+          title={`Sort by ${label.toLowerCase()}`}
+          className={`inline-flex items-center gap-1 rounded px-1 hover:bg-neutral-100 ${
+            on ? "font-semibold text-neutral-900" : ""
+          }`}
+        >
+          {label}
+          {/* Reserve the arrow's width so headers don't jump when sort moves. */}
+          <span className={`w-3 text-xs ${on ? "" : "text-neutral-300"}`}>
+            {arrow || "↕"}
+          </span>
+        </button>
+      </th>
+    );
+  }
 
   const staleCounts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -268,18 +355,18 @@ export function ItemsList({
                     aria-label="select all"
                   />
                 </th>
-                <th className="px-2 py-1 font-medium">Item</th>
-                <th className="px-2 py-1 font-medium">Category</th>
-                <th className="px-2 py-1 font-medium">Section</th>
-                <th className="px-2 py-1 font-medium text-right">Par</th>
-                <th className="px-2 py-1 font-medium">Unit</th>
-                <th className="px-2 py-1 font-medium">Default vendor item</th>
-                <th className="px-2 py-1 font-medium text-right">Price</th>
-                <th className="px-2 py-1 font-medium">Last ordered</th>
+                {sortHeader("Item", "name")}
+                {sortHeader("Category", "category")}
+                {sortHeader("Section", "section")}
+                {sortHeader("Par", "par", "right")}
+                {sortHeader("Unit", "unit")}
+                {sortHeader("Default vendor item", "vendor")}
+                {sortHeader("Price", "price", "right")}
+                {sortHeader("Last ordered", "last")}
               </tr>
             </thead>
             <tbody>
-              {visible.map((item) => {
+              {sorted.map((item) => {
                 const il = item.inventory_item_locations[0] ?? null;
                 const vi = il?.vendor_items ?? null;
                 return (
