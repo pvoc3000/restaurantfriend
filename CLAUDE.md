@@ -21,7 +21,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   Tailwind + `@supabase/supabase-js` + `@supabase/ssr`. This is the POWER TOOL —
   it replaces FMP's desktop layouts: dense, inline-editable tables, bulk
   operations, keyboard-friendly. Not a mobile-first marketing site. Auth +
-  location context live; `/vendors` and `/cleanup` shipped. (Note: Next 16
+  location context live. Shipped: `/items` (nav label "Inventory") + detail,
+  `/vendors` + detail, `/purchase-orders` + detail, `/cleanup`. (Note: Next 16
   renamed the middleware convention — session refresh lives in `web/src/proxy.ts`.)
 - **Migration** (`migration/`): FMP data is LOADED to the hosted DB — 80 vendors,
   790 items, 2,888 vendor items, 1,237 item-locations, full PO history. Loader
@@ -33,16 +34,21 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 
 1. ✅ Schema + RLS applied
 2. ✅ Web skeleton: auth (email/password), org/location context, vendor list
-3. 🚧 FMP → Postgres migration scripts (`migration/`) ✅ loaded; web catalog
-   admin in progress. Shipped: `/cleanup` queue (live from DB, per-location +
-   all-locations, 5 problem checks, burn-down) with inline fix editors (assign
-   default vendor item, package content w/ unit conversion, price, par);
-   multi-favorite plan-row grid editor (schema 003); last-ordered triage
-   (view `v_item_last_ordered`, per-location, staleness chips, bulk-deactivate
-   with "inactive everywhere" follow-up). Next: general catalog admin (items
-   list + detail as a standalone surface — brief §D; the favorites editor
-   currently only reachable via the cleanup drawer, i.e. for broken rows).
-4. Web order guide + PO generation/processing + receiving (real Monday orders)
+3. ✅ FMP → Postgres migration (`migration/`) loaded; web catalog admin shipped.
+   `/cleanup` queue (live from DB, per-location + all-locations, 5 problem
+   checks, burn-down) with inline fix editors (assign default vendor item,
+   package content w/ unit conversion, price, par); multi-favorite plan-row grid
+   editor (schema 003); last-ordered triage (view `v_item_last_ordered`,
+   per-location, staleness chips, bulk-deactivate with "inactive everywhere"
+   follow-up). Then brief §D: Inventory list + item detail, vendor detail with
+   editable per-location config, vendor items everywhere.
+4. 🚧 Web order guide + PO generation/processing + receiving (real Monday orders).
+   Shipped: `/purchase-orders` list (location-scoped, date window, status chips,
+   totals, selection) and PO detail (ordered-vs-received with dual totals,
+   inline receiving, price reconciliation → catalog). NOT built: **PO generation**
+   (needs the order guide — build that next) and **batch process / email PDF /
+   shopping list** (needs the edge function, deferred). The order guide is the
+   remaining prerequisite for a real Monday order.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -83,6 +89,26 @@ renames, translate via that mapping when reading it.
 
 ## Conventions
 
+- **Every list uses `DataTable`** (`web/src/components/catalog/DataTable.tsx`):
+  sortable headers, drag-resizable columns, optional scroll pane with a sticky
+  header, optional expandable rows. Give it columns + rows; don't hand-roll a
+  `<table>`. Supporting pieces: `ColumnHeader` (the header cell + resize grip),
+  `lib/tableSort.ts` (comparator — empty cells sink last in BOTH directions),
+  `lib/columnWidths.ts` (`useResizableColumns`). `/cleanup` predates this and is
+  deliberately left alone.
+- **View state in the URL, display preferences in localStorage.** Filters and
+  sort describe the view (shareable, survive detail round-trips) → query string,
+  written with `history.replaceState` so a keystroke doesn't re-run the server
+  component. Column widths are personal → localStorage, read via
+  `useSyncExternalStore` (an effect would trip the `set-state-in-effect` lint).
+  A list that persists sort in the URL must pass `sort`/`onSortChange` to
+  `DataTable`, or the header arrow and the URL disagree.
+- **Breadcrumbs follow the route taken**, not a fixed hierarchy (`lib/breadcrumbs.ts`):
+  links stamp `from`, the trail nests, recorded hrefs are trimmed so the URL
+  can't grow unbounded. An item reached from a vendor leads back to that vendor.
+- **Safari:** a table cell under `border-collapse` is NOT a containing block in
+  WebKit — anchor absolutely-positioned children to an inner `<div>`. And see
+  web/README.md on Safari caching a stale dev stylesheet.
 - **Table naming** (migration 005, 2026-07-22): junction/config tables are named
   by their endpoints (`vendor_locations`, `inventory_item_locations`); workflow
   tables by their business concept (`purchase_orders`, `order_guide_plan_days`).
@@ -129,6 +155,27 @@ renames, translate via that mapping when reading it.
 - Receiving: per-line qty_received, invoice photo → Storage, and a one-tap
   "invoice price differs → update catalog?" flow.
 - Vendors include non-food suppliers (landlord, plumber) — `order_type: none`.
+
+## Open threads (pinned by Mark — don't act without asking)
+
+- **"Default vendor item" may be the wrong concept.** Mark's words, 2026-07-22.
+  Today `inventory_item_locations.default_vendor_item_id` is a per-location
+  fallback used only by plan rows with a null `vendor_item_id`; in practice the
+  favorites (`order_guide_plan_days`) decide what the guide emits, and the
+  migrated defaults often point at deactivated vendors (99 rows in the cleanup
+  queue). Revisit before the order guide is built — the guide is what consumes it.
+- **Delete/duplicate vendor items.** Design agreed but not built: a per-row `⋯`
+  menu (not right-click — no touch equivalent, and iPad Safari is the ordering
+  stopgap). Delete must be usage-aware: `price_history` is `on delete cascade`
+  (audit trail lost) and `order_guide_plan_days.vendor_item_id` is `on delete
+  set null` (a favorite silently becomes an invisible "inherit default" row).
+  Offer deactivate for anything ever ordered.
+- **`rep_email` looks mis-mapped by the migration** — Restaurant Depot's rows
+  carry `info@donutfriend.com` (our address, not the vendor's). Check the other
+  79 vendors before trusting the column.
+- **"Last ordered" on the vendor screen** means "this item, at this location,
+  from any vendor" — the Inventory semantics. A true per-vendor-item last-order
+  date needs a small view over `purchase_order_items` (migration 006).
 
 ## What NOT to build (deliberately killed or deferred)
 

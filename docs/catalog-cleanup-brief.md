@@ -1,5 +1,11 @@
 # Build brief: Catalog admin + Cleanup queue — v2
 
+**STATUS: shipped (2026-07-22).** §A, §B, §C and §D are all built — see the
+build sequence in CLAUDE.md. §D landed as `/items` (nav label "Inventory") +
+item detail and `/vendors` + vendor detail; the favorites editor is now
+reachable for healthy items, which was §D's stated gap. This brief is kept as
+the record of what was asked for, not as an open work order.
+
 **v2 changes (2026-07-21, after schema 003):** multi-favorite plan rows are now
 real (§A below) — the guide and editors must handle them; and the cleanup queue
 gains PO-history-driven triage (§B) so Mark can bulk-deactivate dead catalog

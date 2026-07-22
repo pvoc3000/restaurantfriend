@@ -25,7 +25,16 @@ never belongs in this folder — it bypasses RLS.
 | `src/app/login/page.tsx` | Email/password sign-in |
 | `src/app/(app)/` | Signed-in routes; the layout renders the header (user + location switcher) |
 | `src/app/actions.ts` | Server actions: sign out, persist `org_members.last_active_location_id` |
-| `src/app/(app)/vendors/page.tsx` | Vendor list with the active location's account / minimum / order days |
+| `src/app/(app)/items/` | Inventory list + item detail (per-location config, vendor items, favorites) |
+| `src/app/(app)/vendors/` | Vendor list + detail (editable per-location config, vendor items) |
+| `src/app/(app)/purchase-orders/` | PO list (date window, status, totals) + detail (receiving, price reconciliation) |
+| `src/app/(app)/cleanup/` | The catalog cleanup queue — predates the shared table components, left as-is |
+| `src/components/catalog/DataTable.tsx` | **The list table.** Sort, resize, sticky-header scroll pane, expandable rows |
+| `src/components/catalog/ColumnHeader.tsx` | Header cell + resize grip (the WebKit containing-block fix lives here) |
+| `src/components/catalog/InlineValue.tsx` | Click-to-edit cell; Enter/blur saves, Escape reverts |
+| `src/lib/tableSort.ts`, `src/lib/columnWidths.ts` | Sort comparator; persisted widths + drag |
+| `src/lib/breadcrumbs.ts` | Trail that follows the route actually taken |
+| `src/lib/purchaseOrders.ts` | PO shapes, totals, price-difference detection |
 
 ## Safari and stale CSS in dev
 
