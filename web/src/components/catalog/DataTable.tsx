@@ -38,6 +38,8 @@ export function DataTable<T>({
   maxHeightClass,
   empty,
   expand,
+  sort: controlledSort,
+  onSortChange,
 }: {
   rows: T[];
   columns: DataColumn<T>[];
@@ -60,6 +62,14 @@ export function DataTable<T>({
     summary?: (row: T) => ReactNode;
     canExpand?: (row: T) => boolean;
   };
+  /**
+   * Controlled sort, for screens that persist it in the URL. Pass both or
+   * neither: with `onSortChange` the caller owns the sort (and the ordering of
+   * `rows`), otherwise the table sorts itself. Two sources of truth here was a
+   * real bug — the header arrow and the URL disagreeing about the order.
+   */
+  sort?: { key: string; dir: SortDir } | null;
+  onSortChange?: (next: { key: string; dir: SortDir }) => void;
 }) {
   const defaultWidths = useMemo<ColumnWidths>(
     () => Object.fromEntries(columns.map((c) => [c.key, c.width])),
@@ -69,9 +79,11 @@ export function DataTable<T>({
   const { widths, startResize, setWidth, reset, customized, totalWidth } =
     useResizableColumns(storageKey, defaultWidths);
 
-  const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(
+  const [internalSort, setInternalSort] = useState<{ key: string; dir: SortDir } | null>(
     defaultSort ? { key: defaultSort.key, dir: defaultSort.dir ?? "asc" } : null
   );
+  const controlled = onSortChange !== undefined;
+  const sort = controlled ? controlledSort ?? null : internalSort;
   const [open, setOpen] = useState<Set<string>>(new Set());
 
   function toggleOpen(key: string) {
@@ -83,20 +95,24 @@ export function DataTable<T>({
     });
   }
 
+  // When the caller owns the sort it has already ordered `rows`; re-sorting
+  // here would fight it (and lose its tiebreaks).
   const sorted = useMemo(() => {
-    if (!sort) return rows;
+    if (controlled || !sort) return rows;
     const column = columns.find((c) => c.key === sort.key);
     if (!column?.sortValue) return rows;
     const value = column.sortValue;
     return [...rows].sort(makeComparator<T>({ value, dir: sort.dir }));
-  }, [rows, columns, sort]);
+  }, [rows, columns, sort, controlled]);
 
   if (rows.length === 0) {
     return empty ? <>{empty}</> : null;
   }
 
   function toggleSort(key: string) {
-    setSort((prev) => ({ key, dir: nextSortDir(prev?.key === key, prev?.dir ?? "asc") }));
+    const next = { key, dir: nextSortDir(sort?.key === key, sort?.dir ?? "asc") };
+    if (onSortChange) onSortChange(next);
+    else setInternalSort(next);
   }
 
   const wrapper = scroll
