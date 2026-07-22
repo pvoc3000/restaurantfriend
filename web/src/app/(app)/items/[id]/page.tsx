@@ -33,7 +33,7 @@ export default async function ItemDetailPage({
   searchParams: Promise<RawSearchParams>;
 }) {
   const { id } = await params;
-  // The list's filters ride along in the query string so "← Items" returns to
+  // The list's filters ride along in the query string so "← Inventory Items" returns to
   // the same filtered view instead of resetting to everything.
   const backHref = itemsHref(parseItemFilters(await searchParams));
   const session = await getAppSession();
@@ -69,7 +69,7 @@ export default async function ItemDetailPage({
     <div className="space-y-6">
       <div className="text-sm">
         <Link href={backHref} className="text-blue-700 hover:underline">
-          ← Items
+          ← Inventory Items
         </Link>
       </div>
 

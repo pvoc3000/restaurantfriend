@@ -14,6 +14,7 @@ import {
   type SortKey,
   type StaleFilter,
 } from "@/lib/itemFilters";
+import { useColumnWidths, type ColumnWidths } from "@/lib/columnWidths";
 import type { ItemRow } from "@/app/(app)/items/page";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
@@ -21,6 +22,35 @@ const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
   { key: "inactive", label: "Inactive" },
   { key: "all", label: "All" },
 ];
+
+// The table is `table-fixed` with an explicit <colgroup> so drag-resizing a
+// column actually holds — with auto layout the browser re-negotiates every
+// width from the content. Widths are in px; `sort: null` = not sortable.
+const COLUMNS: {
+  key: string;
+  label: string;
+  width: number;
+  sort: SortKey | null;
+  align?: "right";
+}[] = [
+  { key: "select", label: "", width: 32, sort: null },
+  { key: "name", label: "Item", width: 260, sort: "name" },
+  { key: "category", label: "Category", width: 140, sort: "category" },
+  { key: "section", label: "Section", width: 170, sort: "section" },
+  { key: "par", label: "Par", width: 72, sort: "par", align: "right" },
+  { key: "unit", label: "Unit", width: 72, sort: "unit" },
+  { key: "vendor", label: "Default vendor item", width: 300, sort: "vendor" },
+  { key: "price", label: "Price", width: 90, sort: "price", align: "right" },
+  { key: "last", label: "Last ordered", width: 120, sort: "last" },
+];
+
+// Module-level so the widths hook's memo key is stable across renders.
+const DEFAULT_WIDTHS: ColumnWidths = Object.fromEntries(
+  COLUMNS.map((c) => [c.key, c.width])
+);
+
+const WIDTHS_STORAGE_KEY = "rf.items.columnWidths.v1";
+const MIN_COLUMN_WIDTH = 48;
 
 // Sorting by category or section turns the list into a grouped report: a
 // banner row before each run of matching rows. Only these two group — the rest
@@ -93,6 +123,37 @@ export function ItemsList({
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const { widths, setWidth, reset: resetWidths, customized } = useColumnWidths(
+    WIDTHS_STORAGE_KEY,
+    DEFAULT_WIDTHS
+  );
+  // Live widths during a drag; committed to storage on pointer-up so we're not
+  // writing localStorage on every mouse move.
+  const [dragWidths, setDragWidths] = useState<ColumnWidths | null>(null);
+  const effectiveWidths = dragWidths ?? widths;
+  const tableWidth = COLUMNS.reduce((sum, c) => sum + (effectiveWidths[c.key] ?? c.width), 0);
+
+  function startResize(event: React.PointerEvent, columnKey: string) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const base = { ...effectiveWidths };
+    const startWidth = base[columnKey] ?? MIN_COLUMN_WIDTH;
+    const widthAt = (clientX: number) =>
+      Math.max(MIN_COLUMN_WIDTH, startWidth + clientX - startX);
+
+    const onMove = (e: PointerEvent) => {
+      setDragWidths({ ...base, [columnKey]: widthAt(e.clientX) });
+    };
+    const onUp = (e: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      setDragWidths(null);
+      setWidth(columnKey, widthAt(e.clientX));
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
 
   function update(patch: Partial<ItemFilters>) {
     const next = { ...filters, ...patch };
@@ -167,28 +228,46 @@ export function ItemsList({
 
   // A plain function, not a nested component: <Foo/> defined inside a render
   // would be a new component type each pass and remount the header every time.
-  function sortHeader(label: string, key: SortKey, align: "left" | "right" = "left") {
-    const on = filters.sort === key;
+  function columnHeader(col: (typeof COLUMNS)[number]) {
+    const on = col.sort !== null && filters.sort === col.sort;
     const arrow = on ? (filters.dir === "asc" ? "▲" : "▼") : "";
     return (
       <th
-        className={`px-2 py-1 font-medium ${align === "right" ? "text-right" : ""}`}
+        key={col.key}
+        className={`relative px-2 py-1 font-medium ${col.align === "right" ? "text-right" : ""}`}
         aria-sort={on ? (filters.dir === "asc" ? "ascending" : "descending") : "none"}
       >
-        <button
-          type="button"
-          onClick={() => toggleSort(key)}
-          title={`Sort by ${label.toLowerCase()}`}
-          className={`inline-flex items-center gap-1 rounded px-1 hover:bg-neutral-100 ${
-            on ? "font-semibold text-neutral-900" : ""
-          }`}
-        >
-          {label}
-          {/* Reserve the arrow's width so headers don't jump when sort moves. */}
-          <span className={`w-3 text-xs ${on ? "" : "text-neutral-300"}`}>
-            {arrow || "↕"}
-          </span>
-        </button>
+        {col.key === "select" ? (
+          <input
+            type="checkbox"
+            checked={allVisibleChecked}
+            onChange={toggleAllVisible}
+            aria-label="select all"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => col.sort && toggleSort(col.sort)}
+            title={`Sort by ${col.label.toLowerCase()}`}
+            className={`inline-flex max-w-full items-center gap-1 truncate rounded px-1 hover:bg-neutral-100 ${
+              on ? "font-semibold text-neutral-900" : ""
+            }`}
+          >
+            <span className="truncate">{col.label}</span>
+            {/* Reserve the arrow's width so headers don't jump when sort moves. */}
+            <span className={`w-3 shrink-0 text-xs ${on ? "" : "text-neutral-300"}`}>
+              {arrow || "↕"}
+            </span>
+          </button>
+        )}
+
+        {/* Drag handle on the column's right edge. */}
+        <span
+          onPointerDown={(e) => startResize(e, col.key)}
+          onDoubleClick={() => setWidth(col.key, col.width)}
+          title="Drag to resize · double-click to reset this column"
+          className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize select-none hover:bg-blue-400"
+        />
       </th>
     );
   }
@@ -271,11 +350,20 @@ export function ItemsList({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-xl font-semibold">Items</h1>
+        <h1 className="text-xl font-semibold">Inventory Items</h1>
         <span className="text-sm text-neutral-500">
           {visible.length} of {items.length}
           {activeLocationCode ? ` · ${activeLocationCode}` : ""}
         </span>
+        {customized && (
+          <button
+            onClick={resetWidths}
+            title="Restore the default column widths"
+            className="ml-auto text-sm text-neutral-600 hover:underline"
+          >
+            Reset column widths
+          </button>
+        )}
       </div>
 
       {/* Search + category */}
@@ -375,25 +463,18 @@ export function ItemsList({
         <p className="text-sm text-neutral-600">No items match these filters.</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="min-w-full border-collapse text-sm">
+          <table
+            className="table-fixed border-collapse text-sm"
+            style={{ width: tableWidth }}
+          >
+            <colgroup>
+              {COLUMNS.map((col) => (
+                <col key={col.key} style={{ width: effectiveWidths[col.key] ?? col.width }} />
+              ))}
+            </colgroup>
             <thead>
               <tr className="border-b border-neutral-300 text-left text-neutral-600">
-                <th className="w-8 px-2 py-1">
-                  <input
-                    type="checkbox"
-                    checked={allVisibleChecked}
-                    onChange={toggleAllVisible}
-                    aria-label="select all"
-                  />
-                </th>
-                {sortHeader("Item", "name")}
-                {sortHeader("Category", "category")}
-                {sortHeader("Section", "section")}
-                {sortHeader("Par", "par", "right")}
-                {sortHeader("Unit", "unit")}
-                {sortHeader("Default vendor item", "vendor")}
-                {sortHeader("Price", "price", "right")}
-                {sortHeader("Last ordered", "last")}
+                {COLUMNS.map(columnHeader)}
               </tr>
             </thead>
             <tbody>
@@ -412,7 +493,7 @@ export function ItemsList({
                       item.is_active ? "" : "text-neutral-400"
                     }`}
                   >
-                    <td className="px-2 py-1">
+                    <td className="truncate px-2 py-1">
                       <input
                         type="checkbox"
                         checked={checked.has(item.id)}
@@ -420,7 +501,7 @@ export function ItemsList({
                         aria-label={`select ${item.name}`}
                       />
                     </td>
-                    <td className="px-2 py-1">
+                    <td className="truncate px-2 py-1">
                       <Link
                         href={itemDetailHref(item.id, filters)}
                         className="text-blue-700 hover:underline"
@@ -438,17 +519,17 @@ export function ItemsList({
                         </span>
                       )}
                     </td>
-                    <td className="px-2 py-1 text-neutral-600">
+                    <td className="truncate px-2 py-1 text-neutral-600">
                       {item.category ?? "—"}
                     </td>
-                    <td className="px-2 py-1 text-neutral-600">
+                    <td className="truncate px-2 py-1 text-neutral-600">
                       {il?.shop_sections?.display_name ?? "—"}
                     </td>
-                    <td className="px-2 py-1 text-right tabular-nums text-neutral-600">
+                    <td className="truncate px-2 py-1 text-right tabular-nums text-neutral-600">
                       {qty(il?.default_par)}
                     </td>
-                    <td className="px-2 py-1 text-neutral-600">{item.base_unit}</td>
-                    <td className="px-2 py-1 text-neutral-600">
+                    <td className="truncate px-2 py-1 text-neutral-600">{item.base_unit}</td>
+                    <td className="truncate px-2 py-1 text-neutral-600">
                       {vi ? (
                         <>
                           <span className="font-medium text-neutral-700">
@@ -463,10 +544,10 @@ export function ItemsList({
                         <span className="text-neutral-400">none</span>
                       )}
                     </td>
-                    <td className="px-2 py-1 text-right tabular-nums text-neutral-600">
+                    <td className="truncate px-2 py-1 text-right tabular-nums text-neutral-600">
                       {money(vi?.price)}
                     </td>
-                    <td className="px-2 py-1 tabular-nums">
+                    <td className="truncate px-2 py-1 tabular-nums">
                       {item.last_order_date ? (
                         <span className="text-neutral-600">{item.last_order_date}</span>
                       ) : (
@@ -482,7 +563,7 @@ export function ItemsList({
                   <Fragment key={item.id}>
                     <tr className="border-b border-neutral-300 bg-neutral-100">
                       <td
-                        colSpan={9}
+                        colSpan={COLUMNS.length}
                         className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-700"
                       >
                         {label}
