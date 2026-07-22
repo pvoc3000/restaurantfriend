@@ -62,7 +62,6 @@ export function OrderGuide({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [onlyTouched, setOnlyTouched] = useState(false);
-  const [hideBlocked, setHideBlocked] = useState(false);
   const [term, setTerm] = useState("");
   // Grouping is client-side only — the rows are already loaded, so switching
   // between the walk, an A–Z list and a per-vendor view costs nothing.
@@ -100,7 +99,6 @@ export function OrderGuide({
   const visibleRows = useMemo(() => {
     const words = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return rows.filter((row) => {
-      if (hideBlocked && !row.is_orderable) return false;
       if (onlyTouched) {
         const entry = entries.get(row.vendor_item_id);
         if (!entry || (entry.qty_to_order === null && entry.on_hand === null)) return false;
@@ -118,7 +116,7 @@ export function OrderGuide({
         .toLowerCase();
       return words.every((w) => haystack.includes(w));
     });
-  }, [rows, entries, term, onlyTouched, hideBlocked]);
+  }, [rows, entries, term, onlyTouched]);
 
   const sections = useMemo(
     () => groupGuide(visibleRows, grouping),
@@ -220,15 +218,6 @@ export function OrderGuide({
           />
           Only lines I&apos;ve touched
         </label>
-        <label className="flex items-center gap-1.5 text-neutral-700">
-          <input
-            type="checkbox"
-            checked={hideBlocked}
-            onChange={(e) => setHideBlocked(e.target.checked)}
-          />
-          Hide unorderable
-        </label>
-
         <span className="flex items-center gap-1">
           <span className="text-xs uppercase tracking-wide text-neutral-400">
             Group by

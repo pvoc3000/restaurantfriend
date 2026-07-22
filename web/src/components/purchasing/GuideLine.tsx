@@ -73,22 +73,16 @@ export function GuideLine({
 
   const arrives = deliveryLabel(row.vendor_delivery_days);
 
+  // Only orderable lines reach the guide — the page filters on the view's
+  // active cascade — so there's no blocked state to render here.
   return (
-    <tr className={`border-b border-neutral-100 ${row.is_orderable ? "" : "opacity-60"}`}>
+    <tr className="border-b border-neutral-100">
       <td className="py-1 pl-6 pr-2">
         <div className="flex flex-wrap items-baseline gap-x-2">
           <span className="font-medium text-neutral-800">{row.vendor_name}</span>
           <span className="text-neutral-600">
             {[row.brand, row.vendor_item_description].filter(Boolean).join(" · ")}
           </span>
-          {!row.is_orderable && (
-            <span
-              className="rounded bg-neutral-200 px-1 text-xs text-neutral-600"
-              title="This line can't be ordered until the cause is fixed"
-            >
-              {row.hidden_reason}
-            </span>
-          )}
         </div>
         <div className="text-xs text-neutral-500">
           {row.package_desc ?? "?"}

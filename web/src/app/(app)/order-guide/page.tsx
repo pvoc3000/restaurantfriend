@@ -79,6 +79,18 @@ export default async function OrderGuidePage({
     if (!data || data.length < 1000) break;
   }
 
+  // The guide shows ONLY what can actually be ordered (Mark, 2026-07-22).
+  // `is_orderable` is the view's composed active cascade — vendor AND vendor
+  // item AND inventory item AND item-location all active — so one flag covers
+  // every way a line can be dead, including a plan row whose vendor item no
+  // longer resolves at all.
+  //
+  // Deliberate departure from spec §4.7a, which asked for blocked lines shown
+  // greyed with the reason. That belongs on the catalog screens, where you can
+  // act on it; during a walk it's noise. `/cleanup` remains where dead pairings
+  // get found and fixed.
+  const orderableRows = rows.filter((row) => row.is_orderable === true);
+
   const { data: entryRows } = await supabase
     .from("order_guide_entries")
     .select("vendor_item_id, on_hand, qty_to_order")
@@ -87,7 +99,7 @@ export default async function OrderGuidePage({
 
   return (
     <OrderGuide
-      rows={rows}
+      rows={orderableRows}
       entries={(entryRows ?? []) as GuideEntry[]}
       weekday={weekday}
       availableDays={availableDays}
