@@ -17,12 +17,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   APPLIED to the hosted DB. One org (Donut Friend), 6 locations seeded
   (DF01, DF02 active; EVENT is virtual). Mark has an auth user + `org_members`
   owner row.
-- **Web app** (`web/`, scaffolded): Next.js 16 (App Router) + TypeScript +
+- **Web app** (`web/`): Next.js 16 (App Router) + TypeScript +
   Tailwind + `@supabase/supabase-js` + `@supabase/ssr`. This is the POWER TOOL —
   it replaces FMP's desktop layouts: dense, inline-editable tables, bulk
   operations, keyboard-friendly. Not a mobile-first marketing site. Auth +
-  location context live. Shipped: `/items` (nav label "Inventory") + detail,
-  `/vendors` + detail, `/purchase-orders` + detail, `/cleanup`. (Note: Next 16
+  location context live. Shipped: `/order-guide`, `/items` (nav
+  label "Inventory") + detail, `/vendors` + detail, `/purchase-orders` + detail,
+  `/cleanup`. (Note: Next 16
   renamed the middleware convention — session refresh lives in `web/src/proxy.ts`.)
 - **Migration** (`migration/`): FMP data is LOADED to the hosted DB — 80 vendors,
   790 items, 2,888 vendor items, 1,237 item-locations, full PO history. Loader
@@ -43,6 +44,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    follow-up). Then brief §D: Inventory list + item detail, vendor detail with
    editable per-location config, vendor items everywhere.
 4. 🚧 Web order guide + PO generation/processing + receiving (real Monday orders).
+   Shipped: `/order-guide` — walk-order sections, item headers with par, plan
+   lines nested (multi-favorite), three-state qty boxes, count mode
+   (`ceil((par-on_hand)/package_content)`), vendor totals bar vs minimums,
+   writes to `order_guide_entries` per line. No clear/update ceremony.
    Shipped: `/purchase-orders` list (location-scoped, date window, status chips,
    totals, selection) and PO detail (ordered-vs-received with dual totals,
    inline receiving, price reconciliation → catalog). NOT built: **PO generation**
@@ -61,7 +66,9 @@ groups lines by inventory item and `par_qty` on a plan row is a PER-LINE par.
 Migration 004 adds the last-ordered view (per-location semantics: "last ordered
 AT this location"). Migration 005 renames tables for clarity — see
 "Table naming" under Conventions; docs/purchasing-spec.md §5 predates the
-renames, translate via that mapping when reading it.
+renames, translate via that mapping when reading it. Migration 006 adds
+`po_number_seq` + `next_po_number()` for PO generation — **written, not yet
+applied**; Mark runs it when generation ships.
 
 ## Non-negotiable design rules
 

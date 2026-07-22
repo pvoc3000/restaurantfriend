@@ -1,0 +1,187 @@
+// The order guide (spec §4.1–4.6). Everything here is derived from the live
+// view `v_order_guide` — never materialized, never cached (design rule 4).
+
+export type GuideRow = {
+  item_location_id: string;
+  inventory_item_id: string;
+  item_name: string;
+  category: string | null;
+  base_unit: string;
+  shop_section: string | null;
+  shop_section_sort: number | null;
+  par_qty: number | null;
+  par_mode: string | null;
+  vendor_item_id: string;
+  vendor_id: string;
+  vendor_name: string;
+  vendor_order_type: string;
+  brand: string | null;
+  vendor_item_description: string | null;
+  product_id: string | null;
+  package_desc: string | null;
+  package_content: number | null;
+  effective_price: number | null;
+  unit_price: number | null;
+  vendor_minimum: number | null;
+  vendor_delivery_days: number[] | null;
+  is_orderable: boolean;
+  hidden_reason: string | null;
+};
+
+/** What's been entered against a line today. Absent = untouched. */
+export type GuideEntry = {
+  vendor_item_id: string;
+  on_hand: number | null;
+  qty_to_order: number | null;
+};
+
+export type EntryState = {
+  on_hand: number | null;
+  qty_to_order: number | null;
+};
+
+/**
+ * The three states FMP encoded and we deliberately preserve (§4.8):
+ * entered (>0), explicitly zeroed (0), untouched (null). "I decided no" and
+ * "I haven't looked yet" are different facts during a walk.
+ */
+export type QtyState = "entered" | "zeroed" | "untouched";
+
+export function qtyState(qty: number | null | undefined): QtyState {
+  if (qty === null || qty === undefined) return "untouched";
+  return Number(qty) > 0 ? "entered" : "zeroed";
+}
+
+export const QTY_CLASS: Record<QtyState, string> = {
+  entered: "border-green-500 bg-green-50 text-green-900",
+  zeroed: "border-red-400 bg-red-50 text-red-900",
+  untouched: "border-neutral-300 bg-white",
+};
+
+/**
+ * Count mode (§4.3): on-hand in base units → packages to order.
+ * `ceil((par − on_hand) / package_content)`, floored at zero. Returns null when
+ * the data can't support a suggestion — a missing par or package content is
+ * exactly what the cleanup queue flags, and guessing here would be worse than
+ * saying nothing.
+ */
+export function suggestQty(
+  par: number | null,
+  onHand: number | null,
+  packageContent: number | null
+): number | null {
+  if (par === null || onHand === null) return null;
+  if (packageContent === null || Number(packageContent) <= 0) return null;
+  const needed = Number(par) - Number(onHand);
+  if (needed <= 0) return 0;
+  return Math.ceil(needed / Number(packageContent));
+}
+
+/** One inventory item and its plan lines — the guide's unit of display. */
+export type GuideItem = {
+  inventory_item_id: string;
+  item_name: string;
+  base_unit: string;
+  par_qty: number | null;
+  lines: GuideRow[];
+};
+
+export type GuideSection = {
+  key: string;
+  label: string;
+  sort: number;
+  items: GuideItem[];
+};
+
+/**
+ * Group into shop sections in walk order, then items, then their plan lines.
+ * Multi-favorite plan rows (schema 003) mean one item can have several lines on
+ * the same day, so the item is the header and lines nest beneath it (brief §A).
+ */
+export function groupGuide(rows: GuideRow[]): GuideSection[] {
+  const sections = new Map<string, GuideSection>();
+
+  for (const row of rows) {
+    const label = row.shop_section ?? "Uncategorized";
+    // Unassigned items sort last rather than first — an "Uncategorized" bucket
+    // at the top of a walk is noise before you've taken a step.
+    const sort = row.shop_section ? Number(row.shop_section_sort ?? 0) : Number.MAX_SAFE_INTEGER;
+
+    let section = sections.get(label);
+    if (!section) {
+      section = { key: label, label, sort, items: [] };
+      sections.set(label, section);
+    }
+
+    let item = section.items.find((i) => i.inventory_item_id === row.inventory_item_id);
+    if (!item) {
+      item = {
+        inventory_item_id: row.inventory_item_id,
+        item_name: row.item_name,
+        base_unit: row.base_unit,
+        // Item-level par: the plan row's par is a PER-LINE override, so the
+        // header shows the first line's par only as a starting point.
+        par_qty: row.par_qty,
+        lines: [],
+      };
+      section.items.push(item);
+    }
+    item.lines.push(row);
+  }
+
+  const list = [...sections.values()].sort((a, b) => a.sort - b.sort);
+  for (const section of list) {
+    section.items.sort((a, b) => a.item_name.localeCompare(b.item_name));
+  }
+  return list;
+}
+
+export type VendorTotal = {
+  vendor_id: string;
+  vendor_name: string;
+  minimum: number | null;
+  subtotal: number;
+  lines: number;
+  /** Under an existing minimum: this vendor generates no PO (§4.2). */
+  short: boolean;
+};
+
+/** Running subtotal per vendor against its minimum — the guide's instrument. */
+export function vendorTotals(
+  rows: GuideRow[],
+  entries: Map<string, EntryState>
+): VendorTotal[] {
+  const totals = new Map<string, VendorTotal>();
+
+  for (const row of rows) {
+    const qty = entries.get(row.vendor_item_id)?.qty_to_order ?? null;
+    if (qty === null || Number(qty) <= 0) continue;
+
+    const entry = totals.get(row.vendor_id) ?? {
+      vendor_id: row.vendor_id,
+      vendor_name: row.vendor_name,
+      minimum: row.vendor_minimum === null ? null : Number(row.vendor_minimum),
+      subtotal: 0,
+      lines: 0,
+      short: false,
+    };
+    entry.subtotal += Number(qty) * Number(row.effective_price ?? 0);
+    entry.lines += 1;
+    totals.set(row.vendor_id, entry);
+  }
+
+  const list = [...totals.values()];
+  for (const t of list) t.short = t.minimum !== null && t.subtotal < t.minimum;
+  return list.sort((a, b) => b.subtotal - a.subtotal);
+}
+
+const DAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/** "arrives Thu" chips (§4.1) — delivery days are already in the data. */
+export function deliveryLabel(days: number[] | null): string | null {
+  if (!days || days.length === 0) return null;
+  const labels = [...days].sort((a, b) => a - b).map((d) => DAY_LABELS[d - 1] ?? d);
+  return `arrives ${labels.join("/")}`;
+}
+
+export const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
