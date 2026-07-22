@@ -4,6 +4,7 @@ import { getAppSession } from "@/lib/session";
 import { VENDOR_ITEM_SELECT } from "@/lib/catalog";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { currentQuery, parseTrail } from "@/lib/breadcrumbs";
+import { staleBucket } from "@/lib/lastOrdered";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { VendorLocationsTable } from "@/components/catalog/VendorLocationsTable";
 import {
@@ -62,7 +63,7 @@ export default async function VendorDetailPage({
         .maybeSingle(),
       supabase
         .from("vendor_items")
-        .select(`${VENDOR_ITEM_SELECT}, inventory_items ( id, name, base_unit )`)
+        .select(`${VENDOR_ITEM_SELECT}, inventory_items ( id, name, base_unit, category )`)
         .eq("vendor_id", id)
         .order("is_active", { ascending: false })
         .order("description"),
@@ -74,6 +75,50 @@ export default async function VendorDetailPage({
   if (!vendor) notFound();
 
   const v = vendor as unknown as Vendor;
+  const items = (vendorItems ?? []) as unknown as VendorItemWithItem[];
+
+  // Last-ordered for the age filter. Semantics match the Inventory list: when
+  // the linked ITEM was last ordered at the active location, from any vendor —
+  // not "last ordered from this vendor", which would need a per-vendor-item
+  // view. Bounded to this vendor's items so it stays two small queries.
+  const itemIds = [
+    ...new Set(items.map((vi) => vi.inventory_items?.id).filter((x): x is string => !!x)),
+  ];
+  const lastOrderedByItem = new Map<string, string | null>();
+
+  if (session.activeLocation && itemIds.length > 0) {
+    const { data: locationRows } = await supabase
+      .from("inventory_item_locations")
+      .select("id, inventory_item_id")
+      .eq("location_id", session.activeLocation.id)
+      .in("inventory_item_id", itemIds);
+
+    const itemByLocationRow = new Map(
+      (locationRows ?? []).map((r) => [r.id, r.inventory_item_id])
+    );
+
+    if (itemByLocationRow.size > 0) {
+      const { data: lastOrdered, error: loError } = await supabase
+        .from("v_item_last_ordered")
+        .select("item_location_id, last_order_date")
+        .in("item_location_id", [...itemByLocationRow.keys()]);
+
+      if (loError) {
+        console.warn("v_item_last_ordered unavailable:", loError.message);
+      } else {
+        for (const row of lastOrdered ?? []) {
+          const itemId = itemByLocationRow.get(row.item_location_id);
+          if (itemId) lastOrderedByItem.set(itemId, row.last_order_date);
+        }
+      }
+    }
+  }
+
+  const today = new Date();
+  const itemsWithAge: VendorItemWithItem[] = items.map((vi) => {
+    const last = vi.inventory_items ? lastOrderedByItem.get(vi.inventory_items.id) ?? null : null;
+    return { ...vi, last_order_date: last, stale: staleBucket(last, today) };
+  });
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
   // Links out of this page come back here, with the trail so far intact.
   const here = { href: `/vendors/${id}${queryString}`, label: v.name };
@@ -124,10 +169,12 @@ export default async function VendorDetailPage({
           </p>
         ) : (
           <VendorItemsTable
-            vendorItems={(vendorItems ?? []) as unknown as VendorItemWithItem[]}
+            vendorItems={itemsWithAge}
             showItem
             scroll
             from={here}
+            filters
+            showLastOrdered={session.activeLocation !== null}
           />
         )}
       </section>

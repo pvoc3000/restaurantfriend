@@ -1,16 +1,29 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { unitPrice, unitPriceLabel, type CatalogVendorItem } from "@/lib/catalog";
 import { withFrom, type Crumb } from "@/lib/breadcrumbs";
+import type { StaleBucket } from "@/lib/lastOrdered";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
 import { DataTable, type DataColumn } from "./DataTable";
+import { ListFilters, type ActiveFilter, type StaleFilter } from "./ListFilters";
 
 // On the vendor screen each row belongs to a different inventory item, so the
 // query embeds the item; on the item screen that column is redundant.
 export type VendorItemWithItem = CatalogVendorItem & {
-  inventory_items?: { id: string; name: string; base_unit: string } | null;
+  inventory_items?: {
+    id: string;
+    name: string;
+    base_unit: string;
+    category?: string | null;
+  } | null;
+  // Attached by the vendor screen: when the linked inventory item was last
+  // ordered AT THE ACTIVE LOCATION (v_item_last_ordered), same semantics as the
+  // Inventory list. Not vendor-item specific — see the note in the page.
+  last_order_date?: string | null;
+  stale?: StaleBucket;
 };
 
 /**
@@ -30,6 +43,8 @@ export function VendorItemsTable({
   showItem = false,
   scroll = false,
   from,
+  filters = false,
+  showLastOrdered = false,
 }: {
   vendorItems: VendorItemWithItem[];
   baseUnit?: string;
@@ -39,7 +54,64 @@ export function VendorItemsTable({
   scroll?: boolean;
   /** Where links out of this table should return to. */
   from?: Crumb;
+  /** Search + category + active + last-ordered bar, as on the Inventory list. */
+  filters?: boolean;
+  showLastOrdered?: boolean;
 }) {
+  const [term, setTerm] = useState("");
+  const [category, setCategory] = useState("");
+  // "All" rather than Inventory's "Active" default: this screen has always
+  // shown every one of a vendor's items, and silently hiding the inactive ones
+  // on load would look like data loss.
+  const [active, setActive] = useState<ActiveFilter>("all");
+  const [stale, setStale] = useState<StaleFilter>("any");
+
+  const categories = useMemo(
+    () =>
+      [
+        ...new Set(
+          vendorItems
+            .map((vi) => vi.inventory_items?.category)
+            .filter((c): c is string => !!c)
+        ),
+      ].sort(),
+    [vendorItems]
+  );
+
+  const staleCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const vi of vendorItems) if (vi.stale) counts[vi.stale] = (counts[vi.stale] ?? 0) + 1;
+    return counts;
+  }, [vendorItems]);
+
+  const visible = useMemo(() => {
+    if (!filters) return vendorItems;
+    const words = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return vendorItems.filter((vi) => {
+      if (active === "active" && !vi.is_active) return false;
+      if (active === "inactive" && vi.is_active) return false;
+      if (category && vi.inventory_items?.category !== category) return false;
+      if (stale !== "any" && vi.stale !== stale) return false;
+      if (words.length === 0) return true;
+      // Every word must appear somewhere in the row, so "bag brown" matches
+      // regardless of which field each word came from.
+      const haystack = [
+        vi.inventory_items?.name,
+        vi.vendors?.name,
+        vi.product_id,
+        vi.brand,
+        vi.description,
+        vi.package_desc,
+        vi.notes,
+        vi.inventory_items?.category,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return words.every((word) => haystack.includes(word));
+    });
+  }, [vendorItems, filters, term, category, active, stale]);
+
   const unitFor = (vi: VendorItemWithItem) =>
     vi.inventory_items?.base_unit ?? baseUnit ?? "unit";
 
@@ -186,6 +258,22 @@ export function VendorItemsTable({
         <InlineValue table="vendor_items" id={vi.id} column="notes" value={vi.notes} />
       ),
     },
+    ...(showLastOrdered
+      ? [
+          {
+            key: "last_ordered",
+            label: "Last ordered",
+            width: 120,
+            sortValue: (vi: VendorItemWithItem) => vi.last_order_date ?? null,
+            render: (vi: VendorItemWithItem) =>
+              vi.last_order_date ? (
+                <span className="tabular-nums text-neutral-600">{vi.last_order_date}</span>
+              ) : (
+                <span className="text-amber-700">never</span>
+              ),
+          },
+        ]
+      : []),
     {
       key: "is_active",
       label: "Active",
@@ -202,20 +290,49 @@ export function VendorItemsTable({
     },
   ];
 
-  return (
+  const table = (
     <DataTable
-      rows={vendorItems}
+      rows={visible}
       columns={columns}
       rowKey={(vi) => vi.id}
       storageKey={`rf.vendorItems.columnWidths.v1${showItem ? ".byVendor" : ".byItem"}`}
       rowClassName={(vi) => (vi.is_active ? "" : "text-neutral-400")}
       scroll={scroll}
+      // The filter bar eats about 9rem above the pane; without this the page
+      // starts scrolling again and the sticky config is pushed off-screen.
+      maxHeightClass={filters ? "max-h-[calc(100vh-36rem)]" : undefined}
       empty={
         <p className="text-sm text-neutral-600">
-          No vendor items yet. The cleanup drawer&apos;s vendor-item picker can link
-          an existing one to this item.
+          {vendorItems.length === 0
+            ? "No vendor items yet. The cleanup drawer's vendor-item picker can link an existing one to this item."
+            : "No vendor items match these filters."}
         </p>
       }
     />
+  );
+
+  if (!filters) return table;
+
+  return (
+    <div className="space-y-3">
+      <ListFilters
+        term={term}
+        onTerm={setTerm}
+        placeholder="Search item, product ID, brand, description…"
+        categories={categories}
+        category={category}
+        onCategory={setCategory}
+        active={active}
+        onActive={setActive}
+        stale={showLastOrdered ? stale : undefined}
+        onStale={showLastOrdered ? setStale : undefined}
+        staleCounts={staleCounts}
+        totalCount={vendorItems.length}
+      />
+      <p className="text-xs text-neutral-500">
+        {visible.length} of {vendorItems.length}
+      </p>
+      {table}
+    </div>
   );
 }

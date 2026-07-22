@@ -35,7 +35,7 @@ export function DataTable<T>({
   defaultSort,
   rowClassName,
   scroll = false,
-  maxHeightClass = "max-h-[calc(100vh-27rem)]",
+  maxHeightClass,
   empty,
 }: {
   rows: T[];
@@ -78,7 +78,7 @@ export function DataTable<T>({
   }
 
   const wrapper = scroll
-    ? `${maxHeightClass} min-h-64 overflow-auto rounded border border-neutral-200`
+    ? `${maxHeightClass ?? "max-h-[calc(100vh-27rem)]"} min-h-64 overflow-auto rounded border border-neutral-200`
     : "overflow-x-auto";
 
   return (
