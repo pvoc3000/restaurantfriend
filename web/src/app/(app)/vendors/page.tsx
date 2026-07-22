@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { VendorActiveToggle } from "@/components/VendorActiveToggle";
@@ -106,17 +107,24 @@ export default async function VendorsPage() {
                     }`}
                   >
                     <td className="px-2 py-1">
-                      {v.url ? (
+                      {/* Name opens the vendor detail screen; the external site
+                          stays reachable as the ↗ beside it. */}
+                      <Link
+                        href={`/vendors/${v.id}`}
+                        className="text-blue-700 hover:underline"
+                      >
+                        {v.name}
+                      </Link>
+                      {v.url && (
                         <a
                           href={v.url}
                           target="_blank"
                           rel="noreferrer"
-                          className="text-blue-700 hover:underline"
+                          title="Vendor website"
+                          className="ml-1 text-neutral-400 hover:text-neutral-700"
                         >
-                          {v.name}
+                          ↗
                         </a>
-                      ) : (
-                        v.name
                       )}
                     </td>
                     <td className="px-2 py-1 text-neutral-600">
