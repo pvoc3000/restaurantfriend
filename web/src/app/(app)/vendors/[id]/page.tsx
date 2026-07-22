@@ -13,6 +13,7 @@ import {
 } from "@/components/catalog/VendorItemsTable";
 
 type VendorLocationRow = {
+  id: string;
   location_id: string;
   account_number: string | null;
   minimum_order: number | null;
@@ -56,7 +57,7 @@ export default async function VendorDetailPage({
         .from("vendors")
         .select(
           `id, name, vendor_type, order_type, url, is_active,
-           vendor_locations ( location_id, account_number, minimum_order,
+           vendor_locations ( id, location_id, account_number, minimum_order,
                               order_days, delivery_days, is_active )`
         )
         .eq("id", id)

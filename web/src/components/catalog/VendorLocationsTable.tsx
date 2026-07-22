@@ -2,14 +2,9 @@
 
 import { money } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
-
-// ISO weekdays, 1 = Monday (CLAUDE.md).
-const DAY_LABELS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
-
-function days(list: number[] | null) {
-  if (!list || list.length === 0) return "—";
-  return [...list].sort((a, b) => a - b).map((d) => DAY_LABELS[d - 1] ?? d).join(" ");
-}
+import { InlineValue } from "./InlineValue";
+import { ActiveToggle } from "./ActiveToggle";
+import { WeekdayPicker } from "./WeekdayPicker";
 
 // Sorting a weekday set on its canonical "1,3,5" string groups locations that
 // share a schedule, which is what you're scanning for. Empty sorts last.
@@ -19,6 +14,7 @@ function daysKey(list: number[] | null) {
 }
 
 export type VendorLocationRow = {
+  id: string;
   location_id: string;
   account_number: string | null;
   minimum_order: number | null;
@@ -27,7 +23,11 @@ export type VendorLocationRow = {
   is_active: boolean;
 };
 
-/** A vendor's per-location config — account, minimum and days for each shop. */
+/**
+ * A vendor's per-location config — account, minimum and days for each shop.
+ * Editable in place (spec §4.8 puts this on the vendor screen); writes go
+ * through RLS, which requires purchaser or above.
+ */
 export function VendorLocationsTable({
   rows,
   codeById,
@@ -59,7 +59,14 @@ export function VendorLocationsTable({
       label: "Account",
       width: 140,
       sortValue: (r) => r.account_number,
-      render: (r) => <span className="text-neutral-600">{r.account_number ?? "—"}</span>,
+      render: (r) => (
+        <InlineValue
+          table="vendor_locations"
+          id={r.id}
+          column="account_number"
+          value={r.account_number}
+        />
+      ),
     },
     {
       key: "minimum",
@@ -67,28 +74,61 @@ export function VendorLocationsTable({
       width: 115,
       align: "right",
       sortValue: (r) => (r.minimum_order === null ? null : Number(r.minimum_order)),
-      render: (r) => <span className="text-neutral-600">{money(r.minimum_order)}</span>,
+      render: (r) => (
+        <InlineValue
+          table="vendor_locations"
+          id={r.id}
+          column="minimum_order"
+          value={r.minimum_order}
+          kind="number"
+          align="right"
+          format={(v) => money(Number(v))}
+        />
+      ),
     },
     {
       key: "order_days",
       label: "Order days",
-      width: 150,
+      width: 190,
       sortValue: (r) => daysKey(r.order_days),
-      render: (r) => <span className="text-neutral-600">{days(r.order_days)}</span>,
+      render: (r) => (
+        <WeekdayPicker
+          table="vendor_locations"
+          id={r.id}
+          column="order_days"
+          value={r.order_days}
+          label="Order day"
+        />
+      ),
     },
     {
       key: "delivery_days",
       label: "Delivery days",
-      width: 150,
+      width: 190,
       sortValue: (r) => daysKey(r.delivery_days),
-      render: (r) => <span className="text-neutral-600">{days(r.delivery_days)}</span>,
+      render: (r) => (
+        <WeekdayPicker
+          table="vendor_locations"
+          id={r.id}
+          column="delivery_days"
+          value={r.delivery_days}
+          label="Delivery day"
+        />
+      ),
     },
     {
       key: "is_active",
       label: "Active",
       width: 80,
       sortValue: (r) => (r.is_active ? 0 : 1),
-      render: (r) => <span className="text-neutral-600">{r.is_active ? "yes" : "no"}</span>,
+      render: (r) => (
+        <ActiveToggle
+          table="vendor_locations"
+          id={r.id}
+          active={r.is_active}
+          label="Vendor active at this location"
+        />
+      ),
     },
   ];
 

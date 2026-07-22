@@ -22,6 +22,7 @@ export function InlineValue({
   placeholder = "—",
   align = "left",
   className = "",
+  format,
 }: {
   table: string;
   id: string;
@@ -31,6 +32,8 @@ export function InlineValue({
   placeholder?: string;
   align?: "left" | "right";
   className?: string;
+  /** Display-only formatting (e.g. money). Editing always shows the raw value. */
+  format?: (value: string | number) => string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -109,7 +112,11 @@ export function InlineValue({
         align === "right" ? "text-right tabular-nums" : "text-left"
       } ${value === null || value === "" ? "text-neutral-400" : ""} ${className}`}
     >
-      {value === null || value === "" ? placeholder : String(value)}
+      {value === null || value === ""
+        ? placeholder
+        : format
+          ? format(value)
+          : String(value)}
     </button>
   );
 }
