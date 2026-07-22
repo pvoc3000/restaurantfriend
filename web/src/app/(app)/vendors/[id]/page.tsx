@@ -177,6 +177,7 @@ export default async function VendorDetailPage({
           <VendorItemsTable
             vendorItems={(vendorItems ?? []) as unknown as VendorItemWithItem[]}
             showItem
+            scroll
           />
         )}
       </section>

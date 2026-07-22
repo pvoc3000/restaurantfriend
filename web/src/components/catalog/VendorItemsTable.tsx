@@ -25,11 +25,17 @@ export function VendorItemsTable({
   baseUnit,
   showVendor = false,
   showItem = false,
+  scroll = false,
 }: {
   vendorItems: VendorItemWithItem[];
   baseUnit?: string;
   showVendor?: boolean;
   showItem?: boolean;
+  /**
+   * Give the table its own scroll pane with a sticky header, so a vendor with
+   * hundreds of items doesn't push its own config off the top of the screen.
+   */
+  scroll?: boolean;
 }) {
   if (vendorItems.length === 0) {
     return (
@@ -40,22 +46,41 @@ export function VendorItemsTable({
     );
   }
 
+  // The pane takes what's left of the viewport under the header and per-location
+  // config, with a floor so it stays usable on a short window. 27rem is what
+  // sits above it for a typical vendor; one with many locations can still leave
+  // the page itself slightly scrollable, which is harmless — the wheel over the
+  // pane always scrolls the pane.
+  const wrapper = scroll
+    ? "max-h-[calc(100vh-27rem)] min-h-64 overflow-auto rounded border border-neutral-200"
+    : "overflow-x-auto";
+
+  // A sticky row inside border-collapse loses its bottom border as it detaches,
+  // so the divider is drawn with an inset shadow on the cells instead.
+  const headCell = scroll
+    ? "sticky top-0 z-10 bg-white px-2 py-1 font-medium shadow-[inset_0_-1px_0_#d4d4d4]"
+    : "px-2 py-1 font-medium";
+
   return (
-    <div className="overflow-x-auto">
+    <div className={wrapper}>
       <table className="min-w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-neutral-300 text-left text-neutral-600">
-            {showVendor && <th className="px-2 py-1 font-medium">Vendor</th>}
-            {showItem && <th className="px-2 py-1 font-medium">Item</th>}
-            <th className="px-2 py-1 font-medium">Product ID</th>
-            <th className="px-2 py-1 font-medium">Brand</th>
-            <th className="px-2 py-1 font-medium">Description</th>
-            <th className="px-2 py-1 font-medium">Pack</th>
-            <th className="px-2 py-1 font-medium text-right">Content</th>
-            <th className="px-2 py-1 font-medium text-right">Price</th>
-            <th className="px-2 py-1 font-medium text-right">Unit price</th>
-            <th className="px-2 py-1 font-medium">Notes</th>
-            <th className="px-2 py-1 font-medium">Active</th>
+          <tr
+            className={`text-left text-neutral-600 ${
+              scroll ? "" : "border-b border-neutral-300"
+            }`}
+          >
+            {showVendor && <th className={headCell}>Vendor</th>}
+            {showItem && <th className={headCell}>Item</th>}
+            <th className={headCell}>Product ID</th>
+            <th className={headCell}>Brand</th>
+            <th className={headCell}>Description</th>
+            <th className={headCell}>Pack</th>
+            <th className={`${headCell} text-right`}>Content</th>
+            <th className={`${headCell} text-right`}>Price</th>
+            <th className={`${headCell} text-right`}>Unit price</th>
+            <th className={headCell}>Notes</th>
+            <th className={headCell}>Active</th>
           </tr>
         </thead>
         <tbody>
