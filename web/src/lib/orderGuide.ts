@@ -90,26 +90,58 @@ export type GuideSection = {
   key: string;
   label: string;
   sort: number;
+  /** Item mode has nothing to head each group with — the list is the group. */
+  showHeader: boolean;
   items: GuideItem[];
 };
 
 /**
- * Group into shop sections in walk order, then items, then their plan lines.
- * Multi-favorite plan rows (schema 003) mean one item can have several lines on
- * the same day, so the item is the header and lines nest beneath it (brief §A).
+ * How the guide is organised. Three real jobs, not three sorts of one list:
+ * - `section` — the physical walk (§4.6), the default working mode
+ * - `item` — one flat A–Z list, for looking something up rather than walking
+ * - `vendor` — what each vendor's order looks like, which is how the minimum
+ *   question is actually answered
+ *
+ * An item sourced from two vendors appears under BOTH vendor groups in vendor
+ * mode, each showing only that vendor's line — which is the point: you're
+ * looking at one vendor's basket, not the item's full plan.
  */
-export function groupGuide(rows: GuideRow[]): GuideSection[] {
+export type GuideGrouping = "section" | "item" | "vendor";
+
+export const GROUPING_LABEL: Record<GuideGrouping, string> = {
+  section: "Shop section",
+  item: "Item",
+  vendor: "Vendor",
+};
+
+function groupKeyFor(row: GuideRow, mode: GuideGrouping): { label: string; sort: number } {
+  if (mode === "vendor") return { label: row.vendor_name, sort: 0 };
+  if (mode === "item") return { label: "", sort: 0 };
+  return {
+    label: row.shop_section ?? "Uncategorized",
+    // Unassigned items sort last rather than first — an "Uncategorized" bucket
+    // at the top of a walk is noise before you've taken a step.
+    sort: row.shop_section ? Number(row.shop_section_sort ?? 0) : Number.MAX_SAFE_INTEGER,
+  };
+}
+
+/**
+ * Group rows, then items, then their plan lines. Multi-favorite plan rows
+ * (schema 003) mean one item can have several lines on the same day, so the
+ * item is the header and lines nest beneath it (brief §A).
+ */
+export function groupGuide(
+  rows: GuideRow[],
+  mode: GuideGrouping = "section"
+): GuideSection[] {
   const sections = new Map<string, GuideSection>();
 
   for (const row of rows) {
-    const label = row.shop_section ?? "Uncategorized";
-    // Unassigned items sort last rather than first — an "Uncategorized" bucket
-    // at the top of a walk is noise before you've taken a step.
-    const sort = row.shop_section ? Number(row.shop_section_sort ?? 0) : Number.MAX_SAFE_INTEGER;
+    const { label, sort } = groupKeyFor(row, mode);
 
     let section = sections.get(label);
     if (!section) {
-      section = { key: label, label, sort, items: [] };
+      section = { key: label || "all", label, sort, showHeader: mode !== "item", items: [] };
       sections.set(label, section);
     }
 
@@ -129,7 +161,11 @@ export function groupGuide(rows: GuideRow[]): GuideSection[] {
     item.lines.push(row);
   }
 
-  const list = [...sections.values()].sort((a, b) => a.sort - b.sort);
+  // Section mode has a meaningful numeric order (the walk); the others are
+  // alphabetical.
+  const list = [...sections.values()].sort((a, b) =>
+    mode === "section" ? a.sort - b.sort : a.label.localeCompare(b.label)
+  );
   for (const section of list) {
     section.items.sort((a, b) => a.item_name.localeCompare(b.item_name));
   }

@@ -8,9 +8,11 @@ import { money } from "@/lib/purchaseOrders";
 import {
   groupGuide,
   vendorTotals,
+  GROUPING_LABEL,
   WEEKDAY_LABELS,
   type EntryState,
   type GuideEntry,
+  type GuideGrouping,
   type GuideRow,
 } from "@/lib/orderGuide";
 import { GuideLine } from "./GuideLine";
@@ -62,6 +64,9 @@ export function OrderGuide({
   const [onlyTouched, setOnlyTouched] = useState(false);
   const [hideBlocked, setHideBlocked] = useState(false);
   const [term, setTerm] = useState("");
+  // Grouping is client-side only — the rows are already loaded, so switching
+  // between the walk, an A–Z list and a per-vendor view costs nothing.
+  const [grouping, setGrouping] = useState<GuideGrouping>("section");
 
   async function commit(row: GuideRow, patch: Partial<EntryState>) {
     const current = entries.get(row.vendor_item_id) ?? { on_hand: null, qty_to_order: null };
@@ -115,7 +120,10 @@ export function OrderGuide({
     });
   }, [rows, entries, term, onlyTouched, hideBlocked]);
 
-  const sections = useMemo(() => groupGuide(visibleRows), [visibleRows]);
+  const sections = useMemo(
+    () => groupGuide(visibleRows, grouping),
+    [visibleRows, grouping]
+  );
   const totals = useMemo(() => vendorTotals(rows, entries), [rows, entries]);
   const grandTotal = totals.reduce((sum, t) => (t.short ? sum : sum + t.subtotal), 0);
   const shortTotal = totals.reduce((sum, t) => (t.short ? sum + t.subtotal : sum), 0);
@@ -220,6 +228,26 @@ export function OrderGuide({
           />
           Hide unorderable
         </label>
+
+        <span className="flex items-center gap-1">
+          <span className="text-xs uppercase tracking-wide text-neutral-400">
+            Group by
+          </span>
+          {(["section", "item", "vendor"] as GuideGrouping[]).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setGrouping(mode)}
+              className={`rounded px-2 py-1 ${
+                grouping === mode
+                  ? "bg-neutral-900 text-white"
+                  : "text-neutral-600 hover:bg-neutral-100"
+              }`}
+            >
+              {GROUPING_LABEL[mode]}
+            </button>
+          ))}
+        </span>
+
         <span className="text-neutral-500">
           {visibleRows.length} of {rows.length} lines
         </span>
@@ -244,17 +272,19 @@ export function OrderGuide({
           <tbody>
             {sections.map((section) => (
               <Fragment key={section.key}>
-                <tr className="border-b border-neutral-300 bg-neutral-100">
-                  <td
-                    colSpan={5}
-                    className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-700"
-                  >
-                    {section.label}
-                    <span className="ml-2 font-normal normal-case tracking-normal text-neutral-500">
-                      {section.items.length}
-                    </span>
-                  </td>
-                </tr>
+                {section.showHeader && (
+                  <tr className="border-b border-neutral-300 bg-neutral-100">
+                    <td
+                      colSpan={5}
+                      className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-700"
+                    >
+                      {section.label}
+                      <span className="ml-2 font-normal normal-case tracking-normal text-neutral-500">
+                        {section.items.length}
+                      </span>
+                    </td>
+                  </tr>
+                )}
 
                 {section.items.map((item) => (
                   <Fragment key={item.inventory_item_id}>
