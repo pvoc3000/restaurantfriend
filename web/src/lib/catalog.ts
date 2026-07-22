@@ -46,6 +46,18 @@ export const VENDOR_ITEM_SELECT = `
   vendors ( id, name, is_active )
 `;
 
+/**
+ * Same columns, but `vendors!inner` so a query can add
+ * `.eq("vendors.is_active", true)` and drop items belonging to deactivated
+ * vendors entirely — the choice-list rule the favorites editor already follows.
+ * Not for the vendor's own detail screen, where that filter would empty the
+ * page whenever the vendor itself is inactive.
+ */
+export const VENDOR_ITEM_SELECT_ACTIVE_VENDOR = VENDOR_ITEM_SELECT.replace(
+  "vendors (",
+  "vendors!inner ("
+);
+
 export function money(value: number | null | undefined) {
   if (value === null || value === undefined) return "—";
   return `$${Number(value).toLocaleString("en-US", { minimumFractionDigits: 2 })}`;

@@ -2,7 +2,12 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { VENDOR_ITEM_SELECT, type CatalogItem, type CatalogVendorItem } from "@/lib/catalog";
+import {
+  VENDOR_ITEM_SELECT,
+  VENDOR_ITEM_SELECT_ACTIVE_VENDOR,
+  type CatalogItem,
+  type CatalogVendorItem,
+} from "@/lib/catalog";
 import { ItemFields } from "@/components/catalog/ItemFields";
 import { ItemLocationRows } from "@/components/catalog/ItemLocationRows";
 import { VendorItemsTable } from "@/components/catalog/VendorItemsTable";
@@ -31,10 +36,14 @@ export default async function ItemDetailPage({
   const [{ data: item, error }, { data: vendorItems, error: viError }] =
     await Promise.all([
       supabase.from("inventory_items").select(SELECT).eq("id", id).maybeSingle(),
+      // Deactivated vendors are gone from this screen entirely — you can't
+      // order from them, so their items are noise here. An individually
+      // inactive item under an ACTIVE vendor still shows, dimmed and toggleable.
       supabase
         .from("vendor_items")
-        .select(VENDOR_ITEM_SELECT)
+        .select(VENDOR_ITEM_SELECT_ACTIVE_VENDOR)
         .eq("inventory_item_id", id)
+        .eq("vendors.is_active", true)
         .order("is_active", { ascending: false }),
     ]);
 
@@ -78,6 +87,10 @@ export default async function ItemDetailPage({
         <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
           Vendor items
         </h2>
+        <p className="text-xs text-neutral-500">
+          Items from deactivated vendors are hidden. Reactivate the vendor on its
+          detail screen to bring them back.
+        </p>
         {viError ? (
           <p className="text-sm text-red-700">
             Could not load vendor items: {viError.message}
