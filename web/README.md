@@ -26,3 +26,16 @@ never belongs in this folder — it bypasses RLS.
 | `src/app/(app)/` | Signed-in routes; the layout renders the header (user + location switcher) |
 | `src/app/actions.ts` | Server actions: sign out, persist `org_members.last_active_location_id` |
 | `src/app/(app)/vendors/page.tsx` | Vendor list with the active location's account / minimum / order days |
+
+## Safari and stale CSS in dev
+
+If a style change shows up over HMR but disappears the moment you reload,
+Safari is serving a cached stylesheet. In dev the CSS chunk has a **stable**
+filename derived from the source path (`src_app_globals_<id>.css`) whose
+contents change on every edit; Chrome revalidates it each load, Safari happily
+reuses its cached copy. The symptom is confusing because the markup is correct
+and only the newest utility classes appear to do nothing.
+
+Fix while working: **Develop → Disable Caches** in Safari, or hard-reload with
+`⌘⌥R`. Not an issue in production — `next build` emits content-hashed CSS
+(`<hash>.css`), so a changed stylesheet is always a new URL.
