@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +21,18 @@ const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
   { key: "inactive", label: "Inactive" },
   { key: "all", label: "All" },
 ];
+
+// Sorting by category or section turns the list into a grouped report: a
+// banner row before each run of matching rows. Only these two group — the rest
+// (name, par, price, date) have no meaningful repeated value to break on.
+const GROUPING_KEYS: SortKey[] = ["category", "section"];
+
+function groupLabel(item: ItemRow, key: SortKey): string {
+  if (key === "section") {
+    return item.inventory_item_locations[0]?.shop_sections?.display_name ?? "No section";
+  }
+  return item.category ?? "No category";
+}
 
 /**
  * What each sortable column sorts on. Sections sort by their numeric
@@ -107,6 +119,8 @@ export function ItemsList({
     });
   }, [items, filters]);
 
+  const grouping = GROUPING_KEYS.includes(filters.sort) ? filters.sort : null;
+
   // Empty cells sink to the bottom in BOTH directions — flipping the sort to
   // find the biggest par shouldn't fill the top with items that have no par.
   const sorted = useMemo(() => {
@@ -117,14 +131,31 @@ export function ItemsList({
       if (va === null && vb === null) return a.name.localeCompare(b.name);
       if (va === null) return 1;
       if (vb === null) return -1;
-      const primary =
+      let c =
         typeof va === "number" && typeof vb === "number"
           ? va - vb
           : String(va).localeCompare(String(vb), undefined, { numeric: true });
-      // Name is the tiebreaker so equal values keep a stable, readable order.
-      return (primary === 0 ? a.name.localeCompare(b.name) : primary) * dir;
+      // Two shop sections can share a sort_order; tie-break on the label so
+      // each group stays one contiguous run under its header.
+      if (c === 0 && grouping) {
+        c = groupLabel(a, grouping).localeCompare(groupLabel(b, grouping));
+      }
+      // Name is the final tiebreaker so equal rows keep a stable order.
+      if (c === 0) c = a.name.localeCompare(b.name);
+      return c * dir;
     });
-  }, [visible, filters.sort, filters.dir]);
+  }, [visible, filters.sort, filters.dir, grouping]);
+
+  const groupCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (grouping) {
+      for (const item of sorted) {
+        const label = groupLabel(item, grouping);
+        counts.set(label, (counts.get(label) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [sorted, grouping]);
 
   function toggleSort(key: SortKey) {
     update(
@@ -366,12 +397,17 @@ export function ItemsList({
               </tr>
             </thead>
             <tbody>
-              {sorted.map((item) => {
+              {sorted.map((item, i) => {
                 const il = item.inventory_item_locations[0] ?? null;
                 const vi = il?.vendor_items ?? null;
-                return (
+                // A banner row starts each new run of the grouped column.
+                const label = grouping ? groupLabel(item, grouping) : null;
+                const startsGroup =
+                  label !== null &&
+                  (i === 0 || groupLabel(sorted[i - 1], grouping!) !== label);
+
+                const row = (
                   <tr
-                    key={item.id}
                     className={`border-b border-neutral-100 hover:bg-neutral-50 ${
                       item.is_active ? "" : "text-neutral-400"
                     }`}
@@ -438,6 +474,25 @@ export function ItemsList({
                       )}
                     </td>
                   </tr>
+                );
+
+                if (!startsGroup) return <Fragment key={item.id}>{row}</Fragment>;
+
+                return (
+                  <Fragment key={item.id}>
+                    <tr className="border-b border-neutral-300 bg-neutral-100">
+                      <td
+                        colSpan={9}
+                        className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-700"
+                      >
+                        {label}
+                        <span className="ml-2 font-normal normal-case tracking-normal text-neutral-500">
+                          {groupCounts.get(label!) ?? 0}
+                        </span>
+                      </td>
+                    </tr>
+                    {row}
+                  </Fragment>
                 );
               })}
             </tbody>
