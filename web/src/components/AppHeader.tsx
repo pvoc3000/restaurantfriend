@@ -5,7 +5,7 @@ import type { AppSession } from "@/lib/session";
 
 const NAV = [
   { href: "/", label: "Home" },
-  { href: "/items", label: "Inventory Items" },
+  { href: "/items", label: "Inventory" },
   { href: "/vendors", label: "Vendors" },
   { href: "/cleanup", label: "Cleanup" },
 ];

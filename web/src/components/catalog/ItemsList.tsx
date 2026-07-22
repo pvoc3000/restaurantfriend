@@ -376,7 +376,7 @@ export function ItemsList({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-xl font-semibold">Inventory Items</h1>
+        <h1 className="text-xl font-semibold">Inventory</h1>
         <span className="text-sm text-neutral-500">
           {visible.length} of {items.length}
           {activeLocationCode ? ` · ${activeLocationCode}` : ""}
