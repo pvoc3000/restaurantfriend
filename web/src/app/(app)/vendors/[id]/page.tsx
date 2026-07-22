@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { money, VENDOR_ITEM_SELECT } from "@/lib/catalog";
+import type { RawSearchParams } from "@/lib/itemFilters";
+import { parseVendorFilters, vendorsHref } from "@/lib/vendorFilters";
 import {
   VendorItemsTable,
   type VendorItemWithItem,
@@ -37,10 +39,15 @@ type Vendor = {
 
 export default async function VendorDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<RawSearchParams>;
 }) {
   const { id } = await params;
+  // The list's filters ride along in the query string so "← Vendors" returns to
+  // the same filtered view instead of resetting to everything.
+  const backHref = vendorsHref(parseVendorFilters(await searchParams));
   const session = await getAppSession();
   const supabase = await createClient();
 
@@ -77,7 +84,7 @@ export default async function VendorDetailPage({
   return (
     <div className="space-y-6">
       <div className="text-sm">
-        <Link href="/vendors" className="text-blue-700 hover:underline">
+        <Link href={backHref} className="text-blue-700 hover:underline">
           ← Vendors
         </Link>
       </div>

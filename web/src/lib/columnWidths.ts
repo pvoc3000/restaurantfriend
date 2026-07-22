@@ -9,7 +9,7 @@
 // stored widths after hydration without a mismatch — and without a setState in
 // an effect, which the lint config rejects.
 
-import { useCallback, useMemo, useSyncExternalStore } from "react";
+import { useCallback, useMemo, useState, useSyncExternalStore } from "react";
 
 export type ColumnWidths = Record<string, number>;
 
@@ -95,4 +95,58 @@ export function useColumnWidths(storageKey: string, defaults: ColumnWidths) {
   const customized = Object.keys(stored).length > 0;
 
   return { widths, setWidth, reset, customized };
+}
+
+export const MIN_COLUMN_WIDTH = 48;
+
+/**
+ * Everything a resizable table header needs: persisted widths plus the
+ * pointer-drag that changes them. Shared by every list screen so the drag
+ * behaviour (and its Safari fixes) can't drift between them.
+ *
+ * `defaults` must be a stable module-level constant.
+ */
+export function useResizableColumns(storageKey: string, defaults: ColumnWidths) {
+  const { widths, setWidth, reset, customized } = useColumnWidths(storageKey, defaults);
+
+  // Live widths during a drag, committed to storage on pointer-up so we're not
+  // writing localStorage on every mouse move.
+  const [dragWidths, setDragWidths] = useState<ColumnWidths | null>(null);
+  const effective = dragWidths ?? widths;
+
+  function startResize(event: React.PointerEvent, column: string) {
+    event.preventDefault();
+    const startX = event.clientX;
+    const base = { ...effective };
+    const startWidth = base[column] ?? MIN_COLUMN_WIDTH;
+    const widthAt = (clientX: number) =>
+      Math.max(MIN_COLUMN_WIDTH, startWidth + clientX - startX);
+
+    // Hold the resize cursor and kill text selection for the whole page while
+    // dragging — otherwise the cursor flickers back to a caret the moment the
+    // pointer leaves the grip, which reads as the drag having stopped.
+    const previousCursor = document.body.style.cursor;
+    const previousSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const onMove = (e: PointerEvent) => {
+      setDragWidths({ ...base, [column]: widthAt(e.clientX) });
+    };
+    const onUp = (e: PointerEvent) => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousSelect;
+      setDragWidths(null);
+      setWidth(column, widthAt(e.clientX));
+    };
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
+
+  const totalWidth = (columns: { key: string; width: number }[]) =>
+    columns.reduce((sum, c) => sum + (effective[c.key] ?? c.width), 0);
+
+  return { widths: effective, startResize, setWidth, reset, customized, totalWidth };
 }

@@ -14,7 +14,9 @@ import {
   type SortKey,
   type StaleFilter,
 } from "@/lib/itemFilters";
-import { useColumnWidths, type ColumnWidths } from "@/lib/columnWidths";
+import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
+import { makeComparator, nextSortDir, type SortValue } from "@/lib/tableSort";
+import { ColumnHeader } from "./ColumnHeader";
 import type { ItemRow } from "@/app/(app)/items/page";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
@@ -50,7 +52,6 @@ const DEFAULT_WIDTHS: ColumnWidths = Object.fromEntries(
 );
 
 const WIDTHS_STORAGE_KEY = "rf.items.columnWidths.v1";
-const MIN_COLUMN_WIDTH = 48;
 
 // Sorting by category or section turns the list into a grouped report: a
 // banner row before each run of matching rows. Only these two group — the rest
@@ -69,7 +70,7 @@ function groupLabel(item: ItemRow, key: SortKey): string {
  * sort_order, not the display name, so the list follows the physical walk order
  * of the shop rather than alphabet.
  */
-function sortValue(item: ItemRow, key: SortKey): string | number | null {
+function sortValue(item: ItemRow, key: SortKey): SortValue {
   const il = item.inventory_item_locations[0] ?? null;
   const vi = il?.vendor_items ?? null;
   switch (key) {
@@ -124,46 +125,14 @@ export function ItemsList({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const { widths, setWidth, reset: resetWidths, customized } = useColumnWidths(
-    WIDTHS_STORAGE_KEY,
-    DEFAULT_WIDTHS
-  );
-  // Live widths during a drag; committed to storage on pointer-up so we're not
-  // writing localStorage on every mouse move.
-  const [dragWidths, setDragWidths] = useState<ColumnWidths | null>(null);
-  const effectiveWidths = dragWidths ?? widths;
-  const tableWidth = COLUMNS.reduce((sum, c) => sum + (effectiveWidths[c.key] ?? c.width), 0);
-
-  function startResize(event: React.PointerEvent, columnKey: string) {
-    event.preventDefault();
-    const startX = event.clientX;
-    const base = { ...effectiveWidths };
-    const startWidth = base[columnKey] ?? MIN_COLUMN_WIDTH;
-    const widthAt = (clientX: number) =>
-      Math.max(MIN_COLUMN_WIDTH, startWidth + clientX - startX);
-
-    // Hold the resize cursor and kill text selection for the whole page while
-    // dragging — otherwise the cursor flickers back to a caret the moment the
-    // pointer leaves the 12px grip, which reads as the drag having stopped.
-    const previousCursor = document.body.style.cursor;
-    const previousSelect = document.body.style.userSelect;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const onMove = (e: PointerEvent) => {
-      setDragWidths({ ...base, [columnKey]: widthAt(e.clientX) });
-    };
-    const onUp = (e: PointerEvent) => {
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", onUp);
-      document.body.style.cursor = previousCursor;
-      document.body.style.userSelect = previousSelect;
-      setDragWidths(null);
-      setWidth(columnKey, widthAt(e.clientX));
-    };
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", onUp);
-  }
+  const {
+    widths: effectiveWidths,
+    startResize,
+    setWidth,
+    reset: resetWidths,
+    customized,
+    totalWidth,
+  } = useResizableColumns(WIDTHS_STORAGE_KEY, DEFAULT_WIDTHS);
 
   function update(patch: Partial<ItemFilters>) {
     const next = { ...filters, ...patch };
@@ -192,30 +161,23 @@ export function ItemsList({
 
   const grouping = GROUPING_KEYS.includes(filters.sort) ? filters.sort : null;
 
-  // Empty cells sink to the bottom in BOTH directions — flipping the sort to
-  // find the biggest par shouldn't fill the top with items that have no par.
-  const sorted = useMemo(() => {
-    const dir = filters.dir === "asc" ? 1 : -1;
-    return [...visible].sort((a, b) => {
-      const va = sortValue(a, filters.sort);
-      const vb = sortValue(b, filters.sort);
-      if (va === null && vb === null) return a.name.localeCompare(b.name);
-      if (va === null) return 1;
-      if (vb === null) return -1;
-      let c =
-        typeof va === "number" && typeof vb === "number"
-          ? va - vb
-          : String(va).localeCompare(String(vb), undefined, { numeric: true });
-      // Two shop sections can share a sort_order; tie-break on the label so
-      // each group stays one contiguous run under its header.
-      if (c === 0 && grouping) {
-        c = groupLabel(a, grouping).localeCompare(groupLabel(b, grouping));
-      }
-      // Name is the final tiebreaker so equal rows keep a stable order.
-      if (c === 0) c = a.name.localeCompare(b.name);
-      return c * dir;
-    });
-  }, [visible, filters.sort, filters.dir, grouping]);
+  const sorted = useMemo(
+    () =>
+      [...visible].sort(
+        makeComparator<ItemRow>({
+          value: (item) => sortValue(item, filters.sort),
+          dir: filters.dir,
+          // Two shop sections can share a sort_order; tie-break on the label so
+          // each group stays one contiguous run under its header. Name is the
+          // final tiebreaker so equal rows keep a stable order.
+          tiebreaks: [
+            ...(grouping ? [(item: ItemRow) => groupLabel(item, grouping)] : []),
+            (item: ItemRow) => item.name,
+          ],
+        })
+      ),
+    [visible, filters.sort, filters.dir, grouping]
+  );
 
   const groupCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -229,78 +191,7 @@ export function ItemsList({
   }, [sorted, grouping]);
 
   function toggleSort(key: SortKey) {
-    update(
-      filters.sort === key
-        ? { dir: filters.dir === "asc" ? "desc" : "asc" }
-        : { sort: key, dir: "asc" }
-    );
-  }
-
-  // A plain function, not a nested component: <Foo/> defined inside a render
-  // would be a new component type each pass and remount the header every time.
-  function columnHeader(col: (typeof COLUMNS)[number]) {
-    const on = col.sort !== null && filters.sort === col.sort;
-    const arrow = on ? (filters.dir === "asc" ? "▲" : "▼") : "";
-    return (
-      <th
-        key={col.key}
-        // p-0 on the cell, padding on the inner div: that way the resize handle
-        // can sit exactly on the column boundary instead of inside the padding.
-        //
-        // The positioning context is that inner DIV, not this <th>: under
-        // border-collapse WebKit doesn't make a table cell a containing block,
-        // so an absolutely-positioned grip anchored to the <th> escapes to the
-        // table and disappears in Safari while looking fine in Chrome.
-        className="p-0 font-medium"
-        aria-sort={on ? (filters.dir === "asc" ? "ascending" : "descending") : "none"}
-      >
-        <div
-          className={`relative flex items-center px-2 py-1 ${
-            col.align === "right" ? "justify-end" : ""
-          }`}
-        >
-          {col.key === "select" ? (
-            <input
-              type="checkbox"
-              checked={allVisibleChecked}
-              onChange={toggleAllVisible}
-              aria-label="select all"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={() => col.sort && toggleSort(col.sort)}
-              title={`Sort by ${col.label.toLowerCase()}`}
-              className={`inline-flex max-w-full items-center gap-1 rounded px-1 hover:bg-neutral-100 ${
-                on ? "font-semibold text-neutral-900" : ""
-              }`}
-            >
-              <span className="truncate">{col.label}</span>
-              {/* Reserve the arrow's width so headers don't jump when sort moves. */}
-              <span className={`w-3 shrink-0 text-xs ${on ? "" : "text-neutral-300"}`}>
-                {arrow || "↕"}
-              </span>
-            </button>
-          )}
-
-          {/* Resize grip: a visible divider on every column boundary so it's
-              discoverable at rest, with a hit area wider than the line itself
-              and straddling the boundary. `group` drives the hover state of the
-              line inside it. Lives inside the div — see the note on the <th>. */}
-          <span
-            onPointerDown={(e) => startResize(e, col.key)}
-            onDoubleClick={() => setWidth(col.key, col.width)}
-            role="separator"
-            aria-orientation="vertical"
-            aria-label={`Resize ${col.label || "select"} column`}
-            title="Drag to resize · double-click to reset this column"
-            className="group absolute inset-y-0 right-0 z-10 flex w-3 translate-x-1/2 cursor-col-resize touch-none select-none justify-center"
-          >
-            <span className="w-px self-stretch bg-neutral-300 transition-colors group-hover:w-0.5 group-hover:bg-blue-500" />
-          </span>
-        </div>
-      </th>
-    );
+    update({ sort: key, dir: nextSortDir(filters.sort === key, filters.dir) });
   }
 
   const staleCounts = useMemo(() => {
@@ -499,7 +390,7 @@ export function ItemsList({
         <div className="overflow-x-auto">
           <table
             className="table-fixed border-collapse text-sm"
-            style={{ width: tableWidth }}
+            style={{ width: totalWidth(COLUMNS) }}
           >
             <colgroup>
               {COLUMNS.map((col) => (
@@ -508,7 +399,26 @@ export function ItemsList({
             </colgroup>
             <thead>
               <tr className="border-b border-neutral-300 text-left text-neutral-600">
-                {COLUMNS.map(columnHeader)}
+                {COLUMNS.map((col) => (
+                  <ColumnHeader
+                    key={col.key}
+                    label={col.label}
+                    align={col.align}
+                    sorted={col.sort !== null && filters.sort === col.sort ? filters.dir : false}
+                    onSort={col.sort ? () => toggleSort(col.sort!) : undefined}
+                    onResizeStart={(e) => startResize(e, col.key)}
+                    onResizeReset={() => setWidth(col.key, col.width)}
+                  >
+                    {col.key === "select" ? (
+                      <input
+                        type="checkbox"
+                        checked={allVisibleChecked}
+                        onChange={toggleAllVisible}
+                        aria-label="select all"
+                      />
+                    ) : undefined}
+                  </ColumnHeader>
+                ))}
               </tr>
             </thead>
             <tbody>
