@@ -25,10 +25,10 @@ export const PROBLEM_LABEL: Record<ProblemKind, string> = {
   no_par: "No par",
 };
 
-// The shape the page selects from item_locations. vendor_items is the resolved
+// The shape the page selects from inventory_item_locations. vendor_items is the resolved
 // default (may be null); nested vendors carries the vendor's active flag.
 export type CleanupRow = {
-  id: string; // item_locations.id
+  id: string; // inventory_item_locations.id
   location_id: string;
   inventory_item_id: string;
   default_par: number | null;

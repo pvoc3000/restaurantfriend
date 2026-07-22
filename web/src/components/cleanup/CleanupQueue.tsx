@@ -110,7 +110,7 @@ export function CleanupQueue({
     const rows = items.filter((i) => checked.has(i.id));
 
     const { error } = await supabase
-      .from("item_locations")
+      .from("inventory_item_locations")
       .update({ is_active: false })
       .in("id", ids);
     if (error) {
@@ -123,7 +123,7 @@ export function CleanupQueue({
     // deactivate the item entirely (brief §B3 follow-up).
     const invIds = [...new Set(rows.map((r) => r.inventory_item_id))];
     const { data: stillActive, error: qErr } = await supabase
-      .from("item_locations")
+      .from("inventory_item_locations")
       .select("inventory_item_id")
       .in("inventory_item_id", invIds)
       .eq("is_active", true);

@@ -4,6 +4,13 @@ Every column that migrates, and everything that deliberately doesn't.
 Source: DF-PO-System.fmp12 (catalog + POs) and DF-Locations.fmp12 (locations).
 Weekdays everywhere: ISO 1=Mon … 7=Sun (matches FMP `Get DayNum`; FMP repetition *n* = weekday *n*).
 
+Table names here reflect **migration 005** (2026-07-22 renames: `item_locations`→
+`inventory_item_locations`, `item_order_days`→`order_guide_plan_days`, `guide_entries`→
+`order_guide_entries`, `po_items`→`purchase_order_items`, `po_attachments`→
+`purchase_order_attachments`, `reminders`→`purchase_reminders`). The transformed
+**JSON files keep their pre-rename names** (`item_locations.json`, `item_order_days.json`,
+`po_items_1/2.json`) — `load.mjs` maps file → table.
+
 ## Vendor → `vendors`
 
 | FMP | Schema | Notes |
@@ -44,7 +51,7 @@ Weekdays everywhere: ISO 1=Mon … 7=Sun (matches FMP `Get DayNum`; FMP repetiti
 | — | `base_unit` | **derived**: the default vendor item's unit, normalized (lb→lbs, ct→ea); fallback = modal unit family of the item's vendor items; no data → `ea` |
 | `Note` | `note` | |
 | `isActive` | `is_active` | |
-| `_VendorItemKey_num` | → `item_locations.default_vendor_item_id` | item-level favorite in FMP |
+| `_VendorItemKey_num` | → `inventory_item_locations.default_vendor_item_id` | item-level favorite in FMP |
 | `Assigned_To`, `Log`, `ToOrder` | **dropped** | session state / future feature |
 
 ## VendorItems → `vendor_items`
@@ -64,26 +71,26 @@ Weekdays everywhere: ISO 1=Mon … 7=Sun (matches FMP `Get DayNum`; FMP repetiti
 | `Par` (text) | **dropped** | superseded by per-location pars in InventoryLoc |
 | `InventoryDays`, `OrderFrequency`, `StoreSection`, `toOrder`, `OrderedAmount`, `Price_Previous`, `DELETE onInventory`, `Log` | **dropped** | day plan comes from OrderGuide favorites; rest is session state / stale cache |
 
-## InventoryLoc → `item_locations` + `item_order_days` (pars) + `shop_sections`
+## InventoryLoc → `inventory_item_locations` + `order_guide_plan_days` (pars) + `shop_sections`
 
 | FMP | Schema | Notes |
 |---|---|---|
-| `_InventoryKey_num` + `Location` | `item_locations (inventory_item_id, location_id)` | 218 fully blank rows and 5 duplicates dropped (audit) |
-| `Shop_Location` | `shop_sections.display_name` + `item_locations.shop_section_id` | leading number → `sort_order`; text split into area / sub-area |
-| `Par__array[1]` | `item_locations.default_par` | **in base units.** Par text parsed: package pars ("2 cs", "3 EA") × default vendor item's package_content; measure pars ("5 lbs", "1/2 gal") converted directly; "#"=lbs, "1.5g"/"3G"=gallons |
-| `Par__array[2..7]` | `item_order_days.par_qty` (weekday 2–7) | per-day par overrides |
-| `isFixed_array[n]` | `item_order_days.par_mode` | `1`→'fixed' |
+| `_InventoryKey_num` + `Location` | `inventory_item_locations (inventory_item_id, location_id)` | 218 fully blank rows and 5 duplicates dropped (audit) |
+| `Shop_Location` | `shop_sections.display_name` + `inventory_item_locations.shop_section_id` | leading number → `sort_order`; text split into area / sub-area |
+| `Par__array[1]` | `inventory_item_locations.default_par` | **in base units.** Par text parsed: package pars ("2 cs", "3 EA") × default vendor item's package_content; measure pars ("5 lbs", "1/2 gal") converted directly; "#"=lbs, "1.5g"/"3G"=gallons |
+| `Par__array[2..7]` | `order_guide_plan_days.par_qty` (weekday 2–7) | per-day par overrides |
+| `isFixed_array[n]` | `order_guide_plan_days.par_mode` | `1`→'fixed' |
 | `isActive_b` | `is_active` | |
 | `Note` | `note` | |
 | `OrderDays_array` | **dropped** | 947 of 1242 rows are all-days, 294 all-off — carries no plan info; the real day plan is the OrderGuide favorites |
 | `Par_Amount/Unit/Size_array` | **dropped** | used on only 3 rows ever |
 | `Shop_LocationID` | **dropped** | FMP-internal UUID |
 
-## OrderGuide → `item_order_days` (favorites) + `vendor_item_location_prices`
+## OrderGuide → `order_guide_plan_days` (favorites) + `vendor_item_location_prices`
 
 | FMP | Schema | Notes |
 |---|---|---|
-| `_key_VendorItem_num` + `Location` + `isDefault[n]` | `item_order_days.vendor_item_id` for weekday *n* | the per-day favorite. Stored as NULL when it equals the item default (inherit). Conflicts (two favorites, same day) resolved toward the item default — 631 cases in audit |
+| `_key_VendorItem_num` + `Location` + `isDefault[n]` | `order_guide_plan_days.vendor_item_id` for weekday *n* | the per-day favorite. Stored as NULL when it equals the item default (inherit). Conflicts (two favorites, same day) resolved toward the item default — 631 cases in audit |
 | `UnitPrice_num` | `vendor_item_location_prices.price` | only where it differs from the vendor item's global price (135 rows) |
 | `shouldOrder[n]`, `Order_Amount`, `On_Hand`, `isNotNeeded` | **dropped** | transient session state from the last FMP ordering session |
 | all `OG_*` fields | **dropped** | denormalized display caches — the new system computes these live (`v_order_guide`) |
@@ -112,7 +119,7 @@ Weekdays everywhere: ISO 1=Mon … 7=Sun (matches FMP `Get DayNum`; FMP repetiti
 | `PO_Notes` / `PO_SentNotes` | `notes` / `sent_notes` | |
 | `Vendor_*`, `Location_*` snapshots, `CSV`, totals, globals | **dropped** | recomputable / display caches |
 
-## POItem → `po_items`
+## POItem → `purchase_order_items`
 
 | FMP | Schema | Notes |
 |---|---|---|

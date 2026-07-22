@@ -9,7 +9,7 @@ delta. Read docs/purchasing-spec.md + CLAUDE.md first; migration 003
 
 ## A. Multi-favorite plan rows (schema 003)
 
-`item_order_days` is now unique on (item_location, weekday, **vendor_item**) —
+`order_guide_plan_days` is now unique on (item_location, weekday, **vendor_item**) —
 an item can have several favorited vendor items on the same weekday. The data
 loaded this way: 10,462 plan rows, ~2,370 day-groups with >1 line. Two intents:
 
@@ -23,7 +23,7 @@ Consequences for UI:
    (name, section, item par); one child line per plan row (vendor, description,
    package, price, qty box). `v_order_guide` already emits one row per plan row.
 2. **`par_qty` on a plan row = per-LINE par** (rare; item-level
-   `item_locations.default_par` is the group total). Don't sum line pars into
+   `inventory_item_locations.default_par` is the group total). Don't sum line pars into
    the item par — they're overrides for specific lines only.
 3. **Favorites editor** (item detail, per location): the item's vendor items in
    a weekday × vendor-item grid of checkboxes mirroring FMP's favorites row;
@@ -41,12 +41,12 @@ The queue's biggest waste-of-time risk is Mark hand-fixing items he stopped
 ordering years ago. PO history is loaded — use it:
 
 1. Add a **"Last ordered"** column to the cleanup queue and items list:
-   `max(purchase_orders.order_date)` over the item's vendor items' po_items at
+   `max(purchase_orders.order_date)` over the item's vendor items' purchase_order_items at
    that location (one query/view, not N+1 — consider a small SQL view
    `v_item_last_ordered(item_location_id, last_order_date)`).
 2. Add filter chips: **never ordered** (37 active rows) · **2+ years** (143) ·
    **1-2 years** (80) · **within a year** (650).
-3. Add **bulk select + "Deactivate selected"** (sets `item_locations.is_active
+3. Add **bulk select + "Deactivate selected"** (sets `inventory_item_locations.is_active
    = false`; separate action for `inventory_items.is_active = false` when the
    item is inactive at ALL locations — offer as a follow-up prompt).
 4. Suggested flow shown in the UI: triage stale rows first, then fix what's

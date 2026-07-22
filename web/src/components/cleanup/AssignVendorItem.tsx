@@ -112,7 +112,7 @@ export function AssignVendorItem({
       }
     }
     const { error } = await supabase
-      .from("item_locations")
+      .from("inventory_item_locations")
       .update({ default_vendor_item_id: vi.id })
       .eq("id", itemLocationId);
     setBusy(false);
@@ -126,7 +126,7 @@ export function AssignVendorItem({
     const { error } =
       scope === "here"
         ? await supabase
-            .from("item_locations")
+            .from("inventory_item_locations")
             .update({ is_active: false })
             .eq("id", itemLocationId)
         : await supabase

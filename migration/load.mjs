@@ -67,11 +67,11 @@ if (WIPE) {
   console.log('wiping previously migrated data…');
   // reverse dependency order; org-scoped only. Deletes are batched by id —
   // single-statement deletes of 100k+ rows hit Supabase's statement timeout.
-  for (const t of ['po_attachments', 'po_items', 'purchase_orders', 'guide_entries',
-                   'item_order_days', 'item_locations', 'shop_sections',
-                   'vendor_item_location_prices', 'price_history', 'par_history',
+  for (const t of ['purchase_order_attachments', 'purchase_order_items', 'purchase_orders',
+                   'order_guide_entries', 'order_guide_plan_days', 'inventory_item_locations',
+                   'shop_sections', 'vendor_item_location_prices', 'price_history', 'par_history',
                    'vendor_items', 'inventory_items', 'vendor_locations', 'vendors',
-                   'reminders', 'purchase_requests']) {
+                   'purchase_reminders', 'purchase_requests']) {
     if (t === 'vendor_item_location_prices') {
       // composite PK, tiny table — one statement is fine
       const { error } = await db.from(t).delete().eq('org_id', ORG);
@@ -165,7 +165,11 @@ const SEC = {};
   for (const r of back) SEC[`${codeByLoc[r.location_id]}|${r.display_name}`] = r.id;
 }
 
-// 8. item_locations -------------------------------------------------------
+// NOTE (migration 005): tables were renamed for clarity, but the transformed
+// JSON files keep their original FMP-era names (item_locations.json, …) —
+// J('item_locations') below reads the FILE; insertBatched targets the TABLE.
+
+// 8. inventory_item_locations ---------------------------------------------
 const ILOC = {};
 {
   const src = J('item_locations');
@@ -176,14 +180,14 @@ const ILOC = {};
     default_vendor_item_id: VITEM[i.default_vendor_item_legacy_id] ?? null,
     default_par: i.default_par, note: i.note, is_active: i.is_active,
   }));
-  const back = await insertBatched('item_locations', rows, 'id, inventory_item_id, location_id');
+  const back = await insertBatched('inventory_item_locations', rows, 'id, inventory_item_id, location_id');
   const legByUuid = Object.fromEntries(Object.entries(ITEM).map(([leg, id]) => [id, leg]));
   const codeByLoc = Object.fromEntries(Object.entries(LOC).map(([c, id]) => [id, c]));
   for (const r of back) ILOC[`${legByUuid[r.inventory_item_id]}|${codeByLoc[r.location_id]}`] = r.id;
 }
 
-// 9. item_order_days ------------------------------------------------------
-await insertBatched('item_order_days', J('item_order_days')
+// 9. order_guide_plan_days ------------------------------------------------
+await insertBatched('order_guide_plan_days', J('item_order_days')
   .filter((d) => ILOC[`${d.inventory_item_legacy_id}|${d.location_code}`])
   .map((d) => ({
     org_id: ORG, item_location_id: ILOC[`${d.inventory_item_legacy_id}|${d.location_code}`],
@@ -206,7 +210,7 @@ const POID = {};
   for (const p of src) POID[p.legacy_id] = byNum[p.po_number];
 }
 for (const part of ['po_items_1', 'po_items_2']) {
-  await insertBatched('po_items', J(part)
+  await insertBatched('purchase_order_items', J(part)
     .filter((p) => POID[p.po_legacy_id])
     .map((p) => ({
       org_id: ORG, po_id: POID[p.po_legacy_id],
@@ -219,11 +223,11 @@ for (const part of ['po_items_1', 'po_items_2']) {
 
 console.log('\nDONE. Sanity counts:');
 for (const t of ['vendors', 'vendor_locations', 'inventory_items', 'vendor_items',
-                 'vendor_item_location_prices', 'shop_sections', 'item_locations',
-                 'item_order_days', 'purchase_orders', 'po_items']) {
+                 'vendor_item_location_prices', 'shop_sections', 'inventory_item_locations',
+                 'order_guide_plan_days', 'purchase_orders', 'purchase_order_items']) {
   const { count: c } = await db.from(t).select('*', { count: 'exact', head: true });
   console.log(`  ${t}: ${c}`);
 }
 console.log('\nExpected: vendors 80 · vendor_locations 135 · inventory_items 790 · vendor_items 2888');
-console.log('          prices 135 · sections 168 · item_locations 1237 · order days 6686');
-console.log('          purchase_orders 16814 · po_items 104669');
+console.log('          prices 135 · sections 168 · inventory_item_locations 1237 · plan days 10462');
+console.log('          purchase_orders 16814 · purchase_order_items 104669');

@@ -31,7 +31,7 @@ type FetchResult = { error: string } | { vendorItems: VendorItem[]; plan: PlanMa
 
 /**
  * Multi-favorite plan-row editor (brief §A, schema 003): a weekday × vendor-item
- * checkbox grid. Each checked cell is an item_order_days row favoriting that
+ * checkbox grid. Each checked cell is an order_guide_plan_days row favoriting that
  * vendor item on that weekday for this item-location. An item can have several
  * favorites on the same day (multi-vendor sourcing or pack-size variants).
  */
@@ -66,7 +66,7 @@ export function FavoritesEditor({
           .eq("vendors.is_active", true)
           .order("id"),
         supabase
-          .from("item_order_days")
+          .from("order_guide_plan_days")
           .select("id, weekday, vendor_item_id")
           .eq("item_location_id", itemLocationId),
       ]);
@@ -108,7 +108,7 @@ export function FavoritesEditor({
     setError(null);
     const k = key(weekday, viId);
     if (on) {
-      const { error } = await supabase.from("item_order_days").insert({
+      const { error } = await supabase.from("order_guide_plan_days").insert({
         org_id: orgId,
         item_location_id: itemLocationId,
         weekday,
@@ -119,7 +119,7 @@ export function FavoritesEditor({
       const id = plan.get(k);
       if (id) {
         const { error } = await supabase
-          .from("item_order_days")
+          .from("order_guide_plan_days")
           .delete()
           .eq("id", id);
         if (error) setError(error.message);
@@ -136,7 +136,7 @@ export function FavoritesEditor({
     if (on) {
       const missing = DAYS.filter((d) => !plan.has(key(d.weekday, viId)));
       if (missing.length > 0) {
-        const { error } = await supabase.from("item_order_days").insert(
+        const { error } = await supabase.from("order_guide_plan_days").insert(
           missing.map((d) => ({
             org_id: orgId,
             item_location_id: itemLocationId,
@@ -152,7 +152,7 @@ export function FavoritesEditor({
       ) as string[];
       if (ids.length > 0) {
         const { error } = await supabase
-          .from("item_order_days")
+          .from("order_guide_plan_days")
           .delete()
           .in("id", ids);
         if (error) setError(error.message);

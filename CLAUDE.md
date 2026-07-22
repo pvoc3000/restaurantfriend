@@ -49,11 +49,13 @@ The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
 multi-favorites + §B last-ordered triage). Cleanup checks live in
 `web/src/lib/cleanup.ts`; unit conversion in `web/src/lib/units.ts`;
 last-ordered buckets in `web/src/lib/lastOrdered.ts`. Schema: migration 003
-makes `item_order_days` unique per (item, weekday, **vendor_item**) — multiple
+makes `order_guide_plan_days` unique per (item, weekday, **vendor_item**) — multiple
 favorites per day (multi-vendor sourcing / pack-size variants), so the guide
 groups lines by inventory item and `par_qty` on a plan row is a PER-LINE par.
 Migration 004 adds the last-ordered view (per-location semantics: "last ordered
-AT this location").
+AT this location"). Migration 005 renames tables for clarity — see
+"Table naming" under Conventions; docs/purchasing-spec.md §5 predates the
+renames, translate via that mapping when reading it.
 
 ## Non-negotiable design rules
 
@@ -81,6 +83,16 @@ AT this location").
 
 ## Conventions
 
+- **Table naming** (migration 005, 2026-07-22): junction/config tables are named
+  by their endpoints (`vendor_locations`, `inventory_item_locations`); workflow
+  tables by their business concept (`purchase_orders`, `order_guide_plan_days`).
+  Follow these rules for every new table. Renames applied (old → new, for
+  reading pre-005 docs/specs): `item_locations` → `inventory_item_locations` ·
+  `item_order_days` → `order_guide_plan_days` · `guide_entries` →
+  `order_guide_entries` · `po_items` → `purchase_order_items` ·
+  `po_attachments` → `purchase_order_attachments` · `reminders` →
+  `purchase_reminders`. Column names were NOT renamed (`po_id`,
+  `item_location_id` remain). The migration JSON files also keep old names.
 - Weekdays: ISO smallint, 1 = Monday … 7 = Sunday (all ordering currently
   happens Monday; don't foreground the day dimension in UI).
 - Roles: owner / admin / purchaser / staff (in `org_members.role`).

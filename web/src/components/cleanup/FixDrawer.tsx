@@ -335,7 +335,7 @@ function ParEditor({
     setError(null);
     // Default par changes are logged by a DB trigger (CLAUDE.md rule 6).
     const { error } = await supabase
-      .from("item_locations")
+      .from("inventory_item_locations")
       .update({ default_par: p })
       .eq("id", itemLocationId);
     setBusy(false);

@@ -47,10 +47,10 @@ export default async function CleanupPage({
     let from = 0;
     for (;;) {
       const { data, error } = await supabase
-        .from("item_locations")
+        .from("inventory_item_locations")
         .select(SELECT)
         .eq("is_active", true)
-        // brief P1: only active item_locations joined to ACTIVE items. !inner
+        // brief P1: only active inventory_item_locations joined to ACTIVE items. !inner
         // guarantees the item exists; this filters out deactivated ones — and
         // makes "deactivate item everywhere" burn the row off the queue.
         .eq("inventory_items.is_active", true)
