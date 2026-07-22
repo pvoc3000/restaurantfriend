@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { staleBucket, type StaleBucket } from "@/lib/lastOrdered";
 import { VENDOR_ITEM_SELECT, type CatalogItem } from "@/lib/catalog";
+import { parseItemFilters, type RawSearchParams } from "@/lib/itemFilters";
 import { ItemsList } from "@/components/catalog/ItemsList";
 
 // The list is item-master rows with the CURRENT location's config embedded, so
@@ -22,7 +23,13 @@ export type ItemRow = CatalogItem & {
   stale: StaleBucket;
 };
 
-export default async function ItemsPage() {
+export default async function ItemsPage({
+  searchParams,
+}: {
+  searchParams: Promise<RawSearchParams>;
+}) {
+  // Filters arrive in the URL so returning from item detail restores them.
+  const initialFilters = parseItemFilters(await searchParams);
   const session = await getAppSession();
   const supabase = await createClient();
   const locationId = session.activeLocation?.id ?? null;
@@ -81,6 +88,7 @@ export default async function ItemsPage() {
       items={rows}
       categories={categories}
       activeLocationCode={session.activeLocation?.code ?? null}
+      initialFilters={initialFilters}
     />
   );
 }

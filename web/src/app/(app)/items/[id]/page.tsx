@@ -8,6 +8,7 @@ import {
   type CatalogItem,
   type CatalogVendorItem,
 } from "@/lib/catalog";
+import { itemsHref, parseItemFilters, type RawSearchParams } from "@/lib/itemFilters";
 import { ItemFields } from "@/components/catalog/ItemFields";
 import { ItemLocationRows } from "@/components/catalog/ItemLocationRows";
 import { VendorItemsTable } from "@/components/catalog/VendorItemsTable";
@@ -26,10 +27,15 @@ const SELECT = `
 
 export default async function ItemDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<RawSearchParams>;
 }) {
   const { id } = await params;
+  // The list's filters ride along in the query string so "← Items" returns to
+  // the same filtered view instead of resetting to everything.
+  const backHref = itemsHref(parseItemFilters(await searchParams));
   const session = await getAppSession();
   const supabase = await createClient();
 
@@ -62,7 +68,7 @@ export default async function ItemDetailPage({
   return (
     <div className="space-y-6">
       <div className="text-sm">
-        <Link href="/items" className="text-blue-700 hover:underline">
+        <Link href={backHref} className="text-blue-700 hover:underline">
           ← Items
         </Link>
       </div>

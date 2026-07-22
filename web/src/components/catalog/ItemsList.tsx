@@ -4,14 +4,18 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { STALE_ORDER, STALE_LABEL, type StaleBucket } from "@/lib/lastOrdered";
+import { STALE_ORDER, STALE_LABEL } from "@/lib/lastOrdered";
 import { money, qty, vendorItemLabel } from "@/lib/catalog";
+import {
+  itemDetailHref,
+  itemFiltersToQuery,
+  type ActiveFilter,
+  type ItemFilters,
+  type StaleFilter,
+} from "@/lib/itemFilters";
 import type { ItemRow } from "@/app/(app)/items/page";
 
-type ActiveTab = "active" | "inactive" | "all";
-type StaleTab = StaleBucket | "any";
-
-const ACTIVE_TABS: { key: ActiveTab; label: string }[] = [
+const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
   { key: "active", label: "Active" },
   { key: "inactive", label: "Inactive" },
   { key: "all", label: "All" },
@@ -21,34 +25,45 @@ const ACTIVE_TABS: { key: ActiveTab; label: string }[] = [
  * The general catalog list (brief §D) — search / category / active /
  * last-ordered, with multi-select deactivate. Unlike /cleanup this shows the
  * whole catalog, healthy rows included; it's the way in to item detail.
+ *
+ * Filters live in the URL so they survive a trip into item detail and back.
+ * The URL is written with history.replaceState rather than router.replace on
+ * purpose: router.replace would re-run the server component (a full refetch of
+ * ~790 items) on every keystroke, and all the filtering here is client-side.
  */
 export function ItemsList({
   items,
   categories,
   activeLocationCode,
+  initialFilters,
 }: {
   items: ItemRow[];
   categories: string[];
   activeLocationCode: string | null;
+  initialFilters: ItemFilters;
 }) {
   const router = useRouter();
   const supabase = createClient();
 
-  const [term, setTerm] = useState("");
-  const [category, setCategory] = useState<string>("");
-  const [activeTab, setActiveTab] = useState<ActiveTab>("active");
-  const [staleTab, setStaleTab] = useState<StaleTab>("any");
+  const [filters, setFilters] = useState<ItemFilters>(initialFilters);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  function update(patch: Partial<ItemFilters>) {
+    const next = { ...filters, ...patch };
+    setFilters(next);
+    const query = itemFiltersToQuery(next);
+    window.history.replaceState(null, "", query ? `/items?${query}` : "/items");
+  }
+
   const visible = useMemo(() => {
-    const t = term.trim().toLowerCase();
+    const t = filters.q.trim().toLowerCase();
     return items.filter((i) => {
-      if (activeTab === "active" && !i.is_active) return false;
-      if (activeTab === "inactive" && i.is_active) return false;
-      if (category && i.category !== category) return false;
-      if (staleTab !== "any" && i.stale !== staleTab) return false;
+      if (filters.active === "active" && !i.is_active) return false;
+      if (filters.active === "inactive" && i.is_active) return false;
+      if (filters.category && i.category !== filters.category) return false;
+      if (filters.stale !== "any" && i.stale !== filters.stale) return false;
       if (!t) return true;
       const vi = i.inventory_item_locations[0]?.vendor_items ?? null;
       return (
@@ -58,7 +73,7 @@ export function ItemsList({
         (vi !== null && vendorItemLabel(vi).toLowerCase().includes(t))
       );
     });
-  }, [items, term, category, activeTab, staleTab]);
+  }, [items, filters]);
 
   const staleCounts = useMemo(() => {
     const c: Record<string, number> = {};
@@ -148,14 +163,14 @@ export function ItemsList({
       {/* Search + category */}
       <div className="flex flex-wrap items-center gap-2">
         <input
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
+          value={filters.q}
+          onChange={(e) => update({ q: e.target.value })}
           placeholder="Search name, category, vendor…"
           className="w-72 rounded border border-neutral-300 px-2 py-1 text-sm"
         />
         <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
+          value={filters.category}
+          onChange={(e) => update({ category: e.target.value })}
           className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm"
         >
           <option value="">All categories</option>
@@ -170,9 +185,9 @@ export function ItemsList({
           {ACTIVE_TABS.map((t) => (
             <button
               key={t.key}
-              onClick={() => setActiveTab(t.key)}
+              onClick={() => update({ active: t.key })}
               className={`rounded px-2 py-1 ${
-                activeTab === t.key
+                filters.active === t.key
                   ? "bg-neutral-900 text-white"
                   : "text-neutral-600 hover:bg-neutral-100"
               }`}
@@ -188,14 +203,14 @@ export function ItemsList({
         <span className="text-xs uppercase tracking-wide text-neutral-400">
           Last ordered
         </span>
-        {(["any", ...STALE_ORDER] as StaleTab[]).map((t) => {
+        {(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => {
           const count = t === "any" ? items.length : staleCounts[t] ?? 0;
           const label = t === "any" ? "Any age" : STALE_LABEL[t];
-          const on = staleTab === t;
+          const on = filters.stale === t;
           return (
             <button
               key={t}
-              onClick={() => setStaleTab(t)}
+              onClick={() => update({ stale: t })}
               className={`rounded-full border px-3 py-1 text-sm ${
                 on
                   ? "border-amber-700 bg-amber-700 text-white"
@@ -284,7 +299,7 @@ export function ItemsList({
                     </td>
                     <td className="px-2 py-1">
                       <Link
-                        href={`/items/${item.id}`}
+                        href={itemDetailHref(item.id, filters)}
                         className="text-blue-700 hover:underline"
                       >
                         {item.name}
