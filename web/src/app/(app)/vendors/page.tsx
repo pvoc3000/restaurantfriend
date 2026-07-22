@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { VendorActiveToggle } from "@/components/VendorActiveToggle";
 
 // ISO weekdays: 1 = Monday … 7 = Sunday.
 const DAY_LABELS = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
@@ -100,7 +101,9 @@ export default async function VendorsPage() {
                 return (
                   <tr
                     key={v.id}
-                    className="border-b border-neutral-100 hover:bg-neutral-50"
+                    className={`border-b border-neutral-100 hover:bg-neutral-50 ${
+                      v.is_active ? "" : "text-neutral-400"
+                    }`}
                   >
                     <td className="px-2 py-1">
                       {v.url ? (
@@ -133,11 +136,7 @@ export default async function VendorsPage() {
                       {days(config?.delivery_days ?? null)}
                     </td>
                     <td className="px-2 py-1">
-                      {v.is_active ? (
-                        <span className="text-green-700">yes</span>
-                      ) : (
-                        <span className="text-neutral-400">no</span>
-                      )}
+                      <VendorActiveToggle vendorId={v.id} active={v.is_active} />
                     </td>
                   </tr>
                 );

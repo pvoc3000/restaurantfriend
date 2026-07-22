@@ -15,8 +15,11 @@ type VendorItemRow = {
   vendors: { name: string; is_active: boolean } | null;
 };
 
+// vendors!inner + the .eq("vendors.is_active", true) filter on each query keeps
+// items from DEACTIVATED vendors out of the choice lists (an individually
+// inactive vendor item under an active vendor can still appear, badged).
 const SELECT =
-  "id, description, brand, package_desc, package_content, price, is_active, inventory_item_id, vendors ( name, is_active )";
+  "id, description, brand, package_desc, package_content, price, is_active, inventory_item_id, vendors!inner ( name, is_active )";
 
 function money(v: number | null) {
   return v === null || v === undefined
@@ -56,6 +59,7 @@ export function AssignVendorItem({
       .from("vendor_items")
       .select(SELECT)
       .eq("inventory_item_id", inventoryItemId)
+      .eq("vendors.is_active", true)
       .order("is_active", { ascending: false })
       .then(({ data, error }) => {
         if (cancelled) return;
@@ -77,6 +81,7 @@ export function AssignVendorItem({
     supabase
       .from("vendor_items")
       .select(SELECT)
+      .eq("vendors.is_active", true)
       .or(`description.ilike.%${t}%,brand.ilike.%${t}%,product_id.ilike.%${t}%`)
       .limit(25)
       .then(({ data, error }) => {

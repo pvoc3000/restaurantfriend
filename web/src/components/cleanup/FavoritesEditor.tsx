@@ -59,9 +59,11 @@ export function FavoritesEditor({
       await Promise.all([
         supabase
           .from("vendor_items")
-          .select("id, description, brand, package_desc, vendors ( name )")
+          // vendors!inner + the filter hides items from deactivated vendors.
+          .select("id, description, brand, package_desc, vendors!inner ( name, is_active )")
           .eq("inventory_item_id", inventoryItemId)
           .eq("is_active", true)
+          .eq("vendors.is_active", true)
           .order("id"),
         supabase
           .from("item_order_days")
