@@ -142,12 +142,22 @@ export function ItemsList({
     const widthAt = (clientX: number) =>
       Math.max(MIN_COLUMN_WIDTH, startWidth + clientX - startX);
 
+    // Hold the resize cursor and kill text selection for the whole page while
+    // dragging — otherwise the cursor flickers back to a caret the moment the
+    // pointer leaves the 12px grip, which reads as the drag having stopped.
+    const previousCursor = document.body.style.cursor;
+    const previousSelect = document.body.style.userSelect;
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
     const onMove = (e: PointerEvent) => {
       setDragWidths({ ...base, [columnKey]: widthAt(e.clientX) });
     };
     const onUp = (e: PointerEvent) => {
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
+      document.body.style.cursor = previousCursor;
+      document.body.style.userSelect = previousSelect;
       setDragWidths(null);
       setWidth(columnKey, widthAt(e.clientX));
     };
@@ -234,40 +244,56 @@ export function ItemsList({
     return (
       <th
         key={col.key}
-        className={`relative px-2 py-1 font-medium ${col.align === "right" ? "text-right" : ""}`}
+        // p-0 on the cell, padding on the inner div: that way the resize handle
+        // can sit exactly on the column boundary instead of inside the padding.
+        className="relative p-0 font-medium"
         aria-sort={on ? (filters.dir === "asc" ? "ascending" : "descending") : "none"}
       >
-        {col.key === "select" ? (
-          <input
-            type="checkbox"
-            checked={allVisibleChecked}
-            onChange={toggleAllVisible}
-            aria-label="select all"
-          />
-        ) : (
-          <button
-            type="button"
-            onClick={() => col.sort && toggleSort(col.sort)}
-            title={`Sort by ${col.label.toLowerCase()}`}
-            className={`inline-flex max-w-full items-center gap-1 truncate rounded px-1 hover:bg-neutral-100 ${
-              on ? "font-semibold text-neutral-900" : ""
-            }`}
-          >
-            <span className="truncate">{col.label}</span>
-            {/* Reserve the arrow's width so headers don't jump when sort moves. */}
-            <span className={`w-3 shrink-0 text-xs ${on ? "" : "text-neutral-300"}`}>
-              {arrow || "↕"}
-            </span>
-          </button>
-        )}
+        <div
+          className={`flex items-center px-2 py-1 ${
+            col.align === "right" ? "justify-end" : ""
+          }`}
+        >
+          {col.key === "select" ? (
+            <input
+              type="checkbox"
+              checked={allVisibleChecked}
+              onChange={toggleAllVisible}
+              aria-label="select all"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={() => col.sort && toggleSort(col.sort)}
+              title={`Sort by ${col.label.toLowerCase()}`}
+              className={`inline-flex max-w-full items-center gap-1 rounded px-1 hover:bg-neutral-100 ${
+                on ? "font-semibold text-neutral-900" : ""
+              }`}
+            >
+              <span className="truncate">{col.label}</span>
+              {/* Reserve the arrow's width so headers don't jump when sort moves. */}
+              <span className={`w-3 shrink-0 text-xs ${on ? "" : "text-neutral-300"}`}>
+                {arrow || "↕"}
+              </span>
+            </button>
+          )}
+        </div>
 
-        {/* Drag handle on the column's right edge. */}
+        {/* Resize grip: a visible divider on every column boundary so it's
+            discoverable at rest, with a hit area wider than the line itself and
+            straddling the boundary. `group` drives the hover state of the line
+            inside it. */}
         <span
           onPointerDown={(e) => startResize(e, col.key)}
           onDoubleClick={() => setWidth(col.key, col.width)}
+          role="separator"
+          aria-orientation="vertical"
+          aria-label={`Resize ${col.label || "select"} column`}
           title="Drag to resize · double-click to reset this column"
-          className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize select-none hover:bg-blue-400"
-        />
+          className="group absolute inset-y-0 right-0 z-10 flex w-3 translate-x-1/2 cursor-col-resize touch-none select-none justify-center"
+        >
+          <span className="my-1 w-px bg-neutral-300 transition-colors group-hover:w-0.5 group-hover:bg-blue-500" />
+        </span>
       </th>
     );
   }
@@ -355,15 +381,18 @@ export function ItemsList({
           {visible.length} of {items.length}
           {activeLocationCode ? ` · ${activeLocationCode}` : ""}
         </span>
-        {customized && (
-          <button
-            onClick={resetWidths}
-            title="Restore the default column widths"
-            className="ml-auto text-sm text-neutral-600 hover:underline"
-          >
-            Reset column widths
-          </button>
-        )}
+        <span className="ml-auto flex items-center gap-3 text-xs text-neutral-400">
+          <span>Drag the dividers between column headers to resize</span>
+          {customized && (
+            <button
+              onClick={resetWidths}
+              title="Restore the default column widths"
+              className="text-neutral-600 hover:underline"
+            >
+              Reset column widths
+            </button>
+          )}
+        </span>
       </div>
 
       {/* Search + category */}
