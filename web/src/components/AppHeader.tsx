@@ -1,14 +1,7 @@
-import Link from "next/link";
 import { signOut } from "@/app/actions";
 import { LocationSwitcher } from "@/components/LocationSwitcher";
+import { NavLinks } from "@/components/NavLinks";
 import type { AppSession } from "@/lib/session";
-
-const NAV = [
-  { href: "/", label: "Home" },
-  { href: "/items", label: "Inventory" },
-  { href: "/vendors", label: "Vendors" },
-  { href: "/cleanup", label: "Cleanup" },
-];
 
 export function AppHeader({ session }: { session: AppSession }) {
   return (
@@ -16,17 +9,7 @@ export function AppHeader({ session }: { session: AppSession }) {
       <div className="flex flex-wrap items-center gap-4 px-4 py-2">
         <span className="font-semibold tracking-tight">restaurantfriend</span>
 
-        <nav className="flex items-center gap-3 text-sm">
-          {NAV.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="text-neutral-600 hover:text-neutral-900 hover:underline"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
+        <NavLinks />
 
         <div className="ml-auto flex items-center gap-4">
           <LocationSwitcher
