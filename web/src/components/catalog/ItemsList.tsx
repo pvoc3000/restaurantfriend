@@ -246,11 +246,16 @@ export function ItemsList({
         key={col.key}
         // p-0 on the cell, padding on the inner div: that way the resize handle
         // can sit exactly on the column boundary instead of inside the padding.
-        className="relative p-0 font-medium"
+        //
+        // The positioning context is that inner DIV, not this <th>: under
+        // border-collapse WebKit doesn't make a table cell a containing block,
+        // so an absolutely-positioned grip anchored to the <th> escapes to the
+        // table and disappears in Safari while looking fine in Chrome.
+        className="p-0 font-medium"
         aria-sort={on ? (filters.dir === "asc" ? "ascending" : "descending") : "none"}
       >
         <div
-          className={`flex items-center px-2 py-1 ${
+          className={`relative flex items-center px-2 py-1 ${
             col.align === "right" ? "justify-end" : ""
           }`}
         >
@@ -277,23 +282,23 @@ export function ItemsList({
               </span>
             </button>
           )}
-        </div>
 
-        {/* Resize grip: a visible divider on every column boundary so it's
-            discoverable at rest, with a hit area wider than the line itself and
-            straddling the boundary. `group` drives the hover state of the line
-            inside it. */}
-        <span
-          onPointerDown={(e) => startResize(e, col.key)}
-          onDoubleClick={() => setWidth(col.key, col.width)}
-          role="separator"
-          aria-orientation="vertical"
-          aria-label={`Resize ${col.label || "select"} column`}
-          title="Drag to resize · double-click to reset this column"
-          className="group absolute inset-y-0 right-0 z-10 flex w-3 translate-x-1/2 cursor-col-resize touch-none select-none justify-center"
-        >
-          <span className="my-1 w-px bg-neutral-300 transition-colors group-hover:w-0.5 group-hover:bg-blue-500" />
-        </span>
+          {/* Resize grip: a visible divider on every column boundary so it's
+              discoverable at rest, with a hit area wider than the line itself
+              and straddling the boundary. `group` drives the hover state of the
+              line inside it. Lives inside the div — see the note on the <th>. */}
+          <span
+            onPointerDown={(e) => startResize(e, col.key)}
+            onDoubleClick={() => setWidth(col.key, col.width)}
+            role="separator"
+            aria-orientation="vertical"
+            aria-label={`Resize ${col.label || "select"} column`}
+            title="Drag to resize · double-click to reset this column"
+            className="group absolute inset-y-0 right-0 z-10 flex w-3 translate-x-1/2 cursor-col-resize touch-none select-none justify-center"
+          >
+            <span className="w-px self-stretch bg-neutral-300 transition-colors group-hover:w-0.5 group-hover:bg-blue-500" />
+          </span>
+        </div>
       </th>
     );
   }

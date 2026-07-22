@@ -28,11 +28,15 @@ export function NavLinks() {
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className={
+            // A bottom BORDER, not text-decoration: Safari places an
+            // underline-offset rule inconsistently against the header's own
+            // border and it can vanish. The transparent border on inactive
+            // links keeps every item the same height.
+            className={`border-b-2 pb-0.5 ${
               active
-                ? "font-semibold text-neutral-900 underline decoration-neutral-900 decoration-2 underline-offset-8"
-                : "text-neutral-600 hover:text-neutral-900 hover:underline hover:underline-offset-8"
-            }
+                ? "border-neutral-900 font-semibold text-neutral-900"
+                : "border-transparent text-neutral-600 hover:border-neutral-300 hover:text-neutral-900"
+            }`}
           >
             {item.label}
           </Link>
