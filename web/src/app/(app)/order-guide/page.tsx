@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import type { RawSearchParams } from "@/lib/itemFilters";
-import type { GuideEntry, GuideRow } from "@/lib/orderGuide";
+import { guideToday, serverTimeZone, type GuideEntry, type GuideRow } from "@/lib/orderGuide";
 import { OrderGuide } from "@/components/purchasing/OrderGuide";
 
 const SELECT = `
@@ -45,8 +45,19 @@ export default async function OrderGuidePage({
     (a, b) => a - b
   );
 
-  const today = new Date();
-  const todayWeekday = ((today.getDay() + 6) % 7) + 1; // JS Sunday=0 → ISO Mon=1
+  // Date and weekday both come from the org's timezone so they can't disagree
+  // (see guideToday). The weekday picks WHICH plan to walk; the date is when
+  // you walked it, and is what entries are recorded against.
+  const { data: org } = await supabase
+    .from("orgs")
+    .select("settings")
+    .eq("id", session.membership.org_id)
+    .maybeSingle();
+
+  const timeZone =
+    (org?.settings as { timezone?: string } | null)?.timezone ?? serverTimeZone();
+  const { date: guideDate, weekday: todayWeekday } = guideToday(timeZone);
+
   const requested = Number(one(params.day));
   const weekday =
     requested >= 1 && requested <= 7
@@ -54,10 +65,6 @@ export default async function OrderGuidePage({
       : availableDays.includes(todayWeekday)
         ? todayWeekday
         : availableDays[0] ?? todayWeekday;
-
-  // The session's date — what entries are recorded against. The weekday picks
-  // WHICH plan to walk; the date is when you walked it.
-  const guideDate = today.toISOString().slice(0, 10);
 
   const rows: GuideRow[] = [];
   for (let from = 0; ; from += 1000) {

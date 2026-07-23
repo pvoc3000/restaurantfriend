@@ -18,7 +18,7 @@ export default async function PurchaseOrderDetailPage({
   const { id } = await params;
   const trail = parseTrail(await searchParams, {
     href: "/purchase-orders",
-    label: "Orders",
+    label: "POs",
   });
   const session = await getAppSession();
   const supabase = await createClient();

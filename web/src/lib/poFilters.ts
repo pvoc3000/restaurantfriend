@@ -90,7 +90,7 @@ export function poListHref(filters: PoFilters): string {
 export function poDetailHref(id: string, filters: PoFilters): string {
   return withFrom(`/purchase-orders/${id}`, {
     href: poListHref(filters),
-    label: "Orders",
+    label: "POs",
   });
 }
 

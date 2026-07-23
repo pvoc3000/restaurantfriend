@@ -221,3 +221,36 @@ export function deliveryLabel(days: number[] | null): string | null {
 }
 
 export const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/**
+ * Today's calendar date AND weekday in one timezone, so they can never
+ * disagree.
+ *
+ * Doing this with `new Date().toISOString()` is wrong and fails quietly: at
+ * 7pm in Los Angeles it is already tomorrow in UTC, so an evening walk gets
+ * filed under tomorrow's date while the weekday still says today — one session
+ * split across two guide dates, with the morning's entries seeming to vanish.
+ *
+ * The zone comes from `orgs.settings.timezone` (design rule 2: no business
+ * facts in code). With none set we fall back to wherever the server thinks it
+ * is, which is right in local dev and wrong on a UTC host — so set it before
+ * deploying.
+ */
+export function guideToday(timeZone: string): { date: string; weekday: number } {
+  // en-CA formats as YYYY-MM-DD, which is the shape Postgres `date` wants.
+  const date = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
+  // Read the weekday back off that calendar date rather than off the instant,
+  // which is what keeps the two in step.
+  const jsDay = new Date(`${date}T00:00:00Z`).getUTCDay();
+  return { date, weekday: ((jsDay + 6) % 7) + 1 }; // JS Sunday=0 → ISO Mon=1
+}
+
+export function serverTimeZone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+}
