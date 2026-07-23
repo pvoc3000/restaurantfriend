@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useCallback, useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -51,23 +51,6 @@ export function OrderGuide({
 }) {
   const router = useRouter();
   const supabase = createClient();
-
-  // The column headers stick directly below the header block, so they need its
-  // height — which changes as vendors appear in the totals bar and as the
-  // controls wrap on a narrow window. A ref callback with a ResizeObserver
-  // keeps a CSS variable in step; measuring in an effect and storing it in
-  // state would re-render the whole guide on every resize (and trip the
-  // set-state-in-effect lint).
-  const wrapRef = useRef<HTMLDivElement>(null);
-  const stickyHead = useCallback((node: HTMLDivElement | null) => {
-    if (!node) return;
-    const publish = () =>
-      node.parentElement?.style.setProperty("--guide-head", `${node.offsetHeight}px`);
-    publish();
-    const observer = new ResizeObserver(publish);
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, []);
 
   // Entries are held locally and written through: a walk is hundreds of small
   // edits and a server round-trip per keystroke would make it unusable.
@@ -169,14 +152,7 @@ export function OrderGuide({
   const shortTotal = totals.reduce((sum, t) => (t.short ? sum + t.subtotal : sum), 0);
 
   return (
-    <div ref={wrapRef}>
-      {/* Everything above the rows travels together: title, day, vendor totals,
-          filters. The column headers stick directly beneath it, which is why
-          this block's live height is published as --guide-head. */}
-      <div
-        ref={stickyHead}
-        className="sticky top-0 z-30 space-y-2 border-b-2 border-neutral-900 bg-white pb-2 pt-1"
-      >
+    <div className="space-y-2">
       <div className="flex flex-wrap items-baseline gap-3">
         <h1 className="text-xl font-semibold">Order guide</h1>
         <span className="text-sm text-neutral-500">
@@ -304,7 +280,6 @@ export function OrderGuide({
           {visibleRows.length} of {rows.length} lines
         </span>
       </div>
-      </div>
 
       {sections.length === 0 ? (
         <p className="pt-4 text-sm text-neutral-600">
@@ -312,11 +287,14 @@ export function OrderGuide({
           what appears here.
         </p>
       ) : (
+        // The lines scroll in their own pane, so the controls above stay put
+        // without the page itself sticking anything. Sized to the rest of the
+        // viewport, with a floor for short windows.
+        <div className="max-h-[calc(100vh-15rem)] min-h-64 overflow-auto rounded border border-neutral-300">
         <table className="w-full border-collapse text-sm">
           <thead>
-            {/* Sticky on the CELLS, not the row: a <thead>/<tr> can't be a
-                sticky container in Safari. Offset by the block above it, which
-                grows as vendors appear in the totals bar. */}
+            {/* Sticky to the PANE, not the page — and on the cells, since
+                Safari won't make a <thead>/<tr> a sticky container. */}
             <tr className="text-left text-xs uppercase tracking-wide text-neutral-600">
               {[
                 ["Vendor", ""],
@@ -330,8 +308,7 @@ export function OrderGuide({
               ].map(([label, extra]) => (
                 <th
                   key={label}
-                  style={{ top: "var(--guide-head, 0px)" }}
-                  className={`sticky z-20 bg-white px-2 py-1 font-semibold shadow-[inset_0_-2px_0_#171717] ${extra}`}
+                  className={`sticky top-0 z-20 bg-white px-2 py-1 font-semibold shadow-[inset_0_-2px_0_#171717] ${extra}`}
                 >
                   {label}
                 </th>
@@ -401,6 +378,7 @@ export function OrderGuide({
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );
