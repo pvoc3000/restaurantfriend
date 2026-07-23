@@ -3,7 +3,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import type { RawSearchParams } from "@/lib/itemFilters";
-import { parseTrail } from "@/lib/breadcrumbs";
+import { currentQuery, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import type { PoLine, PurchaseOrder } from "@/lib/purchaseOrders";
 import { PurchaseOrderDetail } from "@/components/purchasing/PurchaseOrderDetail";
@@ -16,7 +16,8 @@ export default async function PurchaseOrderDetailPage({
   searchParams: Promise<RawSearchParams>;
 }) {
   const { id } = await params;
-  const trail = parseTrail(await searchParams, {
+  const rawParams = await searchParams;
+  const trail = parseTrail(rawParams, {
     href: "/purchase-orders",
     label: "POs",
   });
@@ -71,7 +72,10 @@ export default async function PurchaseOrderDetailPage({
           vendorLink={
             order.vendors ? (
               <Link
-                href={`/vendors/${order.vendors.id}`}
+                href={withFrom(`/vendors/${order.vendors.id}`, {
+                  href: `/purchase-orders/${id}${currentQuery(rawParams)}`,
+                  label: order.po_number,
+                })}
                 className="text-blue-700 hover:underline"
               >
                 {order.vendors.name}

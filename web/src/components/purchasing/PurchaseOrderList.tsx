@@ -21,6 +21,7 @@ import {
   type StatusFilter,
 } from "@/lib/poFilters";
 import { makeComparator, type SortValue } from "@/lib/tableSort";
+import { withFrom } from "@/lib/breadcrumbs";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import type { PoListRow } from "@/app/(app)/purchase-orders/page";
 
@@ -181,7 +182,13 @@ export function PurchaseOrderList({
       sortValue: (po) => po.vendors?.name ?? null,
       render: (po) =>
         po.vendors ? (
-          <Link href={`/vendors/${po.vendors.id}`} className="text-blue-700 hover:underline">
+          <Link
+            href={withFrom(`/vendors/${po.vendors.id}`, {
+              href: poListHref(filters),
+              label: "POs",
+            })}
+            className="text-blue-700 hover:underline"
+          >
             {po.vendors.name}
           </Link>
         ) : (

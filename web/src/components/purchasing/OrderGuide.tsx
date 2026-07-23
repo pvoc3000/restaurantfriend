@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/purchaseOrders";
+import { withFrom } from "@/lib/breadcrumbs";
 import {
   groupGuide,
   vendorTotals,
@@ -117,6 +118,10 @@ export function OrderGuide({
       return words.every((w) => haystack.includes(w));
     });
   }, [rows, entries, term, onlyTouched]);
+
+  // Leaving the guide for an item must lead back to the guide — and to the day
+  // you were walking, not whichever day defaults today.
+  const here = { href: `/order-guide?day=${weekday}`, label: "Order Guide" };
 
   const sections = useMemo(
     () => groupGuide(visibleRows, grouping),
@@ -280,7 +285,7 @@ export function OrderGuide({
                     <tr className="border-b border-neutral-100 bg-neutral-50">
                       <td colSpan={5} className="px-2 py-1">
                         <Link
-                          href={`/items/${item.inventory_item_id}`}
+                          href={withFrom(`/items/${item.inventory_item_id}`, here)}
                           className="font-medium text-blue-700 hover:underline"
                         >
                           {item.item_name}
