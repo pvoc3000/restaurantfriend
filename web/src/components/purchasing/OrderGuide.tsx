@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useCallback, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -51,6 +51,23 @@ export function OrderGuide({
 }) {
   const router = useRouter();
   const supabase = createClient();
+
+  // The column headers stick directly below the header block, so they need its
+  // height — which changes as vendors appear in the totals bar and as the
+  // controls wrap on a narrow window. A ref callback with a ResizeObserver
+  // keeps a CSS variable in step; measuring in an effect and storing it in
+  // state would re-render the whole guide on every resize (and trip the
+  // set-state-in-effect lint).
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const stickyHead = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return;
+    const publish = () =>
+      node.parentElement?.style.setProperty("--guide-head", `${node.offsetHeight}px`);
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
 
   // Entries are held locally and written through: a walk is hundreds of small
   // edits and a server round-trip per keystroke would make it unusable.
@@ -152,7 +169,14 @@ export function OrderGuide({
   const shortTotal = totals.reduce((sum, t) => (t.short ? sum + t.subtotal : sum), 0);
 
   return (
-    <div className="space-y-4">
+    <div ref={wrapRef}>
+      {/* Everything above the rows travels together: title, day, vendor totals,
+          filters. The column headers stick directly beneath it, which is why
+          this block's live height is published as --guide-head. */}
+      <div
+        ref={stickyHead}
+        className="sticky top-0 z-30 space-y-2 border-b-2 border-neutral-900 bg-white pb-2 pt-1"
+      >
       <div className="flex flex-wrap items-baseline gap-3">
         <h1 className="text-xl font-semibold">Order guide</h1>
         <span className="text-sm text-neutral-500">
@@ -183,9 +207,8 @@ export function OrderGuide({
         </button>
       </div>
 
-      {/* Vendor totals bar — the guide's central instrument (§4.2). Sticky so
-          it stays visible while you walk. */}
-      <div className="sticky top-0 z-20 space-y-2 border-b border-neutral-200 bg-white/95 py-2 backdrop-blur">
+      {/* Vendor totals bar — the guide's central instrument (§4.2). */}
+      <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
           {totals.length === 0 ? (
             <span className="text-sm text-neutral-500">
@@ -281,24 +304,38 @@ export function OrderGuide({
           {visibleRows.length} of {rows.length} lines
         </span>
       </div>
+      </div>
 
       {sections.length === 0 ? (
-        <p className="text-sm text-neutral-600">
+        <p className="pt-4 text-sm text-neutral-600">
           No plan lines for this day. Favorites on the item detail screen decide
           what appears here.
         </p>
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b-2 border-neutral-900 text-left text-xs uppercase tracking-wide text-neutral-600">
-              <th className="px-2 py-1 font-semibold">Vendor</th>
-              <th className="px-2 py-1 font-semibold">Description</th>
-              <th className="px-2 py-1 font-semibold">Pack</th>
-              <th className="px-2 py-1 text-right font-semibold">Price</th>
-              <th className="w-20 px-2 py-1 text-right font-semibold">On hand</th>
-              <th className="w-12 px-1 py-1 text-right font-semibold">Sugg</th>
-              <th className="w-56 px-2 py-1 text-right font-semibold">Order</th>
-              <th className="w-24 px-2 py-1 text-right font-semibold">Line</th>
+            {/* Sticky on the CELLS, not the row: a <thead>/<tr> can't be a
+                sticky container in Safari. Offset by the block above it, which
+                grows as vendors appear in the totals bar. */}
+            <tr className="text-left text-xs uppercase tracking-wide text-neutral-600">
+              {[
+                ["Vendor", ""],
+                ["Description", ""],
+                ["Pack", ""],
+                ["Price", "text-right"],
+                ["On hand", "w-20 text-right"],
+                ["Sugg", "w-12 text-right"],
+                ["Order", "w-56 text-right"],
+                ["Line", "w-24 text-right"],
+              ].map(([label, extra]) => (
+                <th
+                  key={label}
+                  style={{ top: "var(--guide-head, 0px)" }}
+                  className={`sticky z-20 bg-white px-2 py-1 font-semibold shadow-[inset_0_-2px_0_#171717] ${extra}`}
+                >
+                  {label}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody>
