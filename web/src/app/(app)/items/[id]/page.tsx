@@ -12,6 +12,7 @@ import { currentQuery, parseTrail } from "@/lib/breadcrumbs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { ItemFields } from "@/components/catalog/ItemFields";
 import { ItemLocationRows } from "@/components/catalog/ItemLocationRows";
+import type { PlanRow } from "@/components/catalog/OrderDaysPicker";
 import { VendorItemsTable } from "@/components/catalog/VendorItemsTable";
 
 // Item detail is per-ITEM, not per-location: every location's row is listed so
@@ -62,6 +63,19 @@ export default async function ItemDetailPage({
   if (!item) notFound();
 
   const row = item as unknown as CatalogItem;
+
+  // The item's ordering days per location: a plan row's existence for a weekday
+  // IS "we order this here on that day" (spec §4.1). Fetched for every location
+  // row, including plan rows the favorites grid hides because their vendor is
+  // deactivated — otherwise an "on" day could look empty.
+  const { data: planRows } = await supabase
+    .from("order_guide_plan_days")
+    .select("id, item_location_id, weekday, vendor_item_id, par_qty")
+    .in(
+      "item_location_id",
+      row.inventory_item_locations.map((il) => il.id)
+    );
+
   const locationRows = [...row.inventory_item_locations].sort((a, b) => {
     const codeA = session.locations.find((l) => l.id === a.location_id)?.code ?? "";
     const codeB = session.locations.find((l) => l.id === b.location_id)?.code ?? "";
@@ -80,6 +94,7 @@ export default async function ItemDetailPage({
         </h2>
         <ItemLocationRows
           rows={locationRows}
+          planRows={(planRows ?? []) as PlanRow[]}
           locations={session.locations}
           inventoryItemId={row.id}
           baseUnit={row.base_unit}

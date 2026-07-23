@@ -8,6 +8,7 @@ import { money, unitPriceLabel, vendorItemLabel, type CatalogItemLocation } from
 import { DataTable, type DataColumn } from "./DataTable";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
+import { OrderDaysPicker, type PlanRow } from "./OrderDaysPicker";
 import { FavoritesEditor } from "@/components/cleanup/FavoritesEditor";
 
 // One row per location, whether or not the item is stocked there — an item
@@ -24,6 +25,7 @@ type Row = { location: Location; il: CatalogItemLocation | null };
  */
 export function ItemLocationRows({
   rows,
+  planRows,
   locations,
   inventoryItemId,
   baseUnit,
@@ -31,6 +33,7 @@ export function ItemLocationRows({
   activeLocationId,
 }: {
   rows: CatalogItemLocation[];
+  planRows: PlanRow[];
   locations: Location[];
   inventoryItemId: string;
   baseUnit: string;
@@ -43,6 +46,13 @@ export function ItemLocationRows({
   const [error, setError] = useState<string | null>(null);
 
   const byLocation = new Map(rows.map((r) => [r.location_id, r]));
+
+  const planByLocation = new Map<string, PlanRow[]>();
+  for (const plan of planRows) {
+    const list = planByLocation.get(plan.item_location_id) ?? [];
+    list.push(plan);
+    planByLocation.set(plan.item_location_id, list);
+  }
   const tableRows: Row[] = locations.map((location) => ({
     location,
     il: byLocation.get(location.id) ?? null,
@@ -90,6 +100,25 @@ export function ItemLocationRows({
       render: (r) =>
         r.il ? (
           <span className="text-neutral-600">{r.il.shop_sections?.display_name ?? "—"}</span>
+        ) : (
+          dash
+        ),
+    },
+    {
+      key: "order_days",
+      label: "Order days",
+      width: 150,
+      // Sorts on how MANY days it's ordered — "which items do we buy most
+      // often here" is the question worth asking of this column.
+      sortValue: (r) =>
+        r.il ? new Set(planByLocation.get(r.il.id)?.map((p) => p.weekday)).size : null,
+      render: (r) =>
+        r.il ? (
+          <OrderDaysPicker
+            itemLocationId={r.il.id}
+            orgId={orgId}
+            rows={planByLocation.get(r.il.id) ?? []}
+          />
         ) : (
           dash
         ),
