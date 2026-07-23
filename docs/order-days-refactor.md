@@ -63,36 +63,44 @@ alter table inventory_item_locations
    this weekday". Filters keep their current meanings (skipped = untouched
    favorites only).
 
-## Backfill — read this before planning it
+## Backfill — straightforward
 
-**The item-level order days are NOT in the transformed export.** Verified
-2026-07-22:
+Backfill `order_days` from the distinct weekdays each item-location already has
+plan rows for. That is faithful to the current data and needs no re-export.
 
-- `../../FMP Export/transformed/item_order_days.json` is already in plan-row
-  shape (`inventory_item_legacy_id, location_code, weekday, vendor_item_legacy_id,
-  par_qty, par_mode`) — the transform already collapsed item days ∩ vendor-item
-  days into rows.
-- **897 of its 1,035 item-locations carry all seven weekdays**, which is why
-  DF01's Wednesday guide shows 476 lines. The artifact originates in the Cowork
-  transform pipeline, not in `migration/load.mjs` and not in the web app.
-- `item_locations.json` and `inventory_items.json` have no order-day fields at
-  all, so there is nothing better to load from what's in hand.
+**Do not "fix" the all-seven-days items.** An earlier draft of this brief called
+897-of-1,035 item-locations carrying all seven weekdays a migration artifact.
+**It isn't** — Mark ran FileMaker that way deliberately (2026-07-22): seven days
+was the default, and leaving items on every day kept the solution flexible
+because item order days were only *one* of several conditions deciding whether a
+line appeared. Treat the current day sets as correct.
 
-Options, in the order worth considering:
+## The real open question: what else filtered the FMP guide
 
-1. **Derive from PO history.** 16.8k POs with `order_date` are already loaded:
-   for each item-location, the distinct weekdays it was actually ordered on in
-   the last N years. This reconstructs what the shop really does rather than
-   what the old config claimed, and it's a single SQL statement. Sanity-check it
-   against Mark's expectation that nearly everything is Monday.
-2. **Re-export from FileMaker** with the item-level order-day field preserved,
-   then re-transform. Correct, but needs the pipeline that lives outside this
-   repo.
-3. **Seed everything to Monday** and let Mark fix exceptions with the picker.
-   Crude, but the picker exists and most items really are Monday-only.
+Mark: "whether or not a vendor item appeared in the order guide was determined
+by a number of things — inventory order days was just one of them." Those other
+conditions are NOT yet identified, and they are why the new guide shows items
+his Monday guide didn't. **Ask Mark before guessing.**
 
-Do NOT backfill from the current `order_guide_plan_days` rows — that just
-re-imports the all-seven artifact.
+One condition is already measurable and is very likely part of it — **the vendor's
+own order days**. `vendor_locations.order_days` records which weekdays each
+vendor accepts orders at each location, and `v_order_guide` ignores the column
+completely. Measured on DF01 Wednesday, 2026-07-22:
+
+| | lines |
+|---|---|
+| orderable guide lines | 398 |
+| vendor **does** take Wednesday orders | 222 |
+| vendor does **not** take Wednesday orders | **176** |
+
+The offenders are exactly the vendors you would expect to be day-restricted:
+Restaurant Depot (65 lines), Amazon (38), BakeMark (18), CREAMO (11).
+
+If that condition belongs in the guide, it is a small change to the view
+(`and vl.order_days @> array[weekday]`) and would cut Wednesday's lines by ~44%
+on its own — possibly resolving the complaint without any of the work above.
+Confirm with Mark first: some vendors are self-shop (Restaurant Depot, order
+type `in_person`) where "order days" may mean something different.
 
 ## Don't change
 
