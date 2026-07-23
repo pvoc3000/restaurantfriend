@@ -167,11 +167,12 @@ applied**; Mark runs them in the Supabase SQL editor.
 
 ## Open threads (pinned by Mark — don't act without asking)
 
-- **Order days vs favorites — agreed refactor, not started.** `order_guide_plan_days`
-  conflates "does this item appear on this day" with "which vendor item is
-  preferred", which is why the guide can not show an item with no favorites and
-  why clearing a day destroys them. Fix is specced in
-  `docs/order-days-refactor.md`: add `inventory_item_locations.order_days`.
+- **Guide membership vs "should order" — model settled, not built.** Membership is
+  the active cascade ALONE (active vendor item + item + vendor); "should order"
+  is the focus list, true when the day is in the vendor order days AND the item
+  order days AND that vendor item favorite days. Green marks should-order lines,
+  not entered ones. The current guide conflates the two and ignores vendor order
+  days. Specced in `docs/order-days-refactor.md`.
 - **"Default vendor item" may be the wrong concept.** Mark's words, 2026-07-22.
   Today `inventory_item_locations.default_vendor_item_id` is a per-location
   fallback used only by plan rows with a null `vendor_item_id`; in practice the

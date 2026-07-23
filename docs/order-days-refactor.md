@@ -1,127 +1,119 @@
-# Brief: separate "order days" from "favorites"
+# Brief: guide membership vs "should order"
 
-**Status: agreed with Mark 2026-07-22, not started.** Read
-`docs/purchasing-spec.md` §4.1–4.6 and CLAUDE.md first.
+**Status: model settled with Mark 2026-07-22, not built.** Read
+`docs/purchasing-spec.md` §4.1–4.6 and CLAUDE.md first. This supersedes an
+earlier draft of this file that framed the problem as "order days vs favorites";
+that framing was wrong in an instructive way — see *What I got wrong*.
 
-## The problem, in one paragraph
+## The model, in Mark's words
 
-FileMaker kept two independent facts: **item order days** ("we order this here
-on Mon/Fri") and **favorites** ("and we prefer this vendor item"). The current
-schema merged them into one table, `order_guide_plan_days`, whose rows are
-`(item_location, weekday, vendor_item)`. An item's order days are therefore not
-stored — they're derived from which favorites happen to exist. That conflation
-is the direct cause of three problems:
+Two separate questions, and the current build answers neither cleanly.
 
-1. **The guide can't show an item with no favorites for the day.** `/order-guide`
-   asks `v_order_guide` for the day's plan rows and builds the "All" filter from
-   the *alternates of those items*. An item with zero rows never enters the list,
-   so it can't be ordered on the off chance — the exact FMP behaviour Mark relies
-   on (clear the order days, keep the item reachable).
-2. **Clearing a day destroys favorites.** `OrderDaysPicker` deletes that
-   weekday's rows, so which vendor you preferred is lost. The confirm dialog in
-   that component is papering over avoidable data loss.
-3. **Order days can't be corrected in bulk**, because there's nothing to correct
-   — only rows to delete and recreate, which loses vendor choice and per-line par.
+**1. Does this line appear on the guide at all?** Active vendor item **and**
+active inventory item **and** active vendor. Nothing else. Maximum flexibility:
+everything orderable is reachable every day, in case this is the week you need
+it.
 
-Multi-favorite per day (schema 003) and per-line `par_qty` are good and must
-survive. They never required the merge: item-level days and a multi-row
-favorites table are orthogonal.
+**2. Is this a line I need to touch today?** ("should order" — FMP's focus
+list.) All four must be true for the day being walked:
 
-## Target model
-
-Add order days to the item-location, mirroring the column `vendor_locations`
-already has:
-
-```sql
-alter table inventory_item_locations
-  add column order_days smallint[] not null default '{}';
+```
+should_order(day) =
+      membership (the active cascade above)
+  AND day ∈ vendor_locations.order_days          -- vendor takes orders that day
+  AND day ∈ inventory item's order days          -- we order this item that day
+  AND day ∈ that vendor item's favorite days     -- and prefer this source
 ```
 
-- **`inventory_item_locations.order_days`** — does this item appear on this
-  day's guide at this location. The ONLY thing that decides guide membership.
-- **`order_guide_plan_days`** — favorites only: which vendor item(s) are
-  preferred, plus `par_qty` / `par_mode` overrides. No longer decides membership.
+Consequences Mark relies on:
 
-## Work
+- **Green fills the order box for should-order lines** — not for "a quantity was
+  entered". Red still wins for an explicitly zeroed line.
+- **"Skipped"** = should-order lines whose order amount hasn't been touched.
+- **Everything else is present but quiet** — reachable, orderable, not demanding
+  attention.
 
-1. **Migration 008**: add the column; backfill (see below); no drop of
-   `order_guide_plan_days` — its rows stay as favorites.
-2. **`v_order_guide`**: drive the FROM clause off `inventory_item_locations`
-   where `order_days @> array[weekday]`, LEFT JOIN plan rows for that weekday.
-   An item with days but no favorite for the day should still emit a line,
-   resolving the vendor item via `il.default_vendor_item_id` (today's
-   `coalesce(iod.vendor_item_id, il.default_vendor_item_id)` already does this —
-   keep it). Emitting one line per favorite, or one line when there are none.
-3. **`web/src/components/catalog/OrderDaysPicker.tsx`**: write the array instead
-   of inserting/deleting plan rows. It becomes almost identical to
-   `WeekdayPicker` (`vendor_locations.order_days`) — consider merging them.
-   The confirm dialog goes away: clearing a day no longer destroys anything.
-4. **`web/src/app/(app)/order-guide/page.tsx`**: the alternates block can be
-   simplified — with membership decided by `order_days`, "All" is naturally
-   every active vendor item for every item scheduled that day.
-5. **`web/src/lib/orderGuide.ts`**: `is_favorite` still means "has a plan row for
-   this weekday". Filters keep their current meanings (skipped = untouched
-   favorites only).
+"Favorites" is one of four conditions, not the organising idea. The organising
+idea is *should order*.
 
-## Backfill — straightforward
+## What the current build gets wrong
 
-Backfill `order_days` from the distinct weekdays each item-location already has
-plan rows for. That is faithful to the current data and needs no re-export.
+| | now | should be |
+|---|---|---|
+| membership | items with a plan row that day, plus their alternates | the active cascade, full stop |
+| vendor order days | ignored entirely | a should-order condition |
+| item order days | not stored; derived from plan rows | stored per item-location |
+| green | a quantity was entered | this is a should-order line |
+| Skipped | untouched favorites | untouched **should-order** lines |
 
-**Do not "fix" the all-seven-days items.** An earlier draft of this brief called
-897-of-1,035 item-locations carrying all seven weekdays a migration artifact.
-**It isn't** — Mark ran FileMaker that way deliberately (2026-07-22): seven days
-was the default, and leaving items on every day kept the solution flexible
-because item order days were only *one* of several conditions deciding whether a
-line appeared. Treat the current day sets as correct.
-
-## The real open question: what else filtered the FMP guide
-
-Mark: "whether or not a vendor item appeared in the order guide was determined
-by a number of things — inventory order days was just one of them." Those other
-conditions are NOT yet identified, and they are why the new guide shows items
-his Monday guide didn't. **Ask Mark before guessing.**
-
-One condition is already measurable and is very likely part of it — **the vendor's
-own order days**. `vendor_locations.order_days` records which weekdays each
-vendor accepts orders at each location, and `v_order_guide` ignores the column
-completely. Measured on DF01 Wednesday, 2026-07-22:
+Measured at DF01, 2026-07-22:
 
 | | lines |
 |---|---|
-| orderable guide lines | 398 |
-| vendor **does** take Wednesday orders | 222 |
-| vendor does **not** take Wednesday orders | **176** |
+| membership (active cascade) | **883** across 337 item-locations |
+| should order, Monday | **229** |
+| should order, Wednesday | **118** |
+| what we currently show as "All" / "Favorites" (Wed) | 841 / 402 |
 
-The offenders are exactly the vendors you would expect to be day-restricted:
-Restaurant Depot (65 lines), Amazon (38), BakeMark (18), CREAMO (11).
+883 is the right order of magnitude for the FMP Monday guide, whose record
+counter read "1 of 705". Today's Wednesday "Favorites" count of 402 is wrong by
+roughly 3× because vendor order days are ignored and membership is conflated.
 
-If that condition belongs in the guide, it is a small change to the view
-(`and vl.order_days @> array[weekday]`) and would cut Wednesday's lines by ~44%
-on its own — possibly resolving the complaint without any of the work above.
-Confirm with Mark first: some vendors are self-shop (Restaurant Depot, order
-type `in_person`) where "order days" may mean something different.
+## Work
+
+1. **Migration 008** — `inventory_item_locations.order_days smallint[] not null
+   default '{}'`, mirroring the column `vendor_locations` already has. Backfill
+   from the distinct weekdays each item-location currently has plan rows for;
+   that is faithful to the present data.
+   `order_guide_plan_days` then means only "this vendor item is a favorite on
+   this weekday" (plus its `par_qty` / `par_mode` overrides).
+2. **`v_order_guide`** — drive membership off the active cascade, LEFT JOIN plan
+   rows, and expose a computed `should_order` boolean per line using the four
+   conditions. Keep `is_orderable` / `hidden_reason`; membership already implies
+   orderable, so the guide's existing filter stays honest.
+3. **`web/src/app/(app)/order-guide/page.tsx`** — delete the alternates block
+   entirely. With membership defined properly the view returns every line, and
+   the hand-rolled merge of "plan rows plus other vendor items" goes away.
+4. **`web/src/lib/orderGuide.ts`** — `qtyClass()` keys off `should_order` rather
+   than `is_favorite`; filters become All / Should order / Skipped / Will order.
+5. **`web/src/components/catalog/OrderDaysPicker.tsx`** — write the array instead
+   of creating and deleting plan rows. It converges with `WeekdayPicker`
+   (`vendor_locations.order_days`); merge them. The confirm dialog goes: clearing
+   a day stops destroying favorites, which is a defect in its own right.
+
+## Decide before building
+
+- **`in_person` vendors.** Restaurant Depot accounts for 65 of the 176 DF01
+  Wednesday lines whose vendor doesn't take Wednesday orders — but you *go
+  shopping* there rather than sending an order, so its `order_days` may mean
+  something different. Ask Mark whether the vendor-day condition applies to
+  `order_type = 'in_person'`.
+- **Blank day sets.** An item-location or vendor with `order_days = '{}'` will
+  never be should-order. Confirm that's intended rather than treating empty as
+  "any day".
 
 ## Don't change
 
-- Multi-favorite plan rows (schema 003) or per-line `par_qty`.
-- `/cleanup` — untouched by convention.
-- The guide's "only orderable lines" rule (Mark, 2026-07-22): inactive vendor,
-  vendor item, or inventory item are all filtered out, not greyed.
+- Multi-favorite plan rows (schema 003) and per-line `par_qty`.
+- The rule that inactive vendor / vendor item / inventory item lines are absent
+  rather than greyed (Mark, 2026-07-22) — that IS the membership rule above.
+- `/cleanup`, untouched by convention.
 
 ## Verification
 
-- `v_order_guide` line count for DF01 Wednesday should drop sharply from 476.
-- An item with `order_days = '{}'` must NOT appear under Favorites but MUST be
-  reachable under All.
-- Clearing a day then re-setting it must leave the favorites intact — the
-  regression this whole brief exists to remove.
-- Test reversibly on real data and verify with a read-only query afterwards;
-  the DB is live and holds 13 years of history.
+- Membership count at DF01 should land near 883; should-order Monday near 229.
+- An item-location with `order_days = '{}'` must still be reachable under All
+  and must not be green anywhere.
+- Clearing an item's order days then restoring them must leave favorites intact.
+- Test reversibly against the live DB and confirm with a read-only query;
+  it holds 13 years of history.
 
-## Related open threads (CLAUDE.md)
+## What I got wrong (keep, so it isn't repeated)
 
-- **"Default vendor item may be the wrong concept."** Same underlying question:
-  what drives the guide. Worth settling in the same pass — with `order_days`
-  deciding membership, `default_vendor_item_id` becomes the fallback source for
-  a scheduled day with no favorite, which is a coherent job for it.
+I first read "897 of 1,035 item-locations carry all seven weekdays" as a
+migration artifact and proposed re-deriving order days from PO history. Mark ran
+FileMaker that way on purpose: seven days was the default and item order days
+were only one of four conditions, so leaving them open cost nothing. The lesson
+is that the day sets were never meant to carry the whole decision — asking what
+*else* gated the FMP guide was the question that unlocked this, and it should
+have come before any diagnosis of the data.
