@@ -12,12 +12,14 @@ import {
 import { money } from "@/lib/purchaseOrders";
 
 /**
- * One plan line: the vendor item, its pack and unit price, and the two entry
- * modes that coexist (§4.3) — type a package quantity directly, or count what's
- * on the shelf and take the suggestion.
+ * One plan line, laid out in the columns the FMP guide used because they're the
+ * ones that get read while walking: who sells it, what it is, what a package
+ * holds, what a base unit costs, and the quantity box.
  *
- * Both boxes commit on blur/Enter rather than per keystroke: a walk generates a
- * lot of typing and every write is a round trip.
+ * Both entry modes coexist (§4.3) — type a package quantity, or count what's on
+ * the shelf and take the suggestion. Text boxes commit on blur/Enter rather
+ * than per keystroke; the steppers commit immediately, since a click is already
+ * a complete decision.
  */
 export function GuideLine({
   row,
@@ -54,6 +56,14 @@ export function GuideLine({
     onCommit({ qty_to_order: next });
   }
 
+  /** Steppers move by one, never below zero. Untouched + 1 = 1, − = 0. */
+  function step(delta: number) {
+    const base = qty === null ? 0 : Number(qty);
+    const next = Math.max(0, base + delta);
+    if (next === qty) return;
+    onCommit({ qty_to_order: next });
+  }
+
   function commitOnHand(raw: string) {
     const trimmed = raw.trim();
     const next = trimmed === "" ? null : Number(trimmed);
@@ -76,25 +86,44 @@ export function GuideLine({
   // Only orderable lines reach the guide — the page filters on the view's
   // active cascade — so there's no blocked state to render here.
   return (
-    <tr className="border-b border-neutral-100">
-      <td className="py-1 pl-6 pr-2">
-        <div className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-medium text-neutral-800">{row.vendor_name}</span>
-          <span className="text-neutral-600">
-            {[row.brand, row.vendor_item_description].filter(Boolean).join(" · ")}
-          </span>
+    <tr className="border-b border-neutral-200">
+      {/* Vendor over brand, the way the printed guide reads. */}
+      <td className="whitespace-nowrap py-1.5 pl-6 pr-2 align-top">
+        <div className="font-semibold uppercase tracking-tight text-neutral-900">
+          {row.vendor_name}
         </div>
-        <div className="text-xs text-neutral-500">
-          {row.package_desc ?? "?"}
-          {row.package_content !== null ? ` · ${row.package_content} ${baseUnit}` : ""}
-          {" · "}
-          {money(row.effective_price)}
-          {row.unit_price !== null ? ` · $${Number(row.unit_price).toFixed(4)}/${baseUnit}` : ""}
-          {arrives ? ` · ${arrives}` : ""}
-        </div>
+        {row.brand && <div className="text-xs text-neutral-500">{row.brand}</div>}
+        {/* Delivery day lives with the vendor, not the description — it's a
+            fact about the source, and it kept pushing the columns apart. */}
+        {arrives && <div className="text-[11px] text-neutral-400">{arrives}</div>}
       </td>
 
-      <td className="px-2 py-1 text-right">
+      <td className="px-2 py-1.5 align-top text-neutral-800">
+        {row.vendor_item_description ?? "—"}
+      </td>
+
+      {/* Pack and unit price: the $/oz comparison across pack sizes is the
+          reason this column exists (§4.6). */}
+      <td className="whitespace-nowrap px-2 py-1.5 align-top tabular-nums text-neutral-800">
+        {row.package_content !== null ? (
+          <>
+            1 &times; {Number(row.package_content)} {baseUnit}
+          </>
+        ) : (
+          <span className="text-neutral-400">—</span>
+        )}
+      </td>
+
+      <td className="whitespace-nowrap px-2 py-1.5 align-top text-right tabular-nums text-neutral-600">
+        {money(row.effective_price)}
+        {row.unit_price !== null && (
+          <div className="text-xs text-neutral-500">
+            (${Number(row.unit_price).toFixed(4)} per {baseUnit})
+          </div>
+        )}
+      </td>
+
+      <td className="px-2 py-1.5 align-top text-right">
         <input
           inputMode="decimal"
           disabled={saving}
@@ -107,11 +136,11 @@ export function GuideLine({
           }}
           placeholder="—"
           title={`On hand in ${baseUnit}`}
-          className="w-16 rounded border border-neutral-300 px-1 py-0.5 text-right text-sm tabular-nums"
+          className="w-14 rounded border border-neutral-300 px-1 py-0.5 text-right text-sm tabular-nums"
         />
       </td>
 
-      <td className="px-2 py-1 text-right text-xs text-neutral-500">
+      <td className="px-1 py-1.5 align-top text-right text-xs text-neutral-500">
         {suggestion === null ? (
           <span title={par === null ? "No par set for this line" : "No package content"}>
             —
@@ -129,24 +158,48 @@ export function GuideLine({
         )}
       </td>
 
-      <td className="px-2 py-1 text-right">
-        <input
-          inputMode="decimal"
-          disabled={saving}
-          value={qtyDraft ?? (qty === null ? "" : String(qty))}
-          onChange={(e) => setQtyDraft(e.target.value)}
-          onBlur={(e) => commitQty(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
-            if (e.key === "Escape") setQtyDraft(null);
-          }}
-          placeholder="—"
-          title="Packages to order"
-          className={`w-16 rounded border px-1 py-0.5 text-right text-sm font-medium tabular-nums ${QTY_CLASS[state]}`}
-        />
+      {/* Pack label + stepper, mirroring the FMP control: minus, box, plus. */}
+      <td className="whitespace-nowrap px-2 py-1.5 align-top">
+        <div className="flex items-center justify-end gap-1">
+          <span className="mr-1 text-xs font-semibold uppercase text-neutral-700">
+            {row.package_desc ?? ""}
+          </span>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => step(-1)}
+            aria-label="Decrease by one"
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-neutral-400 text-neutral-700 hover:bg-neutral-200 disabled:opacity-40"
+          >
+            −
+          </button>
+          <input
+            inputMode="decimal"
+            disabled={saving}
+            value={qtyDraft ?? (qty === null ? "" : String(qty))}
+            onChange={(e) => setQtyDraft(e.target.value)}
+            onBlur={(e) => commitQty(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") setQtyDraft(null);
+            }}
+            placeholder=""
+            title="Packages to order"
+            className={`w-14 rounded border-2 px-1 py-0.5 text-center text-sm font-semibold tabular-nums ${QTY_CLASS[state]}`}
+          />
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => step(1)}
+            aria-label="Increase by one"
+            className="flex h-6 w-6 items-center justify-center rounded-full border border-neutral-400 text-neutral-700 hover:bg-neutral-200 disabled:opacity-40"
+          >
+            +
+          </button>
+        </div>
       </td>
 
-      <td className="px-2 py-1 text-right text-sm tabular-nums text-neutral-600">
+      <td className="px-2 py-1.5 align-top text-right text-sm tabular-nums text-neutral-700">
         {qty !== null && Number(qty) > 0
           ? money(Number(qty) * Number(row.effective_price ?? 0))
           : ""}

@@ -255,25 +255,28 @@ export function OrderGuide({
       ) : (
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b border-neutral-300 text-left text-neutral-600">
-              <th className="px-2 py-1 font-medium">Item / vendor item</th>
-              <th className="w-20 px-2 py-1 text-right font-medium">On hand</th>
-              <th className="w-16 px-2 py-1 text-right font-medium">Sugg.</th>
-              <th className="w-20 px-2 py-1 text-right font-medium">Order</th>
-              <th className="w-24 px-2 py-1 text-right font-medium">Line</th>
+            <tr className="border-b-2 border-neutral-900 text-left text-xs uppercase tracking-wide text-neutral-600">
+              <th className="px-2 py-1 font-semibold">Vendor</th>
+              <th className="px-2 py-1 font-semibold">Description</th>
+              <th className="px-2 py-1 font-semibold">Pack</th>
+              <th className="px-2 py-1 text-right font-semibold">Price</th>
+              <th className="w-20 px-2 py-1 text-right font-semibold">On hand</th>
+              <th className="w-12 px-1 py-1 text-right font-semibold">Sugg</th>
+              <th className="w-56 px-2 py-1 text-right font-semibold">Order</th>
+              <th className="w-24 px-2 py-1 text-right font-semibold">Line</th>
             </tr>
           </thead>
           <tbody>
             {sections.map((section) => (
               <Fragment key={section.key}>
                 {section.showHeader && (
-                  <tr className="border-b border-neutral-300 bg-neutral-100">
+                  <tr className="bg-neutral-900">
                     <td
-                      colSpan={5}
-                      className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-700"
+                      colSpan={8}
+                      className="px-3 py-2 text-center text-base font-bold uppercase tracking-wide text-white"
                     >
                       {section.label}
-                      <span className="ml-2 font-normal normal-case tracking-normal text-neutral-500">
+                      <span className="ml-3 text-sm font-normal text-neutral-400">
                         {section.items.length}
                       </span>
                     </td>
@@ -282,18 +285,31 @@ export function OrderGuide({
 
                 {section.items.map((item) => (
                   <Fragment key={item.inventory_item_id}>
-                    <tr className="border-b border-neutral-100 bg-neutral-50">
-                      <td colSpan={5} className="px-2 py-1">
+                    <tr className="border-t-2 border-neutral-300">
+                      <td colSpan={6} className="px-2 pb-0.5 pt-3">
                         <Link
                           href={withFrom(`/items/${item.inventory_item_id}`, here)}
-                          className="font-medium text-blue-700 hover:underline"
+                          className="text-base font-bold uppercase tracking-tight text-neutral-900 underline decoration-neutral-400 underline-offset-4 hover:decoration-neutral-900"
                         >
                           {item.item_name}
                         </Link>
-                        <span className="ml-2 text-xs text-neutral-500">
-                          par {item.par_qty ?? "—"} {item.base_unit}
-                        </span>
                       </td>
+                      {/* Par sits directly above the order boxes, as in FMP —
+                          it's the number you're ordering up TO. */}
+                      <td className="px-2 pb-0.5 pt-3 text-right">
+                        {item.par_qty === null ? (
+                          // A missing par is a gap to fix, not an alarm — the
+                          // red is reserved for the number you order up to.
+                          <span className="text-xs uppercase tracking-wide text-neutral-400">
+                            no par
+                          </span>
+                        ) : (
+                          <span className="whitespace-nowrap text-sm font-bold uppercase tracking-wide text-red-700">
+                            par {Number(item.par_qty)} {item.base_unit}
+                          </span>
+                        )}
+                      </td>
+                      <td />
                     </tr>
 
                     {item.lines.map((row) => (

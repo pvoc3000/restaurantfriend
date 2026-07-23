@@ -52,10 +52,12 @@ export function qtyState(qty: number | null | undefined): QtyState {
   return Number(qty) > 0 ? "entered" : "zeroed";
 }
 
+// Filled, not tinted — these read at arm's length on a shelf, which is the
+// whole point of the three states.
 export const QTY_CLASS: Record<QtyState, string> = {
-  entered: "border-green-500 bg-green-50 text-green-900",
-  zeroed: "border-red-400 bg-red-50 text-red-900",
-  untouched: "border-neutral-300 bg-white",
+  entered: "border-green-600 bg-green-200 text-green-950",
+  zeroed: "border-red-500 bg-red-200 text-red-950",
+  untouched: "border-neutral-400 bg-white text-neutral-900",
 };
 
 /**
