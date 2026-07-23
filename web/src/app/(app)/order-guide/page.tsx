@@ -17,6 +17,19 @@ function one(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value) ?? "";
 }
 
+/** A vendor item that sells a guide item but has no plan row for this day. */
+type AlternateRow = {
+  id: string;
+  inventory_item_id: string;
+  brand: string | null;
+  description: string | null;
+  product_id: string | null;
+  package_desc: string | null;
+  package_content: number | null;
+  price: number | null;
+  vendors: { id: string; name: string; order_type: string; is_active: boolean };
+};
+
 export default async function OrderGuidePage({
   searchParams,
 }: {
@@ -96,7 +109,97 @@ export default async function OrderGuidePage({
   // greyed with the reason. That belongs on the catalog screens, where you can
   // act on it; during a walk it's noise. `/cleanup` remains where dead pairings
   // get found and fixed.
-  const orderableRows = rows.filter((row) => row.is_orderable === true);
+  const planRows: GuideRow[] = rows
+    .filter((row) => row.is_orderable === true)
+    .map((row) => ({ ...row, is_favorite: true }));
+
+  // The OTHER active vendor items that sell these same inventory items. The
+  // view only emits plan rows, so without this the guide can't answer "who else
+  // sells this and at what unit price" — the comparison §4.2 is built around,
+  // and the reason a favorite being green means anything.
+  const itemIds = [...new Set(planRows.map((r) => r.inventory_item_id))];
+  const alternates: GuideRow[] = [];
+
+  if (itemIds.length > 0) {
+    const planVendorItemIds = new Set(planRows.map((r) => r.vendor_item_id));
+
+    const candidates: AlternateRow[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await supabase
+        .from("vendor_items")
+        .select(
+          `id, inventory_item_id, brand, description, product_id, package_desc,
+           package_content, price,
+           vendors!inner ( id, name, order_type, is_active )`
+        )
+        .in("inventory_item_id", itemIds)
+        .eq("is_active", true)
+        .eq("vendors.is_active", true)
+        .range(from, from + 999);
+
+      if (error) break; // Alternates are additive; the plan still stands.
+      candidates.push(...((data ?? []) as unknown as AlternateRow[]));
+      if (!data || data.length < 1000) break;
+    }
+
+    // Per-location price overrides and vendor terms, resolved the same way the
+    // view resolves them (design rule 6: override → global).
+    const [{ data: overrides }, { data: vendorTerms }] = await Promise.all([
+      supabase
+        .from("vendor_item_location_prices")
+        .select("vendor_item_id, price")
+        .eq("location_id", locationId),
+      supabase
+        .from("vendor_locations")
+        .select("vendor_id, minimum_order, delivery_days")
+        .eq("location_id", locationId),
+    ]);
+
+    const priceOverride = new Map(
+      (overrides ?? []).map((o) => [o.vendor_item_id, o.price])
+    );
+    const terms = new Map((vendorTerms ?? []).map((t) => [t.vendor_id, t]));
+
+    // Item-level facts (section, par, base unit) come from the item's own plan
+    // rows — an alternate is another way to buy an item already on the guide.
+    const itemContext = new Map(planRows.map((r) => [r.inventory_item_id, r]));
+
+    for (const vi of candidates) {
+      if (planVendorItemIds.has(vi.id)) continue;
+      const context = itemContext.get(vi.inventory_item_id);
+      if (!context) continue;
+
+      const price = priceOverride.get(vi.id) ?? vi.price;
+      const term = terms.get(vi.vendors.id);
+      const content = vi.package_content === null ? null : Number(vi.package_content);
+
+      alternates.push({
+        ...context,
+        vendor_item_id: vi.id,
+        vendor_id: vi.vendors.id,
+        vendor_name: vi.vendors.name,
+        vendor_order_type: vi.vendors.order_type,
+        brand: vi.brand,
+        vendor_item_description: vi.description,
+        product_id: vi.product_id,
+        package_desc: vi.package_desc,
+        package_content: content,
+        effective_price: price === null ? null : Number(price),
+        unit_price: price !== null && content ? Number(price) / content : null,
+        vendor_minimum: term?.minimum_order ?? null,
+        vendor_delivery_days: term?.delivery_days ?? null,
+        // An alternate carries no plan row, so no per-line par override — the
+        // item's par applies.
+        par_qty: null,
+        par_mode: null,
+        is_orderable: true,
+        hidden_reason: null,
+        is_favorite: false,
+      });
+    }
+  }
+
+  const guideRows = [...planRows, ...alternates];
 
   const { data: entryRows } = await supabase
     .from("order_guide_entries")
@@ -106,7 +209,7 @@ export default async function OrderGuidePage({
 
   return (
     <OrderGuide
-      rows={orderableRows}
+      rows={guideRows}
       entries={(entryRows ?? []) as GuideEntry[]}
       weekday={weekday}
       availableDays={availableDays}

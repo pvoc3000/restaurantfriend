@@ -88,14 +88,25 @@ export function GuideLine({
   return (
     <tr className="border-b border-neutral-200">
       {/* Vendor over brand, the way the printed guide reads. */}
-      <td className="whitespace-nowrap py-1.5 pl-6 pr-2 align-top">
-        <div className="font-semibold uppercase tracking-tight text-neutral-900">
-          {row.vendor_name}
+      <td className="whitespace-nowrap py-1.5 pl-2 pr-2 align-top">
+        <div className="flex items-baseline gap-1.5">
+          {/* Favorites carry a marker so "All" can be scanned: the plan line
+              is the one you'd normally take. */}
+          <span
+            aria-hidden
+            className={row.is_favorite ? "text-amber-500" : "text-transparent"}
+            title={row.is_favorite ? "Favorite — this day's plan line" : undefined}
+          >
+            ★
+          </span>
+          <span className="font-semibold uppercase tracking-tight text-neutral-900">
+            {row.vendor_name}
+          </span>
         </div>
-        {row.brand && <div className="text-xs text-neutral-500">{row.brand}</div>}
+        {row.brand && <div className="pl-5 text-xs text-neutral-500">{row.brand}</div>}
         {/* Delivery day lives with the vendor, not the description — it's a
             fact about the source, and it kept pushing the columns apart. */}
-        {arrives && <div className="text-[11px] text-neutral-400">{arrives}</div>}
+        {arrives && <div className="pl-5 text-[11px] text-neutral-400">{arrives}</div>}
       </td>
 
       <td className="px-2 py-1.5 align-top text-neutral-800">

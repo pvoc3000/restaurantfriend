@@ -8,11 +8,14 @@ import { money } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
   groupGuide,
+  matchesGuideFilter,
   vendorTotals,
   GROUPING_LABEL,
+  GUIDE_FILTER_LABEL,
   WEEKDAY_LABELS,
   type EntryState,
   type GuideEntry,
+  type GuideFilter,
   type GuideGrouping,
   type GuideRow,
 } from "@/lib/orderGuide";
@@ -62,7 +65,9 @@ export function OrderGuide({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [onlyTouched, setOnlyTouched] = useState(false);
+  // Favorites is the default working mode (§4.6) — the plan is what you walk;
+  // the alternates are there for when you need to switch a line.
+  const [filter, setFilter] = useState<GuideFilter>("favorites");
   const [term, setTerm] = useState("");
   // Grouping is client-side only — the rows are already loaded, so switching
   // between the walk, an A–Z list and a per-vendor view costs nothing.
@@ -100,10 +105,7 @@ export function OrderGuide({
   const visibleRows = useMemo(() => {
     const words = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return rows.filter((row) => {
-      if (onlyTouched) {
-        const entry = entries.get(row.vendor_item_id);
-        if (!entry || (entry.qty_to_order === null && entry.on_hand === null)) return false;
-      }
+      if (!matchesGuideFilter(row, entries.get(row.vendor_item_id), filter)) return false;
       if (words.length === 0) return true;
       const haystack = [
         row.item_name,
@@ -117,7 +119,25 @@ export function OrderGuide({
         .toLowerCase();
       return words.every((w) => haystack.includes(w));
     });
-  }, [rows, entries, term, onlyTouched]);
+  }, [rows, entries, term, filter]);
+
+  // Counts on the buttons ignore the search box: they describe the plan, not
+  // whatever you happen to have typed.
+  const filterCounts = useMemo(() => {
+    const counts: Record<GuideFilter, number> = {
+      all: 0,
+      favorites: 0,
+      skipped: 0,
+      will_order: 0,
+    };
+    for (const row of rows) {
+      const entry = entries.get(row.vendor_item_id);
+      for (const f of ["all", "favorites", "skipped", "will_order"] as GuideFilter[]) {
+        if (matchesGuideFilter(row, entry, f)) counts[f] += 1;
+      }
+    }
+    return counts;
+  }, [rows, entries]);
 
   // Leaving the guide for an item must lead back to the guide — and to the day
   // you were walking, not whichever day defaults today.
@@ -215,14 +235,29 @@ export function OrderGuide({
           placeholder="Jump to item, vendor or section…"
           className="w-72 rounded border border-neutral-300 px-2 py-1"
         />
-        <label className="flex items-center gap-1.5 text-neutral-700">
-          <input
-            type="checkbox"
-            checked={onlyTouched}
-            onChange={(e) => setOnlyTouched(e.target.checked)}
-          />
-          Only lines I&apos;ve touched
-        </label>
+        <span className="flex items-center gap-1">
+          {(["all", "favorites", "skipped", "will_order"] as GuideFilter[]).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`rounded px-2.5 py-1 font-medium ${
+                filter === f
+                  ? "bg-neutral-900 text-white"
+                  : "text-neutral-600 hover:bg-neutral-100"
+              }`}
+            >
+              {GUIDE_FILTER_LABEL[f]}
+              <span
+                className={`ml-1.5 font-normal ${
+                  filter === f ? "text-neutral-400" : "text-neutral-400"
+                }`}
+              >
+                {filterCounts[f]}
+              </span>
+            </button>
+          ))}
+        </span>
+
         <span className="flex items-center gap-1">
           <span className="text-xs uppercase tracking-wide text-neutral-400">
             Group by

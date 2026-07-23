@@ -26,7 +26,49 @@ export type GuideRow = {
   vendor_delivery_days: number[] | null;
   is_orderable: boolean;
   hidden_reason: string | null;
+  /**
+   * True when this line is a plan row — a favorite (§4.1). False for the other
+   * vendor items that sell the same inventory item, which the guide carries so
+   * you can reassign a line in the moment (§4.2) and compare unit prices.
+   */
+  is_favorite: boolean;
 };
+
+/**
+ * The quick filters from the FMP guide's find panel (§4.6).
+ * - `all` — every active vendor item for the items on this plan
+ * - `favorites` — the plan rows, the default working mode
+ * - `skipped` — favorites you've decided NOT to order (zeroed or untouched)
+ * - `will_order` — anything with a quantity, favorite or not
+ */
+export type GuideFilter = "all" | "favorites" | "skipped" | "will_order";
+
+export const GUIDE_FILTER_LABEL: Record<GuideFilter, string> = {
+  all: "All",
+  favorites: "Favorites",
+  skipped: "Skipped",
+  will_order: "Will order",
+};
+
+export function matchesGuideFilter(
+  row: GuideRow,
+  entry: EntryState | undefined,
+  filter: GuideFilter
+): boolean {
+  const qty = entry?.qty_to_order ?? null;
+  switch (filter) {
+    case "all":
+      return true;
+    case "favorites":
+      return row.is_favorite;
+    case "skipped":
+      // "No order amount" covers both zeroed and untouched: either way this
+      // favorite isn't being ordered, which is what you're scanning for.
+      return row.is_favorite && (qty === null || Number(qty) === 0);
+    case "will_order":
+      return qty !== null && Number(qty) > 0;
+  }
+}
 
 /** What's been entered against a line today. Absent = untouched. */
 export type GuideEntry = {
