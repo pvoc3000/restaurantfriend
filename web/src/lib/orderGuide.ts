@@ -62,9 +62,9 @@ export function matchesGuideFilter(
     case "favorites":
       return row.is_favorite;
     case "skipped":
-      // "No order amount" covers both zeroed and untouched: either way this
-      // favorite isn't being ordered, which is what you're scanning for.
-      return row.is_favorite && (qty === null || Number(qty) === 0);
+      // Untouched only. A zeroed line is a decision already made — you looked
+      // and said no — so it isn't waiting on you; an untouched one is.
+      return row.is_favorite && qty === null;
     case "will_order":
       return qty !== null && Number(qty) > 0;
   }
@@ -94,13 +94,29 @@ export function qtyState(qty: number | null | undefined): QtyState {
   return Number(qty) > 0 ? "entered" : "zeroed";
 }
 
-// Filled, not tinted — these read at arm's length on a shelf, which is the
-// whole point of the three states.
-export const QTY_CLASS: Record<QtyState, string> = {
-  entered: "border-green-600 bg-green-200 text-green-950",
-  zeroed: "border-red-500 bg-red-200 text-red-950",
-  untouched: "border-neutral-400 bg-white text-neutral-900",
-};
+/**
+ * The order box's fill, from the three states plus whether the line is a
+ * favorite. Filled rather than tinted — these read at arm's length on a shelf.
+ *
+ * - zeroed        red, whatever the line is. An explicit "no" outranks
+ *                 everything else on the row.
+ * - favorite      green: the plan line. Pale while untouched, solid once a
+ *                 quantity is in, so you can still see what you've done.
+ * - alternate     white until used; a quantity on a NON-favorite means you
+ *                 switched source this week, which is worth seeing as its own
+ *                 colour rather than blending in with the plan.
+ */
+export function qtyClass(state: QtyState, isFavorite: boolean): string {
+  if (state === "zeroed") return "border-red-500 bg-red-200 text-red-950";
+  if (isFavorite) {
+    return state === "entered"
+      ? "border-green-600 bg-green-200 text-green-950"
+      : "border-green-500 bg-green-50 text-green-900";
+  }
+  return state === "entered"
+    ? "border-blue-500 bg-blue-100 text-blue-950"
+    : "border-neutral-400 bg-white text-neutral-900";
+}
 
 /**
  * Count mode (§4.3): on-hand in base units → packages to order.

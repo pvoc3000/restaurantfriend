@@ -3,7 +3,7 @@
 import { useState } from "react";
 import {
   deliveryLabel,
-  QTY_CLASS,
+  qtyClass,
   qtyState,
   suggestQty,
   type EntryState,
@@ -196,7 +196,7 @@ export function GuideLine({
             }}
             placeholder=""
             title="Packages to order"
-            className={`w-14 rounded border-2 px-1 py-0.5 text-center text-sm font-semibold tabular-nums ${QTY_CLASS[state]}`}
+            className={`w-14 rounded border-2 px-1 py-0.5 text-center text-sm font-semibold tabular-nums ${qtyClass(state, row.is_favorite)}`}
           />
           <button
             type="button"
