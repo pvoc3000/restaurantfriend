@@ -81,16 +81,37 @@ roughly 3× because vendor order days are ignored and membership is conflated.
    (`vendor_locations.order_days`); merge them. The confirm dialog goes: clearing
    a day stops destroying favorites, which is a defect in its own right.
 
-## Decide before building
+## Settled (Mark, 2026-07-22)
 
-- **`in_person` vendors.** Restaurant Depot accounts for 65 of the 176 DF01
-  Wednesday lines whose vendor doesn't take Wednesday orders — but you *go
-  shopping* there rather than sending an order, so its `order_days` may mean
-  something different. Ask Mark whether the vendor-day condition applies to
-  `order_type = 'in_person'`.
-- **Blank day sets.** An item-location or vendor with `order_days = '{}'` will
-  never be should-order. Confirm that's intended rather than treating empty as
-  "any day".
+- **`in_person` vendors are no different.** The vendor-day condition applies to
+  Restaurant Depot and the like exactly as it does to email/online vendors.
+- **Empty day sets are meaningful, not missing data.** `order_days = '{}'` on an
+  item-location is how you take an item out of focus while keeping it on the
+  guide — "sometimes I want to order an alternate item". Never treat empty as
+  "any day", and never auto-fill it.
+
+## Build this too: say WHY a line isn't should-order
+
+`should_order` is a four-way AND, so when a line isn't green there are four
+possible reasons and, in FMP, no way to see which. The view computes every
+condition anyway — expose the failing one (`vendor doesn't take Wed`, `item not
+scheduled Wed`, `this source isn't a favorite Wed`) the same way `hidden_reason`
+explains the active cascade, and surface it on hover or in the item card. This
+is the cheap improvement over the old system: the model's complexity stops being
+something Mark carries in his head.
+
+## Deliberately NOT doing
+
+- **Collapsing the three day sets.** They answer different questions — the
+  vendor's is an objective fact, the vendor item's is the per-source schedule,
+  the item's is a master switch over all sources. Mark's answer to empty sets
+  above is what makes the third load-bearing.
+- **Letting favorites inherit the item's days when they declare none.** Removes
+  duplication in the common case, but adds an inheritance rule; boring beats
+  clever here (CLAUDE.md).
+- **Deriving the day sets from PO history.** The data supports it and spec §3
+  parks it in v2. Replacing configuration Mark understands with inference he'd
+  have to audit is the wrong trade before the basic loop is habitual.
 
 ## Don't change
 
