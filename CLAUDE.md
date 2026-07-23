@@ -167,6 +167,11 @@ applied**; Mark runs them in the Supabase SQL editor.
 
 ## Open threads (pinned by Mark — don't act without asking)
 
+- **Order days vs favorites — agreed refactor, not started.** `order_guide_plan_days`
+  conflates "does this item appear on this day" with "which vendor item is
+  preferred", which is why the guide can not show an item with no favorites and
+  why clearing a day destroys them. Fix is specced in
+  `docs/order-days-refactor.md`: add `inventory_item_locations.order_days`.
 - **"Default vendor item" may be the wrong concept.** Mark's words, 2026-07-22.
   Today `inventory_item_locations.default_vendor_item_id` is a per-location
   fallback used only by plan rows with a null `vendor_item_id`; in practice the
