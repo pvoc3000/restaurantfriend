@@ -67,8 +67,10 @@ Migration 004 adds the last-ordered view (per-location semantics: "last ordered
 AT this location"). Migration 005 renames tables for clarity — see
 "Table naming" under Conventions; docs/purchasing-spec.md §5 predates the
 renames, translate via that mapping when reading it. Migration 006 adds
-`po_number_seq` + `next_po_number()` for PO generation — **written, not yet
-applied**; Mark runs it when generation ships.
+`po_number_seq` + `next_po_number()` for PO generation and 007 sets
+`orgs.settings.timezone` (the order guide derives "today" from it — without it
+a UTC host rolls the guide date at 5pm local). Both are **written, not yet
+applied**; Mark runs them in the Supabase SQL editor.
 
 ## Non-negotiable design rules
 
