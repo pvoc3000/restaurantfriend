@@ -1,14 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
+  buildEmailParts,
   buildMailto,
+  canSharePdf,
   downloadBlob,
   fetchPoDocData,
   nextDeliveryDate,
   openWindowNow,
+  sharePdf,
   showBlob,
   SENT_VIA_FOR_ORDER_TYPE,
 } from "@/lib/poProcessing";
@@ -46,6 +49,15 @@ export function ProcessPo({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [processed, setProcessed] = useState(false);
+  const [copied, setCopied] = useState(false);
+  // Share support is a client fact that never changes within a page life —
+  // useSyncExternalStore reads it hydration-safely (an effect would trip the
+  // set-state-in-effect lint; server snapshot false keeps SSR consistent).
+  const shareable = useSyncExternalStore(
+    () => () => {},
+    canSharePdf,
+    () => false
+  );
 
   const sentVia = SENT_VIA_FOR_ORDER_TYPE[context.order_type] ?? "print";
   const suggestion =
@@ -79,12 +91,36 @@ export function ProcessPo({
     run("email", async () => {
       const { pdf, docs, org, po } = await loadDocs();
       const blob = await pdf(<docs.PoPdf pos={[po]} org={org} />).toBlob();
+
+      // Share sheet first: the one path where the PDF lands INSIDE the Mail
+      // compose window (macOS and iOS). Recipient/subject may still need the
+      // copy chips — no web API can address a Mail draft.
+      const parts = buildEmailParts(po, org);
+      const shared = await sharePdf(
+        blob,
+        `PO ${po.po_number}.pdf`,
+        parts.subject,
+        parts.body
+      );
+      if (shared === "shared") {
+        setProcessed(true);
+        return;
+      }
+      if (shared === "cancelled") return;
+
+      // No file sharing here (or the gesture expired): the original two-step —
+      // PDF to Downloads, prefilled draft opens, human drags the file in.
       downloadBlob(blob, `PO ${po.po_number}.pdf`);
-      // Same click, so the mail app opens without popup fuss; the PDF is
-      // already in Downloads waiting to be dragged in.
       window.location.href = buildMailto(po, org);
       setProcessed(true);
     });
+
+  async function copyRep() {
+    if (!context.rep_email) return;
+    await navigator.clipboard.writeText(context.rep_email);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
 
   const previewPdf = () => {
     // Opened before any await, while the click gesture still counts — a popup
@@ -182,12 +218,14 @@ export function ProcessPo({
                 onClick={generateAndDraft}
                 className={primaryBtn}
                 title={
-                  context.rep_email
-                    ? `Draft to ${context.rep_email} — attach the downloaded PDF before sending`
-                    : "No rep email on file — the draft opens without a recipient"
+                  shareable
+                    ? "Opens the share sheet with the PDF attached — choose Mail"
+                    : context.rep_email
+                      ? `Draft to ${context.rep_email} — attach the downloaded PDF before sending`
+                      : "No rep email on file — the draft opens without a recipient"
                 }
               >
-                {busy === "email" ? "Rendering…" : "PDF + email draft"}
+                {busy === "email" ? "Rendering…" : "Email PDF…"}
               </button>
             </>
           )}
@@ -234,10 +272,29 @@ export function ProcessPo({
       </div>
 
       {context.order_type === "email_po" && (
-        <p className="text-xs text-neutral-500">
-          The PDF downloads and a mail draft opens
-          {context.rep_email ? ` to ${context.rep_email}` : " (no rep email on file)"} —
-          attach the PDF and edit the text before sending, then mark the order sent.
+        <p className="flex flex-wrap items-center gap-x-2 text-xs text-neutral-500">
+          {shareable ? (
+            <>
+              Opens the share sheet with the PDF attached — choose Mail, address
+              it, edit, send, then mark the order sent.
+            </>
+          ) : (
+            <>
+              The PDF downloads and a mail draft opens
+              {context.rep_email ? "" : " (no rep email on file)"} — attach the
+              PDF and edit before sending, then mark the order sent.
+            </>
+          )}
+          {context.rep_email && (
+            <button
+              type="button"
+              onClick={copyRep}
+              title="Copy the rep's email address"
+              className="rounded border border-neutral-300 bg-white px-1.5 py-0.5 text-neutral-700 hover:bg-neutral-100"
+            >
+              {copied ? "Copied" : `To: ${context.rep_email} ⧉`}
+            </button>
+          )}
         </p>
       )}
 

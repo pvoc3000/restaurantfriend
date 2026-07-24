@@ -361,14 +361,61 @@ export function fillTemplate(template: string, po: PoDocData): string {
   return template.replace(/\{(\w+)\}/g, (m, key) => vars[key] ?? m);
 }
 
+export function buildEmailParts(po: PoDocData, org: OrgDocData) {
+  return {
+    to: po.rep_email ?? "",
+    cc: org.po_email?.cc ?? "",
+    subject: fillTemplate(org.po_email?.subject ?? DEFAULT_SUBJECT, po),
+    body: fillTemplate(org.po_email?.body ?? DEFAULT_BODY, po),
+  };
+}
+
 export function buildMailto(po: PoDocData, org: OrgDocData): string {
+  const parts = buildEmailParts(po, org);
   const params = new URLSearchParams();
-  if (org.po_email?.cc) params.set("cc", org.po_email.cc);
-  params.set("subject", fillTemplate(org.po_email?.subject ?? DEFAULT_SUBJECT, po));
-  params.set("body", fillTemplate(org.po_email?.body ?? DEFAULT_BODY, po));
+  if (parts.cc) params.set("cc", parts.cc);
+  params.set("subject", parts.subject);
+  params.set("body", parts.body);
   // URLSearchParams encodes spaces as '+', which mail apps take literally.
   const query = params.toString().replace(/\+/g, "%20");
-  return `mailto:${encodeURIComponent(po.rep_email ?? "")}?${query}`;
+  return `mailto:${encodeURIComponent(parts.to)}?${query}`;
+}
+
+// ---------------------------------------------------------------------------
+// Web Share API: the one way a web app can put a file INTO Mail's composer on
+// both macOS and iOS — share sheet → Mail → compose with the PDF attached.
+// mailto: cannot attach, ever (RFC 6068), so where sharing is supported it
+// replaces the download-then-drag dance. Recipient/subject can't be forced
+// through the sheet; the UI shows them with copy buttons instead.
+// ---------------------------------------------------------------------------
+
+export type ShareResult = "shared" | "cancelled" | "unsupported";
+
+export function canSharePdf(): boolean {
+  if (typeof navigator === "undefined" || !navigator.canShare) return false;
+  const probe = new File([], "probe.pdf", { type: "application/pdf" });
+  return navigator.canShare({ files: [probe] });
+}
+
+export async function sharePdf(
+  blob: Blob,
+  filename: string,
+  subject: string,
+  body: string
+): Promise<ShareResult> {
+  const file = new File([blob], filename, { type: "application/pdf" });
+  if (!canSharePdf() || !navigator.canShare({ files: [file] })) return "unsupported";
+  try {
+    // Mail uses `title` for the subject where it honors it, `text` for the body.
+    await navigator.share({ files: [file], title: subject, text: body });
+    return "shared";
+  } catch (e) {
+    // Closing the sheet is a decision, not an error — don't surprise the user
+    // with the fallback draft. NotAllowedError (gesture expired while the PDF
+    // rendered) falls through to the mailto path.
+    if (e instanceof DOMException && e.name === "AbortError") return "cancelled";
+    return "unsupported";
+  }
 }
 
 // ---------------------------------------------------------------------------
