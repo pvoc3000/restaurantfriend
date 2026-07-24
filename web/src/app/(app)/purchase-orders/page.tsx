@@ -12,7 +12,7 @@ export type PoListRow = {
   sent_via: string | null;
   order_date: string;
   delivery_date: string | null;
-  vendors: { id: string; name: string } | null;
+  vendors: { id: string; name: string; order_type: string } | null;
   line_count: number;
   ordered_total: number;
   received_total: number;
@@ -41,7 +41,7 @@ export default async function PurchaseOrdersPage({
     .from("purchase_orders")
     .select(
       `id, po_number, status, sent_via, order_date, delivery_date,
-       vendors ( id, name )`
+       vendors ( id, name, order_type )`
     )
     .eq("location_id", session.activeLocation.id)
     .order("order_date", { ascending: false })

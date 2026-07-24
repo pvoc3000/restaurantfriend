@@ -17,6 +17,7 @@ import {
 } from "@/lib/purchaseOrders";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue } from "@/components/catalog/InlineValue";
+import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 
 /**
  * PO detail: what was ordered, what arrived, and the gap between them.
@@ -31,11 +32,14 @@ export function PurchaseOrderDetail({
   lines,
   locationCode,
   vendorLink,
+  processing,
 }: {
   order: PurchaseOrder;
   lines: PoLine[];
   locationCode: string;
   vendorLink: ReactNode;
+  /** Null for viewers below purchaser — the card writes, so it isn't shown. */
+  processing: ProcessingContext | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -233,6 +237,8 @@ export function PurchaseOrderDetail({
       </dl>
 
       {error && <p className="text-sm text-red-700">{error}</p>}
+
+      {processing && <ProcessPo order={order} context={processing} />}
 
       <div className="flex flex-wrap items-center gap-4 rounded border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
         <span>

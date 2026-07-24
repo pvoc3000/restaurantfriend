@@ -77,8 +77,34 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    since last PO" guard is a warning chip and a same-day PO defaults the vendor
    unchecked (re-run guard). Fixture-tested in the Docker harness (numbering,
    snapshots, override price, zeroed-skip, fractional pack_count, empty-day
-   no-op). NOT built: **batch process / email PDF / shopping list** (needs the
-   edge function, deferred).
+   no-op).
+   Shipped 2026-07-23: **PO processing** (spec §2 step 4), no edge function —
+   Mark chose generate-PDF-then-open-mail-draft over automated sending. PDFs
+   render CLIENT-side with @react-pdf/renderer, dynamically imported at click.
+   `lib/poProcessing.ts` (client-safe): `fetchPoDocData` assembles document
+   data for 1..n POs in four bulk queries (org billing/settings, POs + vendor +
+   location address, lines + category/instructions, shop sections — NB
+   `shop_sections.display_name`, there is no `name` column); mailto builder
+   with subject/body templates from `orgs.settings.po_email.subject/body`
+   (generic fallbacks in code, placeholders like {po_number} {rep_first}
+   {account_line}); `nextDeliveryDate` suggests the vendor's next delivery day.
+   `pdf/PoPdfDocs.tsx`: `PoPdf` = §4.9 vendor-facing doc (category-grouped,
+   checkbox/product/qty/pack/composed description, account #, ship-to from
+   `locations.address.shipping`, NO totals — intentional) and
+   `ShoppingListPdf` = in_person mode by shop section (internal: prices +
+   estimated total). Multi-PO = one file, a page run per PO. `ProcessPo.tsx`
+   card on PO detail (purchaser+): per-order_type actions (email_po → PDF
+   download + mailto draft, the human attaches + edits; online → open vendor
+   URL; in_person → shopping list), delivery-date input with suggestion chip,
+   "Mark as sent" (status + sent_via per SENT_VIA_FOR_ORDER_TYPE). PO list
+   selection bar: batch PO PDFs / shopping lists / mark-sent (drafts only).
+   **Popup gotcha:** a window.open after `await` is silently blocked — open the
+   window synchronously in the click handler (`openWindowNow`), navigate it to
+   the blob later (`showBlob`, download fallback). Verified by rendering Mark's
+   two real 2026-07-23 drafts through the actual components in Node (esbuild
+   bundle, read-only service_role fetch) and inspecting the PDFs.
+   NOT built: automated email sending (edge function — revisit if the manual
+   draft flow gets old).
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A

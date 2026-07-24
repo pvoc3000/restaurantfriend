@@ -3,6 +3,13 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import {
+  fetchPoDocData,
+  openWindowNow,
+  showBlob,
+  SENT_VIA_FOR_ORDER_TYPE,
+} from "@/lib/poProcessing";
 import {
   money,
   PO_STATUS_CLASS,
@@ -59,8 +66,11 @@ export function PurchaseOrderList({
   capped: boolean;
 }) {
   const router = useRouter();
+  const supabase = createClient();
   const [filters, setFilters] = useState<PoFilters>(initialFilters);
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [batchBusy, setBatchBusy] = useState<string | null>(null);
+  const [batchError, setBatchError] = useState<string | null>(null);
 
   function update(patch: Partial<PoFilters>) {
     const next = { ...filters, ...patch };
@@ -126,6 +136,68 @@ export function PurchaseOrderList({
       else next.add(id);
       return next;
     });
+  }
+
+  const selectedDrafts = useMemo(
+    () => orders.filter((po) => checked.has(po.id) && po.status === "draft"),
+    [orders, checked]
+  );
+
+  /** One PDF for the whole selection — a page run per PO (spec §4.8's batch
+   *  preview / shopping-list modes). Opened, not downloaded: batch output is
+   *  for reading or printing, and the per-PO email flow does its own download. */
+  async function batchPdf(kind: "po" | "shopping") {
+    // Opened before any await, while the click gesture still counts — a popup
+    // opened after async work is silently blocked.
+    const win = openWindowNow();
+    setBatchBusy(kind);
+    setBatchError(null);
+    try {
+      const [{ pdf }, docs, { org, pos }] = await Promise.all([
+        import("@react-pdf/renderer"),
+        import("./pdf/PoPdfDocs"),
+        fetchPoDocData(supabase, [...checked]),
+      ]);
+      pos.sort((a, b) => a.po_number.localeCompare(b.po_number, undefined, { numeric: true }));
+      const Doc = kind === "po" ? docs.PoPdf : docs.ShoppingListPdf;
+      const blob = await pdf(<Doc pos={pos} org={org} />).toBlob();
+      const name =
+        kind === "po"
+          ? `POs ${pos.map((p) => p.po_number).join(", ")}.pdf`
+          : `Shopping lists ${pos.map((p) => p.po_number).join(", ")}.pdf`;
+      showBlob(win, blob, name);
+    } catch (e) {
+      win?.close();
+      setBatchError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBatchBusy(null);
+    }
+  }
+
+  /** Drafts only — sent_via comes from each vendor's order type. */
+  async function batchMarkSent() {
+    setBatchBusy("sent");
+    setBatchError(null);
+    try {
+      const byVia = new Map<string, string[]>();
+      for (const po of selectedDrafts) {
+        const via = SENT_VIA_FOR_ORDER_TYPE[po.vendors?.order_type ?? "none"] ?? "print";
+        byVia.set(via, [...(byVia.get(via) ?? []), po.id]);
+      }
+      for (const [via, ids] of byVia) {
+        const { error } = await supabase
+          .from("purchase_orders")
+          .update({ status: "sent", sent_via: via })
+          .in("id", ids);
+        if (error) throw new Error(error.message);
+      }
+      setChecked(new Set());
+      router.refresh();
+    } catch (e) {
+      setBatchError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBatchBusy(null);
+    }
   }
 
   const allVisibleChecked =
@@ -334,18 +406,52 @@ export function PurchaseOrderList({
       )}
 
       {checked.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm">
-          <span>{checked.size} selected</span>
-          <span className="tabular-nums text-neutral-600">{money(selectedTotal)}</span>
-          <span className="text-neutral-500">
-            Batch process and shopping lists arrive with PO generation.
-          </span>
-          <button
-            onClick={() => setChecked(new Set())}
-            className="ml-auto text-neutral-600 hover:underline"
-          >
-            Clear
-          </button>
+        <div className="space-y-1 rounded border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm">
+          <div className="flex flex-wrap items-center gap-3">
+            <span>{checked.size} selected</span>
+            <span className="tabular-nums text-neutral-600">{money(selectedTotal)}</span>
+
+            {/* Batch preview (spec §4.8): every selected PO as one PDF, a page
+                run per order, opened for reading or printing. */}
+            <button
+              disabled={batchBusy !== null}
+              onClick={() => batchPdf("po")}
+              className="rounded border border-neutral-300 bg-white px-3 py-1 hover:bg-neutral-100 disabled:opacity-50"
+            >
+              {batchBusy === "po" ? "Rendering…" : "PO PDFs"}
+            </button>
+            <button
+              disabled={batchBusy !== null}
+              onClick={() => batchPdf("shopping")}
+              className="rounded border border-neutral-300 bg-white px-3 py-1 hover:bg-neutral-100 disabled:opacity-50"
+            >
+              {batchBusy === "shopping" ? "Rendering…" : "Shopping lists"}
+            </button>
+            <button
+              disabled={batchBusy !== null || selectedDrafts.length === 0}
+              onClick={batchMarkSent}
+              title={
+                selectedDrafts.length === 0
+                  ? "No drafts selected — only drafts can be marked sent"
+                  : `Marks ${selectedDrafts.length} draft${
+                      selectedDrafts.length === 1 ? "" : "s"
+                    } sent, sent_via from each vendor's order type`
+              }
+              className="rounded border border-neutral-300 bg-white px-3 py-1 hover:bg-neutral-100 disabled:opacity-50"
+            >
+              {batchBusy === "sent"
+                ? "Saving…"
+                : `Mark sent (${selectedDrafts.length})`}
+            </button>
+
+            <button
+              onClick={() => setChecked(new Set())}
+              className="ml-auto text-neutral-600 hover:underline"
+            >
+              Clear
+            </button>
+          </div>
+          {batchError && <p className="text-red-700">{batchError}</p>}
         </div>
       )}
 
