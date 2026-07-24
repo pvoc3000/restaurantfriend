@@ -56,6 +56,19 @@ export function ProcessPo({
   // The compose card's editable fields; null = closed.
   const [compose, setCompose] = useState<EmailParts | null>(null);
   const [sentNote, setSentNote] = useState<string | null>(null);
+  // The attachment, rendered ONCE when the dialog opens: the preview pane and
+  // the send both use this exact blob, so what's shown is what goes out.
+  const [attachment, setAttachment] = useState<{
+    blob: Blob;
+    url: string;
+    filename: string;
+  } | null>(null);
+
+  function closeCompose() {
+    if (attachment) URL.revokeObjectURL(attachment.url);
+    setAttachment(null);
+    setCompose(null);
+  }
 
   const sentVia = SENT_VIA_FOR_ORDER_TYPE[context.order_type] ?? "print";
   const suggestion =
@@ -85,53 +98,54 @@ export function ProcessPo({
     }
   }
 
-  /** Open the compose card prefilled from the templates — no PDF work yet. */
+  /** Open the compose dialog: prefill the fields AND render the attachment,
+   *  so the preview pane shows the exact document Send will transmit. */
   const openCompose = () =>
     run("compose", async () => {
-      const { org, pos } = await fetchPoDocData(supabase, [order.id]);
-      if (pos.length === 0) throw new Error("Order not found");
-      setSentNote(null);
-      setCompose(buildEmailParts(pos[0], org));
-    });
-
-  /** The reviewed fields + the freshly rendered PDF → edge function → sent. */
-  const send = () =>
-    run("send", async () => {
-      if (!compose) return;
       const { pdf, docs, org, po } = await loadDocs();
       const blob = await pdf(<docs.PoPdf pos={[po]} org={org} />).toBlob();
+      setSentNote(null);
+      setAttachment({
+        blob,
+        url: URL.createObjectURL(blob),
+        filename: `PO ${po.po_number}.pdf`,
+      });
+      setCompose(buildEmailParts(po, org));
+    });
+
+  /** The reviewed fields + the previewed PDF → edge function → sent. */
+  const send = () =>
+    run("send", async () => {
+      if (!compose || !attachment) return;
       const { warning } = await sendPoEmail(supabase, {
         po_id: order.id,
         parts: compose,
-        blob,
-        filename: `PO ${po.po_number}.pdf`,
+        blob: attachment.blob,
+        filename: attachment.filename,
       });
-      setCompose(null);
-      setSentNote(
-        `Sent to ${compose.to}${warning ? ` — ${warning}` : ""}`
-      );
+      const to = compose.to;
+      closeCompose();
+      setSentNote(`Sent to ${to}${warning ? ` — ${warning}` : ""}`);
       router.refresh();
     });
 
   /**
    * The escape hatch (e.g. Resend not configured yet): hand the EDITED fields
-   * to the mail app — share sheet where files can be shared, else the PDF
-   * downloads and a prefilled draft opens. Marking sent stays manual here.
+   * and the previewed PDF to the mail app — share sheet where files can be
+   * shared, else download + prefilled draft. Marking sent stays manual here.
    */
   const useMailApp = () =>
     run("mailapp", async () => {
-      if (!compose) return;
-      const { pdf, docs, org, po } = await loadDocs();
-      const blob = await pdf(<docs.PoPdf pos={[po]} org={org} />).toBlob();
+      if (!compose || !attachment) return;
       const shared = await sharePdf(
-        blob,
-        `PO ${po.po_number}.pdf`,
+        attachment.blob,
+        attachment.filename,
         compose.subject,
         compose.body
       );
       if (shared === "cancelled") return;
       if (shared === "unsupported") {
-        downloadBlob(blob, `PO ${po.po_number}.pdf`);
+        downloadBlob(attachment.blob, attachment.filename);
         window.location.href = mailtoFromParts(compose);
       }
       setProcessed(true);
@@ -284,10 +298,36 @@ export function ProcessPo({
 
       {sentNote && <p className="text-xs text-green-800">{sentNote}</p>}
 
-      {/* The compose card: what you see is exactly what sends. */}
+      {/* The compose dialog: what you see is exactly what sends. Floats over
+          the PO like the Generate POs confirm — same overlay pattern. */}
       {compose && (
-        <div className="space-y-2 rounded border border-neutral-200 bg-neutral-50 p-3">
-          <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[6vh]"
+          onClick={() => busy === null && closeCompose()}
+        >
+          <div
+            role="dialog"
+            aria-label={`Email purchase order ${order.po_number}`}
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-5xl space-y-2 rounded-lg bg-white p-4 shadow-xl"
+          >
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-base font-semibold">
+                Email {order.po_number}
+              </h2>
+              <button
+                type="button"
+                onClick={closeCompose}
+                disabled={busy !== null}
+                className="text-sm text-neutral-500 hover:text-neutral-900"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+            <div className="space-y-2">
+            <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
             {(
               [
                 ["To", "to"],
@@ -321,12 +361,12 @@ export function ProcessPo({
 
           <div className="flex flex-wrap items-center gap-3">
             <span className="text-xs text-neutral-500">
-              📎 PO {order.po_number}.pdf — rendered fresh on send
+              📎 {attachment?.filename} — the document shown here is what sends
             </span>
             <span className="ml-auto flex items-center gap-2">
               <button
                 disabled={busy !== null}
-                onClick={() => setCompose(null)}
+                onClick={closeCompose}
                 className="text-neutral-600 hover:text-neutral-900"
               >
                 Cancel
@@ -353,10 +393,34 @@ export function ProcessPo({
               </button>
             </span>
           </div>
+
+            {/* A send failure must surface INSIDE the dialog — the card's own
+                error line would be hidden behind the overlay. */}
+            {error && <p className="text-sm text-red-700">{error}</p>}
+            </div>
+
+            {/* The attachment, as the vendor will see it. <object> (not an
+                iframe) so a browser without an inline PDF viewer shows the
+                fallback below instead of a blank pane. */}
+            {attachment && (
+              <object
+                data={attachment.url}
+                type="application/pdf"
+                aria-label={`Preview of ${attachment.filename}`}
+                className="h-[26rem] w-full rounded border border-neutral-300 md:h-full md:min-h-[26rem]"
+              >
+                <div className="flex h-full items-center justify-center p-4 text-center text-xs text-neutral-500">
+                  This browser can&apos;t preview PDFs inline — use the Preview
+                  PDF button to open it in its own tab.
+                </div>
+              </object>
+            )}
+            </div>
+          </div>
         </div>
       )}
 
-      {error && <p className="text-red-700">{error}</p>}
+      {error && !compose && <p className="text-red-700">{error}</p>}
     </div>
   );
 }

@@ -112,7 +112,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    an explicit purchaser+ check for a readable error. Setup checklist (Resend
    account, domain DNS, RESEND_API_KEY secret, deploy, `po_email.from`
    setting): **docs/po-email-setup.md — NOT yet done, Send errors clearly
-   until it is.** "Use Mail app" in the compose card is the escape hatch and
+   until it is.** The compose is a floating modal (Generate-POs overlay
+   pattern) with a live preview: the PDF renders ONCE at open, shows in an
+   `<object type="application/pdf">` pane (text fallback for browsers without
+   an inline viewer — the Claude browser pane is one), and Send transmits that
+   exact blob. "Use Mail app" in the compose card is the escape hatch and
    carries the EDITED fields: Web Share sheet where supported (`sharePdf` —
    puts the PDF inside Mail's composer; needs a secure context, so plain http
    over LAN to an iPad does NOT get it), else download + mailto draft (mailto
