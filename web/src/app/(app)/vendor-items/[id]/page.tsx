@@ -1,9 +1,9 @@
 import type { RawSearchParams } from "@/lib/itemFilters";
-import { ItemDetail } from "./ItemDetail";
+import { VendorItemDetail } from "./VendorItemDetail";
 
-// The body lives in ItemDetail, shared with the app-wide slide-over panel
+// The body lives in VendorItemDetail, shared with the app-wide slide-over panel
 // (@panel's intercepting route). This page is the hard-load / deep-link form.
-export default async function ItemDetailPage({
+export default async function VendorItemPage({
   params,
   searchParams,
 }: {
@@ -12,5 +12,5 @@ export default async function ItemDetailPage({
 }) {
   const { id } = await params;
   const rawParams = await searchParams;
-  return <ItemDetail id={id} rawParams={rawParams} />;
+  return <VendorItemDetail id={id} rawParams={rawParams} />;
 }

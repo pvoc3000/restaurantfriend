@@ -3,6 +3,10 @@
 // catalog surfaces — /cleanup stays a separate, problem-driven queue.
 
 export type CatalogVendorItem = {
+  /** FMP's pack structure, restored by migration 010 ("12 × 32 oz"). */
+  pack_count?: number | null;
+  pack_size?: number | null;
+  pack_unit?: string | null;
   id: string;
   product_id: string | null;
   brand: string | null;
@@ -21,6 +25,9 @@ export type CatalogItemLocation = {
   location_id: string;
   default_par: number | null;
   default_vendor_item_id: string | null;
+  /** ISO weekdays we order this item at this location (schema 008). One of
+   *  the four should-order conditions; empty = out of focus, still on guide. */
+  order_days: number[];
   note: string | null;
   is_active: boolean;
   shop_sections: { display_name: string; sort_order: number } | null;
@@ -42,6 +49,7 @@ export type CatalogItem = {
 // unorderable — screens badge it rather than hiding it here).
 export const VENDOR_ITEM_SELECT = `
   id, product_id, brand, description, package_desc, package_content, price,
+  pack_count, pack_size, pack_unit,
   notes, is_active, inventory_item_id,
   vendors ( id, name, is_active )
 `;
@@ -97,4 +105,31 @@ export function unitPriceLabel(vi: CatalogVendorItem, baseUnit: string) {
 /** One-line description of a vendor item for dense table cells. */
 export function vendorItemLabel(vi: CatalogVendorItem) {
   return [vi.brand, vi.description].filter(Boolean).join(" · ") || "—";
+}
+
+/**
+ * How a pack reads on the shelf: "12 × 32 oz", the way FileMaker recorded it
+ * (UnitAmount × UnitSize UnitMeasure) and the way a packing slip is checked.
+ *
+ * Falls back to the base-unit total when the structure was never recorded —
+ * 249 vendor items have no pack fields. What it must never do is print a
+ * hardcoded "1 ×", which is what the guide did before migration 010: every
+ * pack claimed to be a single unit, so a case of twelve read "1 × 24 lbs".
+ */
+export function packLabel(
+  vi: {
+    pack_count?: number | null;
+    pack_size?: number | null;
+    pack_unit?: string | null;
+    package_content: number | null;
+  },
+  baseUnit: string
+): string | null {
+  if (vi.pack_size !== null && vi.pack_size !== undefined) {
+    const count = vi.pack_count ?? 1;
+    const unit = vi.pack_unit ?? baseUnit;
+    return `${Number(count)} × ${Number(vi.pack_size)} ${unit}`;
+  }
+  if (vi.package_content === null) return null;
+  return `${Number(vi.package_content)} ${baseUnit}`;
 }

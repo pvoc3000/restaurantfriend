@@ -1,8 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { withFrom } from "@/lib/breadcrumbs";
 import {
   deliveryLabel,
+  notGreenReason,
   qtyClass,
   qtyState,
   suggestQty,
@@ -10,6 +13,7 @@ import {
   type GuideRow,
 } from "@/lib/orderGuide";
 import { money } from "@/lib/purchaseOrders";
+import { packLabel } from "@/lib/catalog";
 
 /**
  * One plan line, laid out in the columns the FMP guide used because they're the
@@ -24,6 +28,8 @@ import { money } from "@/lib/purchaseOrders";
 export function GuideLine({
   row,
   entry,
+  weekday,
+  ignoreDays,
   itemPar,
   baseUnit,
   onCommit,
@@ -31,6 +37,8 @@ export function GuideLine({
 }: {
   row: GuideRow;
   entry: EntryState | undefined;
+  weekday: number;
+  ignoreDays: boolean;
   itemPar: number | null;
   baseUnit: string;
   onCommit: (patch: Partial<EntryState>) => void;
@@ -39,8 +47,10 @@ export function GuideLine({
   const [qtyDraft, setQtyDraft] = useState<string | null>(null);
   const [onHandDraft, setOnHandDraft] = useState<string | null>(null);
 
-  // Per-line par overrides the item's (brief §A: par_qty on a plan row is a
-  // PER-LINE par, not a share of the item total).
+  // Par is a fact about the ITEM at this location on this weekday, never about
+  // which vendor you buy it from (migration 009), so every line under an item
+  // resolves the same number — `itemPar` is just the fallback if the view ever
+  // hands us a null.
   const par = row.par_qty ?? itemPar;
   const onHand = entry?.on_hand ?? null;
   const qty = entry?.qty_to_order ?? null;
@@ -82,6 +92,25 @@ export function GuideLine({
   }
 
   const arrives = deliveryLabel(row.vendor_delivery_days);
+  const pack = packLabel(row, baseUnit);
+
+  // Should-order is a statement about a day, so it means nothing while the day
+  // gates are lifted — no green, and no reason to explain the absence of it.
+  const shouldOrder = ignoreDays ? false : row.should_order;
+
+  // Why a quiet line isn't green, named per failing condition — the model's
+  // complexity stops being something you carry in your head. On the box
+  // itself, where the question gets asked. Under the day-gated list every
+  // visible line already clears the vendor and item days, so in practice this
+  // names the favorite check.
+  const quietReason = ignoreDays ? null : notGreenReason(row, weekday);
+
+  // Leaving a line must lead back to the day being walked, same as the item
+  // header. Vendor name → vendor detail; the description names THIS vendor
+  // item, so it opens the vendor item — where its favorite days, per-location
+  // price and order history live. (The item header above links to the
+  // inventory item.)
+  const here = { href: `/order-guide?day=${weekday}`, label: "Order Guide" };
 
   // Only orderable lines reach the guide — the page filters on the view's
   // active cascade — so there's no blocked state to render here.
@@ -90,18 +119,21 @@ export function GuideLine({
       {/* Vendor over brand, the way the printed guide reads. */}
       <td className="whitespace-nowrap py-1.5 pl-2 pr-2 align-top">
         <div className="flex items-baseline gap-1.5">
-          {/* Favorites carry a marker so "All" can be scanned: the plan line
-              is the one you'd normally take. */}
+          {/* Favorites carry a marker so "All" can be scanned: the source
+              you'd normally take, whether or not it's today's work. */}
           <span
             aria-hidden
             className={row.is_favorite ? "text-amber-500" : "text-transparent"}
-            title={row.is_favorite ? "Favorite — this day's plan line" : undefined}
+            title={row.is_favorite ? "Favorite — the preferred source this day" : undefined}
           >
             ★
           </span>
-          <span className="font-semibold uppercase tracking-tight text-neutral-900">
+          <Link
+            href={withFrom(`/vendors/${row.vendor_id}`, here)}
+            className="font-semibold uppercase tracking-tight text-neutral-900 hover:underline"
+          >
             {row.vendor_name}
-          </span>
+          </Link>
         </div>
         {row.brand && <div className="pl-5 text-xs text-neutral-500">{row.brand}</div>}
         {/* Delivery day lives with the vendor, not the description — it's a
@@ -110,19 +142,19 @@ export function GuideLine({
       </td>
 
       <td className="px-2 py-1.5 align-top text-neutral-800">
-        {row.vendor_item_description ?? "—"}
+        <Link
+          href={withFrom(`/vendor-items/${row.vendor_item_id}`, here)}
+          className="hover:underline"
+        >
+          {row.vendor_item_description ?? "—"}
+        </Link>
       </td>
 
       {/* Pack and unit price: the $/oz comparison across pack sizes is the
-          reason this column exists (§4.6). */}
+          reason this column exists (§4.6). Reads the way the case is labelled —
+          "12 × 32 oz" — because that's what you check a delivery against. */}
       <td className="whitespace-nowrap px-2 py-1.5 align-top tabular-nums text-neutral-800">
-        {row.package_content !== null ? (
-          <>
-            1 &times; {Number(row.package_content)} {baseUnit}
-          </>
-        ) : (
-          <span className="text-neutral-400">—</span>
-        )}
+        {pack ?? <span className="text-neutral-400">—</span>}
       </td>
 
       <td className="whitespace-nowrap px-2 py-1.5 align-top text-right tabular-nums text-neutral-600">
@@ -195,8 +227,8 @@ export function GuideLine({
               if (e.key === "Escape") setQtyDraft(null);
             }}
             placeholder=""
-            title="Packages to order"
-            className={`w-14 rounded border-2 px-1 py-0.5 text-center text-sm font-semibold tabular-nums ${qtyClass(state, row.is_favorite)}`}
+            title={quietReason ?? "Packages to order"}
+            className={`w-14 rounded border-2 px-1 py-0.5 text-center text-sm font-semibold tabular-nums ${qtyClass(state, shouldOrder, row.is_favorite)}`}
           />
           <button
             type="button"

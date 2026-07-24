@@ -12,6 +12,11 @@ import { ActiveToggle } from "./ActiveToggle";
 export function ItemFields({ item }: { item: CatalogItem }) {
   return (
     <div className="space-y-3">
+      {/* Says which KIND of record this is — the panel hides breadcrumbs, so
+          without it an inventory item and a vendor item look alike. */}
+      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+        Inventory
+      </p>
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-xl font-semibold">
           <InlineValue

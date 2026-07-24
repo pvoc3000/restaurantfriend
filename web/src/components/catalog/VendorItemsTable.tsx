@@ -118,6 +118,23 @@ export function VendorItemsTable({
   const link = (href: string) => (from ? withFrom(href, from) : href);
 
   const columns: DataColumn<VendorItemWithItem>[] = [
+    // Active leads on every catalog table (Mark, 2026-07-23): the on/off state
+    // is the first thing scanned, and a fixed first position keeps the toggles
+    // aligned across screens.
+    {
+      key: "is_active",
+      label: "Active",
+      width: 80,
+      sortValue: (vi) => (vi.is_active ? 0 : 1),
+      render: (vi) => (
+        <ActiveToggle
+          table="vendor_items"
+          id={vi.id}
+          active={vi.is_active}
+          label="Vendor item active"
+        />
+      ),
+    },
     ...(showVendor
       ? [
           {
@@ -274,20 +291,6 @@ export function VendorItemsTable({
           },
         ]
       : []),
-    {
-      key: "is_active",
-      label: "Active",
-      width: 80,
-      sortValue: (vi) => (vi.is_active ? 0 : 1),
-      render: (vi) => (
-        <ActiveToggle
-          table="vendor_items"
-          id={vi.id}
-          active={vi.is_active}
-          label="Vendor item active"
-        />
-      ),
-    },
   ];
 
   const table = (

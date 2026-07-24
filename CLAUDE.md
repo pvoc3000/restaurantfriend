@@ -44,10 +44,23 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    follow-up). Then brief §D: Inventory list + item detail, vendor detail with
    editable per-location config, vendor items everywhere.
 4. 🚧 Web order guide + PO generation/processing + receiving (real Monday orders).
-   Shipped: `/order-guide` — walk-order sections, item headers with par, plan
-   lines nested (multi-favorite), three-state qty boxes, count mode
+   Shipped: `/order-guide` — walk-order sections, item headers with par, lines
+   nested (multi-favorite), three-state qty boxes, count mode
    (`ceil((par-on_hand)/package_content)`), vendor totals bar vs minimums,
    writes to `order_guide_entries` per line. No clear/update ceremony.
+   Rebuilt 2026-07-23 on the membership/should-order model (schema 008,
+   `docs/order-days-refactor.md`): membership = the active cascade, green =
+   should-order (vendor + item + favorite day sets all include the walked day),
+   per-line "why isn't this green" tooltips. Filters are two day tiers —
+   **All** = orderable AND day-relevant (vendor order days ∧ item order days),
+   **Favorites** = All ∧ favorite that day (= the view's `should_order`; within
+   All the favorite check is the only thing left, hence the name), Skipped /
+   Will order qty-based. Default filter Favorites; all 7 day chips always show;
+   an **Ignore ordering days** switch lifts the day gates for lookup (FMP's
+   `g_IgnoreOrderDayWhenSearching_b`), which suppresses green and disables the
+   two day-scoped filters.
+   **Broken against the live DB until 008 is applied** — the page selects the
+   view's new columns.
    Shipped: `/purchase-orders` list (location-scoped, date window, status chips,
    totals, selection) and PO detail (ordered-vs-received with dual totals,
    inline receiving, price reconciliation → catalog). NOT built: **PO generation**
@@ -62,15 +75,51 @@ multi-favorites + §B last-ordered triage). Cleanup checks live in
 last-ordered buckets in `web/src/lib/lastOrdered.ts`. Schema: migration 003
 makes `order_guide_plan_days` unique per (item, weekday, **vendor_item**) — multiple
 favorites per day (multi-vendor sourcing / pack-size variants), so the guide
-groups lines by inventory item and `par_qty` on a plan row is a PER-LINE par.
+groups lines by inventory item. (003 also made `par_qty` a per-VENDOR-ITEM par —
+a distinction FMP never had and the data never used; migration 009 undid it.)
 Migration 004 adds the last-ordered view (per-location semantics: "last ordered
 AT this location"). Migration 005 renames tables for clarity — see
 "Table naming" under Conventions; docs/purchasing-spec.md §5 predates the
 renames, translate via that mapping when reading it. Migration 006 adds
 `po_number_seq` + `next_po_number()` for PO generation and 007 sets
 `orgs.settings.timezone` (the order guide derives "today" from it — without it
-a UTC host rolls the guide date at 5pm local). Both are **written, not yet
-applied**; Mark runs them in the Supabase SQL editor.
+a UTC host rolls the guide date at 5pm local). Migration 008 stores item order
+days on `inventory_item_locations.order_days`, makes plan-row `vendor_item_id`
+NOT NULL (materializing the old null-means-default rows), and recreates
+`v_order_guide` at item-location × vendor item × weekday grain with
+`should_order` / `is_favorite` / the three day arrays. Migration 009 returns
+per-weekday par to `inventory_item_locations` (`par_by_weekday` /
+`par_fixed_by_weekday`, slot n = weekday n, mirroring FMP's `Par__array` +
+`isFixed_array`) and drops `par_qty` / `par_mode` from plan rows, leaving the
+plan row a PURE FAVORITE record with no payload — so un-favoriting a day can no
+longer destroy a par. The view's output is unchanged (`par_qty` / `par_mode`
+still, just sourced differently), so no app code changed for par.
+**Migrations 001–011 are ALL APPLIED to the hosted DB** (verified 2026-07-23).
+Mark runs them himself in the Supabase SQL editor — never assume a written
+migration has been applied, and never assume it hasn't: check. Cheap probes:
+`select settings->>'timezone' from orgs` for 007, and for a function, call it
+via RPC with a bogus argument so it raises on its first statement instead of
+doing any work.
+
+Migration 010 restores the vendor item's PACK STRUCTURE — FMP recorded
+`UnitAmount × UnitSize UnitMeasure` ("CS 12 × 32oz") and the original load
+multiplied it into `package_content` alone, so the guide printed a hardcoded
+"1 × 24 lbs" (the "1 ×" was a literal in the UI; it always said 1). 010 adds
+`vendor_items.pack_count / pack_size / pack_unit` and exposes them on the view;
+`package_content` is untouched and remains the base-unit total count mode
+divides by. The VALUES come from the raw export, not the migration — run
+`migration/backfill-pack.mjs` (dry run by default, `--apply` to write) after
+010. Backfill is DONE (2,621 rows, verified field-by-field against the export;
+698 multi-packs). Migration 011 retyped `pack_count` integer → numeric: FMP
+allows a fractional UnitAmount and one row uses it (0.5 × 1qt), which killed
+the first backfill run partway through. **The web app on this branch requires
+010/011** — the guide selects the new columns.
+
+**Par belongs to the item at a location, never to the order guide** (Mark,
+2026-07-23). If a future change wants a par that varies by anything other than
+(item, location, weekday), that is a signal the model is drifting again — 001
+put per-weekday par on plan rows only because that table happened to carry the
+weekday column, and 003 then silently made it per-vendor-item.
 
 ## Non-negotiable design rules
 
@@ -98,6 +147,9 @@ applied**; Mark runs them in the Supabase SQL editor.
 
 ## Conventions
 
+- **The Active toggle is the FIRST column** on every catalog table (Mark,
+  2026-07-23) — vendors list, vendor/item per-location config, vendor items.
+  "Stock here" shares that slot where a row doesn't exist yet.
 - **Every list uses `DataTable`** (`web/src/components/catalog/DataTable.tsx`):
   sortable headers, drag-resizable columns, optional scroll pane with a sticky
   header, optional expandable rows. Give it columns + rows; don't hand-roll a
@@ -110,11 +162,37 @@ applied**; Mark runs them in the Supabase SQL editor.
   written with `history.replaceState` so a keystroke doesn't re-run the server
   component. Column widths are personal → localStorage, read via
   `useSyncExternalStore` (an effect would trip the `set-state-in-effect` lint).
+  **The order guide is the exception**: its day / filter / grouping / ignore-days
+  live in a SESSION cookie (`rf.guide.view`, see `lib/orderGuide.ts`) because the
+  nav link is a bare `/order-guide` with no query to carry, and the weekday must
+  be known SERVER-side before the view is queried — a client store would paint
+  the wrong day first. `signOut` deletes it, so it lasts "until you log out"
+  (Mark, 2026-07-23). An explicit `?day=` still wins over the remembered day.
+  The search box is deliberately NOT remembered.
   A list that persists sort in the URL must pass `sort`/`onSortChange` to
   `DataTable`, or the header arrow and the URL disagree.
 - **Breadcrumbs follow the route taken**, not a fixed hierarchy (`lib/breadcrumbs.ts`):
   links stamp `from`, the trail nests, recorded hrefs are trimmed so the URL
   can't grow unbounded. An item reached from a vendor leads back to that vendor.
+- **Detail views open as a slide-over panel on in-app navigation** (Mark,
+  2026-07-23): `(app)/@panel` intercepting routes float `/items/[id]`,
+  `/vendors/[id]` and `/vendor-items/[id]` over the current page
+  (`DetailPanel.tsx`; close = back). Each detail view leads with a type label
+  ("Inventory" / "Vendor" / "Vendor Item") — the panel hides breadcrumbs, so
+  it's the only cue to which kind of record you're looking at.
+  It is a **slide-over, not a modal**: the header is `sticky z-50`, the panel
+  `z-40` starting below it, so nav stays clickable (a click navigates and the
+  `@panel` catch-all closes the panel). The panel's top offset is MEASURED from
+  the header at runtime — the header wraps to 2–3 rows on a narrow window, so a
+  hardcoded offset silently covers the nav again. Verify overlay changes with a
+  REAL click (`computer`), never a programmatic `.click()`: JS clicks bypass
+  hit-testing and will pass on a nav link that a user physically cannot reach.
+  The page underneath stays mounted — guide scroll/filter survive. Hard loads
+  and deep links render the dedicated pages, which is where breadcrumbs live
+  (the panel shows none). Detail bodies are shared server components
+  (`ItemDetail.tsx` / `VendorDetail.tsx`) — edit those, not the page shells;
+  new detail screens should follow this pattern (slot + `(.)` intercept +
+  catch-all null so nav clicks close the panel).
 - **Safari:** a table cell under `border-collapse` is NOT a containing block in
   WebKit — anchor absolutely-positioned children to an inner `<div>`. And see
   web/README.md on Safari caching a stale dev stylesheet.
@@ -152,8 +230,10 @@ applied**; Mark runs them in the Supabase SQL editor.
 - The order guide walks the physical shop: grouped by `shop_sections`
   (sort_order, e.g. "31 Storage - R1 S1"), item headers show par, vendor items
   nested with pack + unit price ($/oz comparison matters — pack sizes differ).
-- Favorites = the plan row's default vendor item; highlighted, overridable
-  per-line in the moment. The real vendor decision is basket-level: a **vendor
+- Favorites = plan rows (`order_guide_plan_days`): the preferred source per
+  weekday, ★-marked, overridable in the moment. Since 008 a favorite is one of
+  four should-order conditions, not guide membership. The real vendor decision
+  is basket-level: a **vendor
   totals bar** shows each vendor's running subtotal vs its minimum
   (`vendor_locations.minimum_order`); an under-minimum vendor simply gets no PO
   that week (flour is deliberately "ballast" to hit Bakemark's $900 minimum).
@@ -167,24 +247,41 @@ applied**; Mark runs them in the Supabase SQL editor.
 
 ## Open threads (pinned by Mark — don't act without asking)
 
-- **Guide membership vs "should order" — model settled, not built.** Membership is
-  the active cascade ALONE (active vendor item + item + vendor); "should order"
-  is the focus list, true when the day is in the vendor order days AND the item
-  order days AND that vendor item favorite days. Green marks should-order lines,
-  not entered ones. The current guide conflates the two and ignores vendor order
-  days. Specced in `docs/order-days-refactor.md`.
+- **Should-order counts don't match the brief's measurement.** The
+  2026-07-23 build implements the settled model exactly (fixture-tested), and
+  membership verifies at the brief's 883 — but the brief's should-order figures
+  (Mon 229 / Wed 118 at DF01) could not be reproduced from any data source
+  during pre-flight; the model over live data gives Mon 394 / Wed 222. Wed 222
+  matches the earlier draft's same-day vendor-gate measurement, so the gate
+  behaves as measured. Judge the guide by the per-vendor breakdown vs the real
+  ~11 Monday POs (query 4 in migration 008's comments), not the brief's totals.
 - **"Default vendor item" may be the wrong concept.** Mark's words, 2026-07-22.
-  Today `inventory_item_locations.default_vendor_item_id` is a per-location
-  fallback used only by plan rows with a null `vendor_item_id`; in practice the
-  favorites (`order_guide_plan_days`) decide what the guide emits, and the
-  migrated defaults often point at deactivated vendors (99 rows in the cleanup
-  queue). Revisit before the order guide is built — the guide is what consumes it.
+  Since 008 the guide no longer consumes
+  `inventory_item_locations.default_vendor_item_id` at all (the null-plan-row
+  indirection it backed is gone); it survives as catalog metadata (item detail,
+  cleanup checks), and the migrated defaults often point at deactivated vendors.
+  Decide whether it still earns its keep. **Cleanup-check assessment (2026-07-23,
+  measured over 665 active item-locations at DF01+DF02, not yet acted on):** four
+  of the five `lib/cleanup.ts` checks are built on the default and have gone
+  stale. `no_default` (146 flagged, 130 already have a healthy favorite so the
+  guide line is fine) and `default_inactive` (193 / 124 phantom) are obsolete —
+  the guide reads favorites + the active cascade, not the default.
+  `no_package_content` (46) and `no_price` (55) check the DEFAULT's values but
+  the guide's count-mode + totals use each FAVORITE's, so they're pointed at the
+  wrong vendor item. `no_par` (95) is the only one still valid — `default_par`
+  remains the guide's par source via `coalesce(plan.par_qty, il.default_par)`.
+  Also inert post-008: `AssignVendorItem.tsx` writes `default_vendor_item_id`,
+  which no longer affects the guide. Flip side the current checks are blind to:
+  ~3,800 plan-row favorites org-wide point at an inactive vendor/item (the guide
+  correctly drops them; mostly legitimately retired, so arguably not
+  cleanup-worthy). Two paths on the table — re-point the checks at favorites, or
+  retire the default column outright (migration 009). Mark: assess only for now.
 - **Delete/duplicate vendor items.** Design agreed but not built: a per-row `⋯`
   menu (not right-click — no touch equivalent, and iPad Safari is the ordering
   stopgap). Delete must be usage-aware: `price_history` is `on delete cascade`
-  (audit trail lost) and `order_guide_plan_days.vendor_item_id` is `on delete
-  set null` (a favorite silently becomes an invisible "inherit default" row).
-  Offer deactivate for anything ever ordered.
+  (audit trail lost) and since 008 `order_guide_plan_days.vendor_item_id` is
+  `on delete cascade` too — deleting a vendor item silently deletes its
+  favorites and their par overrides. Offer deactivate for anything ever ordered.
 - **`rep_email` looks mis-mapped by the migration** — Restaurant Depot's rows
   carry `info@donutfriend.com` (our address, not the vendor's). Check the other
   79 vendors before trusting the column.

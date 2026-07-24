@@ -1,7 +1,15 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import type { RawSearchParams } from "@/lib/itemFilters";
-import { guideToday, serverTimeZone, type GuideEntry, type GuideRow } from "@/lib/orderGuide";
+import {
+  guideToday,
+  parseGuideView,
+  serverTimeZone,
+  GUIDE_VIEW_COOKIE,
+  type GuideEntry,
+  type GuideRow,
+} from "@/lib/orderGuide";
 import { OrderGuide } from "@/components/purchasing/OrderGuide";
 
 const SELECT = `
@@ -9,26 +17,15 @@ const SELECT = `
   shop_section, shop_section_sort, par_qty, par_mode,
   vendor_item_id, vendor_id, vendor_name, vendor_order_type,
   brand, vendor_item_description, product_id, package_desc, package_content,
+  pack_count, pack_size, pack_unit,
   effective_price, unit_price, vendor_minimum, vendor_delivery_days,
-  is_orderable, hidden_reason
+  is_orderable, hidden_reason,
+  should_order, is_favorite, vendor_order_days, item_order_days, favorite_days
 `;
 
 function one(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value) ?? "";
 }
-
-/** A vendor item that sells a guide item but has no plan row for this day. */
-type AlternateRow = {
-  id: string;
-  inventory_item_id: string;
-  brand: string | null;
-  description: string | null;
-  product_id: string | null;
-  package_desc: string | null;
-  package_content: number | null;
-  price: number | null;
-  vendors: { id: string; name: string; order_type: string; is_active: boolean };
-};
 
 export default async function OrderGuidePage({
   searchParams,
@@ -45,22 +42,9 @@ export default async function OrderGuidePage({
 
   const locationId = session.activeLocation.id;
 
-  // Which weekdays this location actually has a plan for. All ordering happens
-  // Monday today (§4.4), so the day dimension exists but must never make you
-  // think about days you don't use — default to a day that has rows.
-  const { data: planDays } = await supabase
-    .from("order_guide_plan_days")
-    .select("weekday, inventory_item_locations!inner(location_id)")
-    .eq("inventory_item_locations.location_id", locationId)
-    .limit(2000);
-
-  const availableDays = [...new Set((planDays ?? []).map((d) => d.weekday))].sort(
-    (a, b) => a - b
-  );
-
   // Date and weekday both come from the org's timezone so they can't disagree
-  // (see guideToday). The weekday picks WHICH plan to walk; the date is when
-  // you walked it, and is what entries are recorded against.
+  // (see guideToday). The weekday picks WHICH day's work to show; the date is
+  // when you walked it, and is what entries are recorded against.
   const { data: org } = await supabase
     .from("orgs")
     .select("settings")
@@ -71,14 +55,21 @@ export default async function OrderGuidePage({
     (org?.settings as { timezone?: string } | null)?.timezone ?? serverTimeZone();
   const { date: guideDate, weekday: todayWeekday } = guideToday(timeZone);
 
+  // How you left the guide last time, from the session cookie — so coming back
+  // via the nav link doesn't reset the day, filter and grouping you'd set
+  // (Mark, 2026-07-23). Read on the server so the first paint is already right.
+  const view = parseGuideView((await cookies()).get(GUIDE_VIEW_COOKIE)?.value);
+
+  // Precedence: an explicit ?day= (a shared link, or the panel's back-trail)
+  // beats the remembered day, which beats today. The guide exists every day, so
+  // a day with no should-order lines just renders quiet.
   const requested = Number(one(params.day));
   const weekday =
-    requested >= 1 && requested <= 7
-      ? requested
-      : availableDays.includes(todayWeekday)
-        ? todayWeekday
-        : availableDays[0] ?? todayWeekday;
+    requested >= 1 && requested <= 7 ? requested : (view.weekday ?? todayWeekday);
 
+  // Membership is the view's job now: one line per orderable vendor item ×
+  // inventory item at this location, plan row or not. The old hand-rolled
+  // merge of "plan rows plus their alternates" is gone with it.
   const rows: GuideRow[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await supabase
@@ -86,6 +77,15 @@ export default async function OrderGuidePage({
       .select(SELECT)
       .eq("location_id", locationId)
       .eq("weekday", weekday)
+      // The guide shows ONLY what can actually be ordered (Mark, 2026-07-22).
+      // `is_orderable` is the view's composed active cascade, so one filter
+      // covers every way a line can be dead.
+      //
+      // Deliberate departure from spec §4.7a, which asked for blocked lines
+      // shown greyed with the reason. That belongs on the catalog screens,
+      // where you can act on it; during a walk it's noise. `/cleanup` remains
+      // where dead pairings get found and fixed.
+      .eq("is_orderable", true)
       .order("shop_section_sort")
       .order("item_name")
       .range(from, from + 999);
@@ -99,108 +99,6 @@ export default async function OrderGuidePage({
     if (!data || data.length < 1000) break;
   }
 
-  // The guide shows ONLY what can actually be ordered (Mark, 2026-07-22).
-  // `is_orderable` is the view's composed active cascade — vendor AND vendor
-  // item AND inventory item AND item-location all active — so one flag covers
-  // every way a line can be dead, including a plan row whose vendor item no
-  // longer resolves at all.
-  //
-  // Deliberate departure from spec §4.7a, which asked for blocked lines shown
-  // greyed with the reason. That belongs on the catalog screens, where you can
-  // act on it; during a walk it's noise. `/cleanup` remains where dead pairings
-  // get found and fixed.
-  const planRows: GuideRow[] = rows
-    .filter((row) => row.is_orderable === true)
-    .map((row) => ({ ...row, is_favorite: true }));
-
-  // The OTHER active vendor items that sell these same inventory items. The
-  // view only emits plan rows, so without this the guide can't answer "who else
-  // sells this and at what unit price" — the comparison §4.2 is built around,
-  // and the reason a favorite being green means anything.
-  const itemIds = [...new Set(planRows.map((r) => r.inventory_item_id))];
-  const alternates: GuideRow[] = [];
-
-  if (itemIds.length > 0) {
-    const planVendorItemIds = new Set(planRows.map((r) => r.vendor_item_id));
-
-    const candidates: AlternateRow[] = [];
-    for (let from = 0; ; from += 1000) {
-      const { data, error } = await supabase
-        .from("vendor_items")
-        .select(
-          `id, inventory_item_id, brand, description, product_id, package_desc,
-           package_content, price,
-           vendors!inner ( id, name, order_type, is_active )`
-        )
-        .in("inventory_item_id", itemIds)
-        .eq("is_active", true)
-        .eq("vendors.is_active", true)
-        .range(from, from + 999);
-
-      if (error) break; // Alternates are additive; the plan still stands.
-      candidates.push(...((data ?? []) as unknown as AlternateRow[]));
-      if (!data || data.length < 1000) break;
-    }
-
-    // Per-location price overrides and vendor terms, resolved the same way the
-    // view resolves them (design rule 6: override → global).
-    const [{ data: overrides }, { data: vendorTerms }] = await Promise.all([
-      supabase
-        .from("vendor_item_location_prices")
-        .select("vendor_item_id, price")
-        .eq("location_id", locationId),
-      supabase
-        .from("vendor_locations")
-        .select("vendor_id, minimum_order, delivery_days")
-        .eq("location_id", locationId),
-    ]);
-
-    const priceOverride = new Map(
-      (overrides ?? []).map((o) => [o.vendor_item_id, o.price])
-    );
-    const terms = new Map((vendorTerms ?? []).map((t) => [t.vendor_id, t]));
-
-    // Item-level facts (section, par, base unit) come from the item's own plan
-    // rows — an alternate is another way to buy an item already on the guide.
-    const itemContext = new Map(planRows.map((r) => [r.inventory_item_id, r]));
-
-    for (const vi of candidates) {
-      if (planVendorItemIds.has(vi.id)) continue;
-      const context = itemContext.get(vi.inventory_item_id);
-      if (!context) continue;
-
-      const price = priceOverride.get(vi.id) ?? vi.price;
-      const term = terms.get(vi.vendors.id);
-      const content = vi.package_content === null ? null : Number(vi.package_content);
-
-      alternates.push({
-        ...context,
-        vendor_item_id: vi.id,
-        vendor_id: vi.vendors.id,
-        vendor_name: vi.vendors.name,
-        vendor_order_type: vi.vendors.order_type,
-        brand: vi.brand,
-        vendor_item_description: vi.description,
-        product_id: vi.product_id,
-        package_desc: vi.package_desc,
-        package_content: content,
-        effective_price: price === null ? null : Number(price),
-        unit_price: price !== null && content ? Number(price) / content : null,
-        vendor_minimum: term?.minimum_order ?? null,
-        vendor_delivery_days: term?.delivery_days ?? null,
-        // An alternate carries no plan row, so no per-line par override — the
-        // item's par applies.
-        par_qty: null,
-        par_mode: null,
-        is_orderable: true,
-        hidden_reason: null,
-        is_favorite: false,
-      });
-    }
-  }
-
-  const guideRows = [...planRows, ...alternates];
-
   const { data: entryRows } = await supabase
     .from("order_guide_entries")
     .select("vendor_item_id, on_hand, qty_to_order")
@@ -209,10 +107,12 @@ export default async function OrderGuidePage({
 
   return (
     <OrderGuide
-      rows={guideRows}
+      rows={rows}
       entries={(entryRows ?? []) as GuideEntry[]}
       weekday={weekday}
-      availableDays={availableDays}
+      initialFilter={view.filter}
+      initialGrouping={view.grouping}
+      initialIgnoreDays={view.ignoreDays}
       guideDate={guideDate}
       locationId={locationId}
       locationCode={session.activeLocation.code}

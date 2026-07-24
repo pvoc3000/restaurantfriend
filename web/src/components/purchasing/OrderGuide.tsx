@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -10,8 +10,12 @@ import {
   groupGuide,
   matchesGuideFilter,
   vendorTotals,
+  serializeGuideView,
   GROUPING_LABEL,
+  GUIDE_FILTERS,
   GUIDE_FILTER_LABEL,
+  GUIDE_GROUPINGS,
+  GUIDE_VIEW_COOKIE,
   WEEKDAY_LABELS,
   type EntryState,
   type GuideEntry,
@@ -34,7 +38,9 @@ export function OrderGuide({
   rows,
   entries: initialEntries,
   weekday,
-  availableDays,
+  initialFilter,
+  initialGrouping,
+  initialIgnoreDays,
   guideDate,
   locationId,
   locationCode,
@@ -43,7 +49,9 @@ export function OrderGuide({
   rows: GuideRow[];
   entries: GuideEntry[];
   weekday: number;
-  availableDays: number[];
+  initialFilter: GuideFilter;
+  initialGrouping: GuideGrouping;
+  initialIgnoreDays: boolean;
   guideDate: string;
   locationId: string;
   locationCode: string;
@@ -65,13 +73,32 @@ export function OrderGuide({
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Favorites is the default working mode (§4.6) — the plan is what you walk;
-  // the alternates are there for when you need to switch a line.
-  const [filter, setFilter] = useState<GuideFilter>("favorites");
+  // Seeded from the session cookie by the server, so you come back to the view
+  // you left rather than to the defaults. Favorites is the working mode when
+  // there's nothing remembered: the day's preferred sources, everything else
+  // present but quiet.
+  const [filter, setFilter] = useState<GuideFilter>(initialFilter);
+  // Lifts the vendor/item ordering-day gates off the list, for looking
+  // something up regardless of when you'd order it. The walked day still
+  // decides which day's pars and favorites the rows carry.
+  const [ignoreDays, setIgnoreDays] = useState(initialIgnoreDays);
+  // The search box is deliberately NOT remembered — coming back to a list
+  // silently narrowed by a term you've forgotten typing is its own trap.
   const [term, setTerm] = useState("");
   // Grouping is client-side only — the rows are already loaded, so switching
   // between the walk, an A–Z list and a per-vendor view costs nothing.
-  const [grouping, setGrouping] = useState<GuideGrouping>("section");
+  const [grouping, setGrouping] = useState<GuideGrouping>(initialGrouping);
+
+  // Remember the view for the rest of the browser session. A session cookie
+  // (no max-age) is what "until you log out" means here, and signOut clears it.
+  useEffect(() => {
+    document.cookie = `${GUIDE_VIEW_COOKIE}=${serializeGuideView({
+      weekday,
+      filter,
+      grouping,
+      ignoreDays,
+    })}; path=/; SameSite=Lax`;
+  }, [weekday, filter, grouping, ignoreDays]);
 
   async function commit(row: GuideRow, patch: Partial<EntryState>) {
     const current = entries.get(row.vendor_item_id) ?? { on_hand: null, qty_to_order: null };
@@ -105,7 +132,10 @@ export function OrderGuide({
   const visibleRows = useMemo(() => {
     const words = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return rows.filter((row) => {
-      if (!matchesGuideFilter(row, entries.get(row.vendor_item_id), filter)) return false;
+      if (
+        !matchesGuideFilter(row, entries.get(row.vendor_item_id), filter, weekday, ignoreDays)
+      )
+        return false;
       if (words.length === 0) return true;
       const haystack = [
         row.item_name,
@@ -119,10 +149,10 @@ export function OrderGuide({
         .toLowerCase();
       return words.every((w) => haystack.includes(w));
     });
-  }, [rows, entries, term, filter]);
+  }, [rows, entries, term, filter, weekday, ignoreDays]);
 
-  // Counts on the buttons ignore the search box: they describe the plan, not
-  // whatever you happen to have typed.
+  // Counts on the buttons ignore the search box: they describe the day's work,
+  // not whatever you happen to have typed.
   const filterCounts = useMemo(() => {
     const counts: Record<GuideFilter, number> = {
       all: 0,
@@ -132,12 +162,12 @@ export function OrderGuide({
     };
     for (const row of rows) {
       const entry = entries.get(row.vendor_item_id);
-      for (const f of ["all", "favorites", "skipped", "will_order"] as GuideFilter[]) {
-        if (matchesGuideFilter(row, entry, f)) counts[f] += 1;
+      for (const f of GUIDE_FILTERS) {
+        if (matchesGuideFilter(row, entry, f, weekday, ignoreDays)) counts[f] += 1;
       }
     }
     return counts;
-  }, [rows, entries]);
+  }, [rows, entries, weekday, ignoreDays]);
 
   // Leaving the guide for an item must lead back to the guide — and to the day
   // you were walking, not whichever day defaults today.
@@ -156,25 +186,27 @@ export function OrderGuide({
       <div className="flex flex-wrap items-baseline gap-3">
         <h1 className="text-xl font-semibold">Order guide</h1>
         <span className="text-sm text-neutral-500">
-          {locationCode} · {WEEKDAY_LABELS[weekday - 1]} plan · walked {guideDate}
+          {locationCode} · {ignoreDays ? "all days" : WEEKDAY_LABELS[weekday - 1]} ·
+          walked {guideDate}
         </span>
-        {availableDays.length > 1 && (
-          <span className="flex items-center gap-1 text-sm">
-            {availableDays.map((d) => (
-              <Link
-                key={d}
-                href={`/order-guide?day=${d}`}
-                className={`rounded px-2 py-1 ${
-                  d === weekday
-                    ? "bg-neutral-900 text-white"
-                    : "text-neutral-600 hover:bg-neutral-100"
-                }`}
-              >
-                {WEEKDAY_LABELS[d - 1]}
-              </Link>
-            ))}
-          </span>
-        )}
+        {/* All seven days, always. The guide exists every day — picking one
+            scopes the list to what's orderable then, and a day with nothing
+            scheduled simply renders empty rather than disappearing. */}
+        <span className="flex items-center gap-1 text-sm">
+          {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+            <Link
+              key={d}
+              href={`/order-guide?day=${d}`}
+              className={`rounded px-2 py-1 ${
+                d === weekday
+                  ? "bg-neutral-900 text-white"
+                  : "text-neutral-600 hover:bg-neutral-100"
+              }`}
+            >
+              {WEEKDAY_LABELS[d - 1]}
+            </Link>
+          ))}
+        </span>
         <button
           onClick={() => router.refresh()}
           className="ml-auto text-sm text-neutral-500 hover:underline"
@@ -234,46 +266,76 @@ export function OrderGuide({
           placeholder="Jump to item, vendor or section…"
           className="w-72 rounded border border-neutral-300 px-2 py-1"
         />
-        <span className="flex items-center gap-1">
-          {(["all", "favorites", "skipped", "will_order"] as GuideFilter[]).map((f) => (
+        {/* Segmented control: these four are one choice, so they read as one
+            object rather than four loose buttons. */}
+        <span className="inline-flex items-stretch overflow-hidden rounded-md border border-neutral-300">
+          {GUIDE_FILTERS.map((f, i) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`rounded px-2.5 py-1 font-medium ${
+              className={`px-2.5 py-1 font-medium ${
+                i > 0 ? "border-l border-neutral-300" : ""
+              } ${
                 filter === f
                   ? "bg-neutral-900 text-white"
-                  : "text-neutral-600 hover:bg-neutral-100"
+                  : "bg-white text-neutral-600 hover:bg-neutral-100"
               }`}
             >
               {GUIDE_FILTER_LABEL[f]}
-              <span
-                className={`ml-1.5 font-normal ${
-                  filter === f ? "text-neutral-400" : "text-neutral-400"
-                }`}
-              >
+              <span className="ml-1.5 font-normal text-neutral-400">
                 {filterCounts[f]}
               </span>
             </button>
           ))}
         </span>
 
-        <span className="flex items-center gap-1">
+        {/* The escape hatch from the day gates (FMP's "ignore order day"):
+            every orderable line, whenever you'd normally buy it. A switch, not
+            a button — it's a mode you leave on, not an action you fire. Amber
+            rather than the ActiveToggle green, which is already spoken for by
+            the order boxes. */}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={ignoreDays}
+          onClick={() => setIgnoreDays((v) => !v)}
+          title="Show every orderable line, regardless of vendor or item ordering days"
+          className="inline-flex items-center gap-2 text-neutral-600 hover:text-neutral-900"
+        >
+          <span
+            aria-hidden
+            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
+              ignoreDays ? "bg-amber-600" : "bg-neutral-300"
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                ignoreDays ? "translate-x-4" : "translate-x-0.5"
+              }`}
+            />
+          </span>
+          Ignore ordering days
+        </button>
+
+        <span className="flex items-center gap-2">
           <span className="text-xs uppercase tracking-wide text-neutral-400">
             Group by
           </span>
-          {(["section", "item", "vendor"] as GuideGrouping[]).map((mode) => (
-            <button
-              key={mode}
-              onClick={() => setGrouping(mode)}
-              className={`rounded px-2 py-1 ${
-                grouping === mode
-                  ? "bg-neutral-900 text-white"
-                  : "text-neutral-600 hover:bg-neutral-100"
-              }`}
-            >
-              {GROUPING_LABEL[mode]}
-            </button>
-          ))}
+          <span className="inline-flex items-stretch overflow-hidden rounded-md border border-neutral-300">
+            {GUIDE_GROUPINGS.map((mode, i) => (
+              <button
+                key={mode}
+                onClick={() => setGrouping(mode)}
+                className={`px-2 py-1 ${i > 0 ? "border-l border-neutral-300" : ""} ${
+                  grouping === mode
+                    ? "bg-neutral-900 text-white"
+                    : "bg-white text-neutral-600 hover:bg-neutral-100"
+                }`}
+              >
+                {GROUPING_LABEL[mode]}
+              </button>
+            ))}
+          </span>
         </span>
 
         <span className="text-neutral-500">
@@ -283,8 +345,11 @@ export function OrderGuide({
 
       {sections.length === 0 ? (
         <p className="pt-4 text-sm text-neutral-600">
-          No plan lines for this day. Favorites on the item detail screen decide
-          what appears here.
+          {filter === "favorites" || filter === "skipped"
+            ? "No favorites for this day — nothing here has it in the vendor, item, and favorite order days. Switch to All to see everything orderable this day."
+            : ignoreDays
+              ? "No lines match. Every orderable line is listed — check the search box."
+              : "No lines for this day — no vendor takes orders and no item is scheduled. Turn on “Ignore ordering days” to see everything orderable."}
         </p>
       ) : (
         // The lines scroll in their own pane, so the controls above stay put
@@ -366,6 +431,8 @@ export function OrderGuide({
                         key={row.vendor_item_id}
                         row={row}
                         entry={entries.get(row.vendor_item_id)}
+                        weekday={weekday}
+                        ignoreDays={ignoreDays}
                         itemPar={item.par_qty}
                         baseUnit={item.base_unit}
                         saving={saving}

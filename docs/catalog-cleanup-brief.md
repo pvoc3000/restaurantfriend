@@ -28,9 +28,12 @@ Consequences for UI:
 1. **Order guide (when built): group lines by inventory item.** Item header row
    (name, section, item par); one child line per plan row (vendor, description,
    package, price, qty box). `v_order_guide` already emits one row per plan row.
-2. **`par_qty` on a plan row = per-LINE par** (rare; item-level
-   `inventory_item_locations.default_par` is the group total). Don't sum line pars into
-   the item par — they're overrides for specific lines only.
+2. ~~**`par_qty` on a plan row = per-LINE par**~~ — **superseded by migration
+   009 (2026-07-23).** Par is a fact about the ITEM at a location, per weekday:
+   `inventory_item_locations.default_par` plus `par_by_weekday[7]` for the
+   ~1% of item-locations that vary by day. Plan rows carry no par at all, so
+   every line under an item shows the same par. The per-vendor-item par that
+   003 introduced was a distinction FMP never had and the data never used.
 3. **Favorites editor** (item detail, per location): the item's vendor items in
    a weekday × vendor-item grid of checkboxes mirroring FMP's favorites row;
    writes plan rows. Include "all days" toggle per vendor item.

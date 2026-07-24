@@ -34,6 +34,10 @@ type FetchResult = { error: string } | { vendorItems: VendorItem[]; plan: PlanMa
  * checkbox grid. Each checked cell is an order_guide_plan_days row favoriting that
  * vendor item on that weekday for this item-location. An item can have several
  * favorites on the same day (multi-vendor sourcing or pack-size variants).
+ *
+ * A favorite is one of the should-order conditions, not membership (schema
+ * 008): checking a day-cell no longer implicitly turns the item's order day on
+ * — that's the item-location's own order_days array, edited in the row above.
  */
 export function FavoritesEditor({
   itemLocationId,
@@ -73,9 +77,8 @@ export function FavoritesEditor({
     if (viErr || rowErr) return { error: (viErr ?? rowErr)!.message };
     const m: PlanMap = new Map();
     for (const r of rows ?? []) {
-      // Only explicit-vendor-item favorites are cells; a null vendor_item_id
-      // row means "inherit the item default" and isn't shown in the grid.
-      if (r.vendor_item_id) m.set(key(r.weekday, r.vendor_item_id), r.id);
+      // vendor_item_id is NOT NULL since 008 — every plan row is a cell.
+      m.set(key(r.weekday, r.vendor_item_id), r.id);
     }
     return { vendorItems: (vis ?? []) as unknown as VendorItem[], plan: m };
   }, [supabase, inventoryItemId, itemLocationId]);

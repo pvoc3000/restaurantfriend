@@ -5,7 +5,12 @@ import type { AppSession } from "@/lib/session";
 
 export function AppHeader({ session }: { session: AppSession }) {
   return (
-    <header className="border-b border-neutral-200 bg-neutral-50">
+    // Sticky and above the detail panel (z-50 vs the panel's z-40): the panel
+    // is a slide-over, not a modal, so the nav has to stay reachable — a
+    // full-viewport backdrop over the header made every nav link unclickable.
+    // Sticky is load-bearing, not decorative: the panel is fixed and starts
+    // below the header, so a header that scrolled away would leave a dead strip.
+    <header className="sticky top-0 z-50 border-b border-neutral-200 bg-neutral-50">
       <div className="flex flex-wrap items-center gap-4 px-4 py-2">
         <span className="font-semibold tracking-tight">restaurantfriend</span>
 

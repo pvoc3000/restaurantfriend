@@ -20,6 +20,10 @@ export type GuideRow = {
   product_id: string | null;
   package_desc: string | null;
   package_content: number | null;
+  /** FMP's pack structure, restored by 010: "12 × 32 oz" rather than "1 × 24 lbs". */
+  pack_count: number | null;
+  pack_size: number | null;
+  pack_unit: string | null;
   effective_price: number | null;
   unit_price: number | null;
   vendor_minimum: number | null;
@@ -27,21 +31,54 @@ export type GuideRow = {
   is_orderable: boolean;
   hidden_reason: string | null;
   /**
-   * True when this line is a plan row — a favorite (§4.1). False for the other
-   * vendor items that sell the same inventory item, which the guide carries so
-   * you can reassign a line in the moment (§4.2) and compare unit prices.
+   * True when a plan row exists for this line on this weekday — this source is
+   * a favorite today. A favorite is the preferred source whether or not the
+   * line is today's work; should_order is the separate question.
    */
   is_favorite: boolean;
+  /**
+   * The four-way AND, computed in the view: membership (the active cascade)
+   * AND the walked day is in the vendor's order days AND the item's order days
+   * AND this line's favorite days. The guide's focus list.
+   */
+  should_order: boolean;
+  /** The three raw day arrays behind should_order — what makes "why isn't
+   *  this green" explainable per line (see notGreenReason). */
+  vendor_order_days: number[];
+  item_order_days: number[];
+  favorite_days: number[];
 };
 
 /**
- * The quick filters from the FMP guide's find panel (§4.6).
- * - `all` — every active vendor item for the items on this plan
- * - `favorites` — the plan rows, the default working mode
- * - `skipped` — favorites you've decided NOT to order (zeroed or untouched)
+ * The quick filters from the FMP guide's find panel (§4.6), in two day tiers:
+ * - `all` — everything orderable AND relevant to the day being walked (the
+ *   vendor takes orders that day and the item is scheduled that day). Picking a
+ *   day has to mean something for the list, not just for the green.
+ * - `favorites` — `all` plus "and this source is the one we prefer that day",
+ *   the default working mode
+ * - `skipped` — favorites whose order amount hasn't been touched
  * - `will_order` — anything with a quantity, favorite or not
+ *
+ * Why `favorites` and not "should order": `all` now carries the vendor-day and
+ * item-day conditions itself, so within the visible list the ONLY thing
+ * `should_order` adds is the favorite-day check. Same set, and the name says
+ * which condition you're actually toggling.
+ *
+ * `ignoreDays` lifts the vendor-day and item-day gates off every filter, not
+ * just `all` — so the switch means the same thing whichever one you're on, and
+ * flipping it never has to move you off your filter. `favorites` then rests on
+ * the favorite-day condition alone (`is_favorite`), which is the condition that
+ * gives the filter its name. FMP did this with its
+ * `g_IgnoreOrderDayWhenSearching_b` flag.
  */
 export type GuideFilter = "all" | "favorites" | "skipped" | "will_order";
+
+export const GUIDE_FILTERS: GuideFilter[] = [
+  "all",
+  "favorites",
+  "skipped",
+  "will_order",
+];
 
 export const GUIDE_FILTER_LABEL: Record<GuideFilter, string> = {
   all: "All",
@@ -53,18 +90,31 @@ export const GUIDE_FILTER_LABEL: Record<GuideFilter, string> = {
 export function matchesGuideFilter(
   row: GuideRow,
   entry: EntryState | undefined,
-  filter: GuideFilter
+  filter: GuideFilter,
+  weekday: number,
+  ignoreDays: boolean
 ): boolean {
   const qty = entry?.qty_to_order ?? null;
   switch (filter) {
     case "all":
-      return true;
+      // Day-relevant membership: the two conditions that are facts about the
+      // day rather than about your preference. The favorite check is what
+      // `should_order` adds on top.
+      return (
+        ignoreDays ||
+        (row.vendor_order_days.includes(weekday) &&
+          row.item_order_days.includes(weekday))
+      );
     case "favorites":
-      return row.is_favorite;
+      // `should_order` is the precomputed four-way AND; the vendor-day and
+      // item-day halves of it are already true for anything `all` shows, so
+      // inside the visible list this reads exactly as "and it's a favorite".
+      // With the day gates lifted, that favorite-day condition stands alone.
+      return ignoreDays ? row.is_favorite : row.should_order;
     case "skipped":
       // Untouched only. A zeroed line is a decision already made — you looked
       // and said no — so it isn't waiting on you; an untouched one is.
-      return row.is_favorite && qty === null;
+      return (ignoreDays ? row.is_favorite : row.should_order) && qty === null;
     case "will_order":
       return qty !== null && Number(qty) > 0;
   }
@@ -95,27 +145,59 @@ export function qtyState(qty: number | null | undefined): QtyState {
 }
 
 /**
- * The order box's fill, from the three states plus whether the line is a
- * favorite. Filled rather than tinted — these read at arm's length on a shelf.
+ * The order box's fill. Filled rather than tinted — these read at arm's length
+ * on a shelf.
  *
  * - zeroed        red, whatever the line is. An explicit "no" outranks
  *                 everything else on the row.
- * - favorite      green: the plan line. Pale while untouched, solid once a
+ * - should-order  green: today's work. Pale while untouched, solid once a
  *                 quantity is in, so you can still see what you've done.
- * - alternate     white until used; a quantity on a NON-favorite means you
- *                 switched source this week, which is worth seeing as its own
- *                 colour rather than blending in with the plan.
+ * - other lines   white until used. A quantity on a NON-favorite is blue —
+ *                 you switched source, which is true whether or not the line
+ *                 was today's work. A quantity on a favorite that isn't
+ *                 today's work fills neutral: it's your preferred source,
+ *                 just ordered off-schedule.
  */
-export function qtyClass(state: QtyState, isFavorite: boolean): string {
+export function qtyClass(
+  state: QtyState,
+  shouldOrder: boolean,
+  isFavorite: boolean
+): string {
   if (state === "zeroed") return "border-red-500 bg-red-200 text-red-950";
-  if (isFavorite) {
+  if (shouldOrder) {
     return state === "entered"
       ? "border-green-600 bg-green-200 text-green-950"
       : "border-green-500 bg-green-50 text-green-900";
   }
-  return state === "entered"
-    ? "border-blue-500 bg-blue-100 text-blue-950"
-    : "border-neutral-400 bg-white text-neutral-900";
+  if (state === "entered") {
+    return isFavorite
+      ? "border-neutral-500 bg-neutral-200 text-neutral-900"
+      : "border-blue-500 bg-blue-100 text-blue-950";
+  }
+  return "border-neutral-400 bg-white text-neutral-900";
+}
+
+/**
+ * Why this line is NOT green today (§ "say WHY a line isn't should-order").
+ * should_order is a four-way AND, so a quiet line has up to four reasons; the
+ * view ships the three day arrays on every line, so naming the failing
+ * condition costs nothing. Null when the line IS should-order.
+ */
+export function notGreenReason(row: GuideRow, weekday: number): string | null {
+  if (row.should_order) return null;
+  if (!row.is_orderable) return row.hidden_reason;
+  const day = WEEKDAY_LABELS[weekday - 1];
+  const reasons: string[] = [];
+  if (!row.vendor_order_days.includes(weekday))
+    reasons.push(`${row.vendor_name} doesn't take ${day} orders`);
+  if (!row.item_order_days.includes(weekday))
+    reasons.push(`item not scheduled ${day}`);
+  if (!row.favorite_days.includes(weekday))
+    reasons.push(`this source isn't a favorite ${day}`);
+  // All three day sets include today yet the view said no — data changed
+  // between render and read; say something rather than nothing.
+  if (reasons.length === 0) return "not on today's plan";
+  return reasons.join(" · ");
 }
 
 /**
@@ -174,6 +256,66 @@ export const GROUPING_LABEL: Record<GuideGrouping, string> = {
   vendor: "Vendor",
 };
 
+export const GUIDE_GROUPINGS: GuideGrouping[] = ["section", "item", "vendor"];
+
+/**
+ * How you left the guide: the day you were walking, the filter, the grouping
+ * and whether the day gates were lifted. Kept in a SESSION cookie rather than
+ * the URL (the convention for list filters) for two reasons: the nav link is a
+ * bare `/order-guide` with no query to carry, and the weekday has to be known
+ * on the SERVER before the view is queried, so a client-side store would render
+ * the wrong day first and correct it. The cookie dies with the browser session
+ * and `signOut` clears it — "until you log out", as asked (Mark, 2026-07-23).
+ *
+ * An explicit `?day=` still wins, so shared links and the panel's back-trail
+ * keep working.
+ */
+export const GUIDE_VIEW_COOKIE = "rf.guide.view";
+
+export type GuideView = {
+  /** null = no remembered day, fall back to today. */
+  weekday: number | null;
+  filter: GuideFilter;
+  grouping: GuideGrouping;
+  ignoreDays: boolean;
+};
+
+export const DEFAULT_GUIDE_VIEW: GuideView = {
+  weekday: null,
+  filter: "favorites",
+  grouping: "section",
+  ignoreDays: false,
+};
+
+/** Tolerant of anything: a stale or hand-edited cookie falls back to defaults. */
+export function parseGuideView(raw: string | undefined | null): GuideView {
+  if (!raw) return DEFAULT_GUIDE_VIEW;
+  const q = new URLSearchParams(raw);
+
+  const day = Number(q.get("day"));
+  const filter = q.get("filter") as GuideFilter | null;
+  const grouping = q.get("group") as GuideGrouping | null;
+
+  return {
+    weekday: day >= 1 && day <= 7 ? day : null,
+    filter: filter && GUIDE_FILTERS.includes(filter) ? filter : DEFAULT_GUIDE_VIEW.filter,
+    grouping:
+      grouping && GUIDE_GROUPINGS.includes(grouping)
+        ? grouping
+        : DEFAULT_GUIDE_VIEW.grouping,
+    ignoreDays: q.get("ignore") === "1",
+  };
+}
+
+export function serializeGuideView(view: GuideView): string {
+  return new URLSearchParams({
+    day: String(view.weekday ?? ""),
+    filter: view.filter,
+    group: view.grouping,
+    ignore: view.ignoreDays ? "1" : "0",
+  }).toString();
+}
+
 function groupKeyFor(row: GuideRow, mode: GuideGrouping): { label: string; sort: number } {
   if (mode === "vendor") return { label: row.vendor_name, sort: 0 };
   if (mode === "item") return { label: "", sort: 0 };
@@ -186,9 +328,33 @@ function groupKeyFor(row: GuideRow, mode: GuideGrouping): { label: string; sort:
 }
 
 /**
+ * Order the lines under one item: vendor, then that vendor's own description.
+ * Empty descriptions sink last and the compare is numeric-aware, matching the
+ * list screens (`lib/tableSort.ts`) so the whole app orders text the same way.
+ */
+function compareLines(a: GuideRow, b: GuideRow): number {
+  const byVendor = a.vendor_name.localeCompare(b.vendor_name, undefined, {
+    numeric: true,
+  });
+  if (byVendor !== 0) return byVendor;
+
+  const da = a.vendor_item_description ?? "";
+  const db = b.vendor_item_description ?? "";
+  if (!da && !db) return 0;
+  if (!da) return 1;
+  if (!db) return -1;
+  return da.localeCompare(db, undefined, { numeric: true });
+}
+
+/**
  * Group rows, then items, then their plan lines. Multi-favorite plan rows
  * (schema 003) mean one item can have several lines on the same day, so the
  * item is the header and lines nest beneath it (brief §A).
+ *
+ * The full walk order is shop section → inventory item → vendor → vendor item
+ * description (Mark, 2026-07-23). The last two matter because an item sourced
+ * from several vendors used to list its lines in whatever order the query
+ * returned them, which moved between loads.
  */
 export function groupGuide(
   rows: GuideRow[],
@@ -211,8 +377,8 @@ export function groupGuide(
         inventory_item_id: row.inventory_item_id,
         item_name: row.item_name,
         base_unit: row.base_unit,
-        // Item-level par: the plan row's par is a PER-LINE override, so the
-        // header shows the first line's par only as a starting point.
+        // Par is per (item-location, weekday) since 009, so every line under
+        // this item carries the same number — the first one is the item's par.
         par_qty: row.par_qty,
         lines: [],
       };
@@ -228,6 +394,7 @@ export function groupGuide(
   );
   for (const section of list) {
     section.items.sort((a, b) => a.item_name.localeCompare(b.item_name));
+    for (const item of section.items) item.lines.sort(compareLines);
   }
   return list;
 }

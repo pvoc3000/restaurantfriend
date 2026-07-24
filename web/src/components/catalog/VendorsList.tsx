@@ -28,6 +28,8 @@ const COLUMNS: {
   width: number;
   align?: "right";
 }[] = [
+  // Active leads on every catalog table (Mark, 2026-07-23).
+  { key: "active", label: "Active", width: 80 },
   { key: "name", label: "Name", width: 220 },
   { key: "type", label: "Type", width: 120 },
   { key: "order_type", label: "Order via", width: 110 },
@@ -35,7 +37,6 @@ const COLUMNS: {
   { key: "minimum", label: "Minimum", width: 115, align: "right" },
   { key: "order_days", label: "Order days", width: 150 },
   { key: "delivery_days", label: "Delivery days", width: 150 },
-  { key: "active", label: "Active", width: 80 },
 ];
 
 const DEFAULT_WIDTHS: ColumnWidths = Object.fromEntries(
@@ -268,6 +269,9 @@ export function VendorsList({
                     }`}
                   >
                     <td className="truncate px-2 py-1">
+                      <VendorActiveToggle vendorId={v.id} active={v.is_active} />
+                    </td>
+                    <td className="truncate px-2 py-1">
                       <Link
                         href={vendorDetailHref(v.id, filters)}
                         className="text-blue-700 hover:underline"
@@ -290,9 +294,6 @@ export function VendorsList({
                     </td>
                     <td className="truncate px-2 py-1 tabular-nums text-neutral-600">
                       {days(config?.delivery_days ?? null)}
-                    </td>
-                    <td className="truncate px-2 py-1">
-                      <VendorActiveToggle vendorId={v.id} active={v.is_active} />
                     </td>
                   </tr>
                 );

@@ -54,6 +54,21 @@ export function VendorLocationsTable({
   activeLocationId: string | null;
 }) {
   const columns: DataColumn<VendorLocationRow>[] = [
+    // Active leads on every catalog table (Mark, 2026-07-23).
+    {
+      key: "is_active",
+      label: "Active",
+      width: 80,
+      sortValue: (r) => (r.is_active ? 0 : 1),
+      render: (r) => (
+        <ActiveToggle
+          table="vendor_locations"
+          id={r.id}
+          active={r.is_active}
+          label="Vendor active at this location"
+        />
+      ),
+    },
     {
       key: "location",
       label: "Location",
@@ -106,7 +121,7 @@ export function VendorLocationsTable({
     {
       key: "order_days",
       label: "Order days",
-      width: 190,
+      width: 235,
       sortValue: (r) => daysKey(r.order_days),
       render: (r) => (
         <WeekdayPicker
@@ -121,7 +136,7 @@ export function VendorLocationsTable({
     {
       key: "delivery_days",
       label: "Delivery days",
-      width: 190,
+      width: 235,
       sortValue: (r) => daysKey(r.delivery_days),
       render: (r) => (
         <WeekdayPicker
@@ -130,20 +145,6 @@ export function VendorLocationsTable({
           column="delivery_days"
           value={r.delivery_days}
           label="Delivery day"
-        />
-      ),
-    },
-    {
-      key: "is_active",
-      label: "Active",
-      width: 80,
-      sortValue: (r) => (r.is_active ? 0 : 1),
-      render: (r) => (
-        <ActiveToggle
-          table="vendor_locations"
-          id={r.id}
-          active={r.is_active}
-          label="Vendor active at this location"
         />
       ),
     },
