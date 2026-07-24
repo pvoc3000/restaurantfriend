@@ -266,44 +266,89 @@ Deno.serve(async (req) => {
       return json(403, { error: "purchaser role required to send purchase orders" });
     }
 
-    // Transport config: the location's own provider wins over the org's.
+    // Transport: location override → org config → the APP'S OWN sender (the
+    // Bill.com model, Mark 2026-07-24: "sending emails is something the app
+    // provides" — orgs supply nothing but addresses). The app default is one
+    // self-contained secret, EMAIL_CREDS_DEFAULT:
+    //   {"kind":"resend","api_key":"re_…","from":"{org} <po@ourdomain>"}
+    // "{org}" in its from becomes the org's name, and Reply-To falls back to
+    // the org's own addresses so vendor replies land with the org, not us.
     const [{ data: org }, { data: location }] = await Promise.all([
-      supabase.from("orgs").select("settings").eq("id", po.org_id).maybeSingle(),
+      supabase
+        .from("orgs")
+        .select("name, settings")
+        .eq("id", po.org_id)
+        .maybeSingle(),
       supabase
         .from("locations")
         .select("settings")
         .eq("id", po.location_id)
         .maybeSingle(),
     ]);
-    const cfg: ProviderConfig | undefined =
+    const orgSettings = (org?.settings ?? {}) as {
+      email_provider?: ProviderConfig;
+      po_email?: { cc?: string; reply_to?: string };
+      billing?: { email?: string };
+    };
+    const explicit: ProviderConfig | undefined =
       (location?.settings as { email_provider?: ProviderConfig } | null)
-        ?.email_provider ??
-      (org?.settings as { email_provider?: ProviderConfig } | null)
-        ?.email_provider;
+        ?.email_provider ?? orgSettings.email_provider;
 
-    if (!cfg?.kind || !cfg.from || !cfg.secret_ref) {
-      return json(400, {
-        error:
-          "email_provider is not configured — set orgs.settings.email_provider " +
-          '(or a location override) to {"kind","secret_ref","from"}. ' +
-          "See docs/po-email-setup.md",
-      });
+    let cfg: ProviderConfig;
+    let creds: unknown;
+    if (explicit) {
+      if (!explicit.kind || !explicit.from || !explicit.secret_ref) {
+        return json(400, {
+          error:
+            'email_provider config is incomplete — needs {"kind","secret_ref","from"}. ' +
+            "See docs/po-email-setup.md",
+        });
+      }
+      const rawCreds = Deno.env.get(`EMAIL_CREDS_${explicit.secret_ref}`);
+      if (!rawCreds) {
+        return json(500, {
+          error: `secret EMAIL_CREDS_${explicit.secret_ref} is not set (Edge Functions → Secrets)`,
+        });
+      }
+      cfg = explicit;
+      creds = JSON.parse(rawCreds);
+    } else {
+      const rawDefault = Deno.env.get("EMAIL_CREDS_DEFAULT");
+      if (!rawDefault) {
+        return json(500, {
+          error:
+            "no email_provider configured for this org/location, and the app's " +
+            "default sender (secret EMAIL_CREDS_DEFAULT) is not set. " +
+            "See docs/po-email-setup.md",
+        });
+      }
+      const dflt = JSON.parse(rawDefault) as ProviderConfig & { from?: string };
+      if (!dflt.from) {
+        return json(500, {
+          error: 'EMAIL_CREDS_DEFAULT is missing "from" (e.g. "{org} <po@yourdomain>")',
+        });
+      }
+      cfg = {
+        kind: dflt.kind ?? "resend",
+        from: dflt.from.replace("{org}", org?.name ?? "Purchasing"),
+        // Replies must reach the ORG — the platform address is send-only.
+        reply_to:
+          orgSettings.po_email?.reply_to ??
+          orgSettings.po_email?.cc ??
+          orgSettings.billing?.email,
+      };
+      creds = dflt;
     }
-    const sender = SENDERS[cfg.kind];
+
+    const sender = SENDERS[cfg.kind!];
     if (!sender) {
       return json(400, {
         error: `unknown email_provider.kind "${cfg.kind}" — expected one of: ${Object.keys(SENDERS).join(", ")}`,
       });
     }
-    const rawCreds = Deno.env.get(`EMAIL_CREDS_${cfg.secret_ref}`);
-    if (!rawCreds) {
-      return json(500, {
-        error: `secret EMAIL_CREDS_${cfg.secret_ref} is not set (Edge Functions → Secrets)`,
-      });
-    }
 
-    const providerId = await sender(JSON.parse(rawCreds), {
-      from: cfg.from,
+    const providerId = await sender(creds, {
+      from: cfg.from!,
       to,
       cc: cc || undefined,
       replyTo: cfg.reply_to || undefined,

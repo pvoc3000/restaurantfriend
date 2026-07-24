@@ -108,22 +108,29 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **`send-po-email` edge function** (`supabase/functions/send-po-email/`),
    which sends through a **generalized provider layer** (Mark, 2026-07-24:
    "every org, or even every location, should have its own way to send") and
-   stamps status/sent_via/sent_notes (`emailed to … · gmail <id>`). Transport
-   config in settings jsonb, location-over-org:
-   `locations.settings.email_provider ?? orgs.settings.email_provider` =
-   `{kind: "gmail"|"resend", secret_ref, from, reply_to?}`; credentials in
+   stamps status/sent_via/sent_notes (`emailed to … · resend <id>`).
+   Transport resolves three-tier (Mark, 2026-07-24, after reconsidering:
+   "sending emails is something the app provides", the Bill.com model):
+   `locations.settings.email_provider` → `orgs.settings.email_provider` →
+   **the app's own default sender**. Explicit config =
+   `{kind: "gmail"|"resend", secret_ref, from, reply_to?}` with credentials in
    edge-function secrets `EMAIL_CREDS_<secret_ref>` (JSON per provider —
-   NEVER in the DB, settings are member-readable). Donut Friend uses GMAIL
-   (Gmail API over HTTPS — raw SMTP is unreliable on the edge runtime; sent
-   POs land in the mailbox's Sent folder; From must be the authorized mailbox
-   or a configured alias). The MIME builder (multipart/mixed, folded base64,
-   chunked RFC 2047 subjects) is fixture-tested in Node via an esbuild slice —
-   PDF round-trips byte-for-byte. The function authenticates with the
-   CALLER's JWT so all its queries and the status write flow through RLS, plus
-   an explicit purchaser+ check for a readable error. Setup (Google Cloud
-   OAuth internal app, playground refresh token, secret, deploy,
-   `email_provider` setting): **docs/po-email-setup.md — NOT yet done, Send
-   errors clearly until it is.** The compose is a floating modal (Generate-POs overlay
+   NEVER in the DB, settings are member-readable). The app default is ONE
+   self-contained secret `EMAIL_CREDS_DEFAULT`
+   (`{"kind":"resend","api_key","from":"{org} <po@domain>"}`) — `{org}`
+   becomes the org name and Reply-To derives from the org's own addresses
+   (po_email.reply_to → cc → billing.email) so vendor replies reach the org.
+   Donut Friend uses the app default. A `gmail` kind (Gmail API over HTTPS,
+   OAuth refresh token; sent POs land in the mailbox's Sent folder) is fully
+   implemented for bring-your-own orgs/locations. The MIME builder
+   (multipart/mixed, folded base64, chunked RFC 2047 subjects) is
+   fixture-tested in Node via an esbuild slice — PDF round-trips
+   byte-for-byte. The function authenticates with the CALLER's JWT so all its
+   queries and the status write flow through RLS, plus an explicit purchaser+
+   check for a readable error. Setup incl. a no-domain sandbox try-it path
+   (Resend `onboarding@resend.dev` → deliverable only to your own Resend
+   account email): **docs/po-email-setup.md — NOT yet done, Send errors
+   clearly until it is.** The compose is a floating modal (Generate-POs overlay
    pattern) with a live preview: the PDF renders ONCE at open, shows in an
    `<object type="application/pdf">` pane (text fallback for browsers without
    an inline viewer — the Claude browser pane is one), and Send transmits that
