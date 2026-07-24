@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import {
-  VENDOR_ITEM_SELECT,
   VENDOR_ITEM_SELECT_ACTIVE_VENDOR,
   type CatalogItem,
   type CatalogVendorItem,
@@ -20,9 +19,8 @@ import { VendorItemsTable } from "@/components/catalog/VendorItemsTable";
 const SELECT = `
   id, name, category, base_unit, note, is_active,
   inventory_item_locations (
-    id, location_id, default_par, default_vendor_item_id, order_days, note, is_active,
-    shop_sections ( display_name, sort_order ),
-    vendor_items ( ${VENDOR_ITEM_SELECT} )
+    id, location_id, default_par, order_days, note, is_active,
+    shop_sections ( display_name, sort_order )
   )
 `;
 

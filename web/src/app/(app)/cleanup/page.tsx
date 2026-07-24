@@ -1,14 +1,31 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { computeProblems, type CleanupRow, type ProblemKind } from "@/lib/cleanup";
+import {
+  computeProblems,
+  type CleanupFavorite,
+  type CleanupRow,
+  type ProblemKind,
+} from "@/lib/cleanup";
 import { staleBucket, type StaleBucket } from "@/lib/lastOrdered";
 import { CleanupQueue } from "@/components/cleanup/CleanupQueue";
 
 const SELECT = `
-  id, location_id, default_par, default_vendor_item_id, inventory_item_id,
-  inventory_items!inner ( id, name, category, base_unit ),
-  vendor_items ( id, description, brand, package_desc, package_content, price, is_active,
-                 vendors ( id, name, is_active ) )
+  id, location_id, default_par, inventory_item_id,
+  inventory_items!inner ( id, name, category, base_unit )
+`;
+
+// The favorites the guide can actually emit for these item-locations:
+// vendor_items!inner + vendors!inner with both active filters applies the
+// active cascade in the query, so a favorite pointing at a retired vendor
+// never reaches the checks. Filtered by LOCATION rather than by a list of
+// item-location ids — several hundred uuids in a URL is its own problem.
+const FAVORITE_SELECT = `
+  item_location_id,
+  inventory_item_locations!inner ( location_id ),
+  vendor_items!inner (
+    id, description, brand, package_desc, package_content, price, is_active,
+    vendors!inner ( name, is_active )
+  )
 `;
 
 export type QueueItem = CleanupRow & {
@@ -42,7 +59,7 @@ export default async function CleanupPage({
 
   // Fetch active item-location rows (active item enforced by !inner), paginated
   // — PostgREST caps a page at 1000.
-  const rows: CleanupRow[] = [];
+  const rows: Omit<CleanupRow, "favorites">[] = [];
   if (targetIds.length > 0) {
     let from = 0;
     for (;;) {
@@ -64,7 +81,60 @@ export default async function CleanupPage({
           </p>
         );
       }
-      rows.push(...((data ?? []) as unknown as CleanupRow[]));
+      rows.push(...((data ?? []) as unknown as Omit<CleanupRow, "favorites">[]));
+      if (!data || data.length < 1000) break;
+      from += 1000;
+    }
+  }
+
+  // Favorites per item-location. One plan row exists per weekday, so the same
+  // vendor item comes back up to seven times — deduped here, because the
+  // question ("can this source be ordered?") is per vendor item, not per day.
+  const favoritesByIl = new Map<string, Map<string, CleanupFavorite>>();
+  if (targetIds.length > 0) {
+    let from = 0;
+    for (;;) {
+      const { data, error } = await supabase
+        .from("order_guide_plan_days")
+        .select(FAVORITE_SELECT)
+        .in("inventory_item_locations.location_id", targetIds)
+        .eq("vendor_items.is_active", true)
+        .eq("vendor_items.vendors.is_active", true)
+        .order("item_location_id")
+        .range(from, from + 999);
+      if (error) {
+        return (
+          <p className="text-sm text-red-700">
+            Could not load favorites for the queue: {error.message}
+          </p>
+        );
+      }
+      for (const r of (data ?? []) as unknown as {
+        item_location_id: string;
+        vendor_items: {
+          id: string;
+          description: string | null;
+          brand: string | null;
+          package_desc: string | null;
+          package_content: number | null;
+          price: number | null;
+          vendors: { name: string } | null;
+        } | null;
+      }[]) {
+        const vi = r.vendor_items;
+        if (!vi) continue;
+        const bucket = favoritesByIl.get(r.item_location_id) ?? new Map();
+        bucket.set(vi.id, {
+          id: vi.id,
+          description: vi.description,
+          brand: vi.brand,
+          package_desc: vi.package_desc,
+          package_content: vi.package_content,
+          price: vi.price,
+          vendor_name: vi.vendors?.name ?? null,
+        });
+        favoritesByIl.set(r.item_location_id, bucket);
+      }
       if (!data || data.length < 1000) break;
       from += 1000;
     }
@@ -91,11 +161,15 @@ export default async function CleanupPage({
   // Only rows with at least one problem enter the queue.
   const items: QueueItem[] = [];
   for (const row of rows) {
-    const problems = computeProblems(row);
+    const full: CleanupRow = {
+      ...row,
+      favorites: [...(favoritesByIl.get(row.id)?.values() ?? [])],
+    };
+    const problems = computeProblems(full);
     if (problems.length === 0) continue;
     const last_order_date = lastOrderedByIl.get(row.id) ?? null;
     items.push({
-      ...row,
+      ...full,
       location_code: codeById.get(row.location_id) ?? "?",
       problems,
       last_order_date,

@@ -1,72 +1,87 @@
 // The cleanup checks (brief P1), in one place. The /cleanup page fetches rows
 // and runs computeProblems() over them; the count burns down as Mark fixes the
 // underlying data (it's all live — nothing imported from the audit sheet).
+//
+// Rewritten 2026-07-23 to ask about FAVORITES rather than the default vendor
+// item. Until migration 008 the guide resolved a line through
+// `inventory_item_locations.default_vendor_item_id`, so checking that field
+// was checking the thing the guide would emit. It no longer reads it at all —
+// the guide is favorites plus the active cascade — which made two of the five
+// checks measure nothing (`no_default` was 89% false alarms, `default_inactive`
+// 64%: the flagged item already had a healthy favorite and ordered fine) and
+// pointed the other two at the wrong vendor item, since count mode and the
+// vendor totals use each FAVORITE's package content and price, not the
+// default's. Migration 012 then dropped the column outright.
 
 export type ProblemKind =
-  | "no_default" // 1. no default vendor item
-  | "default_inactive" // 2. default vendor item (or its vendor) is inactive
-  | "no_package_content" // 3. default vendor item has no package_content
-  | "no_price" // 4. default vendor item has null/zero price
-  | "no_par"; // 5. no default par (lowest priority)
+  | "no_package_content" // a favorite can't be converted into packages to order
+  | "no_price" // a favorite can't be priced on the totals bar or a PO
+  | "no_par"; // nothing to order up TO (lowest priority)
 
 export const PROBLEM_ORDER: ProblemKind[] = [
-  "no_default",
-  "default_inactive",
   "no_package_content",
   "no_price",
   "no_par",
 ];
 
 export const PROBLEM_LABEL: Record<ProblemKind, string> = {
-  no_default: "No default vendor item",
-  default_inactive: "Default vendor item inactive",
   no_package_content: "No package content",
   no_price: "No price",
   no_par: "No par",
 };
 
-// The shape the page selects from inventory_item_locations. vendor_items is the resolved
-// default (may be null); nested vendors carries the vendor's active flag.
+/**
+ * One of the item-location's favorites, already narrowed to the ones the guide
+ * can actually emit — an inactive vendor item or a deactivated vendor drops out
+ * of the active cascade, so its missing price is nobody's problem.
+ */
+export type CleanupFavorite = {
+  id: string; // vendor_items.id
+  description: string | null;
+  brand: string | null;
+  package_desc: string | null;
+  package_content: number | null;
+  price: number | null;
+  vendor_name: string | null;
+};
+
+// The shape the page selects from inventory_item_locations, plus the favorites
+// gathered for it in a second query.
 export type CleanupRow = {
   id: string; // inventory_item_locations.id
   location_id: string;
   inventory_item_id: string;
   default_par: number | null;
-  default_vendor_item_id: string | null;
   inventory_items: {
     id: string;
     name: string;
     category: string | null;
     base_unit: string;
   };
-  vendor_items: {
-    id: string;
-    description: string | null;
-    brand: string | null;
-    package_desc: string | null;
-    package_content: number | null;
-    price: number | null;
-    is_active: boolean;
-    vendors: { id: string; name: string; is_active: boolean } | null;
-  } | null;
+  favorites: CleanupFavorite[];
 };
+
+/** Favorites the guide would emit but can't convert into packages to order. */
+export function favoritesMissingContent(row: CleanupRow): CleanupFavorite[] {
+  return row.favorites.filter((f) => f.package_content === null);
+}
+
+/** Favorites the guide would emit but can't price. */
+export function favoritesMissingPrice(row: CleanupRow): CleanupFavorite[] {
+  return row.favorites.filter((f) => f.price === null || Number(f.price) === 0);
+}
 
 export function computeProblems(row: CleanupRow): ProblemKind[] {
   const problems: ProblemKind[] = [];
-  const vi = row.vendor_items;
 
-  if (!row.default_vendor_item_id || !vi) {
-    // A dangling id (default set but the row didn't resolve) is treated as
-    // "no default" — the fix is the same: assign a valid one.
-    problems.push("no_default");
-  } else {
-    if (!vi.is_active || (vi.vendors && !vi.vendors.is_active)) {
-      problems.push("default_inactive");
-    }
-    if (vi.package_content === null) problems.push("no_package_content");
-    if (vi.price === null || Number(vi.price) === 0) problems.push("no_price");
-  }
+  // An item-location with NO favorites isn't a defect: an empty day set is how
+  // you take something out of focus while keeping it orderable (Mark,
+  // 2026-07-22). So these only fire on favorites that actually exist.
+  if (favoritesMissingContent(row).length > 0) problems.push("no_package_content");
+  if (favoritesMissingPrice(row).length > 0) problems.push("no_price");
 
+  // par is still the item-location's own (migration 009 moved the per-weekday
+  // overrides here too), so this check is unchanged.
   if (row.default_par === null) problems.push("no_par");
 
   return problems;

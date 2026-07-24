@@ -1,20 +1,23 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { staleBucket, type StaleBucket } from "@/lib/lastOrdered";
-import { VENDOR_ITEM_SELECT, type CatalogItem } from "@/lib/catalog";
+import { type CatalogItem } from "@/lib/catalog";
 import { parseItemFilters, type RawSearchParams } from "@/lib/itemFilters";
 import { ItemsList } from "@/components/catalog/ItemsList";
 
 // The list is item-master rows with the CURRENT location's config embedded, so
-// one row = one item, and the per-location columns (section, par, default
-// vendor item) reflect where you're working. Items with no row at this location
-// still appear — "not stocked here" is a useful signal, not a reason to hide.
+// one row = one item, and the per-location columns (section, par) reflect where
+// you're working. Items with no row at this location still appear — "not
+// stocked here" is a useful signal, not a reason to hide.
+//
+// The vendor_items embed resolved through default_vendor_item_id and went with
+// it in migration 012; there is no single vendor item that speaks for an
+// item-location any more.
 const SELECT = `
   id, name, category, base_unit, note, is_active,
   inventory_item_locations (
-    id, location_id, default_par, default_vendor_item_id, note, is_active,
-    shop_sections ( display_name, sort_order ),
-    vendor_items ( ${VENDOR_ITEM_SELECT} )
+    id, location_id, default_par, note, is_active,
+    shop_sections ( display_name, sort_order )
   )
 `;
 

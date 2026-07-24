@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Location } from "@/lib/session";
-import { money, unitPriceLabel, vendorItemLabel, type CatalogItemLocation } from "@/lib/catalog";
+import { type CatalogItemLocation } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
@@ -17,8 +17,8 @@ type Row = { location: Location; il: CatalogItemLocation | null };
 
 /**
  * One row per location so the shops' differences are visible side by side: par,
- * shop section, the default vendor item, and the weekday favorites grid behind
- * the row's disclosure.
+ * shop section, order days, and the weekday favorites grid behind the row's
+ * disclosure.
  *
  * The favorites editor is the existing cleanup component reused as-is — same
  * grid, now reachable for healthy items too, which was the gap brief §D names.
@@ -165,45 +165,11 @@ export function ItemLocationRows({
           dash
         ),
     },
-    {
-      key: "vendor_item",
-      label: "Default vendor item",
-      width: 300,
-      sortValue: (r) => r.il?.vendor_items?.vendors?.name ?? null,
-      render: (r) => {
-        if (!r.il) return dash;
-        const vi = r.il.vendor_items;
-        if (!vi) return <span className="text-neutral-400">none</span>;
-        return (
-          <span className="text-neutral-600">
-            <span className="font-medium text-neutral-700">{vi.vendors?.name ?? "—"}</span>{" "}
-            {vendorItemLabel(vi)}
-            {vi.package_desc ? (
-              <span className="text-neutral-500"> · {vi.package_desc}</span>
-            ) : null}
-            <span className="ml-1 text-xs text-neutral-500">
-              {unitPriceLabel(vi, baseUnit)}
-            </span>
-          </span>
-        );
-      },
-    },
-    {
-      key: "price",
-      label: "Price",
-      width: 90,
-      align: "right",
-      sortValue: (r) =>
-        r.il?.vendor_items?.price === null || r.il?.vendor_items?.price === undefined
-          ? null
-          : Number(r.il.vendor_items.price),
-      render: (r) =>
-        r.il?.vendor_items ? (
-          <span className="text-neutral-600">{money(r.il.vendor_items.price)}</span>
-        ) : (
-          dash
-        ),
-    },
+    // "Default vendor item" and its price lived here until migration 012.
+    // The guide stopped resolving lines through the default in 008 and the
+    // column is gone; which vendor supplies this item at this location is the
+    // favorites grid behind the row's disclosure, and the Vendor items section
+    // below carries the prices.
     {
       key: "note",
       label: "Note",

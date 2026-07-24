@@ -295,7 +295,7 @@ export function CleanupQueue({
                 <th className="px-2 py-1 font-medium">Item</th>
                 <th className="px-2 py-1 font-medium">Loc</th>
                 <th className="px-2 py-1 font-medium">Category</th>
-                <th className="px-2 py-1 font-medium">Default vendor</th>
+                <th className="px-2 py-1 font-medium">Favorites</th>
                 <th className="px-2 py-1 font-medium">Last ordered</th>
                 <th className="px-2 py-1 font-medium">Problem</th>
               </tr>
@@ -322,9 +322,13 @@ export function CleanupQueue({
                   <td className="px-2 py-1 text-neutral-600">
                     {item.inventory_items.category ?? "—"}
                   </td>
+                  {/* The sources the guide would actually emit for this row —
+                      what the checks now measure. */}
                   <td className="px-2 py-1 text-neutral-600">
-                    {item.vendor_items?.vendors?.name ?? (
+                    {item.favorites.length === 0 ? (
                       <span className="text-neutral-400">none</span>
+                    ) : (
+                      [...new Set(item.favorites.map((f) => f.vendor_name ?? "—"))].join(", ")
                     )}
                   </td>
                   <td className="px-2 py-1 tabular-nums">

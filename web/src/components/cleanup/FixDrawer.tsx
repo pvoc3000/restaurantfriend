@@ -2,11 +2,27 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { PROBLEM_LABEL } from "@/lib/cleanup";
+import {
+  PROBLEM_LABEL,
+  favoritesMissingContent,
+  favoritesMissingPrice,
+  type CleanupFavorite,
+} from "@/lib/cleanup";
 import { UNIT_OPTIONS, packageContent, unitFamily } from "@/lib/units";
 import type { QueueItem } from "@/app/(app)/cleanup/page";
-import { AssignVendorItem } from "./AssignVendorItem";
 import { FavoritesEditor } from "./FavoritesEditor";
+
+/** Which favorite an editor is about — several can be broken on one item. */
+function FavoriteHeading({ f }: { f: CleanupFavorite }) {
+  return (
+    <p className="text-xs text-neutral-500">
+      <span className="font-medium text-neutral-700">{f.vendor_name ?? "—"}</span>
+      {f.brand ? ` · ${f.brand}` : ""}
+      {f.description ? ` · ${f.description}` : ""}
+      {f.package_desc ? ` · ${f.package_desc}` : ""}
+    </p>
+  );
+}
 
 function Section({
   title,
@@ -73,44 +89,28 @@ export function FixDrawer({
           </p>
         ) : (
           <div className="mt-4 space-y-4">
-            {(item.problems.includes("no_default") ||
-              item.problems.includes("default_inactive")) && (
-              <Section
-                title={
-                  item.problems.includes("no_default")
-                    ? PROBLEM_LABEL.no_default
-                    : PROBLEM_LABEL.default_inactive
-                }
-              >
-                <AssignVendorItem
-                  itemLocationId={item.id}
-                  inventoryItemId={item.inventory_items.id}
-                  currentDefaultId={item.default_vendor_item_id}
-                  onChanged={onChanged}
-                />
-              </Section>
-            )}
-
-            {item.problems.includes("no_package_content") && item.vendor_items && (
-              <Section title={PROBLEM_LABEL.no_package_content}>
+            {/* One editor per offending FAVORITE, not one for "the" vendor
+                item: an item can be sourced from several, and the guide uses
+                each line's own content and price. */}
+            {favoritesMissingContent(item).map((f) => (
+              <Section key={`content-${f.id}`} title={PROBLEM_LABEL.no_package_content}>
+                <FavoriteHeading f={f} />
                 <PackageContentEditor
-                  vendorItemId={item.vendor_items.id}
-                  packageDesc={item.vendor_items.package_desc}
+                  vendorItemId={f.id}
+                  packageDesc={f.package_desc}
                   baseUnit={item.inventory_items.base_unit}
-                  price={item.vendor_items.price}
+                  price={f.price}
                   onChanged={onChanged}
                 />
               </Section>
-            )}
+            ))}
 
-            {item.problems.includes("no_price") && item.vendor_items && (
-              <Section title={PROBLEM_LABEL.no_price}>
-                <PriceEditor
-                  vendorItemId={item.vendor_items.id}
-                  onChanged={onChanged}
-                />
+            {favoritesMissingPrice(item).map((f) => (
+              <Section key={`price-${f.id}`} title={PROBLEM_LABEL.no_price}>
+                <FavoriteHeading f={f} />
+                <PriceEditor vendorItemId={f.id} onChanged={onChanged} />
               </Section>
-            )}
+            ))}
 
             {item.problems.includes("no_par") && (
               <Section title={PROBLEM_LABEL.no_par}>

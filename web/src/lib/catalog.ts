@@ -24,14 +24,12 @@ export type CatalogItemLocation = {
   id: string;
   location_id: string;
   default_par: number | null;
-  default_vendor_item_id: string | null;
   /** ISO weekdays we order this item at this location (schema 008). One of
    *  the four should-order conditions; empty = out of focus, still on guide. */
   order_days: number[];
   note: string | null;
   is_active: boolean;
   shop_sections: { display_name: string; sort_order: number } | null;
-  vendor_items: CatalogVendorItem | null;
 };
 
 export type CatalogItem = {

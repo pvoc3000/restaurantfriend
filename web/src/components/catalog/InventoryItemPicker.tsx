@@ -38,8 +38,8 @@ export function InventoryItemPicker({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Same shape as AssignVendorItem's broad search: server-side ilike, and only
-  // once the term is worth running — 790 items is too many to list.
+  // Server-side ilike, and only once the term is worth running — 790 items is
+  // too many to list.
   const canSearch = open && term.trim().length >= 2;
   useEffect(() => {
     if (!canSearch) return;

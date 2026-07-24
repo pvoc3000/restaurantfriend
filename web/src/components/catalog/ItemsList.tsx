@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { STALE_ORDER, STALE_LABEL } from "@/lib/lastOrdered";
-import { money, qty, vendorItemLabel } from "@/lib/catalog";
+import { qty } from "@/lib/catalog";
 import {
   itemDetailHref,
   itemFiltersToQuery,
@@ -41,8 +41,6 @@ const COLUMNS: {
   { key: "section", label: "Section", width: 170, sort: "section" },
   { key: "par", label: "Par", width: 72, sort: "par", align: "right" },
   { key: "unit", label: "Unit", width: 72, sort: "unit" },
-  { key: "vendor", label: "Default vendor item", width: 300, sort: "vendor" },
-  { key: "price", label: "Price", width: 90, sort: "price", align: "right" },
   { key: "last", label: "Last ordered", width: 120, sort: "last" },
 ];
 
@@ -72,7 +70,6 @@ function groupLabel(item: ItemRow, key: SortKey): string {
  */
 function sortValue(item: ItemRow, key: SortKey): SortValue {
   const il = item.inventory_item_locations[0] ?? null;
-  const vi = il?.vendor_items ?? null;
   switch (key) {
     case "name":
       return item.name;
@@ -86,10 +83,6 @@ function sortValue(item: ItemRow, key: SortKey): SortValue {
         : Number(il.default_par);
     case "unit":
       return item.base_unit;
-    case "vendor":
-      return vi?.vendors?.name ?? null;
-    case "price":
-      return vi?.price === null || vi?.price === undefined ? null : Number(vi.price);
     case "last":
       // YYYY-MM-DD sorts chronologically as a string.
       return item.last_order_date;
@@ -149,12 +142,9 @@ export function ItemsList({
       if (filters.category && i.category !== filters.category) return false;
       if (filters.stale !== "any" && i.stale !== filters.stale) return false;
       if (!t) return true;
-      const vi = i.inventory_item_locations[0]?.vendor_items ?? null;
       return (
         i.name.toLowerCase().includes(t) ||
-        (i.category ?? "").toLowerCase().includes(t) ||
-        (vi?.vendors?.name ?? "").toLowerCase().includes(t) ||
-        (vi !== null && vendorItemLabel(vi).toLowerCase().includes(t))
+        (i.category ?? "").toLowerCase().includes(t)
       );
     });
   }, [items, filters]);
@@ -296,7 +286,7 @@ export function ItemsList({
         <input
           value={filters.q}
           onChange={(e) => update({ q: e.target.value })}
-          placeholder="Search name, category, vendor…"
+          placeholder="Search name or category…"
           className="w-72 rounded border border-neutral-300 px-2 py-1 text-sm"
         />
         <select
@@ -424,7 +414,6 @@ export function ItemsList({
             <tbody>
               {sorted.map((item, i) => {
                 const il = item.inventory_item_locations[0] ?? null;
-                const vi = il?.vendor_items ?? null;
                 // A banner row starts each new run of the grouped column.
                 const label = grouping ? groupLabel(item, grouping) : null;
                 const startsGroup =
@@ -473,24 +462,6 @@ export function ItemsList({
                       {qty(il?.default_par)}
                     </td>
                     <td className="truncate px-2 py-1 text-neutral-600">{item.base_unit}</td>
-                    <td className="truncate px-2 py-1 text-neutral-600">
-                      {vi ? (
-                        <>
-                          <span className="font-medium text-neutral-700">
-                            {vi.vendors?.name ?? "—"}
-                          </span>{" "}
-                          {vendorItemLabel(vi)}
-                          {vi.package_desc ? (
-                            <span className="text-neutral-500"> · {vi.package_desc}</span>
-                          ) : null}
-                        </>
-                      ) : (
-                        <span className="text-neutral-400">none</span>
-                      )}
-                    </td>
-                    <td className="truncate px-2 py-1 text-right tabular-nums text-neutral-600">
-                      {money(vi?.price)}
-                    </td>
                     <td className="truncate px-2 py-1 tabular-nums">
                       {item.last_order_date ? (
                         <span className="text-neutral-600">{item.last_order_date}</span>

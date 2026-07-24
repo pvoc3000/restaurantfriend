@@ -8,15 +8,18 @@ import { withFrom } from "./breadcrumbs";
 export type ActiveFilter = "active" | "inactive" | "all";
 export type StaleFilter = StaleBucket | "any";
 
-/** Sortable columns on the items list, keyed by what they sort on. */
+/**
+ * Sortable columns on the items list, keyed by what they sort on.
+ * "vendor" and "price" went with migration 012: both sorted on the item's
+ * DEFAULT vendor item, and there is no longer a single vendor item per
+ * item-location to speak for the row.
+ */
 export const SORT_KEYS = [
   "name",
   "category",
   "section",
   "par",
   "unit",
-  "vendor",
-  "price",
   "last",
 ] as const;
 export type SortKey = (typeof SORT_KEYS)[number];

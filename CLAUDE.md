@@ -36,9 +36,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 1. ✅ Schema + RLS applied
 2. ✅ Web skeleton: auth (email/password), org/location context, vendor list
 3. ✅ FMP → Postgres migration (`migration/`) loaded; web catalog admin shipped.
-   `/cleanup` queue (live from DB, per-location + all-locations, 5 problem
-   checks, burn-down) with inline fix editors (assign default vendor item,
-   package content w/ unit conversion, price, par); multi-favorite plan-row grid
+   `/cleanup` queue (live from DB, per-location + all-locations, 3 problem
+   checks, burn-down) with inline fix editors (package content w/ unit
+   conversion, price, par — one per offending FAVORITE); multi-favorite plan-row grid
    editor (schema 003); last-ordered triage (view `v_item_last_ordered`,
    per-location, staleness chips, bulk-deactivate with "inactive everywhere"
    follow-up). Then brief §D: Inventory list + item detail, vendor detail with
@@ -94,7 +94,9 @@ per-weekday par to `inventory_item_locations` (`par_by_weekday` /
 plan row a PURE FAVORITE record with no payload — so un-favoriting a day can no
 longer destroy a par. The view's output is unchanged (`par_qty` / `par_mode`
 still, just sourced differently), so no app code changed for par.
-**Migrations 001–011 are ALL APPLIED to the hosted DB** (verified 2026-07-23).
+Migration 012 retires `inventory_item_locations.default_vendor_item_id` — dead
+since 008 and read only by the cleanup checks that complained about it.
+**Migrations 001–012 are ALL APPLIED to the hosted DB** (verified 2026-07-23).
 Mark runs them himself in the Supabase SQL editor — never assume a written
 migration has been applied, and never assume it hasn't: check. Cheap probes:
 `select settings->>'timezone' from orgs` for 007, and for a function, call it
@@ -113,7 +115,8 @@ divides by. The VALUES come from the raw export, not the migration — run
 698 multi-packs). Migration 011 retyped `pack_count` integer → numeric: FMP
 allows a fractional UnitAmount and one row uses it (0.5 × 1qt), which killed
 the first backfill run partway through. **The web app on this branch requires
-010/011** — the guide selects the new columns.
+010/011** — the guide selects the new columns — **and must ship BEFORE 012**,
+which drops a column the Inventory list and item detail used to select.
 
 **Par belongs to the item at a location, never to the order guide** (Mark,
 2026-07-23). If a future change wants a par that varies by anything other than
@@ -255,27 +258,20 @@ weekday column, and 003 then silently made it per-vendor-item.
   matches the earlier draft's same-day vendor-gate measurement, so the gate
   behaves as measured. Judge the guide by the per-vendor breakdown vs the real
   ~11 Monday POs (query 4 in migration 008's comments), not the brief's totals.
-- **"Default vendor item" may be the wrong concept.** Mark's words, 2026-07-22.
-  Since 008 the guide no longer consumes
-  `inventory_item_locations.default_vendor_item_id` at all (the null-plan-row
-  indirection it backed is gone); it survives as catalog metadata (item detail,
-  cleanup checks), and the migrated defaults often point at deactivated vendors.
-  Decide whether it still earns its keep. **Cleanup-check assessment (2026-07-23,
-  measured over 665 active item-locations at DF01+DF02, not yet acted on):** four
-  of the five `lib/cleanup.ts` checks are built on the default and have gone
-  stale. `no_default` (146 flagged, 130 already have a healthy favorite so the
-  guide line is fine) and `default_inactive` (193 / 124 phantom) are obsolete —
-  the guide reads favorites + the active cascade, not the default.
-  `no_package_content` (46) and `no_price` (55) check the DEFAULT's values but
-  the guide's count-mode + totals use each FAVORITE's, so they're pointed at the
-  wrong vendor item. `no_par` (95) is the only one still valid — `default_par`
-  remains the guide's par source via `coalesce(plan.par_qty, il.default_par)`.
-  Also inert post-008: `AssignVendorItem.tsx` writes `default_vendor_item_id`,
-  which no longer affects the guide. Flip side the current checks are blind to:
-  ~3,800 plan-row favorites org-wide point at an inactive vendor/item (the guide
-  correctly drops them; mostly legitimately retired, so arguably not
-  cleanup-worthy). Two paths on the table — re-point the checks at favorites, or
-  retire the default column outright (migration 009). Mark: assess only for now.
+- ~~**"Default vendor item" may be the wrong concept."**~~ **RESOLVED
+  2026-07-23 — retired (migration 012).** It stopped having any reader when 008
+  killed the null-plan-row indirection, leaving a closed loop: the only writer
+  was the cleanup queue's own "assign default" editor and the only readers were
+  the checks complaining about it. Measured over 665 active item-locations at
+  DF01+DF02, `no_default` flagged 146 of which 130 (89%) already had a healthy
+  favorite, and `default_inactive` flagged 193 of which 124 (64%) did. Both
+  checks and that editor are gone; `lib/cleanup.ts` now asks about FAVORITES —
+  `no_package_content` and `no_price` evaluate each ACTIVE favorite (the sources
+  the guide actually emits) and `no_par` is unchanged. Those two counts went UP
+  (46→105, 55→59) because they had been inspecting the wrong vendor item and
+  missing real gaps. Also dropped with the column: the "Default vendor item" and
+  "Price" columns on the Inventory list and item detail, and their sort keys —
+  there is no single vendor item that speaks for an item-location any more.
 - **Delete/duplicate vendor items.** Design agreed but not built: a per-row `⋯`
   menu (not right-click — no touch equivalent, and iPad Safari is the ordering
   stopgap). Delete must be usage-aware: `price_history` is `on delete cascade`
