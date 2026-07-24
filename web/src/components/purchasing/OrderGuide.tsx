@@ -24,6 +24,7 @@ import {
   type GuideRow,
 } from "@/lib/orderGuide";
 import { GuideLine } from "./GuideLine";
+import { GeneratePos } from "./GeneratePos";
 
 /**
  * The order guide (spec §4.6): the shop in walk order, item headers with par,
@@ -45,6 +46,7 @@ export function OrderGuide({
   locationId,
   locationCode,
   orgId,
+  canGeneratePos,
 }: {
   rows: GuideRow[];
   entries: GuideEntry[];
@@ -56,6 +58,8 @@ export function OrderGuide({
   locationId: string;
   locationCode: string;
   orgId: string;
+  /** Purchaser+ only — staff walk the guide but can't create POs (RLS). */
+  canGeneratePos: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -255,6 +259,16 @@ export function OrderGuide({
               </span>
             )}
           </span>
+          {/* The walk's end point (spec §2 step 3), so it lives on the
+              instrument that answers "who gets a PO". */}
+          {canGeneratePos && (
+            <GeneratePos
+              totals={totals}
+              locationId={locationId}
+              guideDate={guideDate}
+              weekday={weekday}
+            />
+          )}
         </div>
         {error && <p className="text-sm text-red-700">{error}</p>}
       </div>

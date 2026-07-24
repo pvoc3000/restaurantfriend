@@ -63,10 +63,24 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    view's new columns.
    Shipped: `/purchase-orders` list (location-scoped, date window, status chips,
    totals, selection) and PO detail (ordered-vs-received with dual totals,
-   inline receiving, price reconciliation → catalog). NOT built: **PO generation**
-   (needs the order guide — build that next) and **batch process / email PDF /
-   shopping list** (needs the edge function, deferred). The order guide is the
-   remaining prerequisite for a real Monday order.
+   inline receiving, price reconciliation → catalog).
+   Shipped 2026-07-23: **PO generation** — migration 013's
+   `create_purchase_orders_from_guide(location, guide_date, vendor_ids[])`
+   creates one draft PO per selected vendor from that date's qty>0 guide
+   entries in ONE transaction (snapshot description/brand/pack/price; price =
+   location override → catalog; pack label composed via `trim_scale` from 010's
+   structure; zeroed/untouched entries excluded; vendors with no lines skipped
+   without burning a sequence number). SECURITY INVOKER on purpose — inserts
+   flow through the purchaser+ RLS policies. UI: "Generate POs…" on the guide's
+   totals bar (purchaser+ only) → confirm dialog; vendors at/above minimum
+   preselected, under-minimum unchecked-but-checkable (§4.2), FMP's "<7 days
+   since last PO" guard is a warning chip and a same-day PO defaults the vendor
+   unchecked (re-run guard). Fixture-tested in the Docker harness (numbering,
+   snapshots, override price, zeroed-skip, fractional pack_count, empty-day
+   no-op). **Migration 013 is WRITTEN but NOT YET APPLIED** — the button errors
+   with "Could not find the function … in the schema cache" until Mark runs it.
+   NOT built: **batch process / email PDF / shopping list** (needs the edge
+   function, deferred).
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A

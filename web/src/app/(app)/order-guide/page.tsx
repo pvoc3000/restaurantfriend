@@ -117,6 +117,9 @@ export default async function OrderGuidePage({
       locationId={locationId}
       locationCode={session.activeLocation.code}
       orgId={session.membership.org_id}
+      canGeneratePos={["owner", "admin", "purchaser"].includes(
+        session.membership.role
+      )}
     />
   );
 }
