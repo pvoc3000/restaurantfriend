@@ -361,7 +361,9 @@ export function fillTemplate(template: string, po: PoDocData): string {
   return template.replace(/\{(\w+)\}/g, (m, key) => vars[key] ?? m);
 }
 
-export function buildEmailParts(po: PoDocData, org: OrgDocData) {
+export type EmailParts = { to: string; cc: string; subject: string; body: string };
+
+export function buildEmailParts(po: PoDocData, org: OrgDocData): EmailParts {
   return {
     to: po.rep_email ?? "",
     cc: org.po_email?.cc ?? "",
@@ -370,8 +372,7 @@ export function buildEmailParts(po: PoDocData, org: OrgDocData) {
   };
 }
 
-export function buildMailto(po: PoDocData, org: OrgDocData): string {
-  const parts = buildEmailParts(po, org);
+export function mailtoFromParts(parts: EmailParts): string {
   const params = new URLSearchParams();
   if (parts.cc) params.set("cc", parts.cc);
   params.set("subject", parts.subject);
@@ -379,6 +380,55 @@ export function buildMailto(po: PoDocData, org: OrgDocData): string {
   // URLSearchParams encodes spaces as '+', which mail apps take literally.
   const query = params.toString().replace(/\+/g, "%20");
   return `mailto:${encodeURIComponent(parts.to)}?${query}`;
+}
+
+// ---------------------------------------------------------------------------
+// In-app send (Mark, 2026-07-23: "roll our own"): the compose card posts the
+// reviewed email plus the client-rendered PDF to the send-po-email edge
+// function, which sends via Resend and stamps the PO sent. The human still
+// reads and edits every field — the review just happens in OUR compose card
+// instead of Mail's.
+// ---------------------------------------------------------------------------
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    // result is a data: URL — the base64 payload starts after the comma.
+    reader.onload = () => resolve((reader.result as string).split(",")[1] ?? "");
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(blob);
+  });
+}
+
+export async function sendPoEmail(
+  supabase: SupabaseClient,
+  args: { po_id: string; parts: EmailParts; blob: Blob; filename: string }
+): Promise<{ warning?: string }> {
+  const { data, error } = await supabase.functions.invoke("send-po-email", {
+    body: {
+      po_id: args.po_id,
+      to: args.parts.to,
+      cc: args.parts.cc || undefined,
+      subject: args.parts.subject,
+      body: args.parts.body,
+      pdf_base64: await blobToBase64(args.blob),
+      filename: args.filename,
+    },
+  });
+  if (error) {
+    // FunctionsHttpError carries the function's JSON response — surface the
+    // real message ("RESEND_API_KEY secret is not set"), not "non-2xx".
+    let message = error.message;
+    try {
+      const ctx = (error as { context?: Response }).context;
+      const parsed = await ctx?.json();
+      if (parsed?.error) message = parsed.error;
+    } catch {
+      // keep the generic message
+    }
+    throw new Error(message);
+  }
+  return { warning: (data as { warning?: string } | null)?.warning };
 }
 
 // ---------------------------------------------------------------------------

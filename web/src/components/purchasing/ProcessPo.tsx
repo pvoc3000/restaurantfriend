@@ -1,19 +1,20 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   buildEmailParts,
-  buildMailto,
-  canSharePdf,
   downloadBlob,
   fetchPoDocData,
+  mailtoFromParts,
   nextDeliveryDate,
   openWindowNow,
+  sendPoEmail,
   sharePdf,
   showBlob,
   SENT_VIA_FOR_ORDER_TYPE,
+  type EmailParts,
 } from "@/lib/poProcessing";
 import type { PurchaseOrder } from "@/lib/purchaseOrders";
 
@@ -27,12 +28,15 @@ export type ProcessingContext = {
 
 /**
  * Processing (spec §2 step 4), per vendor order_type:
- * - email_po — generate the §4.9 PDF (lands in Downloads) AND open a prefilled
- *   mail draft; the human attaches the file and edits the text before sending
- *   (mailto can't attach — this two-step is the deliberate v1, Mark 2026-07-23).
+ * - email_po — an IN-APP compose card (Mark, 2026-07-23: "roll our own"):
+ *   to/cc/subject/body prefilled from the templates and editable in place,
+ *   Send posts them with the client-rendered §4.9 PDF to the send-po-email
+ *   edge function (Resend), which also stamps the PO sent. "Use Mail app"
+ *   remains the escape hatch (share sheet, else download + mailto draft).
  * - online   — open the vendor's site; the PDF is available as a reference.
  * - in_person — the shopping list PDF, sorted by shop section.
- * Every path ends at "Mark as sent", which records sent_via.
+ * Every path ends with the PO marked sent — automatically for in-app email,
+ * via the "Mark as sent" button for the rest.
  *
  * The PDF renderer and document components load on first click, not with the
  * page — they're heavy and most visits never generate anything.
@@ -49,15 +53,9 @@ export function ProcessPo({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [processed, setProcessed] = useState(false);
-  const [copied, setCopied] = useState(false);
-  // Share support is a client fact that never changes within a page life —
-  // useSyncExternalStore reads it hydration-safely (an effect would trip the
-  // set-state-in-effect lint; server snapshot false keeps SSR consistent).
-  const shareable = useSyncExternalStore(
-    () => () => {},
-    canSharePdf,
-    () => false
-  );
+  // The compose card's editable fields; null = closed.
+  const [compose, setCompose] = useState<EmailParts | null>(null);
+  const [sentNote, setSentNote] = useState<string | null>(null);
 
   const sentVia = SENT_VIA_FOR_ORDER_TYPE[context.order_type] ?? "print";
   const suggestion =
@@ -87,40 +85,57 @@ export function ProcessPo({
     }
   }
 
-  const generateAndDraft = () =>
-    run("email", async () => {
+  /** Open the compose card prefilled from the templates — no PDF work yet. */
+  const openCompose = () =>
+    run("compose", async () => {
+      const { org, pos } = await fetchPoDocData(supabase, [order.id]);
+      if (pos.length === 0) throw new Error("Order not found");
+      setSentNote(null);
+      setCompose(buildEmailParts(pos[0], org));
+    });
+
+  /** The reviewed fields + the freshly rendered PDF → edge function → sent. */
+  const send = () =>
+    run("send", async () => {
+      if (!compose) return;
       const { pdf, docs, org, po } = await loadDocs();
       const blob = await pdf(<docs.PoPdf pos={[po]} org={org} />).toBlob();
+      const { warning } = await sendPoEmail(supabase, {
+        po_id: order.id,
+        parts: compose,
+        blob,
+        filename: `PO ${po.po_number}.pdf`,
+      });
+      setCompose(null);
+      setSentNote(
+        `Sent to ${compose.to}${warning ? ` — ${warning}` : ""}`
+      );
+      router.refresh();
+    });
 
-      // Share sheet first: the one path where the PDF lands INSIDE the Mail
-      // compose window (macOS and iOS). Recipient/subject may still need the
-      // copy chips — no web API can address a Mail draft.
-      const parts = buildEmailParts(po, org);
+  /**
+   * The escape hatch (e.g. Resend not configured yet): hand the EDITED fields
+   * to the mail app — share sheet where files can be shared, else the PDF
+   * downloads and a prefilled draft opens. Marking sent stays manual here.
+   */
+  const useMailApp = () =>
+    run("mailapp", async () => {
+      if (!compose) return;
+      const { pdf, docs, org, po } = await loadDocs();
+      const blob = await pdf(<docs.PoPdf pos={[po]} org={org} />).toBlob();
       const shared = await sharePdf(
         blob,
         `PO ${po.po_number}.pdf`,
-        parts.subject,
-        parts.body
+        compose.subject,
+        compose.body
       );
-      if (shared === "shared") {
-        setProcessed(true);
-        return;
-      }
       if (shared === "cancelled") return;
-
-      // No file sharing here (or the gesture expired): the original two-step —
-      // PDF to Downloads, prefilled draft opens, human drags the file in.
-      downloadBlob(blob, `PO ${po.po_number}.pdf`);
-      window.location.href = buildMailto(po, org);
+      if (shared === "unsupported") {
+        downloadBlob(blob, `PO ${po.po_number}.pdf`);
+        window.location.href = mailtoFromParts(compose);
+      }
       setProcessed(true);
     });
-
-  async function copyRep() {
-    if (!context.rep_email) return;
-    await navigator.clipboard.writeText(context.rep_email);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }
 
   const previewPdf = () => {
     // Opened before any await, while the click gesture still counts — a popup
@@ -213,20 +228,16 @@ export function ProcessPo({
               <button disabled={busy !== null} onClick={previewPdf} className={btn}>
                 {busy === "preview" ? "Rendering…" : "Preview PDF"}
               </button>
-              <button
-                disabled={busy !== null}
-                onClick={generateAndDraft}
-                className={primaryBtn}
-                title={
-                  shareable
-                    ? "Opens the share sheet with the PDF attached — choose Mail"
-                    : context.rep_email
-                      ? `Draft to ${context.rep_email} — attach the downloaded PDF before sending`
-                      : "No rep email on file — the draft opens without a recipient"
-                }
-              >
-                {busy === "email" ? "Rendering…" : "Email PDF…"}
-              </button>
+              {compose === null && (
+                <button
+                  disabled={busy !== null}
+                  onClick={openCompose}
+                  className={primaryBtn}
+                  title="Compose here — the PDF attaches itself on send"
+                >
+                  {busy === "compose" ? "Loading…" : "Email PO…"}
+                </button>
+              )}
             </>
           )}
 
@@ -271,31 +282,78 @@ export function ProcessPo({
         </span>
       </div>
 
-      {context.order_type === "email_po" && (
-        <p className="flex flex-wrap items-center gap-x-2 text-xs text-neutral-500">
-          {shareable ? (
-            <>
-              Opens the share sheet with the PDF attached — choose Mail, address
-              it, edit, send, then mark the order sent.
-            </>
-          ) : (
-            <>
-              The PDF downloads and a mail draft opens
-              {context.rep_email ? "" : " (no rep email on file)"} — attach the
-              PDF and edit before sending, then mark the order sent.
-            </>
-          )}
-          {context.rep_email && (
-            <button
-              type="button"
-              onClick={copyRep}
-              title="Copy the rep's email address"
-              className="rounded border border-neutral-300 bg-white px-1.5 py-0.5 text-neutral-700 hover:bg-neutral-100"
-            >
-              {copied ? "Copied" : `To: ${context.rep_email} ⧉`}
-            </button>
-          )}
-        </p>
+      {sentNote && <p className="text-xs text-green-800">{sentNote}</p>}
+
+      {/* The compose card: what you see is exactly what sends. */}
+      {compose && (
+        <div className="space-y-2 rounded border border-neutral-200 bg-neutral-50 p-3">
+          <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
+            {(
+              [
+                ["To", "to"],
+                ["Cc", "cc"],
+                ["Subject", "subject"],
+              ] as const
+            ).map(([label, field]) => (
+              <label key={field} className="contents">
+                <span className="text-xs uppercase tracking-wide text-neutral-500">
+                  {label}
+                </span>
+                <input
+                  value={compose[field]}
+                  disabled={busy !== null}
+                  onChange={(e) => setCompose({ ...compose, [field]: e.target.value })}
+                  className="rounded border border-neutral-300 bg-white px-2 py-1"
+                />
+              </label>
+            ))}
+            <span className="self-start pt-1 text-xs uppercase tracking-wide text-neutral-500">
+              Body
+            </span>
+            <textarea
+              value={compose.body}
+              rows={7}
+              disabled={busy !== null}
+              onChange={(e) => setCompose({ ...compose, body: e.target.value })}
+              className="rounded border border-neutral-300 bg-white px-2 py-1"
+            />
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="text-xs text-neutral-500">
+              📎 PO {order.po_number}.pdf — rendered fresh on send
+            </span>
+            <span className="ml-auto flex items-center gap-2">
+              <button
+                disabled={busy !== null}
+                onClick={() => setCompose(null)}
+                className="text-neutral-600 hover:text-neutral-900"
+              >
+                Cancel
+              </button>
+              <button
+                disabled={busy !== null}
+                onClick={useMailApp}
+                className={btn}
+                title="Hand this email to your mail app instead (attachment via the share sheet where supported)"
+              >
+                {busy === "mailapp" ? "Rendering…" : "Use Mail app"}
+              </button>
+              <button
+                disabled={busy !== null || !compose.to.trim()}
+                onClick={send}
+                className={primaryBtn}
+                title={
+                  compose.to.trim()
+                    ? "Send now — the PO is marked sent automatically"
+                    : "Add a recipient first"
+                }
+              >
+                {busy === "send" ? "Sending…" : "Send"}
+              </button>
+            </span>
+          </div>
+        </div>
       )}
 
       {error && <p className="text-red-700">{error}</p>}

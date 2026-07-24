@@ -101,16 +101,22 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **Popup gotcha:** a window.open after `await` is silently blocked — open the
    window synchronously in the click handler (`openWindowNow`), navigate it to
    the blob later (`showBlob`, download fallback).
-   2026-07-23 (Mark: "attach programmatically is core"): email flow is now
-   **Web Share API first** — `sharePdf` puts the PDF INSIDE Mail's composer via
-   the share sheet (works Safari macOS/iOS/iPadOS; mailto can never attach,
-   RFC 6068). Recipient/subject can't be forced through the sheet → copy chip
-   for the rep email; AbortError = user cancelled, do nothing; unsupported/
-   expired-gesture falls back to download+mailto. NB Web Share needs a SECURE
-   context: localhost qualifies, plain http over LAN (iPad → Mac) does NOT —
-   the iPad flow needs an HTTPS deployment to get the share sheet. Fully
-   automated alternative (in-app compose + edge-function send via
-   Resend/SMTP) remains the fallback plan if the share sheet isn't enough. Verified by rendering Mark's
+   2026-07-23 (Mark, after seeing the share-sheet caveats: "roll our own
+   in-app solution"): email POs now use an **in-app compose card** on the
+   Process card — to/cc/subject/body prefilled from the templates, editable in
+   place, Send posts them + the client-rendered PDF (base64) to the
+   **`send-po-email` edge function** (`supabase/functions/send-po-email/`),
+   which sends via the Resend API and stamps status/sent_via/sent_notes
+   (`emailed to … · resend <id>`). The function authenticates with the
+   CALLER's JWT so all its queries and the status write flow through RLS, plus
+   an explicit purchaser+ check for a readable error. Setup checklist (Resend
+   account, domain DNS, RESEND_API_KEY secret, deploy, `po_email.from`
+   setting): **docs/po-email-setup.md — NOT yet done, Send errors clearly
+   until it is.** "Use Mail app" in the compose card is the escape hatch and
+   carries the EDITED fields: Web Share sheet where supported (`sharePdf` —
+   puts the PDF inside Mail's composer; needs a secure context, so plain http
+   over LAN to an iPad does NOT get it), else download + mailto draft (mailto
+   can never attach, RFC 6068). Verified by rendering Mark's
    two real 2026-07-23 drafts through the actual components in Node (esbuild
    bundle, read-only service_role fetch) and inspecting the PDFs.
    NOT built: automated email sending (edge function — revisit if the manual
