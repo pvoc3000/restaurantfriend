@@ -77,10 +77,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    since last PO" guard is a warning chip and a same-day PO defaults the vendor
    unchecked (re-run guard). Fixture-tested in the Docker harness (numbering,
    snapshots, override price, zeroed-skip, fractional pack_count, empty-day
-   no-op). **Migration 013 is WRITTEN but NOT YET APPLIED** — the button errors
-   with "Could not find the function … in the schema cache" until Mark runs it.
-   NOT built: **batch process / email PDF / shopping list** (needs the edge
-   function, deferred).
+   no-op). NOT built: **batch process / email PDF / shopping list** (needs the
+   edge function, deferred).
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -110,7 +108,8 @@ longer destroy a par. The view's output is unchanged (`par_qty` / `par_mode`
 still, just sourced differently), so no app code changed for par.
 Migration 012 retires `inventory_item_locations.default_vendor_item_id` — dead
 since 008 and read only by the cleanup checks that complained about it.
-**Migrations 001–012 are ALL APPLIED to the hosted DB** (verified 2026-07-23).
+**Migrations 001–013 are ALL APPLIED to the hosted DB** (013 verified
+2026-07-23 by the bogus-argument RPC probe).
 Mark runs them himself in the Supabase SQL editor — never assume a written
 migration has been applied, and never assume it hasn't: check. Cheap probes:
 `select settings->>'timezone' from orgs` for 007, and for a function, call it
