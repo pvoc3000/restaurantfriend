@@ -207,14 +207,21 @@ export function PurchaseOrderDetail({
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-xl font-semibold">{order.po_number}</h1>
+      {/* Type label first (house rule): the slide-over panel hides
+          breadcrumbs, so this line is the only cue to the record kind. */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
+          Purchase Order
+        </p>
+        <div className="flex flex-wrap items-baseline gap-3">
+          <h1 className="text-xl font-semibold">{order.po_number}</h1>
         <span className={`rounded px-1.5 py-0.5 text-xs ${PO_STATUS_CLASS[order.status]}`}>
           {PO_STATUS_LABEL[order.status]}
         </span>
         <span className="text-sm text-neutral-500">
           {vendorLink} · {locationCode}
         </span>
+        </div>
       </div>
 
       <dl className="grid max-w-2xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">

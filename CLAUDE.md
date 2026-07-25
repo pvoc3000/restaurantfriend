@@ -260,9 +260,11 @@ weekday column, and 003 then silently made it per-vendor-item.
   can't grow unbounded. An item reached from a vendor leads back to that vendor.
 - **Detail views open as a slide-over panel on in-app navigation** (Mark,
   2026-07-23): `(app)/@panel` intercepting routes float `/items/[id]`,
-  `/vendors/[id]` and `/vendor-items/[id]` over the current page
+  `/vendors/[id]`, `/vendor-items/[id]` and `/purchase-orders/[id]` over the
+  current page
   (`DetailPanel.tsx`; close = back). Each detail view leads with a type label
-  ("Inventory" / "Vendor" / "Vendor Item") — the panel hides breadcrumbs, so
+  ("Inventory" / "Vendor" / "Vendor Item" / "Purchase Order") — the panel
+  hides breadcrumbs, so
   it's the only cue to which kind of record you're looking at.
   It is a **slide-over, not a modal**: the header is `sticky z-50`, the panel
   `z-40` starting below it, so nav stays clickable (a click navigates and the
