@@ -7,8 +7,11 @@ Resolution is three-tier (2026-07-24):
 1. `locations.settings.email_provider` — a location with its own way to send
 2. `orgs.settings.email_provider` — an org with its own way to send
 3. **the app's own sender** — the Bill.com model: the platform sends on the
-   org's behalf; orgs supply nothing but addresses. This is the default and
-   what Donut Friend uses.
+   org's behalf; orgs supply nothing but addresses.
+
+**Donut Friend uses tier 2: an org-level `gmail` config** (2026-07-24 —
+Resend + InMotion DNS was abandoned mid-setup). The app-default section below
+is kept for future orgs.
 
 Until setup is done, Send fails with a clear error naming the missing piece;
 "Use Mail app" in the compose card remains the working path.

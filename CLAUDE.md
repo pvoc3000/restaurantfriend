@@ -120,9 +120,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    (`{"kind":"resend","api_key","from":"{org} <po@domain>"}`) — `{org}`
    becomes the org name and Reply-To derives from the org's own addresses
    (po_email.reply_to → cc → billing.email) so vendor replies reach the org.
-   Donut Friend uses the app default. A `gmail` kind (Gmail API over HTTPS,
-   OAuth refresh token; sent POs land in the mailbox's Sent folder) is fully
-   implemented for bring-your-own orgs/locations. The MIME builder
+   Donut Friend uses an **org-level `gmail` override** (Mark, 2026-07-24 —
+   Resend + InMotion DNS abandoned mid-setup, InMotion issues): Gmail API over
+   HTTPS, OAuth refresh token, sent POs land in info@'s Sent folder. The app
+   default (`EMAIL_CREDS_DEFAULT`, Resend) remains the platform story for
+   future orgs. The MIME builder
    (multipart/mixed, folded base64, chunked RFC 2047 subjects) is
    fixture-tested in Node via an esbuild slice — PDF round-trips
    byte-for-byte. The function authenticates with the CALLER's JWT so all its
