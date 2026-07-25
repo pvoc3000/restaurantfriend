@@ -129,10 +129,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    fixture-tested in Node via an esbuild slice — PDF round-trips
    byte-for-byte. The function authenticates with the CALLER's JWT so all its
    queries and the status write flow through RLS, plus an explicit purchaser+
-   check for a readable error. Setup incl. a no-domain sandbox try-it path
-   (Resend `onboarding@resend.dev` → deliverable only to your own Resend
-   account email): **docs/po-email-setup.md — NOT yet done, Send errors
-   clearly until it is.** The compose is a floating modal (Generate-POs overlay
+   check for a readable error. **LIVE and smoke-tested 2026-07-24**: function
+   deployed, Gmail OAuth done (Google Cloud project 765339329273 — the Gmail
+   API had to be enabled in THAT project, the error names the fix), org
+   config set, self-addressed send verified end-to-end (`emailed to
+   mark@donutfriend.com … · gmail 19f9…` in sent_notes). Setup guide:
+   docs/po-email-setup.md. The compose is a floating modal (Generate-POs overlay
    pattern) with a live preview: the PDF renders ONCE at open, shows in an
    `<object type="application/pdf">` pane (text fallback for browsers without
    an inline viewer — the Claude browser pane is one), and Send transmits that
