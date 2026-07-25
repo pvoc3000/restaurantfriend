@@ -174,6 +174,43 @@ export function PurchaseOrderList({
     }
   }
 
+  /**
+   * Delete the selection, PO lines cascading with their orders. Drafts are
+   * the expected case; anything already sent/received is order HISTORY (and
+   * feeds "last ordered"), so the confirm names those separately before
+   * anything irreversible happens.
+   */
+  async function batchDelete() {
+    const selected = orders.filter((po) => checked.has(po.id));
+    const nonDraft = selected.filter((po) => po.status !== "draft");
+    const message =
+      `Delete ${selected.length} purchase order${selected.length === 1 ? "" : "s"}` +
+      ` and ${selected.length === 1 ? "its" : "their"} lines?` +
+      (nonDraft.length > 0
+        ? `\n\nWARNING: ${nonDraft.length} of them ${
+            nonDraft.length === 1 ? "is" : "are"
+          } not a draft (${[...new Set(nonDraft.map((po) => po.status))].join(", ")}).` +
+          " Deleting sent or received orders erases order history permanently."
+        : "\n\nThis cannot be undone.");
+    if (!window.confirm(message)) return;
+
+    setBatchBusy("delete");
+    setBatchError(null);
+    try {
+      const { error } = await supabase
+        .from("purchase_orders")
+        .delete()
+        .in("id", [...checked]);
+      if (error) throw new Error(error.message);
+      setChecked(new Set());
+      router.refresh();
+    } catch (e) {
+      setBatchError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBatchBusy(null);
+    }
+  }
+
   /** Drafts only — sent_via comes from each vendor's order type. */
   async function batchMarkSent() {
     setBatchBusy("sent");
@@ -442,6 +479,14 @@ export function PurchaseOrderList({
               {batchBusy === "sent"
                 ? "Saving…"
                 : `Mark sent (${selectedDrafts.length})`}
+            </button>
+
+            <button
+              disabled={batchBusy !== null}
+              onClick={batchDelete}
+              className="rounded border border-red-300 bg-white px-3 py-1 text-red-700 hover:bg-red-50 disabled:opacity-50"
+            >
+              {batchBusy === "delete" ? "Deleting…" : "Delete"}
             </button>
 
             <button

@@ -45,6 +45,49 @@ export function PurchaseOrderDetail({
   const supabase = createClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [checkedLines, setCheckedLines] = useState<Set<string>>(new Set());
+
+  // Line selection (and deletion) is purchaser+ work — `processing` is
+  // already null for anyone below that role.
+  const canEditLines = processing !== null;
+
+  function toggleLine(id: string) {
+    setCheckedLines((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  /** Delete the selected lines. Received quantities are order history, so
+   *  the confirm names them before anything irreversible happens. */
+  async function deleteLines() {
+    const selected = lines.filter((l) => checkedLines.has(l.id));
+    const received = selected.filter((l) => l.qty_received !== null);
+    const message =
+      `Delete ${selected.length} line${selected.length === 1 ? "" : "s"} from ${order.po_number}?` +
+      (received.length > 0
+        ? `\n\nWARNING: ${received.length} of them ${
+            received.length === 1 ? "has" : "have"
+          } a received quantity — deleting erases that history permanently.`
+        : "\n\nThis cannot be undone.");
+    if (!window.confirm(message)) return;
+
+    setBusy(true);
+    setError(null);
+    const { error } = await supabase
+      .from("purchase_order_items")
+      .delete()
+      .in("id", [...checkedLines]);
+    setBusy(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setCheckedLines(new Set());
+    router.refresh();
+  }
 
   const ordered = orderedTotal(lines);
   const received = receivedTotal(lines);
@@ -96,6 +139,25 @@ export function PurchaseOrderDetail({
   }
 
   const columns: DataColumn<PoLine>[] = [
+    // Selection first, purchaser+ only — the delete bar appears once
+    // something is checked.
+    ...(canEditLines
+      ? [
+          {
+            key: "select",
+            label: "",
+            width: 32,
+            render: (l: PoLine) => (
+              <input
+                type="checkbox"
+                checked={checkedLines.has(l.id)}
+                onChange={() => toggleLine(l.id)}
+                aria-label={`select ${l.description ?? l.id}`}
+              />
+            ),
+          } as DataColumn<PoLine>,
+        ]
+      : []),
     {
       key: "item",
       label: "Item",
@@ -316,6 +378,27 @@ export function PurchaseOrderDetail({
               </li>
             ))}
           </ul>
+        </div>
+      )}
+
+      {checkedLines.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm">
+          <span>
+            {checkedLines.size} {checkedLines.size === 1 ? "line" : "lines"} selected
+          </span>
+          <button
+            disabled={busy}
+            onClick={deleteLines}
+            className="rounded border border-red-300 bg-white px-3 py-1 text-red-700 hover:bg-red-50 disabled:opacity-50"
+          >
+            {busy ? "Deleting…" : "Delete"}
+          </button>
+          <button
+            onClick={() => setCheckedLines(new Set())}
+            className="ml-auto text-neutral-600 hover:underline"
+          >
+            Clear
+          </button>
         </div>
       )}
 

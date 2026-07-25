@@ -97,7 +97,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    download + mailto draft, the human attaches + edits; online → open vendor
    URL; in_person → shopping list), delivery-date input with suggestion chip,
    "Mark as sent" (status + sent_via per SENT_VIA_FOR_ORDER_TYPE). PO list
-   selection bar: batch PO PDFs / shopping lists / mark-sent (drafts only).
+   selection bar: batch PO PDFs / shopping lists / mark-sent (drafts only) /
+   DELETE (confirm names non-drafts — sent/received POs are order history and
+   feed "last ordered"); PO detail lines get a purchaser+ selection column
+   with the same confirm-gated delete (received quantities named).
    **Popup gotcha:** a window.open after `await` is silently blocked — open the
    window synchronously in the click handler (`openWindowNow`), navigate it to
    the blob later (`showBlob`, download fallback).
