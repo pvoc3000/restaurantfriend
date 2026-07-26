@@ -14,15 +14,20 @@ import {
 import type { NavMemory } from "@/lib/navMemory";
 import { remember, useNavMemory } from "@/lib/navMemoryStore";
 
+// Both tiers are the same height and every tab fills it, so the two bands read
+// as one black block with the tabs set into it.
+const TIER_H = "h-11";
+const TAB = `${TIER_H} flex items-center whitespace-nowrap px-4 no-underline`;
+
 /**
  * The two-tier menu, inherited from DF Operations: sections on top, that
  * section's sub-sections beneath. See lib/nav.ts for the menu itself and
  * lib/navMemoryStore.ts for the "last sub-section per section" memory.
  *
- * Both tiers mark the active item in yellow (Mark, 2026-07-25). The design
- * system spends yellow on one thing per screen, so the tiers are told apart by
- * everything else instead: 12px vs 11px, a brighter inactive white on top, and
- * a hairline between the bands. Both bands are black — there is no grey chrome.
+ * The two bands are one black block — no rule between them (Mark, 2026-07-25).
+ * Active is yellow type on tier 1 and white type on tier 2, neither underlined:
+ * the yellow says which module you're in, and within it the white sub-tab is
+ * simply the brightest thing in the band.
  */
 export function AppNav({
   initialMemory,
@@ -50,55 +55,55 @@ export function AppNav({
   const currentSection = sectionSlug ? findSection(sectionSlug) : undefined;
 
   return (
-    <>
-      <div className="flex min-h-14 flex-wrap items-center gap-x-8 gap-y-2 px-12 py-2">
-        <span className="whitespace-nowrap text-[13px] font-bold uppercase tracking-[0.06em]">
-          Restaurant Friend
-        </span>
+    // Two COLUMNS, not two stacked rows: the wordmark is its own column and
+    // both tiers live in the second one, so tier 2 begins exactly where tier 1's
+    // first tab does. A grid would align them too, but this keeps each tier its
+    // own flex-wrap row — the masthead still has to wrap at iPad widths.
+    <div className="flex items-start gap-x-4 px-12">
+      <span
+        className={`${TIER_H} flex items-center whitespace-nowrap text-[13px] font-bold uppercase tracking-[0.06em]`}
+      >
+        Restaurant Friend
+      </span>
 
-        <nav
-          aria-label="Sections"
-          className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[12px] font-semibold uppercase tracking-[0.06em]"
-        >
-          {SECTIONS.map((section) => {
-            const active = section.slug === sectionSlug;
-            return (
-              <Link
-                key={section.slug}
-                href={sectionHref(section, memory)}
-                aria-current={active ? "page" : undefined}
-                // A bottom BORDER, not text-decoration: Safari places an
-                // underline-offset rule inconsistently against the header's own
-                // border and it can vanish. The transparent border on inactive
-                // items keeps every tab the same height.
-                className={`border-b-2 pb-0.5 whitespace-nowrap no-underline ${
-                  active
-                    ? "border-[var(--rf-yellow-500)] text-[var(--rf-yellow-500)]"
-                    : "border-transparent text-white/60 hover:text-white"
-                }`}
-              >
-                {sectionLabel(section, locationCode)}
-              </Link>
-            );
-          })}
-        </nav>
+      <div className="min-w-0 flex-1">
+        <div className={`flex flex-wrap items-center gap-y-1 ${TIER_H}`}>
+          <nav
+            aria-label="Sections"
+            className="flex flex-wrap items-center gap-y-1 text-[12px] font-semibold uppercase tracking-[0.06em]"
+          >
+            {SECTIONS.map((section) => {
+              const active = section.slug === sectionSlug;
+              return (
+                <Link
+                  key={section.slug}
+                  href={sectionHref(section, memory)}
+                  aria-current={active ? "page" : undefined}
+                  className={`${TAB} ${
+                    active ? "text-mark" : "text-white/60 hover:text-white"
+                  }`}
+                >
+                  {sectionLabel(section, locationCode)}
+                </Link>
+              );
+            })}
+          </nav>
 
-        {/* Tight gaps on purpose: six section tabs plus this cluster is what
-            fits on one row at 1280, and a wrap here pushes the whole masthead
-            to three bands. */}
-        <div className="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-2">
-          {utilities}
+          {/* Tight gaps on purpose: six section tabs plus this cluster is what
+              fits on one row at 1280, and a wrap here pushes the whole masthead
+              to three bands. */}
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-x-4 gap-y-2 pl-4">
+            {utilities}
+          </div>
         </div>
-      </div>
 
-      {/* Second tier. Home and Settings belong to no section, so the band —
-          and the rule above it — disappears there rather than sitting empty.
-          DetailPanel measures the header, so the height change is absorbed. */}
-      {currentSection && (
-        <div className="border-t border-white/15 px-12 py-2">
+        {/* Second tier. Home and Settings belong to no section, so it vanishes
+            there rather than sitting empty — DetailPanel measures the header,
+            so the height change is absorbed. */}
+        {currentSection && (
           <nav
             aria-label={`${sectionLabel(currentSection, locationCode)} sub-sections`}
-            className="flex flex-wrap items-center gap-x-6 gap-y-1 text-[11px] font-semibold uppercase tracking-[0.06em]"
+            className={`flex flex-wrap items-center gap-y-1 text-[11px] font-semibold uppercase tracking-[0.06em] ${TIER_H}`}
           >
             {currentSection.subs.map((sub) => {
               const active = sub.slug === subSlug;
@@ -107,10 +112,8 @@ export function AppNav({
                   key={sub.slug}
                   href={sub.href}
                   aria-current={active ? "page" : undefined}
-                  className={`border-b-2 pb-0.5 whitespace-nowrap no-underline ${
-                    active
-                      ? "border-[var(--rf-yellow-500)] text-[var(--rf-yellow-500)]"
-                      : "border-transparent text-white/50 hover:text-white"
+                  className={`${TAB} ${
+                    active ? "text-white" : "text-white/50 hover:text-white"
                   }`}
                 >
                   {sub.label}
@@ -118,8 +121,8 @@ export function AppNav({
               );
             })}
           </nav>
-        </div>
-      )}
-    </>
+        )}
+      </div>
+    </div>
   );
 }
