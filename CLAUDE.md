@@ -264,6 +264,22 @@ weekday column, and 003 then silently made it per-vendor-item.
   TOP edge** (black-on-black needs a separator, black-on-dimmed-page doesn't);
   the **ActionBar carries commands only** — a control that changes what a list
   SHOWS goes with that list's filters.
+- **The menu is two tiers, from FMP** (Mark, 2026-07-25 — overrides the design
+  system, which had killed the sub-nav): sections on top, that section's
+  sub-sections under it, both bands black, **both marking active in yellow**
+  (told apart by 12px vs 11px, white/60 vs white/50, and a `white/15` hairline).
+  Six sections — the first is labelled with the ACTIVE LOCATION CODE, not
+  "Location". Only Purchasing is built (Vendors · Inventory · Order Guide ·
+  Purchase Orders · Cleanup, Mark's order); everything else lands on
+  `/soon/<section>/<sub>`, one shared placeholder. **The menu is
+  `web/src/lib/nav.ts`** — a screen ships by getting a real `href` there and
+  nothing else moves. Home and Settings are utility ICONS, not tabs, so they
+  light no tab and the second band hides entirely on those routes.
+  Per-section memory (first visit → first sub, later → last sub used) lives in
+  the session cookie `rf.nav` (`lib/navMemory.ts`), **seeded by the server and
+  then owned by the client** (`lib/navMemoryStore.ts`): a server layout does not
+  re-render on soft navigation, so a client-written cookie can never be read
+  back mid-session and the tab hrefs would freeze. `signOut` deletes it.
 - **The Active toggle is the FIRST column** on every catalog table (Mark,
   2026-07-23) — vendors list, vendor/item per-location config, vendor items.
   "Stock here" shares that slot where a row doesn't exist yet.

@@ -18,11 +18,13 @@ export function LocationSwitcher({
   const [isPending, startTransition] = useTransition();
 
   return (
-    <label className="flex items-center gap-3">
-      <span className="text-[12px] uppercase tracking-[0.12em] text-white/55">
-        Location
-      </span>
+    // No visible caption: the first section tab IS the active location's code,
+    // so a "Location" label beside it repeated the word and cost the masthead
+    // an extra wrapped row.
+    <label className="flex items-center">
       <select
+        aria-label="Active location"
+        title="Active location"
         className="h-7 border border-white/40 bg-transparent px-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-white disabled:opacity-35 [&>option]:text-ink"
         value={activeLocationId ?? ""}
         disabled={isPending || locations.length === 0}
@@ -33,9 +35,12 @@ export function LocationSwitcher({
           });
         }}
       >
+        {/* Code only. The names run to "DONUT FRIEND 01 HIGHLAND PARK" and a
+            select is as wide as its widest option, which cost the masthead a
+            whole wrapped row — and the codes are what staff say out loud. */}
         {locations.map((l) => (
-          <option key={l.id} value={l.id}>
-            {l.code} — {l.name}
+          <option key={l.id} value={l.id} title={l.name}>
+            {l.code}
           </option>
         ))}
       </select>
