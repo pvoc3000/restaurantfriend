@@ -10,27 +10,29 @@ export function AppHeader({ session }: { session: AppSession }) {
     // full-viewport backdrop over the header made every nav link unclickable.
     // Sticky is load-bearing, not decorative: the panel is fixed and starts
     // below the header, so a header that scrolled away would leave a dead strip.
-    <header className="sticky top-0 z-50 border-b border-neutral-200 bg-neutral-50">
-      <div className="flex flex-wrap items-center gap-4 px-4 py-2">
-        <span className="font-semibold tracking-tight">restaurantfriend</span>
+    <header className="sticky top-0 z-50 bg-ink text-white">
+      <div className="flex min-h-16 flex-wrap items-center gap-12 px-12 py-3">
+        <span className="whitespace-nowrap text-[15px] font-bold uppercase tracking-[0.06em]">
+          Restaurant Friend
+        </span>
 
         <NavLinks />
 
-        <div className="ml-auto flex items-center gap-4">
+        <div className="ml-auto flex items-center gap-8">
           <LocationSwitcher
             locations={session.locations}
             activeLocationId={session.activeLocation?.id ?? null}
           />
 
-          <span className="text-sm text-neutral-600">
+          <span className="whitespace-nowrap text-[12px] uppercase tracking-[0.12em] text-white/55">
             {session.membership.display_name ?? session.email}
-            <span className="ml-1 text-neutral-400">({session.membership.role})</span>
+            <span> · {session.membership.role}</span>
           </span>
 
           <form action={signOut}>
             <button
               type="submit"
-              className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm hover:bg-neutral-100"
+              className="h-7 border border-white/40 bg-transparent px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-white hover:bg-white hover:text-ink"
             >
               Sign out
             </button>

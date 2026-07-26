@@ -14,7 +14,7 @@ export default async function ItemPanel({
   const { id } = await params;
   const rawParams = await searchParams;
   return (
-    <DetailPanel>
+    <DetailPanel typeLabel="Inventory">
       <ItemDetail id={id} rawParams={rawParams} inPanel />
     </DetailPanel>
   );

@@ -21,7 +21,7 @@ export function NavLinks() {
   const pathname = usePathname();
 
   return (
-    <nav className="flex items-center gap-3 text-sm">
+    <nav className="flex items-center gap-6 text-[12px] font-semibold uppercase tracking-[0.06em]">
       {NAV.map((item) => {
         const active =
           item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
@@ -34,10 +34,10 @@ export function NavLinks() {
             // underline-offset rule inconsistently against the header's own
             // border and it can vanish. The transparent border on inactive
             // links keeps every item the same height.
-            className={`border-b-2 pb-0.5 ${
+            className={`border-b-2 pb-0.5 no-underline ${
               active
-                ? "border-neutral-900 font-semibold text-neutral-900"
-                : "border-transparent text-neutral-600 hover:border-neutral-300 hover:text-neutral-900"
+                ? "border-[var(--rf-yellow-500)] text-[var(--rf-yellow-500)]"
+                : "border-transparent text-white/70 hover:text-white"
             }`}
           >
             {item.label}

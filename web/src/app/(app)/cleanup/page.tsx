@@ -76,7 +76,7 @@ export default async function CleanupPage({
         .range(from, from + 999);
       if (error) {
         return (
-          <p className="text-sm text-red-700">
+          <p className="text-sm text-accent">
             Could not load the cleanup queue: {error.message}
           </p>
         );
@@ -104,7 +104,7 @@ export default async function CleanupPage({
         .range(from, from + 999);
       if (error) {
         return (
-          <p className="text-sm text-red-700">
+          <p className="text-sm text-accent">
             Could not load favorites for the queue: {error.message}
           </p>
         );

@@ -36,11 +36,11 @@ export function ColumnHeader({
     <th
       // p-0 on the cell, padding on the inner div, so the grip can sit exactly
       // on the column boundary instead of inside the padding.
-      className="p-0 font-medium"
+      className="p-0 text-[12px] font-normal uppercase tracking-[0.12em]"
       aria-sort={sorted ? (sorted === "asc" ? "ascending" : "descending") : "none"}
     >
       <div
-        className={`relative flex items-center px-2 py-1 ${
+        className={`relative flex items-center px-4 py-3 ${
           align === "right" ? "justify-end" : ""
         }`}
       >
@@ -50,18 +50,20 @@ export function ColumnHeader({
               type="button"
               onClick={onSort}
               title={`Sort by ${label.toLowerCase()}`}
-              className={`inline-flex max-w-full items-center gap-1 rounded px-1 hover:bg-neutral-100 ${
-                sorted ? "font-semibold text-neutral-900" : ""
+              className={`inline-flex max-w-full items-center gap-1 px-1 uppercase tracking-[0.12em] hover:bg-neutral-100 ${
+                sorted ? "font-semibold text-ink" : "text-subtle"
               }`}
             >
               <span className="truncate">{label}</span>
               {/* Reserve the arrow's width so headers don't jump when sort moves. */}
-              <span className={`w-3 shrink-0 text-xs ${sorted ? "" : "text-neutral-300"}`}>
+              <span
+                className={`w-3 shrink-0 text-[8px] ${sorted ? "" : "text-neutral-300"}`}
+              >
                 {arrow || "↕"}
               </span>
             </button>
           ) : (
-            <span className="truncate px-1">{label}</span>
+            <span className="truncate px-1 text-subtle">{label}</span>
           ))}
 
         {/* Resize grip: a visible divider on every column boundary so it's
@@ -76,7 +78,7 @@ export function ColumnHeader({
           title="Drag to resize · double-click to reset this column"
           className="group absolute inset-y-0 right-0 z-10 flex w-3 translate-x-1/2 cursor-col-resize touch-none select-none justify-center"
         >
-          <span className="w-px self-stretch bg-neutral-300 transition-colors group-hover:w-0.5 group-hover:bg-blue-500" />
+          <span className="w-px self-stretch bg-neutral-200 transition-colors group-hover:w-0.5 group-hover:bg-ink" />
         </span>
       </div>
     </th>

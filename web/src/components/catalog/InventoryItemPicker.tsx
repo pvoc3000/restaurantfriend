@@ -89,14 +89,14 @@ export function InventoryItemPicker({
           onClick={() => setOpen((v) => !v)}
           disabled={busy}
           title="Link this vendor item to a different inventory item"
-          className="rounded border border-neutral-300 px-1.5 py-0.5 text-xs text-neutral-600 hover:bg-neutral-100 disabled:opacity-40"
+          className="border border-ink px-1.5 py-0.5 text-xs text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
         >
           {open ? "Cancel" : "Change"}
         </button>
-        {busy && <span className="text-xs text-neutral-500">saving…</span>}
+        {busy && <span className="text-xs text-subtle">saving…</span>}
       </span>
 
-      {error && <span className="text-xs text-red-700">{error}</span>}
+      {error && <span className="text-xs text-accent">{error}</span>}
 
       {open && (
         <span className="flex flex-col gap-1">
@@ -105,26 +105,26 @@ export function InventoryItemPicker({
             value={term}
             onChange={(e) => setTerm(e.target.value)}
             placeholder="Search inventory items by name…"
-            className="w-80 rounded border border-neutral-300 px-2 py-1 text-sm"
+            className="h-9 w-80 border border-ink px-3 text-sm outline-none focus:border-2"
           />
           {canSearch && results.length === 0 && (
-            <span className="text-xs text-neutral-500">No items match.</span>
+            <span className="text-xs text-subtle">No items match.</span>
           )}
           {canSearch && results.length > 0 && (
-            <ul className="max-h-64 w-80 overflow-auto rounded border border-neutral-200">
+            <ul className="max-h-64 w-80 overflow-auto border border-ink">
               {results.map((it) => {
                 const isCurrent = it.id === currentItemId;
                 return (
                   <li
                     key={it.id}
-                    className="flex items-center gap-2 border-b border-neutral-100 px-2 py-1 text-sm last:border-b-0"
+                    className="flex items-center gap-2 border-b border-hairline px-2 py-1 text-sm last:border-b-0"
                   >
                     <span className="min-w-0 flex-1">
                       <span className="block truncate">{it.name}</span>
-                      <span className="block text-xs text-neutral-500">
+                      <span className="block text-xs text-subtle">
                         {it.category ?? "no category"} · {it.base_unit}
                         {!it.is_active && (
-                          <span className="ml-1 rounded bg-neutral-200 px-1 text-neutral-600">
+                          <span className="ml-1 border border-neutral-300 bg-neutral-100 px-1 text-muted">
                             inactive
                           </span>
                         )}
@@ -134,7 +134,7 @@ export function InventoryItemPicker({
                       type="button"
                       disabled={busy || isCurrent}
                       onClick={() => link(it)}
-                      className="shrink-0 rounded border border-neutral-300 px-2 py-0.5 text-xs hover:bg-neutral-100 disabled:opacity-40"
+                      className="shrink-0 border border-ink px-2 py-0.5 text-xs transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
                     >
                       {isCurrent ? "current" : "Link"}
                     </button>

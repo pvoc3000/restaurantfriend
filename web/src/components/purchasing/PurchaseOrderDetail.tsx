@@ -17,6 +17,7 @@ import {
 } from "@/lib/purchaseOrders";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue } from "@/components/catalog/InlineValue";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 
 /**
@@ -146,13 +147,13 @@ export function PurchaseOrderDetail({
           {
             key: "select",
             label: "",
-            width: 32,
+            width: 40,
             render: (l: PoLine) => (
-              <input
-                type="checkbox"
+              <Checkbox
                 checked={checkedLines.has(l.id)}
                 onChange={() => toggleLine(l.id)}
-                aria-label={`select ${l.description ?? l.id}`}
+                label={`select ${l.description ?? l.id}`}
+                size={18}
               />
             ),
           } as DataColumn<PoLine>,
@@ -161,24 +162,24 @@ export function PurchaseOrderDetail({
     {
       key: "item",
       label: "Item",
-      width: 200,
+      width: 240,
       sortValue: (l) => l.vendor_items?.inventory_items?.name ?? l.description,
       render: (l) => l.vendor_items?.inventory_items?.name ?? "—",
     },
     {
       key: "product_id",
       label: "Product ID",
-      width: 100,
+      width: 120,
       sortValue: (l) => l.product_id,
-      render: (l) => <span className="text-neutral-600">{l.product_id ?? "—"}</span>,
+      render: (l) => <span className="text-muted">{l.product_id ?? "—"}</span>,
     },
     {
       key: "description",
       label: "Ordered as",
-      width: 240,
+      width: 290,
       sortValue: (l) => l.description,
       render: (l) => (
-        <span className="text-neutral-600">
+        <span className="text-muted">
           {[l.brand, l.description].filter(Boolean).join(" · ") || "—"}
         </span>
       ),
@@ -186,22 +187,22 @@ export function PurchaseOrderDetail({
     {
       key: "package_desc",
       label: "Pack",
-      width: 70,
+      width: 85,
       sortValue: (l) => l.package_desc,
-      render: (l) => <span className="text-neutral-600">{l.package_desc ?? "—"}</span>,
+      render: (l) => <span className="text-muted">{l.package_desc ?? "—"}</span>,
     },
     {
       key: "qty_ordered",
       label: "Ordered",
-      width: 80,
+      width: 95,
       align: "right",
       sortValue: (l) => Number(l.qty_ordered),
-      render: (l) => <span className="text-neutral-700">{Number(l.qty_ordered)}</span>,
+      render: (l) => <span className="text-body">{Number(l.qty_ordered)}</span>,
     },
     {
       key: "qty_received",
       label: "Received",
-      width: 90,
+      width: 110,
       align: "right",
       sortValue: (l) => (l.qty_received === null ? null : Number(l.qty_received)),
       render: (l) => (
@@ -219,17 +220,17 @@ export function PurchaseOrderDetail({
     {
       key: "unit_price",
       label: "Unit price",
-      width: 100,
+      width: 120,
       align: "right",
       sortValue: (l) => (l.unit_price === null ? null : Number(l.unit_price)),
       render: (l) => {
         const catalog = l.vendor_items?.price;
         return (
-          <span className="text-neutral-700">
+          <span className="text-body">
             {money(l.unit_price)}
             {priceDiffers(l) && (
               <span
-                className="ml-1 text-xs text-amber-700"
+                className="ml-1 text-xs font-semibold text-accent"
                 title={`Catalog price is ${money(catalog ?? null)}`}
               >
                 ≠
@@ -242,11 +243,11 @@ export function PurchaseOrderDetail({
     {
       key: "line_total",
       label: "Line total",
-      width: 100,
+      width: 120,
       align: "right",
       sortValue: (l) => Number(l.qty_ordered ?? 0) * Number(l.unit_price ?? 0),
       render: (l) => (
-        <span className="text-neutral-600">
+        <span className="text-muted">
           {money(Number(l.qty_ordered ?? 0) * Number(l.unit_price ?? 0))}
         </span>
       ),
@@ -254,7 +255,7 @@ export function PurchaseOrderDetail({
     {
       key: "discrepancy_note",
       label: "Note",
-      width: 160,
+      width: 190,
       sortValue: (l) => l.discrepancy_note,
       render: (l) => (
         <InlineValue
@@ -268,32 +269,65 @@ export function PurchaseOrderDetail({
   ];
 
   return (
-    <div className="space-y-5">
-      {/* Type label first (house rule): the slide-over panel hides
-          breadcrumbs, so this line is the only cue to the record kind. */}
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-          Purchase Order
-        </p>
-        <div className="flex flex-wrap items-baseline gap-3">
-          <h1 className="text-xl font-semibold">{order.po_number}</h1>
-        <span className={`rounded px-1.5 py-0.5 text-xs ${PO_STATUS_CLASS[order.status]}`}>
-          {PO_STATUS_LABEL[order.status]}
-        </span>
-        <span className="text-sm text-neutral-500">
-          {vendorLink} · {locationCode}
-        </span>
+    <div className="space-y-6">
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+        <div>
+          <div className="flex flex-wrap items-center gap-4">
+            <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+              {order.po_number}
+            </h1>
+            <span
+              className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${PO_STATUS_CLASS[order.status]}`}
+            >
+              {PO_STATUS_LABEL[order.status]}
+            </span>
+          </div>
+          <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+            {vendorLink} · {locationCode}
+          </p>
+        </div>
+        {/* Ordered / Received as two Statistics: the header answers "how big
+            is this order and did it all arrive" before anything else. */}
+        <div className="ml-auto flex items-start gap-8 text-right">
+          <div>
+            <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+              Ordered total
+            </div>
+            <div className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
+              {money(ordered)}
+            </div>
+          </div>
+          <div>
+            <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+              Received total
+            </div>
+            <div
+              className={`text-[22px] font-bold tabular-nums tracking-[-0.01em] ${
+                received < ordered - 0.005 ? "text-accent" : ""
+              }`}
+            >
+              {money(received)}
+            </div>
+          </div>
         </div>
       </div>
 
       <dl className="grid max-w-2xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-neutral-500">Ordered</dt>
+        <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+          Ordered
+        </dt>
         <dd className="tabular-nums">{order.order_date}</dd>
-        <dt className="text-neutral-500">Delivery</dt>
+        <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+          Delivery
+        </dt>
         <dd className="tabular-nums">{order.delivery_date ?? "—"}</dd>
-        <dt className="text-neutral-500">Sent via</dt>
+        <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+          Sent via
+        </dt>
         <dd>{order.sent_via ?? "—"}</dd>
-        <dt className="text-neutral-500">Notes</dt>
+        <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+          Notes
+        </dt>
         <dd>
           <InlineValue
             table="purchase_orders"
@@ -305,41 +339,30 @@ export function PurchaseOrderDetail({
         </dd>
       </dl>
 
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      {error && <p className="text-sm text-accent">{error}</p>}
 
       {processing && <ProcessPo order={order} context={processing} />}
 
-      <div className="flex flex-wrap items-center gap-4 rounded border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm">
-        <span>
-          Ordered <span className="font-medium tabular-nums">{money(ordered)}</span>
-        </span>
-        <span>
-          Received{" "}
-          <span
-            className={`font-medium tabular-nums ${
-              received < ordered - 0.005 ? "text-amber-700" : ""
-            }`}
-          >
-            {money(received)}
-          </span>
-        </span>
-        <span className="text-neutral-500">{lines.length} lines</span>
+      <div className="flex flex-wrap items-center gap-4 border border-ink px-4 py-3 text-sm">
+        <span className="text-subtle">{lines.length} lines</span>
 
         <button
           disabled={busy}
           onClick={receiveAll}
-          className="ml-auto rounded border border-neutral-300 bg-white px-3 py-1 hover:bg-neutral-100 disabled:opacity-50"
+          className="ml-auto h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
         >
           Receive all as ordered
         </button>
 
-        <label className="flex items-center gap-1 text-neutral-600">
-          Status
+        <label className="flex items-center gap-2">
+          <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+            Status
+          </span>
           <select
             value={order.status}
             disabled={busy}
             onChange={(e) => setStatus(e.target.value as PoStatus)}
-            className="rounded border border-neutral-300 bg-white px-2 py-1"
+            className="h-9 border border-ink bg-white px-2"
           >
             {PO_STATUS_ORDER.map((s) => (
               <option key={s} value={s}>
@@ -351,8 +374,8 @@ export function PurchaseOrderDetail({
       </div>
 
       {differing.length > 0 && (
-        <div className="space-y-2 rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm">
-          <p className="text-amber-800">
+        <div className="space-y-2 border border-ink bg-mark-fill px-4 py-3 text-sm">
+          <p className="text-ink">
             {differing.length}{" "}
             {differing.length === 1 ? "line's price differs" : "lines' prices differ"} from
             the catalog. Adopting sets the catalog price; the order keeps what it
@@ -361,17 +384,17 @@ export function PurchaseOrderDetail({
           <ul className="space-y-1">
             {differing.map((l) => (
               <li key={l.id} className="flex flex-wrap items-center gap-2">
-                <span className="text-neutral-700">
+                <span className="text-body">
                   {l.vendor_items?.inventory_items?.name ?? l.description}
                 </span>
-                <span className="tabular-nums text-neutral-600">
+                <span className="tabular-nums text-muted">
                   invoice {money(l.unit_price)} · catalog{" "}
                   {money(l.vendor_items?.price ?? null)}
                 </span>
                 <button
                   disabled={busy}
                   onClick={() => adoptPrice(l)}
-                  className="rounded border border-amber-300 bg-white px-2 py-0.5 text-xs text-amber-800 hover:bg-amber-100 disabled:opacity-50"
+                  className="border border-accent bg-white px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
                 >
                   Update catalog to {money(l.unit_price)}
                 </button>
@@ -382,20 +405,20 @@ export function PurchaseOrderDetail({
       )}
 
       {checkedLines.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm">
+        <div className="flex flex-wrap items-center gap-4 border border-ink px-4 py-3 text-sm">
           <span>
             {checkedLines.size} {checkedLines.size === 1 ? "line" : "lines"} selected
           </span>
           <button
             disabled={busy}
             onClick={deleteLines}
-            className="rounded border border-red-300 bg-white px-3 py-1 text-red-700 hover:bg-red-50 disabled:opacity-50"
+            className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
           >
             {busy ? "Deleting…" : "Delete"}
           </button>
           <button
             onClick={() => setCheckedLines(new Set())}
-            className="ml-auto text-neutral-600 hover:underline"
+            className="ml-auto text-muted underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
           >
             Clear
           </button>
@@ -410,10 +433,10 @@ export function PurchaseOrderDetail({
         defaultSort={{ key: "item" }}
         rowClassName={(l) =>
           l.qty_received !== null && Number(l.qty_received) < Number(l.qty_ordered)
-            ? "bg-amber-50/50"
+            ? "bg-[var(--rf-yellow-50)]"
             : ""
         }
-        empty={<p className="text-sm text-neutral-600">This order has no lines.</p>}
+        empty={<p className="text-sm text-muted">This order has no lines.</p>}
       />
     </div>
   );

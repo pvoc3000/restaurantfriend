@@ -1,0 +1,33 @@
+/* Restaurant Friend spacing — an 8px grid, and a lot more of it than the
+   original had. DF Operations packed rows to 24px and ran columns edge to
+   edge; the information was right and the breathing was wrong. Same
+   information, twice the air: rows are 44px+, sections are separated by 48px
+   of nothing, and the page keeps a 48px gutter. */
+:root {
+  --rf-space-1: 0.25rem;   /* 4px  — glyph gaps */
+  --rf-space-2: 0.5rem;    /* 8px  — inside a control */
+  --rf-space-3: 0.75rem;   /* 12px — cell padding y */
+  --rf-space-4: 1rem;      /* 16px — cell padding x, control gap */
+  --rf-space-5: 1.5rem;    /* 24px — group gap */
+  --rf-space-6: 2rem;      /* 32px — band gutter, card padding */
+  --rf-space-7: 3rem;      /* 48px — page gutter, space between sections */
+  --rf-space-8: 4rem;      /* 64px — space above a new shop section */
+  --rf-space-9: 6rem;      /* 96px — top of a form layout */
+
+  /* Control geometry — touch-sized, because this is used on an iPad while
+     holding something else. */
+  --rf-control-h-sm: 1.75rem;  /* 28px — checkbox, small toggle */
+  --rf-control-h: 2.25rem;     /* 36px — buttons, inputs, steppers */
+  --rf-control-h-lg: 2.75rem;  /* 44px — the order box, primary actions */
+  --rf-control-pad-x: var(--rf-space-4);
+  --rf-control-pad-y: var(--rf-space-2);
+  --rf-button-pad-x: var(--rf-space-5);
+  --rf-button-pad-y: var(--rf-space-2);
+
+  --rf-row-pad-y: var(--rf-space-3);
+  --rf-row-pad-x: var(--rf-space-4);
+
+  --rf-field-w-qty: 5rem;        /* the order box */
+  --rf-field-w-search: 22rem;
+  --rf-field-w-field: 20rem;     /* a form field */
+}

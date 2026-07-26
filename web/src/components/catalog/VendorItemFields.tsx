@@ -43,23 +43,18 @@ export function VendorItemFields({
 
   return (
     <div className="space-y-3">
-      {/* Says which KIND of record this is — the panel hides breadcrumbs, so
-          without it a vendor item and an inventory item look alike. */}
-      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-        Vendor Item
-      </p>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           <InlineValue
             table="vendor_items"
             id={vi.id}
             column="description"
             value={vi.description}
             placeholder="No description"
-            className="text-xl font-semibold"
+            className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]"
           />
         </h1>
-        <span className="flex items-center gap-2 text-sm text-neutral-600">
+        <span className="flex items-center gap-2 text-sm text-muted">
           <ActiveToggle
             table="vendor_items"
             id={vi.id}
@@ -71,36 +66,36 @@ export function VendorItemFields({
       </div>
 
       <dl className="grid max-w-2xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="py-0.5 text-neutral-500">Vendor</dt>
+        <dt className="py-0.5 text-subtle">Vendor</dt>
         <dd className="py-0.5">
           {vi.vendors ? (
             <Link
               href={withFrom(`/vendors/${vi.vendors.id}`, here)}
-              className="text-blue-700 hover:underline"
+              className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
             >
               {vi.vendors.name}
             </Link>
           ) : (
-            <span className="text-neutral-400">none</span>
+            <span className="text-faint">none</span>
           )}
           {vi.vendors && !vi.vendors.is_active && (
-            <span className="ml-1 rounded bg-neutral-200 px-1 text-xs text-neutral-600">
+            <span className="ml-1 border border-neutral-300 bg-neutral-100 px-1 text-xs text-muted">
               vendor inactive
             </span>
           )}
         </dd>
 
-        <dt className="py-0.5 text-neutral-500">Inventory item</dt>
+        <dt className="py-0.5 text-subtle">Inventory item</dt>
         <dd className="flex flex-wrap items-start gap-2 py-0.5">
           {vi.inventory_items ? (
             <Link
               href={withFrom(`/items/${vi.inventory_items.id}`, here)}
-              className="text-blue-700 hover:underline"
+              className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
             >
               {vi.inventory_items.name}
             </Link>
           ) : (
-            <span className="text-amber-700">unlinked</span>
+            <span className="text-accent">unlinked</span>
           )}
           <InventoryItemPicker
             vendorItemId={vi.id}
@@ -108,7 +103,7 @@ export function VendorItemFields({
           />
         </dd>
 
-        <dt className="py-0.5 text-neutral-500">Brand</dt>
+        <dt className="py-0.5 text-subtle">Brand</dt>
         <dd>
           <InlineValue
             table="vendor_items"
@@ -119,7 +114,7 @@ export function VendorItemFields({
           />
         </dd>
 
-        <dt className="py-0.5 text-neutral-500">Product ID</dt>
+        <dt className="py-0.5 text-subtle">Product ID</dt>
         <dd>
           <InlineValue
             table="vendor_items"
@@ -130,7 +125,7 @@ export function VendorItemFields({
           />
         </dd>
 
-        <dt className="py-0.5 text-neutral-500">Pack</dt>
+        <dt className="py-0.5 text-subtle">Pack</dt>
         <dd>
           <InlineValue
             table="vendor_items"
@@ -145,7 +140,7 @@ export function VendorItemFields({
             Three fields rather than one so a packing slip can be checked
             against it; `Content` below stays the base-unit total the ordering
             math divides by. */}
-        <dt className="py-0.5 text-neutral-500">Pack of</dt>
+        <dt className="py-0.5 text-subtle">Pack of</dt>
         <dd className="flex items-center gap-1">
           <InlineValue
             table="vendor_items"
@@ -155,7 +150,7 @@ export function VendorItemFields({
             kind="number"
             placeholder="1"
           />
-          <span className="text-neutral-400">×</span>
+          <span className="text-faint">×</span>
           <InlineValue
             table="vendor_items"
             id={vi.id}
@@ -173,7 +168,7 @@ export function VendorItemFields({
           />
         </dd>
 
-        <dt className="py-0.5 text-neutral-500">Content ({unit})</dt>
+        <dt className="py-0.5 text-subtle">Content ({unit})</dt>
         <dd>
           <InlineValue
             table="vendor_items"
@@ -185,7 +180,7 @@ export function VendorItemFields({
           />
         </dd>
 
-        <dt className="py-0.5 text-neutral-500">Price</dt>
+        <dt className="py-0.5 text-subtle">Price</dt>
         <dd>
           <InlineValue
             table="vendor_items"
@@ -197,7 +192,7 @@ export function VendorItemFields({
           />
         </dd>
 
-        <dt className="py-0.5 text-neutral-500">Notes</dt>
+        <dt className="py-0.5 text-subtle">Notes</dt>
         <dd>
           <InlineValue
             table="vendor_items"
@@ -209,7 +204,7 @@ export function VendorItemFields({
         </dd>
       </dl>
 
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-subtle">
         Content is how many {unit} one package holds — it converts a par into
         packages to order. Price is the vendor&apos;s global price; a location
         below may override it.

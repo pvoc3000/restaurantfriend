@@ -58,7 +58,7 @@ export function VendorLocationsTable({
     {
       key: "is_active",
       label: "Active",
-      width: 80,
+      width: 95,
       sortValue: (r) => (r.is_active ? 0 : 1),
       render: (r) => (
         <ActiveToggle
@@ -73,13 +73,13 @@ export function VendorLocationsTable({
       key: "location",
       label: "Location",
       // Wide enough for the code, the "here" badge and the rep summary.
-      width: 250,
+      width: 300,
       sortValue: (r) => codeById[r.location_id] ?? null,
       render: (r) => (
         <>
           {codeById[r.location_id] ?? "—"}
           {r.location_id === activeLocationId && (
-            <span className="ml-1.5 rounded bg-blue-100 px-1 text-xs text-blue-800">
+            <span className="ml-1.5 border border-ink px-1 text-[10px] uppercase tracking-[0.12em] text-ink">
               here
             </span>
           )}
@@ -89,7 +89,7 @@ export function VendorLocationsTable({
     {
       key: "account",
       label: "Account",
-      width: 140,
+      width: 170,
       sortValue: (r) => r.account_number,
       render: (r) => (
         <InlineValue
@@ -103,7 +103,7 @@ export function VendorLocationsTable({
     {
       key: "minimum",
       label: "Minimum",
-      width: 115,
+      width: 140,
       align: "right",
       sortValue: (r) => (r.minimum_order === null ? null : Number(r.minimum_order)),
       render: (r) => (
@@ -121,7 +121,7 @@ export function VendorLocationsTable({
     {
       key: "order_days",
       label: "Order days",
-      width: 235,
+      width: 280,
       sortValue: (r) => daysKey(r.order_days),
       render: (r) => (
         <WeekdayPicker
@@ -136,7 +136,7 @@ export function VendorLocationsTable({
     {
       key: "delivery_days",
       label: "Delivery days",
-      width: 235,
+      width: 280,
       sortValue: (r) => daysKey(r.delivery_days),
       render: (r) => (
         <WeekdayPicker
@@ -161,7 +161,7 @@ export function VendorLocationsTable({
         summary: repSummary,
         render: (r) => (
           <dl className="grid max-w-md grid-cols-[6rem_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="py-0.5 text-neutral-500">Sales rep</dt>
+            <dt className="py-0.5 text-subtle">Sales rep</dt>
             <dd>
               <InlineValue
                 table="vendor_locations"
@@ -171,7 +171,7 @@ export function VendorLocationsTable({
                 placeholder="none"
               />
             </dd>
-            <dt className="py-0.5 text-neutral-500">Phone</dt>
+            <dt className="py-0.5 text-subtle">Phone</dt>
             <dd>
               <InlineValue
                 table="vendor_locations"
@@ -181,7 +181,7 @@ export function VendorLocationsTable({
                 placeholder="none"
               />
             </dd>
-            <dt className="py-0.5 text-neutral-500">Email</dt>
+            <dt className="py-0.5 text-subtle">Email</dt>
             <dd>
               <InlineValue
                 table="vendor_locations"
@@ -195,7 +195,7 @@ export function VendorLocationsTable({
         ),
       }}
       empty={
-        <p className="text-sm text-neutral-600">Not configured at any location yet.</p>
+        <p className="text-sm text-muted">Not configured at any location yet.</p>
       }
     />
   );

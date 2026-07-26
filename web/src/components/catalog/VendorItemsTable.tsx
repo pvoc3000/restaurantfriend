@@ -124,7 +124,7 @@ export function VendorItemsTable({
     {
       key: "is_active",
       label: "Active",
-      width: 80,
+      width: 95,
       sortValue: (vi) => (vi.is_active ? 0 : 1),
       render: (vi) => (
         <ActiveToggle
@@ -140,14 +140,14 @@ export function VendorItemsTable({
           {
             key: "vendor",
             label: "Vendor",
-            width: 150,
+            width: 180,
             sortValue: (vi: VendorItemWithItem) => vi.vendors?.name ?? null,
             render: (vi: VendorItemWithItem) => (
               <>
                 {vi.vendors ? (
                   <Link
                     href={link(`/vendors/${vi.vendors.id}`)}
-                    className="text-blue-700 hover:underline"
+                    className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
                   >
                     {vi.vendors.name}
                   </Link>
@@ -155,7 +155,7 @@ export function VendorItemsTable({
                   "—"
                 )}
                 {vi.vendors && !vi.vendors.is_active && (
-                  <span className="ml-1 rounded bg-neutral-200 px-1 text-xs text-neutral-600">
+                  <span className="ml-1 border border-neutral-300 bg-neutral-100 px-1 text-xs text-muted">
                     vendor inactive
                   </span>
                 )}
@@ -169,18 +169,18 @@ export function VendorItemsTable({
           {
             key: "item",
             label: "Item",
-            width: 170,
+            width: 205,
             sortValue: (vi: VendorItemWithItem) => vi.inventory_items?.name ?? null,
             render: (vi: VendorItemWithItem) =>
               vi.inventory_items ? (
                 <Link
                   href={link(`/items/${vi.inventory_items.id}`)}
-                  className="text-blue-700 hover:underline"
+                  className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
                 >
                   {vi.inventory_items.name}
                 </Link>
               ) : (
-                <span className="text-amber-700">unlinked</span>
+                <span className="text-accent">unlinked</span>
               ),
           },
         ]
@@ -188,7 +188,7 @@ export function VendorItemsTable({
     {
       key: "product_id",
       label: "Product ID",
-      width: 110,
+      width: 130,
       sortValue: (vi) => vi.product_id,
       render: (vi) => (
         <InlineValue table="vendor_items" id={vi.id} column="product_id" value={vi.product_id} />
@@ -197,7 +197,7 @@ export function VendorItemsTable({
     {
       key: "brand",
       label: "Brand",
-      width: 110,
+      width: 130,
       sortValue: (vi) => vi.brand,
       render: (vi) => (
         <InlineValue table="vendor_items" id={vi.id} column="brand" value={vi.brand} />
@@ -206,7 +206,7 @@ export function VendorItemsTable({
     {
       key: "description",
       label: "Description",
-      width: 260,
+      width: 310,
       sortValue: (vi) => vi.description,
       render: (vi) => (
         <InlineValue table="vendor_items" id={vi.id} column="description" value={vi.description} />
@@ -215,7 +215,7 @@ export function VendorItemsTable({
     {
       key: "package_desc",
       label: "Pack",
-      width: 80,
+      width: 95,
       sortValue: (vi) => vi.package_desc,
       render: (vi) => (
         <InlineValue table="vendor_items" id={vi.id} column="package_desc" value={vi.package_desc} />
@@ -224,7 +224,7 @@ export function VendorItemsTable({
     {
       key: "package_content",
       label: "Content",
-      width: 90,
+      width: 110,
       align: "right",
       sortValue: (vi) => (vi.package_content === null ? null : Number(vi.package_content)),
       render: (vi) => (
@@ -241,7 +241,7 @@ export function VendorItemsTable({
     {
       key: "price",
       label: "Price",
-      width: 90,
+      width: 110,
       align: "right",
       sortValue: (vi) => (vi.price === null ? null : Number(vi.price)),
       render: (vi) => (
@@ -258,18 +258,18 @@ export function VendorItemsTable({
     {
       key: "unit_price",
       label: "Unit price",
-      width: 100,
+      width: 120,
       align: "right",
       // Sorts on the number, not the formatted string, so $9 < $10.
       sortValue: (vi) => unitPrice(vi),
       render: (vi) => (
-        <span className="text-neutral-500">{unitPriceLabel(vi, unitFor(vi))}</span>
+        <span className="text-subtle">{unitPriceLabel(vi, unitFor(vi))}</span>
       ),
     },
     {
       key: "notes",
       label: "Notes",
-      width: 150,
+      width: 180,
       sortValue: (vi) => vi.notes,
       render: (vi) => (
         <InlineValue table="vendor_items" id={vi.id} column="notes" value={vi.notes} />
@@ -280,13 +280,13 @@ export function VendorItemsTable({
           {
             key: "last_ordered",
             label: "Last ordered",
-            width: 120,
+            width: 145,
             sortValue: (vi: VendorItemWithItem) => vi.last_order_date ?? null,
             render: (vi: VendorItemWithItem) =>
               vi.last_order_date ? (
-                <span className="tabular-nums text-neutral-600">{vi.last_order_date}</span>
+                <span className="tabular-nums text-muted">{vi.last_order_date}</span>
               ) : (
-                <span className="text-amber-700">never</span>
+                <span className="text-accent">never</span>
               ),
           },
         ]
@@ -299,13 +299,13 @@ export function VendorItemsTable({
       columns={columns}
       rowKey={(vi) => vi.id}
       storageKey={`rf.vendorItems.columnWidths.v1${showItem ? ".byVendor" : ".byItem"}`}
-      rowClassName={(vi) => (vi.is_active ? "" : "text-neutral-400")}
+      rowClassName={(vi) => (vi.is_active ? "" : "text-faint")}
       scroll={scroll}
       // The filter bar eats about 9rem above the pane; without this the page
       // starts scrolling again and the sticky config is pushed off-screen.
       maxHeightClass={filters ? "max-h-[calc(100vh-36rem)]" : undefined}
       empty={
-        <p className="text-sm text-neutral-600">
+        <p className="text-sm text-muted">
           {vendorItems.length === 0
             ? "No vendor items yet. The cleanup drawer's vendor-item picker can link an existing one to this item."
             : "No vendor items match these filters."}
@@ -332,7 +332,7 @@ export function VendorItemsTable({
         staleCounts={staleCounts}
         totalCount={vendorItems.length}
       />
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-subtle">
         {visible.length} of {vendorItems.length}
       </p>
       {table}

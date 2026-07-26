@@ -1,0 +1,13 @@
+/* Restaurant Friend corner radii — square.
+   DF Operations had no rounded corners anywhere except its stepper circles,
+   and squareness is most of why it reads as an instrument rather than an app.
+   We keep it: every box, field, button, band and dialog is a true rectangle.
+   The only curves in the system are circles — the ± steppers and the switch —
+   where the shape says "press me". */
+:root {
+  --rf-radius-none: 0;
+  --rf-radius-sm: 0;      /* deliberately zero: aliased so callers stay honest */
+  --rf-radius-md: 0;
+  --rf-radius-lg: 0;
+  --rf-radius-full: 9999px;  /* steppers, switch track */
+}

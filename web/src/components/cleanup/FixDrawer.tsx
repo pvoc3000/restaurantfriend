@@ -15,8 +15,8 @@ import { FavoritesEditor } from "./FavoritesEditor";
 /** Which favorite an editor is about — several can be broken on one item. */
 function FavoriteHeading({ f }: { f: CleanupFavorite }) {
   return (
-    <p className="text-xs text-neutral-500">
-      <span className="font-medium text-neutral-700">{f.vendor_name ?? "—"}</span>
+    <p className="text-xs text-subtle">
+      <span className="font-medium text-body">{f.vendor_name ?? "—"}</span>
       {f.brand ? ` · ${f.brand}` : ""}
       {f.description ? ` · ${f.description}` : ""}
       {f.package_desc ? ` · ${f.package_desc}` : ""}
@@ -32,8 +32,8 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="space-y-2 border-t border-neutral-200 pt-3">
-      <h3 className="text-sm font-semibold text-neutral-800">{title}</h3>
+    <section className="space-y-2 border-t border-hairline pt-3">
+      <h3 className="text-sm font-semibold text-body">{title}</h3>
       {children}
     </section>
   );
@@ -59,17 +59,17 @@ export function FixDrawer({
         onClick={onClose}
         aria-hidden
       />
-      <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l border-neutral-200 bg-white p-4 shadow-xl">
+      <aside className="fixed inset-y-0 right-0 z-50 w-full max-w-md overflow-y-auto border-l-2 border-ink bg-white p-4">
         <div className="flex items-start justify-between gap-2">
           <div>
             <h2 className="text-lg font-semibold">
               {item?.inventory_items.name ?? "Item"}
             </h2>
             {item && (
-              <p className="text-sm text-neutral-500">
+              <p className="text-sm text-subtle">
                 {item.location_code} · {item.inventory_items.category ?? "—"} ·
                 base unit{" "}
-                <span className="font-medium text-neutral-700">
+                <span className="font-medium text-body">
                   {item.inventory_items.base_unit}
                 </span>
               </p>
@@ -77,14 +77,14 @@ export function FixDrawer({
           </div>
           <button
             onClick={onClose}
-            className="rounded px-2 py-1 text-sm text-neutral-500 hover:bg-neutral-100"
+            className="px-2 py-1 text-sm text-subtle hover:bg-neutral-100"
           >
             Close
           </button>
         </div>
 
         {resolved || !item ? (
-          <p className="mt-6 rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+          <p className="mt-6 border border-ink bg-[var(--rf-green-50)] px-3 py-2 text-sm text-ink">
             ✓ Resolved — this row is off the queue.
           </p>
         ) : (
@@ -192,10 +192,10 @@ function PackageContentEditor({
           step="any"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="w-16 rounded border border-neutral-300 px-2 py-1"
+          className="w-16 border border-ink px-2 py-1"
           aria-label="amount"
         />
-        <span className="text-neutral-500">×</span>
+        <span className="text-subtle">×</span>
         <input
           type="number"
           min="0"
@@ -203,13 +203,13 @@ function PackageContentEditor({
           value={size}
           onChange={(e) => setSize(e.target.value)}
           placeholder="size"
-          className="w-20 rounded border border-neutral-300 px-2 py-1"
+          className="w-20 border border-ink px-2 py-1"
           aria-label="size"
         />
         <select
           value={unit}
           onChange={(e) => setUnit(e.target.value)}
-          className="rounded border border-neutral-300 px-2 py-1"
+          className="border border-ink px-2 py-1"
           aria-label="unit"
         >
           {UNIT_OPTIONS.map((o) => (
@@ -218,16 +218,16 @@ function PackageContentEditor({
             </option>
           ))}
         </select>
-        <span className="text-neutral-500">per {packageDesc ?? "pkg"}</span>
+        <span className="text-subtle">per {packageDesc ?? "pkg"}</span>
       </div>
 
       {incompatible ? (
-        <p className="text-amber-700">
+        <p className="text-accent">
           {unit} can’t convert to the item’s base unit ({baseUnit}). Pick a
           compatible unit.
         </p>
       ) : content !== null ? (
-        <p className="text-neutral-600">
+        <p className="text-muted">
           = <span className="font-medium">{round(content)} {baseUnit}</span> per{" "}
           {packageDesc ?? "package"}
           {unitPrice !== null && (
@@ -238,15 +238,15 @@ function PackageContentEditor({
           )}
         </p>
       ) : (
-        <p className="text-neutral-400">Enter amount and size.</p>
+        <p className="text-faint">Enter amount and size.</p>
       )}
 
-      {error && <p className="text-red-700">{error}</p>}
+      {error && <p className="text-accent">{error}</p>}
 
       <button
         disabled={busy || content === null}
         onClick={save}
-        className="rounded bg-neutral-900 px-3 py-1 text-white disabled:opacity-40"
+        className="bg-ink px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300"
       >
         Save package content
       </button>
@@ -287,7 +287,7 @@ function PriceEditor({
   return (
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2">
-        <span className="text-neutral-500">$</span>
+        <span className="text-subtle">$</span>
         <input
           type="number"
           min="0"
@@ -295,15 +295,15 @@ function PriceEditor({
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           placeholder="0.00"
-          className="w-28 rounded border border-neutral-300 px-2 py-1"
+          className="w-28 border border-ink px-2 py-1"
           aria-label="price"
         />
       </div>
-      {error && <p className="text-red-700">{error}</p>}
+      {error && <p className="text-accent">{error}</p>}
       <button
         disabled={busy || !valid}
         onClick={save}
-        className="rounded bg-neutral-900 px-3 py-1 text-white disabled:opacity-40"
+        className="bg-ink px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300"
       >
         Save price
       </button>
@@ -353,16 +353,16 @@ function ParEditor({
           value={par}
           onChange={(e) => setPar(e.target.value)}
           placeholder={`e.g. 100 (${baseUnit})`}
-          className="w-40 rounded border border-neutral-300 px-2 py-1"
+          className="w-40 border border-ink px-2 py-1"
           aria-label="par"
         />
-        <span className="text-neutral-500">{baseUnit}</span>
+        <span className="text-subtle">{baseUnit}</span>
       </div>
-      {error && <p className="text-red-700">{error}</p>}
+      {error && <p className="text-accent">{error}</p>}
       <button
         disabled={busy || !valid}
         onClick={save}
-        className="rounded bg-neutral-900 px-3 py-1 text-white disabled:opacity-40"
+        className="bg-ink px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300"
       >
         Save par
       </button>

@@ -150,6 +150,14 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    bundle, read-only service_role fetch) and inspecting the PDFs.
    NOT built: automated email sending (edge function — revisit if the manual
    draft flow gets old).
+   Shipped 2026-07-25: the **design system port** (see Conventions) — a restyle
+   only, no query/route/state/copy changes, EXCEPT one new behaviour it needed:
+   **Zero section**, a button inside each shop-section band that marks that
+   section's still-untouched **should-order** lines explicitly zero in one
+   upsert (Mark, 2026-07-25 — FMP's semantics). Entered quantities are never
+   overwritten; lines that weren't that day's work are left untouched. Also new:
+   `components/ui/ActionBar.tsx` (black bottom bar, on `/order-guide` carrying
+   Generate POs) and `components/ui/Checkbox.tsx`.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -234,12 +242,34 @@ weekday column, and 003 then silently made it per-vendor-item.
 
 ## Conventions
 
+- **The look is the `restaurantfriend-design` skill** (a user skill, outside
+  this repo — read `handoff/PORT-GUIDE.md` §8 FIRST, then `readme.md`, then the
+  relevant `<Name>.prompt.md`). Applied wholesale 2026-07-25: black masthead,
+  square corners, no shadows, no blue, colour only ever means record STATE.
+  Tokens live in `web/src/styles/ds/` (copied from the skill) and are exposed to
+  Tailwind v4 through `@theme inline` in `globals.css` — use the semantic
+  utilities (`text-ink`, `text-muted`, `border-hairline`, `bg-go`, `text-accent`)
+  over raw `neutral-*`. **The DS import MUST carry `layer(base)`**: Tailwind v4
+  layers its utilities, unlayered CSS outranks layered CSS regardless of
+  specificity, and an unlayered `base.css` makes its `a { color: black }` beat
+  every `text-white` — the white nav on the black masthead silently renders
+  black. House rules the port settled (Mark, 2026-07-25 — the design system's
+  own sources are updated to match, so don't "restore" them):
+  **switches are black and white**, off = the exact inverse of on (white track,
+  black knob), and a switch is never tinted to say what it does — its label
+  does that; **table rows carry no dividing rule** (56px rows + hover wash;
+  rules that DELIMIT — the head's 2px, a group strip, an expanded row — stay);
+  **every checkbox is `components/ui/Checkbox.tsx`**, never a raw
+  `<input type="checkbox">`; the **slide-over has a black LEFT edge and a grey
+  TOP edge** (black-on-black needs a separator, black-on-dimmed-page doesn't);
+  the **ActionBar carries commands only** — a control that changes what a list
+  SHOWS goes with that list's filters.
 - **The Active toggle is the FIRST column** on every catalog table (Mark,
   2026-07-23) — vendors list, vendor/item per-location config, vendor items.
   "Stock here" shares that slot where a row doesn't exist yet.
 - **Every list uses `DataTable`** (`web/src/components/catalog/DataTable.tsx`):
   sortable headers, drag-resizable columns, optional scroll pane with a sticky
-  header, optional expandable rows. Give it columns + rows; don't hand-roll a
+  header, optional expandable rows, 56px rows and no rule between them. Give it columns + rows; don't hand-roll a
   `<table>`. Supporting pieces: `ColumnHeader` (the header cell + resize grip),
   `lib/tableSort.ts` (comparator — empty cells sink last in BOTH directions),
   `lib/columnWidths.ts` (`useResizableColumns`). `/cleanup` predates this and is

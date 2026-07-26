@@ -6,21 +6,28 @@ export default async function HomePage() {
 
   return (
     <div className="max-w-2xl space-y-4">
-      <h1 className="text-xl font-semibold">
-        Working at{" "}
-        {session.activeLocation
-          ? `${session.activeLocation.code} — ${session.activeLocation.name}`
-          : "no location"}
-      </h1>
+      <div>
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          {session.activeLocation
+            ? `${session.activeLocation.code} — ${session.activeLocation.name}`
+            : "No location"}
+        </h1>
+        <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+          {session.email} · {session.membership.role}
+        </p>
+      </div>
 
-      <p className="text-sm text-neutral-600">
-        Signed in as {session.email} ({session.membership.role}). Switch
-        locations in the header; the choice is saved to your membership row.
+      <p className="text-sm text-muted">
+        Switch locations in the header; the choice is saved to your membership
+        row.
       </p>
 
       <ul className="text-sm">
         <li>
-          <Link href="/vendors" className="text-blue-700 hover:underline">
+          <Link
+            href="/vendors"
+            className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+          >
             Vendors →
           </Link>
         </li>

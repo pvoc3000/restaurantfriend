@@ -12,23 +12,18 @@ import { ActiveToggle } from "./ActiveToggle";
 export function ItemFields({ item }: { item: CatalogItem }) {
   return (
     <div className="space-y-3">
-      {/* Says which KIND of record this is — the panel hides breadcrumbs, so
-          without it an inventory item and a vendor item look alike. */}
-      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-        Inventory
-      </p>
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-xl font-semibold">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           <InlineValue
             table="inventory_items"
             id={item.id}
             column="name"
             value={item.name}
             placeholder="Untitled item"
-            className="text-xl font-semibold"
+            className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]"
           />
         </h1>
-        <span className="flex items-center gap-2 text-sm text-neutral-600">
+        <span className="flex items-center gap-2 text-sm text-muted">
           <ActiveToggle
             table="inventory_items"
             id={item.id}
@@ -40,7 +35,7 @@ export function ItemFields({ item }: { item: CatalogItem }) {
       </div>
 
       <dl className="grid max-w-2xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="py-0.5 text-neutral-500">Category</dt>
+        <dt className="py-0.5 text-subtle">Category</dt>
         <dd>
           <InlineValue
             table="inventory_items"
@@ -51,7 +46,7 @@ export function ItemFields({ item }: { item: CatalogItem }) {
           />
         </dd>
 
-        <dt className="py-0.5 text-neutral-500">Base unit</dt>
+        <dt className="py-0.5 text-subtle">Base unit</dt>
         <dd>
           <InlineValue
             table="inventory_items"
@@ -61,7 +56,7 @@ export function ItemFields({ item }: { item: CatalogItem }) {
           />
         </dd>
 
-        <dt className="py-0.5 text-neutral-500">Note</dt>
+        <dt className="py-0.5 text-subtle">Note</dt>
         <dd>
           <InlineValue
             table="inventory_items"
@@ -73,7 +68,7 @@ export function ItemFields({ item }: { item: CatalogItem }) {
         </dd>
       </dl>
 
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-subtle">
         Pars and on-hand counts are in the base unit; order quantities are in
         packages of the chosen vendor item. Changing the base unit does not
         rescale existing pars or package contents — fix those by hand.

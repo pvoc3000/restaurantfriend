@@ -53,7 +53,7 @@ export async function PurchaseOrderDetailView({
   ]);
 
   if (error) {
-    return <p className="text-sm text-red-700">Could not load order: {error.message}</p>;
+    return <p className="text-sm text-accent">Could not load order: {error.message}</p>;
   }
   if (!po) notFound();
 
@@ -92,7 +92,7 @@ export async function PurchaseOrderDetailView({
       {!inPanel && <Breadcrumbs trail={trail} current={order.po_number} />}
 
       {lineError ? (
-        <p className="text-sm text-red-700">
+        <p className="text-sm text-accent">
           Could not load order lines: {lineError.message}
         </p>
       ) : (
@@ -108,7 +108,7 @@ export async function PurchaseOrderDetailView({
                   href: `/purchase-orders/${id}${currentQuery(rawParams)}`,
                   label: order.po_number,
                 })}
-                className="text-blue-700 hover:underline"
+                className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
               >
                 {order.vendors.name}
               </Link>

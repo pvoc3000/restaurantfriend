@@ -18,10 +18,12 @@ export function LocationSwitcher({
   const [isPending, startTransition] = useTransition();
 
   return (
-    <label className="flex items-center gap-2 text-sm">
-      <span className="text-neutral-500">Location</span>
+    <label className="flex items-center gap-3">
+      <span className="text-[12px] uppercase tracking-[0.12em] text-white/55">
+        Location
+      </span>
       <select
-        className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm disabled:opacity-50"
+        className="h-7 border border-white/40 bg-transparent px-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-white disabled:opacity-35 [&>option]:text-ink"
         value={activeLocationId ?? ""}
         disabled={isPending || locations.length === 0}
         onChange={(e) => {

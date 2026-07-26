@@ -30,6 +30,7 @@ import {
 import { makeComparator, type SortValue } from "@/lib/tableSort";
 import { withFrom } from "@/lib/breadcrumbs";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
+import { Checkbox } from "@/components/ui/Checkbox";
 import type { PoListRow } from "@/app/(app)/purchase-orders/page";
 
 function sortValue(po: PoListRow, key: PoSortKey): SortValue {
@@ -253,25 +254,25 @@ export function PurchaseOrderList({
     {
       key: "select",
       label: "",
-      width: 32,
+      width: 48,
       render: (po) => (
-        <input
-          type="checkbox"
+        <Checkbox
           checked={checked.has(po.id)}
           onChange={() => toggleOne(po.id)}
-          aria-label={`select ${po.po_number}`}
+          label={`select ${po.po_number}`}
+          size={18}
         />
       ),
     },
     {
       key: "po_number",
       label: "PO number",
-      width: 140,
+      width: 170,
       sortValue: (po) => po.po_number,
       render: (po) => (
         <Link
           href={poDetailHref(po.id, filters)}
-          className="text-blue-700 hover:underline"
+          className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
         >
           {po.po_number}
         </Link>
@@ -280,14 +281,14 @@ export function PurchaseOrderList({
     {
       key: "order_date",
       label: "Ordered",
-      width: 110,
+      width: 130,
       sortValue: (po) => po.order_date,
-      render: (po) => <span className="tabular-nums text-neutral-600">{po.order_date}</span>,
+      render: (po) => <span className="tabular-nums text-muted">{po.order_date}</span>,
     },
     {
       key: "vendor",
       label: "Vendor",
-      width: 200,
+      width: 240,
       sortValue: (po) => po.vendors?.name ?? null,
       render: (po) =>
         po.vendors ? (
@@ -296,7 +297,7 @@ export function PurchaseOrderList({
               href: poListHref(filters),
               label: "POs",
             })}
-            className="text-blue-700 hover:underline"
+            className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
           >
             {po.vendors.name}
           </Link>
@@ -307,10 +308,12 @@ export function PurchaseOrderList({
     {
       key: "status",
       label: "Status",
-      width: 110,
+      width: 130,
       sortValue: (po) => PO_STATUS_ORDER.indexOf(po.status),
       render: (po) => (
-        <span className={`rounded px-1.5 py-0.5 text-xs ${PO_STATUS_CLASS[po.status]}`}>
+        <span
+          className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${PO_STATUS_CLASS[po.status]}`}
+        >
           {PO_STATUS_LABEL[po.status]}
         </span>
       ),
@@ -318,39 +321,39 @@ export function PurchaseOrderList({
     {
       key: "sent_via",
       label: "Sent via",
-      width: 100,
+      width: 120,
       sortValue: (po) => po.sent_via,
-      render: (po) => <span className="text-neutral-600">{po.sent_via ?? "—"}</span>,
+      render: (po) => <span className="text-muted">{po.sent_via ?? "—"}</span>,
     },
     {
       key: "delivery_date",
       label: "Delivery",
-      width: 110,
+      width: 130,
       sortValue: (po) => po.delivery_date,
       render: (po) => (
-        <span className="tabular-nums text-neutral-600">{po.delivery_date ?? "—"}</span>
+        <span className="tabular-nums text-muted">{po.delivery_date ?? "—"}</span>
       ),
     },
     {
       key: "lines",
       label: "Lines",
-      width: 70,
+      width: 85,
       align: "right",
       sortValue: (po) => po.line_count,
-      render: (po) => <span className="text-neutral-600">{po.line_count}</span>,
+      render: (po) => <span className="text-muted">{po.line_count}</span>,
     },
     {
       key: "total",
       label: "Ordered",
-      width: 110,
+      width: 130,
       align: "right",
       sortValue: (po) => po.ordered_total,
-      render: (po) => <span className="text-neutral-700">{money(po.ordered_total)}</span>,
+      render: (po) => <span className="text-body">{money(po.ordered_total)}</span>,
     },
     {
       key: "received_total",
       label: "Received",
-      width: 110,
+      width: 130,
       align: "right",
       sortValue: (po) => po.received_total,
       render: (po) => (
@@ -359,8 +362,8 @@ export function PurchaseOrderList({
             // A received total short of what was ordered is the signal worth
             // catching on this screen.
             po.status === "received" && po.received_total < po.ordered_total - 0.005
-              ? "text-amber-700"
-              : "text-neutral-600"
+              ? "font-semibold text-accent"
+              : "text-muted"
           }
         >
           {money(po.received_total)}
@@ -376,57 +379,64 @@ export function PurchaseOrderList({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-xl font-semibold">Purchase orders</h1>
-        <span className="text-sm text-neutral-500">
-          {visible.length} of {orders.length} · {activeLocationCode}
-        </span>
-        <span className="ml-auto text-sm text-neutral-600">
-          Total <span className="font-medium tabular-nums">{money(pageTotal)}</span>
-        </span>
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+        <div>
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Purchase Orders
+          </h1>
+          <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+            {activeLocationCode} · {visible.length} of {orders.length} orders
+          </p>
+        </div>
+        {/* The window total as a Statistic: small-caps label over the figure. */}
+        <div className="ml-auto text-right">
+          <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+            Window total
+          </div>
+          <div className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
+            {money(pageTotal)}
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center gap-4">
         <input
           value={filters.q}
           onChange={(e) => update({ q: e.target.value })}
           placeholder="Search PO number or vendor…"
-          className="w-64 rounded border border-neutral-300 px-2 py-1 text-sm"
+          className="h-9 w-64 border border-ink px-3 text-sm outline-none focus:border-2"
         />
 
-        <div className="flex items-center gap-1 text-sm">
+        {/* Status tabs: an underline marker, not a fill — they scope the view. */}
+        <div className="flex items-center gap-4 text-[12px] font-semibold uppercase tracking-[0.06em]">
           {statusTabs.map((s) => (
             <button
               key={s}
               onClick={() => update({ status: s })}
-              className={`rounded px-2 py-1 ${
+              className={`border-b-2 px-1 pb-0.5 ${
                 filters.status === s
-                  ? "bg-neutral-900 text-white"
-                  : "text-neutral-600 hover:bg-neutral-100"
+                  ? "border-ink text-ink"
+                  : "border-transparent text-muted hover:text-ink"
               }`}
             >
               {s === "all" ? "All" : PO_STATUS_LABEL[s as PoStatus]}
-              <span
-                className={`ml-1.5 ${
-                  filters.status === s ? "text-neutral-300" : "text-neutral-400"
-                }`}
-              >
+              <span className="ml-1.5 font-normal tabular-nums text-faint">
                 {s === "all" ? orders.length : statusCounts[s] ?? 0}
               </span>
             </button>
           ))}
         </div>
 
-        <div className="ml-auto flex items-center gap-1 text-sm">
-          <span className="text-xs uppercase tracking-wide text-neutral-400">Window</span>
+        <div className="ml-auto flex items-center gap-4 text-[12px] font-semibold uppercase tracking-[0.06em]">
+          <span className="font-normal tracking-[0.12em] text-subtle">Window</span>
           {RANGES.map((r) => (
             <button
               key={r.key}
               onClick={() => setRange(r.key)}
-              className={`rounded px-2 py-1 ${
+              className={`border-b-2 px-1 pb-0.5 ${
                 filters.range === r.key
-                  ? "bg-neutral-900 text-white"
-                  : "text-neutral-600 hover:bg-neutral-100"
+                  ? "border-ink text-ink"
+                  : "border-transparent text-muted hover:text-ink"
               }`}
             >
               {r.label}
@@ -436,31 +446,31 @@ export function PurchaseOrderList({
       </div>
 
       {capped && (
-        <p className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <p className="border border-ink bg-mark-fill px-4 py-3 text-sm text-ink">
           Showing the 500 most recent orders in this window — narrow the window
           to see everything in it.
         </p>
       )}
 
       {checked.size > 0 && (
-        <div className="space-y-1 rounded border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="space-y-1 border border-ink px-4 py-3 text-sm">
+          <div className="flex flex-wrap items-center gap-4">
             <span>{checked.size} selected</span>
-            <span className="tabular-nums text-neutral-600">{money(selectedTotal)}</span>
+            <span className="tabular-nums text-muted">{money(selectedTotal)}</span>
 
             {/* Batch preview (spec §4.8): every selected PO as one PDF, a page
                 run per order, opened for reading or printing. */}
             <button
               disabled={batchBusy !== null}
               onClick={() => batchPdf("po")}
-              className="rounded border border-neutral-300 bg-white px-3 py-1 hover:bg-neutral-100 disabled:opacity-50"
+              className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
             >
               {batchBusy === "po" ? "Rendering…" : "PO PDFs"}
             </button>
             <button
               disabled={batchBusy !== null}
               onClick={() => batchPdf("shopping")}
-              className="rounded border border-neutral-300 bg-white px-3 py-1 hover:bg-neutral-100 disabled:opacity-50"
+              className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
             >
               {batchBusy === "shopping" ? "Rendering…" : "Shopping lists"}
             </button>
@@ -474,40 +484,42 @@ export function PurchaseOrderList({
                       selectedDrafts.length === 1 ? "" : "s"
                     } sent, sent_via from each vendor's order type`
               }
-              className="rounded border border-neutral-300 bg-white px-3 py-1 hover:bg-neutral-100 disabled:opacity-50"
+              className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
             >
               {batchBusy === "sent"
                 ? "Saving…"
                 : `Mark sent (${selectedDrafts.length})`}
             </button>
 
+            {/* Danger inverts red on hover — same move, different meaning. */}
             <button
               disabled={batchBusy !== null}
               onClick={batchDelete}
-              className="rounded border border-red-300 bg-white px-3 py-1 text-red-700 hover:bg-red-50 disabled:opacity-50"
+              className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
             >
               {batchBusy === "delete" ? "Deleting…" : "Delete"}
             </button>
 
             <button
               onClick={() => setChecked(new Set())}
-              className="ml-auto text-neutral-600 hover:underline"
+              className="ml-auto text-muted underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
             >
               Clear
             </button>
           </div>
-          {batchError && <p className="text-red-700">{batchError}</p>}
+          {batchError && <p className="text-accent">{batchError}</p>}
         </div>
       )}
 
-      <div className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
+      <div className="flex items-center gap-3 text-sm">
+        <Checkbox
           checked={allVisibleChecked}
           onChange={toggleAllVisible}
-          aria-label="select all"
-        />
-        <span className="text-neutral-500">Select all shown</span>
+          label="select all"
+          size={18}
+        >
+          <span className="text-subtle">Select all shown</span>
+        </Checkbox>
       </div>
 
       <DataTable
@@ -519,7 +531,7 @@ export function PurchaseOrderList({
         onSortChange={(next) =>
           update({ sort: next.key as PoSortKey, dir: next.dir })
         }
-        empty={<p className="text-sm text-neutral-600">No orders in this window.</p>}
+        empty={<p className="text-sm text-muted">No orders in this window.</p>}
       />
     </div>
   );

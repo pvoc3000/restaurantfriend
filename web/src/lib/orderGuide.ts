@@ -163,18 +163,17 @@ export function qtyClass(
   shouldOrder: boolean,
   isFavorite: boolean
 ): string {
-  if (state === "zeroed") return "border-red-500 bg-red-200 text-red-950";
-  if (shouldOrder) {
+  const base = "border-2 border-ink text-ink";
+  if (state === "zeroed") return `${base} bg-[var(--rf-red-200)]`;
+  if (shouldOrder)
     return state === "entered"
-      ? "border-green-600 bg-green-200 text-green-950"
-      : "border-green-500 bg-green-50 text-green-900";
-  }
-  if (state === "entered") {
+      ? `${base} bg-[var(--rf-green-200)]`
+      : `${base} bg-[var(--rf-green-50)]`;
+  if (state === "entered")
     return isFavorite
-      ? "border-neutral-500 bg-neutral-200 text-neutral-900"
-      : "border-blue-500 bg-blue-100 text-blue-950";
-  }
-  return "border-neutral-400 bg-white text-neutral-900";
+      ? `${base} bg-neutral-100`
+      : `${base} bg-[var(--rf-yellow-200)]`; // "you switched source"
+  return `${base} bg-white`;
 }
 
 /**

@@ -1,8 +1,25 @@
 @import "tailwindcss";
+/* Layered into `base` so the design system's element defaults (a, body …)
+   sit BELOW Tailwind's utilities — unlayered CSS would beat every utility
+   class and paint e.g. white nav links black. */
+@import "../styles/ds/styles.css" layer(base);
 
-/* Dense power-tool UI: light only for now, system fonts (no webfont fetch). */
-html {
-  font-family: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", Arial,
-    sans-serif;
-  color-scheme: light;
+/* Expose the design-system tokens to Tailwind v4 utilities so `text-ink`,
+   `bg-go` etc. work alongside raw var() usage. Names stay semantic. */
+@theme inline {
+  --color-ink: var(--rf-neutral-900);
+  --color-body: var(--rf-neutral-700);
+  --color-muted: var(--rf-neutral-600);
+  --color-subtle: var(--rf-neutral-500);
+  --color-faint: var(--rf-neutral-400);
+  --color-hairline: var(--rf-neutral-200);
+  --color-go: var(--rf-green-200);
+  --color-go-wash: var(--rf-green-50);
+  --color-stop: var(--rf-red-200);
+  --color-accent: var(--rf-red-500);
+  --color-mark: var(--rf-yellow-500);
+  --color-mark-fill: var(--rf-yellow-200);
+  --font-sans: var(--rf-font-sans);
+  --radius-*: initial; /* kill Tailwind's radii — the system is square */
+  --shadow-*: initial; /* kill Tailwind's shadows */
 }

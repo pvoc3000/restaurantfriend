@@ -65,7 +65,7 @@ export function ItemLocationRows({
     else router.refresh();
   }
 
-  const dash = <span className="text-neutral-400">—</span>;
+  const dash = <span className="text-faint">—</span>;
 
   const columns: DataColumn<Row>[] = [
     // Active leads on every catalog table (Mark, 2026-07-23). For a location
@@ -74,7 +74,7 @@ export function ItemLocationRows({
     {
       key: "is_active",
       label: "Active",
-      width: 110,
+      width: 130,
       sortValue: (r) => (r.il ? (r.il.is_active ? 0 : 1) : 2),
       render: (r) =>
         r.il ? (
@@ -88,7 +88,7 @@ export function ItemLocationRows({
           <button
             disabled={busy}
             onClick={() => stockHere(r.location.id)}
-            className="rounded border border-neutral-300 px-2 py-0.5 text-xs text-neutral-700 hover:bg-neutral-100 disabled:opacity-40"
+            className="border border-ink px-2 py-0.5 text-xs text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
           >
             Stock here
           </button>
@@ -97,13 +97,13 @@ export function ItemLocationRows({
     {
       key: "location",
       label: "Location",
-      width: 190,
+      width: 230,
       sortValue: (r) => r.location.code,
       render: (r) => (
         <>
           {r.location.code}
           {r.location.id === activeLocationId && (
-            <span className="ml-1.5 rounded bg-blue-100 px-1 text-xs text-blue-800">
+            <span className="ml-1.5 border border-ink px-1 text-[10px] uppercase tracking-[0.12em] text-ink">
               here
             </span>
           )}
@@ -113,11 +113,11 @@ export function ItemLocationRows({
     {
       key: "section",
       label: "Section",
-      width: 170,
+      width: 205,
       sortValue: (r) => r.il?.shop_sections?.sort_order ?? null,
       render: (r) =>
         r.il ? (
-          <span className="text-neutral-600">{r.il.shop_sections?.display_name ?? "—"}</span>
+          <span className="text-muted">{r.il.shop_sections?.display_name ?? "—"}</span>
         ) : (
           dash
         ),
@@ -125,7 +125,7 @@ export function ItemLocationRows({
     {
       key: "order_days",
       label: "Order days",
-      width: 195,
+      width: 235,
       // Sorts on how MANY days it's ordered — "which items do we buy most
       // often here" is the question worth asking of this column.
       sortValue: (r) => (r.il ? r.il.order_days.length : null),
@@ -145,7 +145,7 @@ export function ItemLocationRows({
     {
       key: "par",
       label: `Par (${baseUnit})`,
-      width: 100,
+      width: 120,
       align: "right",
       sortValue: (r) =>
         r.il?.default_par === null || r.il?.default_par === undefined
@@ -173,7 +173,7 @@ export function ItemLocationRows({
     {
       key: "note",
       label: "Note",
-      width: 140,
+      width: 170,
       sortValue: (r) => r.il?.note ?? null,
       render: (r) =>
         r.il ? (
@@ -191,7 +191,7 @@ export function ItemLocationRows({
 
   return (
     <div className="space-y-2">
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      {error && <p className="text-sm text-accent">{error}</p>}
 
       <DataTable
         rows={tableRows}
@@ -199,7 +199,7 @@ export function ItemLocationRows({
         rowKey={(r) => r.location.id}
         storageKey="rf.itemLocations.columnWidths.v1"
         defaultSort={{ key: "location" }}
-        rowClassName={(r) => (r.il && !r.il.is_active ? "text-neutral-400" : "")}
+        rowClassName={(r) => (r.il && !r.il.is_active ? "text-faint" : "")}
         expand={{
           // Only stocked locations have plan rows to favorite.
           canExpand: (r) => r.il !== null,

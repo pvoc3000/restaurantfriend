@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import type { VendorTotal } from "@/lib/orderGuide";
+import { Checkbox } from "@/components/ui/Checkbox";
 
 /**
  * "Generate POs" (spec §2 step 3): one draft PO per vendor from today's
@@ -49,11 +50,14 @@ export function GeneratePos({
   locationId,
   guideDate,
   weekday,
+  trigger,
 }: {
   totals: VendorTotal[];
   locationId: string;
   guideDate: string;
   weekday: number;
+  /** Renders the opening control — the caller owns its placement and look. */
+  trigger: (open: () => void) => ReactNode;
 }) {
   const supabase = createClient();
 
@@ -136,71 +140,63 @@ export function GeneratePos({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openDialog}
-        disabled={totals.length === 0}
-        title={
-          totals.length === 0
-            ? "Enter order quantities first — there's nothing to generate"
-            : undefined
-        }
-        className="rounded bg-neutral-900 px-3 py-1 text-sm font-medium text-white hover:bg-neutral-700 disabled:bg-neutral-300"
-      >
-        Generate POs…
-      </button>
+      {trigger(openDialog)}
 
       {open && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[12vh]"
+          className="fixed inset-0 z-[60] flex items-start justify-center bg-black/55 p-4 pt-[10vh]"
           onClick={() => !creating && setOpen(false)}
         >
           <div
             role="dialog"
             aria-label="Generate purchase orders"
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-xl rounded-lg bg-white p-4 shadow-xl"
+            className="w-full max-w-xl border-2 border-ink bg-white"
           >
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-base font-semibold">
+            {/* Black title bar, caps — a dialog is a white rectangle with a
+                2px black edge; no shadow, no radius. */}
+            <div className="flex items-center justify-between gap-4 bg-ink px-6 py-3 text-white">
+              <h2 className="text-[13px] font-bold uppercase tracking-[0.06em]">
                 {created ? "Purchase orders created" : "Generate purchase orders"}
               </h2>
               <button
                 type="button"
                 onClick={() => setOpen(false)}
                 disabled={creating}
-                className="text-sm text-neutral-500 hover:text-neutral-900"
+                aria-label="Close"
+                className="px-1 text-[17px] leading-none text-white hover:text-white/70 disabled:opacity-35"
               >
-                Close
+                ✕
               </button>
             </div>
+            <div className="p-6">
 
-            {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+            {error && <p className="mt-2 text-sm text-accent">{error}</p>}
 
             {created ? (
-              <div className="mt-3 space-y-2">
+              <div className="mt-3 space-y-4">
                 {created.length === 0 ? (
-                  <p className="text-sm text-neutral-600">
+                  <p className="text-sm text-muted">
                     No POs were created — the selected vendors had no will-order
                     lines.
                   </p>
                 ) : (
-                  <ul className="divide-y divide-neutral-200 rounded border border-neutral-200">
+                  <ul className="divide-y divide-hairline border border-ink">
                     {created.map((po) => (
                       <li
                         key={po.id}
-                        className="flex items-baseline justify-between px-3 py-2 text-sm"
+                        className="flex items-baseline justify-between px-4 py-3 text-sm"
                       >
                         <span>
                           <Link
                             href={withFrom(`/purchase-orders/${po.id}`, here)}
-                            className="font-medium text-neutral-900 underline decoration-neutral-400 underline-offset-2 hover:decoration-neutral-900"
+                            className="font-medium text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
                           >
                             {po.po_number}
                           </Link>{" "}
-                          <span className="text-neutral-600">{po.vendor_name}</span>
+                          <span className="text-muted">{po.vendor_name}</span>
                         </span>
-                        <span className="tabular-nums text-neutral-700">
+                        <span className="tabular-nums text-body">
                           {po.line_count} {po.line_count === 1 ? "line" : "lines"} ·{" "}
                           {money(po.total)}
                         </span>
@@ -208,60 +204,60 @@ export function GeneratePos({
                     ))}
                   </ul>
                 )}
-                <div className="flex justify-end">
+                <div className="-mx-6 -mb-6 flex justify-end border-t border-ink px-6 py-4">
                   <Link
                     href="/purchase-orders"
-                    className="rounded bg-neutral-900 px-3 py-1 text-sm font-medium text-white hover:bg-neutral-700"
+                    className="inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white no-underline hover:bg-neutral-800"
                   >
                     Open purchase orders
                   </Link>
                 </div>
               </div>
             ) : loading ? (
-              <p className="mt-3 text-sm text-neutral-500">Checking recent POs…</p>
+              <p className="mt-3 text-sm text-subtle">Checking recent POs…</p>
             ) : (
-              <div className="mt-3 space-y-3">
-                <p className="text-sm text-neutral-600">
+              <div className="mt-3 space-y-4">
+                <p className="text-sm text-muted">
                   One draft PO per checked vendor, from the quantities entered for{" "}
                   {guideDate}. Vendors under their minimum start unchecked.
                 </p>
 
-                <ul className="divide-y divide-neutral-200 rounded border border-neutral-200">
+                <ul className="divide-y divide-hairline border border-ink">
                   {totals.map((t) => {
                     // Latest first, so [0] is the PO the warning names.
                     const recentPo = recent.find((p) => p.vendor_id === t.vendor_id);
                     return (
-                      <li key={t.vendor_id} className="px-3 py-2">
-                        <label className="flex cursor-pointer items-baseline gap-2 text-sm">
-                          <input
-                            type="checkbox"
+                      <li key={t.vendor_id} className="px-4 py-3">
+                        <div className="flex items-center gap-3 text-sm">
+                          <Checkbox
                             checked={selected.has(t.vendor_id)}
                             onChange={() => toggle(t.vendor_id)}
-                            className="relative top-0.5 h-4 w-4"
+                            label={`Generate a PO for ${t.vendor_name}`}
+                            size={18}
                           />
-                          <span className="font-medium">{t.vendor_name}</span>
-                          <span className="text-neutral-500">
+                          <span className="text-[13px] font-semibold uppercase tracking-[0.06em]">
+                            {t.vendor_name}
+                          </span>
+                          <span className="text-subtle">
                             {t.lines} {t.lines === 1 ? "line" : "lines"}
                           </span>
-                          <span className="ml-auto tabular-nums text-neutral-700">
+                          <span className="ml-auto tabular-nums text-body">
                             {money(t.subtotal)}
                             {t.minimum !== null && (
-                              <span className="text-neutral-400">
-                                {" "}
-                                / {money(t.minimum)}
-                              </span>
+                              <span className="text-faint"> / {money(t.minimum)}</span>
                             )}
                           </span>
-                        </label>
+                        </div>
+                        {/* Both guards inform, they don't block (§4.2). */}
                         {(t.short || recentPo) && (
-                          <div className="mt-1 flex flex-wrap gap-2 pl-6 text-xs">
+                          <div className="mt-2 flex flex-wrap gap-2 pl-7 text-xs">
                             {t.short && (
-                              <span className="rounded-full bg-red-50 px-2 py-0.5 text-red-800">
+                              <span className="border border-ink bg-[var(--rf-red-200)] px-2 py-0.5 text-ink">
                                 {money((t.minimum ?? 0) - t.subtotal)} under minimum
                               </span>
                             )}
                             {recentPo && (
-                              <span className="rounded-full bg-amber-50 px-2 py-0.5 text-amber-800">
+                              <span className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-ink">
                                 {recentPo.order_date === guideDate
                                   ? `already generated today — ${recentPo.po_number}`
                                   : `PO ${recentPo.po_number} on ${recentPo.order_date}`}
@@ -274,12 +270,12 @@ export function GeneratePos({
                   })}
                 </ul>
 
-                <div className="flex items-center justify-end gap-3">
+                <div className="-mx-6 -mb-6 flex items-center justify-end gap-4 border-t border-ink px-6 py-4">
                   <button
                     type="button"
                     onClick={() => setOpen(false)}
                     disabled={creating}
-                    className="text-sm text-neutral-600 hover:text-neutral-900"
+                    className="text-[12px] font-semibold uppercase tracking-[0.06em] text-muted hover:text-ink disabled:opacity-35"
                   >
                     Cancel
                   </button>
@@ -287,7 +283,7 @@ export function GeneratePos({
                     type="button"
                     onClick={create}
                     disabled={creating || selected.size === 0}
-                    className="rounded bg-neutral-900 px-3 py-1 text-sm font-medium text-white hover:bg-neutral-700 disabled:bg-neutral-300"
+                    className="inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white hover:bg-neutral-800 disabled:bg-neutral-300 disabled:text-white"
                   >
                     {creating
                       ? "Creating…"
@@ -296,6 +292,7 @@ export function GeneratePos({
                 </div>
               </div>
             )}
+            </div>
           </div>
         </div>
       )}

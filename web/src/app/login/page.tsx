@@ -35,43 +35,53 @@ export default function LoginPage() {
     <div className="flex flex-1 items-center justify-center px-4 py-16">
       <form
         onSubmit={handleSubmit}
-        className="w-full max-w-sm space-y-4 rounded border border-neutral-200 p-6"
+        className="w-full max-w-sm border-2 border-ink bg-white"
       >
-        <h1 className="text-lg font-semibold">Sign in to restaurantfriend</h1>
+        {/* The wordmark as the card's black title bar — there is no logo, and
+            none should be drawn. */}
+        <h1 className="bg-ink px-6 py-4 text-[15px] font-bold uppercase tracking-[0.06em] text-white">
+          Restaurant Friend
+        </h1>
 
-        <label className="block space-y-1">
-          <span className="text-sm text-neutral-600">Email</span>
-          <input
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded border border-neutral-300 px-2 py-1"
-          />
-        </label>
+        <div className="space-y-5 p-6">
+          <label className="block space-y-1.5">
+            <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
+              Email
+            </span>
+            <input
+              type="email"
+              required
+              autoComplete="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="h-9 w-full border border-ink px-3 outline-none focus:border-2"
+            />
+          </label>
 
-        <label className="block space-y-1">
-          <span className="text-sm text-neutral-600">Password</span>
-          <input
-            type="password"
-            required
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded border border-neutral-300 px-2 py-1"
-          />
-        </label>
+          <label className="block space-y-1.5">
+            <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
+              Password
+            </span>
+            <input
+              type="password"
+              required
+              autoComplete="current-password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="h-9 w-full border border-ink px-3 outline-none focus:border-2"
+            />
+          </label>
 
-        {error && <p className="text-sm text-red-700">{error}</p>}
+          {error && <p className="text-sm text-accent">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={busy}
-          className="w-full rounded bg-neutral-900 px-3 py-1.5 text-white disabled:opacity-50"
-        >
-          {busy ? "Signing in…" : "Sign in"}
-        </button>
+          <button
+            type="submit"
+            disabled={busy}
+            className="h-11 w-full bg-ink text-[13px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300"
+          >
+            {busy ? "Signing in…" : "Sign in"}
+          </button>
+        </div>
       </form>
     </div>
   );

@@ -115,36 +115,39 @@ export function GuideLine({
   // Only orderable lines reach the guide — the page filters on the view's
   // active cascade — so there's no blocked state to render here.
   return (
-    <tr className="border-b border-neutral-200">
-      {/* Vendor over brand, the way the printed guide reads. */}
-      <td className="whitespace-nowrap py-1.5 pl-2 pr-2 align-top">
+    <tr className="border-b border-hairline">
+      {/* Vendor over brand, the way the printed guide reads. Generous row
+          padding on purpose — the walk is read standing up. */}
+      <td className="whitespace-nowrap py-4 pl-4 pr-4 align-top">
         <div className="flex items-baseline gap-1.5">
           {/* Favorites carry a marker so "All" can be scanned: the source
               you'd normally take, whether or not it's today's work. */}
           <span
             aria-hidden
-            className={row.is_favorite ? "text-amber-500" : "text-transparent"}
+            className={
+              row.is_favorite ? "text-[var(--rf-yellow-500)]" : "text-transparent"
+            }
             title={row.is_favorite ? "Favorite — the preferred source this day" : undefined}
           >
             ★
           </span>
           <Link
             href={withFrom(`/vendors/${row.vendor_id}`, here)}
-            className="font-semibold uppercase tracking-tight text-neutral-900 hover:underline"
+            className="text-[13px] font-semibold uppercase tracking-[0.06em] text-ink no-underline hover:underline"
           >
             {row.vendor_name}
           </Link>
         </div>
-        {row.brand && <div className="pl-5 text-xs text-neutral-500">{row.brand}</div>}
+        {row.brand && <div className="pl-5 text-xs text-muted">{row.brand}</div>}
         {/* Delivery day lives with the vendor, not the description — it's a
             fact about the source, and it kept pushing the columns apart. */}
-        {arrives && <div className="pl-5 text-[11px] text-neutral-400">{arrives}</div>}
+        {arrives && <div className="pl-5 text-[11px] text-faint">{arrives}</div>}
       </td>
 
-      <td className="px-2 py-1.5 align-top text-neutral-800">
+      <td className="px-4 py-4 align-top text-body">
         <Link
           href={withFrom(`/vendor-items/${row.vendor_item_id}`, here)}
-          className="hover:underline"
+          className="no-underline hover:underline"
         >
           {row.vendor_item_description ?? "—"}
         </Link>
@@ -153,20 +156,20 @@ export function GuideLine({
       {/* Pack and unit price: the $/oz comparison across pack sizes is the
           reason this column exists (§4.6). Reads the way the case is labelled —
           "12 × 32 oz" — because that's what you check a delivery against. */}
-      <td className="whitespace-nowrap px-2 py-1.5 align-top tabular-nums text-neutral-800">
-        {pack ?? <span className="text-neutral-400">—</span>}
+      <td className="whitespace-nowrap px-4 py-4 align-top tabular-nums text-body">
+        {pack ?? <span className="text-faint">—</span>}
       </td>
 
-      <td className="whitespace-nowrap px-2 py-1.5 align-top text-right tabular-nums text-neutral-600">
+      <td className="whitespace-nowrap px-4 py-4 align-top text-right tabular-nums text-muted">
         {money(row.effective_price)}
         {row.unit_price !== null && (
-          <div className="text-xs text-neutral-500">
+          <div className="text-xs text-subtle">
             (${Number(row.unit_price).toFixed(4)} per {baseUnit})
           </div>
         )}
       </td>
 
-      <td className="px-2 py-1.5 align-top text-right">
+      <td className="px-4 py-4 align-top text-right">
         <input
           inputMode="decimal"
           disabled={saving}
@@ -179,11 +182,11 @@ export function GuideLine({
           }}
           placeholder="—"
           title={`On hand in ${baseUnit}`}
-          className="w-14 rounded border border-neutral-300 px-1 py-0.5 text-right text-sm tabular-nums"
+          className="h-9 w-16 border border-ink px-1 text-right text-sm tabular-nums"
         />
       </td>
 
-      <td className="px-1 py-1.5 align-top text-right text-xs text-neutral-500">
+      <td className="px-1 py-4 align-top text-right text-xs text-subtle">
         {suggestion === null ? (
           <span title={par === null ? "No par set for this line" : "No package content"}>
             —
@@ -194,7 +197,7 @@ export function GuideLine({
             disabled={saving || suggestion === qty}
             onClick={() => onCommit({ qty_to_order: suggestion })}
             title="Use the suggested quantity"
-            className="rounded px-1 hover:bg-neutral-200 disabled:opacity-50"
+            className="px-1 hover:bg-neutral-100 disabled:opacity-35"
           >
             {suggestion}
           </button>
@@ -202,9 +205,9 @@ export function GuideLine({
       </td>
 
       {/* Pack label + stepper, mirroring the FMP control: minus, box, plus. */}
-      <td className="whitespace-nowrap px-2 py-1.5 align-top">
-        <div className="flex items-center justify-end gap-1">
-          <span className="mr-1 text-xs font-semibold uppercase text-neutral-700">
+      <td className="whitespace-nowrap px-4 py-4 align-top">
+        <div className="flex items-center justify-end gap-2">
+          <span className="mr-1 text-xs font-semibold uppercase tracking-[0.06em] text-body">
             {row.package_desc ?? ""}
           </span>
           <button
@@ -212,7 +215,7 @@ export function GuideLine({
             disabled={saving}
             onClick={() => step(-1)}
             aria-label="Decrease by one"
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-neutral-400 text-neutral-700 hover:bg-neutral-200 disabled:opacity-40"
+            className="flex h-9 w-9 items-center justify-center rounded-full border-[1.5px] border-ink text-ink hover:bg-neutral-100 disabled:opacity-35"
           >
             −
           </button>
@@ -228,21 +231,21 @@ export function GuideLine({
             }}
             placeholder=""
             title={quietReason ?? "Packages to order"}
-            className={`w-14 rounded border-2 px-1 py-0.5 text-center text-sm font-semibold tabular-nums ${qtyClass(state, shouldOrder, row.is_favorite)}`}
+            className={`h-11 w-20 px-1 text-center text-[15px] font-semibold tabular-nums ${qtyClass(state, shouldOrder, row.is_favorite)}`}
           />
           <button
             type="button"
             disabled={saving}
             onClick={() => step(1)}
             aria-label="Increase by one"
-            className="flex h-6 w-6 items-center justify-center rounded-full border border-neutral-400 text-neutral-700 hover:bg-neutral-200 disabled:opacity-40"
+            className="flex h-9 w-9 items-center justify-center rounded-full border-[1.5px] border-ink text-ink hover:bg-neutral-100 disabled:opacity-35"
           >
             +
           </button>
         </div>
       </td>
 
-      <td className="px-2 py-1.5 align-top text-right text-sm tabular-nums text-neutral-700">
+      <td className="px-4 py-4 align-top text-right text-[15px] tabular-nums text-body">
         {qty !== null && Number(qty) > 0
           ? money(Number(qty) * Number(row.effective_price ?? 0))
           : ""}

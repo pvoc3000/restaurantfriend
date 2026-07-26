@@ -1,0 +1,36 @@
+/* Restaurant Friend base. White page, black ink, system grotesque, no
+   rounding, links black and underlined. */
+html {
+  font-family: var(--rf-font-sans);
+  color-scheme: light;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+body {
+  margin: 0;
+  background: var(--rf-surface-page);
+  color: var(--rf-text-primary);
+  font-size: var(--rf-text-base);
+  line-height: var(--rf-leading-normal);
+}
+a {
+  color: var(--rf-text-link);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--rf-neutral-400);
+}
+a:hover {
+  text-decoration-color: var(--rf-neutral-900);
+}
+.rf-num {
+  font-variant-numeric: var(--rf-font-variant-numeric);
+}
+/* The house label: small, capitalised, spaced. Used for every column head,
+   field label and caption in the system. */
+.rf-label {
+  font-size: var(--rf-text-xs);
+  text-transform: uppercase;
+  letter-spacing: var(--rf-tracking-label);
+  color: var(--rf-text-subtle);
+}

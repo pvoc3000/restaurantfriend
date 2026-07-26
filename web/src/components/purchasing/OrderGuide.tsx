@@ -25,6 +25,7 @@ import {
 } from "@/lib/orderGuide";
 import { GuideLine } from "./GuideLine";
 import { GeneratePos } from "./GeneratePos";
+import { ActionBar, ActionBarButton } from "@/components/ui/ActionBar";
 
 /**
  * The order guide (spec §4.6): the shop in walk order, item headers with par,
@@ -185,26 +186,82 @@ export function OrderGuide({
   const grandTotal = totals.reduce((sum, t) => (t.short ? sum : sum + t.subtotal), 0);
   const shortTotal = totals.reduce((sum, t) => (t.short ? sum + t.subtotal : sum), 0);
 
+  /**
+   * ZERO SECTION (from the FMP original): mark the section's still-untouched
+   * SHOULD-ORDER lines explicitly zero, so "not ordering" is a decision on
+   * record rather than a gap (Mark, 2026-07-25). Lines that weren't today's
+   * work stay untouched, and entered quantities are never overwritten —
+   * zeroing is for what you walked past, not what you chose.
+   */
+  const [zeroing, setZeroing] = useState<string | null>(null);
+  async function zeroSection(sectionKey: string, lines: GuideRow[]) {
+    const untouched = lines.filter(
+      (row) =>
+        row.should_order &&
+        (entries.get(row.vendor_item_id)?.qty_to_order ?? null) === null
+    );
+    if (untouched.length === 0) return;
+
+    setZeroing(sectionKey);
+    setError(null);
+    const { error } = await supabase.from("order_guide_entries").upsert(
+      untouched.map((row) => ({
+        org_id: orgId,
+        location_id: locationId,
+        guide_date: guideDate,
+        vendor_item_id: row.vendor_item_id,
+        on_hand: entries.get(row.vendor_item_id)?.on_hand ?? null,
+        qty_to_order: 0,
+      })),
+      { onConflict: "location_id,guide_date,vendor_item_id" }
+    );
+    setZeroing(null);
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setEntries((prev) => {
+      const next = new Map(prev);
+      for (const row of untouched) {
+        const current = next.get(row.vendor_item_id);
+        next.set(row.vendor_item_id, {
+          on_hand: current?.on_hand ?? null,
+          qty_to_order: 0,
+        });
+      }
+      return next;
+    });
+  }
+
   return (
-    <div className="space-y-2">
-      <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-xl font-semibold">Order guide</h1>
-        <span className="text-sm text-neutral-500">
-          {locationCode} · {ignoreDays ? "all days" : WEEKDAY_LABELS[weekday - 1]} ·
-          walked {guideDate}
-        </span>
-        {/* All seven days, always. The guide exists every day — picking one
-            scopes the list to what's orderable then, and a day with nothing
-            scheduled simply renders empty rather than disappearing. */}
-        <span className="flex items-center gap-1 text-sm">
+    <div className="space-y-4 pb-28">
+      {/* Title block: the screen's name in display caps, the context line in
+          small caps beneath it. */}
+      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+        <div>
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Order Guide
+          </h1>
+          <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+            {locationCode} · {ignoreDays ? "all days" : WEEKDAY_LABELS[weekday - 1]} ·
+            walked {guideDate} · {visibleRows.length} of {rows.length} lines
+          </p>
+        </div>
+        {/* All seven days, always, as one segmented control. The guide exists
+            every day — picking one scopes the list to what's orderable then,
+            and a day with nothing scheduled simply renders empty rather than
+            disappearing. */}
+        <span className="inline-flex h-9 items-stretch border border-ink">
           {[1, 2, 3, 4, 5, 6, 7].map((d) => (
             <Link
               key={d}
               href={`/order-guide?day=${d}`}
-              className={`rounded px-2 py-1 ${
+              className={`inline-flex items-center px-3 text-[12px] font-semibold uppercase tracking-[0.06em] no-underline ${
+                d > 1 ? "border-l border-ink" : ""
+              } ${
                 d === weekday
-                  ? "bg-neutral-900 text-white"
-                  : "text-neutral-600 hover:bg-neutral-100"
+                  ? "bg-ink text-white"
+                  : "bg-white text-ink hover:bg-neutral-100"
               }`}
             >
               {WEEKDAY_LABELS[d - 1]}
@@ -213,18 +270,20 @@ export function OrderGuide({
         </span>
         <button
           onClick={() => router.refresh()}
-          className="ml-auto text-sm text-neutral-500 hover:underline"
+          className="ml-auto text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
         >
           Refresh
         </button>
       </div>
 
-      {/* Vendor totals bar — the guide's central instrument (§4.2). */}
+      {/* Vendor totals bar — the guide's central instrument (§4.2): square
+          boxes on a ruled bar, so it reads as an instrument panel rather than
+          a row of tags. */}
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-4 border-y border-ink py-4">
           {totals.length === 0 ? (
-            <span className="text-sm text-neutral-500">
-              Nothing ordered yet — quantities you enter total up here by vendor.
+            <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+              Nothing ordered yet — quantities you enter total up here by vendor
             </span>
           ) : (
             totals.map((t) => (
@@ -235,14 +294,14 @@ export function OrderGuide({
                     ? `Under the ${money(t.minimum)} minimum — this vendor generates no PO`
                     : undefined
                 }
-                className={`rounded-full border px-3 py-1 text-sm ${
-                  t.short
-                    ? "border-red-300 bg-red-50 text-red-800"
-                    : "border-green-300 bg-green-50 text-green-900"
+                className={`inline-flex items-baseline gap-3 border border-ink px-4 py-2 ${
+                  t.short ? "bg-[var(--rf-red-200)]" : "bg-[var(--rf-green-200)]"
                 }`}
               >
-                {t.vendor_name}{" "}
-                <span className="tabular-nums">
+                <span className="text-[12px] font-semibold uppercase tracking-[0.06em]">
+                  {t.vendor_name}
+                </span>
+                <span className="text-[13px] tabular-nums">
                   {money(t.subtotal)}
                   {t.minimum !== null ? ` / ${money(t.minimum)}` : ""}
                 </span>
@@ -250,53 +309,50 @@ export function OrderGuide({
             ))
           )}
 
-          <span className="ml-auto text-sm">
-            <span className="text-neutral-500">Will order </span>
-            <span className="font-medium tabular-nums">{money(grandTotal)}</span>
+          <span className="ml-auto inline-flex items-baseline gap-3">
+            <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+              Will order
+            </span>
+            <span className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
+              {money(grandTotal)}
+            </span>
             {shortTotal > 0 && (
-              <span className="ml-2 text-red-700" title="Vendors under their minimum">
+              <span
+                className="text-[12px] uppercase tracking-[0.12em] text-accent"
+                title="Vendors under their minimum"
+              >
                 +{money(shortTotal)} blocked
               </span>
             )}
           </span>
-          {/* The walk's end point (spec §2 step 3), so it lives on the
-              instrument that answers "who gets a PO". */}
-          {canGeneratePos && (
-            <GeneratePos
-              totals={totals}
-              locationId={locationId}
-              guideDate={guideDate}
-              weekday={weekday}
-            />
-          )}
         </div>
-        {error && <p className="text-sm text-red-700">{error}</p>}
+        {error && <p className="text-sm text-accent">{error}</p>}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3 text-sm">
+      <div className="flex flex-wrap items-center gap-4 text-sm">
         <input
           value={term}
           onChange={(e) => setTerm(e.target.value)}
           placeholder="Jump to item, vendor or section…"
-          className="w-72 rounded border border-neutral-300 px-2 py-1"
+          className="h-9 w-72 border border-ink px-3 outline-none focus:border-2"
         />
         {/* Segmented control: these four are one choice, so they read as one
             object rather than four loose buttons. */}
-        <span className="inline-flex items-stretch overflow-hidden rounded-md border border-neutral-300">
+        <span className="inline-flex h-9 items-stretch border border-ink">
           {GUIDE_FILTERS.map((f, i) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-2.5 py-1 font-medium ${
-                i > 0 ? "border-l border-neutral-300" : ""
+              className={`inline-flex items-center gap-2 px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
+                i > 0 ? "border-l border-ink" : ""
               } ${
                 filter === f
-                  ? "bg-neutral-900 text-white"
-                  : "bg-white text-neutral-600 hover:bg-neutral-100"
+                  ? "bg-ink text-white"
+                  : "bg-white text-ink hover:bg-neutral-100"
               }`}
             >
               {GUIDE_FILTER_LABEL[f]}
-              <span className="ml-1.5 font-normal text-neutral-400">
+              <span className="font-normal tabular-nums opacity-55">
                 {filterCounts[f]}
               </span>
             </button>
@@ -305,45 +361,50 @@ export function OrderGuide({
 
         {/* The escape hatch from the day gates (FMP's "ignore order day"):
             every orderable line, whenever you'd normally buy it. A switch, not
-            a button — it's a mode you leave on, not an action you fire. Amber
-            rather than the ActiveToggle green, which is already spoken for by
-            the order boxes. */}
+            a button — it's a mode you leave on, not an action you fire. It
+            lives with the filters it changes, and matches the app's other
+            switches: black/white, off = the exact inverse of on (Mark,
+            2026-07-25). */}
         <button
           type="button"
           role="switch"
           aria-checked={ignoreDays}
           onClick={() => setIgnoreDays((v) => !v)}
           title="Show every orderable line, regardless of vendor or item ordering days"
-          className="inline-flex items-center gap-2 text-neutral-600 hover:text-neutral-900"
+          className="inline-flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-body hover:text-ink"
         >
           <span
             aria-hidden
-            className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors ${
-              ignoreDays ? "bg-amber-600" : "bg-neutral-300"
+            className={`relative inline-flex h-[26px] w-[46px] shrink-0 items-center rounded-full border-[1.5px] border-ink transition-colors ${
+              ignoreDays ? "bg-ink" : "bg-white"
             }`}
           >
             <span
-              className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                ignoreDays ? "translate-x-4" : "translate-x-0.5"
+              className={`inline-block h-[18px] w-[18px] transform rounded-full transition-transform ${
+                ignoreDays
+                  ? "translate-x-[22px] bg-white"
+                  : "translate-x-[2px] bg-ink"
               }`}
             />
           </span>
           Ignore ordering days
         </button>
 
-        <span className="flex items-center gap-2">
-          <span className="text-xs uppercase tracking-wide text-neutral-400">
+        <span className="flex items-center gap-3">
+          <span className="text-xs uppercase tracking-[0.12em] text-subtle">
             Group by
           </span>
-          <span className="inline-flex items-stretch overflow-hidden rounded-md border border-neutral-300">
+          <span className="inline-flex h-9 items-stretch border border-ink">
             {GUIDE_GROUPINGS.map((mode, i) => (
               <button
                 key={mode}
                 onClick={() => setGrouping(mode)}
-                className={`px-2 py-1 ${i > 0 ? "border-l border-neutral-300" : ""} ${
+                className={`inline-flex items-center px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
+                  i > 0 ? "border-l border-ink" : ""
+                } ${
                   grouping === mode
-                    ? "bg-neutral-900 text-white"
-                    : "bg-white text-neutral-600 hover:bg-neutral-100"
+                    ? "bg-ink text-white"
+                    : "bg-white text-ink hover:bg-neutral-100"
                 }`}
               >
                 {GROUPING_LABEL[mode]}
@@ -351,14 +412,10 @@ export function OrderGuide({
             ))}
           </span>
         </span>
-
-        <span className="text-neutral-500">
-          {visibleRows.length} of {rows.length} lines
-        </span>
       </div>
 
       {sections.length === 0 ? (
-        <p className="pt-4 text-sm text-neutral-600">
+        <p className="pt-4 text-sm text-muted">
           {filter === "favorites" || filter === "skipped"
             ? "No favorites for this day — nothing here has it in the vendor, item, and favorite order days. Switch to All to see everything orderable this day."
             : ignoreDays
@@ -368,26 +425,27 @@ export function OrderGuide({
       ) : (
         // The lines scroll in their own pane, so the controls above stay put
         // without the page itself sticking anything. Sized to the rest of the
-        // viewport, with a floor for short windows.
-        <div className="max-h-[calc(100vh-15rem)] min-h-64 overflow-auto rounded border border-neutral-300">
-        <table className="w-full border-collapse text-sm">
+        // viewport (minus the action bar), with a floor for short windows. No
+        // outer box — the sticky head's 2px rule is the structure.
+        <div className="max-h-[calc(100vh-21rem)] min-h-64 overflow-auto">
+        <table className="w-full border-collapse text-[15px]">
           <thead>
             {/* Sticky to the PANE, not the page — and on the cells, since
                 Safari won't make a <thead>/<tr> a sticky container. */}
-            <tr className="text-left text-xs uppercase tracking-wide text-neutral-600">
+            <tr className="text-left text-[12px] uppercase tracking-[0.12em] text-subtle">
               {[
                 ["Vendor", ""],
                 ["Description", ""],
                 ["Pack", ""],
                 ["Price", "text-right"],
-                ["On hand", "w-20 text-right"],
-                ["Sugg", "w-12 text-right"],
-                ["Order", "w-56 text-right"],
-                ["Line", "w-24 text-right"],
+                ["On hand", "w-24 text-right"],
+                ["Sugg", "w-14 text-right"],
+                ["Order", "w-64 text-right"],
+                ["Line", "w-28 text-right"],
               ].map(([label, extra]) => (
                 <th
                   key={label}
-                  className={`sticky top-0 z-20 bg-white px-2 py-1 font-semibold shadow-[inset_0_-2px_0_#171717] ${extra}`}
+                  className={`sticky top-0 z-20 bg-white px-4 py-3 font-normal shadow-[inset_0_-2px_0_var(--rf-neutral-900)] ${extra}`}
                 >
                   {label}
                 </th>
@@ -395,49 +453,76 @@ export function OrderGuide({
             </tr>
           </thead>
           <tbody>
-            {sections.map((section) => (
+            {sections.map((section, sectionIndex) => (
               <Fragment key={section.key}>
                 {section.showHeader && (
-                  <tr className="bg-neutral-900">
-                    <td
-                      colSpan={8}
-                      className="px-3 py-2 text-center text-base font-bold uppercase tracking-wide text-white"
-                    >
-                      {section.label}
-                      <span className="ml-3 text-sm font-normal text-neutral-400">
-                        {section.items.length}
-                      </span>
-                    </td>
-                  </tr>
+                  <>
+                    {/* A new section gets 64px of nothing above its band. */}
+                    {sectionIndex > 0 && (
+                      <tr aria-hidden>
+                        <td colSpan={8} className="h-16" />
+                      </tr>
+                    )}
+                    <tr className="bg-ink">
+                      <td colSpan={8} className="px-8 py-0">
+                        <div className="flex min-h-20 items-center gap-6">
+                          <span className="text-[36px] font-bold uppercase leading-none tracking-[-0.02em] text-white">
+                            {section.label}
+                          </span>
+                          <span className="text-[12px] uppercase tracking-[0.12em] text-white/55">
+                            {section.items.length}{" "}
+                            {section.items.length === 1 ? "item" : "items"}
+                          </span>
+                          {/* The section's own command lives in its band, as
+                              the original had it: an explicit zero for every
+                              line you walked past. Entered quantities are
+                              never touched. */}
+                          <button
+                            type="button"
+                            disabled={zeroing !== null}
+                            onClick={() => {
+                              const lines = section.items.flatMap((i) => i.lines);
+                              void zeroSection(section.key, lines);
+                            }}
+                            className="ml-auto h-9 border border-white/40 px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-white hover:text-ink disabled:opacity-35"
+                          >
+                            {zeroing === section.key ? "Zeroing…" : "Zero section"}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  </>
                 )}
 
                 {section.items.map((item) => (
                   <Fragment key={item.inventory_item_id}>
-                    <tr className="border-t-2 border-neutral-300">
-                      <td colSpan={6} className="px-2 pb-0.5 pt-3">
-                        <Link
-                          href={withFrom(`/items/${item.inventory_item_id}`, here)}
-                          className="text-base font-bold uppercase tracking-tight text-neutral-900 underline decoration-neutral-400 underline-offset-4 hover:decoration-neutral-900"
-                        >
-                          {item.item_name}
-                        </Link>
-                      </td>
-                      {/* Par sits directly above the order boxes, as in FMP —
-                          it's the number you're ordering up TO. */}
-                      <td className="px-2 pb-0.5 pt-3 text-right">
-                        {item.par_qty === null ? (
-                          // A missing par is a gap to fix, not an alarm — the
-                          // red is reserved for the number you order up to.
-                          <span className="text-xs uppercase tracking-wide text-neutral-400">
-                            no par
+                    {/* Item header: bold caps over a 2px black rule, par in
+                        red on the right — directly above the order boxes,
+                        because it's the number you order up TO. */}
+                    <tr>
+                      <td colSpan={8} className="px-0 pb-0 pt-12">
+                        <div className="flex items-end gap-4 border-b-2 border-ink px-4 pb-2">
+                          <Link
+                            href={withFrom(`/items/${item.inventory_item_id}`, here)}
+                            className="text-[22px] font-bold uppercase leading-tight tracking-[0.06em] text-ink no-underline hover:underline"
+                          >
+                            {item.item_name}
+                          </Link>
+                          <span className="ml-auto">
+                            {item.par_qty === null ? (
+                              // A missing par is a gap to fix, not an alarm —
+                              // red is reserved for the number you order up to.
+                              <span className="text-xs uppercase tracking-[0.12em] text-faint">
+                                no par
+                              </span>
+                            ) : (
+                              <span className="whitespace-nowrap text-[15px] font-bold uppercase tracking-[0.06em] text-accent">
+                                par {Number(item.par_qty)} {item.base_unit}
+                              </span>
+                            )}
                           </span>
-                        ) : (
-                          <span className="whitespace-nowrap text-sm font-bold uppercase tracking-wide text-red-700">
-                            par {Number(item.par_qty)} {item.base_unit}
-                          </span>
-                        )}
+                        </div>
                       </td>
-                      <td />
                     </tr>
 
                     {item.lines.map((row) => (
@@ -461,6 +546,38 @@ export function OrderGuide({
         </table>
         </div>
       )}
+
+      {/* The screen's decision, pinned to the bottom the way the original's
+          command bar was. */}
+      <ActionBar
+        note={`${locationCode} · ${
+          ignoreDays ? "all days" : WEEKDAY_LABELS[weekday - 1]
+        } · ${visibleRows.length} of ${rows.length} lines`}
+      >
+        {/* The walk's end point (spec §2 step 3): who gets a PO. */}
+        {canGeneratePos && (
+          <GeneratePos
+            totals={totals}
+            locationId={locationId}
+            guideDate={guideDate}
+            weekday={weekday}
+            trigger={(open) => (
+              <ActionBarButton
+                primary
+                onClick={open}
+                disabled={totals.length === 0}
+                title={
+                  totals.length === 0
+                    ? "Enter order quantities first — there's nothing to generate"
+                    : undefined
+                }
+              >
+                Generate POs…
+              </ActionBarButton>
+            )}
+          />
+        )}
+      </ActionBar>
     </div>
   );
 }

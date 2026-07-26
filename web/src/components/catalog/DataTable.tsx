@@ -115,15 +115,17 @@ export function DataTable<T>({
     else setInternalSort(next);
   }
 
+  // No outer box: the header's 2px black rule and the row hairlines are the
+  // only structure a table gets.
   const wrapper = scroll
-    ? `${maxHeightClass ?? "max-h-[calc(100vh-27rem)]"} min-h-64 overflow-auto rounded border border-neutral-200`
+    ? `${maxHeightClass ?? "max-h-[calc(100vh-27rem)]"} min-h-64 overflow-auto`
     : "overflow-x-auto";
 
   return (
     <div className="space-y-1">
       <div className={wrapper}>
         <table
-          className="table-fixed border-collapse text-sm"
+          className="table-fixed border-collapse text-[15px]"
           style={{ width: totalWidth(columns) }}
         >
           <colgroup>
@@ -132,15 +134,11 @@ export function DataTable<T>({
             ))}
           </colgroup>
           <thead className={scroll ? "sticky top-0 z-10 bg-white" : ""}>
-            <tr
-              className={`text-left text-neutral-600 ${
-                scroll
-                  ? // A sticky row inside border-collapse loses its bottom
-                    // border as it detaches, so draw it as an inset shadow.
-                    "[&>th]:shadow-[inset_0_-1px_0_#d4d4d4]"
-                  : "border-b border-neutral-300"
-              }`}
-            >
+            {/* The 2px rule under every table head, drawn as an inset shadow
+                because a sticky row inside border-collapse loses its bottom
+                border as it detaches. Same rule in both cases so sticky and
+                static tables read identically. */}
+            <tr className="text-left [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]">
               {columns.map((col) => (
                 <ColumnHeader
                   key={col.key}
@@ -162,10 +160,10 @@ export function DataTable<T>({
 
               return (
                 <Fragment key={key}>
+                  {/* No rule between rows (Mark, 2026-07-25) — the hover wash
+                      carries the eye across the width instead. */}
                   <tr
-                    className={`border-b border-neutral-100 hover:bg-neutral-50 ${
-                      rowClassName?.(row) ?? ""
-                    }`}
+                    className={`hover:bg-neutral-50 ${rowClassName?.(row) ?? ""}`}
                   >
                     {columns.map((col, index) => {
                       const cell = col.render(row);
@@ -174,32 +172,30 @@ export function DataTable<T>({
                       // than as another column.
                       const content =
                         index === 0 && expand ? (
-                          <span className="flex min-w-0 items-center gap-1.5">
+                          <span className="flex min-w-0 items-center gap-3">
                             {expandable ? (
                               // A bordered box rather than a bare glyph: it
                               // reads as a control at a glance and gives a
-                              // real click target.
+                              // real click target. Filled black when open.
                               <button
                                 type="button"
                                 onClick={() => toggleOpen(key)}
                                 aria-expanded={isOpen}
                                 aria-label={isOpen ? "Collapse row" : "Expand row"}
-                                className={`flex h-5 w-5 shrink-0 items-center justify-center rounded border text-[10px] leading-none transition-colors ${
-                                  isOpen
-                                    ? "border-neutral-400 bg-neutral-200 text-neutral-900"
-                                    : "border-neutral-300 bg-white text-neutral-600 hover:border-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+                                className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center border-[1.5px] border-ink text-[9px] leading-none transition-colors ${
+                                  isOpen ? "bg-ink text-white" : "bg-white text-ink"
                                 }`}
                               >
                                 {isOpen ? "▼" : "▶"}
                               </button>
                             ) : (
-                              <span aria-hidden className="w-5 shrink-0" />
+                              <span aria-hidden className="w-[22px] shrink-0" />
                             )}
                             <span className="min-w-0 shrink-0 truncate">{cell}</span>
                             {/* A summary that returns nothing renders nothing —
                                 no placeholder eating the row's width. */}
                             {expand.summary?.(row) && (
-                              <span className="min-w-0 truncate text-xs text-neutral-400">
+                              <span className="min-w-0 truncate text-xs text-faint">
                                 {expand.summary(row)}
                               </span>
                             )}
@@ -211,7 +207,7 @@ export function DataTable<T>({
                       return (
                         <td
                           key={col.key}
-                          className={`px-2 py-1 ${col.wrap ? "" : "truncate"} ${
+                          className={`h-14 px-4 py-4 ${col.wrap ? "" : "truncate"} ${
                             col.align === "right" ? "text-right tabular-nums" : ""
                           }`}
                         >
@@ -222,8 +218,8 @@ export function DataTable<T>({
                   </tr>
 
                   {isOpen && expand && (
-                    <tr className="border-b border-neutral-100 bg-neutral-50">
-                      <td colSpan={columns.length} className="px-2 py-3">
+                    <tr className="border-b border-hairline bg-neutral-50">
+                      <td colSpan={columns.length} className="px-4 py-5">
                         {expand.render(row)}
                       </td>
                     </tr>
@@ -240,7 +236,7 @@ export function DataTable<T>({
           <button
             onClick={reset}
             title="Restore the default column widths"
-            className="text-xs text-neutral-500 hover:underline"
+            className="text-[12px] uppercase tracking-[0.12em] text-subtle hover:underline"
           >
             Reset column widths
           </button>

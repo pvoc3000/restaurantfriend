@@ -29,7 +29,7 @@ export default async function PurchaseOrdersPage({
 
   if (!session.activeLocation) {
     return (
-      <p className="text-sm text-neutral-600">
+      <p className="text-sm text-muted">
         Pick a location to see its purchase orders.
       </p>
     );
@@ -54,7 +54,7 @@ export default async function PurchaseOrdersPage({
 
   if (error) {
     return (
-      <p className="text-sm text-red-700">
+      <p className="text-sm text-accent">
         Could not load purchase orders: {error.message}
       </p>
     );
@@ -74,7 +74,7 @@ export default async function PurchaseOrdersPage({
 
     if (lineError) {
       return (
-        <p className="text-sm text-red-700">
+        <p className="text-sm text-accent">
           Could not load order lines: {lineError.message}
         </p>
       );

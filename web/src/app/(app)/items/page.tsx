@@ -50,7 +50,7 @@ export default async function ItemsPage({
 
     if (error) {
       return (
-        <p className="text-sm text-red-700">
+        <p className="text-sm text-accent">
           Could not load the catalog: {error.message}
         </p>
       );

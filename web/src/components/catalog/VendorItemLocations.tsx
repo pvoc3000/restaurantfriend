@@ -127,7 +127,7 @@ function FavoriteDays({
   }
 
   return (
-    <span className="inline-flex items-center gap-0.5">
+    <span className="inline-flex items-center">
       {DAYS.map((d) => {
         const active = on.includes(d.weekday);
         return (
@@ -138,10 +138,8 @@ function FavoriteDays({
             aria-label={`Favorite on ${d.label}`}
             disabled={busy}
             onClick={() => toggle(d.weekday)}
-            className={`rounded px-1 text-xs tabular-nums disabled:opacity-50 ${
-              active
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+            className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums transition-colors first:border-l disabled:opacity-35 ${
+              active ? "bg-ink text-white" : "bg-white text-faint hover:text-ink"
             }`}
           >
             {d.label}
@@ -156,15 +154,11 @@ function FavoriteDays({
         disabled={busy}
         onClick={toggleAll}
         title={allOn ? "Clear every day" : "Favorite on every day"}
-        className={`ml-1.5 rounded border px-1 text-xs disabled:opacity-50 ${
-          allOn
-            ? "border-neutral-900 bg-neutral-900 text-white"
-            : "border-neutral-300 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700"
-        }`}
+        className="ml-2 text-xs text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900 disabled:opacity-35"
       >
-        All
+        {allOn ? "None" : "All"}
       </button>
-      {failed && <span className="ml-1 text-xs text-red-700">retry</span>}
+      {failed && <span className="ml-1 text-xs text-accent">retry</span>}
     </span>
   );
 }
@@ -187,19 +181,19 @@ export function VendorItemLocations({
   globalPrice: number | null;
   activeLocationId: string | null;
 }) {
-  const dash = <span className="text-neutral-400">—</span>;
+  const dash = <span className="text-faint">—</span>;
 
   const columns: DataColumn<VendorItemLocationRow>[] = [
     {
       key: "location",
       label: "Location",
-      width: 150,
+      width: 180,
       sortValue: (r) => r.location.code,
       render: (r) => (
         <>
           {r.location.code}
           {r.location.id === activeLocationId && (
-            <span className="ml-1.5 rounded bg-blue-100 px-1 text-xs text-blue-800">
+            <span className="ml-1.5 border border-ink px-1 text-[10px] uppercase tracking-[0.12em] text-ink">
               here
             </span>
           )}
@@ -209,7 +203,7 @@ export function VendorItemLocations({
     {
       key: "favorite_days",
       label: "Favorite days",
-      width: 235,
+      width: 280,
       // Sorts on how many days it's the preferred source here.
       sortValue: (r) => (r.itemLocationId ? r.favoriteDays.length : null),
       render: (r) =>
@@ -221,13 +215,13 @@ export function VendorItemLocations({
             days={r.favoriteDays}
           />
         ) : (
-          <span className="text-xs text-neutral-400">not stocked here</span>
+          <span className="text-xs text-faint">not stocked here</span>
         ),
     },
     {
       key: "price",
       label: "Price",
-      width: 130,
+      width: 155,
       align: "right",
       sortValue: (r) =>
         r.overridePrice === null
@@ -237,20 +231,20 @@ export function VendorItemLocations({
           : Number(r.overridePrice),
       render: (r) =>
         r.overridePrice !== null ? (
-          <span className="text-neutral-800">
+          <span className="text-body">
             {money(r.overridePrice)}
-            <span className="ml-1 rounded bg-amber-100 px-1 text-xs text-amber-800">
+            <span className="ml-1 border border-ink bg-mark-fill px-1 text-xs text-ink">
               override
             </span>
           </span>
         ) : (
-          <span className="text-neutral-500">{money(globalPrice)}</span>
+          <span className="text-subtle">{money(globalPrice)}</span>
         ),
     },
     {
       key: "par",
       label: "Item par",
-      width: 100,
+      width: 120,
       align: "right",
       sortValue: (r) => (r.defaultPar === null ? null : Number(r.defaultPar)),
       render: (r) => (r.itemLocationId ? qty(r.defaultPar) : dash),
@@ -258,13 +252,13 @@ export function VendorItemLocations({
     {
       key: "last_ordered",
       label: "Last ordered",
-      width: 130,
+      width: 155,
       sortValue: (r) => r.lastOrderDate,
       render: (r) =>
         r.lastOrderDate ? (
-          <span className="tabular-nums text-neutral-600">{r.lastOrderDate}</span>
+          <span className="tabular-nums text-muted">{r.lastOrderDate}</span>
         ) : (
-          <span className="text-neutral-400">never</span>
+          <span className="text-faint">never</span>
         ),
     },
   ];
@@ -277,7 +271,7 @@ export function VendorItemLocations({
       storageKey="rf.vendorItemLocations.columnWidths.v1"
       defaultSort={{ key: "location" }}
       rowClassName={(r) =>
-        r.itemLocationId && !r.itemLocationActive ? "text-neutral-400" : ""
+        r.itemLocationId && !r.itemLocationActive ? "text-faint" : ""
       }
     />
   );

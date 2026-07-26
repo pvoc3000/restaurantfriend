@@ -17,6 +17,7 @@ import {
 import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
 import { makeComparator, nextSortDir, type SortValue } from "@/lib/tableSort";
 import { ColumnHeader } from "./ColumnHeader";
+import { Checkbox } from "@/components/ui/Checkbox";
 import type { ItemRow } from "@/app/(app)/items/page";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
@@ -35,13 +36,13 @@ const COLUMNS: {
   sort: SortKey | null;
   align?: "right";
 }[] = [
-  { key: "select", label: "", width: 32, sort: null },
-  { key: "name", label: "Item", width: 260, sort: "name" },
-  { key: "category", label: "Category", width: 140, sort: "category" },
-  { key: "section", label: "Section", width: 170, sort: "section" },
-  { key: "par", label: "Par", width: 72, sort: "par", align: "right" },
-  { key: "unit", label: "Unit", width: 72, sort: "unit" },
-  { key: "last", label: "Last ordered", width: 120, sort: "last" },
+  { key: "select", label: "", width: 40, sort: null },
+  { key: "name", label: "Item", width: 310, sort: "name" },
+  { key: "category", label: "Category", width: 170, sort: "category" },
+  { key: "section", label: "Section", width: 205, sort: "section" },
+  { key: "par", label: "Par", width: 85, sort: "par", align: "right" },
+  { key: "unit", label: "Unit", width: 85, sort: "unit" },
+  { key: "last", label: "Last ordered", width: 145, sort: "last" },
 ];
 
 // Module-level so the widths hook's memo key is stable across renders.
@@ -262,18 +263,18 @@ export function ItemsList({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-xl font-semibold">Inventory</h1>
-        <span className="text-sm text-neutral-500">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">Inventory</h1>
+        <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
           {visible.length} of {items.length}
           {activeLocationCode ? ` · ${activeLocationCode}` : ""}
         </span>
-        <span className="ml-auto flex items-center gap-3 text-xs text-neutral-400">
+        <span className="ml-auto flex items-center gap-3 text-xs text-faint">
           <span>Drag the dividers between column headers to resize</span>
           {customized && (
             <button
               onClick={resetWidths}
               title="Restore the default column widths"
-              className="text-neutral-600 hover:underline"
+              className="text-muted hover:underline"
             >
               Reset column widths
             </button>
@@ -287,12 +288,12 @@ export function ItemsList({
           value={filters.q}
           onChange={(e) => update({ q: e.target.value })}
           placeholder="Search name or category…"
-          className="w-72 rounded border border-neutral-300 px-2 py-1 text-sm"
+          className="h-9 w-72 border border-ink px-3 text-sm outline-none focus:border-2"
         />
         <select
           value={filters.category}
           onChange={(e) => update({ category: e.target.value })}
-          className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm"
+          className="h-9 border border-ink bg-white px-2 text-sm"
         >
           <option value="">All categories</option>
           {categories.map((c) => (
@@ -307,10 +308,10 @@ export function ItemsList({
             <button
               key={t.key}
               onClick={() => update({ active: t.key })}
-              className={`rounded px-2 py-1 ${
+              className={`border-b-2 px-1 pb-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] ${
                 filters.active === t.key
-                  ? "bg-neutral-900 text-white"
-                  : "text-neutral-600 hover:bg-neutral-100"
+                  ? "border-ink text-ink"
+                  : "border-transparent text-muted hover:text-ink"
               }`}
             >
               {t.label}
@@ -321,7 +322,7 @@ export function ItemsList({
 
       {/* Last-ordered filter — same buckets as the cleanup queue */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs uppercase tracking-wide text-neutral-400">
+        <span className="text-xs uppercase tracking-[0.12em] text-faint">
           Last ordered
         </span>
         {(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => {
@@ -332,14 +333,14 @@ export function ItemsList({
             <button
               key={t}
               onClick={() => update({ stale: t })}
-              className={`rounded-full border px-3 py-1 text-sm ${
+              className={`border px-3 py-1 text-sm ${
                 on
-                  ? "border-amber-700 bg-amber-700 text-white"
-                  : "border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+                  ? (t === "any" ? "border-ink bg-ink text-white" : "border-ink bg-[var(--rf-yellow-500)] text-ink")
+                  : "border-ink text-body hover:bg-neutral-100"
               }`}
             >
               {label}
-              <span className={`ml-1.5 ${on ? "text-amber-200" : "text-neutral-400"}`}>
+              <span className={`ml-1.5 ${on && t === "any" ? "text-white/60" : "text-faint"}`}>
                 {count}
               </span>
             </button>
@@ -348,34 +349,34 @@ export function ItemsList({
       </div>
 
       {checked.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm">
+        <div className="flex flex-wrap items-center gap-3 border border-ink px-4 py-3 text-sm">
           <span>{checked.size} selected</span>
           <button
             disabled={busy}
             onClick={() => deactivate("here")}
-            className="rounded border border-neutral-300 bg-white px-3 py-1 hover:bg-neutral-100 disabled:opacity-50"
+            className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
           >
             Deactivate here{activeLocationCode ? ` (${activeLocationCode})` : ""}
           </button>
           <button
             disabled={busy}
             onClick={() => deactivate("everywhere")}
-            className="rounded bg-red-700 px-3 py-1 text-white hover:bg-red-800 disabled:opacity-50"
+            className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
           >
             Deactivate everywhere
           </button>
           <button
             onClick={() => setChecked(new Set())}
-            className="text-neutral-600 hover:underline"
+            className="text-muted hover:underline"
           >
             Clear
           </button>
-          {error && <span className="text-red-700">{error}</span>}
+          {error && <span className="text-accent">{error}</span>}
         </div>
       )}
 
       {visible.length === 0 ? (
-        <p className="text-sm text-neutral-600">No items match these filters.</p>
+        <p className="text-sm text-muted">No items match these filters.</p>
       ) : (
         <div className="overflow-x-auto">
           <table
@@ -388,7 +389,7 @@ export function ItemsList({
               ))}
             </colgroup>
             <thead>
-              <tr className="border-b border-neutral-300 text-left text-neutral-600">
+              <tr className="text-left text-muted [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]">
                 {COLUMNS.map((col) => (
                   <ColumnHeader
                     key={col.key}
@@ -400,11 +401,11 @@ export function ItemsList({
                     onResizeReset={() => setWidth(col.key, col.width)}
                   >
                     {col.key === "select" ? (
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={allVisibleChecked}
                         onChange={toggleAllVisible}
-                        aria-label="select all"
+                        label="select all"
+                        size={18}
                       />
                     ) : undefined}
                   </ColumnHeader>
@@ -421,52 +422,54 @@ export function ItemsList({
                   (i === 0 || groupLabel(sorted[i - 1], grouping!) !== label);
 
                 const row = (
+                  // No rule between rows (Mark, 2026-07-25) — the hover wash
+                  // is enough to track a row across the width.
                   <tr
-                    className={`border-b border-neutral-100 hover:bg-neutral-50 ${
-                      item.is_active ? "" : "text-neutral-400"
+                    className={`hover:bg-neutral-50 ${
+                      item.is_active ? "" : "text-faint"
                     }`}
                   >
-                    <td className="truncate px-2 py-1">
-                      <input
-                        type="checkbox"
+                    <td className="truncate px-4 py-4">
+                      <Checkbox
                         checked={checked.has(item.id)}
                         onChange={() => toggleOne(item.id)}
-                        aria-label={`select ${item.name}`}
+                        label={`select ${item.name}`}
+                        size={18}
                       />
                     </td>
-                    <td className="truncate px-2 py-1">
+                    <td className="truncate px-4 py-4">
                       <Link
                         href={itemDetailHref(item.id, filters)}
-                        className="text-blue-700 hover:underline"
+                        className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
                       >
                         {item.name}
                       </Link>
                       {!item.is_active && (
-                        <span className="ml-1.5 rounded bg-neutral-200 px-1 text-xs text-neutral-600">
+                        <span className="ml-1.5 border border-neutral-300 bg-neutral-100 px-1 text-xs text-muted">
                           inactive
                         </span>
                       )}
                       {!il && (
-                        <span className="ml-1.5 rounded bg-amber-100 px-1 text-xs text-amber-800">
+                        <span className="ml-1.5 border border-ink bg-mark-fill px-1 text-xs text-ink">
                           not stocked here
                         </span>
                       )}
                     </td>
-                    <td className="truncate px-2 py-1 text-neutral-600">
+                    <td className="truncate px-4 py-4 text-muted">
                       {item.category ?? "—"}
                     </td>
-                    <td className="truncate px-2 py-1 text-neutral-600">
+                    <td className="truncate px-4 py-4 text-muted">
                       {il?.shop_sections?.display_name ?? "—"}
                     </td>
-                    <td className="truncate px-2 py-1 text-right tabular-nums text-neutral-600">
+                    <td className="truncate px-4 py-4 text-right tabular-nums text-muted">
                       {qty(il?.default_par)}
                     </td>
-                    <td className="truncate px-2 py-1 text-neutral-600">{item.base_unit}</td>
-                    <td className="truncate px-2 py-1 tabular-nums">
+                    <td className="truncate px-4 py-4 text-muted">{item.base_unit}</td>
+                    <td className="truncate px-4 py-4 tabular-nums">
                       {item.last_order_date ? (
-                        <span className="text-neutral-600">{item.last_order_date}</span>
+                        <span className="text-muted">{item.last_order_date}</span>
                       ) : (
-                        <span className="text-amber-700">never</span>
+                        <span className="text-accent">never</span>
                       )}
                     </td>
                   </tr>
@@ -476,13 +479,13 @@ export function ItemsList({
 
                 return (
                   <Fragment key={item.id}>
-                    <tr className="border-b border-neutral-300 bg-neutral-100">
+                    <tr className="border-b border-hairline bg-neutral-100">
                       <td
                         colSpan={COLUMNS.length}
-                        className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-700"
+                        className="px-2 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-body"
                       >
                         {label}
-                        <span className="ml-2 font-normal normal-case tracking-normal text-neutral-500">
+                        <span className="ml-2 font-normal normal-case tracking-normal text-subtle">
                           {groupCounts.get(label!) ?? 0}
                         </span>
                       </td>

@@ -9,11 +9,17 @@ import type { Crumb } from "@/lib/breadcrumbs";
  */
 export function Breadcrumbs({ trail, current }: { trail: Crumb[]; current: string }) {
   return (
-    <nav aria-label="Breadcrumb" className="text-sm">
-      <ol className="flex flex-wrap items-center gap-1 text-neutral-500">
+    <nav
+      aria-label="Breadcrumb"
+      className="text-[12px] uppercase tracking-[0.12em]"
+    >
+      <ol className="flex flex-wrap items-center gap-3 text-subtle">
         {trail.map((crumb) => (
-          <li key={crumb.href} className="flex items-center gap-1">
-            <Link href={crumb.href} className="text-blue-700 hover:underline">
+          <li key={crumb.href} className="flex items-center gap-3">
+            <Link
+              href={crumb.href}
+              className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+            >
               {crumb.label}
             </Link>
             <span aria-hidden className="text-neutral-300">
@@ -21,7 +27,7 @@ export function Breadcrumbs({ trail, current }: { trail: Crumb[]; current: strin
             </span>
           </li>
         ))}
-        <li className="max-w-xs truncate text-neutral-700" aria-current="page">
+        <li className="max-w-xs truncate text-body" aria-current="page">
           {current}
         </li>
       </ol>

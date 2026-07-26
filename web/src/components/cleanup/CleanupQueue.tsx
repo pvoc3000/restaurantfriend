@@ -10,6 +10,7 @@ import {
   type StaleBucket,
 } from "@/lib/lastOrdered";
 import type { QueueItem } from "@/app/(app)/cleanup/page";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { FixDrawer } from "./FixDrawer";
 
 type ProblemTab = ProblemKind | "all";
@@ -168,27 +169,27 @@ export function CleanupQueue({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-xl font-semibold">Catalog cleanup</h1>
-        <span className="text-sm text-neutral-500">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">Catalog cleanup</h1>
+        <span className="text-sm text-subtle">
           {items.length} {items.length === 1 ? "row needs" : "rows need"} attention
         </span>
         <div className="ml-auto flex items-center gap-1 text-sm">
           <button
             onClick={() => setScope(false)}
-            className={`rounded px-2 py-1 ${
+            className={`border-b-2 px-1 pb-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] ${
               allLocations
-                ? "text-neutral-600 hover:bg-neutral-100"
-                : "bg-neutral-900 text-white"
+                ? "border-transparent text-muted hover:text-ink"
+                : "border-ink text-ink"
             }`}
           >
             {activeLocationCode ?? "This location"}
           </button>
           <button
             onClick={() => setScope(true)}
-            className={`rounded px-2 py-1 ${
+            className={`border-b-2 px-1 pb-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] ${
               allLocations
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-600 hover:bg-neutral-100"
+                ? "border-ink text-ink"
+                : "border-transparent text-muted hover:text-ink"
             }`}
           >
             All locations
@@ -196,7 +197,7 @@ export function CleanupQueue({
         </div>
       </div>
 
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-subtle">
         Suggested flow: triage stale rows first — select what you no longer order
         and deactivate it — then fix what remains.
       </p>
@@ -211,14 +212,14 @@ export function CleanupQueue({
             <button
               key={t}
               onClick={() => setProblemTab(t)}
-              className={`rounded-full border px-3 py-1 text-sm ${
+              className={`border px-3 py-1 text-sm ${
                 on
                   ? "border-neutral-900 bg-neutral-900 text-white"
-                  : "border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+                  : "border-ink text-body hover:bg-neutral-100"
               }`}
             >
               {label}
-              <span className={`ml-1.5 ${on ? "text-neutral-300" : "text-neutral-400"}`}>
+              <span className={`ml-1.5 ${on ? "text-neutral-300" : "text-faint"}`}>
                 {count}
               </span>
             </button>
@@ -228,7 +229,7 @@ export function CleanupQueue({
 
       {/* Last-ordered (staleness) filter */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs uppercase tracking-wide text-neutral-400">
+        <span className="text-xs uppercase tracking-[0.12em] text-faint">
           Last ordered
         </span>
         {(["any", ...STALE_ORDER] as StaleTab[]).map((t) => {
@@ -239,14 +240,14 @@ export function CleanupQueue({
             <button
               key={t}
               onClick={() => setStaleTab(t)}
-              className={`rounded-full border px-3 py-1 text-sm ${
+              className={`border px-3 py-1 text-sm ${
                 on
-                  ? "border-amber-700 bg-amber-700 text-white"
-                  : "border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+                  ? (t === "any" ? "border-ink bg-ink text-white" : "border-ink bg-[var(--rf-yellow-500)] text-ink")
+                  : "border-ink text-body hover:bg-neutral-100"
               }`}
             >
               {label}
-              <span className={`ml-1.5 ${on ? "text-amber-200" : "text-neutral-400"}`}>
+              <span className={`ml-1.5 ${on && t === "any" ? "text-white/60" : "text-faint"}`}>
                 {count}
               </span>
             </button>
@@ -256,40 +257,40 @@ export function CleanupQueue({
 
       {/* Bulk action bar */}
       {checked.size > 0 && (
-        <div className="flex flex-wrap items-center gap-3 rounded border border-neutral-300 bg-neutral-50 px-3 py-2 text-sm">
+        <div className="flex flex-wrap items-center gap-3 border border-ink px-4 py-3 text-sm">
           <span>{checked.size} selected</span>
           <button
             disabled={bulkBusy}
             onClick={deactivateSelected}
-            className="rounded bg-red-700 px-3 py-1 text-white hover:bg-red-800 disabled:opacity-50"
+            className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
           >
             Deactivate selected here
           </button>
           <button
             onClick={() => setChecked(new Set())}
-            className="text-neutral-600 hover:underline"
+            className="text-muted hover:underline"
           >
             Clear
           </button>
-          {bulkError && <span className="text-red-700">{bulkError}</span>}
+          {bulkError && <span className="text-accent">{bulkError}</span>}
         </div>
       )}
 
       {visible.length === 0 ? (
-        <p className="rounded border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-800">
+        <p className="border border-ink bg-[var(--rf-green-50)] px-3 py-2 text-sm text-ink">
           Nothing here — this queue is clear.
         </p>
       ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full border-collapse text-sm">
             <thead>
-              <tr className="border-b border-neutral-300 text-left text-neutral-600">
+              <tr className="text-left text-muted [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]">
                 <th className="w-8 px-2 py-1">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={allVisibleChecked}
                     onChange={toggleAllVisible}
-                    aria-label="select all"
+                    label="select all"
+                    size={18}
                   />
                 </th>
                 <th className="px-2 py-1 font-medium">Item</th>
@@ -305,37 +306,37 @@ export function CleanupQueue({
                 <tr
                   key={item.id}
                   onClick={() => setSelectedId(item.id)}
-                  className={`cursor-pointer border-b border-neutral-100 hover:bg-neutral-50 ${
-                    selectedId === item.id ? "bg-blue-50" : ""
+                  className={`cursor-pointer border-b border-hairline hover:bg-neutral-50 ${
+                    selectedId === item.id ? "bg-neutral-100" : ""
                   }`}
                 >
                   <td className="px-2 py-1" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={checked.has(item.id)}
                       onChange={() => toggleOne(item.id)}
-                      aria-label={`select ${item.inventory_items.name}`}
+                      label={`select ${item.inventory_items.name}`}
+                      size={18}
                     />
                   </td>
                   <td className="px-2 py-1">{item.inventory_items.name}</td>
-                  <td className="px-2 py-1 text-neutral-600">{item.location_code}</td>
-                  <td className="px-2 py-1 text-neutral-600">
+                  <td className="px-2 py-1 text-muted">{item.location_code}</td>
+                  <td className="px-2 py-1 text-muted">
                     {item.inventory_items.category ?? "—"}
                   </td>
                   {/* The sources the guide would actually emit for this row —
                       what the checks now measure. */}
-                  <td className="px-2 py-1 text-neutral-600">
+                  <td className="px-2 py-1 text-muted">
                     {item.favorites.length === 0 ? (
-                      <span className="text-neutral-400">none</span>
+                      <span className="text-faint">none</span>
                     ) : (
                       [...new Set(item.favorites.map((f) => f.vendor_name ?? "—"))].join(", ")
                     )}
                   </td>
                   <td className="px-2 py-1 tabular-nums">
                     {item.last_order_date ? (
-                      <span className="text-neutral-600">{item.last_order_date}</span>
+                      <span className="text-muted">{item.last_order_date}</span>
                     ) : (
-                      <span className="text-amber-700">never</span>
+                      <span className="text-accent">never</span>
                     )}
                   </td>
                   <td className="px-2 py-1">
@@ -343,7 +344,7 @@ export function CleanupQueue({
                       {item.problems.map((p) => (
                         <span
                           key={p}
-                          className="rounded bg-amber-100 px-1.5 py-0.5 text-xs text-amber-800"
+                          className="border border-ink bg-mark-fill px-1.5 py-0.5 text-xs text-ink"
                         >
                           {PROBLEM_LABEL[p]}
                         </span>
@@ -369,32 +370,32 @@ export function CleanupQueue({
 
       {/* Deactivate-everywhere follow-up (brief §B3) */}
       {followUp && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
-          <div className="w-full max-w-md space-y-3 rounded border border-neutral-300 bg-white p-4 shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 p-4">
+          <div className="w-full max-w-md space-y-3 border-2 border-ink bg-white p-4">
             <h2 className="text-lg font-semibold">Deactivate items entirely?</h2>
-            <p className="text-sm text-neutral-600">
+            <p className="text-sm text-muted">
               {followUp.length}{" "}
               {followUp.length === 1 ? "item is" : "items are"} now inactive at
               every location. Deactivate the item{followUp.length === 1 ? "" : "s"}{" "}
               in the catalog too?
             </p>
-            <ul className="max-h-40 overflow-y-auto text-sm text-neutral-700">
+            <ul className="max-h-40 overflow-y-auto text-sm text-body">
               {followUp.map((f) => (
                 <li key={f.id}>• {f.name}</li>
               ))}
             </ul>
-            {bulkError && <p className="text-sm text-red-700">{bulkError}</p>}
+            {bulkError && <p className="text-sm text-accent">{bulkError}</p>}
             <div className="flex justify-end gap-2">
               <button
                 onClick={() => setFollowUp(null)}
-                className="rounded border border-neutral-300 px-3 py-1 text-sm hover:bg-neutral-100"
+                className="h-9 border border-ink px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
               >
                 Leave active
               </button>
               <button
                 disabled={bulkBusy}
                 onClick={deactivateItemsEverywhere}
-                className="rounded bg-red-700 px-3 py-1 text-sm text-white hover:bg-red-800 disabled:opacity-50"
+                className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
               >
                 Deactivate {followUp.length === 1 ? "item" : "all"}
               </button>

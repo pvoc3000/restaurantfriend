@@ -1,0 +1,34 @@
+/* Heritage layer — DF Operations (FileMaker Pro), the system restaurantfriend
+   replaces. These values describe the ORIGINAL, sampled from the 2026 desktop
+   and iPad screenshots in `references/legacy-fmp/`. They exist so the FMP
+   recreation kit is accurate and so the lineage of the new product's decisions
+   is legible. Do NOT style new restaurantfriend screens from this file —
+   `tokens/colors.css` is the live system. The one thing that survived
+   unchanged is the meaning of the fills: green = ordering, red = zeroed. */
+:root {
+  /* Chrome — solid black bars, top and bottom, edge to edge */
+  --rf-legacy-chrome: #000000;         /* @kind color */
+  --rf-legacy-chrome-alt: #1a1a1a;     /* record counter well */
+  --rf-legacy-module-bar: #c9c9c9;     /* module tab strip */
+  --rf-legacy-module-active: #3d3d3d;  /* the module you're in */
+  --rf-legacy-module-label: #6e6e6e;   /* inactive module label */
+  --rf-legacy-subnav-label: #d0d0d0;   /* inactive sub-nav label */
+  --rf-legacy-tab-inactive: #e6e6e6;   /* INFO / PRODUCTS / HISTORY tabs */
+
+  /* The layout name, always yellow on black, top left */
+  --rf-legacy-title: #ffff00;          /* @kind color */
+
+  /* Row fills — the ancestors of the order box's three states */
+  --rf-legacy-qty-green: #cfe8cb;      /* a quantity is going on the order */
+  --rf-legacy-qty-red: #ffb3ac;        /* explicitly zeroed */
+  --rf-legacy-row-selected: #dbe6f7;   /* the record under the cursor */
+  --rf-legacy-par: #ff0000;            /* PAR 2X 50LBS, right-aligned */
+
+  /* Geometry */
+  --rf-legacy-module-h: 40px;          /* @kind spacing */
+  --rf-legacy-subnav-h: 36px;          /* @kind spacing */
+  --rf-legacy-title-h: 34px;           /* @kind spacing */
+  --rf-legacy-band-h: 72px;            /* black shop-section band */
+  --rf-legacy-actionbar-h: 74px;       /* @kind spacing */
+  --rf-legacy-touch-h: 96px;           /* iPad action bar */
+}

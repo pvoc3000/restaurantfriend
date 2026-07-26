@@ -202,27 +202,29 @@ export function ProcessPo({
     });
 
   const btn =
-    "rounded border border-neutral-300 bg-white px-3 py-1 hover:bg-neutral-100 disabled:opacity-50";
+    "h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
   const primaryBtn =
-    "rounded bg-neutral-900 px-3 py-1 font-medium text-white hover:bg-neutral-700 disabled:bg-neutral-400";
+    "h-9 bg-ink px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300";
 
   return (
-    <div className="space-y-2 rounded border border-neutral-300 bg-white px-3 py-2 text-sm">
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs font-semibold uppercase tracking-wide text-neutral-500">
+    <div className="space-y-3 border border-ink bg-white p-6 text-sm">
+      <div className="flex flex-wrap items-center gap-4">
+        <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Process · {context.order_type.replace("_", " ")}
         </span>
 
         {/* Delivery date first: it prints on the document, so set it before
             generating. The suggestion is the vendor's next delivery day. */}
-        <label className="flex items-center gap-1 text-neutral-600">
-          Delivery
+        <label className="flex items-center gap-2 text-muted">
+          <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+            Delivery
+          </span>
           <input
             type="date"
             value={order.delivery_date ?? ""}
             disabled={busy !== null}
             onChange={(e) => setDelivery(e.target.value || null)}
-            className="rounded border border-neutral-300 px-1.5 py-0.5"
+            className="h-9 border border-ink px-2"
           />
         </label>
         {suggestion && (
@@ -230,7 +232,7 @@ export function ProcessPo({
             disabled={busy !== null}
             onClick={() => setDelivery(suggestion)}
             title="The vendor's next delivery day after the order date"
-            className="rounded-full border border-blue-300 bg-blue-50 px-2 py-0.5 text-xs text-blue-800 hover:bg-blue-100 disabled:opacity-50"
+            className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink hover:bg-[var(--rf-yellow-100)] disabled:opacity-35"
           >
             arrives {suggestion}
           </button>
@@ -296,36 +298,38 @@ export function ProcessPo({
         </span>
       </div>
 
-      {sentNote && <p className="text-xs text-green-800">{sentNote}</p>}
+      {sentNote && <p className="text-xs text-[var(--rf-green-600)]">{sentNote}</p>}
 
       {/* The compose dialog: what you see is exactly what sends. Floats over
           the PO like the Generate POs confirm — same overlay pattern. */}
       {compose && (
         <div
-          className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 p-4 pt-[6vh]"
+          className="fixed inset-0 z-[60] flex items-start justify-center bg-black/55 p-4 pt-[6vh]"
           onClick={() => busy === null && closeCompose()}
         >
           <div
             role="dialog"
             aria-label={`Email purchase order ${order.po_number}`}
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-5xl space-y-2 rounded-lg bg-white p-4 shadow-xl"
+            className="w-full max-w-5xl border-2 border-ink bg-white"
           >
-            <div className="flex items-baseline justify-between">
-              <h2 className="text-base font-semibold">
+            {/* Black title bar, caps — the house dialog edge. */}
+            <div className="flex items-center justify-between gap-4 bg-ink px-6 py-3 text-white">
+              <h2 className="text-[13px] font-bold uppercase tracking-[0.06em]">
                 Email {order.po_number}
               </h2>
               <button
                 type="button"
                 onClick={closeCompose}
                 disabled={busy !== null}
-                className="text-sm text-neutral-500 hover:text-neutral-900"
+                aria-label="Close"
+                className="px-1 text-[17px] leading-none text-white hover:text-white/70 disabled:opacity-35"
               >
-                Close
+                ✕
               </button>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 p-6 md:grid-cols-2">
             <div className="space-y-2">
             <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
             {(
@@ -336,18 +340,18 @@ export function ProcessPo({
               ] as const
             ).map(([label, field]) => (
               <label key={field} className="contents">
-                <span className="text-xs uppercase tracking-wide text-neutral-500">
+                <span className="text-xs uppercase tracking-[0.12em] text-subtle">
                   {label}
                 </span>
                 <input
                   value={compose[field]}
                   disabled={busy !== null}
                   onChange={(e) => setCompose({ ...compose, [field]: e.target.value })}
-                  className="rounded border border-neutral-300 bg-white px-2 py-1"
+                  className="border border-ink bg-white px-2 py-1 outline-none focus:border-2"
                 />
               </label>
             ))}
-            <span className="self-start pt-1 text-xs uppercase tracking-wide text-neutral-500">
+            <span className="self-start pt-1 text-xs uppercase tracking-[0.12em] text-subtle">
               Body
             </span>
             <textarea
@@ -355,19 +359,20 @@ export function ProcessPo({
               rows={7}
               disabled={busy !== null}
               onChange={(e) => setCompose({ ...compose, body: e.target.value })}
-              className="rounded border border-neutral-300 bg-white px-2 py-1"
+              className="border border-ink bg-white px-2 py-1 outline-none focus:border-2"
             />
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs text-neutral-500">
-              📎 {attachment?.filename} — the document shown here is what sends
+            <span className="text-xs text-subtle">
+              Attached: {attachment?.filename} — the document shown here is what
+              sends
             </span>
-            <span className="ml-auto flex items-center gap-2">
+            <span className="ml-auto flex items-center gap-3">
               <button
                 disabled={busy !== null}
                 onClick={closeCompose}
-                className="text-neutral-600 hover:text-neutral-900"
+                className="text-[12px] font-semibold uppercase tracking-[0.06em] text-muted hover:text-ink disabled:opacity-35"
               >
                 Cancel
               </button>
@@ -396,7 +401,7 @@ export function ProcessPo({
 
             {/* A send failure must surface INSIDE the dialog — the card's own
                 error line would be hidden behind the overlay. */}
-            {error && <p className="text-sm text-red-700">{error}</p>}
+            {error && <p className="text-sm text-accent">{error}</p>}
             </div>
 
             {/* The attachment, as the vendor will see it. <object> (not an
@@ -407,9 +412,9 @@ export function ProcessPo({
                 data={attachment.url}
                 type="application/pdf"
                 aria-label={`Preview of ${attachment.filename}`}
-                className="h-[26rem] w-full rounded border border-neutral-300 md:h-full md:min-h-[26rem]"
+                className="h-[26rem] w-full border border-ink md:h-full md:min-h-[26rem]"
               >
-                <div className="flex h-full items-center justify-center p-4 text-center text-xs text-neutral-500">
+                <div className="flex h-full items-center justify-center p-4 text-center text-xs text-subtle">
                   This browser can&apos;t preview PDFs inline — use the Preview
                   PDF button to open it in its own tab.
                 </div>
@@ -420,7 +425,7 @@ export function ProcessPo({
         </div>
       )}
 
-      {error && !compose && <p className="text-red-700">{error}</p>}
+      {error && !compose && <p className="text-accent">{error}</p>}
     </div>
   );
 }

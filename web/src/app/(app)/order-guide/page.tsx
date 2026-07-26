@@ -37,7 +37,7 @@ export default async function OrderGuidePage({
   const supabase = await createClient();
 
   if (!session.activeLocation) {
-    return <p className="text-sm text-neutral-600">Pick a location to open its guide.</p>;
+    return <p className="text-sm text-muted">Pick a location to open its guide.</p>;
   }
 
   const locationId = session.activeLocation.id;
@@ -92,7 +92,7 @@ export default async function OrderGuidePage({
 
     if (error) {
       return (
-        <p className="text-sm text-red-700">Could not load the guide: {error.message}</p>
+        <p className="text-sm text-accent">Could not load the guide: {error.message}</p>
       );
     }
     rows.push(...((data ?? []) as unknown as GuideRow[]));

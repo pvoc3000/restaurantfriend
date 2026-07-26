@@ -58,17 +58,24 @@ export function ActiveToggle({
         }
         disabled={pending}
         onClick={toggle}
-        className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-50 ${
-          on ? "bg-green-600" : "bg-neutral-300"
+        // Black when on, not green: green is spoken for by the order box.
+        className={`relative inline-flex h-[26px] w-[46px] shrink-0 items-center rounded-full border-[1.5px] border-ink transition-colors disabled:opacity-35 ${
+          on ? "bg-ink" : "bg-white"
         }`}
       >
+        {/* Off is the exact inverse of on (Mark, 2026-07-25): black track /
+            white knob ↔ white track / black knob. */}
         <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-            on ? "translate-x-4" : "translate-x-0.5"
+          className={`inline-block h-[18px] w-[18px] transform rounded-full transition-transform ${
+            on ? "translate-x-[22px] bg-white" : "translate-x-[2px] bg-ink"
           }`}
         />
       </button>
-      {failed && <span className="text-xs text-red-700">retry</span>}
+      {failed && (
+        <span className="text-[12px] uppercase tracking-[0.12em] text-accent">
+          retry
+        </span>
+      )}
     </span>
   );
 }

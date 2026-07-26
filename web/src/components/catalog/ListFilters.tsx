@@ -51,14 +51,14 @@ export function ListFilters({
           value={term}
           onChange={(e) => onTerm(e.target.value)}
           placeholder={placeholder}
-          className="w-72 rounded border border-neutral-300 px-2 py-1 text-sm"
+          className="h-9 w-72 border border-ink px-3 text-sm outline-none focus:border-2"
         />
 
         {categories && onCategory && (
           <select
             value={category ?? ""}
             onChange={(e) => onCategory(e.target.value)}
-            className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm"
+            className="h-9 border border-ink bg-white px-2 text-sm"
           >
             <option value="">All categories</option>
             {categories.map((c) => (
@@ -70,15 +70,17 @@ export function ListFilters({
         )}
 
         {active && onActive && (
-          <div className="flex items-center gap-1 text-sm">
+          // FilterTabs: an underline marker, not a black fill — filters change
+          // what you see, commands change the data.
+          <div className="flex items-center gap-4 text-[12px] font-semibold uppercase tracking-[0.06em]">
             {ACTIVE_TABS.map((t) => (
               <button
                 key={t.key}
                 onClick={() => onActive(t.key)}
-                className={`rounded px-2 py-1 ${
+                className={`border-b-2 px-1 pb-0.5 ${
                   active === t.key
-                    ? "bg-neutral-900 text-white"
-                    : "text-neutral-600 hover:bg-neutral-100"
+                    ? "border-ink text-ink"
+                    : "border-transparent text-muted hover:text-ink"
                 }`}
               >
                 {t.label}
@@ -90,25 +92,32 @@ export function ListFilters({
 
       {stale && onStale && (
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs uppercase tracking-wide text-neutral-400">
+          <span className="text-xs uppercase tracking-[0.12em] text-subtle">
             Last ordered
           </span>
           {(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => {
             const count = t === "any" ? totalCount ?? 0 : staleCounts?.[t] ?? 0;
             const label = t === "any" ? "Any age" : STALE_LABEL[t];
             const on = stale === t;
+            // "Any age" selected is a neutral black fill; a selected AGE
+            // bucket is yellow — the "look at this" accent, since a stale
+            // filter is on and hiding everything fresh.
+            const selected =
+              t === "any"
+                ? "border-ink bg-ink text-white"
+                : "border-ink bg-[var(--rf-yellow-500)] text-ink";
             return (
               <button
                 key={t}
                 onClick={() => onStale(t)}
-                className={`rounded-full border px-3 py-1 text-sm ${
+                className={`border px-3 py-1 text-sm ${
                   on
-                    ? "border-amber-700 bg-amber-700 text-white"
-                    : "border-neutral-300 text-neutral-700 hover:bg-neutral-100"
+                    ? selected
+                    : "border-ink text-body hover:bg-neutral-100"
                 }`}
               >
                 {label}
-                <span className={`ml-1.5 ${on ? "text-amber-200" : "text-neutral-400"}`}>
+                <span className={`ml-1.5 ${on && t === "any" ? "text-white/60" : "text-faint"}`}>
                   {count}
                 </span>
               </button>

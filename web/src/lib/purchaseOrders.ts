@@ -25,11 +25,11 @@ export const PO_STATUS_LABEL: Record<PoStatus, string> = {
 // Badge colours: draft is in-progress, sent is awaiting delivery, received is
 // done, void/closed are inert.
 export const PO_STATUS_CLASS: Record<PoStatus, string> = {
-  draft: "bg-blue-100 text-blue-800",
-  sent: "bg-amber-100 text-amber-800",
-  received: "bg-green-100 text-green-800",
-  closed: "bg-neutral-200 text-neutral-700",
-  void: "bg-neutral-200 text-neutral-500",
+  draft: "border border-ink bg-white text-ink",
+  sent: "border border-ink bg-[var(--rf-yellow-200)] text-ink",
+  received: "border border-ink bg-[var(--rf-green-200)] text-ink",
+  closed: "border border-neutral-300 bg-neutral-100 text-muted",
+  void: "border border-neutral-300 bg-white text-faint",
 };
 
 export type PoLine = {

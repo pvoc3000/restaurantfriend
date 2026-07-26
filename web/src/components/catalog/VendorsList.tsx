@@ -29,14 +29,14 @@ const COLUMNS: {
   align?: "right";
 }[] = [
   // Active leads on every catalog table (Mark, 2026-07-23).
-  { key: "active", label: "Active", width: 80 },
-  { key: "name", label: "Name", width: 220 },
-  { key: "type", label: "Type", width: 120 },
-  { key: "order_type", label: "Order via", width: 110 },
-  { key: "account", label: "Account", width: 130 },
-  { key: "minimum", label: "Minimum", width: 115, align: "right" },
-  { key: "order_days", label: "Order days", width: 150 },
-  { key: "delivery_days", label: "Delivery days", width: 150 },
+  { key: "active", label: "Active", width: 95 },
+  { key: "name", label: "Name", width: 265 },
+  { key: "type", label: "Type", width: 145 },
+  { key: "order_type", label: "Order via", width: 130 },
+  { key: "account", label: "Account", width: 155 },
+  { key: "minimum", label: "Minimum", width: 140, align: "right" },
+  { key: "order_days", label: "Order days", width: 180 },
+  { key: "delivery_days", label: "Delivery days", width: 180 },
 ];
 
 const DEFAULT_WIDTHS: ColumnWidths = Object.fromEntries(
@@ -171,18 +171,18 @@ export function VendorsList({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-xl font-semibold">Vendors</h1>
-        <span className="text-sm text-neutral-500">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">Vendors</h1>
+        <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
           {visible.length} of {vendors.length}
           {activeLocationCode ? ` · ${activeLocationCode}` : ""}
         </span>
-        <span className="ml-auto flex items-center gap-3 text-xs text-neutral-400">
+        <span className="ml-auto flex items-center gap-3 text-xs text-faint">
           <span>Drag the dividers between column headers to resize</span>
           {customized && (
             <button
               onClick={reset}
               title="Restore the default column widths"
-              className="text-neutral-600 hover:underline"
+              className="text-muted hover:underline"
             >
               Reset column widths
             </button>
@@ -195,12 +195,12 @@ export function VendorsList({
           value={filters.q}
           onChange={(e) => update({ q: e.target.value })}
           placeholder="Search name, type, account…"
-          className="w-72 rounded border border-neutral-300 px-2 py-1 text-sm"
+          className="h-9 w-72 border border-ink px-3 text-sm outline-none focus:border-2"
         />
         <select
           value={filters.type}
           onChange={(e) => update({ type: e.target.value })}
-          className="rounded border border-neutral-300 bg-white px-2 py-1 text-sm"
+          className="h-9 border border-ink bg-white px-2 text-sm"
         >
           <option value="">All types</option>
           {types.map((t) => (
@@ -215,10 +215,10 @@ export function VendorsList({
             <button
               key={t.key}
               onClick={() => update({ active: t.key })}
-              className={`rounded px-2 py-1 ${
+              className={`border-b-2 px-1 pb-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] ${
                 filters.active === t.key
-                  ? "bg-neutral-900 text-white"
-                  : "text-neutral-600 hover:bg-neutral-100"
+                  ? "border-ink text-ink"
+                  : "border-transparent text-muted hover:text-ink"
               }`}
             >
               {t.label}
@@ -228,7 +228,7 @@ export function VendorsList({
       </div>
 
       {sorted.length === 0 ? (
-        <p className="text-sm text-neutral-600">No vendors match these filters.</p>
+        <p className="text-sm text-muted">No vendors match these filters.</p>
       ) : (
         <div className="overflow-x-auto">
           <table
@@ -241,7 +241,7 @@ export function VendorsList({
               ))}
             </colgroup>
             <thead>
-              <tr className="border-b border-neutral-300 text-left text-neutral-600">
+              <tr className="text-left text-muted [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]">
                 {COLUMNS.map((col) => (
                   <ColumnHeader
                     key={col.key}
@@ -264,35 +264,35 @@ export function VendorsList({
 
                 const row = (
                   <tr
-                    className={`border-b border-neutral-100 hover:bg-neutral-50 ${
-                      v.is_active ? "" : "text-neutral-400"
+                    className={`hover:bg-neutral-50 ${
+                      v.is_active ? "" : "text-faint"
                     }`}
                   >
-                    <td className="truncate px-2 py-1">
+                    <td className="truncate px-4 py-4">
                       <VendorActiveToggle vendorId={v.id} active={v.is_active} />
                     </td>
-                    <td className="truncate px-2 py-1">
+                    <td className="truncate px-4 py-4">
                       <Link
                         href={vendorDetailHref(v.id, filters)}
-                        className="text-blue-700 hover:underline"
+                        className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
                       >
                         {v.name}
                       </Link>
                     </td>
-                    <td className="truncate px-2 py-1 text-neutral-600">
+                    <td className="truncate px-4 py-4 text-muted">
                       {v.vendor_type ?? "—"}
                     </td>
-                    <td className="truncate px-2 py-1 text-neutral-600">{v.order_type}</td>
-                    <td className="truncate px-2 py-1 text-neutral-600">
+                    <td className="truncate px-4 py-4 text-muted">{v.order_type}</td>
+                    <td className="truncate px-4 py-4 text-muted">
                       {config?.account_number ?? "—"}
                     </td>
-                    <td className="truncate px-2 py-1 text-right tabular-nums text-neutral-600">
+                    <td className="truncate px-4 py-4 text-right tabular-nums text-muted">
                       {money(config?.minimum_order ?? null)}
                     </td>
-                    <td className="truncate px-2 py-1 tabular-nums text-neutral-600">
+                    <td className="truncate px-4 py-4 tabular-nums text-muted">
                       {days(config?.order_days ?? null)}
                     </td>
-                    <td className="truncate px-2 py-1 tabular-nums text-neutral-600">
+                    <td className="truncate px-4 py-4 tabular-nums text-muted">
                       {days(config?.delivery_days ?? null)}
                     </td>
                   </tr>
@@ -302,13 +302,13 @@ export function VendorsList({
 
                 return (
                   <Fragment key={v.id}>
-                    <tr className="border-b border-neutral-300 bg-neutral-100">
+                    <tr className="border-b border-hairline bg-neutral-100">
                       <td
                         colSpan={COLUMNS.length}
-                        className="px-2 py-1 text-xs font-semibold uppercase tracking-wide text-neutral-700"
+                        className="px-2 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-body"
                       >
                         {label}
-                        <span className="ml-2 font-normal normal-case tracking-normal text-neutral-500">
+                        <span className="ml-2 font-normal normal-case tracking-normal text-subtle">
                           {groupCounts.get(label!) ?? 0}
                         </span>
                       </td>

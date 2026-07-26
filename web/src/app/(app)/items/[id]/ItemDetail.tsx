@@ -60,7 +60,7 @@ export async function ItemDetail({
     ]);
 
   if (error) {
-    return <p className="text-sm text-red-700">Could not load item: {error.message}</p>;
+    return <p className="text-sm text-accent">Could not load item: {error.message}</p>;
   }
   if (!item) notFound();
 
@@ -79,7 +79,7 @@ export async function ItemDetail({
       <ItemFields item={row} />
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Per-location config
         </h2>
         <ItemLocationRows
@@ -93,15 +93,15 @@ export async function ItemDetail({
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Vendor items
         </h2>
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-subtle">
           Items from deactivated vendors are hidden. Reactivate the vendor on its
           detail screen to bring them back.
         </p>
         {viError ? (
-          <p className="text-sm text-red-700">
+          <p className="text-sm text-accent">
             Could not load vendor items: {viError.message}
           </p>
         ) : (

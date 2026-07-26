@@ -80,7 +80,7 @@ export async function VendorDetail({
     ]);
 
   if (error) {
-    return <p className="text-sm text-red-700">Could not load vendor: {error.message}</p>;
+    return <p className="text-sm text-accent">Could not load vendor: {error.message}</p>;
   }
   if (!vendor) notFound();
 
@@ -137,15 +137,9 @@ export async function VendorDetail({
     <div className="space-y-6">
       {!inPanel && <Breadcrumbs trail={trail} current={v.name} />}
 
-      {/* Says which KIND of record this is — the panel hides breadcrumbs, so
-          without it a vendor and a vendor item look alike. */}
-      <p className="text-xs font-semibold uppercase tracking-wide text-neutral-400">
-        Vendor
-      </p>
-
       <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-xl font-semibold">{v.name}</h1>
-        <span className="text-sm text-neutral-500">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">{v.name}</h1>
+        <span className="text-sm text-subtle">
           {v.vendor_type ?? "—"} · orders via {v.order_type}
           {v.is_active ? "" : " · inactive"}
         </span>
@@ -154,7 +148,7 @@ export async function VendorDetail({
             href={v.url}
             target="_blank"
             rel="noreferrer"
-            className="text-sm text-blue-700 hover:underline"
+            className="text-sm text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
           >
             website
           </a>
@@ -162,7 +156,7 @@ export async function VendorDetail({
       </div>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Per-location config
         </h2>
         <VendorLocationsTable
@@ -173,14 +167,14 @@ export async function VendorDetail({
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Vendor items{" "}
-          <span className="font-normal normal-case tracking-normal text-neutral-400">
+          <span className="font-normal normal-case tracking-normal text-faint">
             {vendorItems?.length ?? 0}
           </span>
         </h2>
         {viError ? (
-          <p className="text-sm text-red-700">
+          <p className="text-sm text-accent">
             Could not load vendor items: {viError.message}
           </p>
         ) : (

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { Checkbox } from "@/components/ui/Checkbox";
 
 // ISO weekdays 1=Mon … 7=Sun (CLAUDE.md). All ordering is Monday today, so Mon
 // leads; the rest stay available but unobtrusive.
@@ -167,23 +168,23 @@ export function FavoritesEditor({
   }
 
   if (vendorItems === null)
-    return <p className="text-sm text-neutral-500">Loading favorites…</p>;
+    return <p className="text-sm text-subtle">Loading favorites…</p>;
 
   if (vendorItems.length === 0)
     return (
-      <p className="text-sm text-neutral-600">
+      <p className="text-sm text-muted">
         No active vendor items to favorite yet — assign one above first.
       </p>
     );
 
   return (
     <div className="space-y-2 text-sm">
-      {error && <p className="text-red-700">{error}</p>}
+      {error && <p className="text-accent">{error}</p>}
 
       <div className="overflow-x-auto">
         <table className="border-collapse">
           <thead>
-            <tr className="text-neutral-500">
+            <tr className="text-subtle">
               <th className="px-1 py-1 text-left font-medium">Vendor item</th>
               {DAYS.map((d, i) => (
                 <th key={i} className="w-7 px-1 py-1 text-center font-medium">
@@ -197,15 +198,15 @@ export function FavoritesEditor({
             {vendorItems.map((vi) => {
               const allOn = DAYS.every((d) => plan.has(key(d.weekday, vi.id)));
               return (
-                <tr key={vi.id} className="border-t border-neutral-100">
+                <tr key={vi.id} className="border-t border-hairline">
                   <td className="max-w-[11rem] px-1 py-1">
                     <div className="truncate">
                       <span className="font-medium">{vi.vendors?.name ?? "—"}</span>{" "}
-                      <span className="text-neutral-500">
+                      <span className="text-subtle">
                         {vi.package_desc ?? ""}
                       </span>
                     </div>
-                    <div className="truncate text-xs text-neutral-500">
+                    <div className="truncate text-xs text-subtle">
                       {vi.brand ? `${vi.brand} · ` : ""}
                       {vi.description ?? ""}
                     </div>
@@ -213,25 +214,29 @@ export function FavoritesEditor({
                   {DAYS.map((d, i) => {
                     const on = plan.has(key(d.weekday, vi.id));
                     return (
-                      <td key={i} className="px-1 py-1 text-center">
-                        <input
-                          type="checkbox"
-                          checked={on}
-                          disabled={busy}
-                          onChange={(e) => toggle(d.weekday, vi.id, e.target.checked)}
-                          aria-label={`${vi.vendors?.name ?? "vendor"} day ${d.weekday}`}
-                        />
+                      <td key={i} className="px-1 py-1">
+                        <span className="flex justify-center">
+                          <Checkbox
+                            checked={on}
+                            disabled={busy}
+                            onChange={(next) => toggle(d.weekday, vi.id, next)}
+                            label={`${vi.vendors?.name ?? "vendor"} day ${d.weekday}`}
+                            size={18}
+                          />
+                        </span>
                       </td>
                     );
                   })}
-                  <td className="px-1 py-1 text-center">
-                    <input
-                      type="checkbox"
-                      checked={allOn}
-                      disabled={busy}
-                      onChange={(e) => toggleAllDays(vi.id, e.target.checked)}
-                      aria-label="all days"
-                    />
+                  <td className="px-1 py-1">
+                    <span className="flex justify-center">
+                      <Checkbox
+                        checked={allOn}
+                        disabled={busy}
+                        onChange={(next) => toggleAllDays(vi.id, next)}
+                        label="all days"
+                        size={18}
+                      />
+                    </span>
                   </td>
                 </tr>
               );
@@ -240,7 +245,7 @@ export function FavoritesEditor({
         </table>
       </div>
 
-      <p className="text-xs text-neutral-500">
+      <p className="text-xs text-subtle">
         Several favorites on one day = pick the source at order time (multi-vendor
         or pack sizes). If the variants are <em>distinct needs</em> each deserving
         its own par/on-hand (e.g. San Pellegrino flavors), split them into

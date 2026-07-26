@@ -61,7 +61,7 @@ export async function VendorItemDetail({
 
   if (error) {
     return (
-      <p className="text-sm text-red-700">Could not load vendor item: {error.message}</p>
+      <p className="text-sm text-accent">Could not load vendor item: {error.message}</p>
     );
   }
   if (!vendorItem) notFound();
@@ -173,7 +173,7 @@ export async function VendorItemDetail({
       <VendorItemFields vi={vi} here={here} />
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Per-location
         </h2>
         <VendorItemLocations
@@ -183,7 +183,7 @@ export async function VendorItemDetail({
           globalPrice={vi.price}
           activeLocationId={session.activeLocation?.id ?? null}
         />
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-subtle">
           A favorite day marks this as the preferred source for that day&apos;s
           guide. Price overrides are set by receiving; the guide and POs resolve
           override → vendor price.
@@ -191,26 +191,26 @@ export async function VendorItemDetail({
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-neutral-500">
+        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Price history
         </h2>
         {(history ?? []).length === 0 ? (
-          <p className="text-sm text-neutral-600">No recorded price changes.</p>
+          <p className="text-sm text-muted">No recorded price changes.</p>
         ) : (
           <table className="text-sm">
             <tbody>
               {((history ?? []) as PriceChange[]).map((h) => (
-                <tr key={h.id} className="border-b border-neutral-100">
-                  <td className="py-1 pr-4 tabular-nums text-neutral-500">
+                <tr key={h.id} className="border-b border-hairline">
+                  <td className="py-1 pr-4 tabular-nums text-subtle">
                     {h.changed_at.slice(0, 10)}
                   </td>
-                  <td className="py-1 pr-4 text-neutral-600">
+                  <td className="py-1 pr-4 text-muted">
                     {h.location_id ? (codeById.get(h.location_id) ?? "—") : "all locations"}
                   </td>
                   <td className="py-1 pr-4 tabular-nums">
                     {money(h.old_price)} → <strong>{money(h.new_price)}</strong>
                   </td>
-                  <td className="py-1 text-xs text-neutral-500">{h.source}</td>
+                  <td className="py-1 text-xs text-subtle">{h.source}</td>
                 </tr>
               ))}
             </tbody>

@@ -12,7 +12,13 @@ import { useRouter } from "next/navigation";
  * Close = router.back(): the panel is a history entry, so Back and the ✕ are
  * the same move. Wide, not centered — these are dense tables, not dialogs.
  */
-export function DetailPanel({ children }: { children: React.ReactNode }) {
+export function DetailPanel({
+  typeLabel,
+  children,
+}: {
+  typeLabel: string;
+  children: React.ReactNode;
+}) {
   const router = useRouter();
 
   // The panel starts exactly below the header, MEASURED rather than assumed:
@@ -48,28 +54,36 @@ export function DetailPanel({ children }: { children: React.ReactNode }) {
       style={{ top: headerHeight }}
       role="dialog"
     >
-      {/* Backdrop: dim just enough to read "layered", keep the walk visible. */}
+      {/* Backdrop: dim the page hard enough to read "layered", no blur. */}
       <div
-        className="absolute inset-0 bg-black/30"
+        className="absolute inset-0 bg-black/55"
         onClick={() => router.back()}
         aria-hidden
       />
-      {/* 75% of the viewport (Mark, 2026-07-23) — full width on phones. The
-          sliver of page left visible keeps the "layered" read; the tables
-          inside get the room they were designed for. */}
-      <div className="absolute inset-y-0 right-0 flex w-full flex-col bg-white shadow-2xl sm:w-3/4">
-        <div className="flex items-center justify-end border-b border-neutral-200 px-4 py-2">
+      {/* Wide and edge-anchored — dense tables, not a dialog. Full width on
+          phones; the sliver of page left visible keeps the "layered" read.
+          Depth is edges, never a shadow: 2px black on the left against the
+          dimmed page, 2px grey on top so the type strip doesn't merge into
+          the black masthead directly above it (Mark, 2026-07-25). */}
+      <div className="absolute inset-y-0 right-0 flex w-full flex-col border-l-2 border-t-2 border-l-ink border-t-subtle bg-white sm:w-[68%]">
+        {/* The black strip carries the record TYPE — the panel hides
+            breadcrumbs, so this is the only cue to what kind of record is
+            open. */}
+        <div className="flex items-center justify-between gap-4 bg-ink px-6 py-3 text-white">
+          <span className="text-[12px] uppercase tracking-[0.12em] text-white/60">
+            {typeLabel}
+          </span>
           <button
             type="button"
             onClick={() => router.back()}
             aria-label="Close"
             title="Close (Esc)"
-            className="rounded px-2 py-0.5 text-lg leading-none text-neutral-500 hover:bg-neutral-100 hover:text-neutral-900"
+            className="px-1 text-[17px] leading-none text-white hover:text-white/70"
           >
-            ×
+            ✕
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-4">{children}</div>
+        <div className="flex-1 overflow-y-auto px-6 py-6">{children}</div>
       </div>
     </div>
   );

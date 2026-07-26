@@ -94,11 +94,11 @@ export function InlineValue({
               setEditing(false);
             }
           }}
-          className={`w-full min-w-16 rounded border border-blue-400 px-1 py-0.5 text-sm ${
+          className={`w-full min-w-16 border-2 border-ink px-2 py-1 outline-none ${
             align === "right" ? "text-right tabular-nums" : ""
           }`}
         />
-        {error && <span className="text-xs text-red-700">{error}</span>}
+        {error && <span className="text-xs text-accent">{error}</span>}
       </span>
     );
   }
@@ -108,9 +108,10 @@ export function InlineValue({
       type="button"
       onClick={open}
       title="Click to edit"
-      className={`w-full rounded px-1 py-0.5 hover:bg-blue-50 ${
+      // Dotted underline at rest — the quietest possible "this is editable".
+      className={`w-full px-1 py-0.5 underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 ${
         align === "right" ? "text-right tabular-nums" : "text-left"
-      } ${value === null || value === "" ? "text-neutral-400" : ""} ${className}`}
+      } ${value === null || value === "" ? "text-faint" : ""} ${className}`}
     >
       {value === null || value === ""
         ? placeholder

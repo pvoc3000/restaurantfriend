@@ -14,7 +14,7 @@ export default async function PurchaseOrderPanel({
   const { id } = await params;
   const rawParams = await searchParams;
   return (
-    <DetailPanel>
+    <DetailPanel typeLabel="Purchase Order">
       <PurchaseOrderDetailView id={id} rawParams={rawParams} inPanel />
     </DetailPanel>
   );

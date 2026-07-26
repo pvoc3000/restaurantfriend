@@ -1,0 +1,98 @@
+/* Restaurant Friend colors — a modern reading of DF Operations.
+   Two rules carry the whole system:
+     1. STRUCTURE IS BLACK. Rules, borders, bands, headers, controls. There is
+        no grey chrome and no tinted surface; contrast does the work that
+        shadows and fills do elsewhere.
+     2. COLOUR IS STATE, never decoration. A fill means something happened to
+        that record. Three fills exist — go, stop, attention — and they only
+        ever appear inside a control or a cell, never across a whole screen.
+   Blue is deliberately absent: links are black and underlined, the way the
+   original printed guide read. */
+:root {
+  /* Ink — true black to true white */
+  --rf-white: #ffffff;
+  --rf-neutral-50: #f7f7f7;   /* faintest wash — zebra-free row banding */
+  --rf-neutral-100: #f1f1f1;  /* group strip */
+  --rf-neutral-200: #e4e4e4;  /* hairline between rows */
+  --rf-neutral-300: #cfcfcf;  /* disabled edge */
+  --rf-neutral-400: #9b9b9b;  /* placeholder, empty value */
+  --rf-neutral-500: #757575;  /* caption */
+  --rf-neutral-600: #545454;  /* secondary text */
+  --rf-neutral-700: #333333;  /* body */
+  --rf-neutral-800: #1a1a1a;  /* strong body, hover fill on black */
+  --rf-neutral-900: #000000;  /* THE colour: ink, rules, bands, buttons */
+  --rf-neutral-950: #000000;
+
+  /* Red — par, an explicit zero, anything irreversible */
+  --rf-red-50: #fdecea;
+  --rf-red-100: #ffdbd6;
+  --rf-red-200: #ffcfc9;   /* zeroed order box (from FMP's #ffb3ac, calmed) */
+  --rf-red-300: #f3a49b;
+  --rf-red-500: #d20000;   /* the accent red */
+  --rf-red-700: #a80000;
+  --rf-red-800: #8c0000;
+  --rf-red-950: #3d0000;
+
+  /* Green — a quantity is going on the order; active; received */
+  --rf-green-50: #eef7ec;
+  --rf-green-100: #e2f1de;
+  --rf-green-200: #cfe8cb;  /* sampled from the FileMaker order box */
+  --rf-green-300: #a8d3a1;
+  --rf-green-500: #4a9c3f;
+  --rf-green-600: #2f7a26;
+  --rf-green-900: #174410;
+  --rf-green-950: #0b2a08;
+
+  /* Yellow — the one inherited accent: "you are here / needs a look".
+     From the layout title FileMaker set in yellow on black. Use it on at most
+     one thing per screen. */
+  --rf-yellow-50: #fffbe6;
+  --rf-yellow-100: #fff4bf;
+  --rf-yellow-200: #ffe98a;
+  --rf-yellow-500: #ffd400;
+  --rf-yellow-600: #e0ba00;
+  --rf-yellow-700: #a88a00;
+  --rf-yellow-800: #6b5800;
+
+  /* ---- Semantic aliases ---- */
+  --rf-text-primary: var(--rf-neutral-900);
+  --rf-text-body: var(--rf-neutral-700);
+  --rf-text-muted: var(--rf-neutral-600);
+  --rf-text-subtle: var(--rf-neutral-500);
+  --rf-text-faint: var(--rf-neutral-400);
+  --rf-text-inverse: var(--rf-white);
+  --rf-text-link: var(--rf-neutral-900);
+  --rf-text-accent: var(--rf-red-500);
+
+  --rf-surface-page: var(--rf-white);
+  --rf-surface-chrome: var(--rf-neutral-900);  /* chrome is black, not grey */
+  --rf-surface-raised: var(--rf-white);
+  --rf-surface-sunken: var(--rf-neutral-50);
+  --rf-surface-group: var(--rf-neutral-100);
+  --rf-surface-band: var(--rf-neutral-900);
+  --rf-surface-hover: var(--rf-neutral-100);
+  --rf-surface-row-hover: var(--rf-neutral-50);
+  --rf-surface-backdrop: rgb(0 0 0 / 0.55);
+
+  --rf-border-hairline: var(--rf-neutral-200);
+  --rf-border-default: var(--rf-neutral-900);
+  --rf-border-strong: var(--rf-neutral-900);
+  --rf-border-control: var(--rf-neutral-900);
+  --rf-border-quiet: var(--rf-neutral-300);
+  --rf-border-focus: var(--rf-red-500);
+
+  --rf-action-primary-bg: var(--rf-neutral-900);
+  --rf-action-primary-bg-hover: var(--rf-neutral-800);
+  --rf-action-primary-bg-disabled: var(--rf-neutral-300);
+  --rf-action-primary-fg: var(--rf-white);
+  --rf-action-danger-fg: var(--rf-red-500);
+  --rf-action-danger-border: var(--rf-red-500);
+  --rf-action-danger-bg-hover: var(--rf-red-50);
+
+  --rf-state-go-fill: var(--rf-green-200);
+  --rf-state-go-wash: var(--rf-green-50);
+  --rf-state-stop-fill: var(--rf-red-200);
+  --rf-state-stop-wash: var(--rf-red-50);
+  --rf-state-mark-fill: var(--rf-yellow-200);
+  --rf-state-mark-wash: var(--rf-yellow-50);
+}

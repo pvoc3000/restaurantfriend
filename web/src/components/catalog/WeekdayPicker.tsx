@@ -85,7 +85,9 @@ export function WeekdayPicker({
   }
 
   return (
-    <span className="inline-flex items-center gap-0.5">
+    <span className="inline-flex items-center">
+      {/* Seven butted boxes sharing one black rule — the modern form of the
+          original's 7-column day grid. */}
       {DAYS.map((day) => {
         const on = days.includes(day.weekday);
         return (
@@ -96,17 +98,15 @@ export function WeekdayPicker({
             aria-label={`${label}: ${day.label}`}
             disabled={pending}
             onClick={() => toggle(day.weekday)}
-            className={`rounded px-1 text-xs tabular-nums disabled:opacity-50 ${
-              on
-                ? "bg-neutral-900 text-white"
-                : "text-neutral-400 hover:bg-neutral-200 hover:text-neutral-700"
+            className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums transition-colors first:border-l disabled:opacity-35 ${
+              on ? "bg-ink text-white" : "bg-white text-faint hover:text-ink"
             }`}
           >
             {day.label}
           </button>
         );
       })}
-      {/* Bordered rather than filled so it reads as a command, not an 8th day. */}
+      {/* An underlined text link so it reads as a command, not an 8th day. */}
       <button
         type="button"
         aria-pressed={allOn}
@@ -114,15 +114,15 @@ export function WeekdayPicker({
         disabled={pending}
         onClick={toggleAll}
         title={allOn ? "Clear every day" : "Select every day"}
-        className={`ml-1.5 rounded border px-1 text-xs disabled:opacity-50 ${
-          allOn
-            ? "border-neutral-900 bg-neutral-900 text-white"
-            : "border-neutral-300 text-neutral-500 hover:bg-neutral-200 hover:text-neutral-700"
-        }`}
+        className="ml-2 text-xs text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900 disabled:opacity-35"
       >
-        All
+        {allOn ? "None" : "All"}
       </button>
-      {failed && <span className="ml-1 text-xs text-red-700">retry</span>}
+      {failed && (
+        <span className="ml-2 text-[12px] uppercase tracking-[0.12em] text-accent">
+          retry
+        </span>
+      )}
     </span>
   );
 }
