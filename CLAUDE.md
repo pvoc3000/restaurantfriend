@@ -280,6 +280,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   then owned by the client** (`lib/navMemoryStore.ts`): a server layout does not
   re-render on soft navigation, so a client-written cookie can never be read
   back mid-session and the tab hrefs would freeze. `signOut` deletes it.
+- **Every slow route needs a `loading.tsx`** (Mark, 2026-07-26 — "enough time
+  for me to wonder each time if the app is working"). Without one Next holds the
+  PREVIOUS page on screen for the whole server wait with no acknowledgement that
+  the click landed; the order guide's TTFB is ~3.5s (five sequential Supabase
+  round trips, one of them 877 rows). Each is a one-liner re-exporting
+  `components/ui/PageLoading` with a label. Put it on the LEAF segment, not on
+  `(app)/` — a group-level one would also fire for other slots. Verified that
+  `vendors/loading.tsx` does NOT flash when a detail slide-over opens: the
+  `@panel` intercept means `children` never re-renders. This is also the one
+  place the design system's "no spinners, no skeletons" is relaxed — an
+  indeterminate bar, not a skeleton, because a static label during a 3.5s wait
+  still reads as stuck. The keyframes live in `globals.css`.
 - **The Active toggle is the FIRST column** on every catalog table (Mark,
   2026-07-23) — vendors list, vendor/item per-location config, vendor items.
   "Stock here" shares that slot where a row doesn't exist yet.

@@ -23,3 +23,25 @@
   --radius-*: initial; /* kill Tailwind's radii — the system is square */
   --shadow-*: initial; /* kill Tailwind's shadows */
 }
+
+/* The one animation in the system, and it earns it: the order guide spends
+   ~3.5s on the server before the browser gets a byte, and until now the old
+   page just sat there. A static "loading" label still reads as stuck — motion
+   is the whole point of this particular control. See components/ui/PageLoading.
+   Everything else still arrives with no transition at all. */
+@keyframes rf-progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-progress-bar {
+    animation: none;
+    width: 100%;
+    opacity: 0.35;
+  }
+}
