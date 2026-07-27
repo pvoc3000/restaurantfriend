@@ -1,0 +1,44 @@
+/* Restaurant Friend typography — a modern reading of DF Operations.
+   The original set everything in the platform grotesque: names in bold caps,
+   labels in small caps, numbers plain. We keep the face and the habits, and
+   fix the two things that made it hard to read — everything was the same size,
+   and nothing had room. The scale below is wider than the old one at both
+   ends, and every step has a job.
+
+   NO WEBFONTS. The stack resolves to Helvetica Neue on the Macs and iPads this
+   is used on, which is what FileMaker was drawing all along; nothing is
+   fetched, so the first paint is instant on shop wifi. */
+:root {
+  --rf-font-sans: ui-sans-serif, system-ui, -apple-system, "Helvetica Neue", "Helvetica", Arial, sans-serif;
+
+  /* Scale */
+  --rf-text-11: 11px;         /* micro label under a control */
+  --rf-text-xs: 0.75rem;      /* 12px — small caps labels, counts */
+  --rf-text-sm: 0.8125rem;    /* 13px — dense table cells */
+  --rf-text-base: 0.9375rem;  /* 15px — body, form fields, list cells */
+  --rf-text-md: 1.0625rem;    /* 17px — vendor names, subheads */
+  --rf-text-lg: 1.375rem;     /* 22px — item headers */
+  --rf-text-xl: 1.75rem;      /* 28px — screen title */
+  --rf-text-2xl: 2.25rem;     /* 36px — shop-section band */
+  --rf-text-3xl: 3rem;        /* 48px — a single number worth staring at */
+
+  --rf-leading-tight: 1.15;
+  --rf-leading-snug: 1.35;
+  --rf-leading-normal: 1.5;
+  --rf-leading-relaxed: 1.65;
+
+  --rf-weight-normal: 400;
+  --rf-weight-medium: 500;
+  --rf-weight-semibold: 600;
+  --rf-weight-bold: 700;
+
+  /* Tracking. Caps always get air — this is what keeps an all-caps interface
+     from reading as shouting. */
+  --rf-tracking-display: -0.02em;  /* large caps: band, screen title */
+  --rf-tracking-tight: -0.01em;
+  --rf-tracking-normal: 0;
+  --rf-tracking-caps: 0.06em;      /* item headers, buttons, vendor names */
+  --rf-tracking-label: 0.12em;     /* small caps column + field labels */
+
+  --rf-font-variant-numeric: tabular-nums;
+}

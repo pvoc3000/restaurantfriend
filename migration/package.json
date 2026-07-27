@@ -1,0 +1,9 @@
+{
+  "name": "restaurantfriend-migration",
+  "private": true,
+  "type": "module",
+  "description": "One-time FMP -> Supabase data loader. Requires Node 20+ (for --env-file).",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0"
+  }
+}

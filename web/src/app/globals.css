@@ -1,0 +1,47 @@
+@import "tailwindcss";
+/* Layered into `base` so the design system's element defaults (a, body …)
+   sit BELOW Tailwind's utilities — unlayered CSS would beat every utility
+   class and paint e.g. white nav links black. */
+@import "../styles/ds/styles.css" layer(base);
+
+/* Expose the design-system tokens to Tailwind v4 utilities so `text-ink`,
+   `bg-go` etc. work alongside raw var() usage. Names stay semantic. */
+@theme inline {
+  --color-ink: var(--rf-neutral-900);
+  --color-body: var(--rf-neutral-700);
+  --color-muted: var(--rf-neutral-600);
+  --color-subtle: var(--rf-neutral-500);
+  --color-faint: var(--rf-neutral-400);
+  --color-hairline: var(--rf-neutral-200);
+  --color-go: var(--rf-green-200);
+  --color-go-wash: var(--rf-green-50);
+  --color-stop: var(--rf-red-200);
+  --color-accent: var(--rf-red-500);
+  --color-mark: var(--rf-yellow-500);
+  --color-mark-fill: var(--rf-yellow-200);
+  --font-sans: var(--rf-font-sans);
+  --radius-*: initial; /* kill Tailwind's radii — the system is square */
+  --shadow-*: initial; /* kill Tailwind's shadows */
+}
+
+/* The one animation in the system, and it earns it: the order guide spends
+   ~3.5s on the server before the browser gets a byte, and until now the old
+   page just sat there. A static "loading" label still reads as stuck — motion
+   is the whole point of this particular control. See components/ui/PageLoading.
+   Everything else still arrives with no transition at all. */
+@keyframes rf-progress-slide {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(400%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-progress-bar {
+    animation: none;
+    width: 100%;
+    opacity: 0.35;
+  }
+}

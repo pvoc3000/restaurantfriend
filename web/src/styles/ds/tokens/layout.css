@@ -1,0 +1,30 @@
+/* Restaurant Friend layout.
+   The original stacked four chrome bars before any content and pinned a
+   command bar to the bottom. We keep the SHAPE — a black header at the top, a
+   black action bar at the bottom, content between — and cut it to two bars
+   with room to breathe. */
+:root {
+  --rf-z-sticky-thead: 20;  /* @kind other */
+  --rf-z-panel: 40;         /* @kind other */
+  --rf-z-header: 50;        /* @kind other */
+  --rf-z-dialog: 60;        /* @kind other */
+
+  --rf-header-h: 4rem;         /* 64px — black masthead */
+  --rf-actionbar-h: 4.5rem;    /* 72px — black command bar */
+  --rf-band-h: 5rem;           /* 80px — shop-section band */
+  --rf-band-h-lg: 6.5rem;      /* 104px — touch */
+
+  --rf-page-pad-x: var(--rf-space-7);
+  --rf-page-pad-y: var(--rf-space-7);
+
+  --rf-panel-width: 68%;
+  --rf-dialog-width: 40rem;
+  --rf-dialog-top: 10vh;
+  --rf-login-width: 26rem;
+  --rf-prose-width: 46rem;
+  --rf-measure: 72ch;
+
+  --rf-pane-max-h-guide: calc(100vh - 22rem);  /* @kind spacing */
+  --rf-pane-max-h-table: calc(100vh - 28rem);  /* @kind spacing */
+  --rf-pane-min-h: 18rem;
+}

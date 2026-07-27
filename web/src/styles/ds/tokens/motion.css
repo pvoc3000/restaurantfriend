@@ -1,0 +1,15 @@
+/* Restaurant Friend motion — almost none, and never on arrival.
+   The original was instant because it was a desktop database; the modern
+   version should feel the same. Panels and dialogs appear. Nothing slides,
+   fades, scales or bounces. The only transitions are 120ms colour changes on
+   press-able things, and the switch knob's travel. */
+:root {
+  --rf-duration-fast: 120ms;  /* @kind other */
+  --rf-ease-standard: linear; /* @kind other */
+  --rf-transition-colors: color var(--rf-duration-fast) var(--rf-ease-standard),
+    background-color var(--rf-duration-fast) var(--rf-ease-standard),
+    border-color var(--rf-duration-fast) var(--rf-ease-standard);
+  --rf-transition-transform: transform var(--rf-duration-fast) var(--rf-ease-standard);
+  --rf-opacity-disabled: 0.35;         /* @kind other */
+  --rf-opacity-disabled-strong: 0.25;  /* @kind other */
+}

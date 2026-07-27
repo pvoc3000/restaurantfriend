@@ -1,0 +1,15 @@
+/* Restaurant Friend elevation — there is none.
+   Nothing in this system floats. Layering is expressed with a black rule, a
+   black band, or a hard black outline over a dimmed page. No drop shadows, no
+   blur, no glass. A dialog is a white rectangle with a 2px black edge; a
+   slide-over is a white panel with a 2px black left edge. That is the whole
+   depth system, and it is inherited: FileMaker drew boxes, not surfaces. */
+:root {
+  --rf-shadow-none: none;
+  --rf-rule-hairline: inset 0 -1px 0 var(--rf-border-hairline);
+  --rf-rule-header: inset 0 -2px 0 var(--rf-neutral-900);
+  --rf-edge-dialog: 2px solid var(--rf-neutral-900);
+  --rf-edge-panel: 2px solid var(--rf-neutral-900);
+  --rf-edge-control: 1px solid var(--rf-neutral-900);
+  --rf-edge-emphasis: 2px solid var(--rf-neutral-900);
+}
