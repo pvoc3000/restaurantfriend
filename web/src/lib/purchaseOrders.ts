@@ -88,6 +88,22 @@ export function receivedTotal(lines: PoLine[]): number {
 }
 
 /**
+ * How many PACKAGES were ordered, across every line — the count of things that
+ * should physically arrive, which is what you check a delivery against. In
+ * packages of each line's own vendor item (units discipline, design rule 5),
+ * so it sums a case and an each alike; that's the intended meaning here, since
+ * the question is "how many items am I expecting off the truck".
+ */
+export function orderedQty(lines: PoLine[]): number {
+  return lines.reduce((sum, l) => sum + Number(l.qty_ordered ?? 0), 0);
+}
+
+/** The same count for what actually arrived; unreceived lines count as zero. */
+export function receivedQty(lines: PoLine[]): number {
+  return lines.reduce((sum, l) => sum + Number(l.qty_received ?? 0), 0);
+}
+
+/**
  * Lines whose invoice price differs from the catalog price — the one-tap
  * "update catalog?" flow at receiving (spec §2 step 5).
  */

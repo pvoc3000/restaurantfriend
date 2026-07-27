@@ -3,10 +3,13 @@
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { qty } from "@/lib/catalog";
 import {
   money,
+  orderedQty,
   orderedTotal,
   priceDiffers,
+  receivedQty,
   receivedTotal,
   PO_STATUS_CLASS,
   PO_STATUS_LABEL,
@@ -92,6 +95,8 @@ export function PurchaseOrderDetail({
 
   const ordered = orderedTotal(lines);
   const received = receivedTotal(lines);
+  const orderedPackages = orderedQty(lines);
+  const receivedPackages = receivedQty(lines);
   const differing = lines.filter(priceDiffers);
 
   async function setStatus(status: PoStatus) {
@@ -373,8 +378,31 @@ export function PurchaseOrderDetail({
 
       {processing && <ProcessPo order={order} context={processing} />}
 
+      {/* How many DISTINCT products, and how many packages they add up to —
+          the second is what you count off the truck, and the line count alone
+          never told you (Mark, 2026-07-27). Packages of each line's own vendor
+          item, so a case and an each both count as one; that's the intended
+          reading for a delivery check. Received is shown only once something
+          has been, so the bar stays quiet on a draft. */}
       <div className="flex flex-wrap items-center gap-4 border border-ink px-4 py-3 text-sm">
-        <span className="text-subtle">{lines.length} lines</span>
+        <span className="text-subtle">
+          {lines.length} {lines.length === 1 ? "product" : "products"} ·{" "}
+          <span className="tabular-nums text-body">{qty(orderedPackages)}</span>{" "}
+          {orderedPackages === 1 ? "package" : "packages"}
+          {receivedPackages > 0 && (
+            <>
+              {" · "}
+              <span
+                className={`tabular-nums ${
+                  receivedPackages < orderedPackages ? "text-accent" : "text-body"
+                }`}
+              >
+                {qty(receivedPackages)}
+              </span>{" "}
+              received
+            </>
+          )}
+        </span>
 
         <button
           disabled={busy}
