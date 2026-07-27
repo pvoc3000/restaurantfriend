@@ -7,6 +7,9 @@ import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
+  applyExpansions,
+  daySourceIndex,
+  expansionKey,
   groupGuide,
   matchesGuideFilter,
   vendorTotals,
@@ -94,6 +97,53 @@ export function OrderGuide({
   // between the walk, an A–Z list and a per-vendor view costs nothing.
   const [grouping, setGrouping] = useState<GuideGrouping>(initialGrouping);
 
+  /**
+   * Which item blocks are open on their other sources for the day. Held here
+   * and nowhere else: expansion does not stick (Mark, 2026-07-26) — not across
+   * a filter change, a regrouping, or a reload. It's a glance, not a setting,
+   * and a guide that came back with a scatter of items pre-opened would be
+   * lying about where you'd got to. Keys are (group, item) — see expansionKey.
+   */
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+
+  function toggleExpanded(key: string) {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (!next.delete(key)) next.add(key);
+      return next;
+    });
+  }
+
+  /**
+   * The triangle discloses the day's OTHER sources for one item, so it's only
+   * offered where the list is day-scoped and narrower than that (Mark,
+   * 2026-07-26):
+   * - Favorites / Skipped — yes; Skipped is a subset of Favorites and reaching
+   *   for another source is a fair way to burn one down.
+   * - Will order — no. You're reviewing decisions there, not shopping for
+   *   alternatives.
+   * - Ignore ordering days — no. The expansion is DEFINED by the day gates and
+   *   the switch lifts them, so day-filtering one item inside a day-blind list
+   *   would be incoherent; the switch is already this feature's global form.
+   */
+  const canExpand = !ignoreDays && (filter === "favorites" || filter === "skipped");
+
+  /** Changing what the list shows drops the expansions with it. */
+  function changeFilter(next: GuideFilter) {
+    setFilter(next);
+    setExpanded(new Set());
+  }
+
+  function changeGrouping(next: GuideGrouping) {
+    setGrouping(next);
+    setExpanded(new Set());
+  }
+
+  function toggleIgnoreDays() {
+    setIgnoreDays((v) => !v);
+    setExpanded(new Set());
+  }
+
   // Remember the view for the rest of the browser session. A session cookie
   // (no max-age) is what "until you log out" means here, and signOut clears it.
   useEffect(() => {
@@ -178,10 +228,16 @@ export function OrderGuide({
   // you were walking, not whichever day defaults today.
   const here = { href: `/order-guide?day=${weekday}`, label: "Order Guide" };
 
-  const sections = useMemo(
-    () => groupGuide(visibleRows, grouping),
-    [visibleRows, grouping]
-  );
+  // Every day-relevant line keyed by item, so an item header can ask "is there
+  // anything behind my triangle" without rescanning the whole day.
+  const sourceIndex = useMemo(() => daySourceIndex(rows, weekday), [rows, weekday]);
+
+  const sections = useMemo(() => {
+    const grouped = groupGuide(visibleRows, grouping);
+    return canExpand
+      ? applyExpansions(grouped, sourceIndex, expanded, grouping)
+      : grouped;
+  }, [visibleRows, grouping, canExpand, sourceIndex, expanded]);
   const totals = useMemo(() => vendorTotals(rows, entries), [rows, entries]);
   const grandTotal = totals.reduce((sum, t) => (t.short ? sum : sum + t.subtotal), 0);
   const shortTotal = totals.reduce((sum, t) => (t.short ? sum + t.subtotal : sum), 0);
@@ -342,7 +398,7 @@ export function OrderGuide({
           {GUIDE_FILTERS.map((f, i) => (
             <button
               key={f}
-              onClick={() => setFilter(f)}
+              onClick={() => changeFilter(f)}
               className={`inline-flex items-center gap-2 px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
                 i > 0 ? "border-l border-ink" : ""
               } ${
@@ -369,7 +425,7 @@ export function OrderGuide({
           type="button"
           role="switch"
           aria-checked={ignoreDays}
-          onClick={() => setIgnoreDays((v) => !v)}
+          onClick={toggleIgnoreDays}
           title="Show every orderable line, regardless of vendor or item ordering days"
           className="inline-flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-body hover:text-ink"
         >
@@ -398,7 +454,7 @@ export function OrderGuide({
             {GUIDE_GROUPINGS.map((mode, i) => (
               <button
                 key={mode}
-                onClick={() => setGrouping(mode)}
+                onClick={() => changeGrouping(mode)}
                 className={`inline-flex items-center px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
                   i > 0 ? "border-l border-ink" : ""
                 } ${
@@ -494,7 +550,10 @@ export function OrderGuide({
                   </>
                 )}
 
-                {section.items.map((item) => (
+                {section.items.map((item) => {
+                  const itemKey = expansionKey(section.key, item.inventory_item_id);
+                  const isOpen = expanded.has(itemKey);
+                  return (
                   <Fragment key={item.inventory_item_id}>
                     {/* Item header: bold caps over a 2px black rule, par in
                         red on the right — directly above the order boxes,
@@ -502,12 +561,53 @@ export function OrderGuide({
                     <tr>
                       <td colSpan={8} className="px-0 pb-0 pt-12">
                         <div className="flex items-end gap-4 border-b-2 border-ink px-4 pb-2">
-                          <Link
-                            href={withFrom(`/items/${item.inventory_item_id}`, here)}
-                            className="text-[22px] font-bold uppercase leading-tight tracking-[0.06em] text-ink no-underline hover:underline"
-                          >
-                            {item.item_name}
-                          </Link>
+                          <span className="flex items-center gap-3">
+                            {/* The day's other sources for THIS item, without
+                                leaving Favorites (see applyExpansions). A bare
+                                triangle at the scale of the item name rather
+                                than DataTable's small bordered box — this
+                                header is a 22px title read standing up, and the
+                                control has to be hittable at arm's length
+                                (Mark, 2026-07-26). */}
+                            {item.expandable ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleExpanded(itemKey)}
+                                aria-expanded={isOpen}
+                                aria-label={
+                                  isOpen
+                                    ? `Hide other sources for ${item.item_name}`
+                                    : `Show other sources for ${item.item_name}`
+                                }
+                                title={
+                                  isOpen
+                                    ? "Show only today's favorites"
+                                    : "Show every source orderable today"
+                                }
+                                className="flex h-7 w-7 shrink-0 items-center justify-center text-[20px] leading-none text-ink transition-colors hover:text-muted"
+                              >
+                                {isOpen ? "▼" : "▶"}
+                              </button>
+                            ) : (
+                              // Greyed and inert rather than absent (Mark,
+                              // 2026-07-26): the column of triangles stays
+                              // unbroken down the walk, and "nothing else sells
+                              // this today" is worth saying in its own right.
+                              <span
+                                aria-hidden
+                                title="No other sources orderable today"
+                                className="flex h-7 w-7 shrink-0 items-center justify-center text-[20px] leading-none text-faint"
+                              >
+                                ▶
+                              </span>
+                            )}
+                            <Link
+                              href={withFrom(`/items/${item.inventory_item_id}`, here)}
+                              className="text-[22px] font-bold uppercase leading-tight tracking-[0.06em] text-ink no-underline hover:underline"
+                            >
+                              {item.item_name}
+                            </Link>
+                          </span>
                           <span className="ml-auto">
                             {item.par_qty === null ? (
                               // A missing par is a gap to fix, not an alarm —
@@ -539,7 +639,8 @@ export function OrderGuide({
                       />
                     ))}
                   </Fragment>
-                ))}
+                  );
+                })}
               </Fragment>
             ))}
           </tbody>

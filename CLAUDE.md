@@ -158,6 +158,31 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    overwritten; lines that weren't that day's work are left untouched. Also new:
    `components/ui/ActionBar.tsx` (black bottom bar, on `/order-guide` carrying
    Generate POs) and `components/ui/Checkbox.tsx`.
+   Shipped 2026-07-26: **per-item disclosure on the guide** — FMP's per-item
+   "other sources" popup, done inline. A large bare triangle on each item
+   header: collapsed the item shows what the filter shows, expanded it also
+   shows that item's other sources orderable today (`isDayRelevant` = vendor
+   order day ∧ item order day, i.e. the `All` tier). Costs no query — the page
+   already loads every orderable line for the weekday and filters in the
+   browser. Offered only under **Favorites / Skipped with Ignore-days OFF**
+   (under Will order you're reviewing decisions, not shopping for alternatives;
+   with the day gates lifted the expansion's own definition is void and the
+   switch is already its global form). Keyed per (group, item), so in Vendor
+   grouping a block opens onto **that vendor's** other pack sizes only.
+   Expansion never sticks — dropped on any filter/grouping/ignore-days change
+   and on reload — and deliberately ignores the search box. Items with nothing
+   to reveal show a greyed inert triangle (Mark, 2026-07-26) so the column stays
+   unbroken; measured 189 live / 71 inert of 260 item headers on a Saturday at
+   DF01, and 56 of 351 blocks in Vendor grouping.
+   Its safety net lives in `matchesGuideFilter`: **both day filters also show
+   any line carrying a quantity** (Mark's "temporary favorite"), because a
+   quantity counts toward the vendor totals bar and becomes a PO line, so it
+   must never be hidden by a day filter. That closed a hole predating this
+   feature — enter a qty under All, switch to Favorites, watch a live order line
+   vanish — which per-item disclosure would otherwise have made routine. Zeroed
+   lines don't qualify (an explicit no produces nothing); Skipped is unaffected,
+   being untouched-only. The search box still narrows everything, expansions
+   included.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A

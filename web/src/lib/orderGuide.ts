@@ -66,6 +66,9 @@ export type GuideRow = {
  * the favorite-day condition alone (`is_favorite`), which is the condition that
  * gives the filter its name. FMP did this with its
  * `g_IgnoreOrderDayWhenSearching_b` flag.
+ *
+ * Both day tiers also show any line carrying a quantity, whatever day it
+ * belongs to — see the `ordering` clause in matchesGuideFilter.
  */
 export type GuideFilter = "all" | "favorites" | "skipped" | "will_order";
 
@@ -83,6 +86,19 @@ export const GUIDE_FILTER_LABEL: Record<GuideFilter, string> = {
   will_order: "Will order",
 };
 
+/**
+ * The `all` tier's day test: this vendor takes orders on the walked day and the
+ * item is scheduled on it. The two conditions that are facts about the day
+ * rather than about your preference — `should_order` adds the favorite check on
+ * top. Named because it's now asked in two places: the All filter, and per-item
+ * expansion, which discloses exactly this set for one item.
+ */
+export function isDayRelevant(row: GuideRow, weekday: number): boolean {
+  return (
+    row.vendor_order_days.includes(weekday) && row.item_order_days.includes(weekday)
+  );
+}
+
 export function matchesGuideFilter(
   row: GuideRow,
   entry: EntryState | undefined,
@@ -91,28 +107,43 @@ export function matchesGuideFilter(
   ignoreDays: boolean
 ): boolean {
   const qty = entry?.qty_to_order ?? null;
+
+  /**
+   * A line you're actually ordering is never hidden by a day filter (Mark,
+   * 2026-07-26): the quantity is live — it counts toward the vendor totals bar
+   * and it will become a PO line — so it has to stay somewhere you can see it
+   * and undo it. Mark's framing: a quantity on a non-favorite is a TEMPORARY
+   * favorite, and `qtyClass` already fills it yellow to say you switched
+   * source.
+   *
+   * This closes a hole that predates per-item expansion (enter a quantity under
+   * All, switch to Favorites, watch a live order line vanish) and which
+   * expansion would otherwise have made a weekly occurrence. It applies to both
+   * day-scoped filters, not just Favorites, so the two can't invert — a line
+   * entered while the day gates were lifted, or before you moved the day chip,
+   * would otherwise show under Favorites and not under All.
+   *
+   * Zeroed lines deliberately don't qualify: an explicit no produces nothing,
+   * so letting it fall back out of view costs you nothing.
+   */
+  const ordering = qty !== null && Number(qty) > 0;
+
   switch (filter) {
     case "all":
-      // Day-relevant membership: the two conditions that are facts about the
-      // day rather than about your preference. The favorite check is what
-      // `should_order` adds on top.
-      return (
-        ignoreDays ||
-        (row.vendor_order_days.includes(weekday) &&
-          row.item_order_days.includes(weekday))
-      );
+      return ordering || ignoreDays || isDayRelevant(row, weekday);
     case "favorites":
       // `should_order` is the precomputed four-way AND; the vendor-day and
       // item-day halves of it are already true for anything `all` shows, so
       // inside the visible list this reads exactly as "and it's a favorite".
       // With the day gates lifted, that favorite-day condition stands alone.
-      return ignoreDays ? row.is_favorite : row.should_order;
+      return ordering || (ignoreDays ? row.is_favorite : row.should_order);
     case "skipped":
       // Untouched only. A zeroed line is a decision already made — you looked
-      // and said no — so it isn't waiting on you; an untouched one is.
+      // and said no — so it isn't waiting on you; an untouched one is. The
+      // temporary-favorite clause can't apply here by construction.
       return (ignoreDays ? row.is_favorite : row.should_order) && qty === null;
     case "will_order":
-      return qty !== null && Number(qty) > 0;
+      return ordering;
   }
 }
 
@@ -224,6 +255,13 @@ export type GuideItem = {
   base_unit: string;
   par_qty: number | null;
   lines: GuideRow[];
+  /**
+   * This item has day-relevant sources the current filter isn't showing, so its
+   * header gets a live disclosure triangle. Set by `applyExpansions`; absent
+   * means the header shows the greyed, inert triangle instead — the column
+   * stays unbroken and the grey itself says "nothing else sells this today".
+   */
+  expandable?: boolean;
 };
 
 export type GuideSection = {
@@ -395,6 +433,105 @@ export function groupGuide(
     for (const item of section.items) item.lines.sort(compareLines);
   }
   return list;
+}
+
+/**
+ * PER-ITEM DISCLOSURE (Mark, 2026-07-26). The FMP guide had a button beside each
+ * item that popped a panel listing that item's other sources for the day, so you
+ * could order a non-favorite without leaving Favorites and hunting for the item
+ * under All. Same job, done inline: collapsed, an item shows what the filter
+ * shows; expanded, it also shows its other sources orderable today. Nothing
+ * above it moves, which is the part the popup couldn't do — you keep your place
+ * in a several-hundred-line walk.
+ *
+ * It costs no query. The page already loads every orderable line for the
+ * weekday and every filter runs in the browser, so the hidden lines are already
+ * in memory.
+ *
+ * Deliberately NOT narrowed by the search box: you asked for this item's
+ * sources, not for the ones that happen to contain your search term.
+ */
+
+/**
+ * Day-relevant lines per inventory item, built once per load — expansion asks
+ * this question for every item header on screen, and rescanning ~900 rows a few
+ * hundred times per render would be silly.
+ */
+export function daySourceIndex(
+  rows: GuideRow[],
+  weekday: number
+): Map<string, GuideRow[]> {
+  const index = new Map<string, GuideRow[]>();
+  for (const row of rows) {
+    if (!isDayRelevant(row, weekday)) continue;
+    const list = index.get(row.inventory_item_id);
+    if (list) list.push(row);
+    else index.set(row.inventory_item_id, [row]);
+  }
+  return index;
+}
+
+/**
+ * Expansion is per (group, item), not per item: in vendor grouping the same
+ * item heads a block under each vendor that sells it, and those blocks open
+ * independently.
+ */
+export function expansionKey(sectionKey: string, inventoryItemId: string): string {
+  return `${sectionKey} ${inventoryItemId}`;
+}
+
+/** The lines an item's triangle would reveal — its day-relevant sources that
+ *  the filter isn't already showing. */
+function hiddenSources(
+  item: GuideItem,
+  index: Map<string, GuideRow[]>,
+  grouping: GuideGrouping
+): GuideRow[] {
+  const sources = index.get(item.inventory_item_id);
+  if (!sources) return [];
+
+  const shown = new Set(item.lines.map((line) => line.vendor_item_id));
+  // In vendor grouping the block IS one vendor's basket, so it opens onto that
+  // vendor's other pack sizes and nothing else (Mark, 2026-07-26) — pulling a
+  // rival's line into a vendor's basket would break what the grouping means.
+  // Every line in the block shares the vendor, so the first one names it.
+  const vendorId = grouping === "vendor" ? (item.lines[0]?.vendor_id ?? null) : null;
+
+  return sources.filter(
+    (row) =>
+      !shown.has(row.vendor_item_id) &&
+      (vendorId === null || row.vendor_id === vendorId)
+  );
+}
+
+/**
+ * Append each expanded item's hidden sources, and mark every item with whether
+ * it has any — the header can then omit the control rather than offer one that
+ * opens onto nothing.
+ */
+export function applyExpansions(
+  sections: GuideSection[],
+  index: Map<string, GuideRow[]>,
+  expanded: Set<string>,
+  grouping: GuideGrouping
+): GuideSection[] {
+  return sections.map((section) => ({
+    ...section,
+    items: section.items.map((item) => {
+      const hidden = hiddenSources(item, index, grouping);
+      if (hidden.length === 0) return item;
+      if (!expanded.has(expansionKey(section.key, item.inventory_item_id)))
+        return { ...item, expandable: true };
+      return {
+        ...item,
+        expandable: true,
+        // Revealed lines take their place in the walk order rather than piling
+        // up underneath — vendor, then that vendor's description, same as the
+        // favorites they join.
+        lines: [...item.lines, ...hidden].sort(compareLines),
+      };
+    }),
+  }));
 }
 
 export type VendorTotal = {
