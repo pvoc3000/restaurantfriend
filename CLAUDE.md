@@ -355,6 +355,27 @@ weekday column, and 003 then silently made it per-vendor-item.
   from accruing memory — **restart the dev server every day or two**, and
   `npm run clean` if `.next` gets large (it was 1.3 GB). Check with
   `ps -o rss= -p <pid>` before debugging a phantom app bug.
+- **A FRESH `next dev` that reload-loops is a different bug: stale clients**
+  (Mark, 2026-07-27 — same symptom minutes after `npm run clean && npm run dev`,
+  so the memory ceiling above cannot be the cause; restarting again is the wrong
+  move and will look like it failed). Tell them apart by the log: this one
+  carries **`ChunkLoadError: Failed to load chunk …hmr-client…`** and every
+  `GET /order-guide` still returns **200** in normal time (~300–450ms). The
+  server is healthy and answering; the CLIENTS can't use the answer.
+  `npm run clean` deletes `.next` and regenerates every chunk with a new content
+  hash, so any tab still open from before the clean asks for hashes that no
+  longer exist, fails, and full-reloads to recover — a browser-side loop that
+  looks exactly like a server-side one. **Two or more distinct chunk hashes in
+  the log means two or more clients pinned to different builds** — that's the
+  tell, since one client would converge on one build. Fix: close every tab
+  pointing at the app and open one fresh. Count ALL of them — Safari (which
+  already caches dev assets too aggressively, see web/README.md), any iPad on
+  the LAN, and **any browser-pane tab Claude left open**, which is what caused
+  the 2026-07-27 instance (three tabs parked on `/order-guide`, the heaviest
+  route). Confirm a suspect tab with
+  `performance.getEntriesByType('navigation')[0].type` — `"reload"` means it
+  reloaded itself rather than being navigated. Claude: close your localhost tabs
+  when you finish verifying.
 - **Every slow route needs a `loading.tsx`** (Mark, 2026-07-26 — "enough time
   for me to wonder each time if the app is working"). Without one Next holds the
   PREVIOUS page on screen for the whole server wait with no acknowledgement that
