@@ -4,7 +4,7 @@ import { money } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
-import { WeekdayPicker } from "./WeekdayPicker";
+import { WeekdayPicker, WEEKDAY_PICKER_WIDTH } from "./WeekdayPicker";
 
 // Sorting a weekday set on its canonical "1,3,5" string groups locations that
 // share a schedule, which is what you're scanning for. Empty sorts last.
@@ -121,7 +121,7 @@ export function VendorLocationsTable({
     {
       key: "order_days",
       label: "Order days",
-      width: 280,
+      width: WEEKDAY_PICKER_WIDTH,
       sortValue: (r) => daysKey(r.order_days),
       render: (r) => (
         <WeekdayPicker
@@ -136,7 +136,7 @@ export function VendorLocationsTable({
     {
       key: "delivery_days",
       label: "Delivery days",
-      width: 280,
+      width: WEEKDAY_PICKER_WIDTH,
       sortValue: (r) => daysKey(r.delivery_days),
       render: (r) => (
         <WeekdayPicker

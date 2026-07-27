@@ -4,6 +4,17 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
+/**
+ * What a DataTable column holding a day picker has to be, in px: seven 32px
+ * boxes (224) + the All/None command (~40) + the cell's own px-4 (32).
+ * DataTable is `table-fixed` with `truncate` cells, so a column narrower than
+ * this silently CLIPS the right-hand end — which is how the All command went
+ * missing from the item screen's Order days column (Mark, 2026-07-27: "should
+ * have an All toggle"; it was there, just cut off). Every column rendering a
+ * picker uses this so it can't drift again.
+ */
+export const WEEKDAY_PICKER_WIDTH = 300;
+
 // ISO weekdays, 1 = Monday … 7 = Sunday (CLAUDE.md).
 const DAYS = [
   { weekday: 1, label: "Mo" },
