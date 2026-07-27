@@ -204,8 +204,17 @@ export function GuideLine({
         )}
       </td>
 
-      {/* Pack label + stepper, mirroring the FMP control: minus, box, plus. */}
-      <td className="whitespace-nowrap px-4 py-4 align-top">
+      <td className="px-4 py-4 align-top text-right text-[15px] tabular-nums text-body">
+        {qty !== null && Number(qty) > 0
+          ? money(Number(qty) * Number(row.effective_price ?? 0))
+          : ""}
+      </td>
+
+      {/* Pack label + stepper, mirroring the FMP control: minus, box, plus.
+          The row's LAST cell (Mark, 2026-07-27): this is the only thing on the
+          line you touch, so it's pinned to the right edge where a thumb lands
+          rather than sitting inboard of a line total you only read. */}
+      <td className="whitespace-nowrap py-4 pl-4 pr-0 align-top">
         <div className="flex items-center justify-end gap-2">
           <span className="mr-1 text-xs font-semibold uppercase tracking-[0.06em] text-body">
             {row.package_desc ?? ""}
@@ -243,12 +252,6 @@ export function GuideLine({
             +
           </button>
         </div>
-      </td>
-
-      <td className="px-4 py-4 align-top text-right text-[15px] tabular-nums text-body">
-        {qty !== null && Number(qty) > 0
-          ? money(Number(qty) * Number(row.effective_price ?? 0))
-          : ""}
       </td>
     </tr>
   );
