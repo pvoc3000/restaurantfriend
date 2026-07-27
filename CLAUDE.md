@@ -204,6 +204,20 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    so it also clears entries against vendor items that have since stopped being
    orderable and so aren't on screen. Verified end-to-end at DF02 with DF01's
    rows left intact.
+   Shipped 2026-07-27: the **PO detail line table fits the screen** (Mark — "a
+   lot of the info runs off"). Columns are now Type · Product ID · Item, where
+   Type is `inventory_items.category` (short, repeats down the order, and is
+   what the vendor PDF groups by) and Item is one WRAPPING cell carrying the
+   catalog name over `brand · vendor description` — two columns' information in
+   one column's width. Type wraps too, and Pack took 40px from Note so
+   multi-packs stop reading "1 × 5 l…". Total 1410 → 1290px, which fits a 1440
+   window without horizontal scroll. Widths key bumped to v2 (v1's are wrong
+   now).
+   Shipped 2026-07-27 (first real use of the guide, Mark's notes): the **order
+   column is the row's LAST cell** — pack label, −, box, + against the right
+   edge, with the line total moved inboard, because the stepper is the only
+   thing on a line you touch and a thumb lives at the right edge; and the
+   **masthead collapses** (see Conventions).
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -376,6 +390,71 @@ weekday column, and 003 then silently made it per-vendor-item.
   `performance.getEntriesByType('navigation')[0].type` — `"reload"` means it
   reloaded itself rather than being navigated. Claude: close your localhost tabs
   when you finish verifying.
+- **A reload loop tied to a specific ACTION is neither of the two bugs above**
+  (Mark, 2026-07-27 — deleting a PO line loops every time; "I keep being told
+  the reloading has something to do with the server running too long or too
+  many tabs open… I think this is incorrect." He is right). MEASURE BEFORE
+  BLAMING EITHER — both stories were false here:
+  - *Memory ceiling?* `ps -o pid,etime,rss= -p <next-server pid>`. Measured
+    2026-07-27: up 3h36m at **3,358 MB against the 8,192 MB cap** the `dev`
+    script now sets — 41%, not 102%. Rules it out.
+  - *Stale chunk?* Take the hash from the ChunkLoadError and check both that it
+    exists (`find .next -name '*hmr-client*'`) and that it SERVES
+    (`curl -o /dev/null -w '%{http_code}' 'http://localhost:3000/_next/static/chunks/%5Bturbopack%5D_..._<hash>._.js'`).
+    Measured: all three hashes present, all **HTTP 200**. A chunk that serves
+    fine is not a stale chunk, so the tab story doesn't apply either.
+  Also ruled out that day, each with a measurement: `router.refresh()` alone
+  (one RSC request, 1,284ms, no reload — the guide's Refresh button is a
+  zero-mutation way to test it); a main-thread freeze like `window.confirm`
+  (blocked 9s, HMR reconnected, no reload); and the app hard-reloading itself
+  (no `location.reload()` anywhere — the only `window.location` writes are the
+  mailto and the PDF blob window).
+  Note the error says **`unhandledRejection`**, which is a NODE process event —
+  it is the dev SERVER reporting, not the browser, and it names an
+  `[app-client]` chunk loaded by an **async loader**. PO detail is the only
+  screen carrying a heavy dynamic client import (`@react-pdf/renderer`, imported
+  at click in `ProcessPo` / `lib/poProcessing.ts`). Unconfirmed, but that's
+  where to look first — and reproducing needs a real line deleted, so ASK.
+- **The masthead collapses to a strip** (Mark, 2026-07-27 — two black bands plus
+  the utilities row cost ~88px at the top of every screen, "too much space…
+  should probably scroll away… we would need a shortcut to bring it back").
+  Collapsing beats scrolling away, and is what that shortcut wants to be: the
+  strip is ALWAYS on screen, so the menu returns with one tap from anywhere in
+  an 800-line list instead of a scroll to the top. It also keeps the header
+  sticky, which is load-bearing — `DetailPanel` is fixed and starts below the
+  header, so a header that scrolled off would leave a dead strip across the top
+  of every slide-over. `components/HeaderShell.tsx` owns stickiness, the toggle
+  (▲ in the utilities cluster, "Menu ▾" in the strip) and the state; the strip
+  keeps the two things you'd otherwise lose — which app this is and WHICH
+  LOCATION you're ordering for. Remembered per user in localStorage
+  (`lib/chromeStore.ts`, `useSyncExternalStore` like columnWidths), because it's
+  a display preference. HeaderShell also publishes the header's MEASURED height
+  as `--rf-header-h` (seeded at 5.5rem in `globals.css`), and the order guide's
+  scroll pane subtracts that variable instead of a constant — so collapsing
+  hands those ~56px straight to the list, which is the point. Any other screen
+  sizing itself against the viewport should use the variable too.
+- **An overlay rendered inside the ActionBar inherits its `text-white`**
+  (Mark, 2026-07-27 — "the vendor names are unreadable… is the text colored
+  white?" Yes). `position: fixed` moves the box, not its place in the DOM, so
+  colour cascades from the black bar straight into the floating dialog and any
+  text without an explicit colour class renders white on white. Give the panel
+  its own `text-ink` rather than patching each line — `GeneratePos` does. Same
+  goes for any future overlay whose trigger lives in a black bar.
+- **A dialog pins its title bar and its footer, and scrolls only the middle**
+  (`max-h-[85vh] flex flex-col` + `min-h-0 flex-1 overflow-y-auto` on the body).
+  The overlay is fixed, so a dialog taller than the window cannot be scrolled by
+  the page and its footer is simply unreachable — Generate POs wanted 990px in a
+  900px window at 12 vendors, putting "Create N POs" 162px below the fold on the
+  first real ordering day.
+- **A DataTable column holding a day picker must be `WEEKDAY_PICKER_WIDTH`**
+  (300px, exported from `WeekdayPicker.tsx`). The table is `table-fixed` with
+  `truncate` cells, so a narrow column silently CLIPS the right-hand end rather
+  than wrapping or scrolling — which is how the All/None command went missing
+  from the item screen's Order days column at 235px (Mark, 2026-07-27 asked for
+  an All toggle there; it had been in the component since the design-system port,
+  just cut off). Seven 32px boxes + the command + the cell's px-4 = 288.
+  Anything interactive at the right edge of a fixed column deserves the same
+  arithmetic.
 - **Every slow route needs a `loading.tsx`** (Mark, 2026-07-26 — "enough time
   for me to wonder each time if the app is working"). Without one Next holds the
   PREVIOUS page on screen for the whole server wait with no acknowledgement that
