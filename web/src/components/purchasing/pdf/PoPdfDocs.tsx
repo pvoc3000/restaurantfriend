@@ -20,6 +20,24 @@ import {
   type PoDocData,
 } from "@/lib/poProcessing";
 
+/**
+ * FOUR sizes and TWO greys, and nothing else (Mark, 2026-07-27 — "I want to
+ * simplify it"). The document had drifted to seven sizes and four greys, most
+ * of them one-offs:
+ *
+ *   16  Helvetica-Bold     the document's name — org, or "Shopping list"
+ *   14  Helvetica-Bold     "PURCHASE ORDER"; regular for the number beside it
+ *    9  Helvetica[-Bold]   everything you read: lines, meta values, totals
+ *    8  Helvetica          secondary — labels, addresses, instructions, footer
+ *
+ *   #111  body
+ *   #666  secondary
+ *
+ * 7pt and 8pt were indistinguishable in print but split across four styles,
+ * and 10 and 12 each appeared exactly once. Weight and colour carry the
+ * hierarchy instead — a printed order is read at arm's length on a shelf, so
+ * fewer, larger steps beat a fine-grained scale.
+ */
 const styles = StyleSheet.create({
   page: {
     padding: 36,
@@ -34,9 +52,11 @@ const styles = StyleSheet.create({
     marginBottom: 14,
   },
   orgName: { fontSize: 16, fontFamily: "Helvetica-Bold" },
-  orgLine: { fontSize: 8, color: "#444" },
+  orgLine: { fontSize: 8, color: "#666" },
   poTitle: { fontSize: 14, fontFamily: "Helvetica-Bold", textAlign: "right" },
-  poNumber: { fontSize: 12, textAlign: "right", marginTop: 2 },
+  // Same size as the title, regular weight: the number is the other half of
+  // the heading, not a caption under it. Was the only 12pt in the document.
+  poNumber: { fontSize: 14, textAlign: "right", marginTop: 2 },
   metaGrid: {
     flexDirection: "row",
     gap: 24,
@@ -47,7 +67,7 @@ const styles = StyleSheet.create({
   },
   metaBlock: { flexGrow: 1, flexBasis: 0 },
   metaLabel: {
-    fontSize: 7,
+    fontSize: 8,
     fontFamily: "Helvetica-Bold",
     color: "#666",
     textTransform: "uppercase",
@@ -85,26 +105,28 @@ const styles = StyleSheet.create({
     marginRight: 6,
     marginTop: 1,
   },
-  colProduct: { width: 60, color: "#444" },
+  colProduct: { width: 60, color: "#666" },
   colQty: { width: 40, fontFamily: "Helvetica-Bold", textAlign: "right", paddingRight: 8 },
   colPack: { width: 70, paddingRight: 6 },
   colDesc: { flexGrow: 1, flexBasis: 0 },
-  instructions: { color: "#444", fontSize: 8, marginTop: 1 },
-  notes: { marginTop: 12, fontSize: 8, color: "#444" },
+  instructions: { color: "#666", fontSize: 8, marginTop: 1 },
+  notes: { marginTop: 12, fontSize: 8, color: "#666" },
   footer: {
     position: "absolute",
     bottom: 20,
     left: 36,
     right: 36,
-    fontSize: 7,
-    color: "#888",
+    fontSize: 8,
+    color: "#666",
     textAlign: "center",
   },
   totalRow: {
     flexDirection: "row",
     justifyContent: "flex-end",
     marginTop: 8,
-    fontSize: 10,
+    // Body size, bold — same treatment as the summary line at the top, which
+    // is the other number that sums the page. Was the only 10pt.
+    fontSize: 9,
     fontFamily: "Helvetica-Bold",
   },
 });
