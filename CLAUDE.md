@@ -187,6 +187,14 @@ longer destroy a par. The view's output is unchanged (`par_qty` / `par_mode`
 still, just sourced differently), so no app code changed for par.
 Migration 012 retires `inventory_item_locations.default_vendor_item_id` — dead
 since 008 and read only by the cleanup checks that complained about it.
+Migration 014 is **WRITTEN BUT NOT APPLIED**: it makes `v_item_last_ordered`
+security DEFINER with an explicit `il.org_id in (select user_org_ids())` guard.
+004 made it `security_invoker`, which evaluates four tables' RLS inside an
+aggregate over 104,669 `purchase_order_items` rows — measured 2026-07-26 at
+4,336ms in-app vs 160–250ms for the identical query under `service_role`. That
+one view is ~4.3s of `/items`'s ~5.1s, and `/cleanup` and vendor detail pay it
+too. Expect ~200ms after applying; re-measure rather than assume.
+
 **Migrations 001–013 are ALL APPLIED to the hosted DB** (013 verified
 2026-07-23 by the bogus-argument RPC probe).
 Mark runs them himself in the Supabase SQL editor — never assume a written
