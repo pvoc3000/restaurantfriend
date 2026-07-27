@@ -292,6 +292,20 @@ weekday column, and 003 then silently made it per-vendor-item.
   place the design system's "no spinners, no skeletons" is relaxed — an
   indeterminate bar, not a skeleton, because a static label during a 3.5s wait
   still reads as stuck. The keyframes live in `globals.css`.
+- **Page speed: round trips and payload, in that order** (measured 2026-07-26,
+  dev server, hosted Supabase). `getAppSession` is wrapped in React `cache()` —
+  the (app) layout AND the page both call it, which was a duplicate ~220-450ms
+  on every full load; it also fetches `org_members` + `locations` in one
+  `Promise.all` and **embeds `orgs(settings)`** so no screen needs its own query
+  for the timezone (verified read-only that PostgREST returns that embed as an
+  OBJECT, not an array — an array would silently fall back to the server's
+  timezone). A Supabase query builder is a **lazy thenable**: assigning it to a
+  variable sends nothing, so to overlap two queries you must call `.then()` on
+  the first. On the guide, columns are the other half — the same 877-row query
+  costs 781ms wide and 284ms with a single column, so the SELECT lists only what
+  the screen reads. Guide median went 1308→1051ms (nav click) and 1565→1246ms
+  (full load). What's left is mostly that payload; cutting it further means
+  fewer rows, and caching the view is forbidden by design rule 4.
 - **The Active toggle is the FIRST column** on every catalog table (Mark,
   2026-07-23) — vendors list, vendor/item per-location config, vendor items.
   "Stock here" shares that slot where a row doesn't exist yet.

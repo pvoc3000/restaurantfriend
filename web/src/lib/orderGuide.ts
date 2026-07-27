@@ -10,11 +10,9 @@ export type GuideRow = {
   shop_section: string | null;
   shop_section_sort: number | null;
   par_qty: number | null;
-  par_mode: string | null;
   vendor_item_id: string;
   vendor_id: string;
   vendor_name: string;
-  vendor_order_type: string;
   brand: string | null;
   vendor_item_description: string | null;
   product_id: string | null;
@@ -28,8 +26,6 @@ export type GuideRow = {
   unit_price: number | null;
   vendor_minimum: number | null;
   vendor_delivery_days: number[] | null;
-  is_orderable: boolean;
-  hidden_reason: string | null;
   /**
    * True when a plan row exists for this line on this weekday — this source is
    * a favorite today. A favorite is the preferred source whether or not the
@@ -184,7 +180,10 @@ export function qtyClass(
  */
 export function notGreenReason(row: GuideRow, weekday: number): string | null {
   if (row.should_order) return null;
-  if (!row.is_orderable) return row.hidden_reason;
+  // No "not orderable" branch: the guide's query filters is_orderable = true,
+  // so a dead pairing never reaches this function — and carrying the column
+  // just to test it cost 877 constants per load. Blocked lines are /cleanup's
+  // job, not the walk's.
   const day = WEEKDAY_LABELS[weekday - 1];
   const reasons: string[] = [];
   if (!row.vendor_order_days.includes(weekday))
