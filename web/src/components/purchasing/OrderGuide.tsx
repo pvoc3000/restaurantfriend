@@ -294,6 +294,75 @@ export function OrderGuide({
     });
   }
 
+  /**
+   * CLEAR THE WHOLE DAY — reset every line of this location's guide for this
+   * date back to untouched: quantities entered, quantities explicitly zeroed,
+   * and on-hand counts alike (Mark, 2026-07-26 — a full reset of the walk, not
+   * just the order column).
+   *
+   * An UPDATE to nulls rather than a DELETE, because `order_guide_entries` has
+   * select/insert/update policies and no DELETE policy (migration 001) — a
+   * delete from the app would match zero rows and report success. Nulling is
+   * equivalent anyway: every reader treats a (null, null) row exactly as it
+   * treats an absent one.
+   *
+   * Scoped by location + date, not by the loaded rows, so it also clears
+   * entries against vendor items that have since stopped being orderable and
+   * so aren't on screen to be seen. Any member may do it — that's what the
+   * update policy allows, and whoever can walk the guide can restart it.
+   */
+  const [clearing, setClearing] = useState(false);
+
+  const dayTally = useMemo(() => {
+    let entered = 0;
+    let zeroed = 0;
+    let counted = 0;
+    for (const entry of entries.values()) {
+      const qty = entry.qty_to_order;
+      if (qty !== null && Number(qty) > 0) entered += 1;
+      else if (qty !== null) zeroed += 1;
+      if (entry.on_hand !== null) counted += 1;
+    }
+    return { entered, zeroed, counted, total: entered + zeroed + counted };
+  }, [entries]);
+
+  async function clearGuide() {
+    const parts = [
+      dayTally.entered > 0
+        ? `${dayTally.entered} order quantit${dayTally.entered === 1 ? "y" : "ies"}` +
+          ` worth ${money(grandTotal + shortTotal)}`
+        : null,
+      dayTally.zeroed > 0 ? `${dayTally.zeroed} zeroed line${dayTally.zeroed === 1 ? "" : "s"}` : null,
+      dayTally.counted > 0
+        ? `${dayTally.counted} on-hand count${dayTally.counted === 1 ? "" : "s"}`
+        : null,
+    ].filter(Boolean);
+
+    if (
+      !window.confirm(
+        `Clear the whole guide for ${guideDate} at ${locationCode}?\n\n` +
+          `This resets every line to untouched, discarding ${parts.join(", ")}.` +
+          `\n\nPurchase orders already generated are not affected. This cannot be undone.`
+      )
+    )
+      return;
+
+    setClearing(true);
+    setError(null);
+    const { error } = await supabase
+      .from("order_guide_entries")
+      .update({ on_hand: null, qty_to_order: null })
+      .eq("location_id", locationId)
+      .eq("guide_date", guideDate);
+    setClearing(false);
+
+    if (error) {
+      setError(error.message);
+      return;
+    }
+    setEntries(new Map());
+  }
+
   return (
     <div className="space-y-4 pb-28">
       {/* Title block: the screen's name in display caps, the context line in
@@ -666,6 +735,20 @@ export function OrderGuide({
           ignoreDays ? "all days" : WEEKDAY_LABELS[weekday - 1]
         } · ${visibleRows.length} of ${rows.length} lines`}
       >
+        {/* Start the day over. Left of Generate POs and never the primary
+            cell — it's the escape hatch, not the destination. */}
+        <ActionBarButton
+          onClick={() => void clearGuide()}
+          disabled={clearing || dayTally.total === 0}
+          title={
+            dayTally.total === 0
+              ? "Nothing entered yet — there's nothing to clear"
+              : "Reset every line of this day's guide to untouched"
+          }
+        >
+          {clearing ? "Clearing…" : "Clear guide…"}
+        </ActionBarButton>
+
         {/* The walk's end point (spec §2 step 3): who gets a PO. */}
         {canGeneratePos && (
           <GeneratePos

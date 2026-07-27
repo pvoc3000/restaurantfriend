@@ -114,6 +114,16 @@ export default async function OrderGuidePage({
 
   return (
     <OrderGuide
+      // Remount when the guide's identity changes. Switching location is a
+      // navigation to the SAME route, so React keeps the component instance
+      // alive and `useState(() => …initialEntries)` — an initialiser that runs
+      // once per mount — silently keeps the previous location's quantities.
+      // The guide then showed DF01's numbers against DF02's lines and totalled
+      // them in the vendor bar (writes went to the right place; only the
+      // display lied). Keying on the pair is cheaper than syncing state in an
+      // effect, and it drops the per-item expansions too, which is what we
+      // want anyway.
+      key={`${locationId}:${guideDate}`}
       rows={rows}
       entries={(entryRows ?? []) as GuideEntry[]}
       weekday={weekday}
