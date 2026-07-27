@@ -46,7 +46,7 @@ export async function PurchaseOrderDetailView({
       .select(
         `id, vendor_item_id, description, brand, product_id, package_desc,
          qty_ordered, qty_received, unit_price, discrepancy_note,
-         vendor_items ( id, price, inventory_items ( id, name ) )`
+         vendor_items ( id, price, inventory_items ( id, name, category ) )`
       )
       .eq("po_id", id)
       .order("description"),

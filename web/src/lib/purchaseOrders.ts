@@ -49,7 +49,9 @@ export type PoLine = {
   vendor_items: {
     id: string;
     price: number | null;
-    inventory_items: { id: string; name: string } | null;
+    // `category` is the item TYPE ("Dry Goods", "Frozen Goods" — schema 001's
+    // own wording); it groups the vendor-facing PDF and leads the detail table.
+    inventory_items: { id: string; name: string; category: string | null } | null;
   } | null;
 };
 

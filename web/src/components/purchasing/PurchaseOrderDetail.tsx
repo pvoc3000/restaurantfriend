@@ -159,12 +159,22 @@ export function PurchaseOrderDetail({
           } as DataColumn<PoLine>,
         ]
       : []),
+    // Type leads (Mark, 2026-07-27 — the table ran off the screen): the item's
+    // category is short, repeats down the order, and is what the vendor-facing
+    // PDF groups by, so it costs 130px where the item NAME cost 240.
     {
-      key: "item",
-      label: "Item",
-      width: 240,
-      sortValue: (l) => l.vendor_items?.inventory_items?.name ?? l.description,
-      render: (l) => l.vendor_items?.inventory_items?.name ?? "—",
+      key: "item_type",
+      label: "Type",
+      width: 130,
+      // Wraps rather than widens — "Flavors and Extracts" doesn't fit 130px on
+      // one line and clipping it to "Flavors and …" loses the distinction.
+      wrap: true,
+      sortValue: (l) => l.vendor_items?.inventory_items?.category ?? null,
+      render: (l) => (
+        <span className="text-muted">
+          {l.vendor_items?.inventory_items?.category ?? "—"}
+        </span>
+      ),
     },
     {
       key: "product_id",
@@ -173,21 +183,39 @@ export function PurchaseOrderDetail({
       sortValue: (l) => l.product_id,
       render: (l) => <span className="text-muted">{l.product_id ?? "—"}</span>,
     },
+    // What the item IS and what you ordered it as, in one wrapping cell —
+    // two columns' worth of information in one column's width. The catalog
+    // name leads because that's what you recognise; the snapshot beneath it is
+    // what the vendor's invoice will say.
     {
-      key: "description",
-      label: "Ordered as",
-      width: 290,
-      sortValue: (l) => l.description,
-      render: (l) => (
-        <span className="text-muted">
-          {[l.brand, l.description].filter(Boolean).join(" · ") || "—"}
-        </span>
-      ),
+      key: "item",
+      label: "Item",
+      width: 280,
+      wrap: true,
+      sortValue: (l) => l.vendor_items?.inventory_items?.name ?? l.description,
+      render: (l) => {
+        const name = l.vendor_items?.inventory_items?.name ?? null;
+        const orderedAs = [l.brand, l.description].filter(Boolean).join(" · ");
+        // A line whose vendor item is gone still has its snapshot — that's the
+        // historical record, so it leads instead of an em dash.
+        if (!name) return <span className="text-muted">{orderedAs || "—"}</span>;
+        return (
+          <span className="block leading-snug">
+            <span className="block text-ink">{name}</span>
+            {orderedAs && (
+              <span className="block text-xs text-muted">{orderedAs}</span>
+            )}
+          </span>
+        );
+      },
     },
     {
       key: "package_desc",
       label: "Pack",
-      width: 85,
+      // 85px clipped every multi-pack to "1 × 5 l…", which is the same
+      // information-off-the-edge problem. The 40px comes out of Note below, so
+      // the table's total width is unchanged.
+      width: 125,
       sortValue: (l) => l.package_desc,
       render: (l) => <span className="text-muted">{l.package_desc ?? "—"}</span>,
     },
@@ -255,7 +283,9 @@ export function PurchaseOrderDetail({
     {
       key: "discrepancy_note",
       label: "Note",
-      width: 190,
+      // Lent 40px to Pack: this column is empty on almost every line, and it's
+      // the last one, so it's also the cheapest place to give width back.
+      width: 150,
       sortValue: (l) => l.discrepancy_note,
       render: (l) => (
         <InlineValue
@@ -429,7 +459,10 @@ export function PurchaseOrderDetail({
         rows={lines}
         columns={columns}
         rowKey={(l) => l.id}
-        storageKey="rf.purchaseOrderLines.columnWidths.v1"
+        // v2: the columns changed meaning (Type replaced the item name, and the
+        // name moved into the wrapping Item cell), so any width stored against
+        // v1's keys is wrong by definition — a new key drops them.
+        storageKey="rf.purchaseOrderLines.columnWidths.v2"
         defaultSort={{ key: "item" }}
         rowClassName={(l) =>
           l.qty_received !== null && Number(l.qty_received) < Number(l.qty_ordered)
