@@ -735,8 +735,11 @@ export function OrderGuide({
           ignoreDays ? "all days" : WEEKDAY_LABELS[weekday - 1]
         } · ${visibleRows.length} of ${rows.length} lines`}
       >
-        {/* Start the day over. Left of Generate POs and never the primary
-            cell — it's the escape hatch, not the destination. */}
+        {/* Start the day over. Left of Generate POs — the escape hatch comes
+            before the destination. Both cells are plain black: Mark preferred
+            the black cell to the white fill (2026-07-26), so this bar has no
+            primary. The bar's own black is emphasis enough; a white cell inside
+            it read as a different kind of object. */}
         <ActionBarButton
           onClick={() => void clearGuide()}
           disabled={clearing || dayTally.total === 0}
@@ -758,7 +761,6 @@ export function OrderGuide({
             weekday={weekday}
             trigger={(open) => (
               <ActionBarButton
-                primary
                 onClick={open}
                 disabled={totals.length === 0}
                 title={

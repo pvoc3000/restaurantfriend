@@ -323,7 +323,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   `<input type="checkbox">`; the **slide-over has a black LEFT edge and a grey
   TOP edge** (black-on-black needs a separator, black-on-dimmed-page doesn't);
   the **ActionBar carries commands only** — a control that changes what a list
-  SHOWS goes with that list's filters.
+  SHOWS goes with that list's filters — and its cells are **all plain black**
+  (Mark, 2026-07-26): `ActionBarButton` still has a `primary` white-fill
+  variant, but nothing uses it, because against the bar's own black a white cell
+  read as a different kind of object rather than as the important one.
 - **The menu is two tiers, from FMP** (Mark, 2026-07-25 — overrides the design
   system, which had killed the sub-nav): sections on top, that section's
   sub-sections under it, both bands black, **both marking active in yellow**

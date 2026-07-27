@@ -25,8 +25,14 @@ export function ActionBar({ note, children }: { note?: ReactNode; children: Reac
 }
 
 /**
- * One cell of the bar. At most one `primary` (white fill) per bar; everything
- * else is a black cell separated by a faint rule.
+ * One cell of the bar: a black cell separated from its neighbour by a faint
+ * rule. `primary` fills it white instead — at most one per bar.
+ *
+ * Nothing uses `primary` today. The order guide, the app's only ActionBar, had
+ * it on Generate POs and dropped it (Mark, 2026-07-26): against the bar's own
+ * black, a white cell read as a different kind of object rather than as the
+ * important one. The variant stays because it's part of the design system's
+ * vocabulary, but prefer plain cells until a bar genuinely needs a hierarchy.
  */
 export function ActionBarButton({
   primary = false,
