@@ -557,7 +557,12 @@ export function OrderGuide({
         // without the page itself sticking anything. Sized to the rest of the
         // viewport (minus the action bar), with a floor for short windows. No
         // outer box — the sticky head's 2px rule is the structure.
-        <div className="max-h-[calc(100vh-21rem)] min-h-64 overflow-auto">
+        //
+        // The masthead's share is subtracted as a live variable rather than
+        // baked into the constant (globals.css, HeaderShell): collapsing the
+        // menu hands those ~56px straight to the list, which is the whole point
+        // of collapsing it.
+        <div className="max-h-[calc(100vh-var(--rf-header-h)-15.5rem)] min-h-64 overflow-auto">
         <table className="w-full border-collapse text-[15px]">
           <thead>
             {/* Sticky to the PANE, not the page — and on the cells, since
@@ -570,8 +575,12 @@ export function OrderGuide({
                 ["Price", "text-right"],
                 ["On hand", "w-24 text-right"],
                 ["Sugg", "w-14 text-right"],
-                ["Order", "w-64 text-right"],
                 ["Line", "w-28 text-right"],
+                // LAST column on purpose (Mark, 2026-07-27): the stepper is
+                // what a thumb reaches for all the way down the walk, so it
+                // sits against the right edge and the line total — read, never
+                // touched — moves inboard of it.
+                ["Order", "w-64 pr-0 text-right"],
               ].map(([label, extra]) => (
                 <th
                   key={label}

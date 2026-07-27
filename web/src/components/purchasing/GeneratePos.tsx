@@ -151,11 +151,17 @@ export function GeneratePos({
             role="dialog"
             aria-label="Generate purchase orders"
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-xl border-2 border-ink bg-white"
+            // `text-ink` is load-bearing, not decoration: this dialog is a DOM
+            // CHILD of the ActionBar, which sets `text-white` for its own black
+            // bar. Position:fixed moves the box, not its place in the tree, so
+            // colour inherits straight through and any dialog text without an
+            // explicit class renders white on white (the vendor names did).
+            // Setting it once here means no future line can fall into it.
+            className="flex max-h-[85vh] w-full max-w-xl flex-col border-2 border-ink bg-white text-ink"
           >
             {/* Black title bar, caps — a dialog is a white rectangle with a
                 2px black edge; no shadow, no radius. */}
-            <div className="flex items-center justify-between gap-4 bg-ink px-6 py-3 text-white">
+            <div className="flex shrink-0 items-center justify-between gap-4 bg-ink px-6 py-3 text-white">
               <h2 className="text-[13px] font-bold uppercase tracking-[0.06em]">
                 {created ? "Purchase orders created" : "Generate purchase orders"}
               </h2>
@@ -169,7 +175,14 @@ export function GeneratePos({
                 ✕
               </button>
             </div>
-            <div className="p-6">
+            {/* Only the BODY scrolls. A dozen vendors made the dialog taller
+                than the window, and the overlay is position:fixed, so the page
+                couldn't scroll to reach "Create N POs" — the one button the
+                dialog exists for sat below the fold, unreachable (found
+                2026-07-27 at 12 vendors in a 900px window: the dialog wanted
+                990px). Title bar and footer are pinned; the vendor list moves
+                between them. */}
+            <div className="min-h-0 flex-1 overflow-y-auto p-6">
 
             {error && <p className="mt-2 text-sm text-accent">{error}</p>}
 
@@ -204,14 +217,6 @@ export function GeneratePos({
                     ))}
                   </ul>
                 )}
-                <div className="-mx-6 -mb-6 flex justify-end border-t border-ink px-6 py-4">
-                  <Link
-                    href="/purchase-orders"
-                    className="inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white no-underline hover:bg-neutral-800"
-                  >
-                    Open purchase orders
-                  </Link>
-                </div>
               </div>
             ) : loading ? (
               <p className="mt-3 text-sm text-subtle">Checking recent POs…</p>
@@ -269,30 +274,45 @@ export function GeneratePos({
                     );
                   })}
                 </ul>
-
-                <div className="-mx-6 -mb-6 flex items-center justify-end gap-4 border-t border-ink px-6 py-4">
-                  <button
-                    type="button"
-                    onClick={() => setOpen(false)}
-                    disabled={creating}
-                    className="text-[12px] font-semibold uppercase tracking-[0.06em] text-muted hover:text-ink disabled:opacity-35"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    onClick={create}
-                    disabled={creating || selected.size === 0}
-                    className="inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white hover:bg-neutral-800 disabled:bg-neutral-300 disabled:text-white"
-                  >
-                    {creating
-                      ? "Creating…"
-                      : `Create ${selected.size} ${selected.size === 1 ? "PO" : "POs"}`}
-                  </button>
-                </div>
               </div>
             )}
             </div>
+
+            {/* Pinned footer: the dialog's decision is always on screen, however
+                many vendors the day has. */}
+            {!loading && (
+              <div className="flex shrink-0 items-center justify-end gap-4 border-t border-ink px-6 py-4">
+                {created ? (
+                  <Link
+                    href="/purchase-orders"
+                    className="inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white no-underline hover:bg-neutral-800"
+                  >
+                    Open purchase orders
+                  </Link>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setOpen(false)}
+                      disabled={creating}
+                      className="text-[12px] font-semibold uppercase tracking-[0.06em] text-muted hover:text-ink disabled:opacity-35"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={create}
+                      disabled={creating || selected.size === 0}
+                      className="inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white hover:bg-neutral-800 disabled:bg-neutral-300 disabled:text-white"
+                    >
+                      {creating
+                        ? "Creating…"
+                        : `Create ${selected.size} ${selected.size === 1 ? "PO" : "POs"}`}
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
           </div>
         </div>
       )}

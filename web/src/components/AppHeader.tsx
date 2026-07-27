@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 
 import { signOut } from "@/app/actions";
 import { AppNav } from "@/components/AppNav";
+import { HeaderShell, MenuCollapseButton } from "@/components/HeaderShell";
 import { LocationSwitcher } from "@/components/LocationSwitcher";
 import { GearIcon, HomeIcon, IconButton } from "@/components/ui/IconButton";
 import { NAV_COOKIE, parseNavMemory } from "@/lib/navMemory";
@@ -13,12 +14,9 @@ export async function AppHeader({ session }: { session: AppSession }) {
   const initialMemory = parseNavMemory((await cookies()).get(NAV_COOKIE)?.value);
 
   return (
-    // Sticky and above the detail panel (z-50 vs the panel's z-40): the panel
-    // is a slide-over, not a modal, so the nav has to stay reachable — a
-    // full-viewport backdrop over the header made every nav link unclickable.
-    // Sticky is load-bearing, not decorative: the panel is fixed and starts
-    // below the header, so a header that scrolled away would leave a dead strip.
-    <header className="sticky top-0 z-50 bg-ink text-white">
+    // The shell owns stickiness, the collapse toggle and the measured height —
+    // see components/HeaderShell.
+    <HeaderShell locationCode={session.activeLocation?.code ?? null}>
       <AppNav
         initialMemory={initialMemory}
         locationCode={session.activeLocation?.code ?? null}
@@ -50,9 +48,13 @@ export async function AppHeader({ session }: { session: AppSession }) {
                 Sign out
               </button>
             </form>
+
+            {/* Last in the cluster: it's the control you reach for once, when
+                you're about to start walking. */}
+            <MenuCollapseButton />
           </>
         }
       />
-    </header>
+    </HeaderShell>
   );
 }

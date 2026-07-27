@@ -24,6 +24,15 @@
   --shadow-*: initial; /* kill Tailwind's shadows */
 }
 
+:root {
+  /* The masthead's height, republished on every resize by HeaderShell (it
+     wraps to two or three rows at narrow widths, and collapses to a strip).
+     Screens that size a scroll pane against the viewport subtract this instead
+     of a constant, so collapsing the menu actually hands them the space. Seeded
+     with the two-tier height so the first paint is right. */
+  --rf-header-h: 5.5rem;
+}
+
 /* The one animation in the system, and it earns it: the order guide spends
    ~3.5s on the server before the browser gets a byte, and until now the old
    page just sat there. A static "loading" label still reads as stuck — motion

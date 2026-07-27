@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Location } from "@/lib/session";
 import { money, qty } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
+import { WEEKDAY_PICKER_WIDTH } from "./WeekdayPicker";
 
 // ISO weekdays, 1 = Monday … 7 = Sunday (CLAUDE.md).
 const DAYS = [
@@ -203,7 +204,7 @@ export function VendorItemLocations({
     {
       key: "favorite_days",
       label: "Favorite days",
-      width: 280,
+      width: WEEKDAY_PICKER_WIDTH,
       // Sorts on how many days it's the preferred source here.
       sortValue: (r) => (r.itemLocationId ? r.favoriteDays.length : null),
       render: (r) =>

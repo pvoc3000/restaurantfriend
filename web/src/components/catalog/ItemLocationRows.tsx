@@ -8,7 +8,7 @@ import { type CatalogItemLocation } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
-import { WeekdayPicker } from "./WeekdayPicker";
+import { WeekdayPicker, WEEKDAY_PICKER_WIDTH } from "./WeekdayPicker";
 import { FavoritesEditor } from "@/components/cleanup/FavoritesEditor";
 
 // One row per location, whether or not the item is stocked there — an item
@@ -125,7 +125,7 @@ export function ItemLocationRows({
     {
       key: "order_days",
       label: "Order days",
-      width: 235,
+      width: WEEKDAY_PICKER_WIDTH,
       // Sorts on how MANY days it's ordered — "which items do we buy most
       // often here" is the question worth asking of this column.
       sortValue: (r) => (r.il ? r.il.order_days.length : null),
