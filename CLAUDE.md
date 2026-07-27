@@ -164,11 +164,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    shows that item's other sources orderable today (`isDayRelevant` = vendor
    order day ∧ item order day, i.e. the `All` tier). Costs no query — the page
    already loads every orderable line for the weekday and filters in the
-   browser. Offered only under **Favorites / Skipped with Ignore-days OFF**
-   (under Will order you're reviewing decisions, not shopping for alternatives;
-   with the day gates lifted the expansion's own definition is void and the
-   switch is already its global form). Keyed per (group, item), so in Vendor
-   grouping a block opens onto **that vendor's** other pack sizes only.
+   browser. The triangle TRAILS the item name (Mark, 2026-07-26 — the name is
+   what you scan for down the walk, so nothing sits to its left) and is offered
+   **only under Favorites, with Ignore-days OFF**: All already shows every
+   day-relevant source, Skipped is a burn-down of what you haven't looked at,
+   under Will order you're reviewing decisions rather than shopping for
+   alternatives, and with the day gates lifted the expansion's own definition is
+   void (the switch is already its global form). Outside Favorites the header
+   shows NO triangle, not even the greyed one — the grey asserts "no other
+   source today", which only Favorites is positioned to claim. Keyed per (group,
+   item), so in Vendor grouping a block opens onto **that vendor's** other pack
+   sizes only.
    Expansion never sticks — dropped on any filter/grouping/ignore-days change
    and on reload — and deliberately ignores the search box. Items with nothing
    to reveal show a greyed inert triangle (Mark, 2026-07-26) so the column stays
@@ -183,6 +189,21 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    lines don't qualify (an explicit no produces nothing); Skipped is unaffected,
    being untouched-only. The search box still narrows everything, expansions
    included.
+   Shipped 2026-07-26: **Clear guide** — an ActionBar command (left of Generate
+   POs, never the primary cell) that resets the whole day at this location to
+   untouched: quantities entered, quantities explicitly zeroed, AND on-hand
+   counts (Mark, 2026-07-26 — a full reset of the walk, not just the order
+   column). Any member may run it; that's what the RLS update policy allows and
+   whoever can walk the guide can restart it. `window.confirm`, matching the PO
+   batch-delete pattern, naming what's being discarded and its dollar value.
+   **It is an UPDATE to nulls, not a DELETE** — `order_guide_entries` has
+   select/insert/update policies and NO delete policy (001), so a delete from
+   the app would match zero rows and cheerfully report success. Nulling is
+   equivalent anyway: every reader treats a (null, null) row exactly as an
+   absent one. Scoped by location + guide_date rather than by the loaded rows,
+   so it also clears entries against vendor items that have since stopped being
+   orderable and so aren't on screen. Verified end-to-end at DF02 with DF01's
+   rows left intact.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -302,7 +323,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   `<input type="checkbox">`; the **slide-over has a black LEFT edge and a grey
   TOP edge** (black-on-black needs a separator, black-on-dimmed-page doesn't);
   the **ActionBar carries commands only** — a control that changes what a list
-  SHOWS goes with that list's filters.
+  SHOWS goes with that list's filters — and its cells are **all plain black**
+  (Mark, 2026-07-26): `ActionBarButton` still has a `primary` white-fill
+  variant, but nothing uses it, because against the bar's own black a white cell
+  read as a different kind of object rather than as the important one.
 - **The menu is two tiers, from FMP** (Mark, 2026-07-25 — overrides the design
   system, which had killed the sub-nav): sections on top, that section's
   sub-sections under it, both bands black, **both marking active in yellow**
@@ -357,6 +381,17 @@ weekday column, and 003 then silently made it per-vendor-item.
   the screen reads. Guide median went 1308→1051ms (nav click) and 1565→1246ms
   (full load). What's left is mostly that payload; cutting it further means
   fewer rows, and caching the view is forbidden by design rule 4.
+- **A client component that seeds `useState` from server data must be KEYED by
+  that data's identity** (found 2026-07-26). Switching location is a navigation
+  to the SAME route, so React keeps the component instance and a
+  `useState(() => …props)` initialiser — which runs once per mount — never sees
+  the new props. `OrderGuide` had this: after switching DF01 → DF02 the guide
+  showed DF01's quantities and on-hand counts against DF02's lines and totalled
+  them in the vendor bar. Writes still went to the correct location, so only the
+  display lied, which is why it survived unnoticed. Fixed with
+  `key={`${locationId}:${guideDate}`}` on the page — cheaper than syncing state
+  in an effect, and it can't drift. Check any other screen that copies server
+  props into state when the location can change under it.
 - **The Active toggle is the FIRST column** on every catalog table (Mark,
   2026-07-23) — vendors list, vendor/item per-location config, vendor items.
   "Stock here" shares that slot where a row doesn't exist yet.
