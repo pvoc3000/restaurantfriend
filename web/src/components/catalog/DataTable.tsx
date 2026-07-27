@@ -12,6 +12,13 @@ export type DataColumn<T> = {
   align?: "right";
   /** Omit to make the column unsortable (e.g. a control column). */
   sortValue?: (row: T) => SortValue;
+  /**
+   * Applied in order when `sortValue` ties, never overriding the chosen
+   * column. For a column with few distinct values — a category, a status —
+   * the primary sort alone leaves the rows inside each group in whatever
+   * order they arrived, which reads as unsorted.
+   */
+  sortTiebreaks?: ((row: T) => string)[];
   render: (row: T) => ReactNode;
   /** Cells truncate by default; opt out for cells that need to wrap. */
   wrap?: boolean;
@@ -102,7 +109,9 @@ export function DataTable<T>({
     const column = columns.find((c) => c.key === sort.key);
     if (!column?.sortValue) return rows;
     const value = column.sortValue;
-    return [...rows].sort(makeComparator<T>({ value, dir: sort.dir }));
+    return [...rows].sort(
+      makeComparator<T>({ value, dir: sort.dir, tiebreaks: column.sortTiebreaks })
+    );
   }, [rows, columns, sort, controlled]);
 
   if (rows.length === 0) {

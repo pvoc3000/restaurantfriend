@@ -175,6 +175,16 @@ export function PurchaseOrderDetail({
       // one line and clipping it to "Flavors and …" loses the distinction.
       wrap: true,
       sortValue: (l) => l.vendor_items?.inventory_items?.category ?? null,
+      // Type, then Item, then description (Mark, 2026-07-27). A category
+      // covers several lines, so the type alone leaves each group in arrival
+      // order; the two tiebreaks are the Item cell's own two lines, read top
+      // to bottom. Brand last so identical descriptions still land somewhere
+      // predictable.
+      sortTiebreaks: [
+        (l) => l.vendor_items?.inventory_items?.name ?? l.description ?? "",
+        (l) => l.description ?? "",
+        (l) => l.brand ?? "",
+      ],
       render: (l) => (
         <span className="text-muted">
           {l.vendor_items?.inventory_items?.category ?? "—"}
@@ -198,6 +208,9 @@ export function PurchaseOrderDetail({
       width: 280,
       wrap: true,
       sortValue: (l) => l.vendor_items?.inventory_items?.name ?? l.description,
+      // One item can appear twice under different pack sizes, so the cell's
+      // second line breaks the tie here too.
+      sortTiebreaks: [(l) => l.description ?? "", (l) => l.brand ?? ""],
       render: (l) => {
         const name = l.vendor_items?.inventory_items?.name ?? null;
         const orderedAs = [l.brand, l.description].filter(Boolean).join(" · ");
