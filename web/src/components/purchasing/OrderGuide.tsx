@@ -115,18 +115,23 @@ export function OrderGuide({
   }
 
   /**
-   * The triangle discloses the day's OTHER sources for one item, so it's only
-   * offered where the list is day-scoped and narrower than that (Mark,
-   * 2026-07-26):
-   * - Favorites / Skipped — yes; Skipped is a subset of Favorites and reaching
-   *   for another source is a fair way to burn one down.
-   * - Will order — no. You're reviewing decisions there, not shopping for
-   *   alternatives.
-   * - Ignore ordering days — no. The expansion is DEFINED by the day gates and
-   *   the switch lifts them, so day-filtering one item inside a day-blind list
+   * The triangle discloses the day's OTHER sources for one item, so it belongs
+   * only on the one list that is narrower than that — Favorites, the working
+   * mode (Mark, 2026-07-26). Everywhere else it would either mean nothing or
+   * mean something different:
+   * - All — already shows every day-relevant source; there is nothing behind it.
+   * - Skipped — a burn-down of what you haven't looked at. Expanding it mixes
+   *   in lines you've already priced, which isn't what that list is for.
+   * - Will order — you're reviewing decisions, not shopping for alternatives.
+   * - Ignore ordering days — the expansion is DEFINED by the day gates and the
+   *   switch lifts them, so day-filtering one item inside a day-blind list
    *   would be incoherent; the switch is already this feature's global form.
+   *
+   * When it's off, the header shows NO triangle at all — not the greyed one.
+   * The grey means "this item has no other source today", which is a claim
+   * only Favorites is in a position to make.
    */
-  const canExpand = !ignoreDays && (filter === "favorites" || filter === "skipped");
+  const canExpand = !ignoreDays && filter === "favorites";
 
   /** Changing what the list shows drops the expansions with it. */
   function changeFilter(next: GuideFilter) {
@@ -562,51 +567,57 @@ export function OrderGuide({
                       <td colSpan={8} className="px-0 pb-0 pt-12">
                         <div className="flex items-end gap-4 border-b-2 border-ink px-4 pb-2">
                           <span className="flex items-center gap-3">
-                            {/* The day's other sources for THIS item, without
-                                leaving Favorites (see applyExpansions). A bare
-                                triangle at the scale of the item name rather
-                                than DataTable's small bordered box — this
-                                header is a 22px title read standing up, and the
-                                control has to be hittable at arm's length
-                                (Mark, 2026-07-26). */}
-                            {item.expandable ? (
-                              <button
-                                type="button"
-                                onClick={() => toggleExpanded(itemKey)}
-                                aria-expanded={isOpen}
-                                aria-label={
-                                  isOpen
-                                    ? `Hide other sources for ${item.item_name}`
-                                    : `Show other sources for ${item.item_name}`
-                                }
-                                title={
-                                  isOpen
-                                    ? "Show only today's favorites"
-                                    : "Show every source orderable today"
-                                }
-                                className="flex h-7 w-7 shrink-0 items-center justify-center text-[20px] leading-none text-ink transition-colors hover:text-muted"
-                              >
-                                {isOpen ? "▼" : "▶"}
-                              </button>
-                            ) : (
-                              // Greyed and inert rather than absent (Mark,
-                              // 2026-07-26): the column of triangles stays
-                              // unbroken down the walk, and "nothing else sells
-                              // this today" is worth saying in its own right.
-                              <span
-                                aria-hidden
-                                title="No other sources orderable today"
-                                className="flex h-7 w-7 shrink-0 items-center justify-center text-[20px] leading-none text-faint"
-                              >
-                                ▶
-                              </span>
-                            )}
                             <Link
                               href={withFrom(`/items/${item.inventory_item_id}`, here)}
                               className="text-[22px] font-bold uppercase leading-tight tracking-[0.06em] text-ink no-underline hover:underline"
                             >
                               {item.item_name}
                             </Link>
+                            {/* The day's other sources for THIS item, without
+                                leaving Favorites (see applyExpansions). It
+                                trails the name rather than leading it (Mark,
+                                2026-07-26) — the name is what you're scanning
+                                for down the walk, so nothing should sit to the
+                                left of it. A bare triangle at the scale of that
+                                name rather than DataTable's small bordered box:
+                                this header is a 22px title read standing up and
+                                the control has to be hittable at arm's length.
+                                Absent entirely outside Favorites — see
+                                canExpand. */}
+                            {canExpand &&
+                              (item.expandable ? (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpanded(itemKey)}
+                                  aria-expanded={isOpen}
+                                  aria-label={
+                                    isOpen
+                                      ? `Hide other sources for ${item.item_name}`
+                                      : `Show other sources for ${item.item_name}`
+                                  }
+                                  title={
+                                    isOpen
+                                      ? "Show only today's favorites"
+                                      : "Show every source orderable today"
+                                  }
+                                  className="flex h-7 w-7 shrink-0 items-center justify-center text-[20px] leading-none text-ink transition-colors hover:text-muted"
+                                >
+                                  {isOpen ? "▼" : "▶"}
+                                </button>
+                              ) : (
+                                // Greyed and inert rather than absent (Mark,
+                                // 2026-07-26): every item on the working list
+                                // says something about its other sources, and
+                                // silence would be ambiguous between "none" and
+                                // "not checked".
+                                <span
+                                  aria-hidden
+                                  title="No other sources orderable today"
+                                  className="flex h-7 w-7 shrink-0 items-center justify-center text-[20px] leading-none text-faint"
+                                >
+                                  ▶
+                                </span>
+                              ))}
                           </span>
                           <span className="ml-auto">
                             {item.par_qty === null ? (

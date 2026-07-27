@@ -164,11 +164,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    shows that item's other sources orderable today (`isDayRelevant` = vendor
    order day ∧ item order day, i.e. the `All` tier). Costs no query — the page
    already loads every orderable line for the weekday and filters in the
-   browser. Offered only under **Favorites / Skipped with Ignore-days OFF**
-   (under Will order you're reviewing decisions, not shopping for alternatives;
-   with the day gates lifted the expansion's own definition is void and the
-   switch is already its global form). Keyed per (group, item), so in Vendor
-   grouping a block opens onto **that vendor's** other pack sizes only.
+   browser. The triangle TRAILS the item name (Mark, 2026-07-26 — the name is
+   what you scan for down the walk, so nothing sits to its left) and is offered
+   **only under Favorites, with Ignore-days OFF**: All already shows every
+   day-relevant source, Skipped is a burn-down of what you haven't looked at,
+   under Will order you're reviewing decisions rather than shopping for
+   alternatives, and with the day gates lifted the expansion's own definition is
+   void (the switch is already its global form). Outside Favorites the header
+   shows NO triangle, not even the greyed one — the grey asserts "no other
+   source today", which only Favorites is positioned to claim. Keyed per (group,
+   item), so in Vendor grouping a block opens onto **that vendor's** other pack
+   sizes only.
    Expansion never sticks — dropped on any filter/grouping/ignore-days change
    and on reload — and deliberately ignores the search box. Items with nothing
    to reveal show a greyed inert triangle (Mark, 2026-07-26) so the column stays
