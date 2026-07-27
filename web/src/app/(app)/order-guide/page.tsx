@@ -97,7 +97,11 @@ export default async function OrderGuidePage({
       // where you can act on it; during a walk it's noise. `/cleanup` remains
       // where dead pairings get found and fixed.
       .eq("is_orderable", true)
+      // shop_section_sort is the AREA number and is shared by every shelf in
+      // that area, so it needs the section name after it to be a total order —
+      // same tiebreak groupGuide applies (see lib/orderGuide.ts).
       .order("shop_section_sort")
+      .order("shop_section")
       .order("item_name")
       .range(from, from + 999);
 

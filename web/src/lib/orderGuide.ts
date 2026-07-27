@@ -425,8 +425,19 @@ export function groupGuide(
 
   // Section mode has a meaningful numeric order (the walk); the others are
   // alphabetical.
+  //
+  // `sort_order` is NOT unique — it's the AREA number ("02"), shared by every
+  // shelf in that area: 9 sections share sort_order 2, 7 share 3, and so on
+  // (measured 2026-07-27 over 168 sections). So the number alone only orders
+  // the walk down to the area, and within an area the ties used to fall out in
+  // whatever order the rows happened to arrive — "02 Storage - R1 S3" before
+  // "R1 S1" (Mark, 2026-07-27). The display name carries the shelf, and it
+  // repeats the area prefix, so it's the natural tiebreak; `numeric` so S10
+  // would follow S9 rather than S1.
   const list = [...sections.values()].sort((a, b) =>
-    mode === "section" ? a.sort - b.sort : a.label.localeCompare(b.label)
+    mode === "section"
+      ? a.sort - b.sort || a.label.localeCompare(b.label, undefined, { numeric: true })
+      : a.label.localeCompare(b.label)
   );
   for (const section of list) {
     section.items.sort((a, b) => a.item_name.localeCompare(b.item_name));
