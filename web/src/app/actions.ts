@@ -6,15 +6,17 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { NAV_COOKIE } from "@/lib/navMemory";
 import { GUIDE_VIEW_COOKIE } from "@/lib/orderGuide";
+import { PO_VIEW_COOKIE } from "@/lib/poFilters";
 
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
-  // The remembered guide view and the remembered menu are per-session state,
+  // The remembered guide view, PO list view and menu are per-session state,
   // not per-user config — the next person to sign in on this machine should
   // start from the defaults.
   const jar = await cookies();
   jar.delete(GUIDE_VIEW_COOKIE);
+  jar.delete(PO_VIEW_COOKIE);
   jar.delete(NAV_COOKIE);
   redirect("/login");
 }

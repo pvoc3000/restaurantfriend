@@ -1,7 +1,14 @@
+import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import type { RawSearchParams } from "@/lib/itemFilters";
-import { parsePoFilters, rangeStart } from "@/lib/poFilters";
+import {
+  parsePoFilters,
+  parsePoView,
+  rangeStart,
+  PO_VIEW_COOKIE,
+} from "@/lib/poFilters";
+import { serverTimeZone } from "@/lib/today";
 import type { PoStatus } from "@/lib/purchaseOrders";
 import { PurchaseOrderList } from "@/components/purchasing/PurchaseOrderList";
 
@@ -23,7 +30,11 @@ export default async function PurchaseOrdersPage({
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
-  const filters = parsePoFilters(await searchParams);
+  // How you left the list last time, from the session cookie — read on the
+  // server so the first paint is already sorted and filtered the way you had
+  // it, rather than flashing the defaults. An explicit query param still wins.
+  const remembered = parsePoView((await cookies()).get(PO_VIEW_COOKIE)?.value);
+  const filters = parsePoFilters(await searchParams, remembered);
   const session = await getAppSession();
   const supabase = await createClient();
 
@@ -47,7 +58,12 @@ export default async function PurchaseOrdersPage({
     .order("order_date", { ascending: false })
     .limit(500);
 
-  const start = rangeStart(filters.range, new Date());
+  // The org's calendar day, not the host's — a Today window on a UTC host
+  // would otherwise start hiding this afternoon's orders (see lib/today).
+  const start = rangeStart(
+    filters.range,
+    session.orgSettings.timezone ?? serverTimeZone()
+  );
   if (start) query = query.gte("order_date", start);
 
   const { data: orders, error } = await query;

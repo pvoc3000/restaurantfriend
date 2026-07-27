@@ -1,6 +1,8 @@
 // The order guide (spec §4.1–4.6). Everything here is derived from the live
 // view `v_order_guide` — never materialized, never cached (design rule 4).
 
+import { todayInTimeZone } from "./today";
+
 export type GuideRow = {
   item_location_id: string;
   inventory_item_id: string;
@@ -610,13 +612,9 @@ export const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
  * deploying.
  */
 export function guideToday(timeZone: string): { date: string; weekday: number } {
-  // en-CA formats as YYYY-MM-DD, which is the shape Postgres `date` wants.
-  const date = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
+  // The date itself comes from lib/today, shared with the PO list's date
+  // windows so the two can't drift apart on what "today" means.
+  const date = todayInTimeZone(timeZone);
 
   // Read the weekday back off that calendar date rather than off the instant,
   // which is what keeps the two in step.
@@ -624,6 +622,6 @@ export function guideToday(timeZone: string): { date: string; weekday: number } 
   return { date, weekday: ((jsDay + 6) % 7) + 1 }; // JS Sunday=0 → ISO Mon=1
 }
 
-export function serverTimeZone(): string {
-  return Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-}
+// serverTimeZone moved to lib/today alongside todayInTimeZone — the PO list's
+// date windows need the same fallback, and one definition can't drift.
+export { serverTimeZone } from "./today";

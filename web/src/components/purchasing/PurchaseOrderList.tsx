@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -21,6 +21,8 @@ import {
   poDetailHref,
   poFiltersToQuery,
   poListHref,
+  serializePoView,
+  PO_VIEW_COOKIE,
   RANGES,
   type PoFilters,
   type PoSortKey,
@@ -73,6 +75,18 @@ export function PurchaseOrderList({
   const [batchBusy, setBatchBusy] = useState<string | null>(null);
   const [batchError, setBatchError] = useState<string | null>(null);
 
+  /**
+   * Remember the view for the rest of the browser session. The URL alone
+   * can't do it: the menu's link is a bare `/purchase-orders`, so coming back
+   * through it dropped the sort and filters every time (Mark, 2026-07-27).
+   * Same session cookie the order guide uses, written from an effect for the
+   * same reason — a cookie write in the component body is a modification of
+   * outside state, which the lint rejects. signOut deletes it.
+   */
+  useEffect(() => {
+    document.cookie = `${PO_VIEW_COOKIE}=${serializePoView(filters)}; path=/; SameSite=Lax`;
+  }, [filters]);
+
   function update(patch: Partial<PoFilters>) {
     const next = { ...filters, ...patch };
     setFilters(next);
@@ -85,9 +99,14 @@ export function PurchaseOrderList({
   }
 
   // The date window is a server filter, so changing it must re-run the page —
-  // router.push, not the replaceState the other filters use.
+  // router.push, not the replaceState the other filters use. setFilters as
+  // well as pushing: the push re-renders the server component but does NOT
+  // remount this one, so state seeded from props would otherwise keep showing
+  // the old window on the chips.
   function setRange(range: RangeKey) {
-    router.push(poListHref({ ...filters, range }));
+    const next = { ...filters, range };
+    setFilters(next);
+    router.push(poListHref(next));
   }
 
   const statusCounts = useMemo(() => {

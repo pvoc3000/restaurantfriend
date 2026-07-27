@@ -491,7 +491,9 @@ export function PurchaseOrderDetail({
         // name moved into the wrapping Item cell), so any width stored against
         // v1's keys is wrong by definition — a new key drops them.
         storageKey="rf.purchaseOrderLines.columnWidths.v2"
-        defaultSort={{ key: "item" }}
+        // Type first (Mark, 2026-07-27): it groups the order the way the
+        // vendor-facing PDF does, so the screen and the document read alike.
+        defaultSort={{ key: "item_type" }}
         rowClassName={(l) =>
           l.qty_received !== null && Number(l.qty_received) < Number(l.qty_ordered)
             ? "bg-[var(--rf-yellow-50)]"
