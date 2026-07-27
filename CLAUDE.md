@@ -294,6 +294,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   then owned by the client** (`lib/navMemoryStore.ts`): a server layout does not
   re-render on soft navigation, so a client-written cookie can never be read
   back mid-session and the tab hrefs would freeze. `signOut` deletes it.
+- **A days-old `next dev` will start reload-looping** (Mark, 2026-07-26 — the
+  order guide stuck on its loading bar, restarting, page reloading by itself,
+  cured for a few minutes by navigating away and back). Not an app bug: the dev
+  server had been up 2.5 days at **4,250 MB RSS against Node's 4,144 MB default
+  heap cap** — 102.5% of the ceiling. At the cap V8 major-GCs on every
+  allocation, requests stall, the HMR socket drops, and Next's dev client
+  full-reloads to reconnect, over and over. The order guide trips it first
+  because it's the heaviest route. `npm run dev` now sets
+  `--max-old-space-size=8192`, which buys headroom but does not stop Next dev
+  from accruing memory — **restart the dev server every day or two**, and
+  `npm run clean` if `.next` gets large (it was 1.3 GB). Check with
+  `ps -o rss= -p <pid>` before debugging a phantom app bug.
 - **Every slow route needs a `loading.tsx`** (Mark, 2026-07-26 — "enough time
   for me to wonder each time if the app is working"). Without one Next holds the
   PREVIOUS page on screen for the whole server wait with no acknowledgement that
