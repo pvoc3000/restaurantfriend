@@ -114,7 +114,10 @@ const styles = StyleSheet.create({
   // The vendor PO prints a package TYPE now, and the longest in the catalog is
   // four characters ("FLAT", "ROLL"). The shopping list keeps the wide column
   // because it still prints the composed pack.
-  colPack: { width: 36, paddingRight: 6 },
+  // Bold, like the quantity beside it (Mark, 2026-07-28): "2 CS" is the
+  // instruction — the two words are one fact, and they should carry the same
+  // weight when the order is read off a shelf.
+  colPack: { width: 36, paddingRight: 6, fontFamily: "Helvetica-Bold" },
   colPackWide: { width: 70, paddingRight: 6 },
   // Shopping-list only: "$32.50 ea" needs the width the product column used to
   // have, and it isn't a product ID — it had been borrowing that style.
