@@ -151,7 +151,7 @@ function money(value: number | null): string {
 }
 
 /**
- * "item // brand // description" — §4.9's composed description, minus the
+ * "description // brand // pack" — §4.9's composed description, minus the
  * price (Mark, 2026-07-28: "remove any pricing information"). The document
  * already carried no extended prices and no total; the unit price was the last
  * money on it. What we think a case costs is our side of the conversation —
@@ -162,9 +162,15 @@ function money(value: number | null): string {
  */
 function composedDescription(line: DocLine): string {
   return [
-    line.item_name ?? line.description,
+    // The VENDOR's description leads; our catalog name is the fallback, not a
+    // prefix (Mark, 2026-07-28). They're filling this order off their own
+    // product list, and "Napkins" is what we call it, not what they sell.
+    line.description ?? line.item_name,
     line.brand,
-    line.description !== line.item_name ? line.description : null,
+    // The pack STRUCTURE tails the line — "12 × 32 oz", the thing you check a
+    // delivery against. The Pack column carries only the type ("CS"), so this
+    // is where the size went; skip it when the two would say the same word.
+    line.pack === line.pack_type ? null : line.pack,
   ]
     .filter(Boolean)
     .join("  //  ");

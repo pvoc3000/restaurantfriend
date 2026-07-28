@@ -642,7 +642,12 @@ weekday column, and 003 then silently made it per-vendor-item.
   extended prices, not a total) and its Pack column prints the package TYPE the
   vendor sells in — "CS", "EA" — from `vendor_items.package_desc`, falling back
   to the line snapshot only when that snapshot is a bare type (FMP history) and
-  not migration 013's composed "12 × 32 oz". The per-line ordering note is the
+  not migration 013's composed "12 × 32 oz" — that composed pack tails the
+  description instead. Each line reads
+  **`<vendor description or, failing that, our item name> // <brand> // <pack>`**
+  (Mark, 2026-07-28): the VENDOR's own description leads, because they fill the
+  order off their product list and our catalog name isn't on it. The per-line
+  ordering note is the
   LINE's own `notes` (migration 015), not a live read of `vendor_items.notes`.
   The in_person **shopping list is internal** and keeps its prices, its
   estimated total, and the composed pack.
