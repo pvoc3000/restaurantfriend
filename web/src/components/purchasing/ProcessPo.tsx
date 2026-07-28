@@ -213,8 +213,11 @@ export function ProcessPo({
           Process · {context.order_type.replace("_", " ")}
         </span>
 
-        {/* Delivery date first: it prints on the document, so set it before
-            generating. The suggestion is the vendor's next delivery day. */}
+        {/* Delivery date first: it prints on the document. Generation fills it
+            in from the vendor's delivery days (migration 016), so this is
+            usually already correct — it's here for the exceptions (a holiday, a
+            special run, a vendor with no delivery days recorded). The
+            suggestion chip only appears when the date is still empty. */}
         <label className="flex items-center gap-2 text-muted">
           <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
             Delivery

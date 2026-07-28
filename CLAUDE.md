@@ -254,6 +254,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    two are told apart — Note goes to the vendor, Receiving never leaves the
    building. Every other column gave up a few pixels to pay for it, so the table
    is still 1290px; widths key bumped to v3.
+   (e) **A generated PO knows its delivery date** (migration 016, needs
+   applying) — the vendor's next delivery day after the order date, from
+   `vendor_locations.delivery_days`, so the PDF's Delivery block is filled in
+   without anyone remembering. The Process card's date input stays for the
+   exceptions.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -310,10 +315,20 @@ future order inherits (Mark, 2026-07-28). Fixture-tested in the Docker harness �
 snapshot on generation, catalog edit doesn't touch the order, line edit doesn't
 touch the catalog, backfill skips non-drafts.
 
-**Migrations 001–014 are APPLIED to the hosted DB** (013 verified
-2026-07-23 by the bogus-argument RPC probe). **015 is WRITTEN, NOT APPLIED** —
-PO detail and the PDF both select `purchase_order_items.notes`, so those two
-screens 400 against the live DB until Mark runs it.
+Migration 016 makes a generated PO know when it arrives: `next_delivery_date`
+(immutable, `((day - isodow + 6) % 7) + 1`, so the answer is STRICTLY after the
+order date — a Tuesday order to a Tuesday-delivering vendor arrives the
+following Tuesday) and a recreated generation function that fills
+`purchase_orders.delivery_date` from `vendor_locations.delivery_days`. Null when
+the vendor has no delivery days (13 of DF01's 56 vendor-locations), which is
+what the Process card's date input is still for. Drafts are backfilled, history
+isn't. Same arithmetic as the suggestion chip it replaces
+(`lib/poProcessing.ts` `nextDeliveryDate`) — if one changes, change both.
+
+**Migrations 001–015 are APPLIED to the hosted DB** (013 verified
+2026-07-23 by the bogus-argument RPC probe; 015 verified 2026-07-28 — 10 of 64
+draft lines carry a backfilled note, 258 sampled non-draft lines carry none).
+**016 is WRITTEN, NOT APPLIED.**
 Mark runs them himself in the Supabase SQL editor — never assume a written
 migration has been applied, and never assume it hasn't: check. Cheap probes:
 `select settings->>'timezone' from orgs` for 007, and for a function, call it
