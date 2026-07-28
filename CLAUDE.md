@@ -218,6 +218,36 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    edge, with the line total moved inboard, because the stepper is the only
    thing on a line you touch and a thumb lives at the right edge; and the
    **masthead collapses** (see Conventions).
+   Shipped 2026-07-28: **a PO is a working document, not a frozen record.**
+   Three changes, all Mark's.
+   (a) **Add item** on the line bar (`AddPoLines.tsx`, purchaser+) opens a panel
+   of every ACTIVE vendor item for that PO's vendor — search box, an order
+   amount and an "Add to PO" button per row — and STAYS OPEN after each add,
+   because adding four things is the shape of the task. Lines snapshot the
+   catalog exactly the way migration 013 does (composed pack label, price =
+   location override → `vendor_items.price`) so an added line is
+   indistinguishable from a generated one. An item already on the order RAISES
+   ITS EXISTING LINE rather than creating a second line of the same SKU; each
+   row shows what's already on order so the arithmetic is visible.
+   (b) **Every field on the order is inline-editable** ("I should be able to
+   edit the information in a purchase order, especially before it's sent. At the
+   very least the item amount") — ordered qty, unit price, product ID, pack, the
+   brand/description snapshot, received qty, note, and the order/delivery dates.
+   Read-only still: the catalog item's NAME (edit it on the item), the line
+   total (derived), and the ≠ price-reconciliation action, which writes the
+   other way onto `vendor_items`. NOT gated on status — you can already delete a
+   line off a received order — but gated on purchaser+, which is what the RLS
+   policy allows; below that every cell renders as plain text instead of
+   offering a write the DB would reject. `InlineValue` gained `kind="date"` and
+   `nullable={false}` (a NOT NULL column asks for a value instead of bouncing a
+   Postgres constraint back at you).
+   (c) **The vendor PDF carries no money at all** and its Pack column prints the
+   package TYPE ("CS", "EA") rather than 013's composed structure — see the
+   PoPdf note under §4.9 below. Prices baked into FMP's description text are
+   deliberately NOT stripped (Mark: "ignore historical purchase orders… just
+   change the behavior going forward"); nor are the 28 active vendor items whose
+   NOTES carry a price, since 24 of those are real quantity-break instructions
+   ("$8.25 ea in lots of 48") that belong on the order.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -586,8 +616,13 @@ weekday column, and 003 then silently made it per-vendor-item.
   that week (flour is deliberately "ballast" to hit Bakemark's $900 minimum).
 - PO processing by vendor `order_type`: email_po → PDF emailed (edge function,
   later), online → open vendor URL, in_person → shopping list sorted by shop
-  section. PO PDF spec: docs/purchasing-spec.md §4.9 (no totals on the
-  vendor-facing document — intentional).
+  section. PO PDF spec: docs/purchasing-spec.md §4.9 — the vendor-facing
+  document carries **NO PRICES AT ALL** (Mark, 2026-07-28: not unit prices, not
+  extended prices, not a total) and its Pack column prints the package TYPE the
+  vendor sells in — "CS", "EA" — from `vendor_items.package_desc`, falling back
+  to the line snapshot only when that snapshot is a bare type (FMP history) and
+  not migration 013's composed "12 × 32 oz". The in_person **shopping list is
+  internal** and keeps its prices, its estimated total, and the composed pack.
 - Receiving: per-line qty_received, invoice photo → Storage, and a one-tap
   "invoice price differs → update catalog?" flow.
 - Vendors include non-food suppliers (landlord, plumber) — `order_type: none`.
