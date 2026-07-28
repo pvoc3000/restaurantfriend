@@ -37,8 +37,11 @@ export type DocLine = {
   unit_price: number | null;
   item_name: string | null;
   category: string | null;
-  /** Vendor-item ordering instructions — §4.9: they print on the line. */
-  instructions: string | null;
+  /** The line's own ordering note — §4.9: it prints on the line. Snapshotted
+   *  onto purchase_order_items at generation (migration 015), NOT read live
+   *  from the catalog: a reprint has to reproduce the document that was sent,
+   *  and striking a note off one order mustn't touch every future one. */
+  notes: string | null;
   shop_section: string | null;
   shop_section_sort: number | null;
 };
@@ -192,7 +195,7 @@ export async function fetchPoDocData(
           unit_price: l.unit_price === null ? null : Number(l.unit_price),
           item_name: l.item_name,
           category: l.category,
-          instructions: l.instructions,
+          notes: l.notes,
           shop_section: l.inventory_item_id
             ? (sections.get(`${l.inventory_item_id}:${po.location_id}`)?.name ?? null)
             : null,
@@ -225,7 +228,7 @@ type RawLine = {
   unit_price: number | null;
   item_name: string | null;
   category: string | null;
-  instructions: string | null;
+  notes: string | null;
   inventory_item_id: string | null;
 };
 
@@ -244,9 +247,9 @@ async function fetchLines(
     const { data, error } = await supabase
       .from("purchase_order_items")
       .select(
-        `id, po_id, product_id, brand, description, package_desc,
+        `id, po_id, product_id, brand, description, package_desc, notes,
          qty_ordered, unit_price,
-         vendor_items ( id, notes, package_desc, inventory_items ( id, name, category ) )`
+         vendor_items ( id, package_desc, inventory_items ( id, name, category ) )`
       )
       .in("po_id", poIds)
       .range(from, from + 999);
@@ -259,11 +262,11 @@ async function fetchLines(
       brand: string | null;
       description: string | null;
       package_desc: string | null;
+      notes: string | null;
       qty_ordered: number;
       unit_price: number | null;
       vendor_items: {
         id: string;
-        notes: string | null;
         package_desc: string | null;
         inventory_items: { id: string; name: string; category: string | null } | null;
       } | null;
@@ -287,7 +290,7 @@ async function fetchLines(
         unit_price: row.unit_price,
         item_name: row.vendor_items?.inventory_items?.name ?? null,
         category: row.vendor_items?.inventory_items?.category ?? null,
-        instructions: row.vendor_items?.notes ?? null,
+        notes: row.notes,
         inventory_item_id: row.vendor_items?.inventory_items?.id ?? null,
       });
     }

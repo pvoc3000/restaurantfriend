@@ -181,13 +181,13 @@ export function PurchaseOrderDetail({
       : []),
     // Type leads (Mark, 2026-07-27 — the table ran off the screen): the item's
     // category is short, repeats down the order, and is what the vendor-facing
-    // PDF groups by, so it costs 130px where the item NAME cost 240.
+    // PDF groups by, so it costs a fraction of what the item NAME cost.
     {
       key: "item_type",
       label: "Type",
-      width: 130,
-      // Wraps rather than widens — "Flavors and Extracts" doesn't fit 130px on
-      // one line and clipping it to "Flavors and …" loses the distinction.
+      width: 110,
+      // Wraps rather than widens — "Flavors and Extracts" doesn't fit on one
+      // line and clipping it to "Flavors and …" loses the distinction.
       wrap: true,
       sortValue: (l) => l.vendor_items?.inventory_items?.category ?? null,
       // Type, then Item, then description (Mark, 2026-07-27). A category
@@ -231,7 +231,7 @@ export function PurchaseOrderDetail({
     {
       key: "item",
       label: "Item",
-      width: 280,
+      width: 230,
       wrap: true,
       sortValue: (l) => l.vendor_items?.inventory_items?.name ?? l.description,
       // One item can appear twice under different pack sizes, so the cell's
@@ -286,9 +286,8 @@ export function PurchaseOrderDetail({
       key: "package_desc",
       label: "Pack",
       // 85px clipped every multi-pack to "1 × 5 l…", which is the same
-      // information-off-the-edge problem. The 40px comes out of Note below, so
-      // the table's total width is unchanged.
-      width: 125,
+      // information-off-the-edge problem.
+      width: 115,
       sortValue: (l) => l.package_desc,
       render: (l) =>
         canEditLines ? (
@@ -358,7 +357,7 @@ export function PurchaseOrderDetail({
     {
       key: "unit_price",
       label: "Unit price",
-      width: 120,
+      width: 110,
       align: "right",
       sortValue: (l) => (l.unit_price === null ? null : Number(l.unit_price)),
       render: (l) => {
@@ -403,7 +402,7 @@ export function PurchaseOrderDetail({
     {
       key: "line_total",
       label: "Line total",
-      width: 120,
+      width: 110,
       align: "right",
       sortValue: (l) => Number(l.qty_ordered ?? 0) * Number(l.unit_price ?? 0),
       render: (l) => (
@@ -412,12 +411,37 @@ export function PurchaseOrderDetail({
         </span>
       ),
     },
+    // The note the VENDOR reads — it prints under the description on their copy
+    // (§4.9). Snapshotted at generation (migration 015) and editable here
+    // precisely so it can be struck off one order without touching the catalog
+    // entry every future order inherits (Mark, 2026-07-28).
+    {
+      key: "notes",
+      label: "Note",
+      width: 130,
+      wrap: true,
+      sortValue: (l) => l.notes,
+      render: (l) =>
+        canEditLines ? (
+          <InlineValue
+            table="purchase_order_items"
+            id={l.id}
+            column="notes"
+            value={l.notes}
+            placeholder="—"
+            className="text-muted"
+          />
+        ) : (
+          <span className="text-muted">{l.notes ?? "—"}</span>
+        ),
+    },
     {
       key: "discrepancy_note",
-      label: "Note",
-      // Lent 40px to Pack: this column is empty on almost every line, and it's
-      // the last one, so it's also the cheapest place to give width back.
-      width: 150,
+      // Renamed from "Note" now that the line has two of them: this one is
+      // receiving's ("short 2 cases") and never leaves the building, while
+      // "Note" above goes to the vendor.
+      label: "Receiving",
+      width: 120,
       sortValue: (l) => l.discrepancy_note,
       render: (l) =>
         canEditLines ? (
@@ -656,10 +680,13 @@ export function PurchaseOrderDetail({
         rows={lines}
         columns={columns}
         rowKey={(l) => l.id}
-        // v2: the columns changed meaning (Type replaced the item name, and the
-        // name moved into the wrapping Item cell), so any width stored against
-        // v1's keys is wrong by definition — a new key drops them.
-        storageKey="rf.purchaseOrderLines.columnWidths.v2"
+        // v3 (2026-07-28): the vendor Note column arrived and every other
+        // column gave up a few pixels to pay for it — total still 1290, which
+        // is what fits a 1440 window. A stored v2 layout has no width for the
+        // new column and keeps the old ones fat, so a new key drops them.
+        // (v2 was the same story for v1: Type replaced the item name, and the
+        // name moved into the wrapping Item cell.)
+        storageKey="rf.purchaseOrderLines.columnWidths.v3"
         // Type first (Mark, 2026-07-27): it groups the order the way the
         // vendor-facing PDF does, so the screen and the document read alike.
         defaultSort={{ key: "item_type" }}

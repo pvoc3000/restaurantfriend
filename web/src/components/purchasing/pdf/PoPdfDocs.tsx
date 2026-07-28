@@ -292,8 +292,11 @@ export function PoPdf({ pos, org }: { pos: PoDocData[]; org: OrgDocData }) {
                   <Text style={styles.colPack}>{line.pack_type ?? ""}</Text>
                   <View style={styles.colDesc}>
                     <Text>{composedDescription(line)}</Text>
-                    {line.instructions && (
-                      <Text style={styles.instructions}>{line.instructions}</Text>
+                    {/* The line's own note (migration 015) — a snapshot the
+                        human can strike off this order, not a live read of the
+                        catalog entry every future order inherits. */}
+                    {line.notes && (
+                      <Text style={styles.instructions}>{line.notes}</Text>
                     )}
                   </View>
                 </View>

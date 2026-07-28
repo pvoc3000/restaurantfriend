@@ -44,7 +44,7 @@ export async function PurchaseOrderDetailView({
     supabase
       .from("purchase_order_items")
       .select(
-        `id, vendor_item_id, description, brand, product_id, package_desc,
+        `id, vendor_item_id, description, brand, product_id, package_desc, notes,
          qty_ordered, qty_received, unit_price, discrepancy_note,
          vendor_items ( id, price, inventory_items ( id, name, category ) )`
       )

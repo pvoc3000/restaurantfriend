@@ -248,6 +248,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    change the behavior going forward"); nor are the 28 active vendor items whose
    NOTES carry a price, since 24 of those are real quantity-break instructions
    ("$8.25 ea in lots of 48") that belong on the order.
+   (d) **The line's printed note is now the LINE's** (migration 015, needs
+   applying): snapshotted at generation and editable in a new "Note" column on
+   PO detail, with the old discrepancy column relabelled **"Receiving"** so the
+   two are told apart — Note goes to the vendor, Receiving never leaves the
+   building. Every other column gave up a few pixels to pay for it, so the table
+   is still 1290px; widths key bumped to v3.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -291,8 +297,23 @@ conclude "nothing was ever ordered" and be wrong — query
 deliberately. Any future definer view carrying a `user_org_ids()` guard has the
 same property.
 
-**Migrations 001–013 are ALL APPLIED to the hosted DB** (013 verified
-2026-07-23 by the bogus-argument RPC probe).
+Migration 015 gives `purchase_order_items` its own `notes` column — the
+ordering note §4.9 prints on each line, which until now was read LIVE from
+`vendor_items.notes` at render time and was the one field on a PO line that
+wasn't a snapshot (so editing the catalog rewrote orders sent months ago, and
+deleting a vendor item erased the note from its own history). 015 adds the
+column, BACKFILLS DRAFTS ONLY (history is left alone — a sent PO's document is
+whatever was sent), and recreates 013's function to snapshot `vi.notes`
+alongside the description. The note is editable per line on PO detail, which is
+the point: strike it off this order without touching the catalog entry every
+future order inherits (Mark, 2026-07-28). Fixture-tested in the Docker harness —
+snapshot on generation, catalog edit doesn't touch the order, line edit doesn't
+touch the catalog, backfill skips non-drafts.
+
+**Migrations 001–014 are APPLIED to the hosted DB** (013 verified
+2026-07-23 by the bogus-argument RPC probe). **015 is WRITTEN, NOT APPLIED** —
+PO detail and the PDF both select `purchase_order_items.notes`, so those two
+screens 400 against the live DB until Mark runs it.
 Mark runs them himself in the Supabase SQL editor — never assume a written
 migration has been applied, and never assume it hasn't: check. Cheap probes:
 `select settings->>'timezone' from orgs` for 007, and for a function, call it
@@ -621,8 +642,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   extended prices, not a total) and its Pack column prints the package TYPE the
   vendor sells in — "CS", "EA" — from `vendor_items.package_desc`, falling back
   to the line snapshot only when that snapshot is a bare type (FMP history) and
-  not migration 013's composed "12 × 32 oz". The in_person **shopping list is
-  internal** and keeps its prices, its estimated total, and the composed pack.
+  not migration 013's composed "12 × 32 oz". The per-line ordering note is the
+  LINE's own `notes` (migration 015), not a live read of `vendor_items.notes`.
+  The in_person **shopping list is internal** and keeps its prices, its
+  estimated total, and the composed pack.
 - Receiving: per-line qty_received, invoice photo → Storage, and a one-tap
   "invoice price differs → update catalog?" flow.
 - Vendors include non-food suppliers (landlord, plumber) — `order_type: none`.

@@ -44,6 +44,8 @@ type PickerRow = {
   pack_count: number | null;
   pack_size: number | null;
   pack_unit: string | null;
+  /** Snapshotted onto the new line, same as the description (migration 015). */
+  notes: string | null;
   inventory_items: { id: string; name: string; base_unit: string } | null;
   // Every location's override, filtered to this PO's location in the browser —
   // the table is "rare per-location price override" (schema 001), so fetching
@@ -125,7 +127,7 @@ export function AddPoLines({
       .from("vendor_items")
       .select(
         `id, product_id, brand, description, package_desc, package_content, price,
-         pack_count, pack_size, pack_unit,
+         pack_count, pack_size, pack_unit, notes,
          inventory_items ( id, name, base_unit ),
          vendor_item_location_prices ( location_id, price )`
       )
@@ -184,6 +186,7 @@ export function AddPoLines({
           brand: vi.brand,
           product_id: vi.product_id,
           package_desc: snapshotPack(vi),
+          notes: vi.notes,
           qty_ordered: n,
           unit_price: effectivePrice(vi, order.location_id),
         });

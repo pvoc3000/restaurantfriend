@@ -42,6 +42,11 @@ export type PoLine = {
   brand: string | null;
   product_id: string | null;
   package_desc: string | null;
+  /** The ordering note printed on the vendor's copy (§4.9). Snapshotted from
+   *  vendor_items.notes at generation (migration 015) and editable per line —
+   *  striking it off one order leaves the catalog entry alone. Distinct from
+   *  discrepancy_note, which is receiving's. */
+  notes: string | null;
   qty_ordered: number;
   qty_received: number | null;
   unit_price: number | null;
