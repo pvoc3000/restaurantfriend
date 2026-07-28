@@ -98,9 +98,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    URL; in_person → shopping list), delivery-date input with suggestion chip,
    "Mark as sent" (status + sent_via per SENT_VIA_FOR_ORDER_TYPE). PO list
    selection bar: batch PO PDFs / shopping lists / mark-sent (drafts only) /
-   DELETE (confirm names non-drafts — sent/received POs are order history and
-   feed "last ordered"); PO detail lines get a purchaser+ selection column
-   with the same confirm-gated delete (received quantities named).
+   mark-received / DELETE (confirm names non-drafts — sent/received POs are
+   order history and feed "last ordered"); PO detail lines get a purchaser+
+   selection column with the same confirm-gated delete (received quantities
+   named).
+   **Mark received writes QUANTITIES, not just the status** (2026-07-28): the
+   list's Received column flags any received PO whose total falls short of what
+   was ordered, so a status-only "received" would paint every order red for a
+   shortfall that never happened. It fills only lines with NO received quantity
+   — a short case someone recorded on the detail screen is a measurement, and a
+   batch button must not overwrite it (PO detail's "Receive all as ordered"
+   deliberately DOES overwrite; it's aimed at one order you're looking at).
+   Eligible = draft or sent: a phone order never passes through "sent", while
+   closed and void are inert states you'd have to leave deliberately.
    **Popup gotcha:** a window.open after `await` is silently blocked — open the
    window synchronously in the click handler (`openWindowNow`), navigate it to
    the blob later (`showBlob`, download fallback).
