@@ -21,6 +21,7 @@ import {
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { AddPoLines } from "./AddPoLines";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 
 /**
@@ -36,12 +37,15 @@ export function PurchaseOrderDetail({
   lines,
   locationCode,
   vendorLink,
+  orgId,
   processing,
 }: {
   order: PurchaseOrder;
   lines: PoLine[];
   locationCode: string;
   vendorLink: ReactNode;
+  /** Needed to INSERT a line — org_id is not null and RLS checks it. */
+  orgId: string;
   /** Null for viewers below purchaser — the card writes, so it isn't shown. */
   processing: ProcessingContext | null;
 }) {
@@ -417,10 +421,18 @@ export function PurchaseOrderDetail({
           )}
         </span>
 
+        {/* Adding a line is a write to the order, so it sits with the other
+            two — and it's purchaser+ for the same reason the delete bar is. */}
+        {canEditLines && (
+          <span className="ml-auto">
+            <AddPoLines order={order} orgId={orgId} lines={lines} />
+          </span>
+        )}
+
         <button
           disabled={busy}
           onClick={receiveAll}
-          className="ml-auto h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+          className={`${canEditLines ? "" : "ml-auto "}h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35`}
         >
           Receive all as ordered
         </button>

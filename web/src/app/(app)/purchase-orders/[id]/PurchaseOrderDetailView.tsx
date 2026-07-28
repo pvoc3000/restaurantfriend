@@ -100,6 +100,7 @@ export async function PurchaseOrderDetailView({
           order={order}
           lines={(lines ?? []) as unknown as PoLine[]}
           locationCode={locationCode}
+          orgId={session.membership.org_id}
           processing={processing}
           vendorLink={
             order.vendors ? (
