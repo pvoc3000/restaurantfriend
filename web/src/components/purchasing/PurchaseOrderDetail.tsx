@@ -27,10 +27,21 @@ import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 /**
  * PO detail: what was ordered, what arrived, and the gap between them.
  *
- * Ordered quantities and the line's unit price are the historical record and
- * stay read-only — receiving adjusts qty_received and notes. The exception is
- * the price-reconciliation action, which writes the invoice price back to the
- * CATALOG (vendor_items.price), leaving the PO's own snapshot untouched.
+ * The order is EDITABLE (Mark, 2026-07-28 — "I should be able to edit the
+ * information in a purchase order, especially before it's sent. At the very
+ * least the item amount"). Ordered quantity, price, and the snapshot fields the
+ * vendor reads are all inline cells; this screen used to freeze them as
+ * "historical record", which was the wrong reading of a draft — a PO is a
+ * working document until it's sent, and after it's sent it's still the place a
+ * correction has to land. It's deliberately not gated on status: you can
+ * already delete a line off a received order, so refusing to fix a typo on one
+ * would be a strange place to draw the line. Every write is purchaser+, which
+ * is what the RLS policy allows — below that the cells render as plain text
+ * rather than offering an edit the database would reject.
+ *
+ * What stays read-only: the catalog item's NAME (that's the catalog's, not the
+ * order's — edit it on the item), and the price-reconciliation action, which
+ * writes the invoice price the other way, onto vendor_items.
  */
 export function PurchaseOrderDetail({
   order,
@@ -200,7 +211,18 @@ export function PurchaseOrderDetail({
       label: "Product ID",
       width: 120,
       sortValue: (l) => l.product_id,
-      render: (l) => <span className="text-muted">{l.product_id ?? "—"}</span>,
+      render: (l) =>
+        canEditLines ? (
+          <InlineValue
+            table="purchase_order_items"
+            id={l.id}
+            column="product_id"
+            value={l.product_id}
+            className="text-muted"
+          />
+        ) : (
+          <span className="text-muted">{l.product_id ?? "—"}</span>
+        ),
     },
     // What the item IS and what you ordered it as, in one wrapping cell —
     // two columns' worth of information in one column's width. The catalog
@@ -218,15 +240,44 @@ export function PurchaseOrderDetail({
       render: (l) => {
         const name = l.vendor_items?.inventory_items?.name ?? null;
         const orderedAs = [l.brand, l.description].filter(Boolean).join(" · ");
+        // The second line is the SNAPSHOT — brand and description as they'll
+        // print on the vendor's copy — so it's the half that's editable. The
+        // name above it belongs to the catalog and isn't the order's to change.
+        const snapshot = canEditLines ? (
+          <span className="flex items-baseline gap-1 text-xs text-muted">
+            <InlineValue
+              table="purchase_order_items"
+              id={l.id}
+              column="brand"
+              value={l.brand}
+              placeholder="brand"
+            />
+            <span className="shrink-0 text-faint">·</span>
+            <InlineValue
+              table="purchase_order_items"
+              id={l.id}
+              column="description"
+              value={l.description}
+              placeholder="description"
+            />
+          </span>
+        ) : orderedAs ? (
+          <span className="block text-xs text-muted">{orderedAs}</span>
+        ) : null;
+
         // A line whose vendor item is gone still has its snapshot — that's the
         // historical record, so it leads instead of an em dash.
-        if (!name) return <span className="text-muted">{orderedAs || "—"}</span>;
+        if (!name) {
+          return canEditLines ? (
+            snapshot
+          ) : (
+            <span className="text-muted">{orderedAs || "—"}</span>
+          );
+        }
         return (
           <span className="block leading-snug">
             <span className="block text-ink">{name}</span>
-            {orderedAs && (
-              <span className="block text-xs text-muted">{orderedAs}</span>
-            )}
+            {snapshot}
           </span>
         );
       },
@@ -239,7 +290,18 @@ export function PurchaseOrderDetail({
       // the table's total width is unchanged.
       width: 125,
       sortValue: (l) => l.package_desc,
-      render: (l) => <span className="text-muted">{l.package_desc ?? "—"}</span>,
+      render: (l) =>
+        canEditLines ? (
+          <InlineValue
+            table="purchase_order_items"
+            id={l.id}
+            column="package_desc"
+            value={l.package_desc}
+            className="text-muted"
+          />
+        ) : (
+          <span className="text-muted">{l.package_desc ?? "—"}</span>
+        ),
     },
     {
       key: "qty_ordered",
@@ -247,7 +309,26 @@ export function PurchaseOrderDetail({
       width: 95,
       align: "right",
       sortValue: (l) => Number(l.qty_ordered),
-      render: (l) => <span className="text-body">{Number(l.qty_ordered)}</span>,
+      // The item amount — the one Mark named. Editable straight through to
+      // sent and received orders: what you're fixing is usually what the
+      // vendor actually billed.
+      render: (l) =>
+        canEditLines ? (
+          <InlineValue
+            table="purchase_order_items"
+            id={l.id}
+            column="qty_ordered"
+            value={Number(l.qty_ordered)}
+            kind="number"
+            align="right"
+            // NOT NULL in schema 001 — an empty box asks for a number rather
+            // than bouncing a Postgres constraint back at you.
+            nullable={false}
+            className="text-body"
+          />
+        ) : (
+          <span className="text-body">{Number(l.qty_ordered)}</span>
+        ),
     },
     {
       key: "qty_received",
@@ -255,17 +336,24 @@ export function PurchaseOrderDetail({
       width: 110,
       align: "right",
       sortValue: (l) => (l.qty_received === null ? null : Number(l.qty_received)),
-      render: (l) => (
-        <InlineValue
-          table="purchase_order_items"
-          id={l.id}
-          column="qty_received"
-          value={l.qty_received}
-          kind="number"
-          align="right"
-          placeholder="—"
-        />
-      ),
+      // Receiving is a purchase_order_items write, so it's purchaser+ too —
+      // the policy has always said so; the cell now says it as well.
+      render: (l) =>
+        canEditLines ? (
+          <InlineValue
+            table="purchase_order_items"
+            id={l.id}
+            column="qty_received"
+            value={l.qty_received}
+            kind="number"
+            align="right"
+            placeholder="—"
+          />
+        ) : (
+          <span className="text-body">
+            {l.qty_received === null ? "—" : Number(l.qty_received)}
+          </span>
+        ),
     },
     {
       key: "unit_price",
@@ -275,17 +363,39 @@ export function PurchaseOrderDetail({
       sortValue: (l) => (l.unit_price === null ? null : Number(l.unit_price)),
       render: (l) => {
         const catalog = l.vendor_items?.price;
+        // Editing this changes what the ORDER says it paid; the ≠ action below
+        // pushes the same number the other way, onto the catalog. Two different
+        // writes, deliberately kept apart.
+        const marker = priceDiffers(l) && (
+          <span
+            className="ml-1 shrink-0 text-xs font-semibold text-accent"
+            title={`Catalog price is ${money(catalog ?? null)}`}
+          >
+            ≠
+          </span>
+        );
+        if (!canEditLines) {
+          return (
+            <span className="text-body">
+              {money(l.unit_price)}
+              {marker}
+            </span>
+          );
+        }
         return (
-          <span className="text-body">
-            {money(l.unit_price)}
-            {priceDiffers(l) && (
-              <span
-                className="ml-1 text-xs font-semibold text-accent"
-                title={`Catalog price is ${money(catalog ?? null)}`}
-              >
-                ≠
-              </span>
-            )}
+          <span className="flex items-baseline justify-end">
+            <InlineValue
+              table="purchase_order_items"
+              id={l.id}
+              column="unit_price"
+              value={l.unit_price}
+              kind="number"
+              align="right"
+              className="min-w-0 flex-1 text-body"
+              // Money to read, the raw number to type.
+              format={(v) => money(Number(v))}
+            />
+            {marker}
           </span>
         );
       },
@@ -309,14 +419,17 @@ export function PurchaseOrderDetail({
       // the last one, so it's also the cheapest place to give width back.
       width: 150,
       sortValue: (l) => l.discrepancy_note,
-      render: (l) => (
-        <InlineValue
-          table="purchase_order_items"
-          id={l.id}
-          column="discrepancy_note"
-          value={l.discrepancy_note}
-        />
-      ),
+      render: (l) =>
+        canEditLines ? (
+          <InlineValue
+            table="purchase_order_items"
+            id={l.id}
+            column="discrepancy_note"
+            value={l.discrepancy_note}
+          />
+        ) : (
+          <span className="text-muted">{l.discrepancy_note ?? "—"}</span>
+        ),
     },
   ];
 
@@ -368,11 +481,38 @@ export function PurchaseOrderDetail({
         <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
           Ordered
         </dt>
-        <dd className="tabular-nums">{order.order_date}</dd>
+        {/* The two dates edit here as well as in the Process card — this is
+            where they're READ, so it's where a wrong one gets noticed. */}
+        <dd className="tabular-nums">
+          {canEditLines ? (
+            <InlineValue
+              table="purchase_orders"
+              id={order.id}
+              column="order_date"
+              value={order.order_date}
+              kind="date"
+              nullable={false}
+            />
+          ) : (
+            order.order_date
+          )}
+        </dd>
         <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
           Delivery
         </dt>
-        <dd className="tabular-nums">{order.delivery_date ?? "—"}</dd>
+        <dd className="tabular-nums">
+          {canEditLines ? (
+            <InlineValue
+              table="purchase_orders"
+              id={order.id}
+              column="delivery_date"
+              value={order.delivery_date}
+              kind="date"
+            />
+          ) : (
+            (order.delivery_date ?? "—")
+          )}
+        </dd>
         <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
           Sent via
         </dt>
@@ -381,13 +521,17 @@ export function PurchaseOrderDetail({
           Notes
         </dt>
         <dd>
-          <InlineValue
-            table="purchase_orders"
-            id={order.id}
-            column="notes"
-            value={order.notes}
-            placeholder="none"
-          />
+          {canEditLines ? (
+            <InlineValue
+              table="purchase_orders"
+              id={order.id}
+              column="notes"
+              value={order.notes}
+              placeholder="none"
+            />
+          ) : (
+            (order.notes ?? "—")
+          )}
         </dd>
       </dl>
 

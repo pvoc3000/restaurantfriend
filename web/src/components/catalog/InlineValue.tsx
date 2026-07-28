@@ -22,16 +22,21 @@ export function InlineValue({
   placeholder = "—",
   align = "left",
   className = "",
+  nullable = true,
   format,
 }: {
   table: string;
   id: string;
   column: string;
   value: string | number | null;
-  kind?: "text" | "number";
+  /** "date" edits with a real date picker and stores an ISO yyyy-mm-dd. */
+  kind?: "text" | "number" | "date";
   placeholder?: string;
   align?: "left" | "right";
   className?: string;
+  /** False for a NOT NULL column: clearing the cell asks for a value instead
+   *  of handing back a raw Postgres null-violation. */
+  nullable?: boolean;
   /** Display-only formatting (e.g. money). Editing always shows the raw value. */
   format?: (value: string | number) => string;
 }) {
@@ -55,6 +60,10 @@ export function InlineValue({
     const next: string | number | null =
       trimmed === "" ? null : kind === "number" ? Number(trimmed) : trimmed;
 
+    if (next === null && !nullable) {
+      setError("required");
+      return;
+    }
     if (kind === "number" && next !== null && Number.isNaN(next)) {
       setError("not a number");
       return;
@@ -84,6 +93,7 @@ export function InlineValue({
           autoFocus
           value={draft}
           disabled={saving}
+          type={kind === "date" ? "date" : undefined}
           inputMode={kind === "number" ? "decimal" : undefined}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={save}
