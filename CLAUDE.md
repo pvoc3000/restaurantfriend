@@ -254,8 +254,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    two are told apart — Note goes to the vendor, Receiving never leaves the
    building. Every other column gave up a few pixels to pay for it, so the table
    is still 1290px; widths key bumped to v3.
-   (e) **A generated PO knows its delivery date** (migration 016, needs
-   applying) — the vendor's next delivery day after the order date, from
+   (e) **A generated PO knows its delivery date** (migration 016) — the
+   vendor's next delivery day after the order date, from
    `vendor_locations.delivery_days`, so the PDF's Delivery block is filled in
    without anyone remembering. The Process card's date input stays for the
    exceptions.
@@ -325,10 +325,15 @@ what the Process card's date input is still for. Drafts are backfilled, history
 isn't. Same arithmetic as the suggestion chip it replaces
 (`lib/poProcessing.ts` `nextDeliveryDate`) — if one changes, change both.
 
-**Migrations 001–015 are APPLIED to the hosted DB** (013 verified
-2026-07-23 by the bogus-argument RPC probe; 015 verified 2026-07-28 — 10 of 64
-draft lines carry a backfilled note, 258 sampled non-draft lines carry none).
-**016 is WRITTEN, NOT APPLIED.**
+**Migrations 001–016 are ALL APPLIED to the hosted DB** (013 verified
+2026-07-23 by the bogus-argument RPC probe; 015 and 016 verified 2026-07-28 —
+the note backfill hit drafts only, and `select next_delivery_date('2026-07-28',
+'{5}')` returns 2026-07-31 over RPC).
+
+The 16 POs Mark sent on 2026-07-27 have NO delivery date and that is deliberate
+(his call, 2026-07-28): 016's backfill skipped them because they were already
+sent, and filling them in afterwards would make the record disagree with the
+document the vendor received. Don't "fix" them.
 Mark runs them himself in the Supabase SQL editor — never assume a written
 migration has been applied, and never assume it hasn't: check. Cheap probes:
 `select settings->>'timezone' from orgs` for 007, and for a function, call it
