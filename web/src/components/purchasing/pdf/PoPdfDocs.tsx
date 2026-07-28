@@ -29,7 +29,9 @@ import {
  *   16  Helvetica-Bold     the document's name — org, or "Shopping list"
  *   14  Helvetica-Bold     "PURCHASE ORDER"; regular for the number beside it
  *    9  Helvetica[-Bold]   everything you read: lines, meta values, totals
- *    8  Helvetica          secondary — labels, addresses, instructions, footer
+ *    8  Helvetica[-Bold]   secondary — addresses, notes, footer; and the
+ *                          header block labels, which are 8pt bold in BODY
+ *                          black (they name the document's structure)
  *
  *   #111  body
  *   #666  secondary
@@ -70,7 +72,11 @@ const styles = StyleSheet.create({
   metaLabel: {
     fontSize: 8,
     fontFamily: "Helvetica-Bold",
-    color: "#666",
+    // Body black, not the secondary grey (Mark, 2026-07-28). These five label
+    // the header blocks a vendor navigates by — DATE, VENDOR, DELIVERY, SHIP
+    // TO, BILL TO — so they're structure, not caption. Still 8pt bold caps:
+    // size and weight already separate them from the values beneath.
+    color: "#111",
     textTransform: "uppercase",
     marginBottom: 2,
   },
