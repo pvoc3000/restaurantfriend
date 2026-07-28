@@ -4,8 +4,9 @@
 //
 // Two documents share the visual language:
 // - PoPdf — the vendor-facing purchase order (spec §4.9, modelled on sent PO
-//   112-18008-01). Unit prices only, NO extended prices and NO total — the
-//   vendor doesn't get our math; internal totals live on the PO detail screen.
+//   112-18008-01). NO PRICES AT ALL (Mark, 2026-07-28) — not unit prices, not
+//   extended prices, not a total. The vendor quotes us; we don't quote them
+//   back. Money lives on the PO detail screen, which is internal.
 // - ShoppingListPdf — the in_person processing mode: same lines sorted by shop
 //   section for walking a store. Internal document, so prices and a running
 //   total ARE here.
@@ -105,9 +106,19 @@ const styles = StyleSheet.create({
     marginRight: 6,
     marginTop: 1,
   },
-  colProduct: { width: 60, color: "#666" },
+  // 48pt fits a 9-character product ID on one line — p90 of the real data,
+  // where the median is 5 (Mark, 2026-07-28: "too wide"). The dozen-character
+  // outliers ("IGL-M243308N") wrapped at 60 too, so nothing got worse.
+  colProduct: { width: 48, color: "#666" },
   colQty: { width: 40, fontFamily: "Helvetica-Bold", textAlign: "right", paddingRight: 8 },
-  colPack: { width: 70, paddingRight: 6 },
+  // The vendor PO prints a package TYPE now, and the longest in the catalog is
+  // four characters ("FLAT", "ROLL"). The shopping list keeps the wide column
+  // because it still prints the composed pack.
+  colPack: { width: 36, paddingRight: 6 },
+  colPackWide: { width: 70, paddingRight: 6 },
+  // Shopping-list only: "$32.50 ea" needs the width the product column used to
+  // have, and it isn't a product ID — it had been borrowing that style.
+  colPrice: { width: 60, color: "#666" },
   colDesc: { flexGrow: 1, flexBasis: 0 },
   instructions: { color: "#666", fontSize: 8, marginTop: 1 },
   notes: { marginTop: 12, fontSize: 8, color: "#666" },
@@ -139,13 +150,21 @@ function money(value: number | null): string {
   })}`;
 }
 
-/** "item // brand // pack // unit price" — §4.9's composed description. */
+/**
+ * "item // brand // description" — §4.9's composed description, minus the
+ * price (Mark, 2026-07-28: "remove any pricing information"). The document
+ * already carried no extended prices and no total; the unit price was the last
+ * money on it. What we think a case costs is our side of the conversation —
+ * the vendor's invoice is theirs — and a stale catalog price printed on an
+ * order invites an argument nobody wants to have.
+ *
+ * `money` is still used by the shopping list, which is internal.
+ */
 function composedDescription(line: DocLine): string {
   return [
     line.item_name ?? line.description,
     line.brand,
     line.description !== line.item_name ? line.description : null,
-    line.unit_price !== null ? money(line.unit_price) : null,
   ]
     .filter(Boolean)
     .join("  //  ");
@@ -270,7 +289,7 @@ export function PoPdf({ pos, org }: { pos: PoDocData[]; org: OrgDocData }) {
                   <View style={styles.checkbox} />
                   <Text style={styles.colProduct}>{line.product_id ?? ""}</Text>
                   <Text style={styles.colQty}>{trimNumber(line.qty)}</Text>
-                  <Text style={styles.colPack}>{line.pack ?? ""}</Text>
+                  <Text style={styles.colPack}>{line.pack_type ?? ""}</Text>
                   <View style={styles.colDesc}>
                     <Text>{composedDescription(line)}</Text>
                     {line.instructions && (
@@ -332,7 +351,9 @@ export function ShoppingListPdf({ pos }: { pos: PoDocData[]; org: OrgDocData }) 
                   <View key={line.id} style={styles.line} wrap={false}>
                     <View style={styles.checkbox} />
                     <Text style={styles.colQty}>{trimNumber(line.qty)}</Text>
-                    <Text style={styles.colPack}>{line.pack ?? ""}</Text>
+                    {/* The internal document keeps the composed pack — you're
+                        picking the case off a shelf, so its size is the point. */}
+                    <Text style={styles.colPackWide}>{line.pack ?? ""}</Text>
                     <View style={styles.colDesc}>
                       <Text>
                         {[line.item_name ?? line.description, line.brand]
@@ -343,7 +364,7 @@ export function ShoppingListPdf({ pos }: { pos: PoDocData[]; org: OrgDocData }) 
                         <Text style={styles.instructions}>{line.description}</Text>
                       )}
                     </View>
-                    <Text style={styles.colProduct}>
+                    <Text style={styles.colPrice}>
                       {line.unit_price !== null
                         ? `${money(line.unit_price)} ea`
                         : ""}

@@ -27,7 +27,12 @@ export type DocLine = {
   product_id: string | null;
   brand: string | null;
   description: string | null;
+  /** The composed pack the line was ordered as ("12 × 32 oz") — the shopping
+   *  list wants it, because you're picking the case off a shelf. */
   pack: string | null;
+  /** Just the package TYPE — "CS", "EA", "BAG" (Mark, 2026-07-28). What the
+   *  vendor-facing PO prints: their own unit of sale, not our arithmetic. */
+  pack_type: string | null;
   qty: number;
   unit_price: number | null;
   item_name: string | null;
@@ -182,6 +187,7 @@ export async function fetchPoDocData(
           brand: l.brand,
           description: l.description,
           pack: l.package_desc,
+          pack_type: l.pack_type,
           qty: Number(l.qty_ordered),
           unit_price: l.unit_price === null ? null : Number(l.unit_price),
           item_name: l.item_name,
@@ -214,6 +220,7 @@ type RawLine = {
   brand: string | null;
   description: string | null;
   package_desc: string | null;
+  pack_type: string | null;
   qty_ordered: number;
   unit_price: number | null;
   item_name: string | null;
@@ -221,6 +228,12 @@ type RawLine = {
   instructions: string | null;
   inventory_item_id: string | null;
 };
+
+/** A pack snapshot that is a package TYPE, not a composed structure. */
+function bareType(packageDesc: string | null): string | null {
+  if (!packageDesc) return null;
+  return packageDesc.includes("×") ? null : packageDesc;
+}
 
 async function fetchLines(
   supabase: SupabaseClient,
@@ -233,7 +246,7 @@ async function fetchLines(
       .select(
         `id, po_id, product_id, brand, description, package_desc,
          qty_ordered, unit_price,
-         vendor_items ( id, notes, inventory_items ( id, name, category ) )`
+         vendor_items ( id, notes, package_desc, inventory_items ( id, name, category ) )`
       )
       .in("po_id", poIds)
       .range(from, from + 999);
@@ -251,6 +264,7 @@ async function fetchLines(
       vendor_items: {
         id: string;
         notes: string | null;
+        package_desc: string | null;
         inventory_items: { id: string; name: string; category: string | null } | null;
       } | null;
     };
@@ -262,6 +276,13 @@ async function fetchLines(
         brand: row.brand,
         description: row.description,
         package_desc: row.package_desc,
+        // The catalog's package type first. The line's own snapshot is the
+        // fallback, but ONLY when it's a bare type: FMP recorded "CS"/"EA"
+        // there and the migrated history still carries it (measured 2026-07-28:
+        // 28 of 1,000 lines rely on this), while migration 013 writes a
+        // COMPOSED label — "12 × 32 oz" — which is exactly the thing the
+        // vendor-facing document is no longer supposed to print.
+        pack_type: row.vendor_items?.package_desc ?? bareType(row.package_desc),
         qty_ordered: row.qty_ordered,
         unit_price: row.unit_price,
         item_name: row.vendor_items?.inventory_items?.name ?? null,
