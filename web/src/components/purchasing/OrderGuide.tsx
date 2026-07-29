@@ -596,7 +596,13 @@ export function OrderGuide({
               Ignore ordering days
             </button>
 
-            <span className="flex items-center gap-3">
+            {/* Pushed to the right edge (Mark, 2026-07-29). Everything left of
+                it narrows the list — search, the four tiers, the day gates —
+                and this one only rearranges what survived, so it reads better
+                as its own thing at the far end than as a fourth filter. ml-auto
+                eats the slack in the row; if the row wraps at a narrow width
+                this lands on its own line, still right-aligned. */}
+            <span className="ml-auto flex items-center gap-3">
               <span className="text-xs uppercase tracking-[0.12em] text-subtle">
                 Group by
               </span>
