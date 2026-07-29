@@ -23,7 +23,8 @@ const FAVORITE_SELECT = `
   item_location_id,
   inventory_item_locations!inner ( location_id ),
   vendor_items!inner (
-    id, description, brand, package_desc, package_content, price, is_active,
+    id, description, brand, package_desc, package_content,
+    pack_count, pack_size, pack_unit, price, is_active,
     vendors!inner ( name, is_active )
   )
 `;
@@ -117,6 +118,9 @@ export default async function CleanupPage({
           brand: string | null;
           package_desc: string | null;
           package_content: number | null;
+          pack_count: number | null;
+          pack_size: number | null;
+          pack_unit: string | null;
           price: number | null;
           vendors: { name: string } | null;
         } | null;
@@ -130,6 +134,9 @@ export default async function CleanupPage({
           brand: vi.brand,
           package_desc: vi.package_desc,
           package_content: vi.package_content,
+          pack_count: vi.pack_count,
+          pack_size: vi.pack_size,
+          pack_unit: vi.pack_unit,
           price: vi.price,
           vendor_name: vi.vendors?.name ?? null,
         });

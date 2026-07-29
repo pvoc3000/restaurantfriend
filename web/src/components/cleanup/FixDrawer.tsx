@@ -6,8 +6,10 @@ import {
   PROBLEM_LABEL,
   favoritesMissingContent,
   favoritesMissingPrice,
+  favoritesWithStaleContent,
   type CleanupFavorite,
 } from "@/lib/cleanup";
+import { derivedPackContent } from "@/lib/catalog";
 import { UNIT_OPTIONS, packageContent, unitFamily } from "@/lib/units";
 import type { QueueItem } from "@/app/(app)/cleanup/page";
 import { FavoritesEditor } from "./FavoritesEditor";
@@ -105,6 +107,27 @@ export function FixDrawer({
               </Section>
             ))}
 
+            {/* Same editor as a missing content, because the fix is the same
+                act — restate what one package holds. What differs is that
+                there's a wrong number to show you first, so you can see what
+                you're overruling. */}
+            {favoritesWithStaleContent(item).map((f) => (
+              <Section
+                key={`stale-${f.id}`}
+                title={PROBLEM_LABEL.stale_package_content}
+              >
+                <FavoriteHeading f={f} />
+                <StaleContentNote f={f} baseUnit={item.inventory_items.base_unit} />
+                <PackageContentEditor
+                  vendorItemId={f.id}
+                  packageDesc={f.package_desc}
+                  baseUnit={item.inventory_items.base_unit}
+                  price={f.price}
+                  onChanged={onChanged}
+                />
+              </Section>
+            ))}
+
             {favoritesMissingPrice(item).map((f) => (
               <Section key={`price-${f.id}`} title={PROBLEM_LABEL.no_price}>
                 <FavoriteHeading f={f} />
@@ -136,6 +159,50 @@ export function FixDrawer({
         )}
       </aside>
     </>
+  );
+}
+
+/**
+ * What the stored total says versus what the pack says, so the disagreement is
+ * on screen rather than asserted. Two readings, because the two failure shapes
+ * need different words: a convertible pack has a right answer to offer, an
+ * unconvertible one only has "this cannot be a conversion of that".
+ */
+function StaleContentNote({
+  f,
+  baseUnit,
+}: {
+  f: CleanupFavorite;
+  baseUnit: string;
+}) {
+  const derived = derivedPackContent(f, baseUnit);
+  const packText = `${Number(f.pack_count ?? 1)} × ${Number(f.pack_size)} ${
+    f.pack_unit ?? baseUnit
+  }`;
+  return (
+    <p className="mb-2 border border-hairline bg-neutral-50 px-2 py-1.5 text-xs text-body">
+      Pack says <span className="font-semibold">{packText}</span>, content says{" "}
+      <span className="font-semibold">
+        {Number(f.package_content)} {baseUnit}
+      </span>
+      .{" "}
+      {derived === null ? (
+        <>
+          That&apos;s {Number(f.pack_count ?? 1)} × {Number(f.pack_size)} with the{" "}
+          {f.pack_unit} thrown away — and {f.pack_unit} doesn&apos;t convert to{" "}
+          {baseUnit}, so nothing can work it out for you. Enter what one package
+          holds in {baseUnit}.
+        </>
+      ) : (
+        <>
+          That pack works out to{" "}
+          <span className="font-semibold">
+            {Number(derived.toFixed(3))} {baseUnit}
+          </span>
+          .
+        </>
+      )}
+    </p>
   );
 }
 
