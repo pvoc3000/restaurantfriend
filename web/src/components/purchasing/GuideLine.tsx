@@ -170,8 +170,16 @@ export function GuideLine({
 
       <td className="whitespace-nowrap px-4 py-4 align-top text-right tabular-nums text-muted">
         {money(row.effective_price)}
+        {/* Two decimals to read, four to compare (Mark, 2026-07-29). The view
+            already computes this to 4dp — `toFixed` only ever changed the
+            rendering, so nothing was lost, it just stopped being visible. That
+            matters on the cheap per-each rows, where $0.0128 and $0.0102 are a
+            25% difference and both print as $0.01. */}
         {row.unit_price !== null && (
-          <div className="text-xs text-subtle">
+          <div
+            className="text-xs text-subtle"
+            title={`$${Number(row.unit_price).toFixed(4)} per ${baseUnit}`}
+          >
             (${Number(row.unit_price).toFixed(2)} per {baseUnit})
           </div>
         )}
