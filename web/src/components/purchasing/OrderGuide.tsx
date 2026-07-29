@@ -31,6 +31,7 @@ import {
 import { GuideLine } from "./GuideLine";
 import { GeneratePos } from "./GeneratePos";
 import { ActionBar, ActionBarButton } from "@/components/ui/ActionBar";
+import { BackToTop } from "@/components/ui/BackToTop";
 
 /**
  * The order guide (spec §4.6): the shop in walk order, item headers with par,
@@ -894,18 +895,10 @@ export function OrderGuide({
       <ActionBar
         trailing={
           <>
-            {/* Movement only — none of these touch anything, which is why they
-                sit at the far edge from the two that do (Mark, 2026-07-29).
-                Top leads the group: it's the one that goes back rather than
-                forward, and it keeps the two "next" cells adjacent as a pair. */}
-            <ActionBarButton
-              compact
-              onClick={() => window.scrollTo({ top: 0, behavior: "auto" })}
-              title="Back to the top of the list"
-            >
-              Top
-            </ActionBarButton>
-
+            {/* Movement only — neither of these touches anything, which is why
+                they sit at the far edge from the two that do (Mark,
+                2026-07-29). Going BACK to the top isn't here: it's the floating
+                disc (components/ui/BackToTop), where the convention puts it. */}
             <ActionBarButton
               onClick={() => scrollToNext("tr[data-untouched]")}
               disabled={untouchedCount === 0}
@@ -974,6 +967,10 @@ export function OrderGuide({
           />
         )}
       </ActionBar>
+
+      {/* Floating, not a bar cell: scrolling back to the top is a scrolling
+          affordance, so it lives over the list rather than among the commands. */}
+      <BackToTop />
     </div>
   );
 }

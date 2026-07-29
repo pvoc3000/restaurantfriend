@@ -64,20 +64,12 @@ export function ActionBar({
  */
 export function ActionBarButton({
   primary = false,
-  compact = false,
   disabled = false,
   onClick,
   title,
   children,
 }: {
   primary?: boolean;
-  /**
-   * Drops the uniform min-width, for a cell whose label is a single short word.
-   * Five full-width cells come to 800px and overflow a 768px bar; the honest
-   * fix is to let the one-word cell be one word wide rather than make every
-   * other label wrap to fit.
-   */
-  compact?: boolean;
   disabled?: boolean;
   onClick?: () => void;
   title?: string;
@@ -95,14 +87,13 @@ export function ActionBarButton({
       // Narrower cells and tighter padding below 1280: four cells at the old
       // 192px + px-8 came to 768px, exactly an iPad portrait window, which left
       // the two groups touching in the middle with no gap between them.
-      // Explicitly a centering flex box. The cells are align-self: stretch to
-      // fill the bar, and a stretched button's label centring is left to the UA
-      // — so state it rather than inherit it (Mark, 2026-07-29). text-center
+      //
+      // Explicitly a centering flex box: the cells are align-self: stretch to
+      // fill the bar, and a stretched button leaves its label's centring to the
+      // UA, so state it rather than inherit it (Mark, 2026-07-29). text-center
       // covers the wrapped case, where the label is an anonymous flex item that
-      // justify-center alone would not centre line-by-line.
-      className={`flex items-center justify-center px-5 text-center text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors disabled:opacity-35 xl:px-8 ${
-        compact ? "" : "min-w-40 xl:min-w-48"
-      } ${
+      // justify-center alone would not centre line by line.
+      className={`flex min-w-40 items-center justify-center px-5 text-center text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors disabled:opacity-35 xl:min-w-48 xl:px-8 ${
         primary
           ? "bg-white text-ink hover:bg-neutral-100"
           : "bg-transparent text-white hover:bg-neutral-800"
