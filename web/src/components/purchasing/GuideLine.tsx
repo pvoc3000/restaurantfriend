@@ -172,7 +172,7 @@ export function GuideLine({
         {money(row.effective_price)}
         {row.unit_price !== null && (
           <div className="text-xs text-subtle">
-            (${Number(row.unit_price).toFixed(4)} per {baseUnit})
+            (${Number(row.unit_price).toFixed(2)} per {baseUnit})
           </div>
         )}
       </td>
