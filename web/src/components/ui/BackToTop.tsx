@@ -4,16 +4,17 @@ import { useSyncExternalStore } from "react";
 
 /**
  * The conventional floating back-to-top control: absent until you've scrolled a
- * screenful, then a black disc above the ActionBar (Mark, 2026-07-29). It used
- * to be a "Top" cell in the bar, which cost a full-width cell and sat with the
- * commands rather than with the scrolling it belongs to.
+ * screenful, then a disc above the ActionBar (Mark, 2026-07-29). It used to be a
+ * "Top" cell in the bar, which cost a full-width cell and sat with the commands
+ * rather than with the scrolling it belongs to.
  *
- * Held to the design system in three ways. The disc is `bg-ink`, matching the
- * command bar directly beneath it, so it reads as chrome over the list rather
- * than as a record on it — colour here would mean state. There is no shadow and
- * no fade: it is simply rendered or not, because the system's rule is no motion
- * on arrival. And the caret is drawn in the same hand as HomeIcon and GearIcon —
- * 16px, currentColor, 1.5px square-capped strokes, no fill.
+ * It is currently a DELIBERATE exception to the design system, on request: grey
+ * fill and a soft drop shadow, where the system says chrome is black and
+ * elevation doesn't exist. See the className for what to change to put it back.
+ *
+ * What still holds: no fade — it is simply rendered or not, because the rule is
+ * no motion on arrival. And the caret is drawn in the same hand as HomeIcon and
+ * GearIcon — 16px, currentColor, 1.5px square-capped strokes, no fill.
  */
 
 /** A screenful-ish. Below this the page barely moved and the button is noise. */
@@ -56,7 +57,19 @@ export function BackToTop() {
       // (z-20), below the detail slide-over (z-40) and the masthead (z-50).
       // 48px square — this is pressed standing, so it clears the 44px
       // touch-target minimum.
-      className="fixed bottom-16 right-4 z-30 grid h-12 w-12 place-items-center rounded-full bg-ink text-white transition-colors hover:bg-neutral-800 xl:right-12"
+      //
+      // GREY + SHADOW: deliberately against the design system, on request to
+      // see it (Mark, 2026-07-29 — "I may decide it's bad but want to see it").
+      // Two rules broken, both worth naming so this is easy to undo:
+      //  - "chrome is black, not grey" (colors.css --rf-surface-chrome). The
+      //    grey is --rf-neutral-600, the darkest that still reads as grey rather
+      //    than as failed black, and white-on-it clears AA.
+      //  - "elevation: there is none" (elevation.css), which is why the shadow
+      //    has to be an arbitrary value — @theme sets --shadow-*: initial, so
+      //    shadow-md and friends don't exist to use.
+      // To revert: bg-[var(--rf-neutral-600)] → bg-ink, drop both shadow-*
+      // classes, hover back to hover:bg-neutral-800.
+      className="fixed bottom-16 right-4 z-30 grid h-12 w-12 place-items-center rounded-full bg-[var(--rf-neutral-600)] text-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--rf-neutral-700)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.28)] xl:right-12"
     >
       <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden focusable="false">
         <path
