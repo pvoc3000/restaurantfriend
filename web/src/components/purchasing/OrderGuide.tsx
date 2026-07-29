@@ -250,6 +250,67 @@ export function OrderGuide({
       ? applyExpansions(grouped, sourceIndex, expanded, grouping)
       : grouped;
   }, [visibleRows, grouping, canExpand, sourceIndex, expanded]);
+  /**
+   * WALK THE LIST from the ActionBar: jump to the next line still waiting for a
+   * decision, or to the next section band (Mark, 2026-07-29). On a long guide
+   * these replace hunting with the scrollbar — the guide is ~190 lines on a
+   * Saturday at DF01 and the thing you want is always "the next one".
+   *
+   * Positions come from the DOM rather than from `sections`, because what the
+   * jump needs is where a row physically IS, and only the browser knows that
+   * once the item headers, section bands and expansions have laid out. The
+   * offset is MEASURED off the masthead and the sticky column labels for the
+   * same reason the labels themselves use a live variable: the masthead is 64px
+   * open, 32 collapsed, and taller again when it wraps.
+   */
+  function scrollToNext(selector: string) {
+    const header = document.querySelector("header");
+    const labels = document.querySelector("thead th");
+    const offset =
+      (header?.getBoundingClientRect().height ?? 0) +
+      (labels?.getBoundingClientRect().height ?? 0);
+
+    const targets = Array.from(document.querySelectorAll<HTMLElement>(selector));
+    if (targets.length === 0) return;
+
+    // Compare in SCROLL space, not viewport space, and clamp to the page's real
+    // limit first. Asking "is this row below the chrome?" breaks on the last few
+    // rows: the page runs out of room to lift them that high, so they sit below
+    // the chrome no matter what and the jump picks the same one forever. Measured
+    // 2026-07-29 — the final untouched row parked 516px down and presses 6, 7
+    // and 8 all landed on the same pixel. Asking "would this row move me?"
+    // instead is the same question everywhere on the page.
+    const maxScroll = Math.max(
+      0,
+      document.documentElement.scrollHeight - window.innerHeight
+    );
+    const scrollFor = (el: HTMLElement) =>
+      Math.min(
+        maxScroll,
+        Math.max(0, window.scrollY + el.getBoundingClientRect().top - offset)
+      );
+
+    // Nothing further down means you're at the end, so wrap: on a burn-down the
+    // answer to "no more after here" is the first one still outstanding.
+    const next = targets.find((el) => scrollFor(el) > window.scrollY + 2) ?? targets[0];
+
+    // INSTANT, not smooth. Two reasons, one measured and one from the design
+    // system. Measured: `behavior: "smooth"` silently does nothing in at least
+    // one Chromium build — scrollTo and scrollIntoView both no-op while "auto"
+    // works — and a walk button that appears dead is the worst outcome here.
+    // And the system's rule is near-zero motion; you pressed "next", so the
+    // jump is the answer, not an animation of the answer. It also means
+    // press-press-press keeps up with you instead of queueing 300ms each.
+    window.scrollTo({ top: scrollFor(next), behavior: "auto" });
+  }
+
+  // What the two jumps have to aim at, so each button can say when there's
+  // nowhere to go. Counted off the same data the list renders from.
+  const untouchedCount = visibleRows.filter(
+    (row) => (entries.get(row.vendor_item_id)?.qty_to_order ?? null) === null
+  ).length;
+  const sectionCount = sections.filter((section) => section.showHeader).length;
+
   const totals = useMemo(() => vendorTotals(rows, entries), [rows, entries]);
   const grandTotal = totals.reduce((sum, t) => (t.short ? sum : sum + t.subtotal), 0);
   const shortTotal = totals.reduce((sum, t) => (t.short ? sum + t.subtotal : sum), 0);
@@ -646,7 +707,7 @@ export function OrderGuide({
                         <td colSpan={7} className="h-16" />
                       </tr>
                     )}
-                    <tr className="bg-ink">
+                    <tr className="bg-ink" data-guide-section="">
                       {/* colSpan stays 8 even where two columns are hidden
                           below 1180px — the browser clamps a colSpan to the
                           real column count, so the band still spans the row. */}
@@ -808,12 +869,40 @@ export function OrderGuide({
       {/* The screen's decision, pinned to the bottom the way the original's
           command bar was. */}
       <ActionBar
-        note={`${locationCode} · ${
-          ignoreDays ? "all days" : WEEKDAY_LABELS[weekday - 1]
-        } · ${visibleRows.length} of ${rows.length} lines`}
+        trailing={
+          <>
+            {/* Movement only — these two touch nothing, which is why they sit
+                at the far edge from the two that do (Mark, 2026-07-29). */}
+            <ActionBarButton
+              onClick={() => scrollToNext("tr[data-untouched]")}
+              disabled={untouchedCount === 0}
+              title={
+                untouchedCount === 0
+                  ? "Every line in this view has an order quantity or an explicit zero"
+                  : `Scroll to the next line with an empty order box — ${untouchedCount} left`
+              }
+            >
+              Next favorite
+            </ActionBarButton>
+
+            <ActionBarButton
+              onClick={() => scrollToNext("tr[data-guide-section]")}
+              disabled={sectionCount === 0}
+              title={
+                sectionCount === 0
+                  ? "Nothing to jump to in this view"
+                  : `Scroll to the next ${
+                      grouping === "vendor" ? "vendor" : "shop section"
+                    } — ${sectionCount} in this view`
+              }
+            >
+              Next section
+            </ActionBarButton>
+          </>
+        }
       >
         {/* Start the day over. Left of Generate POs — the escape hatch comes
-            before the destination. Both cells are plain black: Mark preferred
+            before the destination. Every cell is plain black: Mark preferred
             the black cell to the white fill (2026-07-26), so this bar has no
             primary. The bar's own black is emphasis enough; a white cell inside
             it read as a different kind of object. */}

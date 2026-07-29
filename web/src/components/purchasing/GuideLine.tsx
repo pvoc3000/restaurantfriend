@@ -123,7 +123,17 @@ export function GuideLine({
   // Only orderable lines reach the guide — the page filters on the view's
   // active cascade — so there's no blocked state to render here.
   return (
-    <tr className="border-b border-hairline">
+    // data-untouched marks the lines "Next favorite" walks (OrderGuide's
+    // scrollToNext): an order box with nothing in it. Absent once the line
+    // carries a quantity OR an explicit zero — a zero is a decision, and the
+    // burn-down shouldn't send you back to it. The attribute rather than a ref
+    // registry because the DOM already holds the one thing the jump needs,
+    // which is where each row sits.
+    <tr
+      className="border-b border-hairline"
+      data-guide-line=""
+      data-untouched={qty === null ? "" : undefined}
+    >
       {/* Vendor over brand, the way the printed guide reads. Generous row
           padding on purpose — the walk is read standing up. */}
       <td className="whitespace-nowrap py-4 pl-4 pr-4 align-middle max-[1180px]:whitespace-normal max-[1180px]:px-2">
