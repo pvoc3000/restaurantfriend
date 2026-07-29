@@ -51,8 +51,15 @@ export function BackToTop() {
       onClick={() => window.scrollTo({ top: 0, behavior: "auto" })}
       aria-label="Back to the top of the list"
       title="Back to the top of the list"
-      // bottom-16 clears the 52px ActionBar with 12px to spare; right edge on
-      // the page gutter, which steps in below 1280 like every other band.
+      // bottom-16 clears the 52px ActionBar with 12px to spare.
+      //
+      // right-3 at EVERY width — 12px, deliberately not the page gutter (Mark,
+      // 2026-07-29 asked for it closer to the edge; it was 48px on desktop,
+      // aligned with the content like the four black bands). It shouldn't align
+      // with them: this thing floats over the list instead of sitting in the
+      // column, and convention puts a floating control near the window edge, not
+      // indented to the text. So it no longer steps in at 1280 either.
+      //
       // z-30 matches the bar: above the list and its sticky column labels
       // (z-20), below the detail slide-over (z-40) and the masthead (z-50).
       // 48px square — this is pressed standing, so it clears the 44px
@@ -69,7 +76,7 @@ export function BackToTop() {
       //    shadow-md and friends don't exist to use.
       // To revert: bg-[var(--rf-neutral-600)] → bg-ink, drop both shadow-*
       // classes, hover back to hover:bg-neutral-800.
-      className="fixed bottom-16 right-4 z-30 grid h-12 w-12 place-items-center rounded-full bg-[var(--rf-neutral-600)] text-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--rf-neutral-700)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.28)] xl:right-12"
+      className="fixed bottom-16 right-3 z-30 grid h-12 w-12 place-items-center rounded-full bg-[var(--rf-neutral-600)] text-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--rf-neutral-700)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.28)]"
     >
       <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden focusable="false">
         <path
