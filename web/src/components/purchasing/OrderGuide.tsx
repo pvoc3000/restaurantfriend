@@ -439,12 +439,15 @@ export function OrderGuide({
     // 2026-07-29). The labels' own py-3 is the breathing room they need. Only
     // this screen does it: every other page keeps its title and filters when
     // the chrome collapses, so their top padding isn't leftover.
-    <div className={`space-y-4 pb-28 ${chromeCollapsed ? "-mt-8" : ""}`}>
+    // pb-22 clears the fixed ActionBar: 52px of bar plus 36px so the last row
+    // can scroll out from under it. Paired with the bar's own height — see
+    // components/ui/ActionBar.
+    <div className={`space-y-4 pb-22 ${chromeCollapsed ? "-mt-8" : ""}`}>
       {/* The shelf — everything above the list. It goes with the menu when the
           chrome collapses: on a walk you're reading rows, and the title, the
           day picker, the totals and the filters are all things you set BEFORE
-          you start (Mark, 2026-07-29). The ActionBar's note keeps the context
-          line on screen either way, and the strip brings it all back in a tap. */}
+          you start (Mark, 2026-07-29). The strip keeps which location and which
+          page you're on, and brings the rest back in a tap. */}
       {!chromeCollapsed && (
         <>
           {/* Title block. The context line that used to sit under the title is
@@ -891,8 +894,18 @@ export function OrderGuide({
       <ActionBar
         trailing={
           <>
-            {/* Movement only — these two touch nothing, which is why they sit
-                at the far edge from the two that do (Mark, 2026-07-29). */}
+            {/* Movement only — none of these touch anything, which is why they
+                sit at the far edge from the two that do (Mark, 2026-07-29).
+                Top leads the group: it's the one that goes back rather than
+                forward, and it keeps the two "next" cells adjacent as a pair. */}
+            <ActionBarButton
+              compact
+              onClick={() => window.scrollTo({ top: 0, behavior: "auto" })}
+              title="Back to the top of the list"
+            >
+              Top
+            </ActionBarButton>
+
             <ActionBarButton
               onClick={() => scrollToNext("tr[data-untouched]")}
               disabled={untouchedCount === 0}

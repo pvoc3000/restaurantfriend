@@ -8,7 +8,14 @@ import type { ReactNode } from "react";
  *
  * Fixed rather than sticky so it doesn't depend on the page's own scroll
  * shape; screens that render it must pad their bottom so content can scroll
- * clear of it.
+ * clear of it — 52px of bar wants pb-22, and if one changes so does the other.
+ *
+ * 52px, down from 72 (Mark, 2026-07-29 — the bar was taller than it needed to
+ * be, then "a little taller than that" when 44 was proposed). 44 is the hard
+ * floor rather than the target: these are the cells you press standing, over
+ * and over, and 44 is the touch-target minimum, so 52 keeps 8px of margin over
+ * it. The masthead's bands could go to 28 because you tap them once before you
+ * start walking; this bar cannot.
  *
  * Two groups, pinned to opposite edges (Mark, 2026-07-29): `children` are the
  * things that ACT on the screen, `trailing` the things that only move you
@@ -25,7 +32,7 @@ export function ActionBar({
   trailing?: ReactNode;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 flex min-h-[4.5rem] items-stretch bg-ink text-white">
+    <div className="fixed inset-x-0 bottom-0 z-30 flex min-h-13 items-stretch bg-ink text-white">
       {/* The rule that separates cells belongs on the side facing the middle,
           or the group's outermost cell draws a stray 1px line against the
           window edge. So it falls AFTER each cell on the left and BEFORE each
@@ -57,12 +64,20 @@ export function ActionBar({
  */
 export function ActionBarButton({
   primary = false,
+  compact = false,
   disabled = false,
   onClick,
   title,
   children,
 }: {
   primary?: boolean;
+  /**
+   * Drops the uniform min-width, for a cell whose label is a single short word.
+   * Five full-width cells come to 800px and overflow a 768px bar; the honest
+   * fix is to let the one-word cell be one word wide rather than make every
+   * other label wrap to fit.
+   */
+  compact?: boolean;
   disabled?: boolean;
   onClick?: () => void;
   title?: string;
@@ -80,7 +95,14 @@ export function ActionBarButton({
       // Narrower cells and tighter padding below 1280: four cells at the old
       // 192px + px-8 came to 768px, exactly an iPad portrait window, which left
       // the two groups touching in the middle with no gap between them.
-      className={`min-w-40 px-5 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors disabled:opacity-35 xl:min-w-48 xl:px-8 ${
+      // Explicitly a centering flex box. The cells are align-self: stretch to
+      // fill the bar, and a stretched button's label centring is left to the UA
+      // — so state it rather than inherit it (Mark, 2026-07-29). text-center
+      // covers the wrapped case, where the label is an anonymous flex item that
+      // justify-center alone would not centre line-by-line.
+      className={`flex items-center justify-center px-5 text-center text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors disabled:opacity-35 xl:px-8 ${
+        compact ? "" : "min-w-40 xl:min-w-48"
+      } ${
         primary
           ? "bg-white text-ink hover:bg-neutral-100"
           : "bg-transparent text-white hover:bg-neutral-800"
