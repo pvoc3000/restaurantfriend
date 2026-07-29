@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/purchaseOrders";
-import { parPackageLabel } from "@/lib/catalog";
+import { packageDivisor, parPackageLabel } from "@/lib/catalog";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
   applyExpansions,
@@ -648,7 +648,7 @@ export function OrderGuide({
                     item.lines.find((l) => l.is_favorite) ?? item.lines[0];
                   const headerPar = parPackageLabel(
                     item.par_qty,
-                    parSource?.package_content,
+                    parSource ? packageDivisor(parSource, item.base_unit) : null,
                     parSource?.package_desc
                   );
                   return (

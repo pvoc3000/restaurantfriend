@@ -13,7 +13,7 @@ import {
   type GuideRow,
 } from "@/lib/orderGuide";
 import { money } from "@/lib/purchaseOrders";
-import { packLabel, parPackageLabel } from "@/lib/catalog";
+import { packLabel, packageDivisor, parPackageLabel } from "@/lib/catalog";
 
 /**
  * One plan line, laid out in the columns the FMP guide used because they're the
@@ -54,7 +54,12 @@ export function GuideLine({
   const par = row.par_qty ?? itemPar;
   const onHand = entry?.on_hand ?? null;
   const qty = entry?.qty_to_order ?? null;
-  const suggestion = suggestQty(par, onHand, row.package_content);
+  // ONE divisor for the whole line: the par restatement and the suggestion have
+  // to agree about how big a package is, or the row states two package sizes.
+  // Falls back to the pack structure where `package_content` was never filled
+  // in (Mark, 2026-07-29) — see packageDivisor.
+  const divisor = packageDivisor(row, baseUnit);
+  const suggestion = suggestQty(par, onHand, divisor);
   const state = qtyState(qty);
 
   function commitQty(raw: string) {
@@ -83,7 +88,7 @@ export function GuideLine({
 
     // Counting proposes a quantity, it never dictates one — but only fill an
     // untouched box, so a count never silently overwrites a decision.
-    const proposed = suggestQty(par, next, row.package_content);
+    const proposed = suggestQty(par, next, divisor);
     onCommit(
       qty === null && proposed !== null
         ? { on_hand: next, qty_to_order: proposed }
@@ -95,7 +100,7 @@ export function GuideLine({
   const pack = packLabel(row, baseUnit);
   // The same par the item header states, said in THIS line's packages — the
   // unit the box beside it counts in.
-  const parPack = parPackageLabel(par, row.package_content, row.package_desc);
+  const parPack = parPackageLabel(par, divisor, row.package_desc);
 
   // Should-order is a statement about a day, so it means nothing while the day
   // gates are lifted — no green, and no reason to explain the absence of it.
@@ -166,7 +171,7 @@ export function GuideLine({
         {pack ?? <span className="text-faint">—</span>}
         {parPack && (
           <div
-            title={`Par ${Number(par)} ${baseUnit} ÷ ${Number(row.package_content)} ${baseUnit} per package`}
+            title={`Par ${Number(par)} ${baseUnit} ÷ ${divisor} ${baseUnit} per package`}
             className="text-xs font-semibold text-accent"
           >
             par {parPack}

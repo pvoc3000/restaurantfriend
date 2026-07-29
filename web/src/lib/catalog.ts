@@ -2,6 +2,8 @@
 // items list, item detail, and vendor detail. These are the general-purpose
 // catalog surfaces — /cleanup stays a separate, problem-driven queue.
 
+import { packageContent } from "./units";
+
 export type CatalogVendorItem = {
   /** FMP's pack structure, restored by migration 010 ("12 × 32 oz"). */
   pack_count?: number | null;
@@ -192,6 +194,42 @@ export function packLabel(
 }
 
 /**
+ * How many base units one of this vendor item's packages holds — the number
+ * that converts between what you count and what you order.
+ *
+ * `package_content` when it's set, and otherwise derived from the pack
+ * structure (Mark, 2026-07-29: a line should divide "if the vendor item has a
+ * package size"). Content is a stored total that nobody can type any more, so
+ * treating it as the only source made a line's arithmetic depend on whether
+ * someone had filled in a cache column rather than on whether the package size
+ * is actually known. 13 item+vendor pairs have the size and not the total.
+ *
+ * Null when there's no size either, or when the size can't reach the base unit
+ * — 12 × 6 oz of raspberries against a base unit of `ea` is not a conversion,
+ * it's a missing fact about how many berries are in a clamshell.
+ */
+export function packageDivisor(
+  vi: {
+    package_content: number | null;
+    pack_count?: number | null;
+    pack_size?: number | null;
+    pack_unit?: string | null;
+  },
+  baseUnit: string
+): number | null {
+  const stored = Number(vi.package_content);
+  if (vi.package_content !== null && stored > 0) return stored;
+  if (vi.pack_size === null || vi.pack_size === undefined) return null;
+  const derived = packageContent(
+    Number(vi.pack_count ?? 1),
+    Number(vi.pack_size),
+    vi.pack_unit ?? baseUnit,
+    baseUnit
+  );
+  return derived !== null && derived > 0 ? derived : null;
+}
+
+/**
  * Par restated in one vendor item's own packages — "3 CS" from a par of 576 oz
  * against a 192 oz case.
  *
@@ -212,12 +250,12 @@ export function packLabel(
  */
 export function parPackageLabel(
   par: number | null | undefined,
-  packageContent: number | null | undefined,
+  divisor: number | null | undefined,
   packageDesc?: string | null
 ): string | null {
   if (par === null || par === undefined) return null;
-  if (packageContent === null || packageContent === undefined) return null;
-  const content = Number(packageContent);
+  if (divisor === null || divisor === undefined) return null;
+  const content = Number(divisor);
   // Also catches NaN, which a `<= 0` test would let through.
   if (!(content > 0)) return null;
   const packages = Number(par) / content;
