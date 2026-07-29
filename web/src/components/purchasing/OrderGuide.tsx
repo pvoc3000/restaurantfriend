@@ -432,7 +432,14 @@ export function OrderGuide({
   }
 
   return (
-    <div className="space-y-4 pb-28">
+    // -mt-8 collapsed, cancelling the page gutter's 32px top padding exactly
+    // (layout.tsx, py-8). With the shelf gone that padding is the last thing
+    // left between the strip and the column labels, and against a 32px strip a
+    // 32px band of nothing reads as shelf that failed to hide (Mark,
+    // 2026-07-29). The labels' own py-3 is the breathing room they need. Only
+    // this screen does it: every other page keeps its title and filters when
+    // the chrome collapses, so their top padding isn't leftover.
+    <div className={`space-y-4 pb-28 ${chromeCollapsed ? "-mt-8" : ""}`}>
       {/* The shelf — everything above the list. It goes with the menu when the
           chrome collapses: on a walk you're reading rows, and the title, the
           day picker, the totals and the filters are all things you set BEFORE
