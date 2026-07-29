@@ -25,7 +25,7 @@ export function LocationSwitcher({
       <select
         aria-label="Active location"
         title="Active location"
-        className="h-7 border border-white/40 bg-transparent px-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-white disabled:opacity-35 [&>option]:text-ink"
+        className="h-6 border border-white/40 bg-transparent px-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-white disabled:opacity-35 [&>option]:text-ink"
         value={activeLocationId ?? ""}
         disabled={isPending || locations.length === 0}
         onChange={(e) => {

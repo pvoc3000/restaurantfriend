@@ -36,8 +36,9 @@ export function GearIcon() {
 }
 
 /**
- * A 28px square target. `title` as well as `aria-label`: with no text beside
- * them these need a hover explanation, not only a screen-reader one.
+ * A 24px square target around a 16px icon. `title` as well as `aria-label`:
+ * with no text beside them these need a hover explanation, not only a
+ * screen-reader one.
  */
 export function IconButton({
   href,
@@ -53,7 +54,7 @@ export function IconButton({
       href={href}
       aria-label={label}
       title={label}
-      className="grid h-7 w-7 place-items-center text-white/60 no-underline hover:text-white"
+      className="grid h-6 w-6 place-items-center text-white/60 no-underline hover:text-white"
     >
       {children}
     </Link>

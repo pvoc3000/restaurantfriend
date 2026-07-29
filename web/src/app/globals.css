@@ -27,10 +27,11 @@
 :root {
   /* The masthead's height, republished on every resize by HeaderShell (it
      wraps to two or three rows at narrow widths, and collapses to a strip).
-     Screens that size a scroll pane against the viewport subtract this instead
-     of a constant, so collapsing the menu actually hands them the space. Seeded
-     with the two-tier height so the first paint is right. */
-  --rf-header-h: 5.5rem;
+     The order guide's column labels stick to it, so a wrong value here shows as
+     a gap under the header on the very first paint. Seeded with the two-tier
+     height — AppNav's py-1 (8px) + 2 × TIER_H (h-7 = 28px) = 64px. If either
+     changes, change this. */
+  --rf-header-h: 4rem;
 }
 
 /* The one animation in the system, and it earns it: the order guide spends

@@ -20,7 +20,10 @@ export async function AppHeader({ session }: { session: AppSession }) {
       <AppNav
         initialMemory={initialMemory}
         locationCode={session.activeLocation?.code ?? null}
-        utilities={
+        // Row 1: what you're looking at. Where to go, which location you're
+        // working at, and whether the chrome is showing (Mark, 2026-07-29 —
+        // the old single row is now two, to match the menu's two tiers).
+        controls={
           <>
             <IconButton href="/" label="Home">
               <HomeIcon />
@@ -35,23 +38,33 @@ export async function AppHeader({ session }: { session: AppSession }) {
               activeLocationId={session.activeLocation?.id ?? null}
             />
 
+            {/* Last in this row: it's the control you reach for once, when
+                you're about to start walking. It belongs with the view
+                controls rather than with the session ones — it changes what
+                you can see, not who you are. */}
+            <MenuCollapseButton />
+          </>
+        }
+        // Row 2: who you are, and leaving.
+        identity={
+          <>
             <span className="whitespace-nowrap text-[12px] uppercase tracking-[0.12em] text-white/55">
               {session.membership.display_name ?? session.email}
               <span> · {session.membership.role}</span>
             </span>
 
+            {/* No box (Mark, 2026-07-29). It's type in the same idiom as the
+                section tabs — quiet until you hover — which also stops row 2
+                reading as a row of controls when it's really a statement about
+                who you are with one way out of it. */}
             <form action={signOut}>
               <button
                 type="submit"
-                className="h-7 border border-white/40 bg-transparent px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-white hover:bg-white hover:text-ink"
+                className="text-[12px] font-semibold uppercase tracking-[0.06em] text-white/60 hover:text-white"
               >
                 Sign out
               </button>
             </form>
-
-            {/* Last in the cluster: it's the control you reach for once, when
-                you're about to start walking. */}
-            <MenuCollapseButton />
           </>
         }
       />

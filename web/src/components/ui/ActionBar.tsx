@@ -14,7 +14,7 @@ export function ActionBar({ note, children }: { note?: ReactNode; children: Reac
   return (
     <div className="fixed inset-x-0 bottom-0 z-30 flex min-h-[4.5rem] items-stretch bg-ink text-white">
       {note && (
-        <div className="flex items-center whitespace-nowrap px-12 text-[12px] uppercase tracking-[0.12em] text-white/55">
+        <div className="flex items-center whitespace-nowrap px-4 text-[12px] uppercase tracking-[0.12em] text-white/55 xl:px-12">
           {note}
         </div>
       )}
