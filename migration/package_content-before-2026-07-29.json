@@ -1,0 +1,616 @@
+{
+  "target": "https://kltxioacvneshbyhxtaj.supabase.co",
+  "rows": 61,
+  "plan": [
+    {
+      "id": "0dfeba45-7b61-4967-ac48-868b477b5913",
+      "item": "Pecan, Pieces",
+      "vendor": "Restaurant Depot",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "6 x 28 oz",
+      "before": 168,
+      "after": 10.5
+    },
+    {
+      "id": "6682bf8a-019f-4f88-a2f5-8307bf56c65b",
+      "item": "Gloves, Rubber",
+      "vendor": "Restaurant Depot",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "1 x 1 ea",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "896b054d-d82c-4b64-93ed-ae1ef14a4d5d",
+      "item": "Pistachios, Whole",
+      "vendor": "Restaurant Depot",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "6 x 32 oz",
+      "before": 192,
+      "after": 12
+    },
+    {
+      "id": "4283704d-fd7e-4395-953f-35acc817eae5",
+      "item": "Silverware",
+      "vendor": "Restaurant Depot",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "1 x 24 ea",
+      "before": null,
+      "after": 24
+    },
+    {
+      "id": "98887ab9-23e3-4731-ad02-a30a0fd4fc5a",
+      "item": "Juice, Single Serving, Orange",
+      "vendor": "Restaurant Depot",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "1 x 12 ea",
+      "before": null,
+      "after": 12
+    },
+    {
+      "id": "36b7fe45-a0fe-41e4-b824-c2baad585719",
+      "item": "Pecan, Pieces",
+      "vendor": "World Wide Produce",
+      "is_active": false,
+      "base_unit": "lbs",
+      "pack": "1 x 25 lbs",
+      "before": 400,
+      "after": 25
+    },
+    {
+      "id": "1efb28b2-33bd-4cd7-8f14-8c48b7d5b4fc",
+      "item": "Puree, Passion Fruit",
+      "vendor": "World Wide Produce",
+      "is_active": false,
+      "base_unit": "oz",
+      "pack": "1 x 2.2 lbs",
+      "before": 2.2,
+      "after": 35.2
+    },
+    {
+      "id": "fe820961-b49a-4b3c-83ff-add7c3cc31ff",
+      "item": "Puree, Passion Fruit",
+      "vendor": "World Wide Produce",
+      "is_active": false,
+      "base_unit": "oz",
+      "pack": "6 x 2.2 lbs",
+      "before": 13.2,
+      "after": 211.20000000000002
+    },
+    {
+      "id": "8555320e-49a1-4e28-a435-9ff33f22b333",
+      "item": "Puree, Mango",
+      "vendor": "World Wide Produce",
+      "is_active": true,
+      "base_unit": "oz",
+      "pack": "6 x 30 oz",
+      "before": 11.25,
+      "after": 180
+    },
+    {
+      "id": "948efc78-d521-4166-9835-0d1c332a1c38",
+      "item": "Extract, Vanilla",
+      "vendor": "World Wide Produce",
+      "is_active": true,
+      "base_unit": "GAL",
+      "pack": "1 x 1 gal",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "bc6926f4-b2d5-4128-9b9f-20bcc8e3ba15",
+      "item": "Pecan, Pieces",
+      "vendor": "World Wide Produce",
+      "is_active": false,
+      "base_unit": "lbs",
+      "pack": "1 x 5 lbs",
+      "before": 80,
+      "after": 5
+    },
+    {
+      "id": "c8bc227d-4020-421d-b104-ec8a6605b04d",
+      "item": "Puree, Strawberry",
+      "vendor": "World Wide Produce",
+      "is_active": false,
+      "base_unit": "oz",
+      "pack": "1 x 2.2 lbs",
+      "before": 2.2,
+      "after": 35.2
+    },
+    {
+      "id": "5047129e-2ccc-433f-8bbb-1a3b1d9d7f8d",
+      "item": "Puree, Strawberry",
+      "vendor": "BakeMark",
+      "is_active": false,
+      "base_unit": "oz",
+      "pack": "1 x 2.2 lbs",
+      "before": 2.2,
+      "after": 35.2
+    },
+    {
+      "id": "615201ee-d3de-4991-89be-de18c04c6899",
+      "item": "Puree, Mango",
+      "vendor": "BakeMark",
+      "is_active": false,
+      "base_unit": "oz",
+      "pack": "1 x 2.2 lbs",
+      "before": 2.2,
+      "after": 35.2
+    },
+    {
+      "id": "be8f1d18-0cd6-4dc8-a2af-84ce63828566",
+      "item": "Puree, Passion Fruit",
+      "vendor": "BakeMark",
+      "is_active": false,
+      "base_unit": "oz",
+      "pack": "1 x 2.2 lbs",
+      "before": 2.2,
+      "after": 35.2
+    },
+    {
+      "id": "c143bc32-8f66-48e0-a089-1263c91aef7b",
+      "item": "Pistachios, Whole",
+      "vendor": "World Wide Produce",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "1 x 5 lbs",
+      "before": 80,
+      "after": 5
+    },
+    {
+      "id": "d174ea6b-3909-4459-815d-a0083c6e4d8e",
+      "item": "Syrup, Maple",
+      "vendor": "Jordano's",
+      "is_active": true,
+      "base_unit": "gal",
+      "pack": "6 x 0.5 gal",
+      "before": null,
+      "after": 3
+    },
+    {
+      "id": "e1587364-8bc4-40aa-92c4-cb79b8df54aa",
+      "item": "Pecan, Pieces",
+      "vendor": "Jordano's",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "1 x 5 lbs",
+      "before": 80,
+      "after": 5
+    },
+    {
+      "id": "14ca39c4-545c-4e3f-96ac-96cb23a147e7",
+      "item": "Juice, Single Serving, Orange",
+      "vendor": "Jordano's",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "12 x 1 ea",
+      "before": null,
+      "after": 12
+    },
+    {
+      "id": "15805716-3f85-4f29-842f-94b6125e6fd3",
+      "item": "Pistachios, Whole",
+      "vendor": "Jordano's",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "1 x 6 lbs",
+      "before": 96,
+      "after": 6
+    },
+    {
+      "id": "a3c917dd-224a-46fb-80ae-b1936a7e9175",
+      "item": "Cup, Ice Cream",
+      "vendor": "P & R Paper",
+      "is_active": false,
+      "base_unit": "ea",
+      "pack": "1 x 1000 ea",
+      "before": null,
+      "after": 1000
+    },
+    {
+      "id": "448896e4-e41e-4384-8e7b-8402dc56aaac",
+      "item": "Extract, Vanilla",
+      "vendor": "Cook's Vanilla",
+      "is_active": true,
+      "base_unit": "GAL",
+      "pack": "1 x 1 gal",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "92489b96-e49e-404f-8c23-700d6208ea10",
+      "item": "Reeds, Ginger Beer",
+      "vendor": "LA Distributing Co.",
+      "is_active": false,
+      "base_unit": "ea",
+      "pack": "24 x 1 ea",
+      "before": null,
+      "after": 24
+    },
+    {
+      "id": "7e1d46aa-51f4-41e4-b135-c0a2a020d32f",
+      "item": "Puree, Strawberry",
+      "vendor": "Sunrise Produce",
+      "is_active": true,
+      "base_unit": "oz",
+      "pack": "1 x 30 oz",
+      "before": 1.875,
+      "after": 30
+    },
+    {
+      "id": "c3a82541-75a9-49a0-8d58-306ef56f64b6",
+      "item": "Pistachios, Whole",
+      "vendor": "Sunrise Produce",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "1 x 5 lbs",
+      "before": 80,
+      "after": 5
+    },
+    {
+      "id": "5335775a-1059-43e7-9cb9-98550b2b7e5f",
+      "item": "Puree, Mango",
+      "vendor": "Sunrise Produce",
+      "is_active": true,
+      "base_unit": "oz",
+      "pack": "6 x 30 oz",
+      "before": 11.25,
+      "after": 180
+    },
+    {
+      "id": "877e311d-3963-4138-90b7-40dd02519043",
+      "item": "Pecan, Pieces",
+      "vendor": "Sunrise Produce",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "1 x 5 lbs",
+      "before": 80,
+      "after": 5
+    },
+    {
+      "id": "b45563a1-4f3a-44ae-9b2d-4d829c42393a",
+      "item": "Gloves, Rubber",
+      "vendor": "Smart and Final",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "1 x 1 ea",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "f43c398c-45cc-4d0b-985c-ac1029c9ebc4",
+      "item": "Extract, Vanilla",
+      "vendor": "UNFI",
+      "is_active": true,
+      "base_unit": "GAL",
+      "pack": "1 x 1 gal",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "33728033-a4cd-4be3-b2ef-42d7d1651788",
+      "item": "Syrup, Maple",
+      "vendor": "Chefs Warehouse",
+      "is_active": true,
+      "base_unit": "gal",
+      "pack": "1 x 1 gal",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "111a93f3-5f02-4559-992a-8d989b49a644",
+      "item": "Juice, Single Serving, Orange",
+      "vendor": "Chefs Warehouse",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "6 x 1 ea",
+      "before": null,
+      "after": 6
+    },
+    {
+      "id": "d2fb3c9f-dcde-4e29-8e53-5431011eb1fd",
+      "item": "Extract, Vanilla",
+      "vendor": "Dawn Foods",
+      "is_active": false,
+      "base_unit": "GAL",
+      "pack": "1 x 1 gal",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "027b34fb-8a18-41bc-86da-9a1e39bbe2f8",
+      "item": "Extract, Vanilla",
+      "vendor": "Dawn Foods",
+      "is_active": false,
+      "base_unit": "GAL",
+      "pack": "1 x 1 gal",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "e1bd6e12-d709-4373-958a-bffe02826539",
+      "item": "Extract, Vanilla",
+      "vendor": "Dawn Foods",
+      "is_active": false,
+      "base_unit": "GAL",
+      "pack": "1 x 1 gal",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "2ac51a52-f503-44a8-a2fd-336bca97934d",
+      "item": "Donut Box, 12 Donuts",
+      "vendor": "Dawn Foods",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "1 x 100 ea",
+      "before": null,
+      "after": 100
+    },
+    {
+      "id": "a77dc92c-f448-4da4-a717-7ef154d97aaa",
+      "item": "Extract, Vanilla",
+      "vendor": "Dawn Foods",
+      "is_active": false,
+      "base_unit": "GAL",
+      "pack": "1 x 1 gal",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "77f1c565-89d1-4c8e-b207-05a6d7fb3f6e",
+      "item": "Pistachios, Whole",
+      "vendor": "Nuts.com",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "1 x 5 lbs",
+      "before": 80,
+      "after": 5
+    },
+    {
+      "id": "21e3c41a-1c4b-4af0-91c0-559d61a380f8",
+      "item": "Pistachios, Whole",
+      "vendor": "Nutsite.com",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "1 x 25 lbs",
+      "before": 400,
+      "after": 25
+    },
+    {
+      "id": "f3c13b60-aa49-4119-b906-addae5e93910",
+      "item": "Pecan, Pieces",
+      "vendor": "Nutsite.com",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "1 x 30 lbs",
+      "before": 480,
+      "after": 30
+    },
+    {
+      "id": "8f50de17-0d67-44ef-9787-965e6b5cd739",
+      "item": "Pecan, Pieces",
+      "vendor": "West Central Produce",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "1 x 5 lbs",
+      "before": 80,
+      "after": 5
+    },
+    {
+      "id": "504f74f2-92a8-468f-b956-febe703589de",
+      "item": "Utensil, Tasting Spoons",
+      "vendor": "Unified Paper",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "1 x 500 ea",
+      "before": null,
+      "after": 500
+    },
+    {
+      "id": "8d7c325a-1218-443b-9f0d-f36470a3aa97",
+      "item": "Extract, Vanilla",
+      "vendor": "Olive Nation",
+      "is_active": false,
+      "base_unit": "GAL",
+      "pack": "1 x 1 gal",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "4d2681c8-2a44-4b46-aed8-40a856f516c1",
+      "item": "Utensil, Spoon, Natural",
+      "vendor": "Individual Foodservice",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "10 x 100 ea",
+      "before": null,
+      "after": 1000
+    },
+    {
+      "id": "ebbd47ef-64ea-4796-b138-33d3c4189533",
+      "item": "Puree, Mango",
+      "vendor": "Amoretti",
+      "is_active": false,
+      "base_unit": "oz",
+      "pack": "1 x 10 lbs",
+      "before": 10,
+      "after": 160
+    },
+    {
+      "id": "696ca49a-85d7-4248-8dba-a77fddfa3464",
+      "item": "Gloves, Rubber",
+      "vendor": "Friendly Foods",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "1 x 1 ea",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "a6beb1e1-c2d3-461a-8a18-e504325d7e22",
+      "item": "Gloves, Rubber",
+      "vendor": "Friendly Foods",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "1 x 1 ea",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "a86fdc78-c637-4375-9496-cb43c130a257",
+      "item": "Brooms",
+      "vendor": "Friendly Foods",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "1 x 1 ea",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "b1602069-f35b-4fdd-a99f-34914a76841b",
+      "item": "Pecan, Pieces",
+      "vendor": "Friendly Foods",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "6 x 28 oz",
+      "before": 168,
+      "after": 10.5
+    },
+    {
+      "id": "f50df55a-fa81-493c-b809-d0c6bc73af8a",
+      "item": "Pistachios, Whole",
+      "vendor": "Friendly Foods",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "6 x 32 oz",
+      "before": 192,
+      "after": 12
+    },
+    {
+      "id": "c5ebd4a8-62a5-4107-9609-8dfbe030655e",
+      "item": "Extract, Vanilla",
+      "vendor": "DF02 DTLA",
+      "is_active": true,
+      "base_unit": "GAL",
+      "pack": "1 x 1 gal",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "a3145d47-fa4c-4580-b8a6-ccbff00c1313",
+      "item": "Pecan, Pieces",
+      "vendor": "Webstaurant Store",
+      "is_active": false,
+      "base_unit": "lbs",
+      "pack": "1 x 5 lbs",
+      "before": 80,
+      "after": 5
+    },
+    {
+      "id": "61eebb05-1cc0-40a0-aaa2-1d3ecfe7f5c2",
+      "item": "Syrup, Maple",
+      "vendor": "Vesta Foodservice",
+      "is_active": true,
+      "base_unit": "gal",
+      "pack": "1 x 1 gal",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "3547af3e-1d6f-4e2d-9def-6787a7e6419d",
+      "item": "Puree, Passion Fruit",
+      "vendor": "Vesta Foodservice",
+      "is_active": true,
+      "base_unit": "oz",
+      "pack": "1 x 30 oz",
+      "before": 1.875,
+      "after": 30
+    },
+    {
+      "id": "5d863044-3dfa-42bb-8162-be8f2f1f6e10",
+      "item": "Puree, Mango",
+      "vendor": "Vesta Foodservice",
+      "is_active": true,
+      "base_unit": "oz",
+      "pack": "1 x 30 oz",
+      "before": 1.875,
+      "after": 30
+    },
+    {
+      "id": "2ca99cea-788d-4a83-aebb-0134bfdf3017",
+      "item": "Strawberries, Fresh",
+      "vendor": "Restaurant Depot",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "2 x 4 lbs",
+      "before": null,
+      "after": 8
+    },
+    {
+      "id": "aecc168a-153c-49a8-82fd-def51d73affc",
+      "item": "Milk, Soy, single serving",
+      "vendor": "Chefs Warehouse",
+      "is_active": true,
+      "base_unit": "oz",
+      "pack": "12 x 11 oz",
+      "before": 8.25,
+      "after": 132
+    },
+    {
+      "id": "ab847810-bf24-47b7-988d-ca3549ae36b1",
+      "item": "Pistachios, Whole",
+      "vendor": "Vesta Foodservice",
+      "is_active": true,
+      "base_unit": "lbs",
+      "pack": "1 x 5 lbs",
+      "before": 80,
+      "after": 5
+    },
+    {
+      "id": "ee824307-c888-4e7a-b92a-8abfdb770608",
+      "item": "Gloves, Rubber",
+      "vendor": "Restaurant Depot",
+      "is_active": true,
+      "base_unit": "ea",
+      "pack": "1 x 1 ea",
+      "before": null,
+      "after": 1
+    },
+    {
+      "id": "eef8e39a-8c13-4948-9e62-aebccff7ca13",
+      "item": "Puree, Strawberry",
+      "vendor": "Vesta Foodservice",
+      "is_active": true,
+      "base_unit": "oz",
+      "pack": "1 x 30 oz",
+      "before": 1.875,
+      "after": 30
+    },
+    {
+      "id": "fa1e755a-bc66-4165-bed2-3d9e796f8888",
+      "item": "Pecan, Pieces",
+      "vendor": "Dawn Foods",
+      "is_active": false,
+      "base_unit": "lbs",
+      "pack": "1 x 30 lbs",
+      "before": 480,
+      "after": 30
+    },
+    {
+      "id": "f62d5ecf-0fb1-4376-b355-b6a69d263180",
+      "item": "Puree, Strawberry",
+      "vendor": "World Wide Produce",
+      "is_active": true,
+      "base_unit": "oz",
+      "pack": "6 x 30 oz",
+      "before": 11.25,
+      "after": 180
+    }
+  ]
+}
