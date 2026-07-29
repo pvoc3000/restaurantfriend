@@ -163,20 +163,9 @@ export function GuideLine({
 
       {/* Pack and unit price: the $/oz comparison across pack sizes is the
           reason this column exists (§4.6). Reads the way the case is labelled —
-          "12 × 32 oz" — because that's what you check a delivery against.
-          The package par sits directly under it: it's derived from that
-          structure, so the two read as one fact about this pack rather than as
-          a number parachuted in beside the stepper. */}
+          "12 × 32 oz" — because that's what you check a delivery against. */}
       <td className="whitespace-nowrap px-4 py-4 align-top tabular-nums text-body">
         {pack ?? <span className="text-faint">—</span>}
-        {parPack && (
-          <div
-            title={`Par ${Number(par)} ${baseUnit} ÷ ${divisor} ${baseUnit} per package`}
-            className="text-xs font-semibold text-accent"
-          >
-            par {parPack}
-          </div>
-        )}
       </td>
 
       <td className="whitespace-nowrap px-4 py-4 align-top text-right tabular-nums text-muted">
@@ -271,6 +260,19 @@ export function GuideLine({
             +
           </button>
         </div>
+        {/* The par in this line's packages, under the box that counts them
+            (Mark, 2026-07-29). Quieter than the number above it — smaller and
+            at 75% — because it's the target you're aiming at, not the decision
+            you're making. `pr-11` is the + button (2.25rem) plus its gap
+            (0.5rem), so its right edge lines up with the box's, not the +'s. */}
+        {parPack && (
+          <div
+            title={`Par ${Number(par)} ${baseUnit} ÷ ${divisor} ${baseUnit} per package`}
+            className="mt-1 pr-11 text-right text-[11px] font-semibold text-accent opacity-75"
+          >
+            par {parPack}
+          </div>
+        )}
       </td>
     </tr>
   );
