@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import { derivedPackContent, vendorItemTitle } from "@/lib/catalog";
 import { InlineValue } from "./InlineValue";
@@ -23,6 +26,69 @@ export type VendorItemRecord = {
   vendors: { id: string; name: string; is_active: boolean } | null;
   inventory_items: { id: string; name: string; base_unit: string } | null;
 };
+
+/**
+ * Restate the content from the pack, without having to nudge a pack field and
+ * put it back (Mark, 2026-07-29 — which is what he'd been doing, because the
+ * recompute only fires on a pack EDIT).
+ *
+ * Only rendered when the pack derives a content that differs from what's
+ * stored, so its presence is the finding: no button means the two already
+ * agree, or the pack can't reach the base unit and only a human can say. It
+ * names the number it will write, so it isn't a blind action.
+ */
+function RecalcContent({
+  vendorItemId,
+  stored,
+  derived,
+  unit,
+}: {
+  vendorItemId: string;
+  stored: number | null;
+  derived: number | null;
+  unit: string;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  if (derived === null) return null;
+  if (stored !== null && Math.abs(Number(stored) - derived) <= Math.max(0.001, derived * 0.001))
+    return null;
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    const { error: writeError } = await supabase
+      .from("vendor_items")
+      .update({ package_content: derived })
+      .eq("id", vendorItemId);
+    setBusy(false);
+    if (writeError) {
+      setError(writeError.message);
+      return;
+    }
+    router.refresh();
+  }
+
+  return (
+    <span className="ml-2 flex shrink-0 items-center gap-1">
+      <button
+        type="button"
+        disabled={busy}
+        onClick={save}
+        title={`The pack works out to ${Number(derived.toFixed(3))} ${unit}${
+          stored === null ? "" : `, not ${Number(stored)}`
+        }`}
+        className="border border-ink px-2 py-0.5 text-xs hover:bg-neutral-100 disabled:opacity-35"
+      >
+        {busy ? "…" : `Recalc → ${Number(derived.toFixed(3))}`}
+      </button>
+      {error && <span className="text-xs text-accent">{error}</span>}
+    </span>
+  );
+}
 
 /**
  * The vendor item master header: what this vendor calls the product, what a
@@ -248,6 +314,12 @@ export function VendorItemFields({
             </span>
             <span>{unit})</span>
           </span>
+          <RecalcContent
+            vendorItemId={vi.id}
+            stored={vi.package_content}
+            derived={derivedPackContent(vi, unit)}
+            unit={unit}
+          />
         </dd>
 
         <dt className="py-0.5 text-subtle">Price</dt>
