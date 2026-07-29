@@ -440,24 +440,37 @@ export function OrderGuide({
           line on screen either way, and the strip brings it all back in a tap. */}
       {!chromeCollapsed && (
         <>
-          {/* Title block: the screen's name in display caps, the context line
-              in small caps beneath it. */}
-          <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
-            <div>
+          {/* Title block. The context line that used to sit under the title is
+              gone (Mark, 2026-07-29) — the location is in the masthead and the
+              day is the lit chip in the picker, so all it added was the walked
+              date. What's left of it is the count, moved up BESIDE the title
+              where it reads as a subtitle, with the day picker taking the line
+              underneath. */}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
               <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
                 Order Guide
               </h1>
-              <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
-                {locationCode} ·{" "}
-                {ignoreDays ? "all days" : WEEKDAY_LABELS[weekday - 1]} · walked{" "}
-                {guideDate} · {visibleRows.length} of {rows.length} lines
+              <p className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+                {visibleRows.length} of {rows.length} items
               </p>
+              <button
+                onClick={() => router.refresh()}
+                className="ml-auto text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+              >
+                Refresh
+              </button>
             </div>
-            {/* All seven days, always, as one segmented control. The guide
-                exists every day — picking one scopes the list to what's
-                orderable then, and a day with nothing scheduled simply renders
-                empty rather than disappearing. */}
-            <span className="inline-flex h-9 items-stretch border border-ink">
+
+            {/* All seven days, always, as one segmented control, directly under
+                the title. The guide exists every day — picking one scopes the
+                list to what's orderable then, and a day with nothing scheduled
+                simply renders empty rather than disappearing.
+                flex + w-fit, not inline-flex: an inline-level box in a block
+                parent sits in a line box and collects its descender space, which
+                is 4px of nothing under the control (the same trap that put Sign
+                out off its baseline). */}
+            <div className="flex h-9 w-fit items-stretch border border-ink">
               {[1, 2, 3, 4, 5, 6, 7].map((d) => (
                 <Link
                   key={d}
@@ -473,13 +486,7 @@ export function OrderGuide({
                   {WEEKDAY_LABELS[d - 1]}
                 </Link>
               ))}
-            </span>
-            <button
-              onClick={() => router.refresh()}
-              className="ml-auto text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-            >
-              Refresh
-            </button>
+            </div>
           </div>
 
           {/* Vendor totals bar — the guide's central instrument (§4.2): square
