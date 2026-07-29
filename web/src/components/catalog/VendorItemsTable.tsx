@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { unitPrice, unitPriceLabel, type CatalogVendorItem } from "@/lib/catalog";
+import { qty, unitPrice, unitPriceLabel, type CatalogVendorItem } from "@/lib/catalog";
 import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import type { StaleBucket } from "@/lib/lastOrdered";
 import { InlineValue } from "./InlineValue";
@@ -227,16 +227,11 @@ export function VendorItemsTable({
       width: 110,
       align: "right",
       sortValue: (vi) => (vi.package_content === null ? null : Number(vi.package_content)),
-      render: (vi) => (
-        <InlineValue
-          table="vendor_items"
-          id={vi.id}
-          column="package_content"
-          value={vi.package_content}
-          kind="number"
-          align="right"
-        />
-      ),
+      // Read-only (Mark, 2026-07-29). It's the base-unit total the ordering
+      // math divides by, derivable from the pack structure beside it, and a
+      // second hand-typed copy of a derived number is only ever a way for the
+      // two to disagree. /cleanup's package editor is the one writer.
+      render: (vi) => qty(vi.package_content),
     },
     {
       key: "price",

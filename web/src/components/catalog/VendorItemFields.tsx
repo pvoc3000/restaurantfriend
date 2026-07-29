@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { withFrom, type Crumb } from "@/lib/breadcrumbs";
+import { vendorItemTitle } from "@/lib/catalog";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
 import { InventoryItemPicker } from "./InventoryItemPicker";
@@ -40,19 +41,17 @@ export function VendorItemFields({
   here: Crumb;
 }) {
   const unit = vi.inventory_items?.base_unit ?? "unit";
+  const title = vendorItemTitle(vi, vi.inventory_items?.name, unit);
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
+        {/* Read-only: the description now has its own field below, and a title
+            you could type into would be a second box writing the same column.
+            Without a description this composes brand + item + pack, so the
+            record still names itself. */}
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          <InlineValue
-            table="vendor_items"
-            id={vi.id}
-            column="description"
-            value={vi.description}
-            placeholder="No description"
-            className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]"
-          />
+          {title ?? <span className="text-faint">Untitled vendor item</span>}
         </h1>
         <span className="flex items-center gap-2 text-sm text-muted">
           <ActiveToggle
@@ -100,6 +99,21 @@ export function VendorItemFields({
           <InventoryItemPicker
             vendorItemId={vi.id}
             currentItemId={vi.inventory_items?.id ?? null}
+          />
+        </dd>
+
+        {/* The vendor's own words for the product — what they'd match against
+            their product list, so it leads the PO line (§4.9) and the title
+            above. Sits with the inventory item because the two together are
+            "their name for our thing". */}
+        <dt className="py-0.5 text-subtle">Description</dt>
+        <dd>
+          <InlineValue
+            table="vendor_items"
+            id={vi.id}
+            column="description"
+            value={vi.description}
+            placeholder="none"
           />
         </dd>
 
@@ -168,18 +182,6 @@ export function VendorItemFields({
           />
         </dd>
 
-        <dt className="py-0.5 text-subtle">Content ({unit})</dt>
-        <dd>
-          <InlineValue
-            table="vendor_items"
-            id={vi.id}
-            column="package_content"
-            value={vi.package_content}
-            kind="number"
-            placeholder="none"
-          />
-        </dd>
-
         <dt className="py-0.5 text-subtle">Price</dt>
         <dd>
           <InlineValue
@@ -205,9 +207,11 @@ export function VendorItemFields({
       </dl>
 
       <p className="text-xs text-subtle">
-        Content is how many {unit} one package holds — it converts a par into
-        packages to order. Price is the vendor&apos;s global price; a location
-        below may override it.
+        One package holds some number of {unit}, and that total is what turns a
+        par into packages to order — it&apos;s set in the cleanup queue rather
+        than typed here, so the pack above is the one place this record
+        describes its packaging. Price is the vendor&apos;s global price; a
+        location below may override it.
       </p>
     </div>
   );
