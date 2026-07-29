@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/purchaseOrders";
-import { packageDivisor, parPackageLabel } from "@/lib/catalog";
 import { withFrom } from "@/lib/breadcrumbs";
 import { useChromeCollapsed } from "@/lib/chromeStore";
 import {
@@ -782,20 +781,6 @@ export function OrderGuide({
                 {section.items.map((item) => {
                   const itemKey = expansionKey(section.key, item.inventory_item_id);
                   const isOpen = expanded.has(itemKey);
-                  // The header states the par as a fact about the shelf, in base
-                  // units — that's the one reading no vendor can contradict. But
-                  // 576 oz is not a number anyone acts on, so it also carries the
-                  // FAVORITE's package translation: the source you'd normally
-                  // take, named in the tooltip because a second source with a
-                  // different pack size will show a different figure on its own
-                  // line, and both are right.
-                  const parSource =
-                    item.lines.find((l) => l.is_favorite) ?? item.lines[0];
-                  const headerPar = parPackageLabel(
-                    item.par_qty,
-                    parSource ? packageDivisor(parSource, item.base_unit) : null,
-                    parSource?.package_desc
-                  );
                   return (
                   <Fragment key={item.inventory_item_id}>
                     {/* Item header: bold caps over a 2px black rule, par in
@@ -865,16 +850,16 @@ export function OrderGuide({
                                 no par
                               </span>
                             ) : (
+                              // The ITEM's par, in base units, and nothing else
+                              // (Mark, 2026-07-29). It used to append the
+                              // favorite's package translation, but an item can
+                              // have several favorites, so that silently picked
+                              // the first and showed one source's reading as if
+                              // it were the item's. Each line states its own
+                              // package par under its own order box, which is
+                              // where a per-source number belongs.
                               <span className="whitespace-nowrap text-[15px] font-bold uppercase tracking-[0.06em] text-accent">
                                 par {Number(item.par_qty)} {item.base_unit}
-                                {headerPar && (
-                                  <span
-                                    title={`${Number(item.par_qty)} ${item.base_unit} is ${headerPar} at ${parSource.vendor_name}`}
-                                  >
-                                    {" · "}
-                                    {headerPar}
-                                  </span>
-                                )}
                               </span>
                             )}
                           </span>
