@@ -131,3 +131,40 @@ export function packLabel(
   if (vi.package_content === null) return null;
   return `${Number(vi.package_content)} ${baseUnit}`;
 }
+
+/**
+ * Par restated in one vendor item's own packages — "3 CS" from a par of 576 oz
+ * against a 192 oz case.
+ *
+ * Par is a fact about the SHELF and stays in base units (migration 009), but the
+ * order box counts PACKAGES, so every line was asking Mark to do the division in
+ * his head. The divisor is already on the row, so this costs no query and each
+ * line answers in the pack it actually sells: 576 oz reads "3 CS" against a
+ * 12 × 16 oz case and "2 CS" against a 24 × 12 oz one. Both are true, which is
+ * why this belongs per line rather than once per item — half of all live pars
+ * sit on items whose vendors disagree on pack size.
+ *
+ * Deliberately NOT rounded up. 88% of live pars divide exactly, so most rows
+ * read clean anyway, and the tail is mostly intentional half-cases (a par of 96
+ * against a 192 oz case is "0.5 CS", not "1 CS"). Rounding up would overstate a
+ * par by up to a full package on exactly the rows where the number is working
+ * hardest, and vendor minimums get decided in whole cases. Quotients under 0.05
+ * read "<0.1" rather than "0", which would look like "don't order any".
+ */
+export function parPackageLabel(
+  par: number | null | undefined,
+  packageContent: number | null | undefined,
+  packageDesc?: string | null
+): string | null {
+  if (par === null || par === undefined) return null;
+  if (packageContent === null || packageContent === undefined) return null;
+  const content = Number(packageContent);
+  // Also catches NaN, which a `<= 0` test would let through.
+  if (!(content > 0)) return null;
+  const packages = Number(par) / content;
+  if (!Number.isFinite(packages)) return null;
+  const unit = packageDesc?.trim() || "pkg";
+  if (packages > 0 && packages < 0.05) return `<0.1 ${unit}`;
+  // Number() drops the trailing zero toFixed leaves, so 3.0 reads "3".
+  return `${Number(packages.toFixed(1))} ${unit}`;
+}

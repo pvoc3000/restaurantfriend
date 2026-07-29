@@ -13,7 +13,7 @@ import {
   type GuideRow,
 } from "@/lib/orderGuide";
 import { money } from "@/lib/purchaseOrders";
-import { packLabel } from "@/lib/catalog";
+import { packLabel, parPackageLabel } from "@/lib/catalog";
 
 /**
  * One plan line, laid out in the columns the FMP guide used because they're the
@@ -93,6 +93,9 @@ export function GuideLine({
 
   const arrives = deliveryLabel(row.vendor_delivery_days);
   const pack = packLabel(row, baseUnit);
+  // The same par the item header states, said in THIS line's packages — the
+  // unit the box beside it counts in.
+  const parPack = parPackageLabel(par, row.package_content, row.package_desc);
 
   // Should-order is a statement about a day, so it means nothing while the day
   // gates are lifted — no green, and no reason to explain the absence of it.
@@ -155,9 +158,20 @@ export function GuideLine({
 
       {/* Pack and unit price: the $/oz comparison across pack sizes is the
           reason this column exists (§4.6). Reads the way the case is labelled —
-          "12 × 32 oz" — because that's what you check a delivery against. */}
+          "12 × 32 oz" — because that's what you check a delivery against.
+          The package par sits directly under it: it's derived from that
+          structure, so the two read as one fact about this pack rather than as
+          a number parachuted in beside the stepper. */}
       <td className="whitespace-nowrap px-4 py-4 align-top tabular-nums text-body">
         {pack ?? <span className="text-faint">—</span>}
+        {parPack && (
+          <div
+            title={`Par ${Number(par)} ${baseUnit} ÷ ${Number(row.package_content)} ${baseUnit} per package`}
+            className="text-xs font-semibold text-accent"
+          >
+            par {parPack}
+          </div>
+        )}
       </td>
 
       <td className="whitespace-nowrap px-4 py-4 align-top text-right tabular-nums text-muted">
