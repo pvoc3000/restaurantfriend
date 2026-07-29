@@ -57,7 +57,14 @@ export async function AppHeader({ session }: { session: AppSession }) {
                 section tabs — quiet until you hover — which also stops row 2
                 reading as a row of controls when it's really a statement about
                 who you are with one way out of it. */}
-            <form action={signOut}>
+            {/* flex, or the button sits 1.3px low against the name beside it
+                (measured 2026-07-29). A form is a block, and an inline-block
+                button inside one sits on a text baseline — so the form's box
+                came out 22.5px around an 18px button, with the descender space
+                below it, and the row's items-center centred the FORM rather
+                than the button. flex makes the form exactly its button's
+                height. */}
+            <form action={signOut} className="flex">
               <button
                 type="submit"
                 className="text-[12px] font-semibold uppercase tracking-[0.06em] text-white/60 hover:text-white"
