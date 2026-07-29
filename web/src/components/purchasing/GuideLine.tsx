@@ -177,21 +177,29 @@ export function GuideLine({
         )}
       </td>
 
+      {/* The unit belongs ON the row, not only in the input's tooltip (Mark,
+          2026-07-29). On hand is counted in base units while the box beside it
+          counts packages, and a case count typed in here is the easiest
+          mistake on the screen to make — so each input now names its own unit:
+          "oz" here, "par 3 CS" under the order box. */}
       <td className="px-4 py-4 align-top text-right">
-        <input
-          inputMode="decimal"
-          disabled={saving}
-          value={onHandDraft ?? (onHand === null ? "" : String(onHand))}
-          onChange={(e) => setOnHandDraft(e.target.value)}
-          onBlur={(e) => commitOnHand(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") e.currentTarget.blur();
-            if (e.key === "Escape") setOnHandDraft(null);
-          }}
-          placeholder="—"
-          title={`On hand in ${baseUnit}`}
-          className="h-9 w-16 border border-ink px-1 text-right text-sm tabular-nums"
-        />
+        <span className="inline-flex items-baseline gap-1.5">
+          <input
+            inputMode="decimal"
+            disabled={saving}
+            value={onHandDraft ?? (onHand === null ? "" : String(onHand))}
+            onChange={(e) => setOnHandDraft(e.target.value)}
+            onBlur={(e) => commitOnHand(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") e.currentTarget.blur();
+              if (e.key === "Escape") setOnHandDraft(null);
+            }}
+            placeholder="—"
+            title={`On hand in ${baseUnit}`}
+            className="h-9 w-16 border border-ink px-1 text-right text-sm tabular-nums"
+          />
+          <span className="text-[11px] text-subtle">{baseUnit}</span>
+        </span>
       </td>
 
       <td className="px-1 py-4 align-top text-right text-xs text-subtle">
@@ -260,17 +268,24 @@ export function GuideLine({
             +
           </button>
         </div>
-        {/* The par in this line's packages, under the box that counts them
-            (Mark, 2026-07-29). Quieter than the number above it — smaller and
-            at 75% — because it's the target you're aiming at, not the decision
-            you're making. `pr-11` is the + button (2.25rem) plus its gap
-            (0.5rem), so its right edge lines up with the box's, not the +'s. */}
+        {/* The par in this line's packages, CENTERED under the box that counts
+            them (Mark, 2026-07-29). Quieter than the number above it — smaller
+            and at 75% — because it's the target you're aiming at, not the
+            decision you're making.
+
+            The geometry is mirrored from the stepper rather than guessed: a
+            w-20 box matching the input's width, pushed left by mr-11 — the +
+            button (2.25rem) plus its gap (0.5rem) — so centering inside it
+            centers under the input. Right-aligning the whole line instead
+            would sit it under the + button. */}
         {parPack && (
-          <div
-            title={`Par ${Number(par)} ${baseUnit} ÷ ${divisor} ${baseUnit} per package`}
-            className="mt-1 pr-11 text-right text-[11px] font-semibold text-accent opacity-75"
-          >
-            par {parPack}
+          <div className="mt-1 flex justify-end">
+            <span
+              title={`Par ${Number(par)} ${baseUnit} ÷ ${divisor} ${baseUnit} per package`}
+              className="mr-11 w-20 text-center text-[11px] font-semibold text-accent opacity-75"
+            >
+              par {parPack}
+            </span>
           </div>
         )}
       </td>
