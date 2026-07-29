@@ -433,16 +433,30 @@ export function OrderGuide({
   }
 
   return (
+    // The two FIXED children — the command bar and the back-to-top disc — sit
+    // OUTSIDE the spacing container, and that placement is load-bearing.
+    // Tailwind's space-y-4 compiles to `margin-block-end` on every child except
+    // the LAST one, and for a fixed box with bottom:0 it's the MARGIN edge that
+    // lands on the viewport bottom. So while the bar was the last child it was
+    // fine, and the moment the disc rendered after it the bar picked up 16px of
+    // bottom margin and lifted 16px off the floor — footer jumping, a strip of
+    // content scrolling through the gap underneath, and the bar's top rising
+    // into the disc (Mark, 2026-07-29). Vertical rhythm means nothing to a fixed
+    // element; keeping them out of the container is the fix, not zeroing the
+    // margin, because the next fixed child would hit it all over again.
+    //
     // -mt-8 collapsed, cancelling the page gutter's 32px top padding exactly
     // (layout.tsx, py-8). With the shelf gone that padding is the last thing
     // left between the strip and the column labels, and against a 32px strip a
-    // 32px band of nothing reads as shelf that failed to hide (Mark,
-    // 2026-07-29). The labels' own py-3 is the breathing room they need. Only
-    // this screen does it: every other page keeps its title and filters when
-    // the chrome collapses, so their top padding isn't leftover.
+    // 32px band of nothing reads as shelf that failed to hide. The labels' own
+    // py-3 is the breathing room they need. Only this screen does it: every
+    // other page keeps its title and filters when the chrome collapses, so
+    // their top padding isn't leftover.
+    //
     // pb-22 clears the fixed ActionBar: 52px of bar plus 36px so the last row
     // can scroll out from under it. Paired with the bar's own height — see
     // components/ui/ActionBar.
+    <>
     <div className={`space-y-4 pb-22 ${chromeCollapsed ? "-mt-8" : ""}`}>
       {/* The shelf — everything above the list. It goes with the menu when the
           chrome collapses: on a walk you're reading rows, and the title, the
@@ -889,6 +903,7 @@ export function OrderGuide({
           </tbody>
         </table>
       )}
+      </div>
 
       {/* The screen's decision, pinned to the bottom the way the original's
           command bar was. */}
@@ -971,6 +986,6 @@ export function OrderGuide({
       {/* Floating, not a bar cell: scrolling back to the top is a scrolling
           affordance, so it lives over the list rather than among the commands. */}
       <BackToTop />
-    </div>
+    </>
   );
 }
