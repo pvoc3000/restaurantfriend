@@ -106,22 +106,43 @@ export function vendorItemLabel(vi: CatalogVendorItem) {
 }
 
 /**
- * What to call a vendor item at the top of its own screen.
+ * The house label format: slots joined with " // " (Mark, 2026-07-29 — "we use
+ * this format a lot and will probably continue to do so in other places").
+ * The PO PDF's line text is the same shape (§4.9), one slot filled differently.
  *
- * The vendor's own description leads — it's what they'd recognise off their
- * product list, same reasoning as the PO PDF's line text (§4.9). When there
- * isn't one, the record still has to name itself, so build the closest thing
- * from what we do know: brand, our item's name, and the pack. Not stored, not
- * editable — a title you could type would just be `description` again, and
- * editing it here while a Description field sits below would be two boxes
- * writing one column.
+ * Empty slots collapse rather than leaving "Flour //  // CS" — a separator with
+ * nothing on one side reads as missing data instead of an absent field. Null
+ * when every slot is empty, so callers can render their own placeholder.
+ */
+export function slashLabel(
+  ...parts: (string | null | undefined)[]
+): string | null {
+  const kept = parts
+    .map((p) => p?.trim())
+    .filter((p): p is string => p !== undefined && p !== "");
+  return kept.length > 0 ? kept.join(" // ") : null;
+}
+
+/**
+ * What to call a vendor item at the top of its own screen:
+ * "Flour, Cake // Giustos // 1 × 50 lbs".
  *
- * Null only when the record carries none of the four, which is a vendor item
- * with nothing in it but a vendor.
+ * OUR item name leads, not the vendor's description — on this screen you're
+ * looking at one vendor's version of something you already know, so the shared
+ * name is the anchor and the brand and pack are what distinguish it from the
+ * other sources of the same item. The vendor's own words have their own field
+ * below; the PO PDF is where they lead instead (§4.9), because there the reader
+ * works off the vendor's product list rather than ours.
+ *
+ * Not stored and not editable — a title you could type would just be
+ * `description` again, and two boxes writing one column is how they end up
+ * disagreeing.
+ *
+ * Null only when the record has no item, no brand and no pack, which is a
+ * vendor item with nothing in it but a vendor.
  */
 export function vendorItemTitle(
   vi: {
-    description: string | null;
     brand: string | null;
     package_desc: string | null;
     pack_count?: number | null;
@@ -132,13 +153,10 @@ export function vendorItemTitle(
   itemName: string | null | undefined,
   baseUnit: string
 ): string | null {
-  const described = vi.description?.trim();
-  if (described) return described;
   // packLabel already falls back to the base-unit total, so this only reaches
   // package_desc ("CS") when there's no structure and no content either.
-  const pack = packLabel(vi, baseUnit) ?? vi.package_desc?.trim() ?? null;
-  const parts = [vi.brand?.trim(), itemName?.trim(), pack].filter(Boolean);
-  return parts.length > 0 ? parts.join(" ") : null;
+  const pack = packLabel(vi, baseUnit) ?? vi.package_desc;
+  return slashLabel(itemName, vi.brand, pack);
 }
 
 /**

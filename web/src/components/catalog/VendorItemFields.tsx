@@ -46,11 +46,15 @@ export function VendorItemFields({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
-        {/* Read-only: the description now has its own field below, and a title
-            you could type into would be a second box writing the same column.
-            Without a description this composes brand + item + pack, so the
-            record still names itself. */}
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+        {/* Composed and read-only: item // brand // pack, the house label
+            format (see vendorItemTitle). The vendor's own description has its
+            own field below — a title you could type into would be a second box
+            writing that same column. */}
+        {/* w-full so the toggle always sits on its own row. A composed title
+            runs 39 chars at the median against a description's handful, so
+            left inline the toggle would sit beside short titles and wrap under
+            long ones — placement that moves record to record. */}
+        <h1 className="w-full text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           {title ?? <span className="text-faint">Untitled vendor item</span>}
         </h1>
         <span className="flex items-center gap-2 text-sm text-muted">
