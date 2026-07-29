@@ -124,25 +124,28 @@ export function slashLabel(
 }
 
 /**
- * What to call a vendor item at the top of its own screen:
- * "Flour, Cake // Giustos // 1 × 50 lbs".
+ * What to call a vendor item at the top of its own screen.
  *
- * OUR item name leads, not the vendor's description — on this screen you're
- * looking at one vendor's version of something you already know, so the shared
- * name is the anchor and the brand and pack are what distinguish it from the
- * other sources of the same item. The vendor's own words have their own field
- * below; the PO PDF is where they lead instead (§4.9), because there the reader
- * works off the vendor's product list rather than ours.
+ * The vendor's own description wins when there is one (Mark, 2026-07-29): it's
+ * how THEY name the product, which is what you're checking when you're looking
+ * at their record, and it's usually more specific than anything we could
+ * assemble. Same reasoning puts it first on the PO line (§4.9).
+ *
+ * Failing that, compose the house format from what we do know —
+ * "Flour, Cake // Giustos // 1 × 50 lbs" — so the record still names itself.
+ * Our item name leads that form because it's the anchor the other two slots
+ * distinguish: brand and pack are what tell this source from the others.
  *
  * Not stored and not editable — a title you could type would just be
  * `description` again, and two boxes writing one column is how they end up
  * disagreeing.
  *
- * Null only when the record has no item, no brand and no pack, which is a
- * vendor item with nothing in it but a vendor.
+ * Null only when there's no description, item, brand or pack, which is a vendor
+ * item with nothing in it but a vendor.
  */
 export function vendorItemTitle(
   vi: {
+    description: string | null;
     brand: string | null;
     package_desc: string | null;
     pack_count?: number | null;
@@ -153,6 +156,8 @@ export function vendorItemTitle(
   itemName: string | null | undefined,
   baseUnit: string
 ): string | null {
+  const described = vi.description?.trim();
+  if (described) return described;
   // packLabel already falls back to the base-unit total, so this only reaches
   // package_desc ("CS") when there's no structure and no content either.
   const pack = packLabel(vi, baseUnit) ?? vi.package_desc;
