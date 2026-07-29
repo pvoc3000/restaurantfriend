@@ -126,7 +126,7 @@ export function GuideLine({
     <tr className="border-b border-hairline">
       {/* Vendor over brand, the way the printed guide reads. Generous row
           padding on purpose — the walk is read standing up. */}
-      <td className="whitespace-nowrap py-4 pl-4 pr-4 align-top">
+      <td className="whitespace-nowrap py-4 pl-4 pr-4 align-middle">
         <div className="flex items-baseline gap-1.5">
           {/* Favorites carry a marker so "All" can be scanned: the source
               you'd normally take, whether or not it's today's work. */}
@@ -152,7 +152,7 @@ export function GuideLine({
         {arrives && <div className="pl-5 text-[11px] text-faint">{arrives}</div>}
       </td>
 
-      <td className="px-4 py-4 align-top text-body">
+      <td className="px-4 py-4 align-middle text-body">
         <Link
           href={withFrom(`/vendor-items/${row.vendor_item_id}`, here)}
           className="no-underline hover:underline"
@@ -164,11 +164,11 @@ export function GuideLine({
       {/* Pack and unit price: the $/oz comparison across pack sizes is the
           reason this column exists (§4.6). Reads the way the case is labelled —
           "12 × 32 oz" — because that's what you check a delivery against. */}
-      <td className="whitespace-nowrap px-4 py-4 align-top tabular-nums text-body">
+      <td className="whitespace-nowrap px-4 py-4 align-middle tabular-nums text-body">
         {pack ?? <span className="text-faint">—</span>}
       </td>
 
-      <td className="whitespace-nowrap px-4 py-4 align-top text-right tabular-nums text-muted">
+      <td className="whitespace-nowrap px-4 py-4 align-middle text-right tabular-nums text-muted">
         {money(row.effective_price)}
         {/* Two decimals to read, four to compare (Mark, 2026-07-29). The view
             already computes this to 4dp — `toFixed` only ever changed the
@@ -190,7 +190,7 @@ export function GuideLine({
           counts packages, and a case count typed in here is the easiest
           mistake on the screen to make — so each input now names its own unit:
           "oz" here, "par 3 CS" under the order box. */}
-      <td className="px-4 py-4 align-top text-right">
+      <td className="px-4 py-4 align-middle text-right">
         <span className="inline-flex items-baseline gap-1.5">
           <input
             inputMode="decimal"
@@ -210,7 +210,7 @@ export function GuideLine({
         </span>
       </td>
 
-      <td className="px-1 py-4 align-top text-right text-xs text-subtle">
+      <td className="px-1 py-4 align-middle text-right text-xs text-subtle">
         {suggestion === null ? (
           <span title={par === null ? "No par set for this line" : "No package content"}>
             —
@@ -228,7 +228,7 @@ export function GuideLine({
         )}
       </td>
 
-      <td className="px-4 py-4 align-top text-right text-[15px] tabular-nums text-body">
+      <td className="px-4 py-4 align-middle text-right text-[15px] tabular-nums text-body">
         {qty !== null && Number(qty) > 0
           ? money(Number(qty) * Number(row.effective_price ?? 0))
           : ""}
@@ -238,7 +238,7 @@ export function GuideLine({
           The row's LAST cell (Mark, 2026-07-27): this is the only thing on the
           line you touch, so it's pinned to the right edge where a thumb lands
           rather than sitting inboard of a line total you only read. */}
-      <td className="whitespace-nowrap py-4 pl-4 pr-0 align-top">
+      <td className="whitespace-nowrap py-4 pl-4 pr-0 align-middle">
         <div className="flex items-center justify-end gap-2">
           <span className="mr-1 text-xs font-semibold uppercase tracking-[0.06em] text-body">
             {row.package_desc ?? ""}
