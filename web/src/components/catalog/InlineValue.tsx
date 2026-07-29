@@ -24,6 +24,7 @@ export function InlineValue({
   className = "",
   nullable = true,
   format,
+  alsoUpdate,
 }: {
   table: string;
   id: string;
@@ -39,6 +40,19 @@ export function InlineValue({
   nullable?: boolean;
   /** Display-only formatting (e.g. money). Editing always shows the raw value. */
   format?: (value: string | number) => string;
+  /**
+   * Extra columns to write in the SAME update, derived from the value being
+   * saved. For a field another column is computed from — a vendor item's pack
+   * size and its base-unit total — a one-column write leaves the pair
+   * disagreeing, which is exactly how a case of 16 oz bottles kept a content of
+   * 192 after the item started being counted in bottles.
+   *
+   * Return null to write only this column. One statement either way, so the two
+   * can't half-succeed.
+   */
+  alsoUpdate?: (
+    next: string | number | null
+  ) => Record<string, string | number | null> | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -75,7 +89,7 @@ export function InlineValue({
     setError(null);
     const { error } = await supabase
       .from(table)
-      .update({ [column]: next })
+      .update({ [column]: next, ...(alsoUpdate?.(next) ?? {}) })
       .eq("id", id);
     setSaving(false);
     if (error) {

@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { withFrom, type Crumb } from "@/lib/breadcrumbs";
-import { vendorItemTitle } from "@/lib/catalog";
+import { derivedPackContent, vendorItemTitle } from "@/lib/catalog";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
 import { InventoryItemPicker } from "./InventoryItemPicker";
@@ -42,6 +42,37 @@ export function VendorItemFields({
 }) {
   const unit = vi.inventory_items?.base_unit ?? "unit";
   const title = vendorItemTitle(vi, vi.inventory_items?.name, unit);
+
+  /**
+   * The base-unit total implied by the pack, with one field about to change.
+   *
+   * Returns null — leaving `package_content` alone — when the new pack can't
+   * reach the base unit, because then there is nothing to compute and the
+   * stored total may well be a deliberate hand-entered one. That case is
+   * visible rather than silent: the total sits in parentheses right beside the
+   * fields being edited, so a number that fails to move is on screen at the
+   * moment it stops being true.
+   */
+  function recomputeContent(
+    patch: Partial<Record<"pack_count" | "pack_size" | "pack_unit", string | number | null>>
+  ) {
+    // pack_unit comes off a text cell, so it arrives as a string — but the cell
+    // can't stop someone typing a number into it, hence the String().
+    const content = derivedPackContent(
+      {
+        pack_count: patch.pack_count !== undefined ? patch.pack_count : vi.pack_count,
+        pack_size: patch.pack_size !== undefined ? patch.pack_size : vi.pack_size,
+        pack_unit:
+          patch.pack_unit !== undefined
+            ? patch.pack_unit === null
+              ? null
+              : String(patch.pack_unit)
+            : vi.pack_unit,
+      },
+      unit
+    );
+    return content === null ? null : { package_content: content };
+  }
 
   return (
     <div className="space-y-3">
@@ -156,34 +187,67 @@ export function VendorItemFields({
 
         {/* The pack as the case is labelled — count × size unit ("12 × 32 oz").
             Three fields rather than one so a packing slip can be checked
-            against it; `Content` below stays the base-unit total the ordering
-            math divides by. */}
+            against it, then the base-unit total in parentheses (Mark,
+            2026-07-29): it's what the ordering math divides by, so it belongs
+            beside the thing it's computed from where a stale one is visible.
+
+            Editing any of the three RECOMPUTES the total — a one-column write
+            is what let a 12 × 16 oz case keep a content of 192 after the item
+            started being counted in bottles. It stays editable because the
+            conversion can't always be done: a case of 16 oz bottles counted in
+            `ea` holds 12, and no amount of unit maths gets there from ounces. */}
         <dt className="py-0.5 text-subtle">Pack of</dt>
-        <dd className="flex items-center gap-1">
-          <InlineValue
-            table="vendor_items"
-            id={vi.id}
-            column="pack_count"
-            value={vi.pack_count}
-            kind="number"
-            placeholder="1"
-          />
-          <span className="text-faint">×</span>
-          <InlineValue
-            table="vendor_items"
-            id={vi.id}
-            column="pack_size"
-            value={vi.pack_size}
-            kind="number"
-            placeholder="size"
-          />
-          <InlineValue
-            table="vendor_items"
-            id={vi.id}
-            column="pack_unit"
-            value={vi.pack_unit}
-            placeholder={unit}
-          />
+        {/* Each cell is width-boxed. InlineValue's resting state is a `w-full`
+            button, so left to themselves in a flex row they all demand 100%
+            and either squash to ragged widths or wrap one-per-line. */}
+        <dd className="flex items-center gap-0.5">
+          <span className="w-10 shrink-0">
+            <InlineValue
+              table="vendor_items"
+              id={vi.id}
+              column="pack_count"
+              value={vi.pack_count}
+              kind="number"
+              placeholder="1"
+              alsoUpdate={(next) => recomputeContent({ pack_count: next })}
+            />
+          </span>
+          <span className="shrink-0 text-faint">×</span>
+          <span className="w-14 shrink-0">
+            <InlineValue
+              table="vendor_items"
+              id={vi.id}
+              column="pack_size"
+              value={vi.pack_size}
+              kind="number"
+              placeholder="size"
+              alsoUpdate={(next) => recomputeContent({ pack_size: next })}
+            />
+          </span>
+          <span className="w-14 shrink-0">
+            <InlineValue
+              table="vendor_items"
+              id={vi.id}
+              column="pack_unit"
+              value={vi.pack_unit}
+              placeholder={unit}
+              alsoUpdate={(next) => recomputeContent({ pack_unit: next })}
+            />
+          </span>
+          <span className="ml-2 flex shrink-0 items-center text-subtle">
+            <span>(</span>
+            <span className="w-16">
+              <InlineValue
+                table="vendor_items"
+                id={vi.id}
+                column="package_content"
+                value={vi.package_content}
+                kind="number"
+                placeholder="none"
+              />
+            </span>
+            <span>{unit})</span>
+          </span>
         </dd>
 
         <dt className="py-0.5 text-subtle">Price</dt>
@@ -211,11 +275,11 @@ export function VendorItemFields({
       </dl>
 
       <p className="text-xs text-subtle">
-        One package holds some number of {unit}, and that total is what turns a
-        par into packages to order — it&apos;s set in the cleanup queue rather
-        than typed here, so the pack above is the one place this record
-        describes its packaging. Price is the vendor&apos;s global price; a
-        location below may override it.
+        The number in parentheses is how many {unit} one package holds — the
+        total that turns a par into packages to order. Editing the pack
+        recomputes it whenever the units allow; where they don&apos;t, set it
+        yourself. Price is the vendor&apos;s global price; a location below may
+        override it.
       </p>
     </div>
   );

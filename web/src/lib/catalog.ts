@@ -219,14 +219,41 @@ export function packageDivisor(
 ): number | null {
   const stored = Number(vi.package_content);
   if (vi.package_content !== null && stored > 0) return stored;
-  if (vi.pack_size === null || vi.pack_size === undefined) return null;
+  return derivedPackContent(vi, baseUnit);
+}
+
+/**
+ * The base-unit total a pack structure implies — "12 × 16 oz" against an `oz`
+ * base unit is 192 — or null when it can't be computed at all.
+ *
+ * Null has two causes and they're different problems: no pack size recorded
+ * (nothing to compute from), or a pack unit that can't reach the base unit. The
+ * second is the interesting one — a case of 12 × 16 oz bottles counted in `ea`
+ * holds 12, and no unit arithmetic gets there from ounces, because the missing
+ * fact is "one bottle is one each" and that lives nowhere. Those are the rows
+ * where the total has to be typed by a human.
+ *
+ * Used both to fill a missing total (packageDivisor) and to keep a stored one
+ * honest when the pack is edited.
+ */
+export function derivedPackContent(
+  pack: {
+    pack_count?: number | string | null;
+    pack_size?: number | string | null;
+    pack_unit?: string | null;
+  },
+  baseUnit: string
+): number | null {
+  const { pack_size: size, pack_count: count, pack_unit: packUnit } = pack;
+  if (size === null || size === undefined || size === "") return null;
   const derived = packageContent(
-    Number(vi.pack_count ?? 1),
-    Number(vi.pack_size),
-    vi.pack_unit ?? baseUnit,
+    Number(count ?? 1),
+    Number(size),
+    packUnit ?? baseUnit,
     baseUnit
   );
-  return derived !== null && derived > 0 ? derived : null;
+  if (derived === null || !Number.isFinite(derived) || derived <= 0) return null;
+  return derived;
 }
 
 /**
