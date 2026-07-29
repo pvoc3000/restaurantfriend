@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/purchaseOrders";
 import { packageDivisor, parPackageLabel } from "@/lib/catalog";
 import { withFrom } from "@/lib/breadcrumbs";
+import { useChromeCollapsed } from "@/lib/chromeStore";
 import {
   applyExpansions,
   daySourceIndex,
@@ -68,6 +69,11 @@ export function OrderGuide({
 }) {
   const router = useRouter();
   const supabase = createClient();
+
+  // The masthead's ▲ hides this screen's shelf too — title, day picker, vendor
+  // totals and filters — leaving the strip, the column labels and the list
+  // (Mark, 2026-07-29). Same flag, so it's one button and one memory, not two.
+  const chromeCollapsed = useChromeCollapsed();
 
   // Entries are held locally and written through: a walk is hundreds of small
   // edits and a server round-trip per keystroke would make it unusable.
@@ -366,184 +372,199 @@ export function OrderGuide({
 
   return (
     <div className="space-y-4 pb-28">
-      {/* Title block: the screen's name in display caps, the context line in
-          small caps beneath it. */}
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
-        <div>
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Order Guide
-          </h1>
-          <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
-            {locationCode} · {ignoreDays ? "all days" : WEEKDAY_LABELS[weekday - 1]} ·
-            walked {guideDate} · {visibleRows.length} of {rows.length} lines
-          </p>
-        </div>
-        {/* All seven days, always, as one segmented control. The guide exists
-            every day — picking one scopes the list to what's orderable then,
-            and a day with nothing scheduled simply renders empty rather than
-            disappearing. */}
-        <span className="inline-flex h-9 items-stretch border border-ink">
-          {[1, 2, 3, 4, 5, 6, 7].map((d) => (
-            <Link
-              key={d}
-              href={`/order-guide?day=${d}`}
-              className={`inline-flex items-center px-3 text-[12px] font-semibold uppercase tracking-[0.06em] no-underline ${
-                d > 1 ? "border-l border-ink" : ""
-              } ${
-                d === weekday
-                  ? "bg-ink text-white"
-                  : "bg-white text-ink hover:bg-neutral-100"
-              }`}
-            >
-              {WEEKDAY_LABELS[d - 1]}
-            </Link>
-          ))}
-        </span>
-        <button
-          onClick={() => router.refresh()}
-          className="ml-auto text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-        >
-          Refresh
-        </button>
-      </div>
-
-      {/* Vendor totals bar — the guide's central instrument (§4.2): square
-          boxes on a ruled bar, so it reads as an instrument panel rather than
-          a row of tags. */}
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-4 border-y border-ink py-4">
-          {totals.length === 0 ? (
-            <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-              Nothing ordered yet — quantities you enter total up here by vendor
+      {/* The shelf — everything above the list. It goes with the menu when the
+          chrome collapses: on a walk you're reading rows, and the title, the
+          day picker, the totals and the filters are all things you set BEFORE
+          you start (Mark, 2026-07-29). The ActionBar's note keeps the context
+          line on screen either way, and the strip brings it all back in a tap. */}
+      {!chromeCollapsed && (
+        <>
+          {/* Title block: the screen's name in display caps, the context line
+              in small caps beneath it. */}
+          <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+            <div>
+              <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+                Order Guide
+              </h1>
+              <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+                {locationCode} ·{" "}
+                {ignoreDays ? "all days" : WEEKDAY_LABELS[weekday - 1]} · walked{" "}
+                {guideDate} · {visibleRows.length} of {rows.length} lines
+              </p>
+            </div>
+            {/* All seven days, always, as one segmented control. The guide
+                exists every day — picking one scopes the list to what's
+                orderable then, and a day with nothing scheduled simply renders
+                empty rather than disappearing. */}
+            <span className="inline-flex h-9 items-stretch border border-ink">
+              {[1, 2, 3, 4, 5, 6, 7].map((d) => (
+                <Link
+                  key={d}
+                  href={`/order-guide?day=${d}`}
+                  className={`inline-flex items-center px-3 text-[12px] font-semibold uppercase tracking-[0.06em] no-underline ${
+                    d > 1 ? "border-l border-ink" : ""
+                  } ${
+                    d === weekday
+                      ? "bg-ink text-white"
+                      : "bg-white text-ink hover:bg-neutral-100"
+                  }`}
+                >
+                  {WEEKDAY_LABELS[d - 1]}
+                </Link>
+              ))}
             </span>
-          ) : (
-            totals.map((t) => (
-              <span
-                key={t.vendor_id}
-                title={
-                  t.short
-                    ? `Under the ${money(t.minimum)} minimum — this vendor generates no PO`
-                    : undefined
-                }
-                className={`inline-flex items-baseline gap-3 border border-ink px-4 py-2 ${
-                  t.short ? "bg-[var(--rf-red-200)]" : "bg-[var(--rf-green-200)]"
-                }`}
-              >
-                <span className="text-[12px] font-semibold uppercase tracking-[0.06em]">
-                  {t.vendor_name}
-                </span>
-                <span className="text-[13px] tabular-nums">
-                  {money(t.subtotal)}
-                  {t.minimum !== null ? ` / ${money(t.minimum)}` : ""}
-                </span>
-              </span>
-            ))
-          )}
-
-          <span className="ml-auto inline-flex items-baseline gap-3">
-            <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-              Will order
-            </span>
-            <span className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
-              {money(grandTotal)}
-            </span>
-            {shortTotal > 0 && (
-              <span
-                className="text-[12px] uppercase tracking-[0.12em] text-accent"
-                title="Vendors under their minimum"
-              >
-                +{money(shortTotal)} blocked
-              </span>
-            )}
-          </span>
-        </div>
-        {error && <p className="text-sm text-accent">{error}</p>}
-      </div>
-
-      <div className="flex flex-wrap items-center gap-4 text-sm">
-        <input
-          value={term}
-          onChange={(e) => setTerm(e.target.value)}
-          placeholder="Jump to item, vendor or section…"
-          className="h-9 w-72 border border-ink px-3 outline-none focus:border-2"
-        />
-        {/* Segmented control: these four are one choice, so they read as one
-            object rather than four loose buttons. */}
-        <span className="inline-flex h-9 items-stretch border border-ink">
-          {GUIDE_FILTERS.map((f, i) => (
             <button
-              key={f}
-              onClick={() => changeFilter(f)}
-              className={`inline-flex items-center gap-2 px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
-                i > 0 ? "border-l border-ink" : ""
-              } ${
-                filter === f
-                  ? "bg-ink text-white"
-                  : "bg-white text-ink hover:bg-neutral-100"
-              }`}
+              onClick={() => router.refresh()}
+              className="ml-auto text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
             >
-              {GUIDE_FILTER_LABEL[f]}
-              <span className="font-normal tabular-nums opacity-55">
-                {filterCounts[f]}
-              </span>
+              Refresh
             </button>
-          ))}
-        </span>
+          </div>
 
-        {/* The escape hatch from the day gates (FMP's "ignore order day"):
-            every orderable line, whenever you'd normally buy it. A switch, not
-            a button — it's a mode you leave on, not an action you fire. It
-            lives with the filters it changes, and matches the app's other
-            switches: black/white, off = the exact inverse of on (Mark,
-            2026-07-25). */}
-        <button
-          type="button"
-          role="switch"
-          aria-checked={ignoreDays}
-          onClick={toggleIgnoreDays}
-          title="Show every orderable line, regardless of vendor or item ordering days"
-          className="inline-flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-body hover:text-ink"
-        >
-          <span
-            aria-hidden
-            className={`relative inline-flex h-[26px] w-[46px] shrink-0 items-center rounded-full border-[1.5px] border-ink transition-colors ${
-              ignoreDays ? "bg-ink" : "bg-white"
-            }`}
-          >
-            <span
-              className={`inline-block h-[18px] w-[18px] transform rounded-full transition-transform ${
-                ignoreDays
-                  ? "translate-x-[22px] bg-white"
-                  : "translate-x-[2px] bg-ink"
-              }`}
+          {/* Vendor totals bar — the guide's central instrument (§4.2): square
+              boxes on a ruled bar, so it reads as an instrument panel rather
+              than a row of tags. */}
+          <div className="flex flex-wrap items-center gap-4 border-y border-ink py-4">
+            {totals.length === 0 ? (
+              <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+                Nothing ordered yet — quantities you enter total up here by
+                vendor
+              </span>
+            ) : (
+              totals.map((t) => (
+                <span
+                  key={t.vendor_id}
+                  title={
+                    t.short
+                      ? `Under the ${money(t.minimum)} minimum — this vendor generates no PO`
+                      : undefined
+                  }
+                  className={`inline-flex items-baseline gap-3 border border-ink px-4 py-2 ${
+                    t.short
+                      ? "bg-[var(--rf-red-200)]"
+                      : "bg-[var(--rf-green-200)]"
+                  }`}
+                >
+                  <span className="text-[12px] font-semibold uppercase tracking-[0.06em]">
+                    {t.vendor_name}
+                  </span>
+                  <span className="text-[13px] tabular-nums">
+                    {money(t.subtotal)}
+                    {t.minimum !== null ? ` / ${money(t.minimum)}` : ""}
+                  </span>
+                </span>
+              ))
+            )}
+
+            <span className="ml-auto inline-flex items-baseline gap-3">
+              <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+                Will order
+              </span>
+              <span className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
+                {money(grandTotal)}
+              </span>
+              {shortTotal > 0 && (
+                <span
+                  className="text-[12px] uppercase tracking-[0.12em] text-accent"
+                  title="Vendors under their minimum"
+                >
+                  +{money(shortTotal)} blocked
+                </span>
+              )}
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            <input
+              value={term}
+              onChange={(e) => setTerm(e.target.value)}
+              placeholder="Jump to item, vendor or section…"
+              className="h-9 w-72 border border-ink px-3 outline-none focus:border-2"
             />
-          </span>
-          Ignore ordering days
-        </button>
+            {/* Segmented control: these four are one choice, so they read as
+                one object rather than four loose buttons. */}
+            <span className="inline-flex h-9 items-stretch border border-ink">
+              {GUIDE_FILTERS.map((f, i) => (
+                <button
+                  key={f}
+                  onClick={() => changeFilter(f)}
+                  className={`inline-flex items-center gap-2 px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
+                    i > 0 ? "border-l border-ink" : ""
+                  } ${
+                    filter === f
+                      ? "bg-ink text-white"
+                      : "bg-white text-ink hover:bg-neutral-100"
+                  }`}
+                >
+                  {GUIDE_FILTER_LABEL[f]}
+                  <span className="font-normal tabular-nums opacity-55">
+                    {filterCounts[f]}
+                  </span>
+                </button>
+              ))}
+            </span>
 
-        <span className="flex items-center gap-3">
-          <span className="text-xs uppercase tracking-[0.12em] text-subtle">
-            Group by
-          </span>
-          <span className="inline-flex h-9 items-stretch border border-ink">
-            {GUIDE_GROUPINGS.map((mode, i) => (
-              <button
-                key={mode}
-                onClick={() => changeGrouping(mode)}
-                className={`inline-flex items-center px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
-                  i > 0 ? "border-l border-ink" : ""
-                } ${
-                  grouping === mode
-                    ? "bg-ink text-white"
-                    : "bg-white text-ink hover:bg-neutral-100"
+            {/* The escape hatch from the day gates (FMP's "ignore order day"):
+                every orderable line, whenever you'd normally buy it. A switch,
+                not a button — it's a mode you leave on, not an action you fire.
+                It lives with the filters it changes, and matches the app's
+                other switches: black/white, off = the exact inverse of on
+                (Mark, 2026-07-25). */}
+            <button
+              type="button"
+              role="switch"
+              aria-checked={ignoreDays}
+              onClick={toggleIgnoreDays}
+              title="Show every orderable line, regardless of vendor or item ordering days"
+              className="inline-flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-body hover:text-ink"
+            >
+              <span
+                aria-hidden
+                className={`relative inline-flex h-[26px] w-[46px] shrink-0 items-center rounded-full border-[1.5px] border-ink transition-colors ${
+                  ignoreDays ? "bg-ink" : "bg-white"
                 }`}
               >
-                {GROUPING_LABEL[mode]}
-              </button>
-            ))}
-          </span>
-        </span>
-      </div>
+                <span
+                  className={`inline-block h-[18px] w-[18px] transform rounded-full transition-transform ${
+                    ignoreDays
+                      ? "translate-x-[22px] bg-white"
+                      : "translate-x-[2px] bg-ink"
+                  }`}
+                />
+              </span>
+              Ignore ordering days
+            </button>
+
+            <span className="flex items-center gap-3">
+              <span className="text-xs uppercase tracking-[0.12em] text-subtle">
+                Group by
+              </span>
+              <span className="inline-flex h-9 items-stretch border border-ink">
+                {GUIDE_GROUPINGS.map((mode, i) => (
+                  <button
+                    key={mode}
+                    onClick={() => changeGrouping(mode)}
+                    className={`inline-flex items-center px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
+                      i > 0 ? "border-l border-ink" : ""
+                    } ${
+                      grouping === mode
+                        ? "bg-ink text-white"
+                        : "bg-white text-ink hover:bg-neutral-100"
+                    }`}
+                  >
+                    {GROUPING_LABEL[mode]}
+                  </button>
+                ))}
+              </span>
+            </span>
+          </div>
+        </>
+      )}
+
+      {/* Deliberately OUTSIDE the shelf: a failed write is the one thing up
+          here that isn't a control, and it has to reach you whether or not the
+          chrome is collapsed. */}
+      {error && <p className="text-sm text-accent">{error}</p>}
 
       {sections.length === 0 ? (
         <p className="pt-4 text-sm text-muted">
@@ -554,38 +575,60 @@ export function OrderGuide({
               : "No lines for this day — no vendor takes orders and no item is scheduled. Turn on “Ignore ordering days” to see everything orderable."}
         </p>
       ) : (
-        // The lines scroll in their own pane, so the controls above stay put
-        // without the page itself sticking anything. Sized to the rest of the
-        // viewport (minus the action bar), with a floor for short windows. No
-        // outer box — the sticky head's 2px rule is the structure.
-        //
-        // The masthead's share is subtracted as a live variable rather than
-        // baked into the constant (globals.css, HeaderShell): collapsing the
-        // menu hands those ~56px straight to the list, which is the whole point
-        // of collapsing it.
-        <div className="max-h-[calc(100vh-var(--rf-header-h)-15.5rem)] min-h-64 overflow-auto">
+        // The list is in the PAGE's flow — no pane, no second scrollbar (Mark,
+        // 2026-07-29). It used to scroll in its own height-capped box, which
+        // meant a wheel moved the shelf or the lines depending on where the
+        // pointer happened to be, and the cap was a hand-tuned guess at the
+        // shelf's height that left a band of dead space above the ActionBar
+        // whenever the guess was wrong. One scroller can't disagree with
+        // itself. No outer box — the sticky head's 2px rule is the structure.
         <table className="w-full border-collapse text-[15px]">
           <thead>
-            {/* Sticky to the PANE, not the page — and on the cells, since
-                Safari won't make a <thead>/<tr> a sticky container. */}
+            {/* Sticky to the VIEWPORT now that nothing else scrolls, parked
+                directly under the masthead — so the labels follow the chrome
+                when it collapses (88px → 32px) instead of needing a constant.
+                On the cells, since Safari won't make a <thead>/<tr> a sticky
+                container. */}
             <tr className="text-left text-[12px] uppercase tracking-[0.12em] text-subtle">
               {[
                 ["Vendor", ""],
+                // Description CARRIES the pack, stacked beneath it (Mark,
+                // 2026-07-29) — the same shape as this row's first cell, where
+                // brand and delivery day sit under the vendor name. Two
+                // columns' worth of information in one column's width, and
+                // labelled for the line that leads it, as Vendor is.
                 ["Description", ""],
-                ["Pack", ""],
                 ["Price", "text-right"],
                 ["On hand", "w-24 text-right"],
                 ["Sugg", "w-14 text-right"],
-                ["Line", "w-28 text-right"],
+                // The ONE column that gives way, and only below 880px (Mark,
+                // 2026-07-29). Two measured facts set that number: the row's
+                // seven columns bottom out at 815px of content (Vendor 146,
+                // Description 112, Price 76, On hand 98, Sugg 56, Line 105,
+                // Order 222), and dropping Line alone takes that to 710 — which
+                // is what makes a 768px portrait window fit. Description is the
+                // column that absorbs the squeeze on the way down; it is the
+                // one that can wrap. Line is the right sacrifice because it's
+                // pure arithmetic you can redo in your head, and the totals bar
+                // already sums it per vendor. Sugg stays at every width — it's
+                // what count mode is FOR, and it earns its 56px on a walk.
+                ["Line", "w-28 text-right max-[880px]:hidden"],
                 // LAST column on purpose (Mark, 2026-07-27): the stepper is
                 // what a thumb reaches for all the way down the walk, so it
                 // sits against the right edge and the line total — read, never
                 // touched — moves inboard of it.
-                ["Order", "w-64 pr-0 text-right"],
+                //
+                // w-64 is a comfort width, not a requirement — the stepper's
+                // own floor is 222px. Below 1180 it's dropped so the slack goes
+                // to Description instead of padding a column that doesn't need
+                // it: measured at 768, that's Description 112 → 131 and 23px
+                // off the tallest row. Description is the one column here that
+                // can use width, so it should get it.
+                ["Order", "w-64 pr-0 text-right max-[1180px]:w-auto"],
               ].map(([label, extra]) => (
                 <th
                   key={label}
-                  className={`sticky top-0 z-20 bg-white px-4 py-3 font-normal shadow-[inset_0_-2px_0_var(--rf-neutral-900)] ${extra}`}
+                  className={`sticky top-[var(--rf-header-h)] z-20 bg-white px-4 py-3 font-normal shadow-[inset_0_-2px_0_var(--rf-neutral-900)] max-[1180px]:px-2 ${extra}`}
                 >
                   {label}
                 </th>
@@ -600,11 +643,14 @@ export function OrderGuide({
                     {/* A new section gets 64px of nothing above its band. */}
                     {sectionIndex > 0 && (
                       <tr aria-hidden>
-                        <td colSpan={8} className="h-16" />
+                        <td colSpan={7} className="h-16" />
                       </tr>
                     )}
                     <tr className="bg-ink">
-                      <td colSpan={8} className="px-8 py-0">
+                      {/* colSpan stays 8 even where two columns are hidden
+                          below 1180px — the browser clamps a colSpan to the
+                          real column count, so the band still spans the row. */}
+                      <td colSpan={7} className="px-4 py-0 xl:px-8">
                         <div className="flex min-h-20 items-center gap-6">
                           <span className="text-[36px] font-bold uppercase leading-none tracking-[-0.02em] text-white">
                             {section.label}
@@ -657,8 +703,8 @@ export function OrderGuide({
                         red on the right — directly above the order boxes,
                         because it's the number you order up TO. */}
                     <tr>
-                      <td colSpan={8} className="px-0 pb-0 pt-12">
-                        <div className="flex items-end gap-4 border-b-2 border-ink px-4 pb-2">
+                      <td colSpan={7} className="px-0 pb-0 pt-12">
+                        <div className="flex items-end gap-4 border-b-2 border-ink px-4 pb-2 max-[1180px]:px-2">
                           <span className="flex items-center gap-3">
                             <Link
                               href={withFrom(`/items/${item.inventory_item_id}`, here)}
@@ -757,7 +803,6 @@ export function OrderGuide({
             ))}
           </tbody>
         </table>
-        </div>
       )}
 
       {/* The screen's decision, pinned to the bottom the way the original's

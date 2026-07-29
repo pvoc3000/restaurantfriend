@@ -126,7 +126,7 @@ export function GuideLine({
     <tr className="border-b border-hairline">
       {/* Vendor over brand, the way the printed guide reads. Generous row
           padding on purpose — the walk is read standing up. */}
-      <td className="whitespace-nowrap py-4 pl-4 pr-4 align-middle">
+      <td className="whitespace-nowrap py-4 pl-4 pr-4 align-middle max-[1180px]:whitespace-normal max-[1180px]:px-2">
         <div className="flex items-baseline gap-1.5">
           {/* Favorites carry a marker so "All" can be scanned: the source
               you'd normally take, whether or not it's today's work. */}
@@ -152,23 +152,27 @@ export function GuideLine({
         {arrives && <div className="pl-5 text-[11px] text-faint">{arrives}</div>}
       </td>
 
-      <td className="px-4 py-4 align-middle text-body">
+      {/* Description over pack, one cell (Mark, 2026-07-29). They were two
+          columns and are now the same shape as the vendor cell beside them:
+          the thing you're looking for on top, the fact that qualifies it
+          underneath. Pack still reads the way the case is labelled — "12 × 32
+          oz" — because that's what you check a delivery against (§4.6), and it
+          stays nowrap at every width so "12 ×" never parts from "32 oz". */}
+      <td className="px-4 py-4 align-middle text-body max-[1180px]:px-2">
         <Link
           href={withFrom(`/vendor-items/${row.vendor_item_id}`, here)}
           className="no-underline hover:underline"
         >
           {row.vendor_item_description ?? "—"}
         </Link>
+        {pack && (
+          <div className="mt-0.5 whitespace-nowrap text-xs tabular-nums text-muted">
+            {pack}
+          </div>
+        )}
       </td>
 
-      {/* Pack and unit price: the $/oz comparison across pack sizes is the
-          reason this column exists (§4.6). Reads the way the case is labelled —
-          "12 × 32 oz" — because that's what you check a delivery against. */}
-      <td className="whitespace-nowrap px-4 py-4 align-middle tabular-nums text-body">
-        {pack ?? <span className="text-faint">—</span>}
-      </td>
-
-      <td className="whitespace-nowrap px-4 py-4 align-middle text-right tabular-nums text-muted">
+      <td className="whitespace-nowrap px-4 py-4 align-middle text-right tabular-nums text-muted max-[1180px]:whitespace-normal max-[1180px]:px-2">
         {money(row.effective_price)}
         {/* Two decimals to read, four to compare (Mark, 2026-07-29). The view
             already computes this to 4dp — `toFixed` only ever changed the
@@ -190,7 +194,7 @@ export function GuideLine({
           counts packages, and a case count typed in here is the easiest
           mistake on the screen to make — so each input now names its own unit:
           "oz" here, "par 3 CS" under the order box. */}
-      <td className="px-4 py-4 align-middle text-right">
+      <td className="px-4 py-4 align-middle text-right max-[1180px]:px-2">
         <span className="inline-flex items-baseline gap-1.5">
           <input
             inputMode="decimal"
@@ -210,6 +214,8 @@ export function GuideLine({
         </span>
       </td>
 
+      {/* Stays at every width (Mark, 2026-07-29): the suggestion is the point
+          of counting, and one tap to accept it is the walk's fastest move. */}
       <td className="px-1 py-4 align-middle text-right text-xs text-subtle">
         {suggestion === null ? (
           <span title={par === null ? "No par set for this line" : "No package content"}>
@@ -228,7 +234,8 @@ export function GuideLine({
         )}
       </td>
 
-      <td className="px-4 py-4 align-middle text-right text-[15px] tabular-nums text-body">
+      {/* The only column that goes below 880px — see the header for why. */}
+      <td className="px-4 py-4 align-middle text-right text-[15px] tabular-nums text-body max-[880px]:hidden">
         {qty !== null && Number(qty) > 0
           ? money(Number(qty) * Number(row.effective_price ?? 0))
           : ""}
@@ -238,7 +245,10 @@ export function GuideLine({
           The row's LAST cell (Mark, 2026-07-27): this is the only thing on the
           line you touch, so it's pinned to the right edge where a thumb lands
           rather than sitting inboard of a line total you only read. */}
-      <td className="whitespace-nowrap py-4 pl-4 pr-0 align-middle">
+      {/* Never wraps, at any width: the −/box/+ is the one thing on the line
+          you touch, and it has to stay one object. It and the on-hand box are
+          the row's two hard floors — everything else gives way around them. */}
+      <td className="whitespace-nowrap py-4 pl-4 pr-0 align-middle max-[1180px]:pl-2">
         <div className="flex items-center justify-end gap-2">
           <span className="mr-1 text-xs font-semibold uppercase tracking-[0.06em] text-body">
             {row.package_desc ?? ""}
