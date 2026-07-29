@@ -3,12 +3,18 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { evaluateNumeric, looksLikeExpression } from "@/lib/calc";
 
 /**
  * One inline-editable cell: click, type, Enter or blur to save. The write is a
  * plain supabase-js update under RLS (purchaser+ for catalog tables), so price
  * and par edits still fire the DB history triggers — never log in app code
  * (CLAUDE.md rule 6).
+ *
+ * A `kind="number"` cell accepts arithmetic: type "4*9*25" and it stores 900,
+ * with a live "= 900" under the box while you type (lib/calc.ts). Par is the
+ * reason — it's in base units, but you know the pack and how many cases you
+ * want, so entering it meant doing the multiplication somewhere else.
  *
  * Escape reverts. A failed write keeps the typed value on screen with the error
  * so nothing is silently lost.
@@ -71,15 +77,26 @@ export function InlineValue({
 
   async function save() {
     const trimmed = draft.trim();
-    const next: string | number | null =
-      trimmed === "" ? null : kind === "number" ? Number(trimmed) : trimmed;
+
+    let next: string | number | null;
+    if (trimmed === "") {
+      next = null;
+    } else if (kind === "number") {
+      // A number cell accepts arithmetic — "4*9*25" stores 900. A plain number
+      // is just an expression that evaluates to itself, so this is a widening,
+      // not a change of behaviour.
+      const value = evaluateNumeric(trimmed);
+      if (value === null) {
+        setError(looksLikeExpression(trimmed) ? "can't work that out" : "not a number");
+        return;
+      }
+      next = value;
+    } else {
+      next = trimmed;
+    }
 
     if (next === null && !nullable) {
       setError("required");
-      return;
-    }
-    if (kind === "number" && next !== null && Number.isNaN(next)) {
-      setError("not a number");
       return;
     }
     setEditing(false);
@@ -99,6 +116,14 @@ export function InlineValue({
     }
     router.refresh();
   }
+
+  // The answer, while you're still typing the sum. Only for something that
+  // actually looks like a calculation — echoing "= 900" under a box you just
+  // typed 900 into would be noise.
+  const preview =
+    editing && kind === "number" && looksLikeExpression(draft)
+      ? evaluateNumeric(draft)
+      : null;
 
   if (editing) {
     return (
@@ -122,7 +147,13 @@ export function InlineValue({
             align === "right" ? "text-right tabular-nums" : ""
           }`}
         />
-        {error && <span className="text-xs text-accent">{error}</span>}
+        {error ? (
+          <span className="text-xs text-accent">{error}</span>
+        ) : (
+          preview !== null && (
+            <span className="text-xs tabular-nums text-muted">= {preview}</span>
+          )
+        )}
       </span>
     );
   }

@@ -14,6 +14,7 @@ import {
 } from "@/lib/orderGuide";
 import { money } from "@/lib/purchaseOrders";
 import { packLabel, packageDivisor, parPackageLabel } from "@/lib/catalog";
+import { evaluateNumeric } from "@/lib/calc";
 
 /**
  * One plan line, laid out in the columns the FMP guide used because they're the
@@ -64,9 +65,11 @@ export function GuideLine({
 
   function commitQty(raw: string) {
     const trimmed = raw.trim();
-    const next = trimmed === "" ? null : Number(trimmed);
+    // "4*9" is a valid quantity here too (lib/calc.ts). A bare number is an
+    // expression that evaluates to itself, so nothing about typing 3 changes.
+    const next = trimmed === "" ? null : evaluateNumeric(trimmed);
     setQtyDraft(null);
-    if (next !== null && Number.isNaN(next)) return;
+    if (trimmed !== "" && next === null) return;
     if (next === qty) return;
     onCommit({ qty_to_order: next });
   }
@@ -81,9 +84,11 @@ export function GuideLine({
 
   function commitOnHand(raw: string) {
     const trimmed = raw.trim();
-    const next = trimmed === "" ? null : Number(trimmed);
+    // Counting a shelf is where this earns its keep: "2*24+6" is three cases
+    // and six loose, without doing it in your head first.
+    const next = trimmed === "" ? null : evaluateNumeric(trimmed);
     setOnHandDraft(null);
-    if (next !== null && Number.isNaN(next)) return;
+    if (trimmed !== "" && next === null) return;
     if (next === onHand) return;
 
     // Counting proposes a quantity, it never dictates one — but only fill an

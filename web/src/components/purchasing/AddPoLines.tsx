@@ -10,6 +10,7 @@ import {
   type PurchaseOrder,
 } from "@/lib/purchaseOrders";
 import { packLabel } from "@/lib/catalog";
+import { evaluateNumeric } from "@/lib/calc";
 
 /**
  * "Add item" on PO detail: everything this vendor currently sells, with a
@@ -161,8 +162,9 @@ export function AddPoLines({
 
   async function add(vi: PickerRow) {
     const raw = (drafts[vi.id] ?? "").trim();
-    const n = raw === "" ? NaN : Number(raw);
-    if (!Number.isFinite(n) || n <= 0) {
+    // Arithmetic allowed, same as every other numeric field (lib/calc.ts).
+    const n = raw === "" ? null : evaluateNumeric(raw);
+    if (n === null || !Number.isFinite(n) || n <= 0) {
       setError("Enter an order amount greater than zero.");
       return;
     }

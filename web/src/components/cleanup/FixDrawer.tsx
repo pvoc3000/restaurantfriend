@@ -11,6 +11,7 @@ import {
 } from "@/lib/cleanup";
 import { derivedPackContent } from "@/lib/catalog";
 import { UNIT_OPTIONS, packageContent, unitFamily } from "@/lib/units";
+import { evaluateNumeric } from "@/lib/calc";
 import type { QueueItem } from "@/app/(app)/cleanup/page";
 import { FavoritesEditor } from "./FavoritesEditor";
 
@@ -406,8 +407,9 @@ function PackageContentEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const a = Number(amount);
-  const s = Number(size);
+  // Arithmetic allowed in both boxes (lib/calc.ts): a pack of "3*4" is 12.
+  const a = evaluateNumeric(amount) ?? NaN;
+  const s = evaluateNumeric(size) ?? NaN;
   const valid = amount !== "" && size !== "" && a > 0 && s > 0;
   const content = valid ? packageContent(a, s, unit, baseUnit) : null;
   const incompatible =
@@ -432,9 +434,7 @@ function PackageContentEditor({
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2">
         <input
-          type="number"
-          min="0"
-          step="any"
+          inputMode="decimal"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           className="w-16 border border-ink px-2 py-1"
@@ -442,9 +442,7 @@ function PackageContentEditor({
         />
         <span className="text-subtle">×</span>
         <input
-          type="number"
-          min="0"
-          step="any"
+          inputMode="decimal"
           value={size}
           onChange={(e) => setSize(e.target.value)}
           placeholder="size"
@@ -513,7 +511,7 @@ function PriceEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const p = Number(price);
+  const p = evaluateNumeric(price) ?? NaN;
   const valid = price !== "" && p > 0;
 
   async function save() {
@@ -534,9 +532,7 @@ function PriceEditor({
       <div className="flex items-center gap-2">
         <span className="text-subtle">$</span>
         <input
-          type="number"
-          min="0"
-          step="0.01"
+          inputMode="decimal"
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           placeholder="0.00"
@@ -572,7 +568,8 @@ function ParEditor({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const p = Number(par);
+  // The field Mark asked for this in: "4*9*25" is 25 cases of 4 x 9 lbs.
+  const p = evaluateNumeric(par) ?? NaN;
   const valid = par !== "" && p >= 0;
 
   async function save() {
@@ -592,9 +589,7 @@ function ParEditor({
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2">
         <input
-          type="number"
-          min="0"
-          step="any"
+          inputMode="decimal"
           value={par}
           onChange={(e) => setPar(e.target.value)}
           placeholder={`e.g. 100 (${baseUnit})`}
