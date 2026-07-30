@@ -664,6 +664,19 @@ weekday column, and 003 then silently made it per-vendor-item.
   `key={`${locationId}:${guideDate}`}` on the page — cheaper than syncing state
   in an effect, and it can't drift. Check any other screen that copies server
   props into state when the location can change under it.
+  **It happened again on `/location`** (Mark, 2026-07-30 — "switching locations
+  kinda updates the page but not completely"), which is worth knowing because
+  of how it PRESENTS: everything stateless updated — the name, both addresses,
+  the tax rate — and only `ActiveToggle`, `OperatingHours` and
+  `ProductionMapping` lied, so it reads as a half-finished refresh rather than
+  as stale state. The tell is a control disagreeing with the text beside it:
+  measured after DF01 → DF03, the switch was still `aria-checked="true"` next
+  to a label that already said "Inactive". Both new screens are now keyed
+  (`/location` on the page, `/shop-sections` on the table), and **a key on a
+  SERVER component does remount its client children** — verified across a soft
+  transition, not assumed. Prefer keying the whole body over keying the
+  offending children: it costs the same and no future stateful child can
+  quietly inherit the last location's data.
 - **The Active toggle is the FIRST column** on every catalog table (Mark,
   2026-07-23) — vendors list, vendor/item per-location config, vendor items.
   "Stock here" shares that slot where a row doesn't exist yet.

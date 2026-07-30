@@ -84,7 +84,12 @@ export default async function ShopSectionsPage() {
         </p>
       </div>
 
+      {/* Keyed for the same reason /location is: switching location is a
+          navigation to this same route, so without it the search box keeps the
+          term you typed against the other shop's shelves. A new location is a
+          new screen. */}
       <ShopSectionsTable
+        key={active.id}
         rows={rows}
         orgId={session.membership.org_id}
         locationId={active.id}
