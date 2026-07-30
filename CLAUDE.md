@@ -397,6 +397,42 @@ weekday column, and 003 then silently made it per-vendor-item.
 
 ## Conventions
 
+- **USE THE PARTS THAT EXIST — don't hand-roll a second one.** This app has no
+  component library by design (Next ships none, Tailwind ships none), so every
+  shared control is one we wrote and every one of them encodes a decision that
+  was expensive to reach. Reaching for a raw `<input>`, `<select>`, `<table>`,
+  a floating panel or a bespoke button is nearly always a mistake — and one
+  that shows, because the second version never behaves quite like the first.
+  The inventory, with the rule each embodies (details in the bullets below):
+
+  | Reach for | Instead of | For |
+  | --- | --- | --- |
+  | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary; opens below the field, portals so panes can't clip it |
+  | `catalog/InlineValue` | a hand-wired edit-in-place | any editable cell — `kind` text / number / date / **pick** |
+  | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
+  | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
+  | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory |
+  | `catalog/ActiveToggle` | a bespoke switch | the Active column, which leads every catalog table |
+  | `catalog/WeekdayPicker` | seven buttons | any day-set; its column must be `WEEKDAY_PICKER_WIDTH` |
+  | `catalog/ListFilters` | a filter row | search + category + active + last-ordered, together |
+  | `catalog/BaseUnitEditor` | writing `base_unit` | changing a unit — it recomputes package contents and warns about pars |
+  | `catalog/InventoryItemPicker` | a search box | finding and linking an inventory item |
+  | `ui/ActionBar` + `ActionBarButton` | a button row | screen-level COMMANDS only (not view controls) |
+  | `ui/PageLoading` | a spinner | the body of every `loading.tsx` |
+  | `ui/BackToTop` | — | long lists; already on the guide |
+  | `components/Breadcrumbs` | a back link | every detail screen, unconditionally |
+
+  Free for nothing, because the shell already does it: **scroll restoration**
+  (`components/ScrollMemory` in the (app) layout — a new screen is covered by
+  existing) and the **collapsing masthead** (`HeaderShell`, which publishes
+  `--rf-header-h`). Vocabularies and conversion live in `lib/units.ts`
+  (`UNIT_PICK_OPTIONS`, `PACKAGE_DESC_OPTIONS`); the other shared brains are
+  `lib/breadcrumbs`, `lib/columnWidths`, `lib/tableSort`, `lib/calc`,
+  `lib/scrollMemory`, `lib/chromeStore`.
+
+  If something genuinely new is needed, build it in `components/ui/` as a
+  general control, use it in at least the place that prompted it, and add a row
+  here — that is how this list came to exist.
 - **The look is the `restaurantfriend-design` skill** (a user skill, outside
   this repo — read `handoff/PORT-GUIDE.md` §8 FIRST, then `readme.md`, then the
   relevant `<Name>.prompt.md`). Applied wholesale 2026-07-25: black masthead,
