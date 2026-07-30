@@ -2,7 +2,7 @@
 // items list, item detail, and vendor detail. These are the general-purpose
 // catalog surfaces — /cleanup stays a separate, problem-driven queue.
 
-import { packageContent } from "./units";
+import { packageContent, unitFamily } from "./units";
 
 export type CatalogVendorItem = {
   /** FMP's pack structure, restored by migration 010 ("12 × 32 oz"). */
@@ -246,10 +246,29 @@ export function derivedPackContent(
 ): number | null {
   const { pack_size: size, pack_count: count, pack_unit: packUnit } = pack;
   if (size === null || size === undefined || size === "") return null;
+
+  // A MISSING pack unit is not the base unit (Mark, 2026-07-29, after the bulk
+  // recalc). UNFI's rice milk is "8 x 64" with no unit on a `lbs` item, and its
+  // siblings are 12 x 32 oz holding 24 lbs — so those are 64-OUNCE cartons worth
+  // 32 lbs, and assuming `lbs` gives 512, sixteen times high. Refuse instead:
+  // the honest answer is that nobody recorded the unit and only a human knows.
+  //
+  // The exception is a COUNT base unit, where the multiplication is unit-free —
+  // "1 x 24" on an `ea` item is 24 each however you read it.
+  //
+  // This guard lives here rather than at the call sites so every reader shares
+  // it: the guide's par line, the Recalc button, the cleanup check and
+  // recalc-package-content.mjs all stop guessing at the same moment.
+  const named = packUnit?.trim();
+  if (!named && unitFamily(baseUnit) !== "count") return null;
+
   const derived = packageContent(
     Number(count ?? 1),
     Number(size),
-    packUnit ?? baseUnit,
+    // `||`, not `??`: `named` is already trimmed, so a whitespace-only unit is
+    // "" — not null — and would otherwise be handed to packageContent as a unit
+    // it can't resolve, losing a count item's content for a stray space.
+    named || baseUnit,
     baseUnit
   );
   if (derived === null || !Number.isFinite(derived) || derived <= 0) return null;

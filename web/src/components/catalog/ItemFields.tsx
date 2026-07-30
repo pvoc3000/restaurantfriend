@@ -1,15 +1,19 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import type { CatalogItem } from "@/lib/catalog";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
+import { BaseUnitEditor } from "./BaseUnitEditor";
 
 /**
  * The item master header: name, category, base unit, note, active. base_unit is
  * free text in the schema (lbs / oz / each / gal) and pars are expressed in it,
  * so changing it does NOT rescale existing pars — the hint says so out loud.
+ * It DOES rescale package contents, which are derivable; see BaseUnitEditor.
  */
 export function ItemFields({ item }: { item: CatalogItem }) {
+  const router = useRouter();
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
@@ -46,13 +50,19 @@ export function ItemFields({ item }: { item: CatalogItem }) {
           />
         </dd>
 
+        {/* Not an InlineValue (Mark, 2026-07-29). A one-column write here is
+            what left "Sugar, Brown" with six oz-based package contents after
+            the item moved to lbs: every content under an item is stated in its
+            base unit, so changing the unit invalidates all of them. The shared
+            editor recomputes the ones whose pack can answer for them and
+            reports the ones that need a human. Same component the cleanup
+            drawer uses, so the two can't drift. */}
         <dt className="py-0.5 text-subtle">Base unit</dt>
         <dd>
-          <InlineValue
-            table="inventory_items"
-            id={item.id}
-            column="base_unit"
-            value={item.base_unit}
+          <BaseUnitEditor
+            inventoryItemId={item.id}
+            baseUnit={item.base_unit}
+            onChanged={() => router.refresh()}
           />
         </dd>
 
@@ -70,8 +80,9 @@ export function ItemFields({ item }: { item: CatalogItem }) {
 
       <p className="text-xs text-subtle">
         Pars and on-hand counts are in the base unit; order quantities are in
-        packages of the chosen vendor item. Changing the base unit does not
-        rescale existing pars or package contents — fix those by hand.
+        packages of the chosen vendor item. Changing the base unit recomputes
+        each package content whose pack can answer for it and reports the ones
+        that can&apos;t. Pars are never rescaled — check them afterwards.
       </p>
     </div>
   );
