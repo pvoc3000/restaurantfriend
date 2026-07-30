@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { TextInput } from "@/components/ui/TextInput";
 import {
   fetchPoDocData,
   openWindowNow,
@@ -490,11 +491,12 @@ export function PurchaseOrderList({
       </div>
 
       <div className="flex flex-wrap items-center gap-4">
-        <input
+        <TextInput
           value={filters.q}
-          onChange={(e) => update({ q: e.target.value })}
+          onValueChange={(q) => update({ q })}
           placeholder="Search PO number or vendor…"
-          className="h-9 w-64 border border-ink px-3 text-sm outline-none focus:border-2"
+          clearLabel="Clear the search"
+          className="h-9 w-64 text-sm"
         />
 
         {/* Status tabs: an underline marker, not a fill — they scope the view. */}

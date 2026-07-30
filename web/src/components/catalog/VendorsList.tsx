@@ -14,6 +14,7 @@ import {
 } from "@/lib/vendorFilters";
 import { ColumnHeader } from "./ColumnHeader";
 import { VendorActiveToggle } from "@/components/VendorActiveToggle";
+import { TextInput } from "@/components/ui/TextInput";
 import type { VendorRow } from "@/app/(app)/vendors/page";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
@@ -191,11 +192,12 @@ export function VendorsList({
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <input
+        <TextInput
           value={filters.q}
-          onChange={(e) => update({ q: e.target.value })}
+          onValueChange={(q) => update({ q })}
           placeholder="Search name, type, account…"
-          className="h-9 w-72 border border-ink px-3 text-sm outline-none focus:border-2"
+          clearLabel="Clear the search"
+          className="h-9 w-72 text-sm"
         />
         <select
           value={filters.type}

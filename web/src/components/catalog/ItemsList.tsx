@@ -18,6 +18,7 @@ import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
 import { makeComparator, nextSortDir, type SortValue } from "@/lib/tableSort";
 import { ColumnHeader } from "./ColumnHeader";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { TextInput } from "@/components/ui/TextInput";
 import type { ItemRow } from "@/app/(app)/items/page";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
@@ -284,11 +285,12 @@ export function ItemsList({
 
       {/* Search + category */}
       <div className="flex flex-wrap items-center gap-2">
-        <input
+        <TextInput
           value={filters.q}
-          onChange={(e) => update({ q: e.target.value })}
+          onValueChange={(q) => update({ q })}
           placeholder="Search name or category…"
-          className="h-9 w-72 border border-ink px-3 text-sm outline-none focus:border-2"
+          clearLabel="Clear the search"
+          className="h-9 w-72 text-sm"
         />
         <select
           value={filters.category}

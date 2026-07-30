@@ -11,6 +11,7 @@ import {
 } from "@/lib/purchaseOrders";
 import { packLabel } from "@/lib/catalog";
 import { evaluateNumeric } from "@/lib/calc";
+import { TextInput } from "@/components/ui/TextInput";
 
 /**
  * "Add item" on PO detail: everything this vendor currently sells, with a
@@ -245,12 +246,13 @@ export function AddPoLines({
                 on a vendor with hundreds of items it's the first thing you use
                 and it must not scroll away. */}
             <div className="flex shrink-0 flex-wrap items-center gap-4 border-b border-ink px-6 py-3">
-              <input
+              <TextInput
                 autoFocus
                 value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                onValueChange={setSearch}
                 placeholder="Search this vendor's items"
-                className="h-9 w-72 border border-ink px-2 text-sm"
+                clearLabel="Clear the search"
+                className="h-9 w-72 text-sm"
               />
               <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
                 {filtered.length} of {rows.length} active

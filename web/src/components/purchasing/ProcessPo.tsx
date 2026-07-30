@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { TextInput } from "@/components/ui/TextInput";
 import {
   buildEmailParts,
   downloadBlob,
@@ -346,11 +347,15 @@ export function ProcessPo({
                 <span className="text-xs uppercase tracking-[0.12em] text-subtle">
                   {label}
                 </span>
-                <input
+                {/* Clearable: these arrive PREFILLED from the org's templates,
+                    so replacing one wholesale — a different recipient, a
+                    subject written by hand — is the normal edit here. */}
+                <TextInput
                   value={compose[field]}
                   disabled={busy !== null}
-                  onChange={(e) => setCompose({ ...compose, [field]: e.target.value })}
-                  className="border border-ink bg-white px-2 py-1 outline-none focus:border-2"
+                  onValueChange={(next) => setCompose({ ...compose, [field]: next })}
+                  clearLabel={`Clear ${label}`}
+                  className="w-full py-1"
                 />
               </label>
             ))}

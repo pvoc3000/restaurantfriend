@@ -572,6 +572,25 @@ weekday column, and 003 then silently made it per-vendor-item.
 - **The Active toggle is the FIRST column** on every catalog table (Mark,
   2026-07-23) — vendors list, vendor/item per-location config, vendor items.
   "Stock here" shares that slot where a row doesn't exist yet.
+- **Wide free-text fields are `components/ui/TextInput.tsx`, and they clear**
+  (Mark, 2026-07-30) — a ✕ inside the field at the right, visible only while the
+  field HAS FOCUS and holds something, emptying it in one tap. It takes
+  `onValueChange` rather than `onChange`, so the button can't be wired up wrong.
+  Two details are load-bearing: `onMouseDown` **preventDefault** on the button
+  (without it the field blurs on press, the button unmounts, and the click lands
+  on nothing), and the right padding is reserved whether or not the ✕ is showing
+  so focusing a field doesn't reflow the text you're reading. `tabIndex={-1}` —
+  Tab goes to the next filter.
+  **Where it goes:** all seven search boxes, and the PO email compose
+  header (To/Cc/Subject — prefilled from templates, so replacing one wholesale
+  is the normal edit). **Where it deliberately doesn't**, because each would be
+  a bug rather than a convenience: numeric boxes (the guide's on-hand/order, the
+  cleanup editors, the PO add-item qty) — they're 4–10 characters wide and on
+  the guide EMPTY AND ZERO MEAN DIFFERENT THINGS, so a one-tap route to
+  "untouched" beside the stepper is a trap; `type="date"` (the browser already
+  draws a control at that edge); `InlineValue` cell editors (they save ON BLUR,
+  so a clear is one stray tap from writing null, and the cells are column-
+  narrow); and the login form.
 - **Every list uses `DataTable`** (`web/src/components/catalog/DataTable.tsx`):
   sortable headers, drag-resizable columns, optional scroll pane with a sticky
   header (which remembers its own scroll — see scroll restoration), optional

@@ -8,6 +8,7 @@ import { money } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import { useChromeCollapsed } from "@/lib/chromeStore";
 import { useScrollMemoryKey } from "@/lib/scrollMemory";
+import { TextInput } from "@/components/ui/TextInput";
 import {
   applyExpansions,
   daySourceIndex,
@@ -582,11 +583,12 @@ export function OrderGuide({
           </div>
 
           <div className="flex flex-wrap items-center gap-4 text-sm">
-            <input
+            <TextInput
               value={term}
-              onChange={(e) => setTerm(e.target.value)}
+              onValueChange={setTerm}
               placeholder="Jump to item, vendor or section…"
-              className="h-9 w-72 border border-ink px-3 outline-none focus:border-2"
+              clearLabel="Clear the search"
+              className="h-9 w-72"
             />
             {/* Segmented control: these four are one choice, so they read as
                 one object rather than four loose buttons. */}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { TextInput } from "@/components/ui/TextInput";
 
 type ItemRow = {
   id: string;
@@ -100,12 +101,13 @@ export function InventoryItemPicker({
 
       {open && (
         <span className="flex flex-col gap-1">
-          <input
+          <TextInput
             autoFocus
             value={term}
-            onChange={(e) => setTerm(e.target.value)}
+            onValueChange={setTerm}
             placeholder="Search inventory items by name…"
-            className="h-9 w-80 border border-ink px-3 text-sm outline-none focus:border-2"
+            clearLabel="Clear the search"
+            className="h-9 w-80 text-sm"
           />
           {canSearch && results.length === 0 && (
             <span className="text-xs text-subtle">No items match.</span>

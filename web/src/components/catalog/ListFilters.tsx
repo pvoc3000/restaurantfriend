@@ -1,6 +1,7 @@
 "use client";
 
 import { STALE_ORDER, STALE_LABEL, type StaleBucket } from "@/lib/lastOrdered";
+import { TextInput } from "@/components/ui/TextInput";
 
 export type ActiveFilter = "active" | "inactive" | "all";
 export type StaleFilter = StaleBucket | "any";
@@ -47,11 +48,12 @@ export function ListFilters({
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap items-center gap-2">
-        <input
+        <TextInput
           value={term}
-          onChange={(e) => onTerm(e.target.value)}
+          onValueChange={onTerm}
           placeholder={placeholder}
-          className="h-9 w-72 border border-ink px-3 text-sm outline-none focus:border-2"
+          clearLabel="Clear the search"
+          className="h-9 w-72 text-sm"
         />
 
         {categories && onCategory && (
