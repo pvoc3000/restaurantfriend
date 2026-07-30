@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { evaluateNumeric, looksLikeExpression } from "@/lib/calc";
+import { PickList, type PickOption } from "@/components/ui/PickList";
 
 /**
  * One inline-editable cell: click, type, Enter or blur to save. The write is a
@@ -18,6 +19,11 @@ import { evaluateNumeric, looksLikeExpression } from "@/lib/calc";
  *
  * Escape reverts. A failed write keeps the typed value on screen with the error
  * so nothing is silently lost.
+ *
+ * `kind="pick"` is the one that DOESN'T take typing: it renders a PickList and
+ * the choice is the edit, saved immediately, with no blur to wait for. Use it
+ * for any column whose values are a known vocabulary — a package token, a unit,
+ * a category — which is most of what used to accept anything at all.
  */
 export function InlineValue({
   table,
@@ -31,13 +37,16 @@ export function InlineValue({
   nullable = true,
   format,
   alsoUpdate,
+  options,
+  allowNew = false,
 }: {
   table: string;
   id: string;
   column: string;
   value: string | number | null;
-  /** "date" edits with a real date picker and stores an ISO yyyy-mm-dd. */
-  kind?: "text" | "number" | "date";
+  /** "date" edits with a real date picker and stores an ISO yyyy-mm-dd;
+   *  "pick" chooses from `options` instead of accepting typing. */
+  kind?: "text" | "number" | "date" | "pick";
   placeholder?: string;
   align?: "left" | "right";
   className?: string;
@@ -59,6 +68,10 @@ export function InlineValue({
   alsoUpdate?: (
     next: string | number | null
   ) => Record<string, string | number | null> | null;
+  /** Required by kind="pick": the vocabulary this column may hold. */
+  options?: PickOption[];
+  /** kind="pick" only — let a value off the list be typed in (categories). */
+  allowNew?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -100,6 +113,18 @@ export function InlineValue({
       return;
     }
     setEditing(false);
+    await write(next, true);
+  }
+
+  /**
+   * The write itself, shared by the typed editors and by `kind="pick"` — which
+   * has no draft and no blur, so it can't go through `save`.
+   *
+   * `reopen` is for the typed path only: putting the box back with the value
+   * still in it is how a failed write stops being silent. A pick has nothing to
+   * put back, and its error shows beside the closed control instead.
+   */
+  async function write(next: string | number | null, reopen: boolean) {
     if (next === value || (next === null && value === null)) return;
 
     setSaving(true);
@@ -111,7 +136,7 @@ export function InlineValue({
     setSaving(false);
     if (error) {
       setError(error.message);
-      setEditing(true);
+      if (reopen) setEditing(true);
       return;
     }
     router.refresh();
@@ -124,6 +149,28 @@ export function InlineValue({
     editing && kind === "number" && looksLikeExpression(draft)
       ? evaluateNumeric(draft)
       : null;
+
+  // A chosen value writes on the spot: there's no draft to abandon and nothing
+  // to confirm, which is the same call BaseUnitEditor made ("picking a unit IS
+  // the edit") and the reason the control can live in a table cell at all.
+  if (kind === "pick") {
+    return (
+      <span className="inline-flex w-full flex-col">
+        <PickList
+          value={value === null ? null : String(value)}
+          options={options ?? []}
+          allowNew={allowNew}
+          disabled={saving}
+          placeholder={placeholder}
+          ariaLabel={column}
+          align={align}
+          onPick={(next) => void write(next === "" ? null : next, false)}
+          className={className}
+        />
+        {error && <span className="text-xs text-accent">{error}</span>}
+      </span>
+    );
+  }
 
   if (editing) {
     return (

@@ -572,6 +572,33 @@ weekday column, and 003 then silently made it per-vendor-item.
 - **The Active toggle is the FIRST column** on every catalog table (Mark,
   2026-07-23) — vendors list, vendor/item per-location config, vendor items.
   "Stock here" shares that slot where a row doesn't exist yet.
+- **A known vocabulary is CHOSEN, never typed** (`components/ui/PickList.tsx`,
+  Mark, 2026-07-30: "the user can enter literally anything… sweep the app").
+  One control everywhere: a small list that opens directly BELOW the field —
+  Mark's stated preference over a native popup menu — with a Find box once
+  there are more than 8 options, group headers, hints beside the values, arrow
+  keys, and the current value ticked. Reach for it through
+  `InlineValue kind="pick"` (choosing IS the edit — it saves immediately, there
+  being no draft and no blur to wait for), or directly where the choice isn't a
+  column write.
+  Two implementation facts are load-bearing: it **portals to the body and
+  positions `fixed`**, because half its homes are cells inside `overflow-auto`
+  panes where an absolute panel is clipped (and WebKit won't make a
+  border-collapse cell a containing block); and it **closes on scroll**, since
+  fixed coordinates go stale the moment the page moves. Note `min-width` beats
+  `max-width` in CSS — the panel's cap is clamped INTO the min, or a 528px
+  field keeps a 528px panel.
+  **Where it went:** vendor item Sold-as (detail + the item screen's table),
+  vendor item pack unit, item Category (`allowNew` — that vocabulary grows, and
+  typing "Merch" surfaces "Merchandise" before it offers to add), base unit,
+  and cleanup's pack-size unit. **Where it deliberately didn't:**
+  `purchase_order_items.package_desc`, which looks like the same field and
+  isn't — generation snapshots the COMPOSED pack there ("1 × 5 lbs", migration
+  013), so a nine-token list couldn't express what belongs in it. Free text
+  stays free text for names, brands, product IDs and notes.
+  Filter dropdowns are still native `<select>`s: they choose a VIEW, not a
+  value, and nothing about them was broken. Convert them if the split ever
+  reads as inconsistent.
 - **The unit menu offers PACKAGES as well as measurements** (`lib/units.ts`,
   Mark, 2026-07-30) — case, bag, tub, box, sleeve, tray, flat, roll, in a
   fourth `<optgroup>` after Count / Weight / Volume. Not invented: the list is

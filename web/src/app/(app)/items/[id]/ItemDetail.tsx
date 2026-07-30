@@ -43,8 +43,11 @@ export async function ItemDetail({
   const session = await getAppSession();
   const supabase = await createClient();
 
-  const [{ data: item, error }, { data: vendorItems, error: viError }] =
-    await Promise.all([
+  const [
+    { data: item, error },
+    { data: vendorItems, error: viError },
+    { data: categoryRows },
+  ] = await Promise.all([
       supabase.from("inventory_items").select(SELECT).eq("id", id).maybeSingle(),
       // Deactivated vendors are gone from this screen entirely — you can't
       // order from them, so their items are noise here. An individually
@@ -55,6 +58,11 @@ export async function ItemDetail({
         .eq("inventory_item_id", id)
         .eq("vendors.is_active", true)
         .order("is_active", { ascending: false }),
+      // What the Category picker offers. One column over the catalog, fired
+      // alongside the other two rather than after them, so it costs no round
+      // trip of its own — there's no `distinct` in PostgREST, and 790 short
+      // strings is cheaper than the view of them would be.
+      supabase.from("inventory_items").select("category"),
     ]);
 
   if (error) {
@@ -63,6 +71,14 @@ export async function ItemDetail({
   if (!item) notFound();
 
   const row = item as unknown as CatalogItem;
+
+  const categories = [
+    ...new Set(
+      ((categoryRows ?? []) as { category: string | null }[])
+        .map((r) => r.category)
+        .filter((c): c is string => c !== null && c !== "")
+    ),
+  ].sort((a, b) => a.localeCompare(b));
 
   const locationRows = [...row.inventory_item_locations].sort((a, b) => {
     const codeA = session.locations.find((l) => l.id === a.location_id)?.code ?? "";
@@ -74,7 +90,7 @@ export async function ItemDetail({
     <div className="space-y-6">
       <Breadcrumbs trail={trail} current={row.name} />
 
-      <ItemFields item={row} />
+      <ItemFields item={row} categories={categories} />
 
       <section className="space-y-2">
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">

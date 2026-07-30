@@ -8,11 +8,18 @@ import { BaseUnitEditor } from "./BaseUnitEditor";
 
 /**
  * The item master header: name, category, base unit, note, active. base_unit is
- * free text in the schema (lbs / oz / each / gal) and pars are expressed in it,
+ * chosen from a list (lbs / oz / each / gal / case) and pars are expressed in it,
  * so changing it does NOT rescale existing pars — the hint says so out loud.
  * It DOES rescale package contents, which are derivable; see BaseUnitEditor.
  */
-export function ItemFields({ item }: { item: CatalogItem }) {
+export function ItemFields({
+  item,
+  categories,
+}: {
+  item: CatalogItem;
+  /** Every category already in the catalog — the list you pick from. */
+  categories: string[];
+}) {
   const router = useRouter();
   return (
     <div className="space-y-3">
@@ -41,12 +48,20 @@ export function ItemFields({ item }: { item: CatalogItem }) {
       <dl className="grid max-w-2xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
         <dt className="py-0.5 text-subtle">Category</dt>
         <dd>
+          {/* Pick from what the catalog already uses, but ADD is allowed: this
+              vocabulary genuinely grows (a new line of merchandise), unlike the
+              package tokens a vendor reads. Typing a name that already exists
+              matches it rather than making a near-duplicate, which is how
+              "COMMISSARY" and "Commissary" would otherwise both end up real. */}
           <InlineValue
             table="inventory_items"
             id={item.id}
             column="category"
             value={item.category}
             placeholder="none"
+            kind="pick"
+            allowNew
+            options={categories.map((c) => ({ value: c, label: c }))}
           />
         </dd>
 

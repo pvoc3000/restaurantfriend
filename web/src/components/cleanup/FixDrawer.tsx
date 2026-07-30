@@ -10,7 +10,8 @@ import {
   type CleanupFavorite,
 } from "@/lib/cleanup";
 import { derivedPackContent } from "@/lib/catalog";
-import { UNIT_GROUPS, UNIT_OPTIONS, packageContent, unitFamily } from "@/lib/units";
+import { UNIT_OPTIONS, UNIT_PICK_OPTIONS, packageContent, unitFamily } from "@/lib/units";
+import { PickList } from "@/components/ui/PickList";
 import { evaluateNumeric } from "@/lib/calc";
 import { BaseUnitEditor } from "@/components/catalog/BaseUnitEditor";
 import type { QueueItem } from "@/app/(app)/cleanup/page";
@@ -297,22 +298,14 @@ function PackageContentEditor({
           className="w-20 border border-ink px-2 py-1"
           aria-label="size"
         />
-        <select
-          value={unit}
-          onChange={(e) => setUnit(e.target.value)}
-          className="border border-ink px-2 py-1"
-          aria-label="unit"
-        >
-          {UNIT_GROUPS.map((group) => (
-            <optgroup key={group.family} label={group.label}>
-              {UNIT_OPTIONS.filter((o) => o.family === group.family).map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+        <span className="inline-block w-28 border border-ink px-1">
+          <PickList
+            value={unit}
+            options={UNIT_PICK_OPTIONS}
+            onPick={setUnit}
+            ariaLabel="unit"
+          />
+        </span>
         <span className="text-subtle">per {packageDesc ?? "pkg"}</span>
       </div>
 

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { qty, unitPrice, unitPriceLabel, type CatalogVendorItem } from "@/lib/catalog";
 import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import type { StaleBucket } from "@/lib/lastOrdered";
+import { PACKAGE_DESC_OPTIONS } from "@/lib/units";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
 import { DataTable, type DataColumn } from "./DataTable";
@@ -214,11 +215,20 @@ export function VendorItemsTable({
     },
     {
       key: "package_desc",
-      label: "Pack",
-      width: 95,
+      // "Sold as", matching the vendor-item screen: this column is what you buy
+      // ONE of, not the size of it (Mark, 2026-07-30).
+      label: "Sold as",
+      width: 110,
       sortValue: (vi) => vi.package_desc,
       render: (vi) => (
-        <InlineValue table="vendor_items" id={vi.id} column="package_desc" value={vi.package_desc} />
+        <InlineValue
+          table="vendor_items"
+          id={vi.id}
+          column="package_desc"
+          value={vi.package_desc}
+          kind="pick"
+          options={PACKAGE_DESC_OPTIONS}
+        />
       ),
     },
     {

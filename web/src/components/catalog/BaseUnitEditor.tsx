@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { UNIT_GROUPS, UNIT_OPTIONS, normalizeUnit } from "@/lib/units";
+import { UNIT_OPTIONS, UNIT_PICK_OPTIONS, normalizeUnit } from "@/lib/units";
+import { PickList } from "@/components/ui/PickList";
 import { derivedPackContent } from "@/lib/catalog";
 
 /**
@@ -156,28 +157,15 @@ export function BaseUnitEditor({
   return (
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2">
-        <select
-          value={next}
-          disabled={busy}
-          onChange={(e) => choose(e.target.value)}
-          className="border border-ink px-2 py-1 disabled:opacity-35"
-          aria-label="base unit"
-        >
-          {!known && (
-            <option key={baseUnit} value={baseUnit}>
-              {baseUnit}
-            </option>
-          )}
-          {UNIT_GROUPS.map((group) => (
-            <optgroup key={group.family} label={group.label}>
-              {UNIT_OPTIONS.filter((o) => o.family === group.family).map((o) => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+        <span className="inline-block w-32 border border-ink px-1">
+          <PickList
+            value={next}
+            options={UNIT_PICK_OPTIONS}
+            disabled={busy}
+            onPick={choose}
+            ariaLabel="base unit"
+          />
+        </span>
         {busy && <span className="text-muted">Saving…</span>}
       </div>
 

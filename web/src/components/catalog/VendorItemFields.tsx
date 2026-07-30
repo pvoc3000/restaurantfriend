@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import { derivedPackContent, vendorItemTitle } from "@/lib/catalog";
+import { PACKAGE_DESC_OPTIONS, UNIT_PICK_OPTIONS } from "@/lib/units";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
 import { InventoryItemPicker } from "./InventoryItemPicker";
@@ -240,7 +241,11 @@ export function VendorItemFields({
           />
         </dd>
 
-        <dt className="py-0.5 text-subtle">Pack</dt>
+        {/* "Pack" and "Pack of" were the same word for two different things and
+            read as a pair when they aren't one (Mark, 2026-07-30). This is what
+            the vendor SELLS you — one case, one bag — and prints as the PO's
+            Pack column; the fields below are what's inside one of them. */}
+        <dt className="py-0.5 text-subtle">Sold as</dt>
         <dd>
           <InlineValue
             table="vendor_items"
@@ -248,6 +253,8 @@ export function VendorItemFields({
             column="package_desc"
             value={vi.package_desc}
             placeholder="none"
+            kind="pick"
+            options={PACKAGE_DESC_OPTIONS}
           />
         </dd>
 
@@ -262,7 +269,7 @@ export function VendorItemFields({
             started being counted in bottles. It stays editable because the
             conversion can't always be done: a case of 16 oz bottles counted in
             `ea` holds 12, and no amount of unit maths gets there from ounces. */}
-        <dt className="py-0.5 text-subtle">Pack of</dt>
+        <dt className="py-0.5 text-subtle">Contains</dt>
         {/* Each cell is width-boxed. InlineValue's resting state is a `w-full`
             button, so left to themselves in a flex row they all demand 100%
             and either squash to ragged widths or wrap one-per-line. */}
@@ -297,6 +304,8 @@ export function VendorItemFields({
               column="pack_unit"
               value={vi.pack_unit}
               placeholder={unit}
+              kind="pick"
+              options={UNIT_PICK_OPTIONS}
               alsoUpdate={(next) => recomputeContent({ pack_unit: next })}
             />
           </span>
@@ -347,7 +356,9 @@ export function VendorItemFields({
       </dl>
 
       <p className="text-xs text-subtle">
-        The number in parentheses is how many {unit} one package holds — the
+        {/* Explicit {" "}: the space after the interpolation was being eaten,
+            and the hint has been reading "how many lbsone package holds". */}
+        The number in parentheses is how many {unit}{" "}one package holds — the
         total that turns a par into packages to order. Editing the pack
         recomputes it whenever the units allow; where they don&apos;t, set it
         yourself. Price is the vendor&apos;s global price; a location below may

@@ -284,6 +284,12 @@ export function PurchaseOrderDetail({
     },
     {
       key: "package_desc",
+      // Stays FREE TEXT while the catalog's own package field becomes a pick
+      // list (Mark's sweep, 2026-07-30) — deliberately, because this column
+      // isn't the same kind of thing. Generation snapshots the COMPOSED pack
+      // here ("1 × 5 lbs", migration 013), not a token from a vocabulary, so a
+      // nine-value list couldn't express what belongs in it and would invite
+      // overwriting a correct pack with "CS".
       label: "Pack",
       // 85px clipped every multi-pack to "1 × 5 l…", which is the same
       // information-off-the-edge problem.

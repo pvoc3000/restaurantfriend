@@ -21,14 +21,17 @@ const UNITS: Record<string, { family: UnitFamily; factor: number; label: string 
   ml: { family: "volume", factor: 1, label: "ml" },
   floz: { family: "volume", factor: 29.5735295625, label: "fl oz" },
   cup: { family: "volume", factor: 236.5882365, label: "cup" },
-  pt: { family: "volume", factor: 473.176473, label: "pt" },
+  pt: { family: "volume", factor: 473.176473, label: "pint" },
+  pint: { family: "volume", factor: 473.176473, label: "pint" },
   qt: { family: "volume", factor: 946.352946, label: "qt" },
   gal: { family: "volume", factor: 3785.411784, label: "gal" },
   l: { family: "volume", factor: 1000, label: "L" },
   // count (canonical: each)
   ea: { family: "count", factor: 1, label: "ea" },
   each: { family: "count", factor: 1, label: "each" },
+  ct: { family: "count", factor: 1, label: "ea" },
   dozen: { family: "count", factor: 12, label: "dozen" },
+  dz: { family: "count", factor: 12, label: "dozen" },
   // Packages — what the thing is bought and stacked as, for items you count in
   // whole containers rather than in weight or each (Mark, 2026-07-30). One item
   // at DF01 is ALREADY counted in CS and the picker couldn't offer it.
@@ -69,6 +72,7 @@ export const UNIT_OPTIONS: { value: string; label: string; family: UnitFamily }[
   "kg",
   "g",
   "floz",
+  "pt",
   "qt",
   "gal",
   "l",
@@ -89,12 +93,50 @@ export const UNIT_OPTIONS: { value: string; label: string; family: UnitFamily }[
  * (Mark, 2026-07-30, asking for "a divider of some sort"). Packages go last:
  * they're the newcomers and the rarer choice.
  */
+/**
+ * What the vendor SELLS it as — `vendor_items.package_desc`, the token that
+ * prints in the Pack column of the PO (spec §4.9). A separate vocabulary from
+ * the units above and deliberately so: these are UPPERCASE because that is what
+ * the catalog holds (CS 1248 rows to `cs` 3) and what a vendor reads on an
+ * order, while units stay lowercase because they feed conversion.
+ *
+ * Frequency order, measured over 2,888 vendor items, so the two answers that
+ * cover 75% of the catalog are the first two you see. Historical values not on
+ * this list (GAL, 1.5G, "1 × 50 lbs" — FMP put sizes in this field) are kept
+ * wherever they're already stored; this is what NEW ones may be.
+ */
+export const PACKAGE_DESC_OPTIONS: { value: string; label: string; hint: string }[] = [
+  { value: "CS", label: "CS", hint: "case" },
+  { value: "EA", label: "EA", hint: "each" },
+  { value: "BAG", label: "BAG", hint: "bag" },
+  { value: "TUB", label: "TUB", hint: "tub" },
+  { value: "BOX", label: "BOX", hint: "box" },
+  { value: "SLEEVE", label: "SLEEVE", hint: "sleeve" },
+  { value: "TRAY", label: "TRAY", hint: "tray" },
+  { value: "FLAT", label: "FLAT", hint: "flat" },
+  { value: "ROLL", label: "ROLL", hint: "roll" },
+];
+
 export const UNIT_GROUPS: { label: string; family: UnitFamily }[] = [
   { label: "Count", family: "count" },
   { label: "Weight", family: "mass" },
   { label: "Volume", family: "volume" },
   { label: "Packages", family: "package" },
 ];
+
+/**
+ * The same units shaped for `PickList` (components/ui/PickList) — the shape is
+ * structural, so this stays a plain lib with no component import. Options are
+ * emitted in group order, which is the order the list draws its headers in.
+ */
+export const UNIT_PICK_OPTIONS: { value: string; label: string; group: string }[] =
+  UNIT_GROUPS.flatMap((group) =>
+    UNIT_OPTIONS.filter((o) => o.family === group.family).map((o) => ({
+      value: o.value,
+      label: o.label,
+      group: group.label,
+    }))
+  );
 
 /**
  * Convert `amount` of `fromUnit` into `toUnit`. Returns null when the units are
