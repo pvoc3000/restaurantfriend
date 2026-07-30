@@ -10,7 +10,7 @@ import {
   type CleanupFavorite,
 } from "@/lib/cleanup";
 import { derivedPackContent } from "@/lib/catalog";
-import { UNIT_OPTIONS, packageContent, unitFamily } from "@/lib/units";
+import { UNIT_GROUPS, UNIT_OPTIONS, packageContent, unitFamily } from "@/lib/units";
 import { evaluateNumeric } from "@/lib/calc";
 import { BaseUnitEditor } from "@/components/catalog/BaseUnitEditor";
 import type { QueueItem } from "@/app/(app)/cleanup/page";
@@ -249,10 +249,21 @@ function PackageContentEditor({
   const s = evaluateNumeric(size) ?? NaN;
   const valid = amount !== "" && size !== "" && a > 0 && s > 0;
   const content = valid ? packageContent(a, s, unit, baseUnit) : null;
+  // "Both units are ones we know, and they still don't convert." Asking whether
+  // the FAMILIES differ isn't enough any more: two package units share the
+  // family `package` and deliberately don't convert to each other (a case is
+  // not n bags), so a cs → bag mistake would have fallen through to "Enter
+  // amount and size" instead of saying what was wrong.
   const incompatible =
-    valid && content === null && unitFamily(unit) !== unitFamily(baseUnit);
+    valid &&
+    content === null &&
+    unitFamily(unit) !== null &&
+    unitFamily(baseUnit) !== null;
   const unitPrice =
     content && content > 0 && price ? Number(price) / content : null;
+  // Name the unit the way the menu named it — the message said "cs" about an
+  // option labelled "case".
+  const unitLabel = UNIT_OPTIONS.find((o) => o.value === unit)?.label ?? unit;
 
   async function save() {
     if (content === null) return;
@@ -292,10 +303,14 @@ function PackageContentEditor({
           className="border border-ink px-2 py-1"
           aria-label="unit"
         >
-          {UNIT_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
+          {UNIT_GROUPS.map((group) => (
+            <optgroup key={group.family} label={group.label}>
+              {UNIT_OPTIONS.filter((o) => o.family === group.family).map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
         <span className="text-subtle">per {packageDesc ?? "pkg"}</span>
@@ -303,7 +318,7 @@ function PackageContentEditor({
 
       {incompatible ? (
         <p className="text-accent">
-          {unit} can’t convert to the item’s base unit ({baseUnit}). Pick a
+          {unitLabel} can’t convert to the item’s base unit ({baseUnit}). Pick a
           compatible unit.
         </p>
       ) : content !== null ? (

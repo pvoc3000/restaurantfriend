@@ -572,6 +572,24 @@ weekday column, and 003 then silently made it per-vendor-item.
 - **The Active toggle is the FIRST column** on every catalog table (Mark,
   2026-07-23) — vendors list, vendor/item per-location config, vendor items.
   "Stock here" shares that slot where a row doesn't exist yet.
+- **The unit menu offers PACKAGES as well as measurements** (`lib/units.ts`,
+  Mark, 2026-07-30) — case, bag, tub, box, sleeve, tray, flat, roll, in a
+  fourth `<optgroup>` after Count / Weight / Volume. Not invented: the list is
+  the catalog's own `package_desc` vocabulary, measured over 2,888 vendor items
+  (CS 1248, BAG 201, TUB 117, BOX 54, SLEEVE 18, FLAT 9, ROLL 6, Tray 4); the
+  one-offs are left out (SET 2, PR 1, and PKG 4, which as a unit of counting
+  says nothing). One item was ALREADY stored as `base_unit = 'CS'` and the
+  picker couldn't offer it.
+  **A package unit converts only to ITSELF** — never to an each, a bag or a
+  weight. There is no ratio to know: a case of cups and a case of flour share
+  nothing but the word, and `package_content` is what the guide divides by to
+  suggest a quantity, so a confident wrong answer there becomes a wrong order.
+  `convert()` enforces it and the factor of 1 on those units is a placeholder
+  that is never reached. Consequence for callers: "do these convert?" can no
+  longer be asked as "are the families equal" — two package units share a
+  family and still refuse (the cleanup drawer's incompatible check had to
+  change). Unit lookups are case-insensitive, so the uppercase `CS`/`EA`/`GAL`
+  in the data select their own menu entries instead of appearing twice.
 - **Wide free-text fields are `components/ui/TextInput.tsx`, and they clear**
   (Mark, 2026-07-30) — a ✕ inside the field at the right, visible only while the
   field HAS FOCUS and holds something, emptying it in one tap. It takes

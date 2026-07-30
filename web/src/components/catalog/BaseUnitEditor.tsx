@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { UNIT_OPTIONS } from "@/lib/units";
+import { UNIT_GROUPS, UNIT_OPTIONS, normalizeUnit } from "@/lib/units";
 import { derivedPackContent } from "@/lib/catalog";
 
 /**
@@ -40,22 +40,23 @@ export function BaseUnitEditor({
   onChanged: () => void;
 }) {
   const supabase = createClient();
+  // The stored unit matched against the list case-insensitively: the data holds
+  // "CS", "EA" and "GAL" uppercase on a handful of rows, and those are the same
+  // units the menu offers. Matching on the raw string listed them a SECOND time
+  // as one-off options sitting above their own duplicates.
+  const known = UNIT_OPTIONS.find((o) => o.value === normalizeUnit(baseUnit));
   // Seeded from a prop, so both call sites KEY this component on
   // (item, baseUnit) — the cleanup drawer swaps `item` without remounting, and
   // an unkeyed instance would show the previous item's unit (CLAUDE.md).
-  const [next, setNext] = useState(baseUnit);
+  const [next, setNext] = useState(known?.value ?? baseUnit);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<{ recomputed: number; manual: number } | null>(
     null
   );
 
-  // The stored unit isn't always one the dropdown offers — "GAL" is in the data
-  // uppercase — and a select that silently reassigns it would be a data edit
-  // nobody asked for.
-  const options = UNIT_OPTIONS.some((o) => o.value === baseUnit)
-    ? UNIT_OPTIONS
-    : [{ value: baseUnit, label: baseUnit }, ...UNIT_OPTIONS];
+  // A unit the list doesn't know at all still has to be shown as itself — a
+  // select that silently reassigned it would be a data edit nobody asked for.
 
   // Takes the unit rather than reading `next`: setNext is async, so the state
   // this runs beside is still the OLD value on the tick `choose` fires.
@@ -162,10 +163,19 @@ export function BaseUnitEditor({
           className="border border-ink px-2 py-1 disabled:opacity-35"
           aria-label="base unit"
         >
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
+          {!known && (
+            <option key={baseUnit} value={baseUnit}>
+              {baseUnit}
             </option>
+          )}
+          {UNIT_GROUPS.map((group) => (
+            <optgroup key={group.family} label={group.label}>
+              {UNIT_OPTIONS.filter((o) => o.family === group.family).map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </optgroup>
           ))}
         </select>
         {busy && <span className="text-muted">Saving…</span>}

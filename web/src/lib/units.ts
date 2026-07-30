@@ -6,7 +6,7 @@
 // into the item's base_unit. Conversion only works within a family; crossing
 // families (weigh a count, etc.) returns null so the UI can warn.
 
-export type UnitFamily = "mass" | "volume" | "count";
+export type UnitFamily = "mass" | "volume" | "count" | "package";
 
 // Factor = how many canonical base units (grams / milliliters / each) one of
 // this unit is. Ratios are what matter, so the canonical choice is arbitrary.
@@ -29,6 +29,27 @@ const UNITS: Record<string, { family: UnitFamily; factor: number; label: string 
   ea: { family: "count", factor: 1, label: "ea" },
   each: { family: "count", factor: 1, label: "each" },
   dozen: { family: "count", factor: 12, label: "dozen" },
+  // Packages — what the thing is bought and stacked as, for items you count in
+  // whole containers rather than in weight or each (Mark, 2026-07-30). One item
+  // at DF01 is ALREADY counted in CS and the picker couldn't offer it.
+  //
+  // The vocabulary is the catalog's own `package_desc`, not an invention:
+  // measured 2026-07-30 over 2,888 vendor items — CS 1248, BAG 201, TUB 117,
+  // BOX 54, SLEEVE 18, FLAT 9, ROLL 6, Tray 4. The one-offs are left out (SET 2,
+  // PR 1, and PKG 4, which as a unit of counting says nothing).
+  //
+  // FACTOR 1 IS A PLACEHOLDER AND NEVER USED: `convert` refuses to cross in or
+  // out of this family (below), because a case is not a fixed quantity of
+  // anything — a case of cups and a case of flour share no ratio.
+  cs: { family: "package", factor: 1, label: "case" },
+  case: { family: "package", factor: 1, label: "case" },
+  bag: { family: "package", factor: 1, label: "bag" },
+  tub: { family: "package", factor: 1, label: "tub" },
+  box: { family: "package", factor: 1, label: "box" },
+  sleeve: { family: "package", factor: 1, label: "sleeve" },
+  tray: { family: "package", factor: 1, label: "tray" },
+  flat: { family: "package", factor: 1, label: "flat" },
+  roll: { family: "package", factor: 1, label: "roll" },
 };
 
 export function normalizeUnit(unit: string): string {
@@ -41,29 +62,57 @@ export function unitFamily(unit: string): UnitFamily | null {
 
 /** The size-dropdown options, grouped by the family so the UI can label them. */
 export const UNIT_OPTIONS: { value: string; label: string; family: UnitFamily }[] = [
-  ["ea", "count"],
-  ["dozen", "count"],
-  ["oz", "mass"],
-  ["lbs", "mass"],
-  ["kg", "mass"],
-  ["g", "mass"],
-  ["floz", "volume"],
-  ["qt", "volume"],
-  ["gal", "volume"],
-  ["l", "volume"],
-  ["ml", "volume"],
-]
-  .map(([value]) => value as string)
-  .map((value) => ({ value, label: UNITS[value].label, family: UNITS[value].family }));
+  "ea",
+  "dozen",
+  "oz",
+  "lbs",
+  "kg",
+  "g",
+  "floz",
+  "qt",
+  "gal",
+  "l",
+  "ml",
+  "cs",
+  "bag",
+  "tub",
+  "box",
+  "sleeve",
+  "tray",
+  "flat",
+  "roll",
+].map((value) => ({ value, label: UNITS[value].label, family: UNITS[value].family }));
+
+/**
+ * The same options as `<optgroup>`s, because a flat list of nineteen mixes two
+ * different kinds of answer — how much of it there is, and what it comes in
+ * (Mark, 2026-07-30, asking for "a divider of some sort"). Packages go last:
+ * they're the newcomers and the rarer choice.
+ */
+export const UNIT_GROUPS: { label: string; family: UnitFamily }[] = [
+  { label: "Count", family: "count" },
+  { label: "Weight", family: "mass" },
+  { label: "Volume", family: "volume" },
+  { label: "Packages", family: "package" },
+];
 
 /**
  * Convert `amount` of `fromUnit` into `toUnit`. Returns null when the units are
  * in different families (incompatible) or either unit is unknown.
+ *
+ * A PACKAGE unit converts only to ITSELF — a case to a case, never a case to an
+ * each or to a bag. There is no ratio to know: a case of cups and a case of
+ * flour have nothing in common but the word. Letting them convert on the shared
+ * family would make `packageContent` return confident nonsense, and package
+ * content is what the guide divides by to suggest a quantity.
  */
 export function convert(amount: number, fromUnit: string, toUnit: string): number | null {
-  const from = UNITS[normalizeUnit(fromUnit)];
-  const to = UNITS[normalizeUnit(toUnit)];
+  const fromKey = normalizeUnit(fromUnit);
+  const toKey = normalizeUnit(toUnit);
+  const from = UNITS[fromKey];
+  const to = UNITS[toKey];
   if (!from || !to || from.family !== to.family) return null;
+  if (from.family === "package" && from.label !== to.label) return null;
   return (amount * from.factor) / to.factor;
 }
 
