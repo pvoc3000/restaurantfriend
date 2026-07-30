@@ -593,6 +593,30 @@ weekday column, and 003 then silently made it per-vendor-item.
   The search box is deliberately NOT remembered.
   A list that persists sort in the URL must pass `sort`/`onSortChange` to
   `DataTable`, or the header arrow and the URL disagree.
+- **The order guide remembers where you were in it** (`lib/scrollMemory.ts`,
+  Mark, 2026-07-30) — this is what pays for detail views going back to full
+  screen. `useScrollMemory(key)` records the window scroll under a key and puts
+  it back on the way in. Four things it took to make that reliable, each of
+  which is a trap on its own:
+  (a) **The key carries the WEEKDAY as well as the location and the date.**
+  `guideDate` is *today* — the day picker doesn't move it — so location+date
+  alone restores Monday's position into Thursday's much shorter list. The key
+  is `guide:<location>:<date>:<weekday>`.
+  (b) **Restoring is a negotiation, not one `scrollTo`.** At mount the list
+  hasn't reached full height, so a single call clamps to whatever the document
+  is at that instant and leaves you short. It re-asserts for up to 12 frames,
+  and surrenders the moment the reader wheels/touches/types — deliberately NOT
+  on the `scroll` event, which our own scrollTo fires.
+  (c) **Writes are throttled by the clock, never deferred to
+  `requestAnimationFrame`.** rAF doesn't run in a hidden tab, so a
+  frame-deferred write can simply never happen — measured 2026-07-30, the
+  position was still null after scrolling. The last thing you did before
+  switching away is exactly what you want remembered.
+  (d) **It flushes on unmount and on `pagehide`** (not `unload` — iOS Safari
+  fires the one and not the other), because the throttle can swallow the last
+  move and leaving is the moment that matters.
+  sessionStorage, so it dies with the tab like the guide's view cookie. The
+  hook is generic; no other list uses it yet.
 - **Breadcrumbs follow the route taken**, not a fixed hierarchy (`lib/breadcrumbs.ts`):
   links stamp `from`, the trail nests, recorded hrefs are trimmed so the URL
   can't grow unbounded. An item reached from a vendor leads back to that vendor.
@@ -609,10 +633,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   `[id]` segment carries its OWN `loading.tsx`; without one the list's
   loading.tsx a segment up covers the wait and announces the wrong thing
   ("Loading the vendor list…" while a vendor opens). What the panel bought and
-  a page cannot: the list underneath stayed mounted, so guide scroll survived a
-  round trip. Filters and sort still survive — they live in the URL or the
-  guide's session cookie — but scroll position does not. New detail screens are
-  just pages.
+  a page can't: the list underneath stayed mounted, so guide scroll survived a
+  round trip. Filters and sort still survive (URL / the guide's session
+  cookie), and the order guide buys its scroll back explicitly — see scroll
+  memory below. New detail screens are just pages.
 - **Safari:** a table cell under `border-collapse` is NOT a containing block in
   WebKit — anchor absolutely-positioned children to an inner `<div>`. And see
   web/README.md on Safari caching a stale dev stylesheet.

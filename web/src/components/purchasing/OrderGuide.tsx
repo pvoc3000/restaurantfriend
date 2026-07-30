@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import { useChromeCollapsed } from "@/lib/chromeStore";
+import { useScrollMemory } from "@/lib/scrollMemory";
 import {
   applyExpansions,
   daySourceIndex,
@@ -74,6 +75,17 @@ export function OrderGuide({
   // totals and filters — leaving the strip, the column labels and the list
   // (Mark, 2026-07-29). Same flag, so it's one button and one memory, not two.
   const chromeCollapsed = useChromeCollapsed();
+
+  // Come back to where you were in the walk. Tapping an item now leaves the
+  // guide entirely (detail views are pages again, 2026-07-30) and this is what
+  // pays for that.
+  //
+  // WEEKDAY is in the key as well as the date, and it has to be: `guideDate` is
+  // today — the day you're walking, which the picker does NOT change — so a key
+  // without the weekday would restore Monday's position into Thursday's much
+  // shorter list. The remembered filter and grouping ride in the view cookie,
+  // so the list you come back to is the list the position was measured against.
+  useScrollMemory(`guide:${locationId}:${guideDate}:${weekday}`);
 
   // Entries are held locally and written through: a walk is hundreds of small
   // edits and a server round-trip per keystroke would make it unusable.
