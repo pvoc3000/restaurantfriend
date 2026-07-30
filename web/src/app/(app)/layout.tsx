@@ -1,4 +1,5 @@
 import { AppHeader } from "@/components/AppHeader";
+import { ScrollMemory } from "@/components/ScrollMemory";
 import { getAppSession } from "@/lib/session";
 
 // Everything inside the (app) route group is signed-in + location-scoped.
@@ -24,6 +25,11 @@ export default async function AppLayout({
           its collapsed strip and the ActionBar carry the SAME pair, so the four
           black-and-white bands stay aligned at every width. */}
       <main className="flex-1 px-4 py-8 xl:px-12">{children}</main>
+      {/* Renders nothing; remembers where you were on every screen. AFTER the
+          page, so a screen publishing its own scroll key has already done so by
+          the time this one's effect runs (effects go child-first, siblings in
+          order). */}
+      <ScrollMemory locationId={session.activeLocation?.id ?? null} />
     </>
   );
 }

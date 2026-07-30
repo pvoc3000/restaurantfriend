@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import { useChromeCollapsed } from "@/lib/chromeStore";
-import { useScrollMemory } from "@/lib/scrollMemory";
+import { useScrollMemoryKey } from "@/lib/scrollMemory";
 import {
   applyExpansions,
   daySourceIndex,
@@ -76,16 +76,19 @@ export function OrderGuide({
   // (Mark, 2026-07-29). Same flag, so it's one button and one memory, not two.
   const chromeCollapsed = useChromeCollapsed();
 
-  // Come back to where you were in the walk. Tapping an item now leaves the
-  // guide entirely (detail views are pages again, 2026-07-30) and this is what
-  // pays for that.
-  //
-  // WEEKDAY is in the key as well as the date, and it has to be: `guideDate` is
-  // today — the day you're walking, which the picker does NOT change — so a key
-  // without the weekday would restore Monday's position into Thursday's much
-  // shorter list. The remembered filter and grouping ride in the view cookie,
-  // so the list you come back to is the list the position was measured against.
-  useScrollMemory(`guide:${locationId}:${guideDate}:${weekday}`);
+  // Every screen is scroll-restored by the shell (components/ScrollMemory), but
+  // the guide is the one screen its default key can't describe, so it names its
+  // own. Two reasons, both fatal to a URL-derived key:
+  // - WEEKDAY. `guideDate` is today — the day you're walking, which the picker
+  //   does NOT change — so location + path would restore Monday's position into
+  //   Thursday's much shorter list.
+  // - The same list arrives at two URLs. The nav link is a bare `/order-guide`
+  //   (the day comes from the view cookie) while the trail back from an item is
+  //   `/order-guide?day=4`, so a key carrying the query would lose the position
+  //   on exactly the round trip this exists for.
+  // The remembered filter and grouping ride in that same cookie, so the list
+  // you come back to is the list the position was measured against.
+  useScrollMemoryKey(`guide:${locationId}:${guideDate}:${weekday}`);
 
   // Entries are held locally and written through: a walk is hundreds of small
   // edits and a server round-trip per keystroke would make it unusable.

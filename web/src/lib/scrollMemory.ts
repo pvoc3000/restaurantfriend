@@ -6,6 +6,11 @@
 // list mounted underneath, and a page navigation tears it down and rebuilds it
 // at the top.
 //
+// It is UNIVERSAL and nothing opts in (Mark, 2026-07-30: "any list view now and
+// in the future"). `components/ScrollMemory.tsx` runs it once from the (app)
+// layout, keyed by active location + pathname, so a screen gets this by
+// existing — there is no hook to remember to call when adding one.
+//
 // sessionStorage, not local: a scroll position is about the walk you're on, and
 // it should die with the tab the way the guide's view cookie dies with the
 // session. Not the URL either — this is nobody's idea of shareable view state.
@@ -17,7 +22,7 @@
 // until the position sticks — and surrender immediately if the reader starts
 // scrolling, because at that point they know better than the memory does.
 
-import { useEffect } from "react";
+import { useEffect, useSyncExternalStore, type RefObject } from "react";
 
 const PREFIX = "rf.scroll.";
 
@@ -46,18 +51,84 @@ function write(key: string, y: number) {
   }
 }
 
+// A screen whose identity is NOT its URL names its own key here, and the shell
+// uses it instead of the pathname. Exactly one screen needs this so far: the
+// order guide shows seven different lists at one path, and arrives at either
+// `/order-guide` or `/order-guide?day=4` for the same one, so neither the path
+// nor the query identifies what you were looking at.
+//
+// A module store read through useSyncExternalStore, like chromeStore: the
+// override is published by a page deep in the tree and consumed by a component
+// in the layout, which no prop can reach.
+let override: string | null = null;
+const listeners = new Set<() => void>();
+
+function subscribeToOverride(onChange: () => void) {
+  listeners.add(onChange);
+  return () => {
+    listeners.delete(onChange);
+  };
+}
+
+/**
+ * Name this screen's scroll key for as long as it's mounted. Effects run
+ * child-first, so this is set before the shell's own effect reads it — but the
+ * shell's first RENDER still sees the default key. That's harmless: the default
+ * key for such a screen never gets written to, so its restore finds nothing and
+ * does nothing, and the re-render with the real key follows immediately.
+ */
+export function useScrollMemoryKey(key: string) {
+  useEffect(() => {
+    override = key;
+    for (const listener of listeners) listener();
+    return () => {
+      // Only clear what we set — a screen replacing another has already
+      // published its own key by the time this runs.
+      if (override !== key) return;
+      override = null;
+      for (const listener of listeners) listener();
+    };
+  }, [key]);
+}
+
+/** The published key, or null to fall back to the shell's URL-derived one. */
+export function useScrollMemoryKeyOverride(): string | null {
+  return useSyncExternalStore(
+    subscribeToOverride,
+    () => override,
+    () => null
+  );
+}
+
 /**
  * Remember this page's scroll position under `key`, and put it back on the way
- * in. The key identifies WHAT is being scrolled, not the route — the order
- * guide passes location + date + weekday, so Monday at DF01 and Thursday at
- * DF02 keep their own places instead of sharing one. Changing the key mid-life
- * is fine: the old position is flushed and the new one looked up.
+ * in. The key identifies WHAT is being scrolled, not the route. Changing the
+ * key mid-life is the normal case — the shell holds one of these for the whole
+ * session and re-keys on every navigation — so the old position is flushed and
+ * the new one looked up.
  *
- * Window scroll only. The guide's list is in the page's own flow (there is no
- * inner pane — see OrderGuide), which is the case for every list in the app.
+ * Scrolls the WINDOW by default. Pass `ref` for a list that scrolls inside its
+ * own pane instead — DataTable's `scroll` mode, which is the only other place
+ * a list can be scrolled in this app. An empty key is a no-op, so a component
+ * can call this unconditionally and decide per render whether it applies.
  */
-export function useScrollMemory(key: string) {
+export function useScrollMemory(key: string, ref?: RefObject<HTMLElement | null>) {
   useEffect(() => {
+    if (!key) return;
+    // A pane that hasn't rendered has no scroll to remember. Refs are populated
+    // before effects run, so this means "not this time", not "not yet".
+    const pane = ref ? ref.current : null;
+    if (ref && !pane) return;
+
+    const getY = () => (pane ? pane.scrollTop : window.scrollY);
+    const setY = (y: number) => {
+      if (pane) pane.scrollTop = y;
+      else window.scrollTo(0, y);
+    };
+    // Wheel and touch land on the pane when there is one; a keypress is
+    // page-wide either way.
+    const scroller: EventTarget = pane ?? window;
+
     const storageKey = PREFIX + key;
     const target = read(storageKey);
 
@@ -68,8 +139,8 @@ export function useScrollMemory(key: string) {
     let frames = 0;
 
     // The last position we believe in, kept in a variable rather than read back
-    // off the window when it's needed: by the time this component unmounts the
-    // router may already have scrolled the page somewhere else.
+    // off the scroller when it's needed: by the time this re-keys or unmounts,
+    // the router may already have scrolled the page somewhere else.
     let latest = 0;
     let moved = false;
     let wroteAt = 0;
@@ -80,7 +151,7 @@ export function useScrollMemory(key: string) {
     // remembered, and it was the thing being dropped (measured 2026-07-30).
     const onScroll = () => {
       if (restoring) return;
-      latest = window.scrollY;
+      latest = getY();
       moved = true;
       const now = performance.now();
       if (now - wroteAt < WRITE_EVERY_MS) return;
@@ -96,11 +167,11 @@ export function useScrollMemory(key: string) {
 
     const settle = () => {
       if (!restoring) return;
-      window.scrollTo(0, target);
+      setY(target);
       frames += 1;
-      // Within a pixel is arrived. Otherwise the document is still too short to
+      // Within a pixel is arrived. Otherwise the list is still too short to
       // reach the target, so wait a frame and ask again.
-      if (frames < SETTLE_FRAMES && Math.abs(window.scrollY - target) > 1) {
+      if (frames < SETTLE_FRAMES && Math.abs(getY() - target) > 1) {
         requestAnimationFrame(settle);
       } else {
         restoring = false;
@@ -114,17 +185,17 @@ export function useScrollMemory(key: string) {
       if (moved) write(storageKey, latest);
     };
 
-    window.addEventListener("scroll", onScroll, { passive: true });
-    window.addEventListener("wheel", surrender, { passive: true });
-    window.addEventListener("touchstart", surrender, { passive: true });
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    scroller.addEventListener("wheel", surrender, { passive: true });
+    scroller.addEventListener("touchstart", surrender, { passive: true });
     window.addEventListener("keydown", surrender);
     window.addEventListener("pagehide", flush);
     if (restoring) requestAnimationFrame(settle);
 
     return () => {
-      window.removeEventListener("scroll", onScroll);
-      window.removeEventListener("wheel", surrender);
-      window.removeEventListener("touchstart", surrender);
+      scroller.removeEventListener("scroll", onScroll);
+      scroller.removeEventListener("wheel", surrender);
+      scroller.removeEventListener("touchstart", surrender);
       window.removeEventListener("keydown", surrender);
       window.removeEventListener("pagehide", flush);
       // Leaving is the moment that matters, and the throttle may have swallowed
@@ -132,5 +203,5 @@ export function useScrollMemory(key: string) {
       // is stored is still true.
       flush();
     };
-  }, [key]);
+  }, [key, ref]);
 }

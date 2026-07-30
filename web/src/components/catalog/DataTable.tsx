@@ -1,8 +1,10 @@
 "use client";
 
-import { Fragment, useMemo, useState, type ReactNode } from "react";
+import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { makeComparator, nextSortDir, type SortDir, type SortValue } from "@/lib/tableSort";
 import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
+import { useScrollMemory } from "@/lib/scrollMemory";
 import { ColumnHeader } from "./ColumnHeader";
 
 export type DataColumn<T> = {
@@ -86,6 +88,15 @@ export function DataTable<T>({
   const { widths, startResize, setWidth, reset, customized, totalWidth } =
     useResizableColumns(storageKey, defaultWidths);
 
+  // A table in `scroll` mode is the one list the page's own scroll memory can't
+  // see: the rows move inside this pane and the window never moves at all. Its
+  // key is the path plus the widths key, which is already this table's identity
+  // — so a paned table remembers its place with no caller changes, and every
+  // future one does too. Unpaned tables pass an empty key, which is a no-op.
+  const paneRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  useScrollMemory(scroll ? `pane:${pathname}:${storageKey}` : "", paneRef);
+
   const [internalSort, setInternalSort] = useState<{ key: string; dir: SortDir } | null>(
     defaultSort ? { key: defaultSort.key, dir: defaultSort.dir ?? "asc" } : null
   );
@@ -132,7 +143,7 @@ export function DataTable<T>({
 
   return (
     <div className="space-y-1">
-      <div className={wrapper}>
+      <div ref={paneRef} className={wrapper}>
         <table
           className="table-fixed border-collapse text-[15px]"
           style={{ width: totalWidth(columns) }}

@@ -574,7 +574,8 @@ weekday column, and 003 then silently made it per-vendor-item.
   "Stock here" shares that slot where a row doesn't exist yet.
 - **Every list uses `DataTable`** (`web/src/components/catalog/DataTable.tsx`):
   sortable headers, drag-resizable columns, optional scroll pane with a sticky
-  header, optional expandable rows, 56px rows and no rule between them. Give it columns + rows; don't hand-roll a
+  header (which remembers its own scroll — see scroll restoration), optional
+  expandable rows, 56px rows and no rule between them. Give it columns + rows; don't hand-roll a
   `<table>`. Supporting pieces: `ColumnHeader` (the header cell + resize grip),
   `lib/tableSort.ts` (comparator — empty cells sink last in BOTH directions),
   `lib/columnWidths.ts` (`useResizableColumns`). `/cleanup` predates this and is
@@ -593,30 +594,43 @@ weekday column, and 003 then silently made it per-vendor-item.
   The search box is deliberately NOT remembered.
   A list that persists sort in the URL must pass `sort`/`onSortChange` to
   `DataTable`, or the header arrow and the URL disagree.
-- **The order guide remembers where you were in it** (`lib/scrollMemory.ts`,
-  Mark, 2026-07-30) — this is what pays for detail views going back to full
-  screen. `useScrollMemory(key)` records the window scroll under a key and puts
-  it back on the way in. Four things it took to make that reliable, each of
-  which is a trap on its own:
-  (a) **The key carries the WEEKDAY as well as the location and the date.**
-  `guideDate` is *today* — the day picker doesn't move it — so location+date
-  alone restores Monday's position into Thursday's much shorter list. The key
-  is `guide:<location>:<date>:<weekday>`.
-  (b) **Restoring is a negotiation, not one `scrollTo`.** At mount the list
+- **Scroll restoration is UNIVERSAL and nothing opts in** (`lib/scrollMemory.ts`
+  + `components/ScrollMemory.tsx`, Mark, 2026-07-30: "any list view now and in
+  the future"). This is what pays for detail views going back to full screen.
+  A new screen gets it by existing — do not add a hook call when you build one.
+  Two scrollers are covered, because those are the only two a list can have:
+  - **The window**, by `<ScrollMemory>` in the (app) layout, keyed by
+    **active location + pathname**. In the layout because the layout survives
+    navigation: one hook, re-keyed on every move, flushes the page you're
+    leaving and restores the one you're arriving at. Location is in the key
+    because every list is location-scoped and switching location is a
+    navigation to the SAME url. The query string is deliberately out of it —
+    filters and sort live there and change per keystroke, and you always return
+    to the url you left because that's what the breadcrumb stamps.
+  - **A DataTable pane** (`scroll` mode — currently only the vendor's items
+    table), keyed by pathname + the table's own `storageKey`. The rows move
+    inside the pane and the window never moves, so the page-level memory can't
+    see it. Automatic for any future paned table.
+  A screen whose identity ISN'T its url publishes its own key with
+  `useScrollMemoryKey`. Exactly one does: the **order guide**, because
+  `guideDate` is *today* and the picker doesn't move it (so location+path would
+  restore Monday's position into Thursday's shorter list), and because the same
+  list arrives at both `/order-guide` and `/order-guide?day=4` — a key carrying
+  the query would miss on exactly the round trip this exists for.
+  Three things it took to make the mechanism reliable, each a trap on its own:
+  (a) **Restoring is a negotiation, not one `scrollTo`.** At mount the list
   hasn't reached full height, so a single call clamps to whatever the document
   is at that instant and leaves you short. It re-asserts for up to 12 frames,
   and surrenders the moment the reader wheels/touches/types — deliberately NOT
   on the `scroll` event, which our own scrollTo fires.
-  (c) **Writes are throttled by the clock, never deferred to
+  (b) **Writes are throttled by the clock, never deferred to
   `requestAnimationFrame`.** rAF doesn't run in a hidden tab, so a
   frame-deferred write can simply never happen — measured 2026-07-30, the
-  position was still null after scrolling. The last thing you did before
-  switching away is exactly what you want remembered.
-  (d) **It flushes on unmount and on `pagehide`** (not `unload` — iOS Safari
-  fires the one and not the other), because the throttle can swallow the last
-  move and leaving is the moment that matters.
-  sessionStorage, so it dies with the tab like the guide's view cookie. The
-  hook is generic; no other list uses it yet.
+  position was still unrecorded after a 6,000px scroll.
+  (c) **It flushes on re-key, on unmount and on `pagehide`** (not `unload` —
+  iOS Safari fires the one and not the other), because the throttle can swallow
+  the last move and leaving is the moment that matters.
+  sessionStorage, so it dies with the tab like the guide's view cookie.
 - **Breadcrumbs follow the route taken**, not a fixed hierarchy (`lib/breadcrumbs.ts`):
   links stamp `from`, the trail nests, recorded hrefs are trimmed so the URL
   can't grow unbounded. An item reached from a vendor leads back to that vendor.
@@ -633,10 +647,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   `[id]` segment carries its OWN `loading.tsx`; without one the list's
   loading.tsx a segment up covers the wait and announces the wrong thing
   ("Loading the vendor list…" while a vendor opens). What the panel bought and
-  a page can't: the list underneath stayed mounted, so guide scroll survived a
-  round trip. Filters and sort still survive (URL / the guide's session
-  cookie), and the order guide buys its scroll back explicitly — see scroll
-  memory below. New detail screens are just pages.
+  a page can't: the list underneath stayed mounted, so scroll survived a round
+  trip. Filters and sort still survive (URL / the guide's session cookie), and
+  scroll is bought back for every screen — see scroll restoration below. New
+  detail screens are just pages.
 - **Safari:** a table cell under `border-collapse` is NOT a containing block in
   WebKit — anchor absolutely-positioned children to an inner `<div>`. And see
   web/README.md on Safari caching a stale dev stylesheet.
