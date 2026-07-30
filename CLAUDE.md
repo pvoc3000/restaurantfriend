@@ -624,6 +624,31 @@ weekday column, and 003 then silently made it per-vendor-item.
 - **Safari:** a table cell under `border-collapse` is NOT a containing block in
   WebKit — anchor absolutely-positioned children to an inner `<div>`. And see
   web/README.md on Safari caching a stale dev stylesheet.
+- **The browser floor is Safari 16.4 / iOS 16.4** (established 2026-07-29, when
+  Mark couldn't get past the login screen on an iPad Air 2). Not a policy — a
+  measurement: the built stylesheet uses `@property` (46×, Safari 16.4+) and
+  `color-mix()` (20×, Safari 16.2+), which is also Tailwind v4's own stated
+  minimum. There is no `browserslist` override and no polyfill, and adding one
+  would mean dropping to Tailwind v3 and unpicking the design-system port.
+  **On iOS every browser is WebKit at the OS version**, so Chrome/Firefox/Edge
+  are the same engine — a browser choice can never work around this, and neither
+  can "request desktop site" (user-agent only). Alternative engines need iOS
+  17.4+ in the EU and no major browser shipped one anyway.
+  **The symptom is not a styling one, which is what makes it confusing:** below
+  the floor React doesn't hydrate, so `login/page.tsx`'s `onSubmit` never
+  attaches, the form does a NATIVE submit to its own URL, and the screen
+  "refreshes with the credentials gone" — no error, because the code that would
+  show one never ran. Tells: a trailing `?` on `/login`, and an unstyled login
+  card. (Harmless at least: neither input has a `name`, so a native GET submits
+  nothing and the password stays out of the URL and history.)
+  Consequence for the roadmap: **an iPad Air 2 can't be the phase-4 ordering
+  stopgap** (iOS 15.8.8 is its terminal version, A8X). Remote-desktopping into a
+  Mac is the only thing that works on that hardware. Do NOT reach for a
+  server-side rendering browser (Puffin et al) — it would bypass the engine
+  limit by routing sign-in through a third party. Whether it can be a phase-5
+  SwiftUI target is a separate question and UNVERIFIED: SwiftUI runs on iOS 15,
+  but NavigationStack, Observation and SwiftData all need 16/17, so check real
+  Xcode deployment-target minimums before counting it in or out.
 - **Table naming** (migration 005, 2026-07-22): junction/config tables are named
   by their endpoints (`vendor_locations`, `inventory_item_locations`); workflow
   tables by their business concept (`purchase_orders`, `order_guide_plan_days`).
@@ -711,7 +736,8 @@ weekday column, and 003 then silently made it per-vendor-item.
   there is no single vendor item that speaks for an item-location any more.
 - **Delete/duplicate vendor items.** Design agreed but not built: a per-row `⋯`
   menu (not right-click — no touch equivalent, and iPad Safari is the ordering
-  stopgap). Delete must be usage-aware: `price_history` is `on delete cascade`
+  stopgap — but see the Safari 16.4 floor under Conventions: whichever iPad that
+  turns out to be, it isn't the Air 2). Delete must be usage-aware: `price_history` is `on delete cascade`
   (audit trail lost) and since 008 `order_guide_plan_days.vendor_item_id` is
   `on delete cascade` too — deleting a vendor item silently deletes its
   favorites and their par overrides. Offer deactivate for anything ever ordered.
