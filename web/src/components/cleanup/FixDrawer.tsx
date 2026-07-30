@@ -153,6 +153,7 @@ export function FixDrawer({
                 broken content and impossible par below is downstream of it. */}
             <Section title="Base unit (all locations)">
               <BaseUnitEditor
+                key={`${item.inventory_item_id}:${item.inventory_items.base_unit}`}
                 inventoryItemId={item.inventory_item_id}
                 baseUnit={item.inventory_items.base_unit}
                 defaultPar={item.default_par}

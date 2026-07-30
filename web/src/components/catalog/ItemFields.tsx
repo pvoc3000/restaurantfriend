@@ -60,6 +60,7 @@ export function ItemFields({ item }: { item: CatalogItem }) {
         <dt className="py-0.5 text-subtle">Base unit</dt>
         <dd>
           <BaseUnitEditor
+            key={`${item.id}:${item.base_unit}`}
             inventoryItemId={item.id}
             baseUnit={item.base_unit}
             onChanged={() => router.refresh()}

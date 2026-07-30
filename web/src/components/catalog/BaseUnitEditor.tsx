@@ -40,6 +40,9 @@ export function BaseUnitEditor({
   onChanged: () => void;
 }) {
   const supabase = createClient();
+  // Seeded from a prop, so both call sites KEY this component on
+  // (item, baseUnit) — the cleanup drawer swaps `item` without remounting, and
+  // an unkeyed instance would show the previous item's unit (CLAUDE.md).
   const [next, setNext] = useState(baseUnit);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,15 +57,17 @@ export function BaseUnitEditor({
     ? UNIT_OPTIONS
     : [{ value: baseUnit, label: baseUnit }, ...UNIT_OPTIONS];
 
-  async function save() {
-    if (next === baseUnit) return;
+  // Takes the unit rather than reading `next`: setNext is async, so the state
+  // this runs beside is still the OLD value on the tick `choose` fires.
+  async function save(chosen: string) {
+    if (chosen === baseUnit) return;
     setBusy(true);
     setError(null);
     setResult(null);
 
     const { error: unitError } = await supabase
       .from("inventory_items")
-      .update({ base_unit: next })
+      .update({ base_unit: chosen })
       .eq("id", inventoryItemId);
     if (unitError) {
       setBusy(false);
@@ -86,7 +91,7 @@ export function BaseUnitEditor({
     let recomputed = 0;
     let manual = 0;
     for (const vi of vis ?? []) {
-      const derived = derivedPackContent(vi, next);
+      const derived = derivedPackContent(vi, chosen);
       if (derived === null) {
         if (vi.package_content !== null) manual++;
         continue;
@@ -110,13 +115,51 @@ export function BaseUnitEditor({
     onChanged();
   }
 
+  /**
+   * Picking a unit IS the edit (Mark, 2026-07-29 — "can't the app tell when the
+   * popup menu is changed?"). It can, and a separate button made the select lie:
+   * it would read "oz" while the database still said "lbs" until you clicked.
+   *
+   * What the button was actually carrying was the warning, and that still has to
+   * be said — package contents get recomputed but PARS DO NOT, so every par at
+   * every location quietly means something else afterwards and nothing else on
+   * screen would tell you. So the warning becomes the confirm. Same two actions
+   * as before, minus a control that showed an unsaved value.
+   *
+   * window.confirm rather than a styled dialog, matching Clear guide and the PO
+   * batch delete: the house pattern for a far-reaching action is a plain confirm
+   * that names what's about to happen.
+   */
+  function choose(chosen: string) {
+    if (chosen === baseUnit) return;
+    const parLine =
+      defaultPar !== null && defaultPar !== undefined
+        ? `The par stays ${Number(defaultPar)} — now meaning ${Number(defaultPar)} ${chosen}, not ${Number(defaultPar)} ${baseUnit}.`
+        : `Pars are NOT converted — each location keeps the number it has, now read as ${chosen} rather than ${baseUnit}.`;
+    const ok = window.confirm(
+      `Count this item in ${chosen} instead of ${baseUnit}?\n\n` +
+        `This applies at EVERY location, not just this one.\n\n` +
+        `Package contents that can be worked out from their pack are recomputed; ` +
+        `the rest are left for you and will show up in the cleanup queue.\n\n` +
+        parLine
+    );
+    // Snap back on cancel, so the control never shows a value that isn't saved.
+    if (!ok) {
+      setNext(baseUnit);
+      return;
+    }
+    setNext(chosen);
+    void save(chosen);
+  }
+
   return (
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2">
         <select
           value={next}
-          onChange={(e) => setNext(e.target.value)}
-          className="border border-ink px-2 py-1"
+          disabled={busy}
+          onChange={(e) => choose(e.target.value)}
+          className="border border-ink px-2 py-1 disabled:opacity-35"
           aria-label="base unit"
         >
           {options.map((o) => (
@@ -125,40 +168,8 @@ export function BaseUnitEditor({
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          disabled={busy || next === baseUnit}
-          onClick={save}
-          className="border border-ink px-3 py-1 hover:bg-neutral-100 disabled:opacity-35"
-        >
-          {busy ? "Saving…" : "Change base unit"}
-        </button>
+        {busy && <span className="text-muted">Saving…</span>}
       </div>
-
-      {next !== baseUnit && !result && (
-        <p className="text-muted">
-          Counts this item in <span className="font-medium text-body">{next}</span>{" "}
-          at <span className="font-medium text-body">every location</span>, not
-          just this one. Package contents that can be worked out from their pack
-          are recomputed; the rest come back to this queue.
-          {defaultPar !== null && defaultPar !== undefined ? (
-            <>
-              {" "}
-              The par stays{" "}
-              <span className="font-medium text-body">{Number(defaultPar)}</span> —
-              now meaning {Number(defaultPar)} {next}, not {Number(defaultPar)}{" "}
-              {baseUnit}. Reset it below if that isn&apos;t what you want.
-            </>
-          ) : (
-            <>
-              {" "}
-              <span className="font-medium text-body">Pars are not converted</span> —
-              each location keeps the number it has, now read as {next} rather
-              than {baseUnit}. Check them below.
-            </>
-          )}
-        </p>
-      )}
 
       {result && (
         <p className="border border-ink bg-[var(--rf-green-50)] px-2 py-1.5 text-ink">
