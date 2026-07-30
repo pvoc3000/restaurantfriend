@@ -53,30 +53,54 @@ export function BackToTop() {
       title="Back to the top of the list"
       // bottom-16 clears the 52px ActionBar with 12px to spare.
       //
-      // right-3 at EVERY width — 12px, deliberately not the page gutter (Mark,
-      // 2026-07-29 asked for it closer to the edge; it was 48px on desktop,
-      // aligned with the content like the four black bands). It shouldn't align
-      // with them: this thing floats over the list instead of sitting in the
-      // column, and convention puts a floating control near the window edge, not
-      // indented to the text. So it no longer steps in at 1280 either.
+      // LEFT, not the conventional right (Mark, 2026-07-29). Convention loses to
+      // the shape of this screen: the guide puts every control it has in the
+      // rightmost column — the −/box/+ stepper, deliberately against the right
+      // edge where a thumb lands — so a bottom-right disc floats over the one
+      // thing you tap all day and can swallow a + on the last visible row.
+      // Bottom-LEFT it covers the Vendor cell, which is text you read and never
+      // touch. left-3 at EVERY width: 12px off the window edge rather than the
+      // page gutter, because it floats over the list instead of sitting in the
+      // column.
       //
       // z-30 matches the bar: above the list and its sticky column labels
       // (z-20), below the detail slide-over (z-40) and the masthead (z-50).
       // 48px square — this is pressed standing, so it clears the 44px
       // touch-target minimum.
       //
-      // GREY + SHADOW: deliberately against the design system, on request to
-      // see it (Mark, 2026-07-29 — "I may decide it's bad but want to see it").
-      // Two rules broken, both worth naming so this is easy to undo:
+      // GREY + SHADOW + TRANSLUCENCE: deliberately against the design system, on
+      // request to see it (Mark, 2026-07-29 — "I may decide it's bad but want to
+      // see it", then "I like being able to see text underneath it"). Three
+      // rules broken, all worth naming so this is easy to undo:
       //  - "chrome is black, not grey" (colors.css --rf-surface-chrome). The
       //    grey is --rf-neutral-600, the darkest that still reads as grey rather
-      //    than as failed black, and white-on-it clears AA.
+      //    than as failed black.
       //  - "elevation: there is none" (elevation.css), which is why the shadow
       //    has to be an arbitrary value — @theme sets --shadow-*: initial, so
       //    shadow-md and friends don't exist to use.
-      // To revert: bg-[var(--rf-neutral-600)] → bg-ink, drop both shadow-*
-      // classes, hover back to hover:bg-neutral-800.
-      className="fixed bottom-16 right-3 z-30 grid h-12 w-12 place-items-center rounded-full bg-[var(--rf-neutral-600)] text-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--rf-neutral-700)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.28)]"
+      //  - opacity as a surface treatment, which the system doesn't otherwise
+      //    use. 85% leaves the row legible through the disc and still measures
+      //    ~5.1:1 for the white caret over white content — past AA for text, and
+      //    well past the 3:1 a glyph needs. Solid on hover, so pressing it feels
+      //    like a button rather than a film.
+      //
+      //    #545454d9 is --rf-neutral-600 at 85%, written as a LITERAL because
+      //    neither token-preserving spelling survives the build, both tried:
+      //      · an arbitrary var() background with a slash-opacity modifier —
+      //        Tailwind can't see a var's alpha, emits a broken var with a
+      //        literal ellipsis in it, and Turbopack's CSS parser then rejects
+      //        the whole sheet. The dev server 500s.
+      //      · an arbitrary color-mix() wrapping the same var — identical
+      //        failure, same mangled var.
+      //    Do NOT write either spelling in this file even inside a comment:
+      //    Tailwind scans comments, so the class is regenerated from the note
+      //    describing it and the build breaks again. (That is how this comment
+      //    came to be phrased in prose.)
+      //    The hex therefore has to be kept in step with the token by hand — if
+      //    --rf-neutral-600 ever moves off #545454, this moves with it.
+      // To revert: bg-[#545454d9] → bg-ink, drop both shadow-* classes, hover
+      // back to hover:bg-neutral-800.
+      className="fixed bottom-16 left-3 z-30 grid h-12 w-12 place-items-center rounded-full bg-[#545454d9] text-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--rf-neutral-700)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.28)]"
     >
       <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden focusable="false">
         <path
