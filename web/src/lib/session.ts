@@ -23,7 +23,22 @@ export type AppSession = {
   userId: string;
   email: string;
   membership: Membership;
+  /**
+   * EVERY location in the org, inactive ones included (Mark, 2026-07-30) — the
+   * switcher offers all six, because an inactive location is still a record
+   * someone has to maintain and `/location` is where it's maintained.
+   *
+   * Use this to LOOK UP a location by id. A `vendor_locations` row at DF03 now
+   * renders its code instead of an em dash.
+   */
   locations: Location[];
+  /**
+   * The subset you'd ENUMERATE — a row per location, a scope over locations.
+   * Item detail's per-location rows, the vendor item's price rows and the
+   * cleanup queue's all-locations mode all use this, so three closed shops
+   * don't sprout dead rows on every screen in the app.
+   */
+  activeLocations: Location[];
   activeLocation: Location | null;
   /** orgs.settings, embedded here rather than fetched again: it's one jsonb
    *  column reached through an FK the membership query already traverses, and
@@ -65,10 +80,11 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
       .select("org_id, role, display_name, last_active_location_id, orgs(settings)")
       .eq("user_id", user.id)
       .maybeSingle<Membership & { orgs: { settings: OrgSettings | null } | null }>(),
+    // No is_active filter: the switcher carries every location. See the two
+    // fields on AppSession for which list a screen should reach for.
     supabase
       .from("locations")
       .select("id, code, name, kind, is_active")
-      .eq("is_active", true)
       .order("code"),
   ]);
 
@@ -83,15 +99,20 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
   if (locationsError) throw locationsError;
 
   const list = (locations ?? []) as Location[];
-  // Fall back to the first location so a fresh user always has a context.
+  const active = list.filter((l) => l.is_active);
+  // Resolved over the FULL list, not the active one: switching to a closed
+  // location would otherwise fall through to the `?? …[0]` and snap silently
+  // back to DF01, which looks exactly like the switcher not working.
+  // The fallback stays active-only so a fresh user lands somewhere real.
   const activeLocation =
-    list.find((l) => l.id === membership.last_active_location_id) ?? list[0] ?? null;
+    list.find((l) => l.id === membership.last_active_location_id) ?? active[0] ?? null;
 
   return {
     userId: user.id,
     email: user.email ?? "",
     membership,
     locations: list,
+    activeLocations: active,
     activeLocation,
     orgSettings: membership.orgs?.settings ?? {},
   };

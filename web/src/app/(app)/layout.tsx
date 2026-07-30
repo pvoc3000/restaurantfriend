@@ -1,4 +1,5 @@
 import { AppHeader } from "@/components/AppHeader";
+import { InactiveLocationGate } from "@/components/InactiveLocationGate";
 import { ScrollMemory } from "@/components/ScrollMemory";
 import { getAppSession } from "@/lib/session";
 
@@ -24,7 +25,17 @@ export default async function AppLayout({
           pages where the table is never wider than the window"). The masthead,
           its collapsed strip and the ActionBar carry the SAME pair, so the four
           black-and-white bands stay aligned at every width. */}
-      <main className="flex-1 px-4 py-8 xl:px-12">{children}</main>
+      <main className="flex-1 px-4 py-8 xl:px-12">
+        {/* The switcher lists closed locations too, so every screen but
+            /location has to answer for one. See InactiveLocationGate. */}
+        <InactiveLocationGate
+          code={session.activeLocation?.code ?? null}
+          isActive={session.activeLocation?.is_active ?? true}
+          locationId={session.activeLocation?.id ?? null}
+        >
+          {children}
+        </InactiveLocationGate>
+      </main>
       {/* Renders nothing; remembers where you were on every screen. AFTER the
           page, so a screen publishing its own scroll key has already done so by
           the time this one's effect runs (effects go child-first, siblings in

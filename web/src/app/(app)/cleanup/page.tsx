@@ -47,9 +47,10 @@ export default async function CleanupPage({
   const session = await getAppSession();
   const supabase = await createClient();
 
-  // "All locations" means all *active* locations — the ones you can actually
-  // work at (the header switcher lists the same set). Default is the active one.
-  const activeLocationIds = session.locations.map((l) => l.id);
+  // "All locations" means all *active* locations — the ones anyone actually
+  // orders at. (The switcher lists closed ones too, so they can be maintained
+  // on /location, but a closed shop's catalog is not a cleanup burn-down.)
+  const activeLocationIds = session.activeLocations.map((l) => l.id);
   const targetIds = allLocations
     ? activeLocationIds
     : session.activeLocation

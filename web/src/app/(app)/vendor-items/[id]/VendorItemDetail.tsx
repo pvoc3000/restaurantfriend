@@ -139,7 +139,9 @@ export async function VendorItemDetail({
     favoritesByIl.set(p.item_location_id, list);
   }
 
-  const locationRows: VendorItemLocationRow[] = session.locations.map((location) => {
+  // A row per ACTIVE location: this table offers a price override at each shop,
+  // and a closed one has nothing to price.
+  const locationRows: VendorItemLocationRow[] = session.activeLocations.map((location) => {
     const il = ilByLocation.get(location.id) ?? null;
     return {
       location,

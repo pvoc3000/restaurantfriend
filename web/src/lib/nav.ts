@@ -46,7 +46,17 @@ export const SECTIONS: NavSection[] = [
     // told you where you were working before you looked anywhere else.
     label: "Location",
     subs: [
-      stub("location", "locations", "Locations"),
+      // Singular, and id-less: /location is always the location you're working
+      // at. The switcher lists closed locations too, so it reaches all six.
+      // The SLUG stays plural — it's the rf.nav cookie key and the target of
+      // /soon/location/locations, and renaming it would cost both for nothing.
+      { slug: "locations", label: "Location", href: "/location", built: true },
+      {
+        slug: "shop-sections",
+        label: "Shop Sections",
+        href: "/shop-sections",
+        built: true,
+      },
       stub("location", "tasks", "Tasks"),
       stub("location", "maintenance-requests", "Maintenance Requests"),
       stub("location", "inspection-logs", "Inspection Logs"),

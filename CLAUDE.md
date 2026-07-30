@@ -269,6 +269,29 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `vendor_locations.delivery_days`, so the PDF's Delivery block is filled in
    without anyone remembering. The Process card's date input stays for the
    exceptions.
+4b. 🚧 **The Location module** — the first screen outside Purchasing (Mark,
+   2026-07-30). `locations` was the one table with no UI at all: nothing in
+   `web/src` wrote to it, and its six rows still carried raw FileMaker text in
+   `settings` (`"10am␝10am␝…"` for hours, `LaborRate_n` as a string) while 42
+   of FMP's 51 location columns had been dropped at transform time. Shipped:
+   **`/location`** — the location you're WORKING AT, singular and id-less;
+   there is no list and no `[id]` route, because the section tab already wears
+   the active code and the switcher reaches the rest. One page, no tabs: FMP's
+   INFO2 was SMTP credentials (replaced by the provider layer, and never to be
+   displayed) plus three unbuilt modules, and REQUESTS was three more. Blocks:
+   identity, the two addresses, operating hours, tax/labor/registers, the
+   production mapping, four counts that link out, and a read-only statement of
+   which email tier POs go through. **`/shop-sections`** — the 168 rows that
+   order the guide's walk, editable at last, location-scoped, with a guarded
+   delete (the FK is `on delete set null`, so deleting a section moves its
+   items to "No section" rather than deleting them).
+   **The switcher now lists ALL SIX locations**, closed ones under an
+   "Inactive" optgroup — an inactive location is a record you maintain, not a
+   shop you work in, so `components/InactiveLocationGate.tsx` in the (app)
+   layout replaces every screen except `/location` with a sentence and an
+   Activate button. Without it those screens don't break, they just render as
+   inexplicably empty tables. One component; delete it and the wiring line to
+   go back. Schema: migration 017 + `migration/backfill-locations.mjs`.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -335,10 +358,35 @@ what the Process card's date input is still for. Drafts are backfilled, history
 isn't. Same arithmetic as the suggestion chip it replaces
 (`lib/poProcessing.ts` `nextDeliveryDate`) — if one changes, change both.
 
+Migration 017 makes the location a real record — the FMP fields that were
+dropped or left as raw text get TYPED COLUMNS on `locations`: `tax_rate`
+(a FRACTION, 0.0975, shown as a percentage), `labor_rate`, `register_count`,
+`open_days` (the same ISO smallint[] `WeekdayPicker` writes), the seven-slot
+`open_time_by_weekday` / `close_time_by_weekday`, and the production mapping
+`kitchen_by_weekday` (seven slots) / `shops_for`. Every per-weekday array
+copies 009's `par_by_weekday` — slot n = weekday n, with the same
+`is null or array_length = 7` guard — so weekday indexing reads the same
+everywhere in the schema. Not more `settings` jsonb: these are structured facts
+of the same class as `vendor_locations.order_days`, and a column is what the
+existing inline controls know how to write. **After the backfill,
+`locations.settings` holds `email_provider` and nothing else** (today, nothing
+at all — DF's override is at the ORG level). 017 also adds
+`unique (location_id, display_name)` on `shop_sections`: that name is the
+identity the guide groups by and the key `load.mjs` dedupes on, and the new
+shop-sections screen is a second writer.
+The VALUES come from the raw export, not the migration — run
+`migration/backfill-locations.mjs` (dry run by default, `--apply` to write),
+which parses `Location.mer` and also STRIPS the retired FMP keys from
+`settings`. Addresses stay jsonb: `lib/poProcessing.ts` reads
+`address.shipping` straight through as a PO's Ship-to, and that contract
+shouldn't move for a form — `InlineValue` grew a json path instead.
+
 **Migrations 001–016 are ALL APPLIED to the hosted DB** (013 verified
 2026-07-23 by the bogus-argument RPC probe; 015 and 016 verified 2026-07-28 —
 the note backfill hit drafts only, and `select next_delivery_date('2026-07-28',
-'{5}')` returns 2026-07-31 over RPC).
+'{5}')` returns 2026-07-31 over RPC). **017 is NOT applied yet** — probe with
+`select tax_rate from locations limit 1`. `/location` selects its columns, so
+that screen is broken until it is.
 
 The 16 POs Mark sent on 2026-07-27 have NO delivery date and that is deliberate
 (his call, 2026-07-28): 016's backfill skipped them because they were already
@@ -384,6 +432,17 @@ weekday column, and 003 then silently made it per-vendor-item.
 3. **Location context**: the user is always "working at" one active location
    (persisted per user in `org_members.last_active_location_id`); every
    location-scoped screen filters by it; switching is a 2-tap header control.
+   The session carries TWO lists and picking the wrong one is a silent bug
+   (2026-07-30): **`session.locations` is every location**, closed ones
+   included — use it to LOOK UP a code by id, and a `vendor_locations` row at
+   DF03 stops rendering an em dash. **`session.activeLocations` is the subset
+   you ENUMERATE** — a row per location, a scope over locations (item detail's
+   per-location rows, the vendor item's price rows, cleanup's all-locations
+   mode), so three closed shops don't sprout dead rows everywhere. And
+   `activeLocation` must resolve over the FULL list: resolving it over the
+   active-only one falls through to the `?? …[0]` fallback and snaps a switch
+   to DF04 silently back to DF01, which looks exactly like the switcher being
+   broken.
 4. **The order guide is the VIEW `v_order_guide`** — never materialize it into
    a table, never cache-and-sync. This rule exists because the FMP version did
    the opposite and it was the single worst source of bugs and slowness.
@@ -408,7 +467,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | Reach for | Instead of | For |
   | --- | --- | --- |
   | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary; opens below the field, portals so panes can't clip it |
-  | `catalog/InlineValue` | a hand-wired edit-in-place | any editable cell — `kind` text / number / date / **pick** |
+  | `catalog/InlineValue` | a hand-wired edit-in-place | any editable cell — `kind` text / number / date / **pick**; `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column |
   | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
   | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory |
@@ -811,7 +870,8 @@ weekday column, and 003 then silently made it per-vendor-item.
 ## Domain cheat-sheet (why screens look the way they do)
 
 - The order guide walks the physical shop: grouped by `shop_sections`
-  (sort_order, e.g. "31 Storage - R1 S1"), item headers show par, vendor items
+  (sort_order, e.g. "31 Storage - R1 S1" — maintained at `/shop-sections`,
+  per location), item headers show par, vendor items
   nested with pack + unit price ($/oz comparison matters — pack sizes differ).
 - Favorites = plan rows (`order_guide_plan_days`): the preferred source per
   weekday, ★-marked, overridable in the moment. Since 008 a favorite is one of

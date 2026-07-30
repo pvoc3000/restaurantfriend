@@ -24,7 +24,45 @@ import { PickList, type PickOption } from "@/components/ui/PickList";
  * the choice is the edit, saved immediately, with no blur to wait for. Use it
  * for any column whose values are a known vocabulary — a package token, a unit,
  * a category — which is most of what used to accept anything at all.
+ *
+ * A cell can also address a key INSIDE a jsonb column: pass `jsonColumn` +
+ * `jsonPath` + the column's current value as `jsonDocument`. That's what the
+ * location's two addresses are — thirteen fields living in `locations.address`,
+ * which stays jsonb because `lib/poProcessing.ts` reads `address.shipping` as
+ * the Ship-to on every vendor PO. See `write()` for the one caveat.
  */
+/**
+ * A copy of `doc` with `path` set to `next` — or with that key REMOVED when
+ * next is null, so clearing a field leaves `{city: "…"}` rather than
+ * `{city: "…", street2: null}` and the address renders the same way an
+ * untouched one does.
+ *
+ * PostgREST can't `jsonb_set`, so the whole column is rewritten. Two people
+ * editing two keys of the same column at the same moment would lose one of the
+ * edits; one person edits this app, and the alternative is a security-definer
+ * RPC per jsonb column, which is a lot of machinery for a form.
+ */
+function setJsonPath(
+  doc: Record<string, unknown> | null | undefined,
+  path: string[],
+  next: string | number | null
+): Record<string, unknown> {
+  const root: Record<string, unknown> = structuredClone(doc ?? {});
+  let node = root;
+  for (const key of path.slice(0, -1)) {
+    const child = node[key];
+    node[key] =
+      child && typeof child === "object" && !Array.isArray(child)
+        ? (child as Record<string, unknown>)
+        : {};
+    node = node[key] as Record<string, unknown>;
+  }
+  const leaf = path[path.length - 1];
+  if (next === null) delete node[leaf];
+  else node[leaf] = next;
+  return root;
+}
+
 export function InlineValue({
   table,
   id,
@@ -39,9 +77,14 @@ export function InlineValue({
   alsoUpdate,
   options,
   allowNew = false,
+  jsonColumn,
+  jsonPath,
+  jsonDocument,
 }: {
   table: string;
   id: string;
+  /** The column this cell writes — unless `jsonPath` is set, in which case
+   *  this is only the field's name for error messages and aria labels. */
   column: string;
   value: string | number | null;
   /** "date" edits with a real date picker and stores an ISO yyyy-mm-dd;
@@ -72,6 +115,12 @@ export function InlineValue({
   options?: PickOption[];
   /** kind="pick" only — let a value off the list be typed in (categories). */
   allowNew?: boolean;
+  /** The jsonb column to write, when this cell edits a key inside one. */
+  jsonColumn?: string;
+  /** Path to the key within that column, e.g. ["shipping", "street1"]. */
+  jsonPath?: string[];
+  /** That column's CURRENT value — the object the new one is derived from. */
+  jsonDocument?: Record<string, unknown> | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -131,7 +180,11 @@ export function InlineValue({
     setError(null);
     const { error } = await supabase
       .from(table)
-      .update({ [column]: next, ...(alsoUpdate?.(next) ?? {}) })
+      .update(
+        jsonColumn && jsonPath
+          ? { [jsonColumn]: setJsonPath(jsonDocument, jsonPath, next) }
+          : { [column]: next, ...(alsoUpdate?.(next) ?? {}) }
+      )
       .eq("id", id);
     setSaving(false);
     if (error) {

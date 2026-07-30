@@ -96,9 +96,12 @@ export async function ItemDetail({
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Per-location config
         </h2>
+        {/* `activeLocations`: this is the "stock here" list, and you don't
+            stock a closed shop. The code lookups above use session.locations,
+            which carries every location. */}
         <ItemLocationRows
           rows={locationRows}
-          locations={session.locations}
+          locations={session.activeLocations}
           inventoryItemId={row.id}
           baseUnit={row.base_unit}
           orgId={session.membership.org_id}
