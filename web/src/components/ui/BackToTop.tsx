@@ -64,7 +64,7 @@ export function BackToTop() {
       // column.
       //
       // z-30 matches the bar: above the list and its sticky column labels
-      // (z-20), below the detail slide-over (z-40) and the masthead (z-50).
+      // (z-20), below the masthead (z-50).
       // 48px square — this is pressed standing, so it clears the 44px
       // touch-target minimum.
       //

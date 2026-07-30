@@ -122,7 +122,7 @@ export function AppNav({
           </nav>
 
           {/* Second tier. Home and Settings belong to no section, so it
-              vanishes there rather than sitting empty — DetailPanel measures
+              vanishes there rather than sitting empty — HeaderShell measures
               the header, so the height change is absorbed. */}
           {currentSection && (
             <nav

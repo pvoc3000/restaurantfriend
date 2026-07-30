@@ -25,18 +25,16 @@ const SELECT = `
 `;
 
 /**
- * The item detail's whole body, shared by the dedicated page and the
- * app-wide slide-over panel (the intercepting route). Breadcrumbs only make
- * sense on the full page — the panel floats over wherever you already are.
+ * The item detail's whole body. Its own full-screen page (Mark, 2026-07-30 —
+ * detail views were slide-overs for a week and are pages again); the body
+ * stays split out from the page shell so the two are easy to tell apart.
  */
 export async function ItemDetail({
   id,
   rawParams,
-  inPanel = false,
 }: {
   id: string;
   rawParams: RawSearchParams;
-  inPanel?: boolean;
 }) {
   // The trail follows the route actually taken — reaching this item from a
   // vendor's item list must lead back to that vendor, not to the Inventory list.
@@ -74,7 +72,7 @@ export async function ItemDetail({
 
   return (
     <div className="space-y-6">
-      {!inPanel && <Breadcrumbs trail={trail} current={row.name} />}
+      <Breadcrumbs trail={trail} current={row.name} />
 
       <ItemFields item={row} />
 

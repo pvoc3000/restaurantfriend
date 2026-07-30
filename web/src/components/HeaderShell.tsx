@@ -16,9 +16,7 @@ import { findSection, findSub, resolveRoute, sectionLabel } from "@/lib/nav";
  * to bring it back"). Collapsing rather than scrolling away is what that
  * shortcut wants to be: the strip is ALWAYS there, so the menu comes back with
  * one tap wherever you are in the list, instead of having to scroll to the top
- * to find it. It also keeps the header sticky, which is load-bearing — the
- * detail slide-over is fixed and starts below the header, so a header that
- * scrolled off would leave a dead strip across the top of the panel.
+ * to find it. It also keeps the header sticky.
  *
  * The flag reaches past this component: it collapses the page's whole chrome,
  * so the order guide's shelf — title, day picker, vendor totals, filters —
@@ -58,8 +56,7 @@ export function HeaderShell({
   // Publish the header's real height so screens that size themselves against
   // the viewport get the space back when it collapses. MEASURED, not assumed:
   // the masthead wraps to two or three rows at iPad widths, so any constant is
-  // wrong at some width. (DetailPanel measures it separately for its own top
-  // offset — same reason.)
+  // wrong at some width.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -75,9 +72,8 @@ export function HeaderShell({
   }, []);
 
   return (
-    // Sticky and above the detail panel (z-50 vs the panel's z-40): the panel
-    // is a slide-over, not a modal, so the nav has to stay reachable — a
-    // full-viewport backdrop over the header made every nav link unclickable.
+    // Sticky, and z-50 so it stays above anything a page floats over itself
+    // (dialogs, the cleanup drawer) — the nav has to stay reachable.
     <header ref={ref} className="sticky top-0 z-50 bg-ink text-white">
       {collapsed ? (
         <div className="flex h-8 items-center gap-4 px-4 text-[11px] uppercase tracking-[0.12em] xl:px-12">

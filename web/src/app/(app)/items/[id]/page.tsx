@@ -1,8 +1,8 @@
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { ItemDetail } from "./ItemDetail";
 
-// The body lives in ItemDetail, shared with the app-wide slide-over panel
-// (@panel's intercepting route). This page is the hard-load / deep-link form.
+// The body lives in ItemDetail; this page is its shell. Detail views are
+// full-screen pages (Mark, 2026-07-30) — no interception, no panel slot.
 export default async function ItemDetailPage({
   params,
   searchParams,

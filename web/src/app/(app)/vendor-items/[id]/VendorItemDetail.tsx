@@ -37,17 +37,15 @@ type PriceChange = {
  * (favorite days, price override, last ordered) or historical (price changes),
  * which is exactly what a row in the vendor-items grid has no room to carry.
  *
- * Shared by the dedicated page and the slide-over panel, like ItemDetail and
- * VendorDetail; breadcrumbs are the full page's job.
+ * Its own full-screen page (Mark, 2026-07-30), with the body split out from
+ * the page shell like ItemDetail and VendorDetail.
  */
 export async function VendorItemDetail({
   id,
   rawParams,
-  inPanel = false,
 }: {
   id: string;
   rawParams: RawSearchParams;
-  inPanel?: boolean;
 }) {
   const queryString = currentQuery(rawParams);
   const session = await getAppSession();
@@ -168,7 +166,7 @@ export async function VendorItemDetail({
 
   return (
     <div className="space-y-6">
-      {!inPanel && <Breadcrumbs trail={trail} current={label} />}
+      <Breadcrumbs trail={trail} current={label} />
 
       <VendorItemFields vi={vi} here={here} />
 

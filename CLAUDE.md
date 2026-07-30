@@ -415,9 +415,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   does that; **table rows carry no dividing rule** (56px rows + hover wash;
   rules that DELIMIT — the head's 2px, a group strip, an expanded row — stay);
   **every checkbox is `components/ui/Checkbox.tsx`**, never a raw
-  `<input type="checkbox">`; the **slide-over has a black LEFT edge and a grey
-  TOP edge** (black-on-black needs a separator, black-on-dimmed-page doesn't);
-  the **ActionBar carries commands only** — a control that changes what a list
+  `<input type="checkbox">`; the **ActionBar carries commands only** — a control that changes what a list
   SHOWS goes with that list's filters — and its cells are **all plain black**
   (Mark, 2026-07-26): `ActionBarButton` still has a `primary` white-fill
   variant, but nothing uses it, because against the bar's own black a white cell
@@ -502,9 +500,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   Collapsing beats scrolling away, and is what that shortcut wants to be: the
   strip is ALWAYS on screen, so the menu returns with one tap from anywhere in
   an 800-line list instead of a scroll to the top. It also keeps the header
-  sticky, which is load-bearing — `DetailPanel` is fixed and starts below the
-  header, so a header that scrolled off would leave a dead strip across the top
-  of every slide-over. `components/HeaderShell.tsx` owns stickiness, the toggle
+  sticky. `components/HeaderShell.tsx` owns stickiness, the toggle
   (▲ in the utilities cluster, "Menu ▾" in the strip) and the state; the strip
   keeps the two things you'd otherwise lose — which app this is and WHICH
   LOCATION you're ordering for. Remembered per user in localStorage
@@ -542,9 +538,9 @@ weekday column, and 003 then silently made it per-vendor-item.
   the click landed; the order guide's TTFB is ~3.5s (five sequential Supabase
   round trips, one of them 877 rows). Each is a one-liner re-exporting
   `components/ui/PageLoading` with a label. Put it on the LEAF segment, not on
-  `(app)/` — a group-level one would also fire for other slots. Verified that
-  `vendors/loading.tsx` does NOT flash when a detail slide-over opens: the
-  `@panel` intercept means `children` never re-renders. This is also the one
+  `(app)/` — a group-level one would also fire for other slots, and a LIST's
+  loading.tsx also covers its `[id]` child unless that child has one of its
+  own, which is why each detail segment now carries one. This is also the one
   place the design system's "no spinners, no skeletons" is relaxed — an
   indeterminate bar, not a skeleton, because a static label during a 3.5s wait
   still reads as stuck. The keyframes live in `globals.css`.
@@ -600,27 +596,23 @@ weekday column, and 003 then silently made it per-vendor-item.
 - **Breadcrumbs follow the route taken**, not a fixed hierarchy (`lib/breadcrumbs.ts`):
   links stamp `from`, the trail nests, recorded hrefs are trimmed so the URL
   can't grow unbounded. An item reached from a vendor leads back to that vendor.
-- **Detail views open as a slide-over panel on in-app navigation** (Mark,
-  2026-07-23): `(app)/@panel` intercepting routes float `/items/[id]`,
-  `/vendors/[id]`, `/vendor-items/[id]` and `/purchase-orders/[id]` over the
-  current page
-  (`DetailPanel.tsx`; close = back). Each detail view leads with a type label
-  ("Inventory" / "Vendor" / "Vendor Item" / "Purchase Order") — the panel
-  hides breadcrumbs, so
-  it's the only cue to which kind of record you're looking at.
-  It is a **slide-over, not a modal**: the header is `sticky z-50`, the panel
-  `z-40` starting below it, so nav stays clickable (a click navigates and the
-  `@panel` catch-all closes the panel). The panel's top offset is MEASURED from
-  the header at runtime — the header wraps to 2–3 rows on a narrow window, so a
-  hardcoded offset silently covers the nav again. Verify overlay changes with a
-  REAL click (`computer`), never a programmatic `.click()`: JS clicks bypass
-  hit-testing and will pass on a nav link that a user physically cannot reach.
-  The page underneath stays mounted — guide scroll/filter survive. Hard loads
-  and deep links render the dedicated pages, which is where breadcrumbs live
-  (the panel shows none). Detail bodies are shared server components
-  (`ItemDetail.tsx` / `VendorDetail.tsx`) — edit those, not the page shells;
-  new detail screens should follow this pattern (slot + `(.)` intercept +
-  catch-all null so nav clicks close the panel).
+- **Detail views are FULL-SCREEN PAGES** (Mark, 2026-07-30 — reversing his
+  2026-07-23 call). `/items/[id]`, `/vendors/[id]`, `/vendor-items/[id]` and
+  `/purchase-orders/[id]` are ordinary routes reached the ordinary way; there
+  is no `@panel` parallel slot, no `(.)` intercept, no `DetailPanel.tsx`, and
+  no `inPanel` prop — all deleted 2026-07-30. **Breadcrumbs** are how you get
+  back and the only cue to which kind of record you're on, so every detail body
+  renders them unconditionally (they were suppressed in the panel, which had a
+  black type strip instead). Bodies stay split out from their page shells
+  (`ItemDetail.tsx` / `VendorDetail.tsx` / `VendorItemDetail.tsx` /
+  `PurchaseOrderDetailView.tsx`) — edit those, not the one-line pages. Each
+  `[id]` segment carries its OWN `loading.tsx`; without one the list's
+  loading.tsx a segment up covers the wait and announces the wrong thing
+  ("Loading the vendor list…" while a vendor opens). What the panel bought and
+  a page cannot: the list underneath stayed mounted, so guide scroll survived a
+  round trip. Filters and sort still survive — they live in the URL or the
+  guide's session cookie — but scroll position does not. New detail screens are
+  just pages.
 - **Safari:** a table cell under `border-collapse` is NOT a containing block in
   WebKit — anchor absolutely-positioned children to an inner `<div>`. And see
   web/README.md on Safari caching a stale dev stylesheet.

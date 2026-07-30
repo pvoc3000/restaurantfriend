@@ -9,18 +9,15 @@ import type { PoLine, PurchaseOrder } from "@/lib/purchaseOrders";
 import { PurchaseOrderDetail } from "@/components/purchasing/PurchaseOrderDetail";
 
 /**
- * The PO detail's whole body, shared by the dedicated page and the app-wide
- * slide-over panel (the intercepting route). Breadcrumbs only make sense on
- * the full page — the panel floats over wherever you already are.
+ * The PO detail's whole body. Its own full-screen page (Mark, 2026-07-30);
+ * the body stays split out from the page shell, like the other detail views.
  */
 export async function PurchaseOrderDetailView({
   id,
   rawParams,
-  inPanel = false,
 }: {
   id: string;
   rawParams: RawSearchParams;
-  inPanel?: boolean;
 }) {
   const trail = parseTrail(rawParams, {
     href: "/purchase-orders",
@@ -89,7 +86,7 @@ export async function PurchaseOrderDetailView({
 
   return (
     <div className="space-y-6">
-      {!inPanel && <Breadcrumbs trail={trail} current={order.po_number} />}
+      <Breadcrumbs trail={trail} current={order.po_number} />
 
       {lineError ? (
         <p className="text-sm text-accent">

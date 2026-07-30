@@ -1,8 +1,8 @@
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { VendorDetail } from "./VendorDetail";
 
-// The body lives in VendorDetail, shared with the app-wide slide-over panel
-// (@panel's intercepting route). This page is the hard-load / deep-link form.
+// The body lives in VendorDetail; this page is its shell. Detail views are
+// full-screen pages (Mark, 2026-07-30) — no interception, no panel slot.
 export default async function VendorDetailPage({
   params,
   searchParams,

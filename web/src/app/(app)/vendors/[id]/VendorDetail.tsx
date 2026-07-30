@@ -36,18 +36,15 @@ type Vendor = {
 };
 
 /**
- * The vendor detail's whole body, shared by the dedicated page and the
- * app-wide slide-over panel (the intercepting route). Breadcrumbs only make
- * sense on the full page — the panel floats over wherever you already are.
+ * The vendor detail's whole body. Its own full-screen page (Mark, 2026-07-30);
+ * the body stays split out from the page shell, like ItemDetail.
  */
 export async function VendorDetail({
   id,
   rawParams,
-  inPanel = false,
 }: {
   id: string;
   rawParams: RawSearchParams;
-  inPanel?: boolean;
 }) {
   // The trail follows the route actually taken (the list's filters ride along
   // inside the recorded href), falling back to the section for a pasted URL.
@@ -135,7 +132,7 @@ export async function VendorDetail({
 
   return (
     <div className="space-y-6">
-      {!inPanel && <Breadcrumbs trail={trail} current={v.name} />}
+      <Breadcrumbs trail={trail} current={v.name} />
 
       <div className="flex flex-wrap items-baseline gap-3">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">{v.name}</h1>
