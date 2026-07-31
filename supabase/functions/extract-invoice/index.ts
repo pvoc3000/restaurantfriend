@@ -71,7 +71,7 @@ const INVOICE_SCHEMA = {
     "invoice_date",
     "invoice_total",
     "lines",
-    "unreadable",
+    "notes",
   ],
   properties: {
     vendor_name: nullable("string"),
@@ -104,9 +104,11 @@ const INVOICE_SCHEMA = {
         },
       },
     },
-    // Where the model couldn't read something. Surfaced to the human rather
-    // than quietly dropped — "I couldn't read line 7" is the useful answer.
-    unreadable: nullable("string"),
+    // The reader's own caveats — surfaced to the human rather than quietly
+    // dropped. Named `notes`, not `unreadable`, because a field called
+    // "unreadable" invites the model to report only illegibility and stay quiet
+    // about the judgements it made, which are just as worth seeing.
+    notes: nullable("string"),
   },
 };
 
@@ -125,15 +127,17 @@ tidy: if the arithmetic on the page is wrong, report what is printed.
   two rates (a per-pound or per-each figure for catch-weight goods alongside a
   case price): pick the one where qty × unit_price equals extended. If neither
   does — a line billed by actual weight, say — report the rate as printed and
-  say so in "unreadable"; do not adjust a number to make the arithmetic close.
+  say so in "notes"; do not adjust a number to make the arithmetic close.
 - pack is the pack or size text if the line shows one ("12 x 32 oz", "CS").
 - Use null for any field not printed on that line. Do not guess.
 - Skip subtotal, tax, delivery, and total rows — those are not line items.
   Put the invoice's grand total in invoice_total.
 - invoice_date as YYYY-MM-DD.
 
-If any part of the document is illegible or ambiguous, say so plainly in
-"unreadable" — naming the line — rather than producing a confident guess.`;
+Use "notes" for anything the reader of this data should know before trusting it,
+naming the lines involved: text you couldn't make out, a choice you had to make
+between two printed numbers, a line whose rate is quoted in different units than
+its quantity. Prefer saying so over producing a confident guess.`;
 
 // ---------------------------------------------------------------------------
 

@@ -28,9 +28,22 @@ export type InvoiceExtraction = {
   invoice_date: string | null;
   invoice_total: number | null;
   lines: InvoiceLine[];
-  /** What the model couldn't read, in its own words. Shown, not swallowed. */
-  unreadable: string | null;
+  /**
+   * The reader's own caveats, in its own words — anything illegible, but also
+   * anything it had to make a judgement about: which of two printed item
+   * numbers it treated as the SKU, why a line's arithmetic doesn't close.
+   * Shown, not swallowed.
+   */
+  notes: string | null;
+  /** What `notes` was called before 2026-07-31, when the field was only for
+   *  illegible text. Read through `extractionNotes`, never directly. */
+  unreadable?: string | null;
 };
+
+/** The reader's notes, whichever key this extraction was stored under. */
+export function extractionNotes(e: InvoiceExtraction): string | null {
+  return e.notes ?? e.unreadable ?? null;
+}
 
 /**
  * What one of these cost, in the units the ORDER counts in.

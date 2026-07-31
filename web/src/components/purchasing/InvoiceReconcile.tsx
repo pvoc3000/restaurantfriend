@@ -1,7 +1,7 @@
 "use client";
 
 import { money } from "@/lib/purchaseOrders";
-import type { InvoiceExtraction } from "@/lib/invoiceExtraction";
+import { extractionNotes, type InvoiceExtraction } from "@/lib/invoiceExtraction";
 import type { MatchResult } from "@/lib/invoiceMatch";
 
 /**
@@ -75,10 +75,17 @@ export function InvoiceReconcile({
         accept it — tap a value in the Invoice columns to take it.
       </p>
 
-      {extraction.unreadable && (
-        <p className="border border-ink bg-[var(--rf-yellow-200)] px-3 py-2 text-ink">
-          Couldn&rsquo;t read: {extraction.unreadable}
-        </p>
+      {/* The reader's caveats — what it couldn't make out, and what it had to
+          judge. Not an error: a line explaining that a rate is printed per case
+          while the quantity is in pieces is the reader being careful, and it's
+          the difference between a number you can trust and one you can't. */}
+      {extractionNotes(extraction) && (
+        <div className="border border-ink bg-[var(--rf-yellow-200)] px-3 py-2 text-ink">
+          <p className="text-[12px] font-semibold uppercase tracking-[0.12em]">
+            Reader&rsquo;s notes
+          </p>
+          <p className="mt-1">{extractionNotes(extraction)}</p>
+        </div>
       )}
 
       {match.unmatchedInvoice.length > 0 && (
