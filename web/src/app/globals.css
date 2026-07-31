@@ -34,6 +34,18 @@
   --rf-header-h: 4rem;
 }
 
+/* A table that has to scroll sideways gives up its sticky column labels — and
+   it has to give up the POSITION too, not just the effect. `position: sticky`
+   with a top offset inside a scroll container that never scrolls vertically
+   pins the cell at that offset, which pushes it BELOW the first rows instead of
+   leaving it alone. See useOverflowOnlyWhenNeeded, which sets the attribute.
+
+   Unlayered so it beats the layered `sticky` utility on the cells, the same
+   mechanism the design-system import relies on. */
+[data-rf-hscroll] th {
+  position: static;
+}
+
 /* The one animation in the system, and it earns it: the order guide spends
    ~3.5s on the server before the browser gets a byte, and until now the old
    page just sat there. A static "loading" label still reads as stuck — motion

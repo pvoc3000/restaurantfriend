@@ -1077,10 +1077,29 @@ weekday column, and 003 then silently made it per-vendor-item.
 
   | list | full | compact | drops |
   | --- | --- | --- | --- |
-  | Inventory | 1040 | **690** | Section, Last ordered |
-  | Shop sections | 1060 | **640** | Area, Sub area |
-  | Vendors | 1290 | **1005** | Order via, Account |
-  | PO list | 1338 | **1143** | Sent via, Lines |
+  | list | full | compact | `compactBelow` |
+  | --- | --- | --- | --- |
+  | Inventory | 1040 | **690** | 1280 |
+  | Shop sections | 1060 | **640** | 1280 |
+  | Vendors | 1290 | **1005** | **1400** |
+  | PO list | 1338 | **1143** | **1440** |
+
+  **`compactBelow` is NOT the app's `xl`** — it's the width at which that
+  table's FULL set fits, which is `full + 96` of gutter. Setting all four to
+  1280 shipped a laptop-shaped hole (Mark, 2026-07-31): Vendors and the PO list
+  showed every column from 1280 up and overflowed until 1386 and 1434, so both
+  broke on a laptop AND on an iPad Pro in landscape while the two narrow lists
+  looked fine. Inventory and Shop sections only survived it by accident — their
+  full sets fit well below 1280.
+
+  **And a table that has to scroll sideways must give up the sticky POSITION,
+  not just the effect.** `position: sticky` with a top offset inside a scroll
+  container that never scrolls vertically pins the cell at that offset, which
+  pushes it BELOW the first rows — measured on the PO list at 1330: labels at
+  y=321, first row at y=299, with fragments of that row peeking above them.
+  `useOverflowOnlyWhenNeeded` therefore also toggles `data-rf-hscroll` on the
+  wrapper, and an unlayered rule in `globals.css` sets those cells back to
+  `position: static`.
 
   **Only Inventory and Shop sections reach a PORTRAIT iPad** (736px of content).
   Vendors and the PO list fit a landscape tablet (1148px) and nothing narrower —

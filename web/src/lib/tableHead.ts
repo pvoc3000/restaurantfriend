@@ -119,6 +119,15 @@ export function useOverflowOnlyWhenNeeded(
       // land on a fraction under browser zoom.
       const fits = table.getBoundingClientRect().width <= el.clientWidth + 1;
       el.style.overflowX = fits ? "visible" : "auto";
+
+      // And turn the sticky OFF while it scrolls. A sticky cell inside a scroll
+      // container doesn't merely fail to stick: with `top: 64px` and a
+      // scrollTop that never leaves 0, the offset PUSHES IT DOWN 64px, so the
+      // first rows render above the column labels. Measured 2026-07-31 on the
+      // PO list at 1330 — header at y=321, first row at y=299, i.e. the labels
+      // sitting below the row they label, with fragments of it peeking over the
+      // top. The attribute is what globals.css hangs `position: static` off.
+      el.toggleAttribute("data-rf-hscroll", !fits);
     };
 
     measure();

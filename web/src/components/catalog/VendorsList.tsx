@@ -285,10 +285,14 @@ export function VendorsList({
         columns={columns}
         rowKey={(v) => v.id}
         storageKey={WIDTHS_STORAGE_KEY}
-        // Below xl the list sheds Order via and Account (Mark, 2026-07-31),
-        // taking the row from 1290px to 1005. That fits a landscape tablet but
-        // NOT a portrait one — see the note in CLAUDE.md.
-        compactBelow={1280}
+        // 1400, NOT the app's usual xl: the threshold has to be the width at
+        // which the FULL set fits, and 1290px of columns needs 1290 + 96 of
+        // gutter = 1386. Set to xl this showed all eight columns from 1280 up
+        // and overflowed until 1386 — a laptop-shaped hole, and exactly where
+        // Mark hit it (2026-07-31).
+        // Sheds Order via and Account (his call), 1290 -> 1005. That fits a
+        // landscape tablet but not a portrait one; see CLAUDE.md.
+        compactBelow={1400}
         // Inactive vendors stay in the list but recede — the Active toggle in
         // the first column is how you bring one back.
         rowClassName={(v) => (v.is_active ? "" : "text-faint")}
