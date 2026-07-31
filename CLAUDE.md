@@ -1064,11 +1064,30 @@ weekday column, and 003 then silently made it per-vendor-item.
   `useOverflowOnlyWhenNeeded` measures and only makes the wrapper a scroll
   container when the table genuinely doesn't fit — the class stays
   `overflow-x-auto` as the safe pre-JS default and the hook relaxes it.
-  **Consequence: a table wider than the content column has no sticky header.**
-  At a desk width every list now fits (the PO list gave up 55px to get there,
-  widths key v2); at 768 none of them do, so on an iPad portrait the labels
-  still scroll away. Fixing that means responsive column-dropping per table,
-  the way the guide drops its Line column at 880 — a real job, not done.
+  **Consequence: a table wider than the content column has no sticky header** —
+  which is why lists shed columns below `xl`. `DataTable`'s **`compactBelow`**
+  (a viewport width) plus **`hideWhenCompact`** on a column drop the reference
+  data a tablet doesn't need, so the row narrows until it FITS. Same idea as the
+  guide dropping its Line column at 880, and it also stops you swiping sideways
+  to read a row. Driven by `useViewportAtLeast` (matchMedia, so a re-render
+  happens when the ANSWER changes, not on every pixel of a drag; server snapshot
+  is the wide answer, so SSR paints the full table and a narrow client swaps
+  after hydration).
+  The sets are Mark's (2026-07-31), except Shop sections which is mine:
+
+  | list | full | compact | drops |
+  | --- | --- | --- | --- |
+  | Inventory | 1040 | **690** | Section, Last ordered |
+  | Shop sections | 1060 | **640** | Area, Sub area |
+  | Vendors | 1290 | **1005** | Order via, Account |
+  | PO list | 1338 | **1143** | Sent via, Lines |
+
+  **Only Inventory and Shop sections reach a PORTRAIT iPad** (736px of content).
+  Vendors and the PO list fit a landscape tablet (1148px) and nothing narrower —
+  measured 2026-07-31: Vendors sticks at 1180 with 143px spare and fails at 768
+  by 269; the PO list sticks at 1180 with **5px** spare. Getting those two to
+  portrait needs roughly two and four more columns dropped respectively, which
+  is a judgement about what a vendor row is FOR, not an arithmetic problem.
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server

@@ -275,6 +275,7 @@ export function ItemsList({
       key: "section",
       label: "Section",
       width: 205,
+      hideWhenCompact: true,
       sortValue: (item) => sortValue(item, "section"),
       render: (item) => (
         <span className="text-muted">
@@ -305,6 +306,7 @@ export function ItemsList({
       key: "last",
       label: "Last ordered",
       width: 145,
+      hideWhenCompact: true,
       sortValue: (item) => sortValue(item, "last"),
       render: (item) =>
         item.last_order_date ? (
@@ -429,6 +431,11 @@ export function ItemsList({
         columns={columns}
         rowKey={(item) => item.id}
         storageKey={WIDTHS_STORAGE_KEY}
+        // Below xl the list sheds Section and Last ordered (Mark, 2026-07-31),
+        // taking the row from 1040px to 690 — which fits a portrait iPad's
+        // 736px column, so the column labels can stick. Both are still on the
+        // item's own screen.
+        compactBelow={1280}
         // Inactive items stay in the list but recede; the row still carries an
         // "inactive" badge, because colour alone shouldn't have to say it.
         rowClassName={(item) => (item.is_active ? "" : "text-faint")}

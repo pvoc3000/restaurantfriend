@@ -18,7 +18,51 @@
 // with it visible. `overflow-y: clip` doesn't rescue it either; also measured.
 // Hence useOverflowOnlyWhenNeeded below.
 
-import { useLayoutEffect } from "react";
+import { useCallback, useLayoutEffect, useSyncExternalStore } from "react";
+
+// One MediaQueryList per threshold, cached: matchMedia objects are cheap but
+// not free, and every table on a screen asks the same question.
+const queries = new Map<number, MediaQueryList>();
+
+function query(px: number): MediaQueryList {
+  let m = queries.get(px);
+  if (!m) {
+    m = window.matchMedia(`(min-width: ${px}px)`);
+    queries.set(px, m);
+  }
+  return m;
+}
+
+/**
+ * Is the viewport at least this wide? A media query rather than a stored width,
+ * so a re-render happens when the answer CHANGES rather than on every pixel of
+ * a window drag.
+ *
+ * The server snapshot is `true` — the wide answer. SSR has no viewport, and
+ * rendering the full table first means a desk browser never flickers; a narrow
+ * client swaps to its compact set right after hydration. useSyncExternalStore
+ * calls getServerSnapshot during hydration too, so there's no mismatch.
+ *
+ * A threshold of 0 always matches, which is how a table with no compact set
+ * opts out while still calling the hook unconditionally.
+ */
+export function useViewportAtLeast(px: number): boolean {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (px <= 0) return () => {};
+      const m = query(px);
+      m.addEventListener("change", onChange);
+      return () => m.removeEventListener("change", onChange);
+    },
+    [px]
+  );
+
+  return useSyncExternalStore(
+    subscribe,
+    () => (px <= 0 ? true : query(px).matches),
+    () => true
+  );
+}
 
 /**
  * Head-row classes for a table in the PAGE's own flow: its cells stick under

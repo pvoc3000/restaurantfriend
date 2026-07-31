@@ -472,6 +472,7 @@ export function PurchaseOrderList({
       label: "Sent via",
       // 120 → 110. The values are one short word — gmail, resend, phone.
       width: 110,
+      hideWhenCompact: true,
       sortValue: (po) => po.sent_via,
       render: (po) => <span className="text-muted">{po.sent_via ?? "—"}</span>,
     },
@@ -488,6 +489,7 @@ export function PurchaseOrderList({
       key: "lines",
       label: "Lines",
       width: 85,
+      hideWhenCompact: true,
       align: "right",
       sortValue: (po) => po.line_count,
       render: (po) => <span className="text-muted">{po.line_count}</span>,
@@ -731,6 +733,10 @@ export function PurchaseOrderList({
         // Vendor and Sent via gave up 15, 30 and 10, which brings the row to
         // 1338 and fits. The key had to move with them or anyone who had ever
         // dragged a column would keep the old total and keep the scrollbar.
+        // Below xl the list sheds Sent via and Lines (Mark, 2026-07-31), taking
+        // the row from 1338px to 1143 — enough for a landscape tablet, not for
+        // a portrait one. See CLAUDE.md.
+        compactBelow={1280}
         storageKey="rf.purchaseOrders.columnWidths.v2"
         sort={{ key: filters.sort, dir: filters.dir }}
         onSortChange={(next) =>

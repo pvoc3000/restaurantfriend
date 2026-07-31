@@ -165,6 +165,7 @@ export function VendorsList({
         key: "order_type",
         label: "Order via",
         width: 130,
+        hideWhenCompact: true,
         sortValue: (v) => sortValue(v, "order_type"),
         render: (v) => <span className="text-muted">{v.order_type}</span>,
       },
@@ -172,6 +173,7 @@ export function VendorsList({
         key: "account",
         label: "Account",
         width: 155,
+        hideWhenCompact: true,
         sortValue: (v) => sortValue(v, "account"),
         render: (v) => (
           <span className="text-muted">{config(v)?.account_number ?? "—"}</span>
@@ -283,6 +285,10 @@ export function VendorsList({
         columns={columns}
         rowKey={(v) => v.id}
         storageKey={WIDTHS_STORAGE_KEY}
+        // Below xl the list sheds Order via and Account (Mark, 2026-07-31),
+        // taking the row from 1290px to 1005. That fits a landscape tablet but
+        // NOT a portrait one — see the note in CLAUDE.md.
+        compactBelow={1280}
         // Inactive vendors stay in the list but recede — the Active toggle in
         // the first column is how you bring one back.
         rowClassName={(v) => (v.is_active ? "" : "text-faint")}

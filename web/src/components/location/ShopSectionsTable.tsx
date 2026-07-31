@@ -110,6 +110,7 @@ export function ShopSectionsTable({
       key: "area",
       label: "Area",
       width: 220,
+      hideWhenCompact: true,
       sortValue: (r) => r.area,
       render: (r) =>
         editable ? (
@@ -131,6 +132,7 @@ export function ShopSectionsTable({
       key: "sub_area",
       label: "Sub area",
       width: 200,
+      hideWhenCompact: true,
       sortValue: (r) => r.sub_area,
       render: (r) =>
         editable ? (
@@ -220,6 +222,11 @@ export function ShopSectionsTable({
         rows={shown}
         columns={columns}
         rowKey={(r) => r.id}
+        // Below xl this sheds Area and Sub area — 1060px down to 640, which
+        // fits a portrait iPad. They're the two halves of Display name
+        // ("31 Storage - R1 S1"), so the identity survives without them.
+        // My choice, not Mark's — the other three lists' sets are his.
+        compactBelow={1280}
         storageKey="rf.shopSections.columnWidths.v1"
         defaultSort={{ key: "sort_order" }}
         empty={

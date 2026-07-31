@@ -9,6 +9,7 @@ import {
   STICKY_HEAD_ROW,
   STICKY_HEAD_ROW_IN_PANE,
   useOverflowOnlyWhenNeeded,
+  useViewportAtLeast,
 } from "@/lib/tableHead";
 import { ColumnHeader } from "./ColumnHeader";
 
@@ -34,6 +35,12 @@ export type DataColumn<T> = {
    * on a selection column, which has no label and nothing to sort by.
    */
   header?: ReactNode;
+  /**
+   * Drop this column when the table is compact — see DataTable's
+   * `compactBelow`. For the reference data you'd read at a desk but not while
+   * standing in the shop; it's still on the record's own screen.
+   */
+  hideWhenCompact?: boolean;
 };
 
 /**
@@ -75,6 +82,7 @@ export function DataTable<T>({
   empty,
   expand,
   group,
+  compactBelow,
   sort: controlledSort,
   onSortChange,
 }: {
@@ -101,6 +109,22 @@ export function DataTable<T>({
   };
   /** Band rows before each run of like-labelled rows. See DataGroup. */
   group?: DataGroup<T>;
+  /**
+   * Below this viewport width, drop every column marked `hideWhenCompact`.
+   *
+   * This is what makes the sticky column labels work on a tablet, and the
+   * reason is worth stating: a sticky cell inside an `overflow-x: auto` box
+   * pins to that box, which never scrolls vertically, so a table that has to
+   * scroll sideways cannot have a sticky header (see useOverflowOnlyWhenNeeded).
+   * Shedding columns until the table FITS is the only fix that also stops you
+   * swiping sideways to read a row — and it's what the order guide has always
+   * done, dropping its Line column below 880.
+   *
+   * Set it to the narrowest width at which the FULL set still fits, so nothing
+   * is hidden while there's room for it. Omit for a table narrow enough
+   * everywhere, or one on a detail screen.
+   */
+  compactBelow?: number;
   /**
    * Controlled sort, for screens that persist it in the URL. Pass both or
    * neither: with `onSortChange` the caller owns the sort (and the ordering of
@@ -129,6 +153,15 @@ export function DataTable<T>({
   // Only the unpaned case: a pane is a scroll container on purpose, and its
   // header sticks to the pane rather than to the masthead.
   useOverflowOnlyWhenNeeded(paneRef, !scroll);
+
+  // COMPACT: below `compactBelow` the marked columns come out, so the table
+  // narrows enough to fit — which is what lets its labels stick. A threshold of
+  // 0 always matches, so a table without a compact set still calls the hook.
+  const wide = useViewportAtLeast(compactBelow ?? 0);
+  const compact = compactBelow !== undefined && !wide;
+  const visibleColumns = compact
+    ? columns.filter((col) => !col.hideWhenCompact)
+    : columns;
 
   const [internalSort, setInternalSort] = useState<{ key: string; dir: SortDir } | null>(
     defaultSort ? { key: defaultSort.key, dir: defaultSort.dir ?? "asc" } : null
@@ -193,10 +226,10 @@ export function DataTable<T>({
       <div ref={paneRef} className={wrapper}>
         <table
           className="table-fixed border-collapse text-[15px]"
-          style={{ width: totalWidth(columns) }}
+          style={{ width: totalWidth(visibleColumns) }}
         >
           <colgroup>
-            {columns.map((col) => (
+            {visibleColumns.map((col) => (
               <col key={col.key} style={{ width: widths[col.key] ?? col.width }} />
             ))}
           </colgroup>
@@ -208,7 +241,7 @@ export function DataTable<T>({
             <tr
               className={`text-left ${scroll ? STICKY_HEAD_ROW_IN_PANE : STICKY_HEAD_ROW}`}
             >
-              {columns.map((col) => (
+              {visibleColumns.map((col) => (
                 <ColumnHeader
                   key={col.key}
                   label={col.label}
@@ -242,7 +275,7 @@ export function DataTable<T>({
                   {startsGroup && (
                     <tr className="border-b border-hairline bg-neutral-100">
                       <td
-                        colSpan={columns.length}
+                        colSpan={visibleColumns.length}
                         className="px-2 py-1 text-xs font-semibold tracking-[0.12em] text-body uppercase"
                       >
                         {label}
@@ -257,7 +290,7 @@ export function DataTable<T>({
                   <tr
                     className={`hover:bg-neutral-50 ${rowClassName?.(row) ?? ""}`}
                   >
-                    {columns.map((col, index) => {
+                    {visibleColumns.map((col, index) => {
                       const cell = col.render(row);
                       // The chevron and summary ride in the first cell so the
                       // disclosure reads as part of the row's identity rather
@@ -311,7 +344,7 @@ export function DataTable<T>({
 
                   {isOpen && expand && (
                     <tr className="border-b border-hairline bg-neutral-50">
-                      <td colSpan={columns.length} className="px-4 py-5">
+                      <td colSpan={visibleColumns.length} className="px-4 py-5">
                         {expand.render(row)}
                       </td>
                     </tr>
