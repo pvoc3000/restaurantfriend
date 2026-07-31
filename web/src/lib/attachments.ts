@@ -4,6 +4,7 @@
 // reads go through short-lived signed URLs.
 
 import type { PickOption } from "@/components/ui/PickList";
+import type { InvoiceExtraction } from "./invoiceExtraction";
 
 export const ATTACHMENT_BUCKET = "po-attachments";
 
@@ -37,6 +38,11 @@ export type PoAttachment = {
   content_type: string | null;
   byte_size: number | null;
   created_at: string;
+  /** What the invoice says, once someone has had it read (migration 019).
+   *  A proposal, never a measurement — see lib/invoiceExtraction. */
+  extraction: InvoiceExtraction | null;
+  extracted_at: string | null;
+  extraction_model: string | null;
 };
 
 /** An attachment plus somewhere to look at it — null when signing failed. */

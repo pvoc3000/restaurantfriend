@@ -96,7 +96,10 @@ export async function PurchaseOrderDetailView({
   // the page does.
   const { data: attachmentRows, error: attachmentError } = await supabase
     .from("purchase_order_attachments")
-    .select("id, po_id, storage_path, kind, file_name, content_type, byte_size, created_at")
+    .select(
+      `id, po_id, storage_path, kind, file_name, content_type, byte_size, created_at,
+       extraction, extracted_at, extraction_model`
+    )
     .eq("po_id", id)
     .order("created_at");
 

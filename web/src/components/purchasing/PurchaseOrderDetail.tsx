@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { qty } from "@/lib/catalog";
@@ -21,12 +21,96 @@ import {
   type PurchaseOrder,
 } from "@/lib/purchaseOrders";
 import type { SignedAttachment } from "@/lib/attachments";
+import { matchInvoiceToOrder, type LineMatch } from "@/lib/invoiceMatch";
 import { PoAttachments } from "./PoAttachments";
+import { InvoiceReconcile } from "./InvoiceReconcile";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { AddPoLines } from "./AddPoLines";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
+
+/**
+ * One value off the invoice, in the line's row.
+ *
+ * Three states, and the difference between them is the whole point:
+ * **nothing** (this line isn't on the invoice, or the invoice didn't print this
+ * field) reads as a quiet dash; **agreement** reads as plain text, because a
+ * number that already matches needs no attention; **disagreement** reads as a
+ * button carrying the ≠ this app already uses for a price that differs, because
+ * the only thing you can do about it is decide.
+ *
+ * A match made by description rather than by the vendor's SKU is marked ≈. That
+ * one's a guess, and a reconciliation screen that presents a guess and a join
+ * identically is worse than one that doesn't guess at all.
+ */
+function InvoiceCell({
+  match,
+  value,
+  differs,
+  canAccept,
+  busy,
+  label,
+  format = (v: number) => String(v),
+  onAccept,
+}: {
+  match: LineMatch | undefined;
+  value: number | null;
+  differs: boolean;
+  canAccept: boolean;
+  busy: boolean;
+  label: string;
+  format?: (value: number) => string;
+  onAccept: (value: number) => void;
+}) {
+  if (!match?.invoice) {
+    return (
+      <span className="text-faint" title="No line on the invoice matched this one">
+        —
+      </span>
+    );
+  }
+  if (value === null) {
+    return (
+      <span className="text-faint" title="The invoice line didn't print this">
+        —
+      </span>
+    );
+  }
+
+  const guessed = match.by === "description";
+  const body = (
+    <>
+      {guessed && (
+        <span
+          className="mr-1 text-xs text-muted"
+          title="Matched on the description, not the vendor's item number — check it"
+        >
+          ≈
+        </span>
+      )}
+      {format(value)}
+    </>
+  );
+
+  if (!differs || !canAccept) {
+    return <span className="text-body">{body}</span>;
+  }
+  return (
+    <button
+      type="button"
+      disabled={busy}
+      onClick={() => onAccept(value)}
+      title={`The invoice says ${format(value)} — tap to set this line's ${label}`}
+      className="text-accent underline decoration-dotted decoration-neutral-400 underline-offset-4 hover:decoration-accent disabled:opacity-35"
+    >
+      {body}
+      <span aria-hidden className="ml-1 text-xs font-semibold">
+        ≠
+      </span>
+    </button>
+  );
+}
 
 /**
  * PO detail: what was ordered, what arrived, and the gap between them.
@@ -75,6 +159,31 @@ export function PurchaseOrderDetail({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [checkedLines, setCheckedLines] = useState<Set<string>>(new Set());
+  const [reconciling, setReconciling] = useState(false);
+
+  // The invoice to reconcile against: the most recently READ attachment. An
+  // order can carry several documents (an invoice and a packing slip, a
+  // corrected re-send), and the one you just had read is the one you meant.
+  const source = useMemo(() => {
+    const read = attachments.filter((a) => a.extraction !== null);
+    if (read.length === 0) return null;
+    return read.reduce((latest, a) =>
+      (a.extracted_at ?? "") > (latest.extracted_at ?? "") ? a : latest
+    );
+  }, [attachments]);
+
+  // Matching is pure and cheap — 5–20 lines against 5–20 lines — so it happens
+  // here on every render rather than being stored. Nothing about a match is
+  // worth persisting: it's derived from two things that are already saved, and
+  // recomputing it means an edited product ID re-matches immediately.
+  const match = useMemo(
+    () => (source?.extraction ? matchInvoiceToOrder(lines, source.extraction.lines) : null),
+    [lines, source]
+  );
+  const matchByLine = useMemo(
+    () => new Map((match?.matches ?? []).map((m) => [m.line.id, m])),
+    [match]
+  );
 
   // Line selection (and deletion) is purchaser+ work — `processing` is
   // already null for anyone below that role.
@@ -171,6 +280,64 @@ export function PurchaseOrderDetail({
     await setStatus("closed");
   }
 
+  /**
+   * Take one value off the invoice onto its line — a received quantity, or the
+   * price we were billed.
+   *
+   * Per-value rather than per-line because they're different decisions with
+   * different consequences: a quantity is a receiving fact, a price is money.
+   * And per-line rather than wholesale because an extraction is a reading of a
+   * photograph, and the person accepting it is the one who can see whether the
+   * reading is right.
+   */
+  async function accept(
+    match: LineMatch,
+    field: "qty_received" | "unit_price",
+    value: number
+  ) {
+    setBusy(true);
+    setError(null);
+    const { error } = await supabase
+      .from("purchase_order_items")
+      .update({ [field]: value })
+      .eq("id", match.line.id);
+    setBusy(false);
+    if (error) setError(error.message);
+    else router.refresh();
+  }
+
+  /**
+   * Fill the received quantity from the invoice, for matched lines that have
+   * none. The Friday move: the invoice doubles as the delivery note.
+   *
+   * Lines with a quantity ALREADY recorded are left alone — the same rule the
+   * PO list's batch mark-received follows, and for the same reason: a short
+   * case someone counted is a measurement, and a bulk button must not overwrite
+   * one with a machine's reading of a photograph.
+   */
+  async function receiveFromInvoice() {
+    const fillable = (match?.matches ?? []).filter(
+      (m) => m.invoice?.qty != null && m.line.qty_received === null
+    );
+    if (fillable.length === 0) return;
+
+    setBusy(true);
+    setError(null);
+    for (const m of fillable) {
+      const { error } = await supabase
+        .from("purchase_order_items")
+        .update({ qty_received: m.invoice!.qty })
+        .eq("id", m.line.id);
+      if (error) {
+        setError(error.message);
+        setBusy(false);
+        return;
+      }
+    }
+    setBusy(false);
+    router.refresh();
+  }
+
   /** Push a line's invoice price onto the catalog; the DB trigger logs it. */
   async function adoptPrice(line: PoLine) {
     if (!line.vendor_items || line.unit_price === null) return;
@@ -208,6 +375,14 @@ export function PurchaseOrderDetail({
     // Type leads (Mark, 2026-07-27 — the table ran off the screen): the item's
     // category is short, repeats down the order, and is what the vendor-facing
     // PDF groups by, so it costs a fraction of what the item NAME cost.
+    //
+    // It's one of the two columns reconcile mode spends: the table is tuned to
+    // 1290px to fit a 1440 window, so the Invoice columns have to be paid for
+    // rather than added. Type and Note are what you're least likely to be
+    // reading while checking an invoice against an order.
+    ...(reconciling
+      ? []
+      : [
     {
       key: "item_type",
       label: "Type",
@@ -222,16 +397,17 @@ export function PurchaseOrderDetail({
       // to bottom. Brand last so identical descriptions still land somewhere
       // predictable.
       sortTiebreaks: [
-        (l) => l.vendor_items?.inventory_items?.name ?? l.description ?? "",
-        (l) => l.description ?? "",
-        (l) => l.brand ?? "",
+        (l: PoLine) => l.vendor_items?.inventory_items?.name ?? l.description ?? "",
+        (l: PoLine) => l.description ?? "",
+        (l: PoLine) => l.brand ?? "",
       ],
-      render: (l) => (
+      render: (l: PoLine) => (
         <span className="text-muted">
           {l.vendor_items?.inventory_items?.category ?? "—"}
         </span>
       ),
-    },
+    } as DataColumn<PoLine>,
+        ]),
     {
       key: "product_id",
       label: "Product ID",
@@ -447,13 +623,16 @@ export function PurchaseOrderDetail({
     // (§4.9). Snapshotted at generation (migration 015) and editable here
     // precisely so it can be struck off one order without touching the catalog
     // entry every future order inherits (Mark, 2026-07-28).
+    ...(reconciling
+      ? []
+      : [
     {
       key: "notes",
       label: "Note",
       width: 130,
       wrap: true,
-      sortValue: (l) => l.notes,
-      render: (l) =>
+      sortValue: (l: PoLine) => l.notes,
+      render: (l: PoLine) =>
         canEditLines ? (
           <InlineValue
             table="purchase_order_items"
@@ -466,7 +645,54 @@ export function PurchaseOrderDetail({
         ) : (
           <span className="text-muted">{l.notes ?? "—"}</span>
         ),
-    },
+    } as DataColumn<PoLine>,
+        ]),
+
+    // The two Invoice columns — what the document says, beside what the order
+    // says. They render as ACTIONS, not data: a value that disagrees is a
+    // button that takes it, and one that agrees is quiet text. Nothing here is
+    // written until it's tapped, which is the whole contract of an extraction.
+    ...(reconciling
+      ? ([
+          {
+            key: "inv_qty",
+            label: "Invoice qty",
+            width: 115,
+            align: "right",
+            sortValue: (l: PoLine) => matchByLine.get(l.id)?.invoice?.qty ?? null,
+            render: (l: PoLine) => (
+              <InvoiceCell
+                match={matchByLine.get(l.id)}
+                value={matchByLine.get(l.id)?.invoice?.qty ?? null}
+                differs={matchByLine.get(l.id)?.qtyDiffers ?? false}
+                canAccept={canEditLines}
+                busy={busy}
+                label="received quantity"
+                onAccept={(v) => accept(matchByLine.get(l.id)!, "qty_received", v)}
+              />
+            ),
+          },
+          {
+            key: "inv_price",
+            label: "Invoice price",
+            width: 125,
+            align: "right",
+            sortValue: (l: PoLine) => matchByLine.get(l.id)?.invoice?.unit_price ?? null,
+            render: (l: PoLine) => (
+              <InvoiceCell
+                match={matchByLine.get(l.id)}
+                value={matchByLine.get(l.id)?.invoice?.unit_price ?? null}
+                differs={matchByLine.get(l.id)?.priceDiffers ?? false}
+                canAccept={canEditLines}
+                busy={busy}
+                label="unit price"
+                format={money}
+                onAccept={(v) => accept(matchByLine.get(l.id)!, "unit_price", v)}
+              />
+            ),
+          },
+        ] as DataColumn<PoLine>[])
+      : []),
     {
       key: "discrepancy_note",
       // Renamed from "Note" now that the line has two of them: this one is
@@ -737,6 +963,46 @@ export function PurchaseOrderDetail({
             Clear
           </button>
         </div>
+      )}
+
+      {/* Reconcile is a VIEW control — it changes what the table shows, not
+          what the order is — so it lives with the table rather than in the
+          command bar above (CLAUDE.md's ActionBar rule, applied to the line
+          bar). It only exists once an invoice has actually been read. */}
+      {source?.extraction && (
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            onClick={() => setReconciling((v) => !v)}
+            className={`h-9 border border-ink px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
+              reconciling ? "bg-ink text-white" : "bg-white hover:bg-neutral-100"
+            }`}
+          >
+            Reconcile against invoice
+          </button>
+          {!reconciling && (
+            <span className="text-xs text-muted">
+              Compare the order against {source.file_name ?? "the invoice"} line
+              by line.
+            </span>
+          )}
+        </div>
+      )}
+
+      {reconciling && source?.extraction && match && (
+        <InvoiceReconcile
+          extraction={source.extraction}
+          match={match}
+          fileName={source.file_name}
+          model={source.extraction_model}
+          receivable={
+            match.matches.filter(
+              (m) => m.invoice?.qty != null && m.line.qty_received === null
+            ).length
+          }
+          busy={busy}
+          onReceiveFromInvoice={receiveFromInvoice}
+        />
       )}
 
       <DataTable

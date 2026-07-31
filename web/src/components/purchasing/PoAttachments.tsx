@@ -34,6 +34,13 @@ import { PickList } from "@/components/ui/PickList";
  * the camera and removes the choice; without it iOS offers Photo Library / Take
  * Photo / Choose File in one sheet — which is what you want, because the invoice
  * is sometimes a photo of a page and sometimes a PDF the vendor emailed.
+ *
+ * It also names formats explicitly rather than saying `image/*`, and that is
+ * load-bearing now that invoices get READ: a photo picked from an iPhone's
+ * library arrives as **HEIC** under `image/*`, which the model API doesn't
+ * accept. Naming jpeg/png/webp makes iOS transcode to JPEG on the way out, so
+ * the file that lands is one that can be read. `image/*` would still upload —
+ * and then fail at extraction, hours later, with the invoice already filed.
  */
 export function PoAttachments({
   poId,
@@ -94,6 +101,44 @@ export function PoAttachments({
     // So the same file can be picked again after a failure — a file input holds
     // its value and won't re-fire change for an identical selection.
     if (fileRef.current) fileRef.current.value = "";
+    router.refresh();
+  }
+
+  /**
+   * Have the invoice read (the `extract-invoice` edge function). It writes the
+   * extraction onto this attachment; `router.refresh()` brings it back and the
+   * line table's Reconcile toggle appears.
+   *
+   * Nothing about the ORDER changes here — extraction only ever produces a
+   * proposal to compare against, which a human then accepts line by line.
+   */
+  async function read(attachment: SignedAttachment) {
+    setBusy(`Reading ${attachment.file_name ?? "the invoice"}…`);
+    setError(null);
+    const { data, error } = await supabase.functions.invoke("extract-invoice", {
+      body: { attachment_id: attachment.id },
+    });
+    setBusy(null);
+    if (error) {
+      // The function returns a readable message in the body; the SDK surfaces
+      // only "non-2xx status code" unless we go and get it.
+      let message = error.message;
+      const res = (error as { context?: Response }).context;
+      if (res) {
+        try {
+          const body = await res.json();
+          if (body?.error) message = body.error;
+        } catch {
+          // Keep the SDK's message.
+        }
+      }
+      setError(message);
+      return;
+    }
+    if (data?.error) {
+      setError(data.error);
+      return;
+    }
     router.refresh();
   }
 
@@ -163,7 +208,7 @@ export function PoAttachments({
               ref={fileRef}
               type="file"
               multiple
-              accept="image/*,application/pdf"
+              accept="image/jpeg,image/png,image/webp,application/pdf"
               className="hidden"
               onChange={(e) => {
                 if (e.target.files?.length) void upload(e.target.files);
@@ -210,15 +255,31 @@ export function PoAttachments({
                   {ATTACHMENT_KIND_LABEL[a.kind]}
                   {a.byte_size !== null && ` · ${fileSize(a.byte_size)}`}
                 </p>
+                {a.extraction && (
+                  <p className="text-[11px] uppercase tracking-[0.12em] text-[var(--rf-green-600)]">
+                    {a.extraction.lines.length}{" "}
+                    {a.extraction.lines.length === 1 ? "line read" : "lines read"}
+                  </p>
+                )}
                 {canEdit && (
-                  <button
-                    type="button"
-                    disabled={busy !== null}
-                    onClick={() => void remove(a)}
-                    className="text-[11px] uppercase tracking-[0.06em] text-accent hover:underline disabled:opacity-35"
-                  >
-                    Remove
-                  </button>
+                  <p className="flex flex-wrap items-baseline gap-2">
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void read(a)}
+                      className="text-[11px] uppercase tracking-[0.06em] text-ink hover:underline disabled:opacity-35"
+                    >
+                      {a.extraction ? "Read again" : "Read invoice"}
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy !== null}
+                      onClick={() => void remove(a)}
+                      className="text-[11px] uppercase tracking-[0.06em] text-accent hover:underline disabled:opacity-35"
+                    >
+                      Remove
+                    </button>
+                  </p>
                 )}
               </div>
             </li>
