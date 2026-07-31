@@ -10,6 +10,7 @@ import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
 import { DataTable, type DataColumn } from "./DataTable";
 import { ListFilters, type ActiveFilter, type StaleFilter } from "./ListFilters";
+import { VendorItemActions } from "./VendorItemActions";
 
 // On the vendor screen each row belongs to a different inventory item, so the
 // query embeds the item; on the item screen that column is redundant.
@@ -46,6 +47,7 @@ export function VendorItemsTable({
   from,
   filters = false,
   showLastOrdered = false,
+  canEdit = false,
 }: {
   vendorItems: VendorItemWithItem[];
   baseUnit?: string;
@@ -58,6 +60,14 @@ export function VendorItemsTable({
   /** Search + category + active + last-ordered bar, as on the Inventory list. */
   filters?: boolean;
   showLastOrdered?: boolean;
+  /**
+   * Purchaser+, which is what the RLS policy on `vendor_items` allows. Only the
+   * ⋯ column depends on it — every other cell here is an `InlineValue` or an
+   * `ActiveToggle`, which have always rendered for everyone and let the database
+   * refuse the write. The menu is different: it OFFERS a delete, and offering
+   * one that will bounce is worse than not showing it.
+   */
+  canEdit?: boolean;
 }) {
   const [term, setTerm] = useState("");
   const [category, setCategory] = useState("");
@@ -294,6 +304,34 @@ export function VendorItemsTable({
                 <span className="text-accent">never</span>
               ),
           },
+        ]
+      : []),
+    // The row's own commands, last — a ⋯ menu rather than a right-click, since
+    // iPad Safari is the ordering surface and has no right-click to give.
+    ...(canEdit
+      ? [
+          {
+            key: "actions",
+            label: "",
+            // 36px button + the cell's own px-4. A narrower column CLIPS the
+            // target rather than shrinking it — the table is `table-fixed` with
+            // `truncate` cells — which is the same arithmetic the day-picker
+            // column needs (WEEKDAY_PICKER_WIDTH).
+            width: 68,
+            render: (vi: VendorItemWithItem) => (
+              <span className="flex justify-end">
+                <VendorItemActions
+                  vendorItemId={vi.id}
+                  label={
+                    vi.inventory_items?.name ||
+                    [vi.brand, vi.description].filter(Boolean).join(" · ") ||
+                    "this vendor item"
+                  }
+                  isActive={vi.is_active}
+                />
+              </span>
+            ),
+          } as DataColumn<VendorItemWithItem>,
         ]
       : []),
   ];

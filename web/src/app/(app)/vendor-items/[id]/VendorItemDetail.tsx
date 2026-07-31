@@ -13,6 +13,7 @@ import {
   VendorItemLocations,
   type VendorItemLocationRow,
 } from "@/components/catalog/VendorItemLocations";
+import { VendorItemActions } from "@/components/catalog/VendorItemActions";
 
 const SELECT = `
   id, brand, description, product_id, package_desc, package_content, price,
@@ -168,7 +169,25 @@ export async function VendorItemDetail({
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs trail={trail} current={label} />
+      {/* The record's own commands sit with its breadcrumb rather than in the
+          fields below: duplicate and delete act on the WHOLE row, and putting
+          them among the per-field editors would read as editing one of them. */}
+      <div className="flex items-start justify-between gap-4">
+        <Breadcrumbs trail={trail} current={label} />
+        {["owner", "admin", "purchaser"].includes(session.membership.role) && (
+          <VendorItemActions
+            vendorItemId={id}
+            label={label}
+            isActive={vi.is_active}
+            // This screen IS the deleted row, so it can't stay on it. Back to
+            // the vendor that owned it, which is also where the trail falls
+            // back to when there's no history to follow.
+            afterDelete={{
+              href: vi.vendors ? `/vendors/${vi.vendors.id}` : "/vendors",
+            }}
+          />
+        )}
+      </div>
 
       <VendorItemFields vi={vi} here={here} />
 

@@ -127,6 +127,7 @@ export async function ItemDetail({
             baseUnit={row.base_unit}
             showVendor
             from={{ href: `/items/${id}${queryString}`, label: row.name }}
+            canEdit={["owner", "admin", "purchaser"].includes(session.membership.role)}
           />
         )}
       </section>
