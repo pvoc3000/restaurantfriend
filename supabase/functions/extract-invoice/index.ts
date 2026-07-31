@@ -150,7 +150,13 @@ Deno.serve(async (req) => {
     const { attachment_id } = await req.json();
     if (!attachment_id) return json(400, { error: "missing attachment_id" });
 
-    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    // `.trim()` is not defensive programming for its own sake: a secret pasted
+    // into a form field or written through an env file very often arrives with
+    // a trailing newline or space, and the API rejects that as an invalid key
+    // with no hint about why. Quotes get the same treatment — a value set as
+    // ANTHROPIC_API_KEY="sk-ant-…" can keep them.
+    const rawKey = Deno.env.get("ANTHROPIC_API_KEY");
+    const apiKey = rawKey?.trim().replace(/^["']|["']$/g, "");
     if (!apiKey) {
       return json(500, {
         error:
@@ -242,20 +248,43 @@ Deno.serve(async (req) => {
     // handing the caller a dead end. An invoice is unlikely to trip them, but
     // the recovery costs two lines. The array form is used because it's the one
     // the TypeScript SDK types.
-    const response = await anthropic.beta.messages.create({
-      model: MODEL,
-      max_tokens: 16000,
-      betas: ["server-side-fallback-2026-06-01"],
-      fallbacks: [{ model: "claude-opus-4-8" }],
-      output_config: {
-        // Transcription, not deduction — this is well below the level of work
-        // that rewards deeper thinking, and lower effort keeps a Friday
-        // afternoon's worth of invoices quick.
-        effort: "medium",
-        format: { type: "json_schema", schema: INVOICE_SCHEMA },
-      },
-      messages: [{ role: "user", content: [source, { type: "text", text: PROMPT }] }],
-    });
+    let response;
+    try {
+      response = await anthropic.beta.messages.create({
+        model: MODEL,
+        max_tokens: 16000,
+        betas: ["server-side-fallback-2026-06-01"],
+        fallbacks: [{ model: "claude-opus-4-8" }],
+        output_config: {
+          // Transcription, not deduction — this is well below the level of work
+          // that rewards deeper thinking, and lower effort keeps a Friday
+          // afternoon's worth of invoices quick.
+          effort: "medium",
+          format: { type: "json_schema", schema: INVOICE_SCHEMA },
+        },
+        messages: [{ role: "user", content: [source, { type: "text", text: PROMPT }] }],
+      });
+    } catch (e) {
+      // A rejected key is the one failure here that says nothing useful on its
+      // own — "invalid x-api-key" is identical whether the secret is wrong,
+      // truncated, or carried a stray newline in from a paste. Report the SHAPE
+      // of what the function received: enough to tell those apart, and nothing
+      // that could be used as a credential.
+      if ((e as { status?: number }).status === 401) {
+        return json(401, {
+          error:
+            "Anthropic rejected the API key. The secret this function received is described below — " +
+            "if it looks right, the key itself is wrong or revoked; if it looks wrong, re-set the secret.",
+          key_shape: {
+            length: apiKey.length,
+            starts_with_sk_ant: apiKey.startsWith("sk-ant-"),
+            had_surrounding_whitespace: rawKey !== rawKey?.trim(),
+            had_quotes: /^["']|["']$/.test(rawKey?.trim() ?? ""),
+          },
+        });
+      }
+      throw e;
+    }
 
     if (response.stop_reason === "refusal") {
       return json(422, {
