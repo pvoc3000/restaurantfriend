@@ -1,6 +1,5 @@
 "use client";
 
-import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -12,7 +11,7 @@ import {
   sectionLabel,
 } from "@/lib/nav";
 import type { NavMemory } from "@/lib/navMemory";
-import { remember, useNavMemory } from "@/lib/navMemoryStore";
+import { useNavMemory, useRememberNavPosition } from "@/lib/navMemoryStore";
 
 // Both tiers are the same height and every tab fills it, so the two bands read
 // as one black block with the tabs set into it.
@@ -69,13 +68,11 @@ export function AppNav({
   const here = resolveRoute(pathname);
   const memory = useNavMemory(initialMemory);
 
-  // Remember where we are so this section's tab comes back here later. An
-  // external-store write, not a setState — see lib/navMemoryStore.ts.
+  // Remember where we are so this section's tab comes back here later. Shared
+  // with the left rail, which does the same job — see lib/navMemoryStore.ts.
   const sectionSlug = here?.sectionSlug;
   const subSlug = here?.subSlug;
-  useEffect(() => {
-    if (sectionSlug && subSlug) remember(sectionSlug, subSlug);
-  }, [sectionSlug, subSlug]);
+  useRememberNavPosition(sectionSlug, subSlug);
 
   const currentSection = sectionSlug ? findSection(sectionSlug) : undefined;
 

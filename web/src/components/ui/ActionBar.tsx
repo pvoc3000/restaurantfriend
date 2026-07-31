@@ -32,7 +32,15 @@ export function ActionBar({
   trailing?: ReactNode;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-30 flex min-h-13 items-stretch bg-ink text-white">
+    // The leading edge stops at the left navigation rail rather than at the
+    // window, or the bar's first cell — Clear guide, Finalize — sits underneath
+    // it. --rf-nav-w is 0px unless the sidebar chrome is on, so this is
+    // identical to `inset-x-0` in the top-menu shape (see globals.css).
+    // rf-chrome-bar: in the SIDEBAR chrome this bar inverts to white with a 2px
+    // rule on top, because the black rail already carries that weight — see the
+    // block in globals.css. In the top-menu chrome the classes match nothing
+    // and the bar stays black.
+    <div className="rf-chrome-bar rf-chrome-bar-bottom fixed right-0 bottom-0 left-[var(--rf-nav-w)] z-30 flex min-h-13 items-stretch bg-ink text-white">
       {/* The rule that separates cells belongs on the side facing the middle,
           or the group's outermost cell draws a stray 1px line against the
           window edge. So it falls AFTER each cell on the left and BEFORE each

@@ -32,6 +32,97 @@
      height — AppNav's py-1 (8px) + 2 × TIER_H (h-7 = 28px) = 64px. If either
      changes, change this. */
   --rf-header-h: 4rem;
+
+  /* The LEFT NAVIGATION RAIL's width, and the page gutter that has to make room
+     for it. See components/SideChrome for the whole mechanism.
+     ZERO here, and zero at every width below xl — which is what makes the
+     sidebar a no-op when it's off. Everything that has to dodge the rail (the
+     page gutter, the fixed ActionBar, the floating BackToTop) reads these
+     variables, and reading 0 leaves each of them exactly where it sat before
+     the sidebar existed. Deleting the sidebar means deleting the two rules
+     below; nothing else has to be untangled.
+     The gutter was the literal pair `px-4 xl:px-12`, written out in four
+     places so the black-and-white bands line up. It's a variable now because
+     the sidebar has to move one side of it without moving the other. */
+  --rf-nav-w: 0px;
+  --rf-content-pl: 1rem;
+  --rf-content-pr: 1rem;
+}
+
+@media (min-width: 1280px) {
+  :root {
+    --rf-content-pl: 3rem;
+    --rf-content-pr: 3rem;
+  }
+
+  /* SIDEBAR MODE, and only at xl and up. Below 1280 the rail isn't rendered at
+     all: the order guide's row bottoms out at 710px of content and an iPad
+     portrait window gives it 736, so there is no rail width that fits. There
+     the menu opens as a full overlay instead.
+     THE ARITHMETIC, at a 1440 window (the design target):
+       today          48 + 1344 content + 48
+       rail collapsed 56 rail + 16 air + 1320 content + 48  → costs 24px, and
+                      the tightest table (VendorLocationsTable, 1305) still
+                      clears by 15px, so nothing that fits today stops fitting.
+       panel open     240 + 16 + 1136 content + 48 → four tables gain a
+                      horizontal scrollbar (VendorLocations 1305, PO detail
+                      1290, Vendors 1290, ItemLocations 1155). That is a KNOWN
+                      and accepted cost of Indeed-style push (Mark, 2026-07-31);
+                      our tables are table-fixed with pixel colgroups and don't
+                      reflow, where Indeed's and Square's are fluid. No panel
+                      width avoids it — even Indeed's own 208px leaves 1168. */
+  [data-chrome="side"] {
+    --rf-nav-w: 56px;
+  }
+  [data-chrome="side-open"] {
+    --rf-nav-w: 240px;
+  }
+  [data-chrome="side"],
+  [data-chrome="side-open"] {
+    --rf-content-pl: calc(var(--rf-nav-w) + 1rem);
+  }
+}
+
+/* SIDEBAR CHROME: THE TWO BARS INVERT.
+   Three black bands — a full-height rail, the top bar and the action bar — is
+   more black than the screen can carry (Mark, 2026-07-31: "otherwise there's
+   too much black"). So the RAIL becomes the black element and the bars step
+   back to white, bounded by the system's own 2px structural rule, the one the
+   table head already draws as an inset shadow. They still read as chrome; they
+   just stop competing with the rail.
+
+   UNLAYERED ON PURPOSE. Tailwind puts its utilities in a layer, and unlayered
+   CSS outranks layered CSS whatever the specificity — the same mechanism the
+   design-system import depends on, used here in the other direction. That is
+   what lets these few rules re-tone every SHARED control inside the bars
+   (IconButton, LocationSwitcher, MenuCollapseButton, ActionBarButton) without
+   forking any of them into a light variant, and without !important.
+
+   Scoped to .rf-chrome-bar, which is on exactly two elements: SideTopBar's
+   header and ui/ActionBar. In top-menu mode nothing here matches, so the black
+   chrome is untouched. Deleting the sidebar means deleting this block and two
+   class names. */
+[data-chrome^="side"] .rf-chrome-bar {
+  background-color: #ffffff;
+  color: var(--rf-neutral-900);
+}
+
+/* :where() keeps these at zero specificity, so anything deliberately styled
+   still wins — they only have to beat a layered utility, which they do by
+   being unlayered. */
+[data-chrome^="side"] .rf-chrome-bar :where(a, button, span, select) {
+  color: var(--rf-neutral-600);
+  border-color: var(--rf-neutral-300);
+}
+
+[data-chrome^="side"] .rf-chrome-bar :where(a:hover, button:hover) {
+  color: var(--rf-neutral-900);
+  background-color: var(--rf-neutral-100);
+}
+
+/* The action bar's own rule sits ABOVE it, being a footer. */
+[data-chrome^="side"] .rf-chrome-bar-bottom {
+  box-shadow: inset 0 2px 0 var(--rf-neutral-900);
 }
 
 /* The one animation in the system, and it earns it: the order guide spends
