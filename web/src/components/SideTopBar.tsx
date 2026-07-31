@@ -47,16 +47,14 @@ export function SideTopBar({
     // The gutter variables rather than a literal pair: --rf-content-pl already
     // includes the rail's width, so the bar's contents start exactly where the
     // page content below them does.
-    // WHITE, not the masthead's black (Mark, 2026-07-31). With the rail running
-    // the full height, a black bar here and another at the bottom put black on
-    // three sides of the page. The rail is the black element in this chrome and
-    // the bars step back, bounded by the design system's 2px structural rule —
-    // the same inset the table head draws — so they still read as chrome.
-    // rf-chrome-bar is what re-tones the SHARED controls inside it; see the
-    // block in globals.css.
+    // BLACK, like the masthead it stands in for — the RAIL is the white element
+    // in this chrome (Mark, 2026-07-31, second pass). The first attempt had it
+    // the other way round, which put white on the two bars and left the rail
+    // carrying all the weight; this way the chrome that frames the page reads
+    // as chrome and the menu itself sits back.
     <header
       ref={ref}
-      className="rf-chrome-bar sticky top-0 z-50 bg-white text-ink shadow-[inset_0_-2px_0_var(--rf-neutral-900)] pl-[var(--rf-content-pl)] pr-[var(--rf-content-pr)]"
+      className="sticky top-0 z-50 bg-ink text-white pl-[var(--rf-content-pl)] pr-[var(--rf-content-pr)]"
     >
       <div className="flex min-h-8 flex-wrap items-center gap-x-4 gap-y-1 py-1">
         {/* Below xl the rail isn't rendered — the order guide's row bottoms out

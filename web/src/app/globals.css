@@ -83,48 +83,6 @@
   }
 }
 
-/* SIDEBAR CHROME: THE TWO BARS INVERT.
-   Three black bands — a full-height rail, the top bar and the action bar — is
-   more black than the screen can carry (Mark, 2026-07-31: "otherwise there's
-   too much black"). So the RAIL becomes the black element and the bars step
-   back to white, bounded by the system's own 2px structural rule, the one the
-   table head already draws as an inset shadow. They still read as chrome; they
-   just stop competing with the rail.
-
-   UNLAYERED ON PURPOSE. Tailwind puts its utilities in a layer, and unlayered
-   CSS outranks layered CSS whatever the specificity — the same mechanism the
-   design-system import depends on, used here in the other direction. That is
-   what lets these few rules re-tone every SHARED control inside the bars
-   (IconButton, LocationSwitcher, MenuCollapseButton, ActionBarButton) without
-   forking any of them into a light variant, and without !important.
-
-   Scoped to .rf-chrome-bar, which is on exactly two elements: SideTopBar's
-   header and ui/ActionBar. In top-menu mode nothing here matches, so the black
-   chrome is untouched. Deleting the sidebar means deleting this block and two
-   class names. */
-[data-chrome^="side"] .rf-chrome-bar {
-  background-color: #ffffff;
-  color: var(--rf-neutral-900);
-}
-
-/* :where() keeps these at zero specificity, so anything deliberately styled
-   still wins — they only have to beat a layered utility, which they do by
-   being unlayered. */
-[data-chrome^="side"] .rf-chrome-bar :where(a, button, span, select) {
-  color: var(--rf-neutral-600);
-  border-color: var(--rf-neutral-300);
-}
-
-[data-chrome^="side"] .rf-chrome-bar :where(a:hover, button:hover) {
-  color: var(--rf-neutral-900);
-  background-color: var(--rf-neutral-100);
-}
-
-/* The action bar's own rule sits ABOVE it, being a footer. */
-[data-chrome^="side"] .rf-chrome-bar-bottom {
-  box-shadow: inset 0 2px 0 var(--rf-neutral-900);
-}
-
 /* The one animation in the system, and it earns it: the order guide spends
    ~3.5s on the server before the browser gets a byte, and until now the old
    page just sat there. A static "loading" label still reads as stuck — motion

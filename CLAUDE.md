@@ -829,13 +829,16 @@ weekday column, and 003 then silently made it per-vendor-item.
   not localStorage, for the reason `rf.guide.view` is a cookie: the server must
   know before it renders or every load paints the wrong chrome and jumps the
   page sideways. `signOut` leaves it — it's config, not position.
-  **In this chrome the two bars INVERT** (Mark — "otherwise there's too much
-  black"): a full-height rail plus a black masthead plus a black action bar is
-  black on three sides, so the rail keeps the weight and the bars go white under
-  the system's own 2px structural rule. Done as **unlayered CSS** scoped to
-  `[data-chrome^="side"] .rf-chrome-bar` in `globals.css` — unlayered beats
-  Tailwind's layered utilities whatever the specificity, which is what re-tones
-  every shared control inside the bars without forking any into a light variant.
+  **In this chrome the RAIL is white and the two bars stay black.** A
+  full-height rail plus a black masthead plus a black action bar was black on
+  three sides (Mark — "too much black"), and the first fix inverted the BARS,
+  which left the chrome that frames the page reading as the quiet part and the
+  menu shouting. Flipped on the second pass: the bars are the masthead and
+  action bar they stand in for, and the rail sits back under the system's own
+  2px structural rule, run down its right edge. Consequence worth knowing —
+  **active can't be yellow TYPE on white** (#ffd400 on white is ~1.6:1), so the
+  yellow left edge carries the accent while the mark itself goes full black
+  against muted, over a neutral row fill.
   Icons are **Material Symbols Sharp** (Apache 2.0), six paths copied into
   `components/ui/NavIcons.tsx` rather than a dependency — and note they are
   FILLED paths, unlike the stroked `HomeIcon`/`GearIcon` they sit beside. SF

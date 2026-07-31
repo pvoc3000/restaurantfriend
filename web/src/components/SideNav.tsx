@@ -107,9 +107,15 @@ export function SideNav({
       {/* THE RAIL. Not rendered while the panel is open — the panel replaces it
           rather than sitting beside it. `hidden xl:flex`, never below xl. */}
       {!open && (
+        // WHITE, with the system's 2px structural rule down its right edge —
+        // the same inset the table head draws, turned ninety degrees. The bars
+        // are black and the rail is the light element (Mark, 2026-07-31, second
+        // pass): a full-height black column plus two black bars was black on
+        // three sides, and inverting the BARS instead left the chrome that
+        // frames the page reading as the quiet part.
         <aside
           aria-label="Sections"
-          className="fixed inset-y-0 left-0 z-50 hidden w-14 flex-col bg-ink text-white xl:flex"
+          className="fixed inset-y-0 left-0 z-50 hidden w-14 flex-col bg-white text-ink shadow-[inset_-2px_0_0_var(--rf-neutral-900)] xl:flex"
         >
           <RailButton
             label="Show the menu labels"
@@ -128,12 +134,15 @@ export function SideNav({
                   title={label}
                   // 56px cells, the app's own row height. The active mark is a
                   // yellow left edge — the vertical form of the design system's
-                  // yellow underline — plus yellow type, which together are the
-                  // one yellow thing the system allows per screen.
+                  // yellow underline, and the one yellow thing on the screen.
+                  // On white it can't ALSO be the type colour: #ffd400 on white
+                  // is about 1.6:1, unreadable. So the edge carries the yellow
+                  // and the mark itself goes full black against muted, which is
+                  // the pair that actually reads at a glance.
                   className={`flex h-14 items-center justify-center border-l-[3px] no-underline ${
                     active
-                      ? "border-mark text-mark"
-                      : "border-transparent text-white/60 hover:text-white"
+                      ? "border-mark bg-neutral-100 text-ink"
+                      : "border-transparent text-muted hover:bg-neutral-100 hover:text-ink"
                   }`}
                 >
                   <NavIcon name={section.slug} />
@@ -165,7 +174,7 @@ export function SideNav({
       {(open || narrowOpen) && (
         <aside
           aria-label="Sections"
-          className={`fixed inset-y-0 left-0 z-50 flex w-60 flex-col overflow-y-auto bg-ink text-white ${
+          className={`fixed inset-y-0 left-0 z-50 flex w-60 flex-col overflow-y-auto bg-white text-ink shadow-[inset_-2px_0_0_var(--rf-neutral-900)] ${
             open ? "" : "xl:hidden"
           } ${narrowOpen ? "" : "max-xl:hidden"}`}
         >
@@ -188,7 +197,7 @@ export function SideNav({
                 <div key={section.slug}>
                   <div
                     className={`flex items-stretch border-l-[3px] ${
-                      active ? "border-mark" : "border-transparent"
+                      active ? "border-mark bg-neutral-100" : "border-transparent"
                     }`}
                   >
                     {/* The row both navigates AND discloses — Square's
@@ -200,7 +209,7 @@ export function SideNav({
                       onClick={closeNarrow}
                       aria-current={active ? "page" : undefined}
                       className={`flex h-11 min-w-0 flex-1 items-center gap-3 pl-4 text-[12px] font-semibold tracking-[0.06em] uppercase no-underline ${
-                        active ? "text-mark" : "text-white/60 hover:text-white"
+                        active ? "text-ink" : "text-muted hover:text-ink"
                       }`}
                     >
                       <NavIcon name={section.slug} />
@@ -216,7 +225,7 @@ export function SideNav({
                       }
                       aria-expanded={isOpen}
                       aria-label={`${isOpen ? "Hide" : "Show"} the ${label} screens`}
-                      className="flex h-11 w-11 shrink-0 items-center justify-center text-white/50 hover:text-white"
+                      className="flex h-11 w-11 shrink-0 items-center justify-center text-subtle hover:text-ink"
                     >
                       {/* ▼ open, a quarter turn anti-clockwise when shut — the
                           app's one disclosure idiom, shared with
@@ -242,7 +251,7 @@ export function SideNav({
                           // pl-11 lands the label under the section label, past
                           // the 24px mark and its gap.
                           className={`flex h-9 items-center pr-4 pl-11 text-[11px] font-semibold tracking-[0.06em] uppercase no-underline ${
-                            here2 ? "text-white" : "text-white/50 hover:text-white"
+                            here2 ? "text-ink" : "text-subtle hover:text-ink"
                           }`}
                         >
                           <span className="truncate">{sub.label}</span>
@@ -280,7 +289,7 @@ function RailButton({
       onClick={onClick}
       aria-label={label}
       title={label}
-      className={`flex h-14 shrink-0 items-center gap-3 text-white/60 hover:text-white ${
+      className={`flex h-14 shrink-0 items-center gap-3 text-muted hover:text-ink ${
         word ? "pl-4" : "justify-center"
       }`}
     >
