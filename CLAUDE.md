@@ -303,6 +303,46 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    is the normal way to walk, and a reminder you only see when you're not working
    is no reminder. Dismissing is an UPDATE, so it's purchaser+ like every other
    write on that table; staff see reminders and can't clear them.
+   Shipped 2026-07-31 (**needs migration 019 + an edge-function secret**):
+   **the invoice gets READ** — spec §3's invoice OCR, which was deferred to v2+
+   until attachments made it buildable. "Read invoice" on the Paperwork card
+   calls the **`extract-invoice` edge function**
+   (`supabase/functions/extract-invoice/`), which downloads the object through
+   the CALLER's JWT (so 018's storage policy decides), hands it to Claude as a
+   vision/document input with a **json_schema `output_config`** so the answer
+   arrives as a guaranteed shape rather than coaxed-out prose, and writes the
+   result onto `purchase_order_attachments.extraction` (019). One secret:
+   `ANTHROPIC_API_KEY`. Model `claude-opus-5` at `effort: "medium"` —
+   transcription, not deduction. Two API details are load-bearing: thinking is
+   ON by default on that model, so **`content[0]` is a thinking block, not the
+   answer** (find the text block); and `stop_reason: "refusal"` returns HTTP
+   200, so it's checked before the content is read.
+   **The extraction is a PROPOSAL and nothing in it ever writes itself.** It
+   feeds **reconcile mode** on the PO line table — a view toggle, so it sits
+   with the table rather than the command bar — which swaps Type and Note for
+   **Invoice qty** and **Invoice price** (1290px either way; the columns are
+   paid for, not added). A value that agrees is quiet text; one that disagrees
+   is a button carrying the same `≠` the price-reconciliation band uses, and
+   tapping it is what writes. `lib/invoiceMatch.ts` pairs the two sides:
+   **`product_id` is the join key** — distributor invoices print the supplier's
+   SKU and 013 snapshots that same value onto the line, which is what makes
+   this a join rather than a research problem. Formatting differences (case,
+   dashes, leading zeros) are normalised away; a SKU that appears twice on
+   either side is **left unmatched rather than paired arbitrarily**, and
+   description similarity (a deliberately high 0.66 Jaccard bar, marked `≈` in
+   the UI) is a fallback only for lines with no printed SKU — "Bananas, Ripe"
+   and "Bananas, Fresh" share most of their tokens. Fixture-tested in Node via
+   an esbuild slice, 19 cases, most of them the negative ones.
+   The one bulk action is **Receive n from invoice**, which fills `qty_received`
+   on matched lines that have NONE — never overwriting a counted quantity, the
+   same rule the PO list's batch mark-received follows. Prices stay per-line:
+   a quantity is a receiving fact, a price is money.
+   Consequence for uploads: the attach control now names
+   `image/jpeg,image/png,image/webp,application/pdf` instead of `image/*`,
+   because a photo picked from an iPhone's library arrives as **HEIC**, which
+   the model API won't take — naming formats makes iOS transcode on the way
+   out, so the failure happens at pick time rather than at extraction time with
+   the invoice already filed.
 4b. 🚧 **The Location module** — the first screen outside Purchasing (Mark,
    2026-07-30). `locations` was the one table with no UI at all: nothing in
    `web/src` wrote to it, and its six rows still carried raw FileMaker text in
@@ -418,12 +458,28 @@ shouldn't move for a form — `InlineValue` grew a json path instead.
 **Migrations 001–016 are ALL APPLIED to the hosted DB** (013 verified
 2026-07-23 by the bogus-argument RPC probe; 015 and 016 verified 2026-07-28 —
 the note backfill hit drafts only, and `select next_delivery_date('2026-07-28',
-'{5}')` returns 2026-07-31 over RPC). **017 and 018 are NOT applied yet** —
-probe 017 with `select tax_rate from locations limit 1` (`/location` selects its
-columns, so that screen is broken until it is) and 018 with
-`select file_name from purchase_order_attachments limit 1` plus
-`select id from storage.buckets where id = 'po-attachments'`. They are
+'{5}')` returns 2026-07-31 over RPC). **018 is APPLIED and verified 2026-07-31**
+— columns present, bucket present and private, and an upload through the app
+landed at `{org_id}/{po_id}/{uuid}.png` with the signed URL rendering; an
+unauthenticated fetch and an `anon` signed-URL request were both refused.
+**017 and 019 are NOT applied yet** — probe 017 with
+`select tax_rate from locations limit 1` (`/location` selects its columns, so
+that screen is broken until it is) and 019 with
+`select extraction from purchase_order_attachments limit 1`. They are
 independent of each other and can be applied in either order.
+
+Migration 019 gives the attachment somewhere to put what the invoice SAYS —
+`extraction` jsonb, `extracted_at`, `extraction_model`. On the attachment rather
+than a table of its own: the reading is 1:1 with the file, re-reading replaces
+rather than accumulates, and deleting the attachment should take it along
+(which a column does for free). **Until 019 is applied, PO detail says so out
+loud** — the Paperwork card is replaced by the Postgres error naming the missing
+column, same as 018's pre-apply behaviour.
+
+**The `extract-invoice` edge function needs one secret** and is not deployed
+yet:
+`supabase secrets set ANTHROPIC_API_KEY=sk-ant-…` then
+`supabase functions deploy extract-invoice`.
 
 Migration 018 gives receiving the invoice — the last unbuilt piece of spec §2
 step 5. It adds `file_name` / `content_type` / `byte_size` to
@@ -1035,5 +1091,10 @@ weekday column, and 003 then silently made it per-vendor-item.
 
 Killed: location transfers/packing lists, PO_Type taxonomy, most legacy
 reports, standalone inventory-count UI. Deferred to v2+: order suggestions,
-minimum helper, invoice OCR, spend dashboard, collaborative ordering, offline.
+minimum helper, spend dashboard, collaborative ordering, offline.
+~~Invoice OCR~~ **built 2026-07-31** — it moved out of v2 because attachments
+made it a small feature rather than a project: the invoice was already in the
+system, the PO line already snapshotted the vendor's SKU to join on, and the
+price-reconciliation band was already the place an answer could land. See build
+step 4.
 When in doubt whether a feature belongs, check the spec's kill list or ask Mark.
