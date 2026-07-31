@@ -352,6 +352,25 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the model API won't take — naming formats makes iOS transcode on the way
    out, so the failure happens at pick time rather than at extraction time with
    the invoice already filed.
+   **Reconcile mode is superseded before it was ever used in anger** (Mark,
+   2026-07-31, after running the whole flow against a real Chefs' Warehouse
+   invoice: *"As it stands, I would never use this feature."*). The ENGINE held
+   up — 19/19 lines joined on `product_id`, and the `extended ÷ qty` price
+   derivation survived catch-weight lines — but reconciliation was built as a
+   MODE on the PO detail table instead of a surface of its own, on the reasoning
+   that a second surface would mean a second place to edit a PO line. That
+   reasoning is about WRITE PATHS and was wrongly applied to a VIEW: receiving
+   against an invoice is a distinct task with a distinct posture (standing at a
+   delivery, holding paper, comparing two documents), and a dedicated screen can
+   write through the same code. The consequences were a seven-step flow, two
+   different places to change a price, a mode you can't tell you're in, and no
+   way to see the invoice while receiving it.
+   The replacement is specced in **`docs/receiving-screen-brief.md`** —
+   a receiving screen showing the invoice beside the lines, one row per line,
+   one receive control that uses the invoice when there is one, and a two-stage
+   **Update PO → Update vendor** button in place of clicking a price to accept
+   it. Decisions locked with Mark: the screen REPLACES reconcile mode, and
+   auto-read on attach applies to `invoice` attachments only.
 4b. 🚧 **The Location module** — the first screen outside Purchasing (Mark,
    2026-07-30). `locations` was the one table with no UI at all: nothing in
    `web/src` wrote to it, and its six rows still carried raw FileMaker text in
