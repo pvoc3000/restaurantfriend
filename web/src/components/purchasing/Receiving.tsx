@@ -324,9 +324,15 @@ export function Receiving({
     />
   );
 
+  // `h-full` + an inner scroller so the lines column matches the document
+  // column's height instead of running past it, and long orders scroll INSIDE
+  // their own pane rather than dragging the whole page (Mark, 2026-07-31). The
+  // header band stays put while the rows move under it.
   const linesPane = (
-    <div className="border border-ink">
-      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b-2 border-ink px-3 py-2">
+    <div className="flex h-full flex-col border border-ink">
+      {/* Same 1px rule as the document pane's toolbar — these two sit side by
+          side and a 2px here read as a mistake. */}
+      <div className="flex shrink-0 flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-ink px-3 py-2">
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           {lines.length} {lines.length === 1 ? "line" : "lines"}
         </h2>
@@ -339,7 +345,9 @@ export function Receiving({
           </span>
         )}
       </div>
-      <ul>
+      {/* min-h-0 is what lets a flex child actually shrink and scroll — without
+          it the ul takes its content height and overflows the box instead. */}
+      <ul className="min-h-0 flex-1 overflow-y-auto">
         {rows.map((line) => (
           <ReceivingRow
             key={line.id}
@@ -459,20 +467,24 @@ export function Receiving({
             {linesPane}
           </div>
         ) : (
+          /* Document LEFT — source, then destination. ONE height for the whole
+             row, so the two columns end level; each column then scrolls its own
+             contents rather than the page scrolling both (Mark, 2026-07-31 —
+             "the purchase order column should be in a scroll view"). Below xl
+             the row is a plain block and both panes size themselves, since
+             stacking is the point there. */
           <div
             ref={splitRef}
-            className={`gap-0 ${layout === "split" ? "flex" : "block xl:flex"}`}
+            className={`gap-0 ${
+              layout === "split" ? "flex" : "block xl:flex"
+            } xl:h-[calc(100vh-var(--rf-header-h)-11rem)] xl:min-h-96`}
           >
-            {/* Document LEFT — source, then destination. Sticky under the
-                masthead's MEASURED height so the page keeps one scroller: the
-                universal ScrollMemory sees it, and the fixed ActionBar sits
-                over a normally-scrolling page. */}
             <div
               style={{ flexBasis: `${split * 100}%` }}
-              className={`sticky top-[calc(var(--rf-header-h)+1rem)] shrink-0 grow-0 max-xl:static max-xl:basis-auto ${
-                shown
-                  ? "h-[calc(100vh-var(--rf-header-h)-9rem)] min-h-64 max-xl:h-[70vh]"
-                  : "h-auto max-xl:h-auto"
+              // An EMPTY pane still matches the column at xl (that's the point),
+              // but must not reserve 70vh of nothing to scroll past when stacked.
+              className={`shrink-0 grow-0 xl:h-full max-xl:basis-auto ${
+                shown ? "max-xl:h-[70vh]" : "max-xl:h-auto"
               }`}
             >
               {documentPane}
@@ -484,7 +496,7 @@ export function Receiving({
               onPointerDown={startDrag}
               className="mx-1 w-2 shrink-0 cursor-col-resize touch-none self-stretch bg-transparent hover:bg-hairline max-xl:hidden"
             />
-            <div className="min-w-0 flex-1 max-xl:mt-4">{linesPane}</div>
+            <div className="min-w-0 flex-1 xl:h-full max-xl:mt-4">{linesPane}</div>
           </div>
         )}
       </div>

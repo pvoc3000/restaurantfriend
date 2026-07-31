@@ -78,9 +78,15 @@ export function InvoiceSummary({
 
       {/* Said in the card, not buried in a tooltip: everything here was read off
           a photograph by a model, and none of it is true until someone says so. */}
+      {/* Two different promises, and they must not be blurred: nothing off the
+          invoice reaches the order unless someone taps it in, and the order
+          isn't done until Finalize. Writing "nothing is written until you
+          Finalize" would be the wrong one — every tap writes immediately, so
+          that sentence would tell you your count wasn't saved when it was. */}
       <p className="text-xs text-muted">
         Read from {fileName ?? "the attachment"}
-        {model && ` by ${model}`}. Nothing is written to this order until you tap it.
+        {model && ` by ${model}`}. Nothing here reaches the order until you take
+        it, and the order isn&rsquo;t done until you Finalize.
       </p>
 
       {/* The reader's caveats — what it couldn't make out, and what it had to

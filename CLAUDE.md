@@ -372,7 +372,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    and gains a "Receive…" link. `lib/nav.ts` needed no change — `resolveRoute`
    prefix-matches.
    **Layout: document LEFT, lines RIGHT, draggable divider** (Mark supplied
-   Bill.com's bill-entry screen as a layout reference). Below `xl` it STACKS
+   Bill.com's bill-entry screen as a layout reference). Side by side, ONE height
+   governs the row so the two columns end level, and the lines pane scrolls its
+   own rows under a fixed header (`min-h-0 flex-1 overflow-y-auto` — without the
+   `min-h-0` a flex child takes its content height and overflows instead of
+   scrolling). Consequence: that scroll is NOT covered by the universal
+   `ScrollMemory`, which watches the window; it resets on a round trip, which is
+   fine while receiving is a single-screen task. Below `xl` it STACKS
    rather than offering a Lines/Invoice toggle — nothing hidden, no mode to be
    lost in — and an empty document pane sizes to its own sentence instead of
    reserving 70vh of nothing to scroll past on an iPad. `Auto` / `Side by side`
