@@ -18,7 +18,7 @@ export async function ReceivingView({
   id: string;
   rawParams: RawSearchParams;
 }) {
-  const trail = parseTrail(rawParams, { href: "/purchase-orders", label: "POs" });
+  const parsed = parseTrail(rawParams, { href: "/purchase-orders", label: "POs" });
   const session = await getAppSession();
   const supabase = await createClient();
 
@@ -46,12 +46,19 @@ export async function ReceivingView({
   // reject is not.
   const canReceive = ["owner", "admin", "purchaser"].includes(session.membership.role);
 
+  const poHref = `/purchase-orders/${id}`;
+  const trail = parsed.some((c) => c.href.split("?")[0] === poHref)
+    ? parsed
+    : [...parsed, { href: poHref, label: order.po_number }];
+
   return (
     <div className="space-y-6">
-      <Breadcrumbs
-        trail={[...trail, { href: `/purchase-orders/${id}`, label: order.po_number }]}
-        current="Receive"
-      />
+      {/* The order crumb is added only if the trail doesn't already have it.
+          Arriving from PO detail, its Receive link stamps this very PO as the
+          `from`, so appending unconditionally produced the same href twice —
+          which React reported as a duplicate key. Arriving at the bare URL, the
+          trail is just "POs" and the crumb is worth adding. */}
+      <Breadcrumbs trail={trail} current="Receive" />
 
       {lineError ? (
         <p className="text-sm text-accent">Could not load order lines: {lineError}</p>

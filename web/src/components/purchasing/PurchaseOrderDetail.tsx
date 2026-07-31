@@ -3,7 +3,6 @@
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { withFrom } from "@/lib/breadcrumbs";
 import { createClient } from "@/lib/supabase/client";
 import { qty } from "@/lib/catalog";
 import {
@@ -63,6 +62,7 @@ export function PurchaseOrderDetail({
   processing,
   attachments,
   attachmentError,
+  receiveHref,
 }: {
   order: PurchaseOrder;
   lines: PoLine[];
@@ -76,6 +76,9 @@ export function PurchaseOrderDetail({
   attachments: SignedAttachment[];
   /** Non-null if the attachments couldn't be read at all — see the page. */
   attachmentError: string | null;
+  /** Link to the receiving screen, stamped with this page's own trail. Built on
+   *  the server, which is the only side that has the search params. */
+  receiveHref: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -635,10 +638,7 @@ export function PurchaseOrderDetail({
             reading an invoice look pointless — and it wasn't role-gated either,
             so staff got an enabled button whose writes RLS rejected. */}
         <Link
-          href={withFrom(`/purchase-orders/${order.id}/receive`, {
-            href: `/purchase-orders/${order.id}`,
-            label: order.po_number,
-          })}
+          href={receiveHref}
           className={`${canEditLines ? "" : "ml-auto "}flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white`}
         >
           Receive&hellip;

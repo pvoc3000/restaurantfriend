@@ -14,8 +14,13 @@ export function Breadcrumbs({ trail, current }: { trail: Crumb[]; current: strin
       className="text-[12px] uppercase tracking-[0.12em]"
     >
       <ol className="flex flex-wrap items-center gap-3 text-subtle">
-        {trail.map((crumb) => (
-          <li key={crumb.href} className="flex items-center gap-3">
+        {/* Keyed by POSITION, not href. A trail follows the route you took, and
+            a route can legitimately revisit a page — vendor → item → that same
+            vendor — so hrefs are not unique and keying on one makes React drop
+            a crumb. The list is short, ordered, and never reordered in place,
+            which is exactly when an index key is the right one. */}
+        {trail.map((crumb, i) => (
+          <li key={`${i}-${crumb.href}`} className="flex items-center gap-3">
             <Link
               href={crumb.href}
               className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"

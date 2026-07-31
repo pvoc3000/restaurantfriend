@@ -87,6 +87,14 @@ export async function PurchaseOrderDetailView({
           // columns it selects, an empty Paperwork card would read as "no
           // invoice yet" instead of "this isn't wired up at this end yet".
           attachmentError={attachmentError}
+          // Built HERE because only the server has `rawParams`, and without
+          // `currentQuery` the stamped crumb is a bare href — the receiving
+          // screen would then show "112-181120-01 / Receive" and lose the POs
+          // crumb that led here.
+          receiveHref={withFrom(`/purchase-orders/${id}/receive`, {
+            href: `/purchase-orders/${id}${currentQuery(rawParams)}`,
+            label: order.po_number,
+          })}
           vendorLink={
             order.vendors ? (
               <Link
