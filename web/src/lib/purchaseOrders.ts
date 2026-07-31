@@ -4,6 +4,8 @@
 // operations, totals row); PO detail preserves ordered-vs-received quantities
 // with dual totals and price reconciliation.
 
+import { priceDiffers as numericPriceDiffers } from "./invoiceExtraction";
+
 export type PoStatus = "draft" | "sent" | "received" | "closed" | "void";
 
 export const PO_STATUS_ORDER: PoStatus[] = [
@@ -54,11 +56,49 @@ export type PoLine = {
   vendor_items: {
     id: string;
     price: number | null;
+    /** The pack TYPE the vendor sells in — "CS", "EA". Distinct from the LINE's
+     *  `package_desc` above, which since migration 013 is a composed structure
+     *  ("12 × 32 oz"). See `packType`. */
+    package_desc: string | null;
+    /** This item's per-location price overrides (design rule 6) — rare, and
+     *  filtered to the order's own location by `effectiveCatalogPrice`. The
+     *  table's key is (vendor_item_id, location_id) with no surrogate id, and
+     *  `price` is NOT NULL (001:166), so a row existing IS an override. */
+    vendor_item_location_prices: {
+      location_id: string;
+      price: number;
+    }[];
     // `category` is the item TYPE ("Dry Goods", "Frozen Goods" — schema 001's
     // own wording); it groups the vendor-facing PDF and leads the detail table.
     inventory_items: { id: string; name: string; category: string | null } | null;
   } | null;
 };
+
+/** A pack snapshot that is a package TYPE, not migration 013's composed structure. */
+export function bareType(packageDesc: string | null): string | null {
+  if (!packageDesc) return null;
+  return packageDesc.includes("×") ? null : packageDesc;
+}
+
+/**
+ * The pack TYPE for a line — what you say after a quantity ("2 CS"), and what
+ * the vendor-facing PDF prints in its Pack column.
+ *
+ * The catalog's own type comes first. The line's snapshot is the fallback, but
+ * ONLY when it's a bare type: FMP recorded "CS"/"EA" there and the migrated
+ * history still carries it (measured 2026-07-28: 28 of 1,000 lines rely on
+ * this), while migration 013 writes a COMPOSED label — "12 × 32 oz" — which
+ * reads as nonsense after a number and is exactly what the vendor-facing
+ * document is no longer supposed to print.
+ */
+export function packType(line: {
+  package_desc: string | null;
+  // Structural, not `Pick<PoLine, …>`: poProcessing's own row type joins a
+  // narrower vendor_items, and this function reads exactly one field of it.
+  vendor_items: { package_desc: string | null } | null;
+}): string | null {
+  return line.vendor_items?.package_desc ?? bareType(line.package_desc);
+}
 
 export type PurchaseOrder = {
   id: string;
@@ -144,7 +184,16 @@ export function closeReadiness(
       `${unreceived} ${unreceived === 1 ? "line has" : "lines have"} no received quantity`
     );
   }
-  const differing = lines.filter(priceDiffers).length;
+  // The EPSILON comparison, not this file's exact `priceDiffers`. The receiving
+  // screen's price button uses the epsilon, so a line it considers settled must
+  // not still be named here — a confirm that contradicts the screen you just
+  // finished working on teaches you to stop reading confirms.
+  const differing = lines.filter(
+    (l) =>
+      l.unit_price !== null &&
+      l.vendor_items !== null &&
+      numericPriceDiffers(l.vendor_items.price, l.unit_price)
+  ).length;
   if (differing > 0) {
     caveats.push(
       `${differing} ${differing === 1 ? "line's price differs" : "lines' prices differ"} from the catalog`

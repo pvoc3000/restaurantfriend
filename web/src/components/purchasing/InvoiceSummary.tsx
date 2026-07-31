@@ -5,36 +5,42 @@ import { extractionNotes, type InvoiceExtraction } from "@/lib/invoiceExtraction
 import type { MatchResult } from "@/lib/invoiceMatch";
 
 /**
- * The band above the line table while you're reconciling against an invoice:
- * what document you're looking at, how much of it lined up, the one bulk action
- * worth having, and — deliberately prominent — everything that DIDN'T line up.
+ * What was read, how much of it lined up, and — deliberately prominent —
+ * everything that didn't.
  *
  * The unmatched half is the point. A reconciliation UI that only shows you the
  * rows it managed to pair reads as complete when it isn't; the lines it
  * couldn't place, and the parts of the page it couldn't read, are exactly what
  * a person needs to look at.
+ *
+ * This sits at the TOP of the receiving screen rather than inside a card
+ * further down, so the first thing you learn on arriving is that a machine has
+ * proposed something and that nothing has been written.
  */
-export function InvoiceReconcile({
+export function InvoiceSummary({
   extraction,
   match,
   fileName,
   model,
-  receivable,
-  busy,
-  onReceiveFromInvoice,
+  receivedTotal,
+  addItemSlot,
 }: {
   extraction: InvoiceExtraction;
   match: MatchResult;
   fileName: string | null;
   model: string | null;
-  /** Matched lines with an invoice quantity and nothing recorded yet. */
-  receivable: number;
-  busy: boolean;
-  onReceiveFromInvoice: () => void;
+  /** What's been counted so far, in money — shown against the invoice total so
+   *  a delivery that doesn't add up is visible without doing the arithmetic. */
+  receivedTotal: number;
+  /** An `AddPoLines` trigger, rendered inside the billed-but-not-ordered block
+   *  where it's actually needed. */
+  addItemSlot?: React.ReactNode;
 }) {
   const matched = match.matches.filter((m) => m.invoice !== null).length;
   const guessed = match.matches.filter((m) => m.by === "description").length;
   const notOnInvoice = match.matches.length - matched;
+  const total = extraction.invoice_total;
+  const short = total !== null && receivedTotal < Number(total) - 0.005;
 
   return (
     <div className="space-y-3 border-2 border-ink px-4 py-3 text-sm">
@@ -45,8 +51,6 @@ export function InvoiceReconcile({
         <span className="text-ink">
           {extraction.invoice_number ?? "no number"}
           {extraction.invoice_date && ` · ${extraction.invoice_date}`}
-          {extraction.invoice_total !== null &&
-            ` · ${money(extraction.invoice_total)}`}
         </span>
         <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
           {matched} of {match.matches.length} lines matched
@@ -54,16 +58,21 @@ export function InvoiceReconcile({
           {notOnInvoice > 0 && ` · ${notOnInvoice} not on the invoice`}
         </span>
 
-        {receivable > 0 && (
-          <button
-            type="button"
-            disabled={busy}
-            onClick={onReceiveFromInvoice}
-            title="Fills the received quantity from the invoice on matched lines that have none. Anything already counted is left alone."
-            className="ml-auto h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-          >
-            Receive {receivable} from invoice
-          </button>
+        {/* Billed against counted. Bill.com puts the line sum beside the bill
+            amount for the same reason: the question "does this delivery add
+            up?" shouldn't need mental arithmetic. */}
+        {total !== null && (
+          <span className="ml-auto flex items-baseline gap-3 tabular-nums">
+            <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+              Billed {money(total)}
+            </span>
+            <span
+              className={`text-[12px] uppercase tracking-[0.12em] ${short ? "text-accent" : "text-subtle"}`}
+              title="What you've recorded as received, at the order's prices"
+            >
+              Received {money(receivedTotal)}
+            </span>
+          </span>
         )}
       </div>
 
@@ -71,8 +80,7 @@ export function InvoiceReconcile({
           a photograph by a model, and none of it is true until someone says so. */}
       <p className="text-xs text-muted">
         Read from {fileName ?? "the attachment"}
-        {model && ` by ${model}`}. Nothing is written to the order until you
-        accept it — tap a value in the Invoice columns to take it.
+        {model && ` by ${model}`}. Nothing is written to this order until you tap it.
       </p>
 
       {/* The reader's caveats — what it couldn't make out, and what it had to
@@ -109,10 +117,10 @@ export function InvoiceReconcile({
               </li>
             ))}
           </ul>
-          <p className="mt-1 text-xs text-muted">
-            Use <span className="text-ink">Add item…</span> to put any of these on
-            the order, then reconcile again.
-          </p>
+          {/* The command lives HERE rather than being named in a sentence and
+              left on another screen — this list is the only place the thought
+              "that should be on the order" occurs. */}
+          {addItemSlot && <div className="mt-2">{addItemSlot}</div>}
         </div>
       )}
     </div>

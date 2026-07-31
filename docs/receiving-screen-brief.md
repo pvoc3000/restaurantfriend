@@ -1,7 +1,22 @@
 # Receiving screen — build brief
 
-**Status:** not started. Supersedes reconcile mode, which ships today and which
-Mark has used once, against a real invoice, and would not use again.
+**Status: BUILT 2026-07-31** at `/purchase-orders/[id]/receive`. Reconcile mode
+is deleted. See CLAUDE.md build-step 4 for what shipped and the decisions that
+moved during the build — in particular the Bill.com-derived layout (document
+left, draggable divider, stacked below `xl`), the Undo on bulk receive, and two
+corrections this brief didn't anticipate: the price button needs its own
+null-tolerant comparator, and "Update vendor" must write
+`vendor_item_location_prices` when the location has an override.
+
+Two things below are now STALE and left as written for the record: the
+"23 fixture cases" (they existed only ad hoc — there are 66 committed ones now,
+run with `npm run fixtures`), and PO 132-181121-01 as the test order (Mark had
+already run it to completion; `132-181132-02` replaced it).
+
+---
+
+Superseded reconcile mode, which Mark used once, against a real invoice, and
+would not use again.
 
 Read `CLAUDE.md` first, then this. The engine described here — extraction,
 matching, price derivation — is built, tested, and working; **this brief is

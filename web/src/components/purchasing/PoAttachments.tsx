@@ -1,19 +1,17 @@
 "use client";
 
-import { useRef, useState } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { useState } from "react";
 import {
-  attachmentPath,
   fileSize,
   isImage,
-  ATTACHMENT_BUCKET,
   ATTACHMENT_KIND_LABEL,
   ATTACHMENT_KIND_OPTIONS,
   type AttachmentKind,
   type SignedAttachment,
 } from "@/lib/attachments";
 import { PickList } from "@/components/ui/PickList";
+import { ProgressBand } from "@/components/ui/ProgressBand";
+import { useAttachmentActions } from "./useAttachmentActions";
 
 /**
  * The paperwork for a delivery (spec §2 step 5). Until now receiving wrote
@@ -41,6 +39,11 @@ import { PickList } from "@/components/ui/PickList";
  * accept. Naming jpeg/png/webp makes iOS transcode to JPEG on the way out, so
  * the file that lands is one that can be read. `image/*` would still upload —
  * and then fail at extraction, hours later, with the invoice already filed.
+ *
+ * The writes themselves live in `useAttachmentActions`, shared with the
+ * receiving screen's document pane — including AUTO-READ, which fires here too
+ * because it's a decision about attaching an invoice rather than about a
+ * screen.
  */
 export function PoAttachments({
   poId,
@@ -55,119 +58,11 @@ export function PoAttachments({
   attachments: SignedAttachment[];
   canEdit: boolean;
 }) {
-  const router = useRouter();
-  const supabase = createClient();
-  const fileRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<AttachmentKind>("invoice");
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function upload(files: FileList) {
-    setError(null);
-    for (const file of Array.from(files)) {
-      setBusy(`Uploading ${file.name}…`);
-      const path = attachmentPath(orgId, poId, file.name);
-
-      const { error: uploadError } = await supabase.storage
-        .from(ATTACHMENT_BUCKET)
-        .upload(path, file, { contentType: file.type || undefined });
-      if (uploadError) {
-        setBusy(null);
-        setError(`${file.name}: ${uploadError.message}`);
-        return;
-      }
-
-      const { error: rowError } = await supabase
-        .from("purchase_order_attachments")
-        .insert({
-          org_id: orgId,
-          po_id: poId,
-          storage_path: path,
-          kind,
-          file_name: file.name,
-          content_type: file.type || null,
-          byte_size: file.size,
-        });
-      if (rowError) {
-        // The object is up but unrecorded. Take it back out rather than leaving
-        // a file nothing points at.
-        await supabase.storage.from(ATTACHMENT_BUCKET).remove([path]);
-        setBusy(null);
-        setError(`${file.name}: ${rowError.message}`);
-        return;
-      }
-    }
-    setBusy(null);
-    // So the same file can be picked again after a failure — a file input holds
-    // its value and won't re-fire change for an identical selection.
-    if (fileRef.current) fileRef.current.value = "";
-    router.refresh();
-  }
-
-  /**
-   * Have the invoice read (the `extract-invoice` edge function). It writes the
-   * extraction onto this attachment; `router.refresh()` brings it back and the
-   * line table's Reconcile toggle appears.
-   *
-   * Nothing about the ORDER changes here — extraction only ever produces a
-   * proposal to compare against, which a human then accepts line by line.
-   */
-  async function read(attachment: SignedAttachment) {
-    setBusy(`Reading ${attachment.file_name ?? "the invoice"}…`);
-    setError(null);
-    const { data, error } = await supabase.functions.invoke("extract-invoice", {
-      body: { attachment_id: attachment.id },
-    });
-    setBusy(null);
-    if (error) {
-      // The function returns a readable message in the body; the SDK surfaces
-      // only "non-2xx status code" unless we go and get it.
-      let message = error.message;
-      const res = (error as { context?: Response }).context;
-      if (res) {
-        try {
-          const body = await res.json();
-          if (body?.error) message = body.error;
-        } catch {
-          // Keep the SDK's message.
-        }
-      }
-      setError(message);
-      return;
-    }
-    if (data?.error) {
-      setError(data.error);
-      return;
-    }
-    router.refresh();
-  }
-
-  async function remove(attachment: SignedAttachment) {
-    if (
-      !window.confirm(
-        `Remove ${attachment.file_name ?? "this attachment"} from this order?\n\nThis cannot be undone.`
-      )
-    ) {
-      return;
-    }
-    setBusy("Removing…");
-    setError(null);
-
-    const { error: rowError } = await supabase
-      .from("purchase_order_attachments")
-      .delete()
-      .eq("id", attachment.id);
-    if (rowError) {
-      setBusy(null);
-      setError(rowError.message);
-      return;
-    }
-    // Best effort: the row is already gone, so a failure here leaves an orphan
-    // object rather than a broken card. Not worth stopping the user over.
-    await supabase.storage.from(ATTACHMENT_BUCKET).remove([attachment.storage_path]);
-    setBusy(null);
-    router.refresh();
-  }
+  const { phase, busy, error, fileRef, upload, read, remove } = useAttachmentActions({
+    poId,
+    orgId,
+  });
 
   return (
     <div className="space-y-3 border border-ink px-4 py-3">
@@ -198,11 +93,11 @@ export function PoAttachments({
             </span>
             <button
               type="button"
-              disabled={busy !== null}
+              disabled={busy}
               onClick={() => fileRef.current?.click()}
               className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
             >
-              {busy ? busy : "Attach…"}
+              Attach&hellip;
             </button>
             <input
               ref={fileRef}
@@ -211,12 +106,26 @@ export function PoAttachments({
               accept="image/jpeg,image/png,image/webp,application/pdf"
               className="hidden"
               onChange={(e) => {
-                if (e.target.files?.length) void upload(e.target.files);
+                if (e.target.files?.length) void upload(e.target.files, kind);
               }}
             />
           </span>
         )}
       </div>
+
+      {/* The progress goes in a band rather than into the button's label: an
+          invoice read is 30s of an Opus call, and a word where "Attach…" used
+          to be is indistinguishable from nothing happening. */}
+      {phase.kind !== "idle" && (
+        <ProgressBand
+          label={phase.label}
+          note={
+            phase.kind === "reading"
+              ? "Reading an invoice takes about half a minute. You can keep working."
+              : undefined
+          }
+        />
+      )}
 
       {error && <p className="text-sm text-accent">{error}</p>}
 
@@ -265,7 +174,7 @@ export function PoAttachments({
                   <p className="flex flex-wrap items-baseline gap-2">
                     <button
                       type="button"
-                      disabled={busy !== null}
+                      disabled={busy}
                       onClick={() => void read(a)}
                       className="text-[11px] uppercase tracking-[0.06em] text-ink hover:underline disabled:opacity-35"
                     >
@@ -273,7 +182,7 @@ export function PoAttachments({
                     </button>
                     <button
                       type="button"
-                      disabled={busy !== null}
+                      disabled={busy}
                       onClick={() => void remove(a)}
                       className="text-[11px] uppercase tracking-[0.06em] text-accent hover:underline disabled:opacity-35"
                     >

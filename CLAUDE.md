@@ -365,12 +365,67 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    write through the same code. The consequences were a seven-step flow, two
    different places to change a price, a mode you can't tell you're in, and no
    way to see the invoice while receiving it.
-   The replacement is specced in **`docs/receiving-screen-brief.md`** —
-   a receiving screen showing the invoice beside the lines, one row per line,
-   one receive control that uses the invoice when there is one, and a two-stage
-   **Update PO → Update vendor** button in place of clicking a price to accept
-   it. Decisions locked with Mark: the screen REPLACES reconcile mode, and
-   auto-read on attach applies to `invoice` attachments only.
+   Shipped 2026-07-31, specced in **`docs/receiving-screen-brief.md`**: the
+   **receiving screen**, `/purchase-orders/[id]/receive`. Reconcile mode, the
+   price-differs band, `InvoiceCell`, `InvoiceReconcile` and "Receive all as
+   ordered" are DELETED; PO detail keeps its inline cells for desk corrections
+   and gains a "Receive…" link. `lib/nav.ts` needed no change — `resolveRoute`
+   prefix-matches.
+   **Layout: document LEFT, lines RIGHT, draggable divider** (Mark supplied
+   Bill.com's bill-entry screen as a layout reference). Below `xl` it STACKS
+   rather than offering a Lines/Invoice toggle — nothing hidden, no mode to be
+   lost in — and an empty document pane sizes to its own sentence instead of
+   reserving 70vh of nothing to scroll past on an iPad. `Auto` / `Side by side`
+   / `Stacked` and the split fraction persist in localStorage
+   (`lib/receivingLayout.ts`, the `chromeStore`/`columnWidths` idiom); the
+   control sits with the view, never in the ActionBar.
+   **Rows are work units, not a `DataTable`** (Mark's call — eight columns of
+   live controls at half width would scroll sideways): identity (name, SKU ·
+   brand · description, the `≈` and `?` markers with their original tooltips),
+   quantities (Ordered · Invoice tap-to-take chips + the guide's three-state
+   box with 44px steppers), then money and the receiving note.
+   **The per-row Invoice chip is NOT gated on `LineMatch.qtyDiffers`** — that
+   flag compares against `qty_received` and so is false on every untouched line,
+   which was the mechanical cause of "what did reading the invoice actually
+   buy?". `qtyDiffers` now only COLOURS the row.
+   **The two-stage price button carries no staging state** — `priceAction` in
+   `lib/receiving.ts` derives it: invoice ≠ order → "Update PO"; else catalog ≠
+   order → "Update vendor"; else nothing. Taking stage 1 makes stage 2 appear by
+   itself, and with no invoice read stage 2 alone does the deleted band's job.
+   Two corrections it forced: it needs its OWN comparator (`needsUpdate` — a
+   null target is a difference, which `invoiceExtraction.priceDiffers` says
+   false to, and that's exactly the line that most needs the button) and it
+   writes **`vendor_item_location_prices` when this location has an override**
+   (design rule 6 — the old `adoptPrice` wrote `vendor_items.price`
+   unconditionally, which at an override location succeeds, reports success and
+   changes nothing). That table is keyed `(vendor_item_id, location_id)` with no
+   surrogate id. `closeReadiness` moved to the same epsilon so the Close confirm
+   can't contradict the screen you just finished.
+   **One receive control**, in the ActionBar: `Receive n from invoice` when an
+   extraction exists, `Receive n as ordered` when not, filling only lines with
+   NO quantity. With an invoice it fills MATCHED lines only — filling the rest
+   from the ordered quantity would assert that something arrived which nobody
+   billed us for. **And it can be undone**: a band offers Undo, which nulls back
+   the specific line ids it just set (held in state, not re-derived). Not a
+   general undo stack — this is the only action that changes fifteen rows on one
+   tap.
+   **Auto-read on attach, `invoice` kind only**, in `useAttachmentActions`
+   (shared with PO detail's Paperwork card, because it's a decision about the
+   ACT of attaching, not about a screen). The upload STANDS if the read fails.
+   Feedback is `ui/ProgressBand`, not a Dialog — a 30-second Opus call must not
+   stop you counting.
+   **`DocumentPane` holds its signed URL in `useState` and is KEYED by
+   attachment id.** `createSignedUrls` mints a fresh JWT per call, so every
+   `router.refresh()` hands down a different URL string; without the key the PDF
+   re-fetches and jumps to page 1 on every quantity you type. Images get zoom
+   and rotate (half these invoices are phone photos of paper, arriving sideways);
+   PDFs get the plugin's viewer plus an always-visible **Open** link, which is
+   not optional — iOS Safari renders page 1 only in `<object>`.
+   Verified 2026-07-31 against **`132-181132-02`** (Chefs' Warehouse, DF02, 15
+   lines): 9 of 15 joined by SKU against the stored invoice, 6 not on it, 10
+   billed but not ordered, 4 catch-weight `?`; bulk fill 9 with the invoice / 15
+   without; a hand-counted 0 survived a bulk receive and Undo restored exactly
+   the 14 it had filled. The order was left as found.
 4b. 🚧 **The Location module** — the first screen outside Purchasing (Mark,
    2026-07-30). `locations` was the one table with no UI at all: nothing in
    `web/src` wrote to it, and its six rows still carried raw FileMaker text in
@@ -490,22 +545,21 @@ the note backfill hit drafts only, and `select next_delivery_date('2026-07-28',
 — columns present, bucket present and private, and an upload through the app
 landed at `{org_id}/{po_id}/{uuid}.png` with the signed URL rendering; an
 unauthenticated fetch and an `anon` signed-URL request were both refused.
-**017 and 019 are NOT applied yet** — probe 017 with
-`select tax_rate from locations limit 1` (`/location` selects its columns, so
-that screen is broken until it is) and 019 with
-`select extraction from purchase_order_attachments limit 1`. They are
-independent of each other and can be applied in either order.
+**017 and 019 are APPLIED** — verified 2026-07-31 by probe (`tax_rate` selects
+on `locations`; `extraction` / `extracted_at` / `extraction_model` select on
+`purchase_order_attachments` and hold a real Chefs' Warehouse reading). This
+line said "NOT applied yet" for a while after they were; **probe, don't read
+this file** — that's what the memory note says and it was right.
 
 Migration 019 gives the attachment somewhere to put what the invoice SAYS —
 `extraction` jsonb, `extracted_at`, `extraction_model`. On the attachment rather
 than a table of its own: the reading is 1:1 with the file, re-reading replaces
 rather than accumulates, and deleting the attachment should take it along
-(which a column does for free). **Until 019 is applied, PO detail says so out
-loud** — the Paperwork card is replaced by the Postgres error naming the missing
-column, same as 018's pre-apply behaviour.
+(which a column does for free). If a screen ever loses these columns again it
+says so out loud — the Paperwork card and the document pane are replaced by the
+Postgres error naming the missing column, same as 018's pre-apply behaviour.
 
-**The `extract-invoice` edge function needs one secret** and is not deployed
-yet:
+**The `extract-invoice` edge function needs one secret:**
 `supabase secrets set ANTHROPIC_API_KEY=sk-ant-…` then
 `supabase functions deploy extract-invoice`.
 
@@ -623,6 +677,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `catalog/InventoryItemPicker` | a search box | finding and linking an inventory item |
   | `ui/ActionBar` + `ActionBarButton` | a button row | screen-level COMMANDS only (not view controls) |
   | `ui/PageLoading` | a spinner | the body of every `loading.tsx` |
+  | `ui/ProgressBand` | a word in a button's label | something slow on a screen that's ALREADY painted (an invoice read is 30s+); same indeterminate bar, never a Dialog — the work behind it must stay usable |
   | `ui/BackToTop` | — | long lists; already on the guide |
   | `components/Breadcrumbs` | a back link | every detail screen, unconditionally |
 
@@ -1032,6 +1087,20 @@ weekday column, and 003 then silently made it per-vendor-item.
 - Secrets: `web/.env.local` only (gitignored). `NEXT_PUBLIC_SUPABASE_URL` =
   https://kltxioacvneshbyhxtaj.supabase.co, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
   from Supabase Studio → Settings → API. Ask Mark to paste it; never commit it.
+- **`npm run fixtures` is the test suite** (`web/scripts/fixtures/`, added
+  2026-07-31). 66 cases over the pure modules — `lib/invoiceMatch` (the SKU
+  join, its two relaxations, the description fallback, and the real Guittard
+  pair that killed Jaccard) and `lib/receiving` (the two-stage price button, the
+  never-overwrite fill rule, pack labels). Before this the repo had no runnable
+  tests at all and the invoice brief told you to "re-run the 23 fixtures", which
+  had only ever existed in an ad-hoc esbuild slice.
+  It adds **no dependency**: `tsc` (already installed) compiles the modules and
+  the cases to CommonJS in `.fixtures-build/` and plain Node runs them. Node
+  can't run the `.ts` directly because the source imports are extensionless.
+  `.fixtures-build` is gitignored and eslint-ignored — lint objects to the
+  `require()` in emitted CJS. Write assertions that FAIL when the code is wrong:
+  the suite was checked by breaking `needsUpdate`'s epsilon and `fillable`'s
+  never-overwrite guard and confirming three cases went red.
 - Git: small commits, plain messages. Mark reviews on GitHub.
 
 ## Domain cheat-sheet (why screens look the way they do)

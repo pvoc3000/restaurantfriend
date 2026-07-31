@@ -10,6 +10,7 @@
 // fresh as the click.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { packType } from "./purchaseOrders";
 
 /** How a PO went out, by the vendor's order_type. Matches the DB check. */
 export const SENT_VIA_FOR_ORDER_TYPE: Record<string, string> = {
@@ -232,12 +233,6 @@ type RawLine = {
   inventory_item_id: string | null;
 };
 
-/** A pack snapshot that is a package TYPE, not a composed structure. */
-function bareType(packageDesc: string | null): string | null {
-  if (!packageDesc) return null;
-  return packageDesc.includes("×") ? null : packageDesc;
-}
-
 async function fetchLines(
   supabase: SupabaseClient,
   poIds: string[]
@@ -279,13 +274,9 @@ async function fetchLines(
         brand: row.brand,
         description: row.description,
         package_desc: row.package_desc,
-        // The catalog's package type first. The line's own snapshot is the
-        // fallback, but ONLY when it's a bare type: FMP recorded "CS"/"EA"
-        // there and the migrated history still carries it (measured 2026-07-28:
-        // 28 of 1,000 lines rely on this), while migration 013 writes a
-        // COMPOSED label — "12 × 32 oz" — which is exactly the thing the
-        // vendor-facing document is no longer supposed to print.
-        pack_type: row.vendor_items?.package_desc ?? bareType(row.package_desc),
+        // One rule, one place — `packType` in lib/purchaseOrders, which the
+        // receiving screen's quantity labels use too.
+        pack_type: packType(row),
         qty_ordered: row.qty_ordered,
         unit_price: row.unit_price,
         item_name: row.vendor_items?.inventory_items?.name ?? null,

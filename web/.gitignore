@@ -12,6 +12,8 @@
 
 # testing
 /coverage
+# `npm run fixtures` compiles here before running the suite in plain Node.
+/.fixtures-build/
 
 # next.js
 /.next/

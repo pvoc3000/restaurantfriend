@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // `npm run fixtures` emits CommonJS here for Node to run. It's build
+    // output, not source, and linting it just objects to require().
+    ".fixtures-build/**",
   ]),
 ]);
 
