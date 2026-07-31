@@ -23,6 +23,9 @@ export type PoListRow = {
   line_count: number;
   ordered_total: number;
   received_total: number;
+  /** Invoices and packing slips on file (migration 018) — the Friday question
+   *  is which delivery still has no paperwork. */
+  attachment_count: number;
 };
 
 export default async function PurchaseOrdersPage({
@@ -105,13 +108,30 @@ export default async function PurchaseOrdersPage({
     if (!lines || lines.length < 1000) break;
   }
 
+  // One more bulk pass, same shape as the totals above. Attachments are far
+  // rarer than lines, so a single page covers any realistic window.
+  const attachmentCounts = new Map<string, number>();
+  if (poIds.length > 0) {
+    const { data: files } = await supabase
+      .from("purchase_order_attachments")
+      .select("po_id")
+      .in("po_id", poIds);
+    for (const f of files ?? []) {
+      attachmentCounts.set(f.po_id, (attachmentCounts.get(f.po_id) ?? 0) + 1);
+    }
+  }
+
   const rows: PoListRow[] = (orders ?? []).map((o) => {
     const t = totals.get(o.id);
     return {
-      ...(o as unknown as Omit<PoListRow, "line_count" | "ordered_total" | "received_total">),
+      ...(o as unknown as Omit<
+        PoListRow,
+        "line_count" | "ordered_total" | "received_total" | "attachment_count"
+      >),
       line_count: t?.lines ?? 0,
       ordered_total: t?.ordered ?? 0,
       received_total: t?.received ?? 0,
+      attachment_count: attachmentCounts.get(o.id) ?? 0,
     };
   });
 
