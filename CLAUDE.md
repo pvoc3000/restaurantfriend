@@ -269,6 +269,40 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `vendor_locations.delivery_days`, so the PDF's Delivery block is filled in
    without anyone remembering. The Process card's date input stays for the
    exceptions.
+   Shipped 2026-07-31 (**needs migration 018**): **receiving gets the invoice**,
+   which finishes step 4's last named piece. A **Paperwork card** on PO detail
+   (`PoAttachments.tsx`, `lib/attachments.ts`) takes photos and PDFs into the
+   private `po-attachments` bucket — kind chosen with `PickList`, thumbnails for
+   images, PDFs as document rows. Signed URLs are minted **server-side** in one
+   `createSignedUrls` batch (one round trip instead of one per card, and a URL
+   built to expire doesn't outlive the page). The two write orders are opposite
+   on purpose: **upload = Storage then row** (a row pointing at nothing renders
+   broken), **delete = row then object** (an orphan object is invisible and
+   harmless). The file input carries **no `capture` attribute** — `capture` forces
+   the camera, and without it iOS offers Photo Library / Take Photo / Choose File
+   in one sheet, which is what you want when the invoice is sometimes a
+   photograph and sometimes a PDF the vendor emailed. The PO list gained a
+   narrow **Files** count: on a Friday the only question it answers is which
+   delivery still has nothing filed.
+   Also shipped: **closing an order means something** (`closeReadiness` in
+   `lib/purchaseOrders.ts`). `closed` existed in 001, sorted and badged, and
+   nothing ever routed you to it. It now means "received, reconciled and filed",
+   with a Close order button on detail (status received or sent) and a batch
+   Close on the list (received only — a draft hasn't arrived). The confirm NAMES
+   what's unresolved — unreceived lines, prices still differing, no paperwork —
+   and then **lets you through anyway**, deliberately: gate closing on a complete
+   set and the order whose invoice never comes is stuck in `received` forever,
+   which is how a status stops meaning anything.
+   And **reminders** (`lib/reminders.ts`, `Reminders.tsx`) — spec §2 step 1, the
+   other 001 table that had never had a writer. Due ones band the top of the
+   guide (`show_on_date <= guideDate`, not `=`, so a day you skip doesn't lose
+   one) and are written from the guide or from a vendor via the same dialog.
+   **The band renders OUTSIDE the collapsing shelf** and that placement is the
+   whole design: everything in the shelf is something you set before you start
+   walking, so it hides with the masthead — but walking with the chrome collapsed
+   is the normal way to walk, and a reminder you only see when you're not working
+   is no reminder. Dismissing is an UPDATE, so it's purchaser+ like every other
+   write on that table; staff see reminders and can't clear them.
 4b. 🚧 **The Location module** — the first screen outside Purchasing (Mark,
    2026-07-30). `locations` was the one table with no UI at all: nothing in
    `web/src` wrote to it, and its six rows still carried raw FileMaker text in
@@ -384,9 +418,34 @@ shouldn't move for a form — `InlineValue` grew a json path instead.
 **Migrations 001–016 are ALL APPLIED to the hosted DB** (013 verified
 2026-07-23 by the bogus-argument RPC probe; 015 and 016 verified 2026-07-28 —
 the note backfill hit drafts only, and `select next_delivery_date('2026-07-28',
-'{5}')` returns 2026-07-31 over RPC). **017 is NOT applied yet** — probe with
-`select tax_rate from locations limit 1`. `/location` selects its columns, so
-that screen is broken until it is.
+'{5}')` returns 2026-07-31 over RPC). **017 and 018 are NOT applied yet** —
+probe 017 with `select tax_rate from locations limit 1` (`/location` selects its
+columns, so that screen is broken until it is) and 018 with
+`select file_name from purchase_order_attachments limit 1` plus
+`select id from storage.buckets where id = 'po-attachments'`. They are
+independent of each other and can be applied in either order.
+
+Migration 018 gives receiving the invoice — the last unbuilt piece of spec §2
+step 5. It adds `file_name` / `content_type` / `byte_size` to
+`purchase_order_attachments` (which had existed since 001 with no writer at all),
+creates the **private** `po-attachments` Storage bucket, and puts four
+org-scoped policies on `storage.objects`. The object key is
+`{org_id}/{po_id}/{uuid}.{ext}` so the policies authorise off the first folder
+segment with no join, the same way every table policy reads `org_id`; the cast
+is wrapped in `public.storage_folder_org()` which returns **null instead of
+raising** on a non-uuid segment, because Postgres gives no guarantee it
+evaluates the `bucket_id` test first. That helper is revoked from `public` AND
+`anon` (per 002) and then **granted explicitly to `authenticated`** — a policy
+runs with the querying role's privileges, so without the grant every read of the
+bucket fails with "permission denied for function" rather than returning no
+rows. 018 also indexes `purchase_reminders (location_id, show_on_date) where
+dismissed_at is null`, which the order guide now queries on every load.
+Verified in the Docker harness (all 18 migrations apply on a storage stub; a
+member sees only their own org's objects, an insert into another org's folder is
+rejected, a junk path yields null rather than an error).
+**Until 018 is applied**, PO detail says so out loud — the Paperwork card is
+replaced by the Postgres error — rather than showing an empty card that reads as
+"no invoice yet".
 
 The 16 POs Mark sent on 2026-07-27 have NO delivery date and that is deliberate
 (his call, 2026-07-28): 016's backfill skipped them because they were already
@@ -467,6 +526,8 @@ weekday column, and 003 then silently made it per-vendor-item.
   | Reach for | Instead of | For |
   | --- | --- | --- |
   | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary; opens below the field, portals so panes can't clip it |
+  | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons |
+  | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands; shares `lib/anchoredPanel` with PickList, so it escapes scroll panes the same way |
   | `catalog/InlineValue` | a hand-wired edit-in-place | any editable cell — `kind` text / number / date / **pick**; `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column |
   | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
@@ -605,19 +666,28 @@ weekday column, and 003 then silently made it per-vendor-item.
   scroll pane subtracts that variable instead of a constant — so collapsing
   hands those ~56px straight to the list, which is the point. Any other screen
   sizing itself against the viewport should use the variable too.
-- **An overlay rendered inside the ActionBar inherits its `text-white`**
-  (Mark, 2026-07-27 — "the vendor names are unreadable… is the text colored
-  white?" Yes). `position: fixed` moves the box, not its place in the DOM, so
-  colour cascades from the black bar straight into the floating dialog and any
-  text without an explicit colour class renders white on white. Give the panel
-  its own `text-ink` rather than patching each line — `GeneratePos` does. Same
-  goes for any future overlay whose trigger lives in a black bar.
+- **An overlay INHERITS from wherever its trigger sits, and `position: fixed`
+  doesn't save it.** Fixed moves the box, not its place in the DOM, so every
+  inherited property cascades straight into the floating panel. Two have bitten,
+  both found the same way — the dialog looked broken and the cause was three
+  ancestors up:
+  `text-white` from the black ActionBar, which rendered the Generate POs vendor
+  names white on white (Mark, 2026-07-27 — "the vendor names are unreadable…");
+  and `white-space: nowrap` from a `DataTable` cell's `truncate`, which stopped
+  every paragraph in the vendor-item delete dialog from wrapping and ran the
+  sentences off the panel's right edge (2026-07-31). **Both are now set once on
+  `ui/Dialog`'s panel (`text-ink whitespace-normal`)**, which is the fix — patching
+  each line only defers it to the next line. A new overlay that ISN'T a `Dialog`
+  inherits the problem back.
 - **A dialog pins its title bar and its footer, and scrolls only the middle**
   (`max-h-[85vh] flex flex-col` + `min-h-0 flex-1 overflow-y-auto` on the body).
   The overlay is fixed, so a dialog taller than the window cannot be scrolled by
   the page and its footer is simply unreachable — Generate POs wanted 990px in a
   900px window at 12 vendors, putting "Create N POs" 162px below the fold on the
-  first real ordering day.
+  first real ordering day. This lives in `ui/Dialog` now (2026-07-31), which was
+  extracted from the three hand-rolled copies that had each learned a different
+  subset of these lessons; `toolbar` is the pinned band under the title bar for a
+  search box that must not scroll away.
 - **A DataTable column holding a day picker must be `WEEKDAY_PICKER_WIDTH`**
   (300px, exported from `WeekdayPicker.tsx`). The table is `table-fixed` with
   `truncate` cells, so a narrow column silently CLIPS the right-hand end rather
@@ -937,13 +1007,23 @@ weekday column, and 003 then silently made it per-vendor-item.
   missing real gaps. Also dropped with the column: the "Default vendor item" and
   "Price" columns on the Inventory list and item detail, and their sort keys —
   there is no single vendor item that speaks for an item-location any more.
-- **Delete/duplicate vendor items.** Design agreed but not built: a per-row `⋯`
-  menu (not right-click — no touch equivalent, and iPad Safari is the ordering
-  stopgap — but see the Safari 16.4 floor under Conventions: whichever iPad that
-  turns out to be, it isn't the Air 2). Delete must be usage-aware: `price_history` is `on delete cascade`
-  (audit trail lost) and since 008 `order_guide_plan_days.vendor_item_id` is
-  `on delete cascade` too — deleting a vendor item silently deletes its
-  favorites and their par overrides. Offer deactivate for anything ever ordered.
+- ~~**Delete/duplicate vendor items.**~~ **RESOLVED 2026-07-31 — built**
+  (`catalog/VendorItemActions.tsx`, on `VendorItemsTable` and the vendor-item
+  screen, purchaser+). A `⋯` menu as agreed, not a right-click — no touch
+  equivalent, and iPad Safari is the ordering stopgap.
+  **Duplicate** copies every field except `id`, the timestamps and `legacy_id`
+  (the FileMaker row's identity; two rows claiming it would corrupt any future
+  reconciliation against the export), and deliberately carries over **neither
+  favorites nor per-location price overrides** — a duplicate is a new SKU, the
+  pack-size-variant case it exists for, not a second favorite.
+  **Delete counts the damage first** and reports it: `price_history`,
+  `vendor_item_location_prices`, `order_guide_entries` and — since 008 —
+  `order_guide_plan_days` all CASCADE, so a delete silently takes the price audit
+  trail, the overrides and **the favorites** with it; `purchase_order_items` is
+  `on delete set null`, so history survives but loses the anchor "last ordered"
+  and price reconciliation need. Anything ever ordered defaults to
+  **Deactivate**, with Delete still reachable beside the real counts. It's a
+  `ui/Dialog`, not `window.confirm`, precisely because it needs three answers.
 - **`rep_email` looks mis-mapped by the migration** — Restaurant Depot's rows
   carry `info@donutfriend.com` (our address, not the vendor's). Check the other
   79 vendors before trusting the column.
