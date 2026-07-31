@@ -1,0 +1,304 @@
+// extract-invoice — read the line items off an attached invoice.
+//
+// Receiving records quantities; migration 018 got the invoice into the system;
+// this reads it. The web app posts an attachment id, this function downloads
+// that object, hands it to Claude with a JSON schema it must answer in, and
+// writes the result back onto the attachment row (migration 019). Matching the
+// extracted lines against the purchase order happens in the browser — see
+// web/src/lib/invoiceMatch.ts — because it's 5–20 lines against 5–20 lines and
+// the human has to confirm every write anyway.
+//
+// **Nothing here writes to the order.** The extraction is a PROPOSAL: it says
+// what the invoice appears to say, and the reconcile mode on PO detail is where
+// a person turns any of it into a received quantity or a price. An OCR mistake
+// that silently became a catalog price would propagate into every future order.
+//
+// Setup: one secret, `ANTHROPIC_API_KEY`.
+//   supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
+//
+// Design rule 1, same as send-po-email: the Supabase client carries the
+// CALLER's JWT, so the storage download and the write-back both flow through
+// RLS exactly as they would from the browser. The explicit role check just
+// gives a readable error instead of a silent zero-row update.
+
+import { createClient } from "npm:@supabase/supabase-js@2";
+import Anthropic from "npm:@anthropic-ai/sdk";
+
+const CORS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+function json(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...CORS, "Content-Type": "application/json" },
+  });
+}
+
+const MODEL = "claude-opus-5";
+
+// The API takes images as jpeg/png/gif/webp and PDFs as documents. HEIC — what
+// an iPhone hands you from the photo library — is NOT among them, which is why
+// the attach control asks iOS for JPEG (see PoAttachments).
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+
+// A photographed page is ~1–4 MB; anything far past that is a scan nobody
+// needed at that resolution. The API's own request ceiling is 32 MB and base64
+// inflates by a third, so this leaves plenty of room and fails with an
+// actionable message rather than a wire error.
+const MAX_BYTES = 8 * 1024 * 1024;
+
+// ---------------------------------------------------------------------------
+// The shape the model must answer in.
+//
+// Structured outputs (`output_config.format`) constrain the response to this
+// schema, so the app parses a guaranteed shape instead of coaxing JSON out of
+// prose. Two rules the schema layer enforces: every object needs
+// `additionalProperties: false`, and every property must be listed in
+// `required` — optionality is expressed by allowing null, not by omission.
+// ---------------------------------------------------------------------------
+
+const nullable = (type: string) => ({ anyOf: [{ type }, { type: "null" }] });
+
+const INVOICE_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "vendor_name",
+    "invoice_number",
+    "invoice_date",
+    "invoice_total",
+    "lines",
+    "unreadable",
+  ],
+  properties: {
+    vendor_name: nullable("string"),
+    invoice_number: nullable("string"),
+    invoice_date: nullable("string"),
+    invoice_total: nullable("number"),
+    lines: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: [
+          "product_id",
+          "description",
+          "qty",
+          "unit_price",
+          "extended",
+          "pack",
+        ],
+        properties: {
+          // The vendor's own SKU. This is the join key — a purchase order line
+          // snapshots the same value in `product_id` — so it matters far more
+          // than anything else on the line.
+          product_id: nullable("string"),
+          description: { type: "string" },
+          qty: nullable("number"),
+          unit_price: nullable("number"),
+          extended: nullable("number"),
+          pack: nullable("string"),
+        },
+      },
+    },
+    // Where the model couldn't read something. Surfaced to the human rather
+    // than quietly dropped — "I couldn't read line 7" is the useful answer.
+    unreadable: nullable("string"),
+  },
+};
+
+const PROMPT = `You are reading a supplier invoice for a bakery's receiving desk.
+
+Transcribe every line item exactly as printed. Do not compute, correct, or
+tidy: if the arithmetic on the page is wrong, report what is printed.
+
+- product_id is the SUPPLIER'S item or SKU number for that line, as printed.
+  It is the single most important field — it is what this invoice gets matched
+  against. If a line has no printed item number, use null; never invent one and
+  never substitute a different number from the row.
+- qty is the quantity billed, unit_price the price for one of whatever unit the
+  line is billed in, extended the line total.
+- pack is the pack or size text if the line shows one ("12 x 32 oz", "CS").
+- Use null for any field not printed on that line. Do not guess.
+- Skip subtotal, tax, delivery, and total rows — those are not line items.
+  Put the invoice's grand total in invoice_total.
+- invoice_date as YYYY-MM-DD.
+
+If any part of the document is illegible or ambiguous, say so plainly in
+"unreadable" — naming the line — rather than producing a confident guess.`;
+
+// ---------------------------------------------------------------------------
+
+/** Base64 without blowing the stack: `fromCharCode(...bytes)` on a multi-MB
+ *  array exceeds the argument limit and throws. */
+function toBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const CHUNK = 0x8000;
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
+
+  try {
+    const { attachment_id } = await req.json();
+    if (!attachment_id) return json(400, { error: "missing attachment_id" });
+
+    const apiKey = Deno.env.get("ANTHROPIC_API_KEY");
+    if (!apiKey) {
+      return json(500, {
+        error:
+          "ANTHROPIC_API_KEY is not set on this project — see supabase/functions/extract-invoice/index.ts",
+      });
+    }
+
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_ANON_KEY")!,
+      { global: { headers: { Authorization: req.headers.get("Authorization")! } } }
+    );
+
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (!user) return json(401, { error: "not signed in" });
+
+    const { data: attachment, error: attachmentError } = await supabase
+      .from("purchase_order_attachments")
+      .select("id, org_id, po_id, storage_path, file_name, content_type")
+      .eq("id", attachment_id)
+      .maybeSingle();
+    if (attachmentError) return json(400, { error: attachmentError.message });
+    if (!attachment) return json(404, { error: "attachment not found" });
+
+    const { data: member } = await supabase
+      .from("org_members")
+      .select("role")
+      .eq("user_id", user.id)
+      .eq("org_id", attachment.org_id)
+      .maybeSingle();
+    if (!member || !["owner", "admin", "purchaser"].includes(member.role)) {
+      return json(403, { error: "purchaser role required to read invoices" });
+    }
+
+    // Through the caller's JWT, so migration 018's storage SELECT policy is
+    // what decides whether this file is theirs to read.
+    const { data: blob, error: downloadError } = await supabase.storage
+      .from("po-attachments")
+      .download(attachment.storage_path);
+    if (downloadError || !blob) {
+      return json(400, {
+        error: `could not read the attachment: ${downloadError?.message ?? "not found"}`,
+      });
+    }
+
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    if (bytes.length > MAX_BYTES) {
+      return json(400, {
+        error: `${attachment.file_name ?? "that file"} is ${Math.round(
+          bytes.length / 1024 / 1024
+        )} MB — too large to read. Attach a smaller photo or a PDF.`,
+      });
+    }
+
+    // `blob.type` is what Storage serves it as and is the more reliable of the
+    // two; the row's recorded content_type is the fallback for objects stored
+    // before the browser reported one.
+    const mediaType = blob.type || attachment.content_type || "";
+    const data = toBase64(bytes);
+
+    let source;
+    if (mediaType === "application/pdf") {
+      source = {
+        type: "document" as const,
+        source: { type: "base64" as const, media_type: "application/pdf" as const, data },
+      };
+    } else if (IMAGE_TYPES.includes(mediaType)) {
+      source = {
+        type: "image" as const,
+        source: {
+          type: "base64" as const,
+          media_type: mediaType as "image/jpeg" | "image/png" | "image/gif" | "image/webp",
+          data,
+        },
+      };
+    } else {
+      return json(400, {
+        error: `${mediaType || "that file type"} can't be read — attach a JPEG, PNG or PDF.`,
+      });
+    }
+
+    const anthropic = new Anthropic({ apiKey });
+
+    // The beta path is only for `fallbacks`: Claude Opus 5's safety classifiers
+    // can decline a request outright (a 200 carrying stop_reason "refusal"), and
+    // this parameter re-runs it on another model inside the same call instead of
+    // handing the caller a dead end. An invoice is unlikely to trip them, but
+    // the recovery costs two lines. The array form is used because it's the one
+    // the TypeScript SDK types.
+    const response = await anthropic.beta.messages.create({
+      model: MODEL,
+      max_tokens: 16000,
+      betas: ["server-side-fallback-2026-06-01"],
+      fallbacks: [{ model: "claude-opus-4-8" }],
+      output_config: {
+        // Transcription, not deduction — this is well below the level of work
+        // that rewards deeper thinking, and lower effort keeps a Friday
+        // afternoon's worth of invoices quick.
+        effort: "medium",
+        format: { type: "json_schema", schema: INVOICE_SCHEMA },
+      },
+      messages: [{ role: "user", content: [source, { type: "text", text: PROMPT }] }],
+    });
+
+    if (response.stop_reason === "refusal") {
+      return json(422, {
+        error: "the model declined to read this document",
+        category: response.stop_details?.category ?? null,
+      });
+    }
+    if (response.stop_reason === "max_tokens") {
+      return json(422, {
+        error:
+          "the invoice was too long to finish reading — try splitting it or entering it by hand",
+      });
+    }
+
+    // Thinking is on by default on this model, so thinking blocks come FIRST in
+    // content — `content[0]` is not the answer. Find the text block.
+    const text = response.content.find((b) => b.type === "text");
+    if (!text || text.type !== "text") {
+      return json(502, { error: "the model returned no readable answer" });
+    }
+
+    let extraction: unknown;
+    try {
+      extraction = JSON.parse(text.text);
+    } catch {
+      return json(502, { error: "the model's answer was not valid JSON" });
+    }
+
+    // Written through the caller's JWT: the purchaser+ policy on
+    // purchase_order_attachments is what allows it, same as every other write
+    // this app makes.
+    const { error: writeError } = await supabase
+      .from("purchase_order_attachments")
+      .update({
+        extraction,
+        extracted_at: new Date().toISOString(),
+        extraction_model: response.model,
+      })
+      .eq("id", attachment.id);
+    if (writeError) return json(400, { error: writeError.message });
+
+    return json(200, { extraction, model: response.model });
+  } catch (e) {
+    return json(500, { error: e instanceof Error ? e.message : String(e) });
+  }
+});
