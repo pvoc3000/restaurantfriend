@@ -11,6 +11,8 @@ import {
   VendorItemsTable,
   type VendorItemWithItem,
 } from "@/components/catalog/VendorItemsTable";
+import { AddVendorReminder } from "@/components/purchasing/Reminders";
+import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 
 type VendorLocationRow = {
   id: string;
@@ -150,6 +152,22 @@ export async function VendorDetail({
             website
           </a>
         )}
+
+        {/* "Next time we order from these people…" — recorded where the thought
+            happens rather than remembered until Monday. It surfaces on the
+            ACTIVE location's guide, which is the one you'd be walking. */}
+        {session.activeLocation &&
+          ["owner", "admin", "purchaser"].includes(session.membership.role) && (
+            <span className="ml-auto">
+              <AddVendorReminder
+                vendorId={v.id}
+                vendorName={v.name}
+                locationId={session.activeLocation.id}
+                orgId={session.membership.org_id}
+                today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
+              />
+            </span>
+          )}
       </div>
 
       <section className="space-y-2">
@@ -182,6 +200,7 @@ export async function VendorDetail({
             from={here}
             filters
             showLastOrdered={session.activeLocation !== null}
+            canEdit={["owner", "admin", "purchaser"].includes(session.membership.role)}
           />
         )}
       </section>

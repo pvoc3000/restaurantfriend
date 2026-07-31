@@ -10,6 +10,7 @@ import {
   type GuideEntry,
   type GuideRow,
 } from "@/lib/orderGuide";
+import { REMINDER_SELECT, type Reminder } from "@/lib/reminders";
 import { OrderGuide } from "@/components/purchasing/OrderGuide";
 
 // Every column here crosses the wire 877 times, so the list is exactly what the
@@ -78,6 +79,22 @@ export default async function OrderGuidePage({
     .eq("guide_date", guideDate)
     .then((r) => r);
 
+  // Due reminders (spec §2 step 1), on the wire alongside the entries for the
+  // same reason — both are free next to the guide's ~850ms.
+  //
+  // `lte` rather than `eq`: a reminder set for a day nobody walked must not
+  // expire unseen. It stays up until it's dismissed, which is what makes it a
+  // reminder rather than a notification. Migration 018 adds the partial index
+  // this rides on.
+  const remindersPromise = supabase
+    .from("purchase_reminders")
+    .select(REMINDER_SELECT)
+    .eq("location_id", locationId)
+    .lte("show_on_date", guideDate)
+    .is("dismissed_at", null)
+    .order("show_on_date")
+    .then((r) => r);
+
   // Membership is the view's job now: one line per orderable vendor item ×
   // inventory item at this location, plan row or not. The old hand-rolled
   // merge of "plan rows plus their alternates" is gone with it.
@@ -115,6 +132,7 @@ export default async function OrderGuidePage({
   }
 
   const { data: entryRows } = await entriesPromise;
+  const { data: reminderRows } = await remindersPromise;
 
   return (
     <OrderGuide
@@ -130,6 +148,7 @@ export default async function OrderGuidePage({
       key={`${locationId}:${guideDate}`}
       rows={rows}
       entries={(entryRows ?? []) as GuideEntry[]}
+      reminders={(reminderRows ?? []) as unknown as Reminder[]}
       weekday={weekday}
       initialFilter={view.filter}
       initialGrouping={view.grouping}

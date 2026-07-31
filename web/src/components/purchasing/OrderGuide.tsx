@@ -29,8 +29,10 @@ import {
   type GuideGrouping,
   type GuideRow,
 } from "@/lib/orderGuide";
+import type { Reminder } from "@/lib/reminders";
 import { GuideLine } from "./GuideLine";
 import { GeneratePos } from "./GeneratePos";
+import { Reminders } from "./Reminders";
 import { ActionBar, ActionBarButton } from "@/components/ui/ActionBar";
 import { BackToTop } from "@/components/ui/BackToTop";
 
@@ -46,6 +48,7 @@ import { BackToTop } from "@/components/ui/BackToTop";
 export function OrderGuide({
   rows,
   entries: initialEntries,
+  reminders,
   weekday,
   initialFilter,
   initialGrouping,
@@ -58,6 +61,8 @@ export function OrderGuide({
 }: {
   rows: GuideRow[];
   entries: GuideEntry[];
+  /** Due at this location and not yet dismissed (spec §2 step 1). */
+  reminders: Reminder[];
   weekday: number;
   initialFilter: GuideFilter;
   initialGrouping: GuideGrouping;
@@ -473,6 +478,22 @@ export function OrderGuide({
     // components/ui/ActionBar.
     <>
     <div className={`space-y-4 pb-22 ${chromeCollapsed ? "-mt-8" : ""}`}>
+      {/* ABOVE the shelf, and outside it: a due reminder is an alert, not a view
+          control, so it must survive the collapse that hides everything else up
+          here. Walking with the chrome collapsed is the normal way to walk —
+          that's what the collapse is for — and a reminder you only see when
+          you're not working is no reminder at all. */}
+      <Reminders
+        reminders={reminders}
+        guideDate={guideDate}
+        locationId={locationId}
+        orgId={orgId}
+        // Both dismissing and writing are UPDATEs/INSERTs on purchase_reminders,
+        // which 001's generic policy makes purchaser+ — the same gate that
+        // decides whether POs can be generated.
+        canWrite={canGeneratePos}
+      />
+
       {/* The shelf — everything above the list. It goes with the menu when the
           chrome collapses: on a walk you're reading rows, and the title, the
           day picker, the totals and the filters are all things you set BEFORE
