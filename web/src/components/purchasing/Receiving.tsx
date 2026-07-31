@@ -276,7 +276,7 @@ export function Receiving({
   }
 
   async function close() {
-    const caveats = closeReadiness(lines, attachments.length);
+    const caveats = closeReadiness(lines, attachments.length, order.location_id);
     const message =
       `Close ${order.po_number}?` +
       (caveats.length > 0

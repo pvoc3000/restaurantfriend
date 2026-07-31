@@ -153,8 +153,30 @@ export function receivedQty(lines: PoLine[]): number {
 }
 
 /**
- * Lines whose invoice price differs from the catalog price — the one-tap
- * "update catalog?" flow at receiving (spec §2 step 5).
+ * The catalog price actually in force at a location — design rule 6's
+ * `vendor_item_location_prices` override → `vendor_items.price`.
+ *
+ * It lives HERE, not in lib/receiving, because `closeReadiness` needs it too
+ * and receiving already imports this file. `hasOverride` says which row a write
+ * should land on; the override table is keyed (vendor_item_id, location_id)
+ * with no surrogate id, so there is no id to hand back.
+ */
+export function effectiveCatalogPrice(
+  line: PoLine,
+  locationId: string
+): { price: number | null; hasOverride: boolean } {
+  const vi = line.vendor_items;
+  if (!vi) return { price: null, hasOverride: false };
+  const override = (vi.vendor_item_location_prices ?? []).find(
+    (p) => p.location_id === locationId
+  );
+  if (override) return { price: Number(override.price), hasOverride: true };
+  return { price: vi.price === null ? null : Number(vi.price), hasOverride: false };
+}
+
+/**
+ * Lines whose invoice price differs from the catalog price — the `≠` marker on
+ * PO detail's Unit price column.
  */
 export function priceDiffers(line: PoLine): boolean {
   if (line.unit_price === null || !line.vendor_items) return false;
@@ -179,7 +201,9 @@ export function priceDiffers(line: PoLine): boolean {
  */
 export function closeReadiness(
   lines: PoLine[],
-  attachmentCount: number
+  attachmentCount: number,
+  /** The order's own location — the price question is per-location. */
+  locationId: string
 ): string[] {
   const caveats: string[] = [];
   const unreceived = lines.filter((l) => l.qty_received === null).length;
@@ -188,16 +212,23 @@ export function closeReadiness(
       `${unreceived} ${unreceived === 1 ? "line has" : "lines have"} no received quantity`
     );
   }
-  // The EPSILON comparison, not this file's exact `priceDiffers`. The receiving
-  // screen's price button uses the epsilon, so a line it considers settled must
-  // not still be named here — a confirm that contradicts the screen you just
-  // finished working on teaches you to stop reading confirms.
-  const differing = lines.filter(
-    (l) =>
-      l.unit_price !== null &&
-      l.vendor_items !== null &&
-      numericPriceDiffers(l.vendor_items.price, l.unit_price)
-  ).length;
+  // This must ask EXACTLY what the receiving screen's price button asks, or the
+  // confirm names a line the screen offers no way to settle — which is what
+  // happened on BakeMark 112-181120-01 (Mark, 2026-07-31): the caramel icing
+  // has a DF01 override of $92.80 matching the line, while `vendor_items.price`
+  // still says $68.80, so Finalize complained about a price that was in fact
+  // settled and no button appeared to settle it.
+  //
+  // Two halves, and BOTH matter: the EPSILON (not this file's exact
+  // `priceDiffers`), and the price actually IN FORCE at this location (not the
+  // base catalog price — design rule 6). Getting only the first was the bug.
+  const differing = lines.filter((l) => {
+    if (l.unit_price === null || l.vendor_items === null) return false;
+    return numericPriceDiffers(
+      effectiveCatalogPrice(l, locationId).price,
+      l.unit_price
+    );
+  }).length;
   if (differing > 0) {
     caveats.push(
       `${differing} ${differing === 1 ? "line's price differs" : "lines' prices differ"} from the catalog`

@@ -84,21 +84,15 @@ export function ReceivingRow({
       {/* Band 1 — what this is. */}
       <div className="flex flex-wrap items-baseline gap-x-2">
         <span className="text-[15px] font-semibold text-ink">{name}</span>
+        {/* Marked, not alarmed. These say "worth your eye", which is the yellow
+            family; red is for something being WRONG, and wearing it here made
+            two description matches read as price errors (Mark, 2026-07-31).
+            They also carry their meaning in WORDS: a bare glyph explains itself
+            only on hover, and the iPad this is used on has no hover. */}
         {match?.by === "description" && (
-          <span
-            className="text-accent"
-            title="Matched on the description, not the vendor's item number — check it"
-          >
-            ≈
-          </span>
-        )}
-        {match?.priceUncertain && match.invoice && (
-          <span
-            className="text-accent"
-            title={`The invoice's own figures don't multiply out — it prints ${match.invoice.qty} × ${match.invoice.unit_price} but a line total of ${match.invoice.extended}. The price shown is the line total divided by the quantity. Often a catch-weight item priced by the pound; check the page before taking it.`}
-          >
-            ?
-          </span>
+          <Marker title="The vendor's item number didn't match ours, so these were paired by their wording. Worth a glance that it's the same product.">
+            ≈ matched by description
+          </Marker>
         )}
       </div>
       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
@@ -246,6 +240,18 @@ export function ReceivingRow({
           )}
         </span>
 
+        {/* The `?` belongs BESIDE THE PRICE, which is what it's about — it used
+            to sit up by the item name, where it read as a doubt about the item.
+            It shows whether or not there's a button, because a catch-weight
+            price you're merely looking at still deserves the warning. */}
+        {match?.priceUncertain && match.invoice && (
+          <Marker
+            title={`The invoice's own figures don't multiply out — it prints ${match.invoice.qty} × ${match.invoice.unit_price} but a line total of ${match.invoice.extended}. The price shown is that line total divided by the quantity. Often a catch-weight item priced by the pound; check the page before taking it.`}
+          >
+            ? invoice math
+          </Marker>
+        )}
+
         {action && canReceive && (
           <button
             type="button"
@@ -261,7 +267,6 @@ export function ReceivingRow({
             className="h-9 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
           >
             {action.stage === "po" ? "Update PO" : "Update vendor"}
-            {action.uncertain && <span className="ml-1 text-accent">?</span>}
           </button>
         )}
 
@@ -281,6 +286,25 @@ export function ReceivingRow({
         </span>
       </div>
     </li>
+  );
+}
+
+/**
+ * "Worth your eye" — the `≈` and `?` the brief insists must survive.
+ *
+ * Yellow, not red: red means something is WRONG, and neither of these is. One
+ * says a pair was made on wording rather than an item number; the other that
+ * the invoice's own arithmetic doesn't close. Both are "check this", which is
+ * exactly what the mark colour means everywhere else in the app.
+ */
+function Marker({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <span
+      title={title}
+      className="border border-ink bg-mark-fill px-1.5 py-0.5 text-[11px] uppercase tracking-[0.06em] text-ink"
+    >
+      {children}
+    </span>
   );
 }
 

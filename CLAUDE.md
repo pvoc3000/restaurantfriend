@@ -399,8 +399,28 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    (design rule 6 — the old `adoptPrice` wrote `vendor_items.price`
    unconditionally, which at an override location succeeds, reports success and
    changes nothing). That table is keyed `(vendor_item_id, location_id)` with no
-   surrogate id. `closeReadiness` moved to the same epsilon so the Close confirm
-   can't contradict the screen you just finished.
+   surrogate id.
+   **`closeReadiness` must ask EXACTLY what the button asks — and that is two
+   halves, not one.** It first moved only to the same epsilon, which shipped a
+   bug Mark hit immediately on BakeMark 112-181120-01: Finalize warned that a
+   price differed from the catalog while no row offered any button to settle it.
+   Cause — the caramel icing has a **DF01 override of $92.80 that matches the
+   line**, while `vendor_items.price` still says $68.80, and `closeReadiness`
+   was comparing against the base catalog price rather than the one in force
+   (design rule 6). A confirm that names something the screen gives you no way
+   to fix teaches you to stop reading confirms. `effectiveCatalogPrice` now
+   lives in **`lib/purchaseOrders`** — not `lib/receiving`, which would be a
+   circular import — and both callers use it; `closeReadiness` takes a
+   `locationId`. Pinned in both directions by fixtures: a matching override
+   reports nothing, a disagreeing one still reports, and an override at another
+   location doesn't speak for this one.
+   **The `≈` and `?` markers are YELLOW and carry words** (Mark, 2026-07-31 —
+   he read two red `≈` beside the price warning as part of it). Red means
+   something is WRONG; these mean "worth your eye", which is the mark colour
+   everywhere else. They also say what they mean — `≈ matched by description`,
+   `? invoice math` — because a bare glyph explains itself only on hover and the
+   iPad has none. The `?` moved from beside the item NAME to beside the PRICE it
+   is actually about, and shows with or without a button.
    **Nothing is prefilled** (Mark, 2026-07-31, rejecting a proposed prefill):
    each quantity carries a **→ button** that pushes it into the received box.
    An arrow is an unmistakable action where an underlined number was only a

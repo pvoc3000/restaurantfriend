@@ -10,7 +10,7 @@ import {
   type InvoiceExtraction,
 } from "./invoiceExtraction";
 import type { LineMatch } from "./invoiceMatch";
-import type { PoLine } from "./purchaseOrders";
+import { effectiveCatalogPrice, type PoLine } from "./purchaseOrders";
 
 /**
  * Should `target` become `next`?
@@ -32,30 +32,11 @@ export function needsUpdate(target: number | null, next: number | null): boolean
 }
 
 /**
- * The catalog price actually in force at this location — design rule 6's
- * `vendor_item_location_prices` override → `vendor_items.price`.
- *
- * `hasOverride` says WHICH row a write should land on. Getting that wrong is
- * invisible rather than loud: at a location with an override, writing
- * `vendor_items.price` succeeds, reports success, and changes nothing anyone
- * will ever see. There is no id to return — the override table is keyed
- * (vendor_item_id, location_id) — so the caller writes against those two.
+ * Re-exported, not redefined. `closeReadiness` needs the same answer, and the
+ * one time these two disagreed the Finalize confirm named a price the screen
+ * offered no way to settle (BakeMark 112-181120-01, 2026-07-31).
  */
-export function effectiveCatalogPrice(
-  line: PoLine,
-  locationId: string
-): { price: number | null; hasOverride: boolean } {
-  const vi = line.vendor_items;
-  if (!vi) return { price: null, hasOverride: false };
-  const override = (vi.vendor_item_location_prices ?? []).find(
-    (p) => p.location_id === locationId
-  );
-  if (override) return { price: Number(override.price), hasOverride: true };
-  return {
-    price: vi.price === null ? null : Number(vi.price),
-    hasOverride: false,
-  };
-}
+export { effectiveCatalogPrice };
 
 export type PriceAction =
   | {

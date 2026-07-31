@@ -5,7 +5,7 @@
 // receiving screen, and it writes money, so most of these are about it.
 
 import { matchInvoiceToOrder, type LineMatch } from "../../src/lib/invoiceMatch";
-import { packType } from "../../src/lib/purchaseOrders";
+import { closeReadiness, packType } from "../../src/lib/purchaseOrders";
 import {
   effectiveCatalogPrice,
   fillable,
@@ -168,6 +168,52 @@ test("the stage machine terminates: rounding to cents cannot re-arm stage 1", ()
   const match = matchInvoiceToOrder([line], [inv]).matches[0];
   const action = priceAction(line, match, LOC);
   no(action && action.stage === "po", "0.0033 apart is inside the epsilon");
+});
+
+// ── closeReadiness must agree with the button ───────────────────────────────
+
+test("Finalize never names a price the row offers no way to settle", () => {
+  // The real BakeMark 112-181120-01 case (Mark, 2026-07-31): the caramel icing
+  // has a DF01 override of 92.80 that MATCHES the line, while the base catalog
+  // price still says 68.80. Finalize warned about it and no button appeared.
+  const line = withCatalog(poLine({ qty_received: 1, unit_price: 92.8 }), {
+    price: 68.8,
+    overrides: [{ location_id: LOC, price: 92.8 }],
+  });
+  eq(priceAction(line, undefined, LOC), null, "settled at this location");
+  eq(closeReadiness([line], 1, LOC), [], "so nothing is unresolved");
+});
+
+test("a genuine catalog difference is still named", () => {
+  const line = withCatalog(poLine({ qty_received: 1, unit_price: 92.8 }), { price: 68.8 });
+  ok(priceAction(line, undefined, LOC));
+  eq(closeReadiness([line], 1, LOC), ["1 line's price differs from the catalog"]);
+});
+
+test("an override that disagrees is named, and the base price is ignored", () => {
+  const line = withCatalog(poLine({ qty_received: 1, unit_price: 92.8 }), {
+    price: 92.8,
+    overrides: [{ location_id: LOC, price: 80 }],
+  });
+  ok(priceAction(line, undefined, LOC), "the price in force is 80, not 92.80");
+  eq(closeReadiness([line], 1, LOC), ["1 line's price differs from the catalog"]);
+});
+
+test("an override at ANOTHER location doesn't speak for this one", () => {
+  const line = withCatalog(poLine({ qty_received: 1, unit_price: 92.8 }), {
+    price: 92.8,
+    overrides: [{ location_id: OTHER, price: 80 }],
+  });
+  eq(priceAction(line, undefined, LOC), null);
+  eq(closeReadiness([line], 1, LOC), []);
+});
+
+test("closeReadiness still reports unreceived lines and missing paperwork", () => {
+  const line = withCatalog(poLine({ unit_price: 10 }), { price: 10 });
+  eq(closeReadiness([line], 0, LOC), [
+    "1 line has no received quantity",
+    "no invoice or packing slip is attached",
+  ]);
 });
 
 // ── skuAction: stage 2 of a manual match ────────────────────────────────────
