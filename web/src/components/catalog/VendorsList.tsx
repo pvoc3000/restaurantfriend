@@ -1,11 +1,9 @@
 "use client";
 
-import { Fragment, useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
-import { STICKY_HEAD_ROW, useOverflowOnlyWhenNeeded } from "@/lib/tableHead";
 import { money } from "@/lib/catalog";
-import { makeComparator, nextSortDir, type SortValue } from "@/lib/tableSort";
-import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
+import { makeComparator, type SortDir, type SortValue } from "@/lib/tableSort";
 import {
   vendorDetailHref,
   vendorFiltersToQuery,
@@ -13,7 +11,7 @@ import {
   type VendorFilters,
   type VendorSortKey,
 } from "@/lib/vendorFilters";
-import { ColumnHeader } from "./ColumnHeader";
+import { DataTable, type DataColumn } from "./DataTable";
 import { VendorActiveToggle } from "@/components/VendorActiveToggle";
 import { TextInput } from "@/components/ui/TextInput";
 import type { VendorRow } from "@/app/(app)/vendors/page";
@@ -23,27 +21,6 @@ const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
   { key: "inactive", label: "Inactive" },
   { key: "all", label: "All" },
 ];
-
-const COLUMNS: {
-  key: VendorSortKey;
-  label: string;
-  width: number;
-  align?: "right";
-}[] = [
-  // Active leads on every catalog table (Mark, 2026-07-23).
-  { key: "active", label: "Active", width: 95 },
-  { key: "name", label: "Name", width: 265 },
-  { key: "type", label: "Type", width: 145 },
-  { key: "order_type", label: "Order via", width: 130 },
-  { key: "account", label: "Account", width: 155 },
-  { key: "minimum", label: "Minimum", width: 140, align: "right" },
-  { key: "order_days", label: "Order days", width: 180 },
-  { key: "delivery_days", label: "Delivery days", width: 180 },
-];
-
-const DEFAULT_WIDTHS: ColumnWidths = Object.fromEntries(
-  COLUMNS.map((c) => [c.key, c.width])
-);
 
 const WIDTHS_STORAGE_KEY = "rf.vendors.columnWidths.v1";
 
@@ -72,8 +49,20 @@ function groupLabel(vendor: VendorRow): string {
   return vendor.vendor_type ?? "No type";
 }
 
+/** This vendor's config at the active location — the page queries only one. */
+function config(vendor: VendorRow) {
+  return vendor.vendor_locations[0] ?? null;
+}
+
+/**
+ * What each column sorts on. ONE function rather than a `sortValue` per column,
+ * because the sort lives in the URL: this list orders `rows` itself and
+ * DataTable renders them as given, so the column definitions and the comparator
+ * would otherwise be two sources for the same answer. The columns delegate here
+ * and pass their key.
+ */
 function sortValue(vendor: VendorRow, key: VendorSortKey): SortValue {
-  const config = vendor.vendor_locations[0] ?? null;
+  const c = config(vendor);
   switch (key) {
     case "name":
       return vendor.name;
@@ -82,15 +71,15 @@ function sortValue(vendor: VendorRow, key: VendorSortKey): SortValue {
     case "order_type":
       return vendor.order_type;
     case "account":
-      return config?.account_number ?? null;
+      return c?.account_number ?? null;
     case "minimum":
-      return config?.minimum_order === null || config?.minimum_order === undefined
+      return c?.minimum_order === null || c?.minimum_order === undefined
         ? null
-        : Number(config.minimum_order);
+        : Number(c.minimum_order);
     case "order_days":
-      return daysKey(config?.order_days ?? null);
+      return daysKey(c?.order_days ?? null);
     case "delivery_days":
-      return daysKey(config?.delivery_days ?? null);
+      return daysKey(c?.delivery_days ?? null);
     case "active":
       // Active first when ascending.
       return vendor.is_active ? 0 : 1;
@@ -114,12 +103,6 @@ export function VendorsList({
   initialFilters: VendorFilters;
 }) {
   const [filters, setFilters] = useState<VendorFilters>(initialFilters);
-  const { widths, startResize, setWidth, reset, customized, totalWidth } =
-    useResizableColumns(WIDTHS_STORAGE_KEY, DEFAULT_WIDTHS);
-
-  // Lets the sticky column labels work — see lib/tableHead.
-  const paneRef = useRef<HTMLDivElement>(null);
-  useOverflowOnlyWhenNeeded(paneRef);
 
   function update(patch: Partial<VendorFilters>) {
     const next = { ...filters, ...patch };
@@ -145,6 +128,87 @@ export function VendorsList({
     });
   }, [vendors, filters]);
 
+  // Sorting is CONTROLLED: it lives in the URL so it survives a trip into a
+  // vendor and back, so this list owns both the order of `rows` and the arrow
+  // in the header. DataTable leaves an already-ordered list alone.
+  const columns: DataColumn<VendorRow>[] = [
+      // Active leads on every catalog table (Mark, 2026-07-23).
+      {
+        key: "active",
+        label: "Active",
+        width: 95,
+        sortValue: (v) => sortValue(v, "active"),
+        render: (v) => <VendorActiveToggle vendorId={v.id} active={v.is_active} />,
+      },
+      {
+        key: "name",
+        label: "Name",
+        width: 265,
+        sortValue: (v) => sortValue(v, "name"),
+        render: (v) => (
+          <Link
+            href={vendorDetailHref(v.id, filters)}
+            className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+          >
+            {v.name}
+          </Link>
+        ),
+      },
+      {
+        key: "type",
+        label: "Type",
+        width: 145,
+        sortValue: (v) => sortValue(v, "type"),
+        render: (v) => <span className="text-muted">{v.vendor_type ?? "—"}</span>,
+      },
+      {
+        key: "order_type",
+        label: "Order via",
+        width: 130,
+        sortValue: (v) => sortValue(v, "order_type"),
+        render: (v) => <span className="text-muted">{v.order_type}</span>,
+      },
+      {
+        key: "account",
+        label: "Account",
+        width: 155,
+        sortValue: (v) => sortValue(v, "account"),
+        render: (v) => (
+          <span className="text-muted">{config(v)?.account_number ?? "—"}</span>
+        ),
+      },
+      {
+        key: "minimum",
+        label: "Minimum",
+        width: 140,
+        align: "right",
+        sortValue: (v) => sortValue(v, "minimum"),
+        render: (v) => (
+          <span className="text-muted">{money(config(v)?.minimum_order ?? null)}</span>
+        ),
+      },
+      {
+        key: "order_days",
+        label: "Order days",
+        width: 180,
+        sortValue: (v) => sortValue(v, "order_days"),
+        render: (v) => (
+          <span className="tabular-nums text-muted">{days(config(v)?.order_days ?? null)}</span>
+        ),
+      },
+      {
+        key: "delivery_days",
+        label: "Delivery days",
+        width: 180,
+        sortValue: (v) => sortValue(v, "delivery_days"),
+        render: (v) => (
+          <span className="tabular-nums text-muted">
+            {days(config(v)?.delivery_days ?? null)}
+          </span>
+        ),
+      },
+  ];
+
   const grouping = filters.sort === GROUPING_KEY;
 
   const sorted = useMemo(
@@ -159,20 +223,6 @@ export function VendorsList({
     [visible, filters.sort, filters.dir]
   );
 
-  const groupCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    if (grouping) {
-      for (const v of sorted) {
-        const label = groupLabel(v);
-        counts.set(label, (counts.get(label) ?? 0) + 1);
-      }
-    }
-    return counts;
-  }, [sorted, grouping]);
-
-  function toggleSort(key: VendorSortKey) {
-    update({ sort: key, dir: nextSortDir(filters.sort === key, filters.dir) });
-  }
 
   return (
     <div className="space-y-4">
@@ -182,17 +232,11 @@ export function VendorsList({
           {visible.length} of {vendors.length}
           {activeLocationCode ? ` · ${activeLocationCode}` : ""}
         </span>
-        <span className="ml-auto flex items-center gap-3 text-xs text-faint">
-          <span>Drag the dividers between column headers to resize</span>
-          {customized && (
-            <button
-              onClick={reset}
-              title="Restore the default column widths"
-              className="text-muted hover:underline"
-            >
-              Reset column widths
-            </button>
-          )}
+        {/* The reset-widths control moved into the table itself, where every
+            other list in the app already puts it — DataTable renders it below
+            the rows once you've dragged something. The hint stays here. */}
+        <span className="ml-auto text-xs text-faint">
+          Drag the dividers between column headers to resize
         </span>
       </div>
 
@@ -234,103 +278,23 @@ export function VendorsList({
         </div>
       </div>
 
-      {sorted.length === 0 ? (
-        <p className="text-sm text-muted">No vendors match these filters.</p>
-      ) : (
-        <div ref={paneRef} className="overflow-x-auto">
-          <table
-            className="table-fixed border-collapse text-sm"
-            style={{ width: totalWidth(COLUMNS) }}
-          >
-            <colgroup>
-              {COLUMNS.map((col) => (
-                <col key={col.key} style={{ width: widths[col.key] ?? col.width }} />
-              ))}
-            </colgroup>
-            <thead>
-              {/* Labels stay put while you scroll 80 vendors — see
-                  lib/tableHead, including why the wrapper above has to give up
-                  its overflow for it to work. */}
-              <tr className={`text-left text-muted ${STICKY_HEAD_ROW}`}>
-                {COLUMNS.map((col) => (
-                  <ColumnHeader
-                    key={col.key}
-                    label={col.label}
-                    align={col.align}
-                    sorted={filters.sort === col.key ? filters.dir : false}
-                    onSort={() => toggleSort(col.key)}
-                    onResizeStart={(e) => startResize(e, col.key)}
-                    onResizeReset={() => setWidth(col.key, col.width)}
-                  />
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {sorted.map((v, i) => {
-                const config = v.vendor_locations[0] ?? null;
-                const label = grouping ? groupLabel(v) : null;
-                const startsGroup =
-                  label !== null && (i === 0 || groupLabel(sorted[i - 1]) !== label);
-
-                const row = (
-                  <tr
-                    className={`hover:bg-neutral-50 ${
-                      v.is_active ? "" : "text-faint"
-                    }`}
-                  >
-                    <td className="truncate px-4 py-4">
-                      <VendorActiveToggle vendorId={v.id} active={v.is_active} />
-                    </td>
-                    <td className="truncate px-4 py-4">
-                      <Link
-                        href={vendorDetailHref(v.id, filters)}
-                        className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-                      >
-                        {v.name}
-                      </Link>
-                    </td>
-                    <td className="truncate px-4 py-4 text-muted">
-                      {v.vendor_type ?? "—"}
-                    </td>
-                    <td className="truncate px-4 py-4 text-muted">{v.order_type}</td>
-                    <td className="truncate px-4 py-4 text-muted">
-                      {config?.account_number ?? "—"}
-                    </td>
-                    <td className="truncate px-4 py-4 text-right tabular-nums text-muted">
-                      {money(config?.minimum_order ?? null)}
-                    </td>
-                    <td className="truncate px-4 py-4 tabular-nums text-muted">
-                      {days(config?.order_days ?? null)}
-                    </td>
-                    <td className="truncate px-4 py-4 tabular-nums text-muted">
-                      {days(config?.delivery_days ?? null)}
-                    </td>
-                  </tr>
-                );
-
-                if (!startsGroup) return <Fragment key={v.id}>{row}</Fragment>;
-
-                return (
-                  <Fragment key={v.id}>
-                    <tr className="border-b border-hairline bg-neutral-100">
-                      <td
-                        colSpan={COLUMNS.length}
-                        className="px-2 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-body"
-                      >
-                        {label}
-                        <span className="ml-2 font-normal normal-case tracking-normal text-subtle">
-                          {groupCounts.get(label!) ?? 0}
-                        </span>
-                      </td>
-                    </tr>
-                    {row}
-                  </Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        rows={sorted}
+        columns={columns}
+        rowKey={(v) => v.id}
+        storageKey={WIDTHS_STORAGE_KEY}
+        // Inactive vendors stay in the list but recede — the Active toggle in
+        // the first column is how you bring one back.
+        rowClassName={(v) => (v.is_active ? "" : "text-faint")}
+        // Bands only when the sort IS the grouped column, or you'd get a
+        // heading every few rows. See DataGroup.
+        group={grouping ? { label: groupLabel } : undefined}
+        sort={{ key: filters.sort, dir: filters.dir }}
+        onSortChange={(next) =>
+          update({ sort: next.key as VendorSortKey, dir: next.dir as SortDir })
+        }
+        empty={<p className="text-sm text-muted">No vendors match these filters.</p>}
+      />
     </div>
   );
 }

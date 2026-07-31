@@ -29,7 +29,28 @@ export type DataColumn<T> = {
   render: (row: T) => ReactNode;
   /** Cells truncate by default; opt out for cells that need to wrap. */
   wrap?: boolean;
+  /**
+   * Replaces the header's sort button with a control — the select-all checkbox
+   * on a selection column, which has no label and nothing to sort by.
+   */
+  header?: ReactNode;
 };
+
+/**
+ * Turns a sorted list into a grouped report: a full-width band before each run
+ * of rows sharing a label, with the size of the run.
+ *
+ * The CALLER decides whether grouping applies — pass `undefined` and there are
+ * no bands. That's because it only makes sense on a column with repeated values
+ * (a category, a section, a type), so both lists that use it switch it on only
+ * when the sort is one of those columns.
+ *
+ * It assumes the rows arrive already grouped, which follows from them being
+ * sorted by the same column. A caller sorting by something else while grouping
+ * by a category would get a band every few rows — correct, and a sign the two
+ * are out of step.
+ */
+export type DataGroup<T> = { label: (row: T) => string };
 
 /**
  * The standard list table: sortable headers, drag-resizable columns persisted
@@ -53,6 +74,7 @@ export function DataTable<T>({
   maxHeightClass,
   empty,
   expand,
+  group,
   sort: controlledSort,
   onSortChange,
 }: {
@@ -77,6 +99,8 @@ export function DataTable<T>({
     summary?: (row: T) => ReactNode;
     canExpand?: (row: T) => boolean;
   };
+  /** Band rows before each run of like-labelled rows. See DataGroup. */
+  group?: DataGroup<T>;
   /**
    * Controlled sort, for screens that persist it in the URL. Pass both or
    * neither: with `onSortChange` the caller owns the sort (and the ordering of
@@ -134,6 +158,20 @@ export function DataTable<T>({
     );
   }, [rows, columns, sort, controlled]);
 
+  // How many rows sit under each band. Recomputed whenever the order changes,
+  // which is cheap even on Inventory's 790 rows and keeps the count honest when
+  // a filter narrows the list.
+  const groupCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    if (group) {
+      for (const row of sorted) {
+        const label = group.label(row);
+        counts.set(label, (counts.get(label) ?? 0) + 1);
+      }
+    }
+    return counts;
+  }, [sorted, group]);
+
   if (rows.length === 0) {
     return empty ? <>{empty}</> : null;
   }
@@ -179,18 +217,41 @@ export function DataTable<T>({
                   onSort={col.sortValue ? () => toggleSort(col.key) : undefined}
                   onResizeStart={(e) => startResize(e, col.key)}
                   onResizeReset={() => setWidth(col.key, col.width)}
-                />
+                >
+                  {col.header}
+                </ColumnHeader>
               ))}
             </tr>
           </thead>
           <tbody>
-            {sorted.map((row) => {
+            {sorted.map((row, index) => {
               const key = rowKey(row);
               const expandable = expand !== undefined && (expand.canExpand?.(row) ?? true);
               const isOpen = expandable && open.has(key);
 
+              // A band opens each new run. Comparing with the PREVIOUS row's
+              // label rather than tracking a running value keeps this a pure
+              // function of the sorted array.
+              const label = group ? group.label(row) : null;
+              const startsGroup =
+                label !== null &&
+                (index === 0 || group!.label(sorted[index - 1]) !== label);
+
               return (
                 <Fragment key={key}>
+                  {startsGroup && (
+                    <tr className="border-b border-hairline bg-neutral-100">
+                      <td
+                        colSpan={columns.length}
+                        className="px-2 py-1 text-xs font-semibold tracking-[0.12em] text-body uppercase"
+                      >
+                        {label}
+                        <span className="ml-2 font-normal tracking-normal text-subtle normal-case">
+                          {groupCounts.get(label) ?? 0}
+                        </span>
+                      </td>
+                    </tr>
+                  )}
                   {/* No rule between rows (Mark, 2026-07-25) — the hover wash
                       carries the eye across the width instead. */}
                   <tr

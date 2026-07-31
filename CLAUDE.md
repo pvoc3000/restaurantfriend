@@ -1027,12 +1027,25 @@ weekday column, and 003 then silently made it per-vendor-item.
   expandable rows, 56px rows and no rule between them. Give it columns + rows; don't hand-roll a
   `<table>`. Supporting pieces: `ColumnHeader` (the header cell + resize grip),
   `lib/tableSort.ts` (comparator — empty cells sink last in BOTH directions),
-  `lib/columnWidths.ts` (`useResizableColumns`). **Three screens don't, and the
-  claim above has been wrong for a while: `/vendors` (`VendorsList`), `/items`
-  (`ItemsList`) and `/cleanup` (`CleanupQueue`) each hand-roll a `<table>`.**
-  They're the two biggest lists in the app, so anything that should be true of
-  "every list" has to be applied to them by hand — which is why the sticky
-  column labels below live in `lib/tableHead` rather than inside `DataTable`.
+  `lib/columnWidths.ts` (`useResizableColumns`). **`/vendors` and `/items` were
+  converted 2026-07-31** — they predated the component (built at commits 13 and
+  24, `DataTable` extracted at 26) and had kept their own `<table>` ever since,
+  sharing only the primitives. The tell was cosmetic and tiny — 14px body text
+  and grey column labels against everyone else's 15px and black — but the cost
+  was real: "sticky labels on every list" landed as four edits instead of one.
+  Converting them needed two additions, both now general:
+  **`group`** (a `DataGroup<T>`: a full-width band with a label and a count
+  before each run of like-labelled rows — Vendors by Type, Inventory by Category
+  or Section) and **`header`** on a column (a control in place of the label, for
+  Inventory's select-all). Both lists drive `sort` / `onSortChange` because
+  their sort lives in the URL, so they order `rows` themselves and `DataTable`
+  renders as given. Their column-width keys were deliberately NOT bumped —
+  the widths didn't change, so anyone's dragged columns survived.
+  **`/cleanup` is the one still hand-rolled**, deliberately: it has no sort and
+  no resize, it's driven by selection into a drawer, and it's a work queue
+  rather than a catalog list. `/order-guide` is also not a `DataTable` and
+  shouldn't become one — it's a walk-order document with nested item and line
+  rows, shop-section bands and three-state quantity boxes.
 - **Column labels STICK, in every list** (Mark, 2026-07-31 — "scrolling in all
   current and future list views shouldn't hide the column titles"). The order
   guide had always done it; nothing else had. `lib/tableHead.ts` holds the two
