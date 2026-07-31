@@ -1027,8 +1027,35 @@ weekday column, and 003 then silently made it per-vendor-item.
   expandable rows, 56px rows and no rule between them. Give it columns + rows; don't hand-roll a
   `<table>`. Supporting pieces: `ColumnHeader` (the header cell + resize grip),
   `lib/tableSort.ts` (comparator — empty cells sink last in BOTH directions),
-  `lib/columnWidths.ts` (`useResizableColumns`). `/cleanup` predates this and is
-  deliberately left alone.
+  `lib/columnWidths.ts` (`useResizableColumns`). **Three screens don't, and the
+  claim above has been wrong for a while: `/vendors` (`VendorsList`), `/items`
+  (`ItemsList`) and `/cleanup` (`CleanupQueue`) each hand-roll a `<table>`.**
+  They're the two biggest lists in the app, so anything that should be true of
+  "every list" has to be applied to them by hand — which is why the sticky
+  column labels below live in `lib/tableHead` rather than inside `DataTable`.
+- **Column labels STICK, in every list** (Mark, 2026-07-31 — "scrolling in all
+  current and future list views shouldn't hide the column titles"). The order
+  guide had always done it; nothing else had. `lib/tableHead.ts` holds the two
+  class strings (`STICKY_HEAD_ROW` under the masthead, `STICKY_HEAD_ROW_IN_PANE`
+  at the top of a scroll pane) and `useOverflowOnlyWhenNeeded`.
+  Two things are load-bearing. **The sticky goes on the `th`, never the `thead`
+  or the `tr`** — in a `border-collapse` table WebKit doesn't honour it on the
+  row, and iPad Safari at the 16.4 floor is what these are read on; the guide
+  put it on the th for the same reason.
+  And **a sticky header and a horizontal-scroll wrapper are MUTUALLY
+  EXCLUSIVE**: an `overflow-x: auto` element is a scroll container (the spec
+  computes `overflow-y` to `auto` beside it), so a sticky cell inside pins to
+  THAT box, which never scrolls vertically, and just leaves with the page.
+  Measured on the vendor list at scrollTop 600: −337px with the wrapper as it
+  was, +64px with it visible; `overflow-y: clip` doesn't rescue it either. So
+  `useOverflowOnlyWhenNeeded` measures and only makes the wrapper a scroll
+  container when the table genuinely doesn't fit — the class stays
+  `overflow-x-auto` as the safe pre-JS default and the hook relaxes it.
+  **Consequence: a table wider than the content column has no sticky header.**
+  At a desk width every list now fits (the PO list gave up 55px to get there,
+  widths key v2); at 768 none of them do, so on an iPad portrait the labels
+  still scroll away. Fixing that means responsive column-dropping per table,
+  the way the guide drops its Line column at 880 — a real job, not done.
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server
@@ -1076,10 +1103,25 @@ weekday column, and 003 then silently made it per-vendor-item.
   `requestAnimationFrame`.** rAF doesn't run in a hidden tab, so a
   frame-deferred write can simply never happen — measured 2026-07-30, the
   position was still unrecorded after a 6,000px scroll.
-  (c) **It flushes on re-key, on unmount and on `pagehide`** (not `unload` —
-  iOS Safari fires the one and not the other), because the throttle can swallow
-  the last move and leaving is the moment that matters.
-  sessionStorage, so it dies with the tab like the guide's view cookie.
+  (c) **It flushes on re-key and on unmount**, because the throttle can swallow
+  the last move and leaving is the moment that matters. There is no `pagehide`
+  flush any more — see below.
+  **It RESETS on launch and on changing location** (Mark, 2026-07-31). The store
+  is a module-level `Map`, not sessionStorage: sessionStorage survives a reload
+  and a sign-out in the same tab, so opening the app could drop you two thousand
+  pixels into a list you last saw yesterday. In memory, a hard load — launch,
+  reload, sign-in — has nothing to restore, while the thing this exists for
+  still works, because the (app) layout survives soft navigation and a
+  list → detail → back trip is all one page load. That's also why the `pagehide`
+  flush went: it existed to survive a reload, which is now exactly the moment
+  the position SHOULD be forgotten.
+  Changing location additionally calls `clearScrollMemory()` and scrolls to the
+  top (`useResetScrollOnLocationChange`, declared BEFORE `useScrollMemory` in
+  the shell so the clear lands between the outgoing key's flush and the incoming
+  key's lookup). It has to be explicit: switching is a navigation to the SAME
+  url, so nothing moves the window by itself and you'd stay parked deep in a
+  list that now holds different rows. The location stays in the key as well —
+  belt and braces, since the failure it prevents is silent.
 - **Breadcrumbs follow the route taken**, not a fixed hierarchy (`lib/breadcrumbs.ts`):
   links stamp `from`, the trail nests, recorded hrefs are trimmed so the URL
   can't grow unbounded. An item reached from a vendor leads back to that vendor.

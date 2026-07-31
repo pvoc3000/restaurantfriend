@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { STICKY_HEAD_ROW, useOverflowOnlyWhenNeeded } from "@/lib/tableHead";
 import { money } from "@/lib/catalog";
 import { makeComparator, nextSortDir, type SortValue } from "@/lib/tableSort";
 import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
@@ -115,6 +116,10 @@ export function VendorsList({
   const [filters, setFilters] = useState<VendorFilters>(initialFilters);
   const { widths, startResize, setWidth, reset, customized, totalWidth } =
     useResizableColumns(WIDTHS_STORAGE_KEY, DEFAULT_WIDTHS);
+
+  // Lets the sticky column labels work — see lib/tableHead.
+  const paneRef = useRef<HTMLDivElement>(null);
+  useOverflowOnlyWhenNeeded(paneRef);
 
   function update(patch: Partial<VendorFilters>) {
     const next = { ...filters, ...patch };
@@ -232,7 +237,7 @@ export function VendorsList({
       {sorted.length === 0 ? (
         <p className="text-sm text-muted">No vendors match these filters.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div ref={paneRef} className="overflow-x-auto">
           <table
             className="table-fixed border-collapse text-sm"
             style={{ width: totalWidth(COLUMNS) }}
@@ -243,7 +248,10 @@ export function VendorsList({
               ))}
             </colgroup>
             <thead>
-              <tr className="text-left text-muted [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]">
+              {/* Labels stay put while you scroll 80 vendors — see
+                  lib/tableHead, including why the wrapper above has to give up
+                  its overflow for it to work. */}
+              <tr className={`text-left text-muted ${STICKY_HEAD_ROW}`}>
                 {COLUMNS.map((col) => (
                   <ColumnHeader
                     key={col.key}

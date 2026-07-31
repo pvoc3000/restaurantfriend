@@ -409,7 +409,11 @@ export function PurchaseOrderList({
     {
       key: "po_number",
       label: "PO number",
-      width: 170,
+      // 170 → 155. See the note on the table's storageKey: the eleven columns
+      // summed to 1393 against 1344 of content, so this list was the one that
+      // couldn't have sticky column labels. A PO number is short and fixed
+      // ("DF01-1043"), so this is the cheapest 15px in the row.
+      width: 155,
       sortValue: (po) => po.po_number,
       render: (po) => (
         <Link
@@ -430,7 +434,10 @@ export function PurchaseOrderList({
     {
       key: "vendor",
       label: "Vendor",
-      width: 240,
+      // 240 → 210. The widest column and the one with the most slack: the
+      // longest vendor name in the catalog is "Trinity Oil & Grease Recycling",
+      // which truncated at 240 as well.
+      width: 210,
       sortValue: (po) => po.vendors?.name ?? null,
       render: (po) =>
         po.vendors ? (
@@ -463,7 +470,8 @@ export function PurchaseOrderList({
     {
       key: "sent_via",
       label: "Sent via",
-      width: 120,
+      // 120 → 110. The values are one short word — gmail, resend, phone.
+      width: 110,
       sortValue: (po) => po.sent_via,
       render: (po) => <span className="text-muted">{po.sent_via ?? "—"}</span>,
     },
@@ -715,7 +723,15 @@ export function PurchaseOrderList({
         rows={sorted}
         columns={columns}
         rowKey={(po) => po.id}
-        storageKey="rf.purchaseOrders.columnWidths.v1"
+        // v2 (2026-07-31): the eleven columns summed to 1393px against 1344 of
+        // content at a 1440 window, so this list had a horizontal scrollbar —
+        // and, once column labels started sticking, was the ONE list that
+        // couldn't have them (a sticky cell inside an overflow-x container pins
+        // to that container, not the page; see lib/tableHead). PO number,
+        // Vendor and Sent via gave up 15, 30 and 10, which brings the row to
+        // 1338 and fits. The key had to move with them or anyone who had ever
+        // dragged a column would keep the old total and keep the scrollbar.
+        storageKey="rf.purchaseOrders.columnWidths.v2"
         sort={{ key: filters.sort, dir: filters.dir }}
         onSortChange={(next) =>
           update({ sort: next.key as PoSortKey, dir: next.dir })

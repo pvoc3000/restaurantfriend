@@ -5,6 +5,11 @@ import { usePathname } from "next/navigation";
 import { makeComparator, nextSortDir, type SortDir, type SortValue } from "@/lib/tableSort";
 import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
 import { useScrollMemory } from "@/lib/scrollMemory";
+import {
+  STICKY_HEAD_ROW,
+  STICKY_HEAD_ROW_IN_PANE,
+  useOverflowOnlyWhenNeeded,
+} from "@/lib/tableHead";
 import { ColumnHeader } from "./ColumnHeader";
 
 export type DataColumn<T> = {
@@ -28,8 +33,9 @@ export type DataColumn<T> = {
 
 /**
  * The standard list table: sortable headers, drag-resizable columns persisted
- * per table, optional scroll pane with a sticky header. Every list in the app
- * uses this so the behaviour is identical everywhere and lives in one place.
+ * per table, and column labels that stick under the masthead as you scroll.
+ * Every list in the app uses this so the behaviour is identical everywhere and
+ * lives in one place.
  *
  * Sort state is local rather than in the URL — these tables are usually one of
  * several on a detail screen, and they'd collide over the same query params.
@@ -96,6 +102,9 @@ export function DataTable<T>({
   const paneRef = useRef<HTMLDivElement>(null);
   const pathname = usePathname();
   useScrollMemory(scroll ? `pane:${pathname}:${storageKey}` : "", paneRef);
+  // Only the unpaned case: a pane is a scroll container on purpose, and its
+  // header sticks to the pane rather than to the masthead.
+  useOverflowOnlyWhenNeeded(paneRef, !scroll);
 
   const [internalSort, setInternalSort] = useState<{ key: string; dir: SortDir } | null>(
     defaultSort ? { key: defaultSort.key, dir: defaultSort.dir ?? "asc" } : null
@@ -153,12 +162,14 @@ export function DataTable<T>({
               <col key={col.key} style={{ width: widths[col.key] ?? col.width }} />
             ))}
           </colgroup>
-          <thead className={scroll ? "sticky top-0 z-10 bg-white" : ""}>
-            {/* The 2px rule under every table head, drawn as an inset shadow
-                because a sticky row inside border-collapse loses its bottom
-                border as it detaches. Same rule in both cases so sticky and
-                static tables read identically. */}
-            <tr className="text-left [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]">
+          <thead>
+            {/* The column labels stick: under the masthead for a table in the
+                page's own flow, at the top of the pane for one that scrolls
+                inside itself. See lib/tableHead for both, and for why the
+                wrapper's overflow has to get out of the way. */}
+            <tr
+              className={`text-left ${scroll ? STICKY_HEAD_ROW_IN_PANE : STICKY_HEAD_ROW}`}
+            >
               {columns.map((col) => (
                 <ColumnHeader
                   key={col.key}

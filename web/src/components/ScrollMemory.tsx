@@ -2,7 +2,11 @@
 
 import { usePathname } from "next/navigation";
 
-import { useScrollMemory, useScrollMemoryKeyOverride } from "@/lib/scrollMemory";
+import {
+  useResetScrollOnLocationChange,
+  useScrollMemory,
+  useScrollMemoryKeyOverride,
+} from "@/lib/scrollMemory";
 
 /**
  * Scroll restoration for EVERY screen (Mark, 2026-07-30: "any list view now and
@@ -15,10 +19,17 @@ import { useScrollMemory, useScrollMemoryKeyOverride } from "@/lib/scrollMemory"
  * page you're leaving and restores the one you're arriving at, in that order,
  * without either page having to know about it.
  *
- * The key is ACTIVE LOCATION + pathname. The location has to be in it because
- * every list here is location-scoped and switching location is a navigation to
- * the same URL — without it, DF01's position would be restored into DF02's
- * shorter list. The query string is deliberately NOT in it: filters and sort
+ * It resets on LAUNCH and on changing LOCATION (Mark, 2026-07-31). Launch comes
+ * free from the store living in memory rather than in sessionStorage — a reload
+ * or a fresh sign-in has nothing to restore. The location change is explicit:
+ * switching is a navigation to the same URL, so nothing moves the window by
+ * itself, and you'd otherwise stay parked deep in a list that now holds
+ * different rows.
+ *
+ * The key is ACTIVE LOCATION + pathname. The location stays in the key even
+ * though a change now wipes the store — belt and braces, since the failure it
+ * prevents (DF01's position restored into DF02's shorter list) is silent.
+ * The query string is deliberately NOT in it: filters and sort
  * live there and change constantly (the search box writes a key per keystroke),
  * and you always come back to the URL you left because that's what the
  * breadcrumb trail stamps. A screen whose identity isn't its path — the order
@@ -31,6 +42,9 @@ import { useScrollMemory, useScrollMemoryKeyOverride } from "@/lib/scrollMemory"
 export function ScrollMemory({ locationId }: { locationId: string | null }) {
   const pathname = usePathname();
   const override = useScrollMemoryKeyOverride();
+  // BEFORE useScrollMemory, so the clear lands between the outgoing key's flush
+  // and the incoming key's lookup. See useResetScrollOnLocationChange.
+  useResetScrollOnLocationChange(locationId);
   useScrollMemory(override ?? `${locationId ?? "anywhere"}:${pathname}`);
   return null;
 }

@@ -11,9 +11,18 @@
 // layout, keyed by active location + pathname, so a screen gets this by
 // existing — there is no hook to remember to call when adding one.
 //
-// sessionStorage, not local: a scroll position is about the walk you're on, and
-// it should die with the tab the way the guide's view cookie dies with the
-// session. Not the URL either — this is nobody's idea of shareable view state.
+// IN MEMORY, and deliberately nowhere else (Mark, 2026-07-31: "should be reset
+// on launch or when changing locations"). It was sessionStorage, which survives
+// a reload and a sign-out in the same tab, so opening the app could drop you
+// two thousand pixels into a list you last saw yesterday with no idea why. A
+// module-level Map dies with the page, so a hard load — a launch, a reload, a
+// sign-in — always starts at the top, while the thing this exists for still
+// works: the (app) layout survives soft navigation, so leaving a list for a
+// detail screen and coming back is all one page load. Not the URL either —
+// this is nobody's idea of shareable view state.
+//
+// Changing LOCATION also wipes it (see clearScrollMemory), because the lists
+// are location-scoped and where you were in DF01's is not a fact about DF02's.
 //
 // Restoring is a NEGOTIATION, not a single scrollTo. The list isn't at its full
 // height the instant the component mounts (fonts land, the sticky bars measure
@@ -22,9 +31,7 @@
 // until the position sticks — and surrender immediately if the reader starts
 // scrolling, because at that point they know better than the memory does.
 
-import { useEffect, useSyncExternalStore, type RefObject } from "react";
-
-const PREFIX = "rf.scroll.";
+import { useEffect, useRef, useSyncExternalStore, type RefObject } from "react";
 
 /** ~200ms at 60fps. Long enough for the list to reach full height, short
  *  enough that a scroll you start yourself is never fought for long. */
@@ -33,22 +40,44 @@ const SETTLE_FRAMES = 12;
 /** Persist at most this often while scrolling; the rest rides on the unmount. */
 const WRITE_EVERY_MS = 120;
 
+const positions = new Map<string, number>();
+
 function read(key: string): number {
-  try {
-    const y = Number(window.sessionStorage.getItem(key));
-    return Number.isFinite(y) && y > 0 ? y : 0;
-  } catch {
-    // Private mode / storage disabled — the list simply opens at the top.
-    return 0;
-  }
+  return positions.get(key) ?? 0;
 }
 
 function write(key: string, y: number) {
-  try {
-    window.sessionStorage.setItem(key, String(Math.round(y)));
-  } catch {
-    // Not being able to remember is not a reason to break scrolling.
-  }
+  positions.set(key, Math.round(y));
+}
+
+/**
+ * Forget every remembered position. Called when the active location changes —
+ * every list in the app is location-scoped, so none of the stored positions
+ * describe the lists you're about to be looking at.
+ */
+export function clearScrollMemory() {
+  positions.clear();
+}
+
+/**
+ * Wipe the memory and go to the top when the location changes.
+ *
+ * Switching location is a navigation to the SAME url, so nothing moves the
+ * window by itself: without this you keep whatever scroll you had, three
+ * thousand pixels into a list that now holds different rows. Declared BEFORE
+ * useScrollMemory in the shell so the ordering works out — React runs the
+ * cleanups first (flushing the old position), then the effects in order, so the
+ * clear lands after that flush and before the new key is looked up.
+ */
+export function useResetScrollOnLocationChange(locationId: string | null) {
+  const previous = useRef(locationId);
+  useEffect(() => {
+    // First mount is not a change — don't fight the page's own initial position.
+    if (previous.current === locationId) return;
+    previous.current = locationId;
+    clearScrollMemory();
+    window.scrollTo(0, 0);
+  }, [locationId]);
 }
 
 // A screen whose identity is NOT its URL names its own key here, and the shell
@@ -129,8 +158,7 @@ export function useScrollMemory(key: string, ref?: RefObject<HTMLElement | null>
     // page-wide either way.
     const scroller: EventTarget = pane ?? window;
 
-    const storageKey = PREFIX + key;
-    const target = read(storageKey);
+    const target = read(key);
 
     // While we're still putting the position back, don't record: the values
     // going past are the ones we're scrolling THROUGH, and recording a 0 from
@@ -156,7 +184,7 @@ export function useScrollMemory(key: string, ref?: RefObject<HTMLElement | null>
       const now = performance.now();
       if (now - wroteAt < WRITE_EVERY_MS) return;
       wroteAt = now;
-      write(storageKey, latest);
+      write(key, latest);
     };
 
     // The reader taking over ends the argument. Deliberately NOT the scroll
@@ -178,18 +206,17 @@ export function useScrollMemory(key: string, ref?: RefObject<HTMLElement | null>
       }
     };
 
-    // A reload or a closed tab unmounts nothing, so the flush has to happen
-    // here too. pagehide rather than unload — iOS Safari fires the one and not
-    // the other, and an iPad is what the guide is walked on.
+    // There is deliberately no pagehide flush any more. It existed to catch a
+    // reload, which unmounts nothing — but the store is in memory now, so a
+    // reload is exactly the moment the position SHOULD be forgotten.
     const flush = () => {
-      if (moved) write(storageKey, latest);
+      if (moved) write(key, latest);
     };
 
     scroller.addEventListener("scroll", onScroll, { passive: true });
     scroller.addEventListener("wheel", surrender, { passive: true });
     scroller.addEventListener("touchstart", surrender, { passive: true });
     window.addEventListener("keydown", surrender);
-    window.addEventListener("pagehide", flush);
     if (restoring) requestAnimationFrame(settle);
 
     return () => {
@@ -197,7 +224,6 @@ export function useScrollMemory(key: string, ref?: RefObject<HTMLElement | null>
       scroller.removeEventListener("wheel", surrender);
       scroller.removeEventListener("touchstart", surrender);
       window.removeEventListener("keydown", surrender);
-      window.removeEventListener("pagehide", flush);
       // Leaving is the moment that matters, and the throttle may have swallowed
       // the last move. Nothing to say if the reader never scrolled — whatever
       // is stored is still true.

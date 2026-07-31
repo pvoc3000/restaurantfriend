@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import { STICKY_HEAD_ROW, useOverflowOnlyWhenNeeded } from "@/lib/tableHead";
 import { createClient } from "@/lib/supabase/client";
 import { PROBLEM_ORDER, PROBLEM_LABEL, type ProblemKind } from "@/lib/cleanup";
 import {
@@ -30,6 +31,10 @@ export function CleanupQueue({
   const router = useRouter();
   const pathname = usePathname();
   const supabase = createClient();
+
+  // Lets the sticky column labels work — see lib/tableHead.
+  const paneRef = useRef<HTMLDivElement>(null);
+  useOverflowOnlyWhenNeeded(paneRef);
 
   const [problemTab, setProblemTab] = useState<ProblemTab>("all");
   const [staleTab, setStaleTab] = useState<StaleTab>("any");
@@ -281,10 +286,11 @@ export function CleanupQueue({
           Nothing here — this queue is clear.
         </p>
       ) : (
-        <div className="overflow-x-auto">
+        <div ref={paneRef} className="overflow-x-auto">
           <table className="min-w-full border-collapse text-sm">
             <thead>
-              <tr className="text-left text-muted [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]">
+              {/* Labels stay put down the burn-down — see lib/tableHead. */}
+              <tr className={`text-left text-muted ${STICKY_HEAD_ROW}`}>
                 <th className="w-8 px-2 py-1">
                   <Checkbox
                     checked={allVisibleChecked}

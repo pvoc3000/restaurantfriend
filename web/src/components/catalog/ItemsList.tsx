@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import Link from "next/link";
+import { STICKY_HEAD_ROW, useOverflowOnlyWhenNeeded } from "@/lib/tableHead";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { STALE_ORDER, STALE_LABEL } from "@/lib/lastOrdered";
@@ -128,6 +129,10 @@ export function ItemsList({
     customized,
     totalWidth,
   } = useResizableColumns(WIDTHS_STORAGE_KEY, DEFAULT_WIDTHS);
+
+  // Lets the sticky column labels work — see lib/tableHead.
+  const paneRef = useRef<HTMLDivElement>(null);
+  useOverflowOnlyWhenNeeded(paneRef);
 
   function update(patch: Partial<ItemFilters>) {
     const next = { ...filters, ...patch };
@@ -380,7 +385,7 @@ export function ItemsList({
       {visible.length === 0 ? (
         <p className="text-sm text-muted">No items match these filters.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <div ref={paneRef} className="overflow-x-auto">
           <table
             className="table-fixed border-collapse text-sm"
             style={{ width: totalWidth(COLUMNS) }}
@@ -391,7 +396,9 @@ export function ItemsList({
               ))}
             </colgroup>
             <thead>
-              <tr className="text-left text-muted [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]">
+              {/* Labels stay put while you scroll 790 items — see
+                  lib/tableHead. */}
+              <tr className={`text-left text-muted ${STICKY_HEAD_ROW}`}>
                 {COLUMNS.map((col) => (
                   <ColumnHeader
                     key={col.key}
