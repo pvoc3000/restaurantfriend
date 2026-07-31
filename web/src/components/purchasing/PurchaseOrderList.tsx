@@ -733,13 +733,10 @@ export function PurchaseOrderList({
         // Vendor and Sent via gave up 15, 30 and 10, which brings the row to
         // 1338 and fits. The key had to move with them or anyone who had ever
         // dragged a column would keep the old total and keep the scrollbar.
-        // 1440, NOT the app's usual xl: the threshold has to be the width at
-        // which the FULL set fits, and 1338px of columns needs 1338 + 96 of
-        // gutter = 1434. Set to xl this showed all eleven columns from 1280 up
-        // and overflowed until 1434.
-        // Sheds Sent via and Lines (Mark, 2026-07-31), 1338 -> 1143 — enough
-        // for a landscape tablet, not for a portrait one. See CLAUDE.md.
-        compactBelow={1440}
+        // Sheds Sent via and Lines below xl (Mark, 2026-07-31). Eleven
+        // columns is too many to read on a tablet; the table fits either way
+        // now that the columns are proportional.
+        compactBelow={1280}
         storageKey="rf.purchaseOrders.columnWidths.v2"
         sort={{ key: filters.sort, dir: filters.dir }}
         onSortChange={(next) =>

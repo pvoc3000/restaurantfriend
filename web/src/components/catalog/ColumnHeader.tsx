@@ -36,11 +36,11 @@ export function ColumnHeader({
     <th
       // p-0 on the cell, padding on the inner div, so the grip can sit exactly
       // on the column boundary instead of inside the padding.
-      className="p-0 text-[12px] font-normal uppercase tracking-[0.12em]"
+      className="p-0 text-[11px] font-normal uppercase tracking-[0.08em] xl:text-[12px] xl:tracking-[0.12em]"
       aria-sort={sorted ? (sorted === "asc" ? "ascending" : "descending") : "none"}
     >
       <div
-        className={`relative flex items-center px-4 py-3 ${
+        className={`relative flex items-center px-3 py-3 xl:px-4 ${
           align === "right" ? "justify-end" : ""
         }`}
       >

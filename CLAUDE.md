@@ -1064,49 +1064,50 @@ weekday column, and 003 then silently made it per-vendor-item.
   `useOverflowOnlyWhenNeeded` measures and only makes the wrapper a scroll
   container when the table genuinely doesn't fit — the class stays
   `overflow-x-auto` as the safe pre-JS default and the hook relaxes it.
-  **Consequence: a table wider than the content column has no sticky header** —
-  which is why lists shed columns below `xl`. `DataTable`'s **`compactBelow`**
-  (a viewport width) plus **`hideWhenCompact`** on a column drop the reference
-  data a tablet doesn't need, so the row narrows until it FITS. Same idea as the
-  guide dropping its Line column at 880, and it also stops you swiping sideways
-  to read a row. Driven by `useViewportAtLeast` (matchMedia, so a re-render
-  happens when the ANSWER changes, not on every pixel of a drag; server snapshot
-  is the wide answer, so SSR paints the full table and a narrow client swaps
-  after hydration).
-  The sets are Mark's (2026-07-31), except Shop sections which is mine:
+  **Columns are FLUID, not fixed pixels** (Mark, 2026-07-31 — "I've asked for
+  responsive design but none of this feels responsive. It feels old school
+  html"). A `DataColumn.width` is now a WEIGHT: `DataTable` renders each `<col>`
+  as a percentage of the visible columns' total, so the table is exactly as wide
+  as its container. A wide screen gets wider columns instead of dead space
+  (measured at 1920: zero dead space, Name 253 → 375px); a narrow one squeezes
+  instead of growing a horizontal scrollbar. Because the table can never exceed
+  its box, **the sticky labels always work** — which is what finally fixed
+  Vendors and the PO list, and got both sticking on a PORTRAIT iPad.
+  Type scales too: body `text-[13px] xl:text-[15px]`, labels `11px`/`12px`,
+  cell padding `px-3 xl:px-4`.
+  **NEVER mix a percentage and a px length in a `<col>` width.** A width of
+  `calc((100% - 95px) * 0.22)` is silently DISCARDED — measured 2026-07-31, the
+  eight vendor columns all collapsed to an equal 163px share, while the same
+  shares as `calc(100% * 0.22)` resolved correctly. That's why a column can't be
+  pinned to exact pixels while its neighbours flex: everything scales, so a
+  control column just needs a weight generous enough to stay usable at the
+  narrowest width it will meet.
+  This also retired the previous approach — per-table `compactBelow` thresholds
+  derived from column sums — which had shipped a laptop-shaped hole (thresholds
+  of 1280 left Vendors and the PO list overflowing until 1386 and 1434) and a
+  6px margin on the PO list that a visible scrollbar was enough to eat.
+  `compactBelow` survives but now means only "too many columns to READ here",
+  so it's the app's ordinary `xl` everywhere.
+  The `useOverflowOnlyWhenNeeded` guard stays as a safety net for a table that
+  somehow still overflows, and it must also toggle the sticky POSITION off, not
+  just the effect: `position: sticky` with a top offset inside a scroll
+  container that never scrolls vertically pins the cell at that offset, pushing
+  it BELOW the rows it labels (measured on the PO list at 1330 — labels at
+  y=321, first row at y=299, with fragments of that row peeking over the top).
+  Hence `data-rf-hscroll` on the wrapper and an unlayered `position: static`
+  rule in `globals.css`.
 
-  | list | full | compact | drops |
-  | --- | --- | --- | --- |
-  | list | full | compact | `compactBelow` |
-  | --- | --- | --- | --- |
-  | Inventory | 1040 | **690** | 1280 |
-  | Shop sections | 1060 | **640** | 1280 |
-  | Vendors | 1290 | **1005** | **1400** |
-  | PO list | 1338 | **1143** | **1440** |
+  | list | weights | compact set drops |
+  | --- | --- | --- |
+  | Inventory | 1040 | Section, Last ordered |
+  | Shop sections | 1060 | Area, Sub area |
+  | Vendors | 1290 | Order via, Account |
+  | PO list | 1338 | Sent via, Lines |
 
-  **`compactBelow` is NOT the app's `xl`** — it's the width at which that
-  table's FULL set fits, which is `full + 96` of gutter. Setting all four to
-  1280 shipped a laptop-shaped hole (Mark, 2026-07-31): Vendors and the PO list
-  showed every column from 1280 up and overflowed until 1386 and 1434, so both
-  broke on a laptop AND on an iPad Pro in landscape while the two narrow lists
-  looked fine. Inventory and Shop sections only survived it by accident — their
-  full sets fit well below 1280.
-
-  **And a table that has to scroll sideways must give up the sticky POSITION,
-  not just the effect.** `position: sticky` with a top offset inside a scroll
-  container that never scrolls vertically pins the cell at that offset, which
-  pushes it BELOW the first rows — measured on the PO list at 1330: labels at
-  y=321, first row at y=299, with fragments of that row peeking above them.
-  `useOverflowOnlyWhenNeeded` therefore also toggles `data-rf-hscroll` on the
-  wrapper, and an unlayered rule in `globals.css` sets those cells back to
-  `position: static`.
-
-  **Only Inventory and Shop sections reach a PORTRAIT iPad** (736px of content).
-  Vendors and the PO list fit a landscape tablet (1148px) and nothing narrower —
-  measured 2026-07-31: Vendors sticks at 1180 with 143px spare and fails at 768
-  by 269; the PO list sticks at 1180 with **5px** spare. Getting those two to
-  portrait needs roughly two and four more columns dropped respectively, which
-  is a judgement about what a vendor row is FOR, not an arithmetic problem.
+  Known rough edge: the PO list's compact set is still EIGHT columns, which at
+  736px truncates dates to "2026-0…" and amounts to "$1,119.…". It fits and
+  sticks, which it never did before, but a portrait iPad wants a second, deeper
+  tier — not built.
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server

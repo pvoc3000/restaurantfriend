@@ -139,7 +139,7 @@ export function DataTable<T>({
     [columns]
   );
 
-  const { widths, startResize, setWidth, reset, customized, totalWidth } =
+  const { widths, startResize, setWidth, reset, customized } =
     useResizableColumns(storageKey, defaultWidths);
 
   // A table in `scroll` mode is the one list the page's own scroll memory can't
@@ -221,16 +221,43 @@ export function DataTable<T>({
     ? `${maxHeightClass ?? "max-h-[calc(100vh-27rem)]"} min-h-64 overflow-auto`
     : "overflow-x-auto";
 
+  // FLUID COLUMNS. The table is exactly as wide as its container and the
+  // columns divide that width in the PROPORTIONS their pixel widths describe.
+  // A wide screen gets wider columns instead of dead space; a narrow one
+  // squeezes instead of growing a horizontal scrollbar. And because the table
+  // can never be wider than the box it sits in, the sticky column labels always
+  // work — pixel widths plus hand-picked breakpoints were what made this feel
+  // "old school html" (Mark, 2026-07-31), and they had left the PO list a 6px
+  // margin that a visible scrollbar was enough to eat.
+  //
+  // PURE PERCENTAGES, never a calc mixing % and px. A <col> width like
+  // `calc((100% - 95px) * 0.22)` is DISCARDED — measured 2026-07-31: the eight
+  // vendor columns all collapsed to an equal 163px share, while the same shares
+  // written as `calc(100% * 0.22)` resolved correctly. So a column can't be held
+  // at a fixed pixel width while its neighbours flex; everything scales, which
+  // is also why a control column just needs a share generous enough to stay
+  // usable at the narrowest width it will meet.
+  const naturalTotal = visibleColumns.reduce(
+    (sum, col) => sum + (widths[col.key] ?? col.width),
+    0
+  );
+
+  const colWidth = (col: DataColumn<T>) => {
+    const w = widths[col.key] ?? col.width;
+    if (naturalTotal <= 0) return `${w}px`;
+    return `${((w / naturalTotal) * 100).toFixed(4)}%`;
+  };
+
   return (
     <div className="space-y-1">
       <div ref={paneRef} className={wrapper}>
-        <table
-          className="table-fixed border-collapse text-[15px]"
-          style={{ width: totalWidth(visibleColumns) }}
-        >
+        {/* 13px on a tablet, 15 at a desk (Mark, 2026-07-31) — the row has
+            less width to give at the small end, and smaller type buys back
+            more of it than any column tuning does. */}
+        <table className="w-full table-fixed border-collapse text-[13px] xl:text-[15px]">
           <colgroup>
             {visibleColumns.map((col) => (
-              <col key={col.key} style={{ width: widths[col.key] ?? col.width }} />
+              <col key={col.key} style={{ width: colWidth(col) }} />
             ))}
           </colgroup>
           <thead>
@@ -332,7 +359,7 @@ export function DataTable<T>({
                       return (
                         <td
                           key={col.key}
-                          className={`h-14 px-4 py-4 ${col.wrap ? "" : "truncate"} ${
+                          className={`h-14 px-3 py-4 xl:px-4 ${col.wrap ? "" : "truncate"} ${
                             col.align === "right" ? "text-right tabular-nums" : ""
                           }`}
                         >
