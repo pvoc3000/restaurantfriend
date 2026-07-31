@@ -119,8 +119,13 @@ tidy: if the arithmetic on the page is wrong, report what is printed.
   It is the single most important field — it is what this invoice gets matched
   against. If a line has no printed item number, use null; never invent one and
   never substitute a different number from the row.
-- qty is the quantity billed, unit_price the price for one of whatever unit the
-  line is billed in, extended the line total.
+- qty is the quantity billed and extended is that line's total charge. Both are
+  printed on the page — never compute them.
+- unit_price is the rate printed for ONE of whatever qty counts. Many lines show
+  two rates (a per-pound or per-each figure for catch-weight goods alongside a
+  case price): pick the one where qty × unit_price equals extended. If neither
+  does — a line billed by actual weight, say — report the rate as printed and
+  say so in "unreadable"; do not adjust a number to make the arithmetic close.
 - pack is the pack or size text if the line shows one ("12 x 32 oz", "CS").
 - Use null for any field not printed on that line. Do not guess.
 - Skip subtotal, tax, delivery, and total rows — those are not line items.

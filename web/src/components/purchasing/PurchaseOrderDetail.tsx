@@ -48,6 +48,7 @@ function InvoiceCell({
   match,
   value,
   differs,
+  uncertain = false,
   canAccept,
   busy,
   label,
@@ -57,6 +58,9 @@ function InvoiceCell({
   match: LineMatch | undefined;
   value: number | null;
   differs: boolean;
+  /** The invoice's own arithmetic doesn't close on this line — usually a
+   *  catch-weight price. Marked, and never offered as a silent one-tap. */
+  uncertain?: boolean;
   canAccept: boolean;
   busy: boolean;
   label: string;
@@ -87,6 +91,18 @@ function InvoiceCell({
           title="Matched on the description, not the vendor's item number — check it"
         >
           ≈
+        </span>
+      )}
+      {uncertain && (
+        <span
+          className="mr-1 text-xs text-muted"
+          title={
+            match.invoice
+              ? `The invoice's own figures don't multiply out — it prints ${match.invoice.qty} × ${match.invoice.unit_price} but a line total of ${match.invoice.extended}. This is the line total divided by the quantity. Often a catch-weight item priced by the pound; check the page before taking it.`
+              : ""
+          }
+        >
+          ?
         </span>
       )}
       {format(value)}
@@ -681,8 +697,9 @@ export function PurchaseOrderDetail({
             render: (l: PoLine) => (
               <InvoiceCell
                 match={matchByLine.get(l.id)}
-                value={matchByLine.get(l.id)?.invoice?.unit_price ?? null}
+                value={matchByLine.get(l.id)?.unitPrice ?? null}
                 differs={matchByLine.get(l.id)?.priceDiffers ?? false}
+                uncertain={matchByLine.get(l.id)?.priceUncertain ?? false}
                 canAccept={canEditLines}
                 busy={busy}
                 label="unit price"

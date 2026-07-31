@@ -13,7 +13,13 @@
 // against.
 
 import type { PoLine } from "./purchaseOrders";
-import { priceDiffers, qtyDiffers, type InvoiceLine } from "./invoiceExtraction";
+import {
+  invoiceUnitPrice,
+  printedPriceDisagrees,
+  priceDiffers,
+  qtyDiffers,
+  type InvoiceLine,
+} from "./invoiceExtraction";
 
 export type LineMatch = {
   line: PoLine;
@@ -24,6 +30,11 @@ export type LineMatch = {
   qtyDiffers: boolean;
   /** Invoice price differs from what the order says it costs. */
   priceDiffers: boolean;
+  /** The per-unit price in the order's terms — see `invoiceUnitPrice`. */
+  unitPrice: number | null;
+  /** The invoice's own qty × price ≠ its line total, so the price is worth a
+   *  human's eye before it's adopted. */
+  priceUncertain: boolean;
 };
 
 export type MatchResult = {
@@ -185,6 +196,7 @@ export function matchInvoiceToOrder(
   const matches: LineMatch[] = lines.map((line) => {
     const hit = found.get(line.id) ?? null;
     const invoice = hit?.invoice ?? null;
+    const unitPrice = invoice ? invoiceUnitPrice(invoice) : null;
     return {
       line,
       invoice,
@@ -193,7 +205,9 @@ export function matchInvoiceToOrder(
       // answers is "does what they billed match what we wrote down", and an
       // unreceived line has nothing to disagree with yet.
       qtyDiffers: qtyDiffers(invoice?.qty ?? null, line.qty_received),
-      priceDiffers: priceDiffers(invoice?.unit_price ?? null, line.unit_price),
+      priceDiffers: priceDiffers(unitPrice, line.unit_price),
+      unitPrice,
+      priceUncertain: invoice ? printedPriceDisagrees(invoice) : false,
     };
   });
 

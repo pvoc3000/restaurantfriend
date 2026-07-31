@@ -33,6 +33,44 @@ export type InvoiceExtraction = {
 };
 
 /**
+ * What one of these cost, in the units the ORDER counts in.
+ *
+ * Derived from the line total rather than taken from the invoice's own unit
+ * price column, which sounds backwards and isn't. A distributor invoice often
+ * prints two rates per line — a per-pound or per-each figure for catch-weight
+ * goods, and the case total — and which one lands in the "unit price" column
+ * varies by line. Measured against Chefs' Warehouse invoice 73341407
+ * (2026-07-31): `extended ÷ qty` reproduced the purchase order's own unit price
+ * exactly on 13 of 19 lines, while the printed unit price agreed on 6.
+ *
+ * `extended` is the number the vendor is actually charging for that line, so
+ * dividing it by the quantity billed gives the per-unit price in our terms —
+ * whatever unit the vendor happened to quote.
+ */
+export function invoiceUnitPrice(line: InvoiceLine): number | null {
+  if (line.extended !== null && line.qty !== null && line.qty !== 0) {
+    return line.extended / line.qty;
+  }
+  return line.unit_price;
+}
+
+/**
+ * The invoice's own arithmetic doesn't close: qty × printed unit price is not
+ * the printed line total.
+ *
+ * Usually that means a catch-weight line (billed by actual pounds, not by the
+ * case) or a second rate column the reading conflated — either way it's a line
+ * where the price is worth a human's eye before it's adopted, so the UI marks
+ * it rather than quietly presenting a derived number as fact.
+ */
+export function printedPriceDisagrees(line: InvoiceLine): boolean {
+  if (line.unit_price === null || line.qty === null || line.extended === null) {
+    return false;
+  }
+  return Math.abs(line.unit_price * line.qty - line.extended) > 0.02;
+}
+
+/**
  * Anything less than half a cent apart is the same price, and anything less
  * than a thousandth apart is the same quantity — floating point and a scanned
  * "4.00" should not read as a discrepancy.
