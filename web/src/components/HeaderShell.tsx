@@ -1,12 +1,9 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 
-import { ChromeToggle } from "@/components/ChromeToggle";
-import type { ChromeMode } from "@/lib/chromeMode";
 import { setChromeCollapsed, useChromeCollapsed } from "@/lib/chromeStore";
-import { usePublishHeaderHeight } from "@/lib/headerHeight";
 import { findSection, findSub, resolveRoute, sectionLabel } from "@/lib/nav";
 
 /**
@@ -34,12 +31,9 @@ import { findSection, findSub, resolveRoute, sectionLabel } from "@/lib/nav";
  */
 export function HeaderShell({
   locationCode,
-  chromeMode,
   children,
 }: {
   locationCode: string | null;
-  /** Only so the strip can carry the chrome toggle — see below. */
-  chromeMode: ChromeMode;
   children: React.ReactNode;
 }) {
   const collapsed = useChromeCollapsed();
@@ -60,10 +54,22 @@ export function HeaderShell({
   const hasTrail = showSection || sub !== undefined;
 
   // Publish the header's real height so screens that size themselves against
-  // the viewport get the space back when it collapses. Shared with the sidebar
-  // chrome's top bar, which has to publish the same variable — see
-  // lib/headerHeight for why it's measured rather than assumed.
-  usePublishHeaderHeight(ref);
+  // the viewport get the space back when it collapses. MEASURED, not assumed:
+  // the masthead wraps to two or three rows at iPad widths, so any constant is
+  // wrong at some width.
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const publish = () =>
+      document.documentElement.style.setProperty(
+        "--rf-header-h",
+        `${Math.round(el.getBoundingClientRect().height)}px`
+      );
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   return (
     // Sticky, and z-50 so it stays above anything a page floats over itself
@@ -91,13 +97,8 @@ export function HeaderShell({
           </span>
           {/* The SAME control that collapsed it, in the same place, still
               looking like itself (Mark, 2026-07-29) — a toggle you can see is
-              a toggle, rather than a caret that becomes a word.
-              The chrome toggle rides along because collapsing replaces the
-              utilities cluster WHOLESALE: without a copy here, someone who
-              walks with the masthead collapsed has no way to reach the sidebar
-              at all. Temporary, like the toggle itself. */}
-          <span className="ml-auto flex items-center gap-4">
-            <ChromeToggle initialMode={chromeMode} />
+              a toggle, rather than a caret that becomes a word. */}
+          <span className="ml-auto">
             <MenuCollapseButton />
           </span>
         </div>

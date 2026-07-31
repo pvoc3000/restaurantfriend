@@ -2,22 +2,13 @@ import { cookies } from "next/headers";
 
 import { signOut } from "@/app/actions";
 import { AppNav } from "@/components/AppNav";
-import { ChromeToggle } from "@/components/ChromeToggle";
 import { HeaderShell, MenuCollapseButton } from "@/components/HeaderShell";
 import { LocationSwitcher } from "@/components/LocationSwitcher";
 import { GearIcon, HomeIcon, IconButton } from "@/components/ui/IconButton";
-import type { ChromeMode } from "@/lib/chromeMode";
 import { NAV_COOKIE, parseNavMemory } from "@/lib/navMemory";
 import type { AppSession } from "@/lib/session";
 
-export async function AppHeader({
-  session,
-  chromeMode,
-}: {
-  session: AppSession;
-  /** Only so the toggle can name the other chrome — see components/ChromeToggle. */
-  chromeMode: ChromeMode;
-}) {
+export async function AppHeader({ session }: { session: AppSession }) {
   // Seeds the menu's memory on first paint. The client owns it from there —
   // this layout won't re-render on soft navigation (see lib/navMemoryStore.ts).
   const initialMemory = parseNavMemory((await cookies()).get(NAV_COOKIE)?.value);
@@ -25,10 +16,7 @@ export async function AppHeader({
   return (
     // The shell owns stickiness, the collapse toggle and the measured height —
     // see components/HeaderShell.
-    <HeaderShell
-      locationCode={session.activeLocation?.code ?? null}
-      chromeMode={chromeMode}
-    >
+    <HeaderShell locationCode={session.activeLocation?.code ?? null}>
       <AppNav
         initialMemory={initialMemory}
         locationCode={session.activeLocation?.code ?? null}
@@ -40,10 +28,6 @@ export async function AppHeader({
             <IconButton href="/" label="Home">
               <HomeIcon />
             </IconButton>
-
-            {/* Beside the home icon, as asked (Mark, 2026-07-31). Temporary —
-                it goes when the sidebar trial is decided. */}
-            <ChromeToggle initialMode={chromeMode} />
 
             <IconButton href="/settings" label="Settings">
               <GearIcon />

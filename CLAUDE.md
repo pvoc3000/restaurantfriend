@@ -799,51 +799,6 @@ weekday column, and 003 then silently made it per-vendor-item.
   then owned by the client** (`lib/navMemoryStore.ts`): a server layout does not
   re-render on soft navigation, so a client-written cookie can never be read
   back mid-session and the tab hrefs would freeze. `signOut` deletes it.
-- **A SECOND menu is on trial beside it: a left rail** (Mark, 2026-07-31 —
-  bill.com / QuickBooks / Square / Indeed all put navigation down the left).
-  Both chromes ship; a `Sidebar` / `Top menu` word button beside the home icon
-  switches them, and one of the two gets deleted once he decides.
-  **`components/SideChrome.tsx`'s header comment carries the recipe for deleting
-  either one** — read it before touching this, and note that killing the TOP
-  menu means rehoming `MenuCollapseButton` first, or the guide's
-  `useChromeCollapsed()` shelf flag is stranded with no button.
-  A synthesis of the two references: Indeed's collapsible mark rail that
-  **PUSHES** content when it expands, and Square's second tier as a nested list
-  under its parent rather than a popup. Tapping a mark NAVIGATES (to that
-  section's last-used sub) — it doesn't open the panel, because making the app's
-  most-used interaction two taps would poison the very thing the trial measures.
-  `lib/nav.ts` is UNCHANGED and shared, so the two menus can't disagree; the
-  nav-position write moved to `useRememberNavPosition` in `lib/navMemoryStore`
-  for the same reason.
-  **Geometry is one variable, `--rf-nav-w`, and it is `0px` in top-menu mode and
-  below `xl`** — the page gutter, the fixed `ActionBar` and `BackToTop` all read
-  it, so at 0 they sit exactly where they always did. Measured at 1440: the
-  56px rail costs 24px of content (1344 → 1320) and the tightest table that
-  fits, `VendorLocationsTable` at 1305, still clears by 15px; the open 240px
-  panel costs 208 (→ 1136) and puts FOUR tables into horizontal scroll. That
-  last is the accepted price of push — our tables are `table-fixed` with pixel
-  colgroups where Indeed's and Square's are fluid, and no panel width avoids it.
-  Below 1280 the rail isn't rendered at all (the guide's row bottoms out at
-  710px against an iPad portrait's 736) and the panel becomes an overlay with a
-  scrim. Mode is the **cookie** `rf.chrome.nav` (`top` / `side` / `side-open`),
-  not localStorage, for the reason `rf.guide.view` is a cookie: the server must
-  know before it renders or every load paints the wrong chrome and jumps the
-  page sideways. `signOut` leaves it — it's config, not position.
-  **In this chrome the RAIL is white and the two bars stay black.** A
-  full-height rail plus a black masthead plus a black action bar was black on
-  three sides (Mark — "too much black"), and the first fix inverted the BARS,
-  which left the chrome that frames the page reading as the quiet part and the
-  menu shouting. Flipped on the second pass: the bars are the masthead and
-  action bar they stand in for, and the rail sits back under the system's own
-  2px structural rule, run down its right edge. Consequence worth knowing —
-  **active can't be yellow TYPE on white** (#ffd400 on white is ~1.6:1), so the
-  yellow left edge carries the accent while the mark itself goes full black
-  against muted, over a neutral row fill.
-  Icons are **Material Symbols Sharp** (Apache 2.0), six paths copied into
-  `components/ui/NavIcons.tsx` rather than a dependency — and note they are
-  FILLED paths, unlike the stroked `HomeIcon`/`GearIcon` they sit beside. SF
-  Symbols are not available to a web app: Apple licenses them only for
-  interfaces on Apple operating systems.
 - **A days-old `next dev` will start reload-looping** (Mark, 2026-07-26 — the
   order guide stuck on its loading bar, restarting, page reloading by itself,
   cured for a few minutes by navigating away and back). Not an app bug: the dev

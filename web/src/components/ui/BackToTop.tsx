@@ -59,18 +59,9 @@ export function BackToTop() {
       // edge where a thumb lands — so a bottom-right disc floats over the one
       // thing you tap all day and can swallow a + on the last visible row.
       // Bottom-LEFT it covers the Vendor cell, which is text you read and never
-      // touch. 12px off the window edge at EVERY width, rather than off the page
-      // gutter, because it floats over the list instead of sitting in the
+      // touch. left-3 at EVERY width: 12px off the window edge rather than the
+      // page gutter, because it floats over the list instead of sitting in the
       // column.
-      //
-      // That 12px is a MARGIN over a left edge that tracks the navigation rail,
-      // not the `left-3` it used to be: bottom-left is exactly where a left
-      // sidebar lands, so the disc has to start where the rail ends.
-      // --rf-nav-w is 0px unless the sidebar chrome is on, so this is the old
-      // position in the top-menu shape. Deliberately margin + variable and NOT
-      // one arbitrary length doing the arithmetic — that spelling needs a space
-      // inside the brackets, Tailwind encodes it, and this file has a history of
-      // arbitrary values breaking Turbopack's CSS parser (see the note below).
       //
       // z-30 matches the bar: above the list and its sticky column labels
       // (z-20), below the masthead (z-50).
@@ -109,7 +100,7 @@ export function BackToTop() {
       //    --rf-neutral-600 ever moves off #545454, this moves with it.
       // To revert: bg-[#545454d9] → bg-ink, drop both shadow-* classes, hover
       // back to hover:bg-neutral-800.
-      className="fixed bottom-16 left-[var(--rf-nav-w)] z-30 ml-3 grid h-12 w-12 place-items-center rounded-full bg-[#545454d9] text-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--rf-neutral-700)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.28)]"
+      className="fixed bottom-16 left-3 z-30 grid h-12 w-12 place-items-center rounded-full bg-[#545454d9] text-white shadow-[0_2px_8px_rgba(0,0,0,0.22)] transition-colors hover:bg-[var(--rf-neutral-700)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.28)]"
     >
       <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden focusable="false">
         <path

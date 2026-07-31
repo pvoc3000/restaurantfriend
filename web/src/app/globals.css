@@ -32,55 +32,6 @@
      height — AppNav's py-1 (8px) + 2 × TIER_H (h-7 = 28px) = 64px. If either
      changes, change this. */
   --rf-header-h: 4rem;
-
-  /* The LEFT NAVIGATION RAIL's width, and the page gutter that has to make room
-     for it. See components/SideChrome for the whole mechanism.
-     ZERO here, and zero at every width below xl — which is what makes the
-     sidebar a no-op when it's off. Everything that has to dodge the rail (the
-     page gutter, the fixed ActionBar, the floating BackToTop) reads these
-     variables, and reading 0 leaves each of them exactly where it sat before
-     the sidebar existed. Deleting the sidebar means deleting the two rules
-     below; nothing else has to be untangled.
-     The gutter was the literal pair `px-4 xl:px-12`, written out in four
-     places so the black-and-white bands line up. It's a variable now because
-     the sidebar has to move one side of it without moving the other. */
-  --rf-nav-w: 0px;
-  --rf-content-pl: 1rem;
-  --rf-content-pr: 1rem;
-}
-
-@media (min-width: 1280px) {
-  :root {
-    --rf-content-pl: 3rem;
-    --rf-content-pr: 3rem;
-  }
-
-  /* SIDEBAR MODE, and only at xl and up. Below 1280 the rail isn't rendered at
-     all: the order guide's row bottoms out at 710px of content and an iPad
-     portrait window gives it 736, so there is no rail width that fits. There
-     the menu opens as a full overlay instead.
-     THE ARITHMETIC, at a 1440 window (the design target):
-       today          48 + 1344 content + 48
-       rail collapsed 56 rail + 16 air + 1320 content + 48  → costs 24px, and
-                      the tightest table (VendorLocationsTable, 1305) still
-                      clears by 15px, so nothing that fits today stops fitting.
-       panel open     240 + 16 + 1136 content + 48 → four tables gain a
-                      horizontal scrollbar (VendorLocations 1305, PO detail
-                      1290, Vendors 1290, ItemLocations 1155). That is a KNOWN
-                      and accepted cost of Indeed-style push (Mark, 2026-07-31);
-                      our tables are table-fixed with pixel colgroups and don't
-                      reflow, where Indeed's and Square's are fluid. No panel
-                      width avoids it — even Indeed's own 208px leaves 1168. */
-  [data-chrome="side"] {
-    --rf-nav-w: 56px;
-  }
-  [data-chrome="side-open"] {
-    --rf-nav-w: 240px;
-  }
-  [data-chrome="side"],
-  [data-chrome="side-open"] {
-    --rf-content-pl: calc(var(--rf-nav-w) + 1rem);
-  }
 }
 
 /* The one animation in the system, and it earns it: the order guide spends
