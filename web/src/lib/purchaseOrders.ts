@@ -119,6 +119,46 @@ export function priceDiffers(line: PoLine): boolean {
   return Number(catalog) !== Number(line.unit_price);
 }
 
+/**
+ * What is still unresolved about an order, in the words the confirm will use.
+ *
+ * Closing means "received, reconciled and filed — done being worked on", which
+ * is the meaning `closed` never had: the status existed in 001 and sorted and
+ * badged correctly, but nothing routed you to it and nothing said what it
+ * asserted, so it sat unused beside `received`.
+ *
+ * It deliberately reports rather than BLOCKS. The tempting version gates closing
+ * on a full set of received quantities, no price mismatches and an invoice on
+ * file — and then the order whose invoice never arrives is stuck in `received`
+ * forever, which is how a status stops meaning anything. Naming what's loose and
+ * letting the human close anyway keeps the judgement where it belongs.
+ */
+export function closeReadiness(
+  lines: PoLine[],
+  attachmentCount: number
+): string[] {
+  const caveats: string[] = [];
+  const unreceived = lines.filter((l) => l.qty_received === null).length;
+  if (unreceived > 0) {
+    caveats.push(
+      `${unreceived} ${unreceived === 1 ? "line has" : "lines have"} no received quantity`
+    );
+  }
+  const differing = lines.filter(priceDiffers).length;
+  if (differing > 0) {
+    caveats.push(
+      `${differing} ${differing === 1 ? "line's price differs" : "lines' prices differ"} from the catalog`
+    );
+  }
+  if (attachmentCount === 0) caveats.push("no invoice or packing slip is attached");
+  return caveats;
+}
+
+/** Closing is for an order that has arrived; void and closed are already inert. */
+export function canClose(status: PoStatus): boolean {
+  return status === "received" || status === "sent";
+}
+
 export function money(value: number | null | undefined) {
   if (value === null || value === undefined) return "—";
   return `$${Number(value).toLocaleString("en-US", {

@@ -176,6 +176,57 @@ export function PurchaseOrderList({
     [orders, checked]
   );
 
+  // Closeable = received. Deliberately narrower than the receivable set: a
+  // draft or a sent order hasn't arrived yet, so there is nothing to have
+  // finished with. PO detail offers Close on `sent` too, because there you're
+  // looking at the one order and can see that it landed.
+  const selectedCloseable = useMemo(
+    () => orders.filter((po) => checked.has(po.id) && po.status === "received"),
+    [orders, checked]
+  );
+
+  /**
+   * Close the selection — the end of an order's life. Like the per-order close,
+   * the confirm NAMES what's unresolved across the batch and then lets it
+   * through; see closeReadiness. Line-level caveats aren't available here (the
+   * list carries totals, not lines), so it reports the two facts it does have:
+   * a short received total, and missing paperwork.
+   */
+  async function batchClose() {
+    const short = selectedCloseable.filter(
+      (po) => po.received_total < po.ordered_total - 0.005
+    ).length;
+    const unfiled = selectedCloseable.filter((po) => po.attachment_count === 0).length;
+    const caveats = [
+      short > 0 && `${short} received less than ${short === 1 ? "it" : "they"} ordered`,
+      unfiled > 0 && `${unfiled} ${unfiled === 1 ? "has" : "have"} no paperwork attached`,
+    ].filter(Boolean);
+    const message =
+      `Close ${selectedCloseable.length} order${selectedCloseable.length === 1 ? "" : "s"}?` +
+      (caveats.length > 0 ? `\n\nStill unresolved:\n· ${caveats.join("\n· ")}` : "") +
+      "\n\nClosed means done being worked on; you can reopen from the status menu.";
+    if (!window.confirm(message)) return;
+
+    setBatchBusy("closed");
+    setBatchError(null);
+    try {
+      const { error } = await supabase
+        .from("purchase_orders")
+        .update({ status: "closed" })
+        .in(
+          "id",
+          selectedCloseable.map((po) => po.id)
+        );
+      if (error) throw new Error(error.message);
+      setChecked(new Set());
+      router.refresh();
+    } catch (e) {
+      setBatchError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBatchBusy(null);
+    }
+  }
+
   /** One PDF for the whole selection — a page run per PO (spec §4.8's batch
    *  preview / shopping-list modes). Opened, not downloaded: batch output is
    *  for reading or printing, and the per-PO email flow does its own download. */
@@ -461,6 +512,22 @@ export function PurchaseOrderList({
         </span>
       ),
     },
+    // The paperwork, as a count (migration 018). Narrow on purpose — the only
+    // question this column answers on a Friday is "which delivery still has
+    // nothing filed", and a dash answers it.
+    {
+      key: "attachments",
+      label: "Files",
+      width: 80,
+      align: "right",
+      sortValue: (po) => po.attachment_count,
+      render: (po) =>
+        po.attachment_count === 0 ? (
+          <span className="text-faint">—</span>
+        ) : (
+          <span className="tabular-nums text-muted">{po.attachment_count}</span>
+        ),
+    },
   ];
 
   const statusTabs: StatusFilter[] = [
@@ -597,6 +664,20 @@ export function PurchaseOrderList({
               {batchBusy === "received"
                 ? "Receiving…"
                 : `Mark received (${selectedReceivable.length})`}
+            </button>
+            <button
+              disabled={batchBusy !== null || selectedCloseable.length === 0}
+              onClick={batchClose}
+              title={
+                selectedCloseable.length === 0
+                  ? "Nothing closeable selected — only a received order can be closed"
+                  : `Closes ${selectedCloseable.length} received order${
+                      selectedCloseable.length === 1 ? "" : "s"
+                    }: reconciled and filed, done being worked on.`
+              }
+              className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+            >
+              {batchBusy === "closed" ? "Closing…" : `Close (${selectedCloseable.length})`}
             </button>
 
             {/* Danger inverts red on hover — same move, different meaning. */}

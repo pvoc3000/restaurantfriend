@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { qty } from "@/lib/catalog";
 import {
+  canClose,
+  closeReadiness,
   money,
   orderedQty,
   orderedTotal,
@@ -18,6 +20,8 @@ import {
   type PoStatus,
   type PurchaseOrder,
 } from "@/lib/purchaseOrders";
+import type { SignedAttachment } from "@/lib/attachments";
+import { PoAttachments } from "./PoAttachments";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -50,6 +54,8 @@ export function PurchaseOrderDetail({
   vendorLink,
   orgId,
   processing,
+  attachments,
+  attachmentError,
 }: {
   order: PurchaseOrder;
   lines: PoLine[];
@@ -59,6 +65,10 @@ export function PurchaseOrderDetail({
   orgId: string;
   /** Null for viewers below purchaser — the card writes, so it isn't shown. */
   processing: ProcessingContext | null;
+  /** The order's paperwork, signed by the server (migration 018). */
+  attachments: SignedAttachment[];
+  /** Non-null if the attachments couldn't be read at all — see the page. */
+  attachmentError: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -143,6 +153,22 @@ export function PurchaseOrderDetail({
     }
     setBusy(false);
     router.refresh();
+  }
+
+  /**
+   * Close the order — "reconciled and filed". The confirm NAMES what's still
+   * loose and then lets you through anyway; see closeReadiness for why gating
+   * would be the wrong call.
+   */
+  async function close() {
+    const caveats = closeReadiness(lines, attachments.length);
+    const message =
+      `Close ${order.po_number}?` +
+      (caveats.length > 0
+        ? `\n\nStill unresolved:\n· ${caveats.join("\n· ")}\n\nClosing anyway is fine — it just means you're done with this order.`
+        : "\n\nEverything is received, reconciled and filed.");
+    if (!window.confirm(message)) return;
+    await setStatus("closed");
   }
 
   /** Push a line's invoice price onto the catalog; the DB trigger logs it. */
@@ -569,6 +595,24 @@ export function PurchaseOrderDetail({
 
       {processing && <ProcessPo order={order} context={processing} />}
 
+      {/* Sits with Process, not with the lines: sending the order and filing
+          what came back are the two things you DO to an order, and the lines
+          are what you read. Visible to everyone — the invoice is the answer to
+          "what did we actually pay" — but only purchaser+ can add or remove,
+          matching migration 018's storage policies. */}
+      {attachmentError ? (
+        <p className="border border-accent px-4 py-3 text-sm text-accent">
+          Could not load this order&rsquo;s paperwork: {attachmentError}
+        </p>
+      ) : (
+        <PoAttachments
+          poId={order.id}
+          orgId={orgId}
+          attachments={attachments}
+          canEdit={canEditLines}
+        />
+      )}
+
       {/* How many DISTINCT products, and how many packages they add up to —
           the second is what you count off the truck, and the line count alone
           never told you (Mark, 2026-07-27). Packages of each line's own vendor
@@ -610,6 +654,19 @@ export function PurchaseOrderDetail({
         >
           Receive all as ordered
         </button>
+
+        {/* The end of the order's life, and the only route to it that means
+            anything — the status menu beside it can always set `closed`, but
+            says nothing about what closing asserts. */}
+        {canEditLines && canClose(order.status) && (
+          <button
+            disabled={busy}
+            onClick={close}
+            className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+          >
+            Close order
+          </button>
+        )}
 
         <label className="flex items-center gap-2">
           <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
