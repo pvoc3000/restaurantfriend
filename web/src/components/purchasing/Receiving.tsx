@@ -25,8 +25,11 @@ import {
   latestRead,
   priceAction,
   receivingOrder,
+  skuAction,
   type PriceAction,
 } from "@/lib/receiving";
+import type { InvoiceLine } from "@/lib/invoiceExtraction";
+import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
 import {
   clampSplit,
   setReceivingLayout,
@@ -83,6 +86,8 @@ export function Receiving({
   const [kind, setKind] = useState<AttachmentKind>("invoice");
   /** The line ids the last bulk receive filled — what Undo would put back. */
   const [lastBulk, setLastBulk] = useState<string[] | null>(null);
+  /** The line being matched by hand, if the pick dialog is open. */
+  const [matching, setMatching] = useState<PoLine | null>(null);
 
   const layout = useReceivingLayout();
   const split = useReceivingSplit();
@@ -235,6 +240,41 @@ export function Receiving({
     );
   }
 
+  /**
+   * Pair this line with an invoice line the matcher couldn't place, by taking
+   * the vendor's item number onto the line.
+   *
+   * It writes `product_id` rather than recording the pairing somewhere, because
+   * the pairing isn't the problem — the STALE SKU is. BakeMark billed 50021
+   * against the 08779 we ordered under (and renumbered two other items on the
+   * same invoice), so once the line carries 50021 the ordinary SKU join finds
+   * it, survives a reload, and needs no column of its own. Editing a line's
+   * product ID is already established policy on PO detail (Mark, 2026-07-28)
+   * and deliberately isn't gated on status.
+   */
+  function matchTo(line: PoLine, invoice: InvoiceLine) {
+    setMatching(null);
+    if (!invoice.product_id) return;
+    void write(() =>
+      supabase
+        .from("purchase_order_items")
+        .update({ product_id: invoice.product_id })
+        .eq("id", line.id)
+    );
+  }
+
+  /** Stage 2: teach the CATALOG the vendor's new number, so the next order
+   *  matches without anyone doing this again. */
+  function adoptSku(line: PoLine) {
+    if (!line.vendor_items || !line.product_id) return;
+    void write(() =>
+      supabase
+        .from("vendor_items")
+        .update({ product_id: line.product_id })
+        .eq("id", line.vendor_items!.id)
+    );
+  }
+
   async function close() {
     const caveats = closeReadiness(lines, attachments.length);
     const message =
@@ -306,10 +346,14 @@ export function Receiving({
             line={line}
             match={matchByLine.get(line.id)}
             action={priceAction(line, matchByLine.get(line.id), order.location_id)}
+            sku={skuAction(line)}
+            canMatch={(match?.unmatchedInvoice.length ?? 0) > 0}
             canReceive={canReceive}
             saving={saving}
             onSetReceived={(value) => setReceived(line, value)}
             onPrice={(action) => applyPrice(line, action)}
+            onMatch={() => setMatching(line)}
+            onAdoptSku={() => adoptSku(line)}
           />
         ))}
       </ul>
@@ -448,14 +492,30 @@ export function Receiving({
       {/* Fixed children OUTSIDE the space-y container: space-y puts a bottom
           margin on every child but the last, and for a bottom:0 fixed box it's
           the margin edge that lands on the viewport floor. */}
+      {/* Finalize then Close, at the right (Mark, 2026-07-31). The pair reads
+          as a form's footer — Finalize is the commit, Close is the way out —
+          which is why Finalize sits in the trailing group with it rather than
+          with the receive command on the left, where the ActionBar's usual
+          act-here / move-there split would have put it. */}
       <ActionBar
         trailing={
-          <Link
-            href={`/purchase-orders/${order.id}`}
-            className="flex min-w-40 items-center justify-center px-5 text-center text-[12px] font-semibold uppercase tracking-[0.06em] text-white no-underline hover:bg-neutral-800 xl:min-w-48 xl:px-8"
-          >
-            Order detail
-          </Link>
+          <>
+            {canReceive && canClose(order.status) && (
+              <ActionBarButton
+                disabled={saving}
+                onClick={() => void close()}
+                title="Mark this order received, reconciled and filed — it names anything still unresolved first."
+              >
+                Finalize
+              </ActionBarButton>
+            )}
+            <Link
+              href={`/purchase-orders/${order.id}`}
+              className="flex min-w-40 items-center justify-center px-5 text-center text-[12px] font-semibold uppercase tracking-[0.06em] text-white no-underline hover:bg-neutral-800 xl:min-w-48 xl:px-8"
+            >
+              Close
+            </Link>
+          </>
         }
       >
         {canReceive && (
@@ -471,13 +531,58 @@ export function Receiving({
                 : `Receive ${toFill.length} as ordered`}
           </ActionBarButton>
         )}
-        {canReceive && canClose(order.status) && (
-          <ActionBarButton disabled={saving} onClick={() => void close()}>
-            Close order
-          </ActionBarButton>
-        )}
       </ActionBar>
       <BackToTop />
+
+      {matching && match && (
+        <Dialog
+          title={`Match ${matching.vendor_items?.inventory_items?.name ?? matching.description ?? "this line"}`}
+          onClose={() => setMatching(null)}
+          width="max-w-2xl"
+          footer={
+            <button
+              type="button"
+              onClick={() => setMatching(null)}
+              className={DIALOG_CANCEL_CLASS}
+            >
+              Cancel
+            </button>
+          }
+        >
+          <p className="mb-4 text-sm text-muted">
+            These invoice lines paired with nothing on this order — usually because
+            the vendor renumbered the item. Picking one sets this line&rsquo;s product
+            ID to the vendor&rsquo;s, which is what makes the two sides join.
+          </p>
+          <ul className="space-y-2">
+            {match.unmatchedInvoice.map((l, i) => (
+              <li
+                key={`${l.product_id ?? "?"}-${i}`}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-hairline px-3 py-2 text-sm"
+              >
+                <span className="tabular-nums text-muted">{l.product_id ?? "no number"}</span>
+                <span className="text-ink">{l.description}</span>
+                <span className="tabular-nums text-muted">
+                  {l.qty ?? "—"} × {money(l.unit_price)}
+                </span>
+                <button
+                  type="button"
+                  disabled={saving || !l.product_id}
+                  onClick={() => matchTo(matching, l)}
+                  title={
+                    l.product_id
+                      ? `Set this line's product ID to ${l.product_id}`
+                      : "This invoice line printed no item number, so there's nothing to match on"
+                  }
+                  className="ml-auto h-9 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
+                >
+                  Match
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Dialog>
+      )}
     </>
   );
 }

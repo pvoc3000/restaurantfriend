@@ -22,20 +22,30 @@ export function ReceivingRow({
   line,
   match,
   action,
+  sku,
+  canMatch,
   canReceive,
   saving,
   onSetReceived,
   onPrice,
+  onMatch,
+  onAdoptSku,
 }: {
   line: PoLine;
   match: LineMatch | undefined;
   /** The two-stage price button's current stage, or null when nothing's owed. */
   action: PriceAction | null;
+  /** Set when the catalog's SKU disagrees with this line's — stage 2 of a match. */
+  sku: { from: string | null; to: string } | null;
+  /** There are invoice lines nothing paired with, so a manual match is possible. */
+  canMatch: boolean;
   /** purchaser+ — below that every control renders as text. */
   canReceive: boolean;
   saving: boolean;
   onSetReceived: (value: number | null) => void;
   onPrice: (action: PriceAction) => void;
+  onMatch: () => void;
+  onAdoptSku: () => void;
 }) {
   // The GuideLine pattern: the draft is null at rest and the render falls back
   // to the prop, so a refresh landing mid-edit can't fight what's being typed
@@ -91,14 +101,36 @@ export function ReceivingRow({
           </span>
         )}
       </div>
-      <div className="mt-0.5 text-xs text-muted">
-        {[line.product_id, line.brand, line.description].filter(Boolean).join(" · ") ||
-          "—"}
+      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted">
+        <span>
+          {[line.product_id, line.brand, line.description].filter(Boolean).join(" · ") ||
+            "—"}
+        </span>
+        {/* Stage 2 of a manual match: this order now says 50021 and the catalog
+            still says 08779, so the NEXT order would need matching by hand
+            again. Separate button, like the price stages — fixing this order is
+            not consent to edit the catalog. */}
+        {sku && canReceive && (
+          <button
+            type="button"
+            disabled={saving}
+            onClick={onAdoptSku}
+            title={`The catalog still calls this ${sku.from ?? "nothing"}. Update it to ${sku.to} so the next order matches on its own.`}
+            className="border border-ink bg-white px-1.5 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink hover:bg-ink hover:text-white disabled:opacity-35"
+          >
+            Catalog says {sku.from ?? "—"} · update
+          </button>
+        )}
       </div>
 
-      {/* Band 2 — the three quantities, ending in the one you touch. */}
+      {/* Band 2 — the three quantities, ending in the one you touch.
+          Nothing is PREFILLED (Mark, 2026-07-31): the numbers stay numbers, and
+          each carries a → that pushes it into the received box. An arrow is an
+          unmistakable action where an underlined number was only a hint, and a
+          box that fills itself would make merely opening an order look like
+          someone had checked the delivery. */}
       <div className="mt-2 flex flex-wrap items-center gap-x-5 gap-y-2">
-        <Chip
+        <Quantity
           label="Ordered"
           value={qtyLabel(ordered, pack)}
           takeable={canReceive && received !== ordered}
@@ -106,8 +138,8 @@ export function ReceivingRow({
           title="Record this line as arriving exactly as ordered"
           onTake={() => onSetReceived(ordered)}
         />
-        <Chip
-          label="Invoice"
+        <Quantity
+          label="Invoiced"
           value={invoiceQty === null ? "—" : qtyLabel(invoiceQty, pack)}
           // Enabled purely on the invoice having printed a quantity — NOT on
           // `match.qtyDiffers`, which compares against what's been received and
@@ -121,6 +153,22 @@ export function ReceivingRow({
               : "Record what the invoice says arrived"
           }
           onTake={() => onSetReceived(Number(invoiceQty))}
+          trailing={
+            // Nothing on the invoice paired with this line, but the invoice has
+            // lines nothing paired with — so there's something to pair BY HAND.
+            // Vendors renumber items and no matcher will ever catch them all.
+            !match?.invoice && canMatch && canReceive ? (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={onMatch}
+                title="Pick the invoice line this is, when the vendor billed it under a different item number"
+                className="h-9 border border-ink bg-white px-2 text-[11px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
+              >
+                Match&hellip;
+              </button>
+            ) : undefined
+          }
         />
 
         <div className="ml-auto flex items-center gap-2 whitespace-nowrap">
@@ -236,14 +284,21 @@ export function ReceivingRow({
   );
 }
 
-/** A quantity you can read, and take in one tap. The guide's suggestion chip. */
-function Chip({
+/**
+ * A quantity, and a → that puts it in the received box.
+ *
+ * The number is never the button. It's a fact you read while comparing three
+ * columns, and making facts clickable is how you end up unsure whether looking
+ * at something changed it.
+ */
+function Quantity({
   label,
   value,
   takeable,
   saving,
   title,
   onTake,
+  trailing,
 }: {
   label: string;
   value: string;
@@ -251,25 +306,25 @@ function Chip({
   saving: boolean;
   title: string;
   onTake: () => void;
+  trailing?: React.ReactNode;
 }) {
   return (
-    <span className="flex items-baseline gap-1.5">
+    <span className="flex items-center gap-1.5">
       <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">{label}</span>
-      {takeable ? (
+      <span className="text-sm tabular-nums text-ink">{value}</span>
+      {takeable && (
         <button
           type="button"
           disabled={saving}
           onClick={onTake}
+          aria-label={title}
           title={title}
-          className="px-1 text-sm tabular-nums text-ink underline decoration-dotted underline-offset-4 hover:bg-neutral-100 disabled:opacity-35"
+          className="grid h-9 w-9 place-items-center border border-ink bg-white text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
         >
-          {value}
+          →
         </button>
-      ) : (
-        <span className="px-1 text-sm tabular-nums text-muted" title={title}>
-          {value}
-        </span>
       )}
+      {trailing}
     </span>
   );
 }

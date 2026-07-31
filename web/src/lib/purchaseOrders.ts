@@ -60,6 +60,10 @@ export type PoLine = {
      *  `package_desc` above, which since migration 013 is a composed structure
      *  ("12 × 32 oz"). See `packType`. */
     package_desc: string | null;
+    /** The catalog's CURRENT SKU. The line above snapshotted it at generation,
+     *  and the gap between them is the prompt to update the catalog after a
+     *  vendor renumbers an item — see `skuAction` in lib/receiving. */
+    product_id: string | null;
     /** This item's per-location price overrides (design rule 6) — rare, and
      *  filtered to the order's own location by `effectiveCatalogPrice`. The
      *  table's key is (vendor_item_id, location_id) with no surrogate id, and

@@ -125,6 +125,30 @@ export function priceAction(
 }
 
 /**
+ * The catalog's SKU disagrees with the line's — offer to fix the catalog.
+ *
+ * The second half of a manual match, and the half that matters next month.
+ * Vendors renumber items (BakeMark billed 50021 against the 08779 we ordered
+ * under, and renumbered two others on the same invoice), so pairing this
+ * order's line by hand settles today's delivery while leaving the catalog stale
+ * — and the next order arrives needing the same manual step.
+ *
+ * Same two-stage shape as `priceAction`, and for the same reason: the order and
+ * the catalog are different records, and changing one is not consent to change
+ * the other.
+ */
+export function skuAction(
+  line: PoLine
+): { from: string | null; to: string } | null {
+  const vi = line.vendor_items;
+  if (!vi || !line.product_id) return null;
+  const a = (vi.product_id ?? "").trim().toUpperCase();
+  const b = line.product_id.trim().toUpperCase();
+  if (a === b) return null;
+  return { from: vi.product_id, to: line.product_id };
+}
+
+/**
  * How the received box reads at arm's length — the order guide's three states,
  * plus the one receiving adds.
  *

@@ -38,7 +38,7 @@ export const PO_SELECT = `id, po_number, status, sent_via, order_date, delivery_
  */
 export const PO_LINE_SELECT = `id, vendor_item_id, description, brand, product_id,
    package_desc, notes, qty_ordered, qty_received, unit_price, discrepancy_note,
-   vendor_items ( id, price, package_desc,
+   vendor_items ( id, price, package_desc, product_id,
                   vendor_item_location_prices ( location_id, price ),
                   inventory_items ( id, name, category ) )`;
 

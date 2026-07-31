@@ -15,6 +15,7 @@ import {
   qtyLabel,
   receivedClass,
   receivingOrder,
+  skuAction,
 } from "../../src/lib/receiving";
 import { eq, no, ok, test } from "./harness";
 import { invoiceLine, poLine, withCatalog } from "./factories";
@@ -167,6 +168,44 @@ test("the stage machine terminates: rounding to cents cannot re-arm stage 1", ()
   const match = matchInvoiceToOrder([line], [inv]).matches[0];
   const action = priceAction(line, match, LOC);
   no(action && action.stage === "po", "0.0033 apart is inside the epsilon");
+});
+
+// ── skuAction: stage 2 of a manual match ────────────────────────────────────
+
+test("sku: a catalog that agrees offers nothing", () => {
+  eq(skuAction(withCatalog(poLine({ product_id: "08779" }))), null);
+});
+
+test("sku: after a manual match, the stale catalog is named", () => {
+  // The real BakeMark case (2026-07-31): we ordered under 08779, they billed
+  // 50021, and matching by hand put 50021 on the line.
+  const line = withCatalog(poLine({ product_id: "50021" }), { product_id: "08779" });
+  eq(skuAction(line), { from: "08779", to: "50021" });
+});
+
+test("sku: a catalog with no number at all is still worth filling in", () => {
+  const line = withCatalog(poLine({ product_id: "50021" }), { product_id: null });
+  eq(skuAction(line), { from: null, to: "50021" });
+});
+
+test("sku: case and padding differences are not a disagreement", () => {
+  eq(skuAction(withCatalog(poLine({ product_id: "ab12" }), { product_id: "AB12 " })), null);
+});
+
+test("sku: a line with no number of its own has nothing to teach the catalog", () => {
+  eq(skuAction(withCatalog(poLine({ product_id: null }), { product_id: "08779" })), null);
+});
+
+test("sku: no catalog row, no offer", () => {
+  eq(skuAction(poLine({ product_id: "50021" })), null);
+});
+
+test("sku: taking the match makes the whole thing settle", () => {
+  // Matching wrote 50021 onto the line; adopting it onto the catalog ends it.
+  const matched = withCatalog(poLine({ product_id: "50021" }), { product_id: "08779" });
+  ok(skuAction(matched));
+  const adopted = withCatalog(poLine({ product_id: "50021" }), { product_id: "50021" });
+  eq(skuAction(adopted), null);
 });
 
 // ── receivedClass ───────────────────────────────────────────────────────────

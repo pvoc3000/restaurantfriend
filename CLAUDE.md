@@ -401,6 +401,27 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    changes nothing). That table is keyed `(vendor_item_id, location_id)` with no
    surrogate id. `closeReadiness` moved to the same epsilon so the Close confirm
    can't contradict the screen you just finished.
+   **Nothing is prefilled** (Mark, 2026-07-31, rejecting a proposed prefill):
+   each quantity carries a **→ button** that pushes it into the received box.
+   An arrow is an unmistakable action where an underlined number was only a
+   hint, the numbers stay readable while you compare three columns, and a box
+   that fills itself would make merely OPENING an order look like someone had
+   checked the delivery — which is what the PO list's Received column exists to
+   tell you. The label is **"Invoiced"**, to rhyme with "Ordered".
+   **Manual match** (Mark, 2026-07-31, after BakeMark 112-181120-01): vendors
+   renumber items, so no matcher catches them all. A row with no invoice match
+   offers `Match…` when the invoice has unpaired lines; picking one **writes the
+   invoice's `product_id` onto the PO line**, which makes the ordinary SKU join
+   find it — no new column, survives a reload. Then `skuAction` offers a second,
+   separate button to teach the CATALOG the new number so the next order matches
+   on its own. Same two-stage shape as the price button and for the same reason:
+   fixing this order is not consent to edit the catalog. Editing a line's
+   product ID was already policy (2026-07-28) and isn't gated on status.
+   Measured on that invoice: 5 lines joined on SKU (three of them only after the
+   leading-zero pass — BakeMark drops ours), 2 were rescued by description where
+   BakeMark had renumbered, and Coconut failed on a plural ("Coconut Flakes" vs
+   "COCONUT FLAKE SWEET" share one word, and the fallback needs three). After a
+   manual match: 8 of 8.
    **One receive control**, in the ActionBar: `Receive n from invoice` when an
    extraction exists, `Receive n as ordered` when not, filling only lines with
    NO quantity. With an invoice it fills MATCHED lines only — filling the rest
@@ -409,6 +430,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the specific line ids it just set (held in state, not re-derived). Not a
    general undo stack — this is the only action that changes fifteen rows on one
    tap.
+   **The bar ends `Finalize` · `Close`** (Mark, 2026-07-31): Finalize is the old
+   "Close order" — `closeReadiness`, which names what's unresolved and lets you
+   through anyway — and Close is the way back to PO detail. They sit together in
+   the TRAILING group, reading as a form's footer, which is the one deliberate
+   exception to the bar's act-here / move-there split.
    **Auto-read on attach, `invoice` kind only**, in `useAttachmentActions`
    (shared with PO detail's Paperwork card, because it's a decision about the
    ACT of attaching, not about a screen). The upload STANDS if the read fails.

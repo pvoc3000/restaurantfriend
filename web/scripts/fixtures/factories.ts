@@ -32,6 +32,8 @@ export function withCatalog(
   catalog: {
     price?: number | null;
     package_desc?: string | null;
+    /** The catalog's CURRENT SKU. Defaults to the line's, i.e. "not stale". */
+    product_id?: string | null;
     name?: string;
     category?: string | null;
     overrides?: { location_id: string; price: number }[];
@@ -43,6 +45,8 @@ export function withCatalog(
       id: `vi-${line.id}`,
       price: catalog.price ?? null,
       package_desc: catalog.package_desc ?? null,
+      product_id:
+        catalog.product_id === undefined ? line.product_id : catalog.product_id,
       vendor_item_location_prices: catalog.overrides ?? [],
       inventory_items: {
         id: `item-${line.id}`,
