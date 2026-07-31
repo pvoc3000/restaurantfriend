@@ -378,7 +378,23 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `min-h-0` a flex child takes its content height and overflows instead of
    scrolling). Consequence: that scroll is NOT covered by the universal
    `ScrollMemory`, which watches the window; it resets on a round trip, which is
-   fine while receiving is a single-screen task. Below `xl` it STACKS
+   fine while receiving is a single-screen task.
+   **That height is MEASURED, never a CSS constant.** `100vh - header - <guess>`
+   ran the columns off the bottom of the window (Mark, 2026-07-31), because what
+   sits above the row varies — the invoice band grows with the reader's notes
+   and the billed-but-not-ordered list, and the progress and undo bands come and
+   go. A `useLayoutEffect` measures the row's own top AND whatever follows it
+   (hard-coding the container's `pb-22` still left ~56px scrolling, because the
+   app layout's `py-8` sits under that too) and writes `style.height` straight
+   to the node — no state, so a resize doesn't re-render nineteen rows and the
+   `set-state-in-effect` lint has nothing to object to. A `ResizeObserver` on
+   the body keeps it honest as bands appear; a >1px guard stops it observing its
+   own write. Split mode also drops `pb-22` to `pb-8`, since a page that doesn't
+   scroll needs no clearance to scroll past the bar — that padding was 90px of
+   dead air. Measured: columns equal, 36px above the bar, page exactly one
+   viewport tall. Below a usable minimum (280px) it stops shrinking and lets the
+   page scroll instead.
+   Below `xl` it STACKS
    rather than offering a Lines/Invoice toggle — nothing hidden, no mode to be
    lost in — and an empty document pane sizes to its own sentence instead of
    reserving 70vh of nothing to scroll past on an iPad. `Auto` / `Side by side`

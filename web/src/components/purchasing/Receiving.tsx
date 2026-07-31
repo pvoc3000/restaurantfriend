@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -91,7 +91,6 @@ export function Receiving({
 
   const layout = useReceivingLayout();
   const split = useReceivingSplit();
-  const splitRef = useRef<HTMLDivElement>(null);
 
   const {
     phase,
@@ -288,11 +287,70 @@ export function Receiving({
     );
   }
 
+  /**
+   * Size the split row to the space actually left below it.
+   *
+   * This can't be a CSS constant. `100vh - header - <a guess>` was the first
+   * attempt and it ran the columns off the bottom of the window (Mark,
+   * 2026-07-31), because what sits ABOVE the row varies: the invoice band grows
+   * with the reader's notes and the billed-but-not-ordered list, and the
+   * progress and undo bands come and go. Only the row knows where it starts.
+   *
+   * Measured, then written straight to the node — no state, so a resize doesn't
+   * re-render nineteen rows, and no setState-in-an-effect for the lint to
+   * object to.
+   *
+   * What's BELOW the row is measured too, rather than assumed. Hard-coding the
+   * container's `pb-22` left ~56px of empty page still scrolling, because the
+   * app layout's own `py-8` sits under that as well. Subtracting whatever
+   * actually follows the row makes the page land exactly one viewport tall, so
+   * nothing scrolls and the measurement can't drift underneath itself.
+   */
+  const rowRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = rowRef.current;
+    if (!el) return;
+    const MIN = 280;
+
+    function measure() {
+      if (!el) return;
+      // Stacked — chosen, or implied by a window narrower than `xl` — sizes
+      // itself and scrolls the page, which is the point of stacking.
+      const splitting =
+        layout === "split" || (layout === "auto" && window.innerWidth >= 1280);
+      if (!splitting) {
+        if (el.style.height) el.style.height = "";
+        return;
+      }
+      const rect = el.getBoundingClientRect();
+      const below =
+        document.documentElement.scrollHeight - (rect.bottom + window.scrollY);
+      const next = Math.max(
+        MIN,
+        Math.round(window.innerHeight - rect.top - window.scrollY - below)
+      );
+      // Only write on a real change: the ResizeObserver below watches the body,
+      // and setting our own height changes it.
+      if (Math.abs(parseFloat(el.style.height || "0") - next) > 1) {
+        el.style.height = `${next}px`;
+      }
+    }
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [layout]);
+
   /** Drag the divider. Fractions rather than pixels, so the split survives a
    *  window resize meaning something different. */
   function startDrag(event: React.PointerEvent) {
     event.preventDefault();
-    const box = splitRef.current?.getBoundingClientRect();
+    const box = rowRef.current?.getBoundingClientRect();
     if (!box) return;
     const move = (e: PointerEvent) =>
       setReceivingSplit(clampSplit((e.clientX - box.left) / box.width));
@@ -373,7 +431,21 @@ export function Receiving({
 
   return (
     <>
-      <div className="space-y-4 pb-22">
+      {/* `pb-22` is the ActionBar's usual clearance — it lets a scrolling page
+          finish above the fixed bar. Split doesn't scroll (the row is sized to
+          the space left), so that padding would just be 90px of dead air above
+          the bar; a smaller one lets the columns come down to meet it. The
+          height measurement reads whatever this resolves to, so the two can't
+          disagree. */}
+      <div
+        className={`space-y-4 ${
+          layout === "split"
+            ? "pb-8"
+            : layout === "stacked"
+              ? "pb-22"
+              : "pb-22 xl:pb-8"
+        }`}
+      >
         {/* Header: which order, and the three numbers that say whether it adds up. */}
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
           <h1 className="text-2xl font-semibold text-ink">Receive {order.po_number}</h1>
@@ -474,18 +546,17 @@ export function Receiving({
              the row is a plain block and both panes size themselves, since
              stacking is the point there. */
           <div
-            ref={splitRef}
-            className={`gap-0 ${
-              layout === "split" ? "flex" : "block xl:flex"
-            } xl:h-[calc(100vh-var(--rf-header-h)-11rem)] xl:min-h-96`}
+            ref={rowRef}
+            className={`gap-0 ${layout === "split" ? "flex" : "block xl:flex"}`}
           >
             <div
               style={{ flexBasis: `${split * 100}%` }}
-              // An EMPTY pane still matches the column at xl (that's the point),
-              // but must not reserve 70vh of nothing to scroll past when stacked.
-              className={`shrink-0 grow-0 xl:h-full max-xl:basis-auto ${
-                shown ? "max-xl:h-[70vh]" : "max-xl:h-auto"
-              }`}
+              // An EMPTY pane still matches the column when split (that's the
+              // point), but must not reserve 70vh of nothing to scroll past
+              // when stacked.
+              className={`shrink-0 grow-0 max-xl:basis-auto ${
+                layout === "split" ? "h-full" : "xl:h-full"
+              } ${shown ? "max-xl:h-[70vh]" : "max-xl:h-auto"}`}
             >
               {documentPane}
             </div>
@@ -496,7 +567,13 @@ export function Receiving({
               onPointerDown={startDrag}
               className="mx-1 w-2 shrink-0 cursor-col-resize touch-none self-stretch bg-transparent hover:bg-hairline max-xl:hidden"
             />
-            <div className="min-w-0 flex-1 xl:h-full max-xl:mt-4">{linesPane}</div>
+            <div
+              className={`min-w-0 flex-1 max-xl:mt-4 ${
+                layout === "split" ? "h-full" : "xl:h-full"
+              }`}
+            >
+              {linesPane}
+            </div>
           </div>
         )}
       </div>
