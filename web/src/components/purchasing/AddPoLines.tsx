@@ -12,6 +12,7 @@ import {
 import { packLabel } from "@/lib/catalog";
 import { evaluateNumeric } from "@/lib/calc";
 import { TextInput } from "@/components/ui/TextInput";
+import { Dialog, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 
 /**
  * "Add item" on PO detail: everything this vendor currently sells, with a
@@ -218,34 +219,16 @@ export function AddPoLines({
       </button>
 
       {open && (
-        <div
-          className="fixed inset-0 z-[60] flex items-start justify-center bg-black/55 p-4 pt-[8vh]"
-          onClick={() => setOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-label={`Add items to ${order.po_number}`}
-            onClick={(e) => e.stopPropagation()}
-            className="flex max-h-[85vh] w-full max-w-4xl flex-col border-2 border-ink bg-white text-ink"
-          >
-            <div className="flex shrink-0 items-center justify-between gap-4 bg-ink px-6 py-3 text-white">
-              <h2 className="text-[13px] font-bold uppercase tracking-[0.06em]">
-                Add items · {vendorName} → {order.po_number}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                aria-label="Close"
-                className="px-1 text-[17px] leading-none text-white hover:text-white/70"
-              >
-                ✕
-              </button>
-            </div>
-
-            {/* Search sits with the title bar rather than in the scrolling body:
-                on a vendor with hundreds of items it's the first thing you use
-                and it must not scroll away. */}
-            <div className="flex shrink-0 flex-wrap items-center gap-4 border-b border-ink px-6 py-3">
+        <Dialog
+          title={`Add items · ${vendorName} → ${order.po_number}`}
+          onClose={() => setOpen(false)}
+          width="max-w-4xl"
+          bodyClassName="px-6 py-4"
+          // The search sits in the dialog's TOOLBAR rather than in the scrolling
+          // body: on a vendor with hundreds of items it's the first thing you
+          // use and it must not scroll away.
+          toolbar={
+            <>
               <TextInput
                 autoFocus
                 value={search}
@@ -263,9 +246,18 @@ export function AddPoLines({
                   adding changes order history
                 </span>
               )}
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-y-auto px-6 py-4">
+            </>
+          }
+          footer={
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className={DIALOG_COMMIT_CLASS}
+            >
+              Done
+            </button>
+          }
+        >
               {error && <p className="mb-3 text-sm text-accent">{error}</p>}
 
               {loading ? (
@@ -356,21 +348,7 @@ export function AddPoLines({
                   })}
                 </ul>
               )}
-            </div>
-
-            {/* Pinned, like every other dialog: the way out is always on screen,
-                however long the vendor's list is. */}
-            <div className="flex shrink-0 items-center justify-end gap-4 border-t border-ink px-6 py-4">
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                className="inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white hover:bg-neutral-800"
-              >
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
+        </Dialog>
       )}
     </>
   );

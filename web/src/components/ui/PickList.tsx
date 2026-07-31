@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useAnchoredPanel } from "@/lib/anchoredPanel";
 
 export type PickOption = {
   value: string;
@@ -22,16 +23,10 @@ export type PickOption = {
  * be searched on iPad, and renders as an OS menu that lands wherever the system
  * decides. This is a list under the field, styled like the rest of the app.
  *
- * Two things make it work anywhere it's dropped:
- *
- * - **It portals to the body and positions `fixed`.** Half its homes are table
- *   cells inside `overflow-auto` panes — the vendor's items table — where an
- *   absolutely-positioned panel is simply clipped. Fixed coordinates measured
- *   off the trigger escape both that and WebKit's rule that a table cell under
- *   `border-collapse` isn't a containing block (CLAUDE.md).
- * - **It closes on scroll.** Fixed coordinates go stale the moment the page
- *   moves, and a list left floating over unrelated rows is worse than one that
- *   shut. Same reason `resize` closes it.
+ * What makes it work anywhere it's dropped — portalling to the body, fixed
+ * coordinates measured off the trigger, closing on scroll — lives in
+ * `lib/anchoredPanel`, which the ⋯ row menu shares. The reasons are written up
+ * there.
  *
  * The stored value is ALWAYS shown even when it isn't on the list: the catalog
  * holds values this vocabulary doesn't (FMP wrote sizes into package_desc), and
@@ -68,9 +63,10 @@ export function PickList({
   const [open, setOpen] = useState(false);
   const [term, setTerm] = useState("");
   const [active, setActive] = useState(0);
-  const [box, setBox] = useState<{ top: number; left: number; width: number } | null>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const close = useCallback(() => setOpen(false), []);
+  const box = useAnchoredPanel({ open, triggerRef, panelRef, align, onClose: close });
 
   // A search box only earns its place on a long list; on five options it's one
   // more thing between you and the answer.
@@ -90,55 +86,6 @@ export function PickList({
     : listed;
   const exact = shown.some((o) => o.label.toLowerCase() === q);
   const offerNew = allowNew && q !== "" && !exact;
-
-  // Measured off the trigger at open time, and again if the panel's own size
-  // changes under it (the list shrinks as you type).
-  useLayoutEffect(() => {
-    if (!open) return;
-    const measure = () => {
-      const el = triggerRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      setBox({
-        top: r.bottom + 2,
-        left: align === "right" ? r.right : r.left,
-        width: r.width,
-      });
-    };
-    measure();
-    const observer = new ResizeObserver(measure);
-    if (triggerRef.current) observer.observe(triggerRef.current);
-    return () => observer.disconnect();
-  }, [open, align]);
-
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.stopPropagation();
-        setOpen(false);
-        triggerRef.current?.focus();
-      }
-    };
-    const onDown = (e: MouseEvent) => {
-      const t = e.target as Node;
-      if (panelRef.current?.contains(t) || triggerRef.current?.contains(t)) return;
-      setOpen(false);
-    };
-    // `true` — capture, so a scroll inside a pane closes it too, not just the
-    // window's own.
-    window.addEventListener("scroll", close, true);
-    window.addEventListener("resize", close);
-    window.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onDown);
-    return () => {
-      window.removeEventListener("scroll", close, true);
-      window.removeEventListener("resize", close);
-      window.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onDown);
-    };
-  }, [open]);
 
   function choose(next: string) {
     setOpen(false);

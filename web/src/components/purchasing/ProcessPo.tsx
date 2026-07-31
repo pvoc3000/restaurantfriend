@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TextInput } from "@/components/ui/TextInput";
+import { Dialog } from "@/components/ui/Dialog";
 import {
   buildEmailParts,
   downloadBlob,
@@ -307,33 +308,15 @@ export function ProcessPo({
       {/* The compose dialog: what you see is exactly what sends. Floats over
           the PO like the Generate POs confirm — same overlay pattern. */}
       {compose && (
-        <div
-          className="fixed inset-0 z-[60] flex items-start justify-center bg-black/55 p-4 pt-[6vh]"
-          onClick={() => busy === null && closeCompose()}
+        <Dialog
+          title={`Email ${order.po_number}`}
+          ariaLabel={`Email purchase order ${order.po_number}`}
+          onClose={closeCompose}
+          busy={busy !== null}
+          width="max-w-5xl"
+          top="pt-[6vh]"
+          bodyClassName="grid gap-4 p-6 md:grid-cols-2"
         >
-          <div
-            role="dialog"
-            aria-label={`Email purchase order ${order.po_number}`}
-            onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-5xl border-2 border-ink bg-white"
-          >
-            {/* Black title bar, caps — the house dialog edge. */}
-            <div className="flex items-center justify-between gap-4 bg-ink px-6 py-3 text-white">
-              <h2 className="text-[13px] font-bold uppercase tracking-[0.06em]">
-                Email {order.po_number}
-              </h2>
-              <button
-                type="button"
-                onClick={closeCompose}
-                disabled={busy !== null}
-                aria-label="Close"
-                className="px-1 text-[17px] leading-none text-white hover:text-white/70 disabled:opacity-35"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="grid gap-4 p-6 md:grid-cols-2">
             <div className="space-y-2">
             <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
             {(
@@ -428,9 +411,7 @@ export function ProcessPo({
                 </div>
               </object>
             )}
-            </div>
-          </div>
-        </div>
+        </Dialog>
       )}
 
       {error && !compose && <p className="text-accent">{error}</p>}

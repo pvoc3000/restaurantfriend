@@ -7,6 +7,11 @@ import { money } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import type { VendorTotal } from "@/lib/orderGuide";
 import { Checkbox } from "@/components/ui/Checkbox";
+import {
+  Dialog,
+  DIALOG_CANCEL_CLASS,
+  DIALOG_COMMIT_CLASS,
+} from "@/components/ui/Dialog";
 
 /**
  * "Generate POs" (spec §2 step 3): one draft PO per vendor from today's
@@ -143,47 +148,47 @@ export function GeneratePos({
       {trigger(openDialog)}
 
       {open && (
-        <div
-          className="fixed inset-0 z-[60] flex items-start justify-center bg-black/55 p-4 pt-[10vh]"
-          onClick={() => !creating && setOpen(false)}
-        >
-          <div
-            role="dialog"
-            aria-label="Generate purchase orders"
-            onClick={(e) => e.stopPropagation()}
-            // `text-ink` is load-bearing, not decoration: this dialog is a DOM
-            // CHILD of the ActionBar, which sets `text-white` for its own black
-            // bar. Position:fixed moves the box, not its place in the tree, so
-            // colour inherits straight through and any dialog text without an
-            // explicit class renders white on white (the vendor names did).
-            // Setting it once here means no future line can fall into it.
-            className="flex max-h-[85vh] w-full max-w-xl flex-col border-2 border-ink bg-white text-ink"
-          >
-            {/* Black title bar, caps — a dialog is a white rectangle with a
-                2px black edge; no shadow, no radius. */}
-            <div className="flex shrink-0 items-center justify-between gap-4 bg-ink px-6 py-3 text-white">
-              <h2 className="text-[13px] font-bold uppercase tracking-[0.06em]">
-                {created ? "Purchase orders created" : "Generate purchase orders"}
-              </h2>
-              <button
-                type="button"
-                onClick={() => setOpen(false)}
-                disabled={creating}
-                aria-label="Close"
-                className="px-1 text-[17px] leading-none text-white hover:text-white/70 disabled:opacity-35"
+        // The overlay itself — pinned title bar, scrolling body, pinned footer,
+        // and the `text-ink` that keeps this dialog readable despite hanging
+        // off the black ActionBar — is components/ui/Dialog.
+        <Dialog
+          title={created ? "Purchase orders created" : "Generate purchase orders"}
+          onClose={() => setOpen(false)}
+          busy={creating}
+          top="pt-[10vh]"
+          footer={
+            !loading &&
+            (created ? (
+              <Link
+                href="/purchase-orders"
+                className="inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white no-underline hover:bg-neutral-800"
               >
-                ✕
-              </button>
-            </div>
-            {/* Only the BODY scrolls. A dozen vendors made the dialog taller
-                than the window, and the overlay is position:fixed, so the page
-                couldn't scroll to reach "Create N POs" — the one button the
-                dialog exists for sat below the fold, unreachable (found
-                2026-07-27 at 12 vendors in a 900px window: the dialog wanted
-                990px). Title bar and footer are pinned; the vendor list moves
-                between them. */}
-            <div className="min-h-0 flex-1 overflow-y-auto p-6">
-
+                Open purchase orders
+              </Link>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  disabled={creating}
+                  className={DIALOG_CANCEL_CLASS}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={create}
+                  disabled={creating || selected.size === 0}
+                  className={DIALOG_COMMIT_CLASS}
+                >
+                  {creating
+                    ? "Creating…"
+                    : `Create ${selected.size} ${selected.size === 1 ? "PO" : "POs"}`}
+                </button>
+              </>
+            ))
+          }
+        >
             {error && <p className="mt-2 text-sm text-accent">{error}</p>}
 
             {created ? (
@@ -276,45 +281,7 @@ export function GeneratePos({
                 </ul>
               </div>
             )}
-            </div>
-
-            {/* Pinned footer: the dialog's decision is always on screen, however
-                many vendors the day has. */}
-            {!loading && (
-              <div className="flex shrink-0 items-center justify-end gap-4 border-t border-ink px-6 py-4">
-                {created ? (
-                  <Link
-                    href="/purchase-orders"
-                    className="inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white no-underline hover:bg-neutral-800"
-                  >
-                    Open purchase orders
-                  </Link>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setOpen(false)}
-                      disabled={creating}
-                      className="text-[12px] font-semibold uppercase tracking-[0.06em] text-muted hover:text-ink disabled:opacity-35"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="button"
-                      onClick={create}
-                      disabled={creating || selected.size === 0}
-                      className="inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white hover:bg-neutral-800 disabled:bg-neutral-300 disabled:text-white"
-                    >
-                      {creating
-                        ? "Creating…"
-                        : `Create ${selected.size} ${selected.size === 1 ? "PO" : "POs"}`}
-                    </button>
-                  </>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
+        </Dialog>
       )}
     </>
   );
