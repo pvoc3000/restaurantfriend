@@ -60,21 +60,46 @@ function tokens(text: string): Set<string> {
   );
 }
 
-/** Jaccard overlap of the two token sets — 0 to 1. */
-function similarity(a: Set<string>, b: Set<string>): number {
+/**
+ * How much of the SHORTER description the two have in common — not how much of
+ * their combined vocabulary (Jaccard), which is what this used to be.
+ *
+ * The two sides describe the same product at very different lengths. An invoice
+ * prints "CHOC GUITTARD 66% ORGANIC 25 LB"; our catalog line carries FileMaker's
+ * accumulated boilerplate — "CHOC-GUITTARD 66% ORGANIC 25 LB // Guittard // CS
+ * (1*25lbs) // $.98 per oz //". Every one of those extra tokens is a token the
+ * invoice can't match, so Jaccard scored that pair 0.55 and refused an obviously
+ * identical line (found against Mark's real DF01 order, 2026-07-31; the fixtures
+ * all used tidy short descriptions and never caught it).
+ *
+ * Containment asks the right question — "is the short one contained in the long
+ * one?" — and answers 1.0 there.
+ */
+function containment(a: Set<string>, b: Set<string>): number {
   if (a.size === 0 || b.size === 0) return 0;
   let shared = 0;
   for (const w of a) if (b.has(w)) shared += 1;
-  return shared / (a.size + b.size - shared);
+  return shared / Math.min(a.size, b.size);
+}
+
+function sharedCount(a: Set<string>, b: Set<string>): number {
+  let shared = 0;
+  for (const w of a) if (b.has(w)) shared += 1;
+  return shared;
 }
 
 /**
- * Two thirds of the words in common. Set deliberately high: "Bananas, Ripe"
- * and "Bananas, Fresh" share most of their tokens and are different products,
- * so the bar has to sit above ordinary family resemblance. Lines that fall
- * short are reported as unmatched rather than guessed at.
+ * Three quarters of the shorter description, AND at least three words in common.
+ *
+ * The second condition is what keeps containment honest. On its own, containment
+ * is 1.0 for any short description that happens to be a subset of a longer one —
+ * a line reading "Milk" would match "Milk Chocolate Bar" perfectly. Requiring
+ * three shared words means a pair has to agree on something substantive, which
+ * is also what keeps "Bananas, Ripe" away from "Bananas, Fresh" (they share one
+ * word, and it's the one word every banana line has).
  */
-const DESCRIPTION_THRESHOLD = 0.66;
+const DESCRIPTION_THRESHOLD = 0.75;
+const MIN_SHARED_WORDS = 3;
 
 /** What a PO line offers for description matching — its own snapshot first,
  *  since that's the vendor's wording and the invoice is the vendor's document;
@@ -143,7 +168,10 @@ export function matchInvoiceToOrder(
   const candidates: { line: PoLine; invoice: InvoiceLine; score: number }[] = [];
   for (const line of remainingPo) {
     for (const invoice of remainingInvoice) {
-      const score = similarity(poTokens.get(line.id)!, invoiceTokens.get(invoice)!);
+      const a = poTokens.get(line.id)!;
+      const b = invoiceTokens.get(invoice)!;
+      if (sharedCount(a, b) < MIN_SHARED_WORDS) continue;
+      const score = containment(a, b);
       if (score >= DESCRIPTION_THRESHOLD) candidates.push({ line, invoice, score });
     }
   }

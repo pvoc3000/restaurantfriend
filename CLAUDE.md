@@ -329,10 +329,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    this a join rather than a research problem. Formatting differences (case,
    dashes, leading zeros) are normalised away; a SKU that appears twice on
    either side is **left unmatched rather than paired arbitrarily**, and
-   description similarity (a deliberately high 0.66 Jaccard bar, marked `≈` in
-   the UI) is a fallback only for lines with no printed SKU — "Bananas, Ripe"
-   and "Bananas, Fresh" share most of their tokens. Fixture-tested in Node via
-   an esbuild slice, 19 cases, most of them the negative ones.
+   description similarity (marked `≈` in the UI) is a fallback only for lines
+   with no printed SKU. That similarity is **containment of the shorter
+   description, not Jaccard** (fixed 2026-07-31 against Mark's real DF01 data,
+   which the tidy fixtures had missed): an invoice prints "CHOC GUITTARD 66%
+   ORGANIC 25 LB" while our line carries FileMaker's boilerplate —
+   "CHOC-GUITTARD 66% ORGANIC 25 LB // Guittard // CS (1*25lbs) // $.98 per oz
+   //" — and every extra token is one the invoice can't match, so Jaccard
+   scored an identical pair 0.55 and refused it. Containment answers 1.0. Its
+   own failure mode (a short description being a subset of an unrelated longer
+   one — "Milk" inside "Milk Chocolate Bar") is closed by **also requiring three
+   shared words**, which is the same condition that keeps "Bananas, Ripe" away
+   from "Bananas, Fresh". Fixture-tested in Node via an esbuild slice, 23 cases,
+   most of them the negative ones.
    The one bulk action is **Receive n from invoice**, which fills `qty_received`
    on matched lines that have NONE — never overwriting a counted quantity, the
    same rule the PO list's batch mark-received follows. Prices stay per-line:
