@@ -210,7 +210,7 @@ export function ShopSectionsTable({
           placeholder="Search sections"
           aria-label="Search shop sections"
           clearLabel="Clear the search"
-          className="w-72"
+          className="h-9 w-72 text-sm"
         />
         <span className="text-sm text-muted">
           {shown.length === rows.length

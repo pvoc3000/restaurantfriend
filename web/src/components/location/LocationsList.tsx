@@ -187,7 +187,10 @@ export function LocationsList({
           placeholder="Search locations"
           aria-label="Search locations"
           clearLabel="Clear the search"
-          className="w-72"
+          // h-9 and text-sm, like every other list's search box — without them
+          // the input takes the browser's default height and stands taller
+          // than the same field on Vendors, Inventory and the PO list.
+          className="h-9 w-72 text-sm"
         />
         <span className="text-sm text-muted">
           {shown.length === rows.length
