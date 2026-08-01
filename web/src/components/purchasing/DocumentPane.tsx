@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PickList } from "@/components/ui/PickList";
+import { Pane, PaneHeader } from "@/components/ui/Pane";
 import {
   fileSize,
   isImage,
@@ -57,8 +58,12 @@ export function DocumentPane({
   stacked: boolean;
 }) {
   return (
-    <div className="flex h-full flex-col border border-ink">
-      <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 border-b border-ink px-3 py-2">
+    <Pane>
+      {/* One row, fixed height, matching the lines column's band exactly — see
+          `ui/Pane`. The name is the only variable-width thing here, so it's the
+          one that gives way: `min-w-0` is what actually lets a flex child
+          truncate instead of refusing to shrink below its text. */}
+      <PaneHeader>
         {attachments.length > 1 ? (
           <span className="min-w-44 max-w-72 flex-1">
             <PickList
@@ -74,7 +79,7 @@ export function DocumentPane({
           </span>
         ) : (
           <span
-            className="truncate text-[12px] uppercase tracking-[0.12em] text-subtle"
+            className="min-w-0 flex-1 truncate text-[12px] uppercase tracking-[0.12em] text-subtle"
             title={attachment?.file_name ?? ""}
           >
             {attachment?.file_name ?? "No document"}
@@ -91,14 +96,14 @@ export function DocumentPane({
             href={attachment.url}
             target="_blank"
             rel="noreferrer"
-            className="text-[12px] font-semibold uppercase tracking-[0.06em] text-ink"
+            className="shrink-0 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink"
           >
             Open
           </a>
         )}
 
         {canEdit && (
-          <span className="ml-auto flex items-center gap-3">
+          <span className="ml-auto flex shrink-0 items-center gap-3">
             <span className="w-32">
               <PickList
                 value={kind}
@@ -142,7 +147,7 @@ export function DocumentPane({
             if (e.target.files?.length) onFilesPicked(e.target.files);
           }}
         />
-      </div>
+      </PaneHeader>
 
       {/* An EMPTY pane doesn't get the tall box. Stacked on an iPad, a document
           area reserved for a document that isn't there is 700px of nothing to
@@ -161,7 +166,7 @@ export function DocumentPane({
           <Viewer key={attachment.id} attachment={attachment} />
         )}
       </div>
-    </div>
+    </Pane>
   );
 }
 
@@ -183,6 +188,14 @@ function Empty({ canEdit }: { canEdit: boolean }) {
 /**
  * The document itself. Split out purely so the `key` above remounts it —
  * everything below depends on `url` never changing under a working page.
+ *
+ * Nothing here carries a `min-height`. It used to (`min-h-64`, 256px), and on a
+ * short pane — a tall invoice band above it, or a small window — that was 2px
+ * MORE than the space the flex row had to give, so the PDF plugin painted over
+ * the pane's own bottom border and the left column's frame stopped matching the
+ * right's (Mark, 2026-07-31). The container always has a height to fill now:
+ * governed by the measured split row when side by side, `h-[70vh]` when
+ * stacked. `overflow-hidden` on `Pane` is the belt to this braces.
  */
 function Viewer({ attachment }: { attachment: SignedAttachment }) {
   const [url] = useState(() => attachment.url);
@@ -191,7 +204,7 @@ function Viewer({ attachment }: { attachment: SignedAttachment }) {
 
   if (!url) {
     return (
-      <div className="grid h-full min-h-64 place-items-center px-6 text-center">
+      <div className="grid h-full place-items-center px-6 text-center">
         <p className="text-sm text-muted">
           This file couldn&rsquo;t be signed for viewing. Reload the page to try again.
         </p>
@@ -201,7 +214,7 @@ function Viewer({ attachment }: { attachment: SignedAttachment }) {
 
   if (isImage(attachment)) {
     return (
-      <div className="relative h-full min-h-64 overflow-auto bg-neutral-100">
+      <div className="relative h-full overflow-auto bg-neutral-100">
         <div className="absolute right-2 top-2 z-10 flex items-center gap-1 border border-ink bg-white">
           <ToolButton label="Zoom out" onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}>
             −
@@ -234,10 +247,10 @@ function Viewer({ attachment }: { attachment: SignedAttachment }) {
   }
 
   return (
-    <object data={url} type="application/pdf" className="h-full min-h-64 w-full">
+    <object data={url} type="application/pdf" className="h-full w-full">
       {/* Shown by any client without an inline PDF viewer — the Claude browser
           pane is one, and so is iOS Safari past page 1. */}
-      <div className="grid h-full min-h-64 place-items-center px-6 text-center">
+      <div className="grid h-full place-items-center px-6 text-center">
         <p className="text-sm text-muted">
           This browser won&rsquo;t show the PDF inline.{" "}
           <a href={url} target="_blank" rel="noreferrer" className="text-ink">

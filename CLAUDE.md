@@ -401,6 +401,22 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    / `Stacked` and the split fraction persist in localStorage
    (`lib/receivingLayout.ts`, the `chromeStore`/`columnWidths` idiom); the
    control sits with the view, never in the ActionBar.
+   **Both columns are `ui/Pane`** (2026-07-31, after Mark: "the header areas of
+   the two columns are different heights… the lines around each column look like
+   different thickness"). They were two hand-rolled frames and they drifted, the
+   `ui/Dialog` story again. Measured with an invoice open: the document band
+   WRAPPED to a second row (filename + Open + kind + Attach + Remove) at 79px
+   against the lines band's 53px, so the two rules that should read as one line
+   across the screen sat 26px apart. The band is now fixed-height and never
+   wraps — the filename truncates, which also stops the controls jumping when
+   you open a different file. Two consequences worth knowing:
+   the `<object>` carried `min-h-64`, which on a short pane was 2px MORE than the
+   flex row had to give, so the PDF plugin painted over the pane's own bottom
+   border (this is why it only ever looked wrong with a document open) — no
+   min-height now, plus `overflow-hidden` on the frame; and a band that can't
+   wrap has a much wider MIN-CONTENT, which outranks `flex-basis`, so the
+   document column silently took 58% of a 50% split until its wrapper got
+   `min-w-0` (the lines side always had it).
    **Rows are work units, not a `DataTable`** (Mark's call — eight columns of
    live controls at half width would scroll sideways): identity (name, SKU ·
    brand · description, the `≈` and `?` markers with their original tooltips),
@@ -760,6 +776,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/ActionBar` + `ActionBarButton` | a button row | screen-level COMMANDS only (not view controls) |
   | `ui/PageLoading` | a spinner | the body of every `loading.tsx` |
   | `ui/ProgressBand` | a word in a button's label | something slow on a screen that's ALREADY painted (an invoice read is 30s+); same indeterminate bar, never a Dialog — the work behind it must stay usable |
+  | `ui/Pane` + `PaneHeader` | a bordered div with a header band you style yourself | a framed column standing beside another (receiving's document + lines): one FIXED-height band so the two rules line up, and `overflow-hidden` so nothing paints over the frame |
   | `ui/BackToTop` | — | long lists; already on the guide |
   | `components/Breadcrumbs` | a back link | every detail screen, unconditionally |
 

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ActionBar, ActionBarButton } from "@/components/ui/ActionBar";
 import { ProgressBand } from "@/components/ui/ProgressBand";
+import { Pane, PaneHeader } from "@/components/ui/Pane";
 import { BackToTop } from "@/components/ui/BackToTop";
 import type { AttachmentKind, SignedAttachment } from "@/lib/attachments";
 import { matchInvoiceToOrder } from "@/lib/invoiceMatch";
@@ -440,10 +441,10 @@ export function Receiving({
   // their own pane rather than dragging the whole page (Mark, 2026-07-31). The
   // header band stays put while the rows move under it.
   const linesPane = (
-    <div className="flex h-full flex-col border border-ink">
-      {/* Same 1px rule as the document pane's toolbar — these two sit side by
-          side and a 2px here read as a mistake. */}
-      <div className="flex shrink-0 flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-ink px-3 py-2">
+    <Pane>
+      {/* The same band as the document column's — one component, so the two
+          rules across the top of the screen can't drift apart again. */}
+      <PaneHeader>
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           {lines.length} {lines.length === 1 ? "line" : "lines"}
         </h2>
@@ -451,11 +452,11 @@ export function Receiving({
           {lines.filter((l) => l.qty_received !== null).length} counted
         </span>
         {canReceive && (
-          <span className="ml-auto">
+          <span className="ml-auto shrink-0">
             <AddPoLines order={order} orgId={orgId} lines={lines} />
           </span>
         )}
-      </div>
+      </PaneHeader>
       {/* min-h-0 is what lets a flex child actually shrink and scroll — without
           it the ul takes its content height and overflows the box instead. */}
       <ul className="min-h-0 flex-1 overflow-y-auto">
@@ -479,7 +480,7 @@ export function Receiving({
       {lines.length === 0 && (
         <p className="px-3 py-6 text-sm text-muted">This order has no lines.</p>
       )}
-    </div>
+    </Pane>
   );
 
   return (
@@ -607,7 +608,14 @@ export function Receiving({
               // An EMPTY pane still matches the column when split (that's the
               // point), but must not reserve 70vh of nothing to scroll past
               // when stacked.
-              className={`shrink-0 grow-0 max-xl:basis-auto ${
+              //
+              // `min-w-0` is not decoration. A flex item's automatic minimum
+              // size is its MIN-CONTENT, which outranks `flex-basis`, and the
+              // header's row of controls made that 780px — so the document
+              // column silently took 58% of a 50% split the moment its band
+              // stopped wrapping. The lines side has carried the same class
+              // since it was written.
+              className={`min-w-0 shrink-0 grow-0 max-xl:basis-auto ${
                 layout === "split" ? "h-full" : "xl:h-full"
               } ${shown ? "max-xl:h-[70vh]" : "max-xl:h-auto"}`}
             >
