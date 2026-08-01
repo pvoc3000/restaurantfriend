@@ -1177,7 +1177,11 @@ weekday column, and 003 then silently made it per-vendor-item.
   dependency for a single icon. An EYE and not the three bars a first pass drew,
   because this menu only ever shows and hides, which is what an eye says. State
   is the button's ink (muted at rest, black when something is hidden), not a
-  count beside it — that would be a second thing to read.
+  count beside it — that would be a second thing to read. **30px at wght 300**
+  in a 38px button (Mark's numbers, 2026-07-31): a Material weight is a
+  DIFFERENT PATH, not a `stroke-width`, so changing it means fetching the
+  `wght300` artwork — and the button has to grow with the glyph or the hover
+  wash sits on the artwork instead of around it.
   `DataTable` reads the hidden set off its own
   `storageKey`, so a table gets this by having a key rather than by opting in,
   and it composes with `compactBelow`: the narrow-screen set still sheds, and

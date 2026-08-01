@@ -67,7 +67,9 @@ export function ColumnsMenu<T>({
             ? `Columns — ${offered.length - hiddenHere} of ${offered.length} shown`
             : "Columns — choose which ones this list shows"
         }
-        className={`grid h-8 w-8 shrink-0 place-items-center transition-colors hover:bg-neutral-100 hover:text-ink ${
+        // 38px square around a 30px glyph: the button has to grow with the
+        // icon or the hover wash sits on the artwork instead of around it.
+        className={`grid h-[38px] w-[38px] shrink-0 place-items-center transition-colors hover:bg-neutral-100 hover:text-ink ${
           hiddenHere > 0 ? "text-ink" : "text-muted"
         }`}
       >
@@ -127,13 +129,21 @@ export function ColumnsMenu<T>({
  * state in a hollow third bar; the eye says "visibility" on its own, so the
  * state moved to the button's ink instead (muted at rest, black when something
  * is hidden), which is the app's usual way of saying a view is narrowed.
+ *
+ * **30px at wght 300** (Mark, 2026-07-31 — it shipped at 20/400). The weight is
+ * a DIFFERENT PATH, not a stroke-width: Material ships each weight as its own
+ * outline, so changing it means fetching the `wght300` artwork. Bigger and
+ * lighter is also the pair that works — 30px at 400 would have been the
+ * heaviest mark on the screen, sitting a few pixels above a 2px header rule.
+ * The optical size stays 24 (a 960-unit grid), which is the one built for
+ * reading at this size.
  */
 function ColumnsIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 -960 960 960" aria-hidden="true">
+    <svg width="30" height="30" viewBox="0 -960 960 960" aria-hidden="true">
       <path
         fill="currentColor"
-        d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v333q-19-11-39-20t-41-16v-137H520v137q-46 14-86 40t-74 63H200v160h82q11 22 22 42t24 38H200Zm0-320h240v-160H200v160Zm0-240h560v-80H200v80Zm280 200Zm0 0Zm0 0Zm0 0ZM640-40q-91 0-168-48T360-220q35-84 112-132t168-48q91 0 168 48t112 132q-35 84-112 132T640-40Zm107.5-106q50.5-26 82.5-74-32-48-82.5-74T640-320q-57 0-107.5 26T450-220q32 48 82.5 74T640-120q57 0 107.5-26Zm-150-31.5Q580-195 580-220t17.5-42.5Q615-280 640-280t42.5 17.5Q700-245 700-220t-17.5 42.5Q665-160 640-160t-42.5-17.5Z"
+        d="M212.31-140Q182-140 161-161q-21-21-21-51.31v-535.38Q140-778 161-799q21-21 51.31-21h535.38Q778-820 799-799q21 21 21 51.31V-427q-14.39-7.92-29.39-14.61-15-6.7-30.61-11.77v-151.24H510v157.78q-32.92 10.92-62.15 29.8-29.23 18.89-54.39 45.12H200v159.61q0 5.39 3.46 8.85t8.85 3.46h86.61q8.7 16.61 17.58 31.42 8.89 14.81 18.81 28.58h-123ZM200-431.92h250v-172.7H200v172.7Zm0-232.69h560v-83.08q0-5.39-3.46-8.85t-8.85-3.46H212.31q-5.39 0-8.85 3.46t-3.46 8.85v83.08ZM480-480Zm0 0Zm0 0Zm0 0ZM642.69-64.62q-82.15 0-151.65-42.8-69.5-42.81-105.65-116.43 36.15-73.61 105.65-116.42t151.65-42.81q82.16 0 151.66 42.81Q863.84-297.46 900-223.85q-36.16 73.62-105.65 116.43-69.5 42.8-151.66 42.8ZM748.85-151q49.92-26.39 82.69-72.85-32.77-46.46-82.69-72.84-49.93-26.39-106.16-26.39t-106.15 26.39q-49.92 26.38-82.69 72.84 32.77 46.46 82.69 72.85 49.92 26.38 106.15 26.38 56.23 0 106.16-26.38Zm-141.54-37.46q-14.62-14.62-14.62-35.39 0-20.77 14.62-35.38 14.61-14.62 35.38-14.62 20.77 0 35.39 14.62 14.61 14.61 14.61 35.38 0 20.77-14.61 35.39-14.62 14.61-35.39 14.61-20.77 0-35.38-14.61Z"
       />
     </svg>
   );
