@@ -1145,7 +1145,15 @@ weekday column, and 003 then silently made it per-vendor-item.
   Mark, 2026-07-31 — FMP's first/previous/next/last book: "especially helpful in
   detail views to go to the next record in the list rather than back to the list
   and then to the next record"). The buttons sit in the `Breadcrumbs` row's new
-  `trailing` slot, which is the one row every detail body has.
+  `trailing` slot, which is the one row every detail body has, and wear
+  **Material Symbols Outlined `first_page` / `chevron_left` / `chevron_right` /
+  `last_page` at wght 300** — the same source and weight as the Columns eye
+  (Mark, 2026-07-31, on spotting that these had shipped as typed characters
+  `|‹ ‹ › ›|` while the eye was real artwork). Their boxes are `1.5px`, heavier
+  than a hairline and carried by the DEAD state too: a border that changed
+  width between live and dead would shift the other three buttons a pixel as
+  you reach an end, which is the one thing a cluster you press repeatedly must
+  never do.
   **The LIST publishes what it is showing** — the rows in the order they're on
   screen, carrying the very hrefs its own links use — and the detail screen
   looks that set up by the path of the crumb that led it there (`crumbPath`).
