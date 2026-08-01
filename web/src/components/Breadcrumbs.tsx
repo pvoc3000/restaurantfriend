@@ -6,14 +6,28 @@ import type { Crumb } from "@/lib/breadcrumbs";
  * link; everything before it is, so any step is one click away — including the
  * vendor you came through, which the browser Back button is otherwise the only
  * way to reach.
+ *
+ * `trailing` is the row's right-hand end, and it exists for the record book
+ * (`ui/RecordNav`). The two belong on one line: this trail says which pile
+ * you're in, the book says where in the pile — and putting the book anywhere
+ * else would have it move about from screen to screen, since no two detail
+ * bodies share a first row.
  */
-export function Breadcrumbs({ trail, current }: { trail: Crumb[]; current: string }) {
+export function Breadcrumbs({
+  trail,
+  current,
+  trailing,
+}: {
+  trail: Crumb[];
+  current: string;
+  trailing?: React.ReactNode;
+}) {
   return (
     <nav
       aria-label="Breadcrumb"
-      className="text-[12px] uppercase tracking-[0.12em]"
+      className="flex items-center gap-4 text-[12px] uppercase tracking-[0.12em]"
     >
-      <ol className="flex flex-wrap items-center gap-3 text-subtle">
+      <ol className="flex min-w-0 flex-1 flex-wrap items-center gap-3 text-subtle">
         {/* Keyed by POSITION, not href. A trail follows the route you took, and
             a route can legitimately revisit a page — vendor → item → that same
             vendor — so hrefs are not unique and keying on one makes React drop
@@ -36,6 +50,7 @@ export function Breadcrumbs({ trail, current }: { trail: Crumb[]; current: strin
           {current}
         </li>
       </ol>
+      {trailing}
     </nav>
   );
 }

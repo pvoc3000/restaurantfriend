@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { money } from "@/lib/catalog";
+import { usePublishRecordSet } from "@/lib/recordSet";
 import { makeComparator, type SortDir, type SortValue } from "@/lib/tableSort";
 import {
   vendorDetailHref,
@@ -12,6 +13,7 @@ import {
   type VendorSortKey,
 } from "@/lib/vendorFilters";
 import { DataTable, type DataColumn } from "./DataTable";
+import { ColumnsMenu } from "./ColumnsMenu";
 import { VendorActiveToggle } from "@/components/VendorActiveToggle";
 import { TextInput } from "@/components/ui/TextInput";
 import type { VendorRow } from "@/app/(app)/vendors/page";
@@ -144,6 +146,7 @@ export function VendorsList({
         key: "name",
         label: "Name",
         width: 265,
+        pinned: true,
         sortValue: (v) => sortValue(v, "name"),
         render: (v) => (
           <Link
@@ -225,6 +228,15 @@ export function VendorsList({
     [visible, filters.sort, filters.dir]
   );
 
+  // The found set, for the record book on vendor detail (lib/recordSet).
+  usePublishRecordSet(
+    "/vendors",
+    useMemo(
+      () => sorted.map((v) => ({ id: v.id, href: vendorDetailHref(v.id, filters) })),
+      [sorted, filters]
+    )
+  );
+
 
   return (
     <div className="space-y-4">
@@ -240,6 +252,7 @@ export function VendorsList({
         <span className="ml-auto text-xs text-faint">
           Drag the dividers between column headers to resize
         </span>
+        <ColumnsMenu storageKey={WIDTHS_STORAGE_KEY} columns={columns} />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

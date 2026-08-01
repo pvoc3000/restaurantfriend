@@ -7,8 +7,9 @@ import {
   type CatalogVendorItem,
 } from "@/lib/catalog";
 import type { RawSearchParams } from "@/lib/itemFilters";
-import { currentQuery, parseTrail } from "@/lib/breadcrumbs";
+import { crumbPath, currentQuery, parseTrail } from "@/lib/breadcrumbs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { RecordNav } from "@/components/ui/RecordNav";
 import { ItemFields } from "@/components/catalog/ItemFields";
 import { ItemLocationRows } from "@/components/catalog/ItemLocationRows";
 import { VendorItemsTable } from "@/components/catalog/VendorItemsTable";
@@ -88,7 +89,12 @@ export async function ItemDetail({
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs trail={trail} current={row.name} />
+      {/* The book walks the Inventory list's found set — see ui/RecordNav. */}
+      <Breadcrumbs
+        trail={trail}
+        current={row.name}
+        trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
+      />
 
       <ItemFields item={row} categories={categories} />
 

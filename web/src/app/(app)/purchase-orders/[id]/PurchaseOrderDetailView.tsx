@@ -3,8 +3,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import type { RawSearchParams } from "@/lib/itemFilters";
-import { currentQuery, parseTrail, withFrom } from "@/lib/breadcrumbs";
+import { crumbPath, currentQuery, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { RecordNav } from "@/components/ui/RecordNav";
 import {
   fetchPoWithLines,
   fetchSignedAttachments,
@@ -71,7 +72,11 @@ export async function PurchaseOrderDetailView({
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs trail={trail} current={order.po_number} />
+      <Breadcrumbs
+        trail={trail}
+        current={order.po_number}
+        trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
+      />
 
       {lineError ? (
         <p className="text-sm text-accent">Could not load order lines: {lineError}</p>

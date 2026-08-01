@@ -44,6 +44,21 @@ function trimTrail(href: string, depth: number): string {
   return trimmed ? `${path}?${trimmed}` : path;
 }
 
+/**
+ * The path a crumb points at, without its query — which is the key its list
+ * publishes a found set under (`lib/recordSet`), and so how a detail screen
+ * works out which pile of records it's sitting in.
+ *
+ * It lives HERE rather than beside the record set because the callers are
+ * server components: `lib/recordSet` is a "use client" module, and a server
+ * component can import a function from one but never call it.
+ */
+export function crumbPath(crumb: Crumb | undefined): string | null {
+  if (!crumb) return null;
+  const path = crumb.href.split("?")[0];
+  return path.startsWith("/") ? path : null;
+}
+
 /** Stamp `from` onto a link so the destination knows where you came from. */
 export function withFrom(href: string, from: Crumb): string {
   const [path, query = ""] = href.split("?");

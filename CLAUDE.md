@@ -777,6 +777,8 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/PageLoading` | a spinner | the body of every `loading.tsx` |
   | `ui/ProgressBand` | a word in a button's label | something slow on a screen that's ALREADY painted (an invoice read is 30s+); same indeterminate bar, never a Dialog — the work behind it must stay usable |
   | `ui/Pane` + `PaneHeader` | a bordered div with a header band you style yourself | a framed column standing beside another (receiving's document + lines): one FIXED-height band so the two rules line up, and `overflow-hidden` so nothing paints over the frame |
+  | `ui/RecordNav` + `lib/recordSet` | going back to the list for the next record | FMP's book on a detail screen: the LIST publishes its found set, the detail walks it |
+  | `catalog/ColumnsMenu` | a bespoke checklist | show/hide columns on a list; pair it with `DataColumn.pinned` on the column that IS the row |
   | `ui/BackToTop` | — | long lists; already on the guide |
   | `components/Breadcrumbs` | a back link | every detail screen, unconditionally |
 
@@ -1139,6 +1141,38 @@ weekday column, and 003 then silently made it per-vendor-item.
   736px truncates dates to "2026-0…" and amounts to "$1,119.…". It fits and
   sticks, which it never did before, but a portrait iPad wants a second, deeper
   tier — not built.
+- **A detail screen walks the found set** (`lib/recordSet` + `ui/RecordNav`,
+  Mark, 2026-07-31 — FMP's first/previous/next/last book: "especially helpful in
+  detail views to go to the next record in the list rather than back to the list
+  and then to the next record"). The buttons sit in the `Breadcrumbs` row's new
+  `trailing` slot, which is the one row every detail body has.
+  **The LIST publishes what it is showing** — the rows in the order they're on
+  screen, carrying the very hrefs its own links use — and the detail screen
+  looks that set up by the path of the crumb that led it there (`crumbPath`).
+  That's the whole design: filters, search, sort and grouping are all accounted
+  for without this ever knowing they exist, and a list that filters in the
+  browser (Inventory, 790 rows) needs the same three lines as one that filters
+  in Postgres. Measured: `2 of 6` inside a search for "flour", `1 of 8` under
+  the PO list's Sent chip.
+  **In memory, like `scrollMemory`, and for the same reason** — the (app) layout
+  survives soft navigation, so list → detail → next → next is one page load. A
+  hard load has no found set and the book simply doesn't appear; storing it
+  would mean opening a pasted URL on Monday and being told you're "4 of 61" of
+  Friday's search. Publishers today: `/items`, `/vendors`, `/purchase-orders`.
+  Vendor-item detail is wired and stays blank until something publishes for it —
+  its only inbound link is the order guide, whose "set" would be that day's
+  walk lines rather than a list of records.
+- **Every list can hide columns** (`catalog/ColumnsMenu` + `lib/columnVisibility`,
+  Mark, 2026-07-31). A Columns button beside each list's filters — never the
+  ActionBar, which carries commands — opening the same `lib/anchoredPanel` panel
+  as `PickList` and `RowMenu`. `DataTable` reads the hidden set off its own
+  `storageKey`, so a table gets this by having a key rather than by opting in,
+  and it composes with `compactBelow`: the narrow-screen set still sheds, and
+  yours comes out on top of it. Stored as the HIDDEN keys, not the visible ones
+  — a column added next month then shows up for everyone instead of being
+  silently missing for anyone who ever opened the menu. `pinned` keeps the
+  column that IS the row (Item, Name, Display name, PO number) out of the menu;
+  control columns have no label to offer.
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server

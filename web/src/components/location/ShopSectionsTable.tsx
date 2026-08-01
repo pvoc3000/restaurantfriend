@@ -7,6 +7,9 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { TextInput } from "@/components/ui/TextInput";
 import { AddShopSection } from "./AddShopSection";
+import { ColumnsMenu } from "@/components/catalog/ColumnsMenu";
+
+const SECTION_WIDTHS_KEY = "rf.shopSections.columnWidths.v1";
 
 export type ShopSectionRow = {
   id: string;
@@ -151,6 +154,7 @@ export function ShopSectionsTable({
       key: "display_name",
       label: "Display name",
       width: 340,
+      pinned: true,
       sortValue: (r) => r.display_name,
       render: (r) =>
         editable ? (
@@ -214,6 +218,9 @@ export function ShopSectionsTable({
             ? `${rows.length} at ${locationCode}`
             : `${shown.length} of ${rows.length}`}
         </span>
+        <span className="ml-auto">
+          <ColumnsMenu storageKey={SECTION_WIDTHS_KEY} columns={columns} />
+        </span>
       </div>
 
       {failed && <p className="text-sm text-accent">Could not delete: {failed}</p>}
@@ -227,7 +234,7 @@ export function ShopSectionsTable({
         // ("31 Storage - R1 S1"), so the identity survives without them.
         // My choice, not Mark's — the other three lists' sets are his.
         compactBelow={1280}
-        storageKey="rf.shopSections.columnWidths.v1"
+        storageKey={SECTION_WIDTHS_KEY}
         defaultSort={{ key: "sort_order" }}
         empty={
           <p className="text-sm text-muted">

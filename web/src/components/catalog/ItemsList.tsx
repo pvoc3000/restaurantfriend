@@ -15,7 +15,9 @@ import {
   type StaleFilter,
 } from "@/lib/itemFilters";
 import { makeComparator, type SortDir, type SortValue } from "@/lib/tableSort";
+import { usePublishRecordSet } from "@/lib/recordSet";
 import { DataTable, type DataColumn } from "./DataTable";
+import { ColumnsMenu } from "./ColumnsMenu";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { TextInput } from "@/components/ui/TextInput";
 import type { ItemRow } from "@/app/(app)/items/page";
@@ -139,6 +141,17 @@ export function ItemsList({
   );
 
 
+  // The found set, in the order it's on screen, for the record book on item
+  // detail (lib/recordSet). `sorted`, not `items`: what the book walks has to
+  // be what you can see, filters, search and sort included.
+  usePublishRecordSet(
+    "/items",
+    useMemo(
+      () => sorted.map((i) => ({ id: i.id, href: itemDetailHref(i.id, filters) })),
+      [sorted, filters]
+    )
+  );
+
   const staleCounts = useMemo(() => {
     const c: Record<string, number> = {};
     for (const i of items) c[i.stale] = (c[i.stale] ?? 0) + 1;
@@ -242,6 +255,8 @@ export function ItemsList({
       key: "name",
       label: "Item",
       width: 310,
+      // The column that IS the row, and the way into the record.
+      pinned: true,
       sortValue: (item) => sortValue(item, "name"),
       render: (item) => (
         <>
@@ -330,6 +345,9 @@ export function ItemsList({
         <span className="ml-auto text-xs text-faint">
           Drag the dividers between column headers to resize
         </span>
+        {/* A view control, so it sits with the list rather than in the
+            ActionBar (CLAUDE.md). */}
+        <ColumnsMenu storageKey={WIDTHS_STORAGE_KEY} columns={columns} />
       </div>
 
       {/* Search + category */}

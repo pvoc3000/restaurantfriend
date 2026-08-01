@@ -3,9 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { VENDOR_ITEM_SELECT } from "@/lib/catalog";
 import type { RawSearchParams } from "@/lib/itemFilters";
-import { currentQuery, parseTrail } from "@/lib/breadcrumbs";
+import { crumbPath, currentQuery, parseTrail } from "@/lib/breadcrumbs";
 import { staleBucket } from "@/lib/lastOrdered";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { RecordNav } from "@/components/ui/RecordNav";
 import { VendorLocationsTable } from "@/components/catalog/VendorLocationsTable";
 import {
   VendorItemsTable,
@@ -134,7 +135,11 @@ export async function VendorDetail({
 
   return (
     <div className="space-y-6">
-      <Breadcrumbs trail={trail} current={v.name} />
+      <Breadcrumbs
+        trail={trail}
+        current={v.name}
+        trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
+      />
 
       <div className="flex flex-wrap items-baseline gap-3">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">{v.name}</h1>

@@ -3,8 +3,9 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { money } from "@/lib/catalog";
 import type { RawSearchParams } from "@/lib/itemFilters";
-import { currentQuery, parseTrail } from "@/lib/breadcrumbs";
+import { crumbPath, currentQuery, parseTrail } from "@/lib/breadcrumbs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { RecordNav } from "@/components/ui/RecordNav";
 import {
   VendorItemFields,
   type VendorItemRecord,
@@ -173,7 +174,11 @@ export async function VendorItemDetail({
           fields below: duplicate and delete act on the WHOLE row, and putting
           them among the per-field editors would read as editing one of them. */}
       <div className="flex items-start justify-between gap-4">
-        <Breadcrumbs trail={trail} current={label} />
+        <Breadcrumbs
+          trail={trail}
+          current={label}
+          trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
+        />
         {["owner", "admin", "purchaser"].includes(session.membership.role) && (
           <VendorItemActions
             vendorItemId={id}

@@ -4,6 +4,7 @@ import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
 import { usePathname } from "next/navigation";
 import { makeComparator, nextSortDir, type SortDir, type SortValue } from "@/lib/tableSort";
 import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
+import { useColumnVisibility } from "@/lib/columnVisibility";
 import { useScrollMemory } from "@/lib/scrollMemory";
 import {
   STICKY_HEAD_ROW,
@@ -41,6 +42,14 @@ export type DataColumn<T> = {
    * standing in the shop; it's still on the record's own screen.
    */
   hideWhenCompact?: boolean;
+  /**
+   * Keep this column out of the Columns menu, so the reader can't hide it.
+   *
+   * For the column that IS the row — the item's name, the PO number — and for
+   * control columns (select-all, the ⋯ menu), which carry no label to offer
+   * anyway. Everything else is the reader's business.
+   */
+  pinned?: boolean;
 };
 
 /**
@@ -159,9 +168,15 @@ export function DataTable<T>({
   // 0 always matches, so a table without a compact set still calls the hook.
   const wide = useViewportAtLeast(compactBelow ?? 0);
   const compact = compactBelow !== undefined && !wide;
-  const visibleColumns = compact
-    ? columns.filter((col) => !col.hideWhenCompact)
-    : columns;
+  // Two independent reasons a column can be absent, and they compose: the
+  // window is too narrow for it (compact), or the reader has unchecked it in
+  // the Columns menu (lib/columnVisibility, keyed by this same storageKey, so a
+  // table gets this by having a key rather than by opting in).
+  const { hidden } = useColumnVisibility(storageKey);
+  const visibleColumns = columns.filter(
+    (col) =>
+      !(compact && col.hideWhenCompact) && !(hidden.has(col.key) && !col.pinned)
+  );
 
   const [internalSort, setInternalSort] = useState<{ key: string; dir: SortDir } | null>(
     defaultSort ? { key: defaultSort.key, dir: defaultSort.dir ?? "asc" } : null

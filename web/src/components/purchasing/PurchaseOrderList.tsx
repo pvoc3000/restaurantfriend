@@ -32,9 +32,14 @@ import {
 } from "@/lib/poFilters";
 import { makeComparator, type SortValue } from "@/lib/tableSort";
 import { withFrom } from "@/lib/breadcrumbs";
+import { usePublishRecordSet } from "@/lib/recordSet";
+import { ColumnsMenu } from "@/components/catalog/ColumnsMenu";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
 import type { PoListRow } from "@/app/(app)/purchase-orders/page";
+
+// Widths and hidden columns share this key — one table, one identity.
+const PO_WIDTHS_KEY = "rf.purchaseOrders.columnWidths.v2";
 
 function sortValue(po: PoListRow, key: PoSortKey): SortValue {
   switch (key) {
@@ -136,6 +141,15 @@ export function PurchaseOrderList({
         })
       ),
     [visible, filters.sort, filters.dir]
+  );
+
+  // The found set, for the record book on PO detail (lib/recordSet).
+  usePublishRecordSet(
+    "/purchase-orders",
+    useMemo(
+      () => sorted.map((po) => ({ id: po.id, href: poDetailHref(po.id, filters) })),
+      [sorted, filters]
+    )
   );
 
   const pageTotal = useMemo(
@@ -409,6 +423,7 @@ export function PurchaseOrderList({
     {
       key: "po_number",
       label: "PO number",
+      pinned: true,
       // 170 → 155. See the note on the table's storageKey: the eleven columns
       // summed to 1393 against 1344 of content, so this list was the one that
       // couldn't have sticky column labels. A PO number is short and fixed
@@ -719,6 +734,9 @@ export function PurchaseOrderList({
         >
           <span className="text-subtle">Select all shown</span>
         </Checkbox>
+        <span className="ml-auto">
+          <ColumnsMenu storageKey={PO_WIDTHS_KEY} columns={columns} />
+        </span>
       </div>
 
       <DataTable
@@ -737,7 +755,7 @@ export function PurchaseOrderList({
         // columns is too many to read on a tablet; the table fits either way
         // now that the columns are proportional.
         compactBelow={1280}
-        storageKey="rf.purchaseOrders.columnWidths.v2"
+        storageKey={PO_WIDTHS_KEY}
         sort={{ key: filters.sort, dir: filters.dir }}
         onSortChange={(next) =>
           update({ sort: next.key as PoSortKey, dir: next.dir })
