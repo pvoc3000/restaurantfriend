@@ -75,6 +75,26 @@ export function ReceivingRow({
     onSetReceived(next);
   }
 
+  // Money to read, the raw number to type — PO detail's own price cell, so the
+  // two screens write the same column the same way. Fixed-width because
+  // `InlineValue` renders `w-full`: without a box to sit in it would stretch
+  // across the band and put the arrow at the far edge of the row.
+  const priceCell = canReceive ? (
+    <span className="w-24 shrink-0">
+      <InlineValue
+        table="purchase_order_items"
+        id={line.id}
+        column="unit_price"
+        value={line.unit_price}
+        kind="number"
+        className="text-ink"
+        format={(v) => money(Number(v))}
+      />
+    </span>
+  ) : (
+    <span className="text-ink">{money(line.unit_price)}</span>
+  );
+
   return (
     <li
       className={`border-b border-hairline px-3 py-3 ${
@@ -224,18 +244,38 @@ export function ReceivingRow({
             at each stage: stage 1 replaces the order's price with the invoice's,
             stage 2 replaces the CATALOG's with the order's. Printing the line
             price on both sides — which is what stage 2 did at first — reads as
-            "$51.23 → $51.23" and says nothing. */}
-        <span className="tabular-nums text-muted">
-          {action?.stage === "vendor" && (
-            <span className="mr-1 text-[11px] uppercase tracking-[0.12em] text-subtle">
-              Catalog
-            </span>
-          )}
-          {money(action ? action.current : line.unit_price)}
-          {action && (
+            "$51.23 → $51.23" and says nothing.
+
+            The LINE's price is typed straight in (Mark, 2026-07-31) — the two
+            buttons only ever offered the two prices the app already knew, and a
+            delivery produces plenty it doesn't: a catch-weight line the reader
+            got wrong (the `?` beside this very number), a credit agreed at the
+            door, a price nobody billed at all. The received quantity has always
+            been typeable and the money beside it wasn't, which is the asymmetry.
+            It's the same cell and the same column PO detail edits, so a price
+            corrected here and a price corrected at the desk are one act.
+
+            Which SIDE of the arrow it sits on follows what the stage is
+            replacing, so the editable number is always the line's own. */}
+        <span className="flex items-center gap-1 tabular-nums text-muted">
+          {action?.stage === "vendor" ? (
             <>
-              {" → "}
-              <span className="text-ink">{money(action.price)}</span>
+              <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+                Catalog
+              </span>
+              <span>{money(action.current)}</span>
+              <span aria-hidden="true">→</span>
+              {priceCell}
+            </>
+          ) : (
+            <>
+              {priceCell}
+              {action && (
+                <>
+                  <span aria-hidden="true">→</span>
+                  <span className="text-ink">{money(action.price)}</span>
+                </>
+              )}
             </>
           )}
         </span>

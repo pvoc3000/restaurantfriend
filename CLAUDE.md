@@ -450,6 +450,20 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    that fills itself would make merely OPENING an order look like someone had
    checked the delivery — which is what the PO list's Received column exists to
    tell you. The label is **"Invoiced"**, to rhyme with "Ordered".
+   **The receiving price is TYPED, not only accepted** (Mark, 2026-07-31: "you
+   should be able to manually edit the price in the invoice receiving panel").
+   The two buttons only ever offered the two prices the app already knew, and a
+   delivery produces plenty it doesn't — a catch-weight line the reader got wrong
+   (the `?` sits beside that very number), a credit agreed at the door, a line
+   that went out with no price at all. The received quantity had always been
+   typeable and the money beside it hadn't. It's `InlineValue` on
+   `purchase_order_items.unit_price` — the same cell and column PO detail edits,
+   so a correction at the delivery and one at the desk are one act — and it sits
+   on whichever SIDE of the arrow the stage isn't replacing, so the editable
+   number is always the LINE's: `[price] → $invoice` at stage 1,
+   `Catalog $x → [price]` at stage 2. Editing re-derives `priceAction`, so
+   typing what you were actually billed is another way to arrive at
+   "Update vendor".
    **Manual match** (Mark, 2026-07-31, after BakeMark 112-181120-01): vendors
    renumber items, so no matcher catches them all. A row with no invoice match
    offers `Match…` when the invoice has unpaired lines; picking one **writes the
