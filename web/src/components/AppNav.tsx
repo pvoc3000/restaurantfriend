@@ -58,9 +58,8 @@ export function AppNav({
   initialMemory: NavMemory;
   locationCode: string | null;
   /** Row 1 of the right-hand column: things that change what you're looking at
-   *  — home, settings, which location, and the chrome collapse. Composed on the
-   *  server so LocationSwitcher and the signOut form action don't have to cross
-   *  into this client component. */
+   *  — home, settings and the chrome collapse. Composed on the server so the
+   *  signOut form action doesn't have to cross into this client component. */
   controls: React.ReactNode;
   /** Row 2: who you're signed in as, and leaving. */
   identity: React.ReactNode;

@@ -26,8 +26,9 @@ export default async function AppLayout({
           its collapsed strip and the ActionBar carry the SAME pair, so the four
           black-and-white bands stay aligned at every width. */}
       <main className="flex-1 px-4 py-8 xl:px-12">
-        {/* The switcher lists closed locations too, so every screen but
-            /location has to answer for one. See InactiveLocationGate. */}
+        {/* You can deactivate the shop you're standing in, right from the
+            Locations list — so every screen but /locations has to answer for a
+            closed one. See InactiveLocationGate. */}
         <InactiveLocationGate
           code={session.activeLocation?.code ?? null}
           isActive={session.activeLocation?.is_active ?? true}

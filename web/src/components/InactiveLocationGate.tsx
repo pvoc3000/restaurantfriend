@@ -5,20 +5,29 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
-/** The one screen an inactive location still answers for. */
-const LOCATION_ROUTE = "/location";
+const LOCATIONS_ROUTE = "/locations";
+
+/** The screens an inactive location still answers for: its own record, and the
+ *  list. BOTH — with the switcher gone the list is the only way to another
+ *  location, so gating it would strand you here. */
+function isLocationRoute(pathname: string): boolean {
+  return pathname === LOCATIONS_ROUTE || pathname.startsWith(`${LOCATIONS_ROUTE}/`);
+}
 
 /**
- * What every screen except `/location` says while you're working at a closed
- * shop (Mark, 2026-07-30: "nothing works for inactive locations except the
- * location detail page, allowing the user to activate the location").
+ * What every screen except the Locations ones says while you're working at a
+ * closed shop (Mark, 2026-07-30: "nothing works for inactive locations except
+ * the location detail page, allowing the user to activate the location").
  *
- * The switcher lists all six locations so DF03–05 can be maintained at all.
- * That makes a closed shop selectable as working context, and every
- * location-scoped screen would then render as an inexplicably empty table —
- * every query filters by `activeLocation.id` and simply matches nothing.
- * Nothing BREAKS; it just looks broken. This turns that into a sentence and an
- * offer.
+ * Every location-scoped screen would otherwise render as an inexplicably empty
+ * table — every query filters by `activeLocation.id` and simply matches
+ * nothing. Nothing BREAKS; it just looks broken. This turns that into a
+ * sentence and an offer.
+ *
+ * Still load-bearing after "only active locations can be worked at" (Mark,
+ * 2026-08-01): that rule closes the ENTRY, not the exit. The Active toggle now
+ * sits on the Locations list, so deactivating the very shop you're standing in
+ * is one tap away — and a legacy `last_active_location_id` can put you here too.
  *
  * One component, one wiring line in the (app) layout. If it turns out to be in
  * the way, deleting both restores the empty tables and nothing else.
@@ -37,7 +46,7 @@ export function InactiveLocationGate({
   const pathname = usePathname();
 
   if (isActive || !locationId) return <>{children}</>;
-  if (pathname === LOCATION_ROUTE) return <>{children}</>;
+  if (isLocationRoute(pathname)) return <>{children}</>;
 
   return (
     <div>
@@ -54,14 +63,17 @@ export function InactiveLocationGate({
       <div className="mt-6 flex flex-wrap items-center gap-3">
         <Activate locationId={locationId} code={code} />
         <Link
-          href={LOCATION_ROUTE}
+          href={`${LOCATIONS_ROUTE}/${locationId}`}
           className="text-sm text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
         >
           Open the {code} record
         </Link>
-        <span className="text-sm text-muted">
-          or switch back in the header.
-        </span>
+        <Link
+          href={LOCATIONS_ROUTE}
+          className="text-sm text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+        >
+          Choose another location
+        </Link>
       </div>
     </div>
   );

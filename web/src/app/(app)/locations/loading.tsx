@@ -1,5 +1,5 @@
 import { PageLoading } from "@/components/ui/PageLoading";
 
 export default function Loading() {
-  return <PageLoading label="this location" />;
+  return <PageLoading label="the locations list" />;
 }

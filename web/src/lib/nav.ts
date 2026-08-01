@@ -43,14 +43,15 @@ export const SECTIONS: NavSection[] = [
     slug: "location",
     // Labelled with the active location's code (DF01, DF02…), never the word
     // "Location" — see sectionLabel(). The old system did the same: the tab
-    // told you where you were working before you looked anywhere else.
+    // told you where you were working before you looked anywhere else. Since
+    // the switcher went, this is also the only place the code is on screen at
+    // every scroll position (with HeaderShell's collapsed strip).
     label: "Location",
     subs: [
-      // Singular, and id-less: /location is always the location you're working
-      // at. The switcher lists closed locations too, so it reaches all six.
-      // The SLUG stays plural — it's the rf.nav cookie key and the target of
-      // /soon/location/locations, and renaming it would cost both for nothing.
-      { slug: "locations", label: "Location", href: "/location", built: true },
+      // A list of all six, and where the working location is chosen (Mark,
+      // 2026-08-01) — this replaced the masthead switcher. It used to be a
+      // singular, id-less /location showing whichever one you were working at.
+      { slug: "locations", label: "Locations", href: "/locations", built: true },
       {
         slug: "shop-sections",
         label: "Shop Sections",

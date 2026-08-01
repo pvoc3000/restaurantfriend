@@ -529,24 +529,52 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `web/src` wrote to it, and its six rows still carried raw FileMaker text in
    `settings` (`"10am␝10am␝…"` for hours, `LaborRate_n` as a string) while 42
    of FMP's 51 location columns had been dropped at transform time. Shipped:
-   **`/location`** — the location you're WORKING AT, singular and id-less;
-   there is no list and no `[id]` route, because the section tab already wears
-   the active code and the switcher reaches the rest. One page, no tabs: FMP's
-   INFO2 was SMTP credentials (replaced by the provider layer, and never to be
-   displayed) plus three unbuilt modules, and REQUESTS was three more. Blocks:
-   identity, the two addresses, operating hours, tax/labor/registers, the
-   production mapping, four counts that link out, and a read-only statement of
-   which email tier POs go through. **`/shop-sections`** — the 168 rows that
+   **`/locations`** (list) **+ `/locations/[id]`** (record). One page, no tabs:
+   FMP's INFO2 was SMTP credentials (replaced by the provider layer, and never
+   to be displayed) plus three unbuilt modules, and REQUESTS was three more.
+   Blocks: identity, the two addresses, operating hours, tax/labor/registers,
+   the production mapping, four counts, and a read-only statement of which
+   email tier POs go through. **`/shop-sections`** — the 168 rows that
    order the guide's walk, editable at last, location-scoped, with a guarded
    delete (the FK is `on delete set null`, so deleting a section moves its
    items to "No section" rather than deleting them).
-   **The switcher now lists ALL SIX locations**, closed ones under an
-   "Inactive" optgroup — an inactive location is a record you maintain, not a
-   shop you work in, so `components/InactiveLocationGate.tsx` in the (app)
-   layout replaces every screen except `/location` with a sentence and an
-   Activate button. Without it those screens don't break, they just render as
-   inexplicably empty tables. One component; delete it and the wiring line to
-   go back. Schema: migration 017 + `migration/backfill-locations.mjs`.
+   `components/InactiveLocationGate.tsx` in the (app) layout replaces every
+   screen except the `/locations` ones with a sentence and an Activate button —
+   an inactive location is a record you maintain, not a shop you work in.
+   Without it those screens don't break, they just render as inexplicably empty
+   tables. One component; delete it and the wiring line to go back. Schema:
+   migration 017 + `migration/backfill-locations.mjs`.
+   Rebuilt 2026-08-01 on Mark's FileMaker shape, after living with the
+   masthead's `<select>`: **the working location is CHOSEN FROM A LIST**, and
+   `components/LocationSwitcher.tsx` is deleted. The list leads with the Active
+   toggle (purchaser+ only, per 001's policy), then a **Working** column —
+   `components/location/WorkingHere.tsx`, three states: a filled `WORKING HERE`
+   chip on the one you're at (filled, where `VendorLocationsTable`'s `here`
+   badge is only bordered — among six rows it has to be unmissable, and fill is
+   the strongest mark available without spending colour), a `Work here` button
+   on any other ACTIVE one, and **nothing at all on an inactive one**. Only an
+   open shop can be worked at (Mark, 2026-08-01): switching to a closed one
+   used to be the only way to reach its record, and the list reaches it
+   directly. That's a UI rule — `set_my_member_profile` checks only that the
+   location is in your org, which is also why the gate is still load-bearing:
+   the Active toggle is now one tap from the shop you're standing in.
+   The list is **deliberately NOT keyed by the working location**, unlike every
+   other location-scoped screen: its rows ARE the locations, so none goes stale
+   when the working one changes, and remounting would throw away the reader's
+   search and sort on every tap. It writes through the same `setActiveLocation`
+   action the switcher used, whose `revalidatePath("/", "layout")` re-renders
+   in place — no refresh, no navigation.
+   The RECORD is keyed by its id, and that key is the point: `/locations/A` →
+   `/locations/B` through the record book is a soft navigation within one
+   dynamic segment, so `OperatingHours`, `ProductionMapping` and `ActiveToggle`
+   — all `useState(props)` — would show A's data beside B's text.
+   Its "In the system" counts are **figures, not links** (Mark, 2026-08-01:
+   "drop the links, but keep the info. It's handy."): those screens follow the
+   WORKING location, so from any record the link was right by coincidence and
+   wrong on the other five. `/location` survives as a redirect shim to
+   `/locations/<working id>`; the nav's tier-2 item is now "Locations"
+   (`lib/nav.ts` — one line), and the tier-1 tab still wears the working code,
+   which with the collapsed strip is now the only place it's always on screen.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -726,7 +754,8 @@ weekday column, and 003 then silently made it per-vendor-item.
    "The Donut Friend Team" into a script; we don't.)
 3. **Location context**: the user is always "working at" one active location
    (persisted per user in `org_members.last_active_location_id`); every
-   location-scoped screen filters by it; switching is a 2-tap header control.
+   location-scoped screen filters by it; you switch by picking a row on
+   `/locations` (it was a 2-tap header control until 2026-08-01).
    The session carries TWO lists and picking the wrong one is a silent bug
    (2026-07-30): **`session.locations` is every location**, closed ones
    included — use it to LOOK UP a code by id, and a `vendor_locations` row at
@@ -736,7 +765,7 @@ weekday column, and 003 then silently made it per-vendor-item.
    mode), so three closed shops don't sprout dead rows everywhere. And
    `activeLocation` must resolve over the FULL list: resolving it over the
    active-only one falls through to the `?? …[0]` fallback and snaps a switch
-   to DF04 silently back to DF01, which looks exactly like the switcher being
+   to DF04 silently back to DF01, which looks exactly like switching being
    broken.
 4. **The order guide is the VIEW `v_order_guide`** — never materialize it into
    a table, never cache-and-sync. This rule exists because the FMP version did
@@ -1134,6 +1163,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | --- | --- | --- |
   | Inventory | 1040 | Section, Last ordered |
   | Shop sections | 1060 | Area, Sub area |
+  | Locations | 995 | City |
   | Vendors | 1290 | Order via, Account |
   | PO list | 1338 | Sent via, Lines |
 

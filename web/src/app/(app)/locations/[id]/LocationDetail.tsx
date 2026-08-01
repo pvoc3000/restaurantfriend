@@ -1,12 +1,17 @@
-import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
+import { LOCATIONS_CRUMB } from "@/lib/locations";
+import type { RawSearchParams } from "@/lib/itemFilters";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
+import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { AddressFields } from "@/components/location/AddressFields";
 import { OperationsFields } from "@/components/location/OperationsFields";
 import { OperatingHours } from "@/components/location/OperatingHours";
 import { ProductionMapping } from "@/components/location/ProductionMapping";
+import { WorkingHere } from "@/components/location/WorkingHere";
 
 /** The columns migration 017 added, plus what 001 always had. */
 type LocationRecord = {
@@ -38,26 +43,26 @@ function Heading({ children }: { children: React.ReactNode }) {
 }
 
 /**
- * Everything the app knows about the location you're working at.
- *
- * There is no location LIST and no `[id]` route: the section tab already wears
- * the active location's code, and the switcher — which lists closed locations
- * too — is how you reach a different record (Mark, 2026-07-30). So no
- * breadcrumbs either; nothing navigates here from a parent.
+ * Everything the app knows about ONE location — any of them, not just the one
+ * you're working at (Mark, 2026-08-01). It used to be singular and id-less,
+ * reached only by switching the working location in the masthead; the Locations
+ * list is its parent now, so it takes an id and carries breadcrumbs and the
+ * record book like every other detail screen.
  *
  * FileMaker split this over three tabs. INFO2 was SMTP credentials (replaced by
  * the edge function's provider layer, and they must never be shown), commuter
  * benefit, shift-report pages and production schedules — three unbuilt modules
  * — and REQUESTS was three more. What's actually ours today fits one page.
  */
-export async function LocationDetail() {
+export async function LocationDetail({
+  id,
+  rawParams,
+}: {
+  id: string;
+  rawParams: RawSearchParams;
+}) {
   const session = await getAppSession();
   const supabase = await createClient();
-  const active = session.activeLocation;
-
-  if (!active) {
-    return <p className="text-sm text-muted">No location is set up for this org yet.</p>;
-  }
 
   // Writes on `locations` need purchaser+ (the generic policy from 001). Below
   // that every field renders as plain text rather than offering an edit the
@@ -79,26 +84,26 @@ export async function LocationDetail() {
          open_time_by_weekday, close_time_by_weekday,
          kitchen_by_weekday, shops_for`
       )
-      .eq("id", active.id)
+      .eq("id", id)
       .maybeSingle(),
     supabase
       .from("shop_sections")
       .select("id", { count: "exact", head: true })
-      .eq("location_id", active.id),
+      .eq("location_id", id),
     supabase
       .from("vendor_locations")
       .select("id", { count: "exact", head: true })
-      .eq("location_id", active.id)
+      .eq("location_id", id)
       .eq("is_active", true),
     supabase
       .from("inventory_item_locations")
       .select("id", { count: "exact", head: true })
-      .eq("location_id", active.id)
+      .eq("location_id", id)
       .eq("is_active", true),
     supabase
       .from("purchase_orders")
       .select("id", { count: "exact", head: true })
-      .eq("location_id", active.id),
+      .eq("location_id", id),
   ]);
 
   if (error) {
@@ -109,6 +114,7 @@ export async function LocationDetail() {
   }
 
   const location = row as unknown as LocationRecord;
+  const trail = parseTrail(rawParams, LOCATIONS_CRUMB);
 
   // Three tiers, the same order `send-po-email` resolves them in: this
   // location's own override, then the org's, then the app's default sender.
@@ -123,6 +129,12 @@ export async function LocationDetail() {
 
   return (
     <div className="space-y-8">
+      <Breadcrumbs
+        trail={trail}
+        current={location.code}
+        trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
+      />
+
       {/* ---- who this is ---------------------------------------------- */}
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
@@ -152,6 +164,13 @@ export async function LocationDetail() {
             )}
             {location.is_active ? "Active" : "Inactive"}
           </span>
+          {/* The same control the list carries, so a record you've just opened
+              can be adopted without walking back to pick it. */}
+          <WorkingHere
+            locationId={location.id}
+            isWorking={location.id === session.activeLocation?.id}
+            isActive={location.is_active}
+          />
         </div>
 
         <dl className="grid max-w-md grid-cols-[6rem_1fr] gap-x-4 gap-y-1 text-sm">
@@ -268,11 +287,15 @@ export async function LocationDetail() {
       {/* ---- what hangs off this location ------------------------------ */}
       <section className="space-y-2">
         <Heading>In the system</Heading>
+        {/* Figures, not links (Mark, 2026-08-01: "drop the links, but keep the
+            info. It's handy."). Every one of those screens is scoped to the
+            WORKING location, so a link from this record was only ever right by
+            coincidence — and wrong on the five records that aren't it. */}
         <div className="flex flex-wrap gap-x-10 gap-y-4">
-          <Count label="Shop sections" value={sectionCount} href="/shop-sections" />
-          <Count label="Vendors here" value={vendorCount} href="/vendors" />
-          <Count label="Items stocked" value={itemCount} href="/items" />
-          <Count label="Purchase orders" value={poCount} href="/purchase-orders" />
+          <Count label="Shop sections" value={sectionCount} />
+          <Count label="Vendors here" value={vendorCount} />
+          <Count label="Items stocked" value={itemCount} />
+          <Count label="Purchase orders" value={poCount} />
         </div>
       </section>
 
@@ -301,23 +324,15 @@ export async function LocationDetail() {
   );
 }
 
-function Count({
-  label,
-  value,
-  href,
-}: {
-  label: string;
-  value: number | null;
-  href: string;
-}) {
+function Count({ label, value }: { label: string; value: number | null }) {
   return (
-    <Link href={href} className="group block">
-      <span className="block text-[28px] font-bold leading-none tabular-nums group-hover:underline">
+    <div>
+      <span className="block text-[28px] font-bold leading-none tabular-nums">
         {value ?? "—"}
       </span>
       <span className="mt-1 block text-[11px] uppercase tracking-[0.12em] text-subtle">
         {label}
       </span>
-    </Link>
+    </div>
   );
 }

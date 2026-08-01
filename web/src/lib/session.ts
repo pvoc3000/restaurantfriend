@@ -25,8 +25,9 @@ export type AppSession = {
   membership: Membership;
   /**
    * EVERY location in the org, inactive ones included (Mark, 2026-07-30) — the
-   * switcher offers all six, because an inactive location is still a record
-   * someone has to maintain and `/location` is where it's maintained.
+   * Locations list shows all six, because an inactive location is still a
+   * record someone has to maintain and `/locations/[id]` is where it's
+   * maintained.
    *
    * Use this to LOOK UP a location by id. A `vendor_locations` row at DF03 now
    * renders its code instead of an em dash.
@@ -80,8 +81,8 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
       .select("org_id, role, display_name, last_active_location_id, orgs(settings)")
       .eq("user_id", user.id)
       .maybeSingle<Membership & { orgs: { settings: OrgSettings | null } | null }>(),
-    // No is_active filter: the switcher carries every location. See the two
-    // fields on AppSession for which list a screen should reach for.
+    // No is_active filter: the Locations list carries every one of them. See
+    // the two fields on AppSession for which list a screen should reach for.
     supabase
       .from("locations")
       .select("id, code, name, kind, is_active")
@@ -100,9 +101,9 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
 
   const list = (locations ?? []) as Location[];
   const active = list.filter((l) => l.is_active);
-  // Resolved over the FULL list, not the active one: switching to a closed
-  // location would otherwise fall through to the `?? …[0]` and snap silently
-  // back to DF01, which looks exactly like the switcher not working.
+  // Resolved over the FULL list, not the active one: a closed location as
+  // working context would otherwise fall through to the `?? …[0]` and snap
+  // silently back to DF01, which looks exactly like the write not landing.
   // The fallback stays active-only so a fresh user lands somewhere real.
   const activeLocation =
     list.find((l) => l.id === membership.last_active_location_id) ?? active[0] ?? null;

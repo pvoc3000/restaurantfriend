@@ -18,8 +18,14 @@ export default async function HomePage() {
       </div>
 
       <p className="text-sm text-muted">
-        Switch locations in the header; the choice is saved to your membership
-        row.
+        Choose where you&rsquo;re working in{" "}
+        <Link
+          href="/locations"
+          className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+        >
+          Locations
+        </Link>
+        ; the choice is saved to your membership row.
       </p>
 
       <ul className="text-sm">

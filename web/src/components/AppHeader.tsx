@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import { signOut } from "@/app/actions";
 import { AppNav } from "@/components/AppNav";
 import { HeaderShell, MenuCollapseButton } from "@/components/HeaderShell";
-import { LocationSwitcher } from "@/components/LocationSwitcher";
 import { GearIcon, HomeIcon, IconButton } from "@/components/ui/IconButton";
 import { NAV_COOKIE, parseNavMemory } from "@/lib/navMemory";
 import type { AppSession } from "@/lib/session";
@@ -20,9 +19,12 @@ export async function AppHeader({ session }: { session: AppSession }) {
       <AppNav
         initialMemory={initialMemory}
         locationCode={session.activeLocation?.code ?? null}
-        // Row 1: what you're looking at. Where to go, which location you're
-        // working at, and whether the chrome is showing (Mark, 2026-07-29 —
-        // the old single row is now two, to match the menu's two tiers).
+        // Row 1: what you're looking at. Where to go, and whether the chrome is
+        // showing (Mark, 2026-07-29 — the old single row is now two, to match
+        // the menu's two tiers). The location SWITCHER used to sit here; the
+        // Locations list replaced it (Mark, 2026-08-01), and the code you're
+        // working at is still on screen at all times — the tier-1 tab wears it
+        // (lib/nav sectionLabel) and so does the collapsed strip.
         controls={
           <>
             <IconButton href="/" label="Home">
@@ -32,11 +34,6 @@ export async function AppHeader({ session }: { session: AppSession }) {
             <IconButton href="/settings" label="Settings">
               <GearIcon />
             </IconButton>
-
-            <LocationSwitcher
-              locations={session.locations}
-              activeLocationId={session.activeLocation?.id ?? null}
-            />
 
             {/* Last in this row: it's the control you reach for once, when
                 you're about to start walking. It belongs with the view
