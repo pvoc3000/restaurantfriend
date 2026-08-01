@@ -67,9 +67,11 @@ export function ColumnsMenu<T>({
             ? `Columns — ${offered.length - hiddenHere} of ${offered.length} shown`
             : "Columns — choose which ones this list shows"
         }
-        className="grid h-8 w-8 shrink-0 place-items-center text-muted transition-colors hover:bg-neutral-100 hover:text-ink"
+        className={`grid h-8 w-8 shrink-0 place-items-center transition-colors hover:bg-neutral-100 hover:text-ink ${
+          hiddenHere > 0 ? "text-ink" : "text-muted"
+        }`}
       >
-        <ColumnsIcon someHidden={hiddenHere > 0} />
+        <ColumnsIcon />
       </button>
 
       {open &&
@@ -114,32 +116,24 @@ export function ColumnsMenu<T>({
 }
 
 /**
- * Three columns, the third hollow when something is hidden.
+ * A table with an eye — Material Symbols Outlined `table_eye` (Apache 2.0),
+ * the glyph Mark picked (2026-07-31). Inlined as a path rather than pulled from
+ * a font or a package: one icon doesn't justify a dependency, and the artifact
+ * is a strict-CSP-friendly `currentColor` shape that inherits the button's
+ * hover the way `RowMenu`'s ⋯ does.
  *
- * An icon, which the design system otherwise doesn't do (Mark, 2026-07-31 —
- * "I know it goes against the design, but would it kill us to use an icon
- * here?"). It wouldn't: the control now lives at the table's right edge where a
- * word would be read as a column label, and this is the one place in the app
- * where a picture of the thing is unambiguous — the icon IS the table's
- * columns. Precedent exists in `RowMenu`'s ⋯, which is the same argument.
- *
- * The hollow third bar is the state, and it's the icon rather than a badge
- * because a count beside it would be a second thing to read. Squares, no
- * rounding, `currentColor` — it inherits the button's hover the way the ⋯ does.
+ * An EYE, not three bars, because the eye is what the control does — this menu
+ * only ever shows and hides. A first pass drew plain columns and carried the
+ * state in a hollow third bar; the eye says "visibility" on its own, so the
+ * state moved to the button's ink instead (muted at rest, black when something
+ * is hidden), which is the app's usual way of saying a view is narrowed.
  */
-function ColumnsIcon({ someHidden }: { someHidden: boolean }) {
+function ColumnsIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
-      <rect x="0.5" y="1.5" width="4" height="13" fill="currentColor" />
-      <rect x="6" y="1.5" width="4" height="13" fill="currentColor" />
-      <rect
-        x="11.5"
-        y="1.5"
-        width="4"
-        height="13"
-        fill={someHidden ? "none" : "currentColor"}
-        stroke="currentColor"
-        strokeDasharray={someHidden ? "2 2" : undefined}
+    <svg width="20" height="20" viewBox="0 -960 960 960" aria-hidden="true">
+      <path
+        fill="currentColor"
+        d="M200-120q-33 0-56.5-23.5T120-200v-560q0-33 23.5-56.5T200-840h560q33 0 56.5 23.5T840-760v333q-19-11-39-20t-41-16v-137H520v137q-46 14-86 40t-74 63H200v160h82q11 22 22 42t24 38H200Zm0-320h240v-160H200v160Zm0-240h560v-80H200v80Zm280 200Zm0 0Zm0 0Zm0 0ZM640-40q-91 0-168-48T360-220q35-84 112-132t168-48q91 0 168 48t112 132q-35 84-112 132T640-40Zm107.5-106q50.5-26 82.5-74-32-48-82.5-74T640-320q-57 0-107.5 26T450-220q32 48 82.5 74T640-120q57 0 107.5-26Zm-150-31.5Q580-195 580-220t17.5-42.5Q615-280 640-280t42.5 17.5Q700-245 700-220t-17.5 42.5Q665-160 640-160t-42.5-17.5Z"
       />
     </svg>
   );

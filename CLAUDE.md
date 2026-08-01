@@ -1170,11 +1170,14 @@ weekday column, and 003 then silently made it per-vendor-item.
   `lib/anchoredPanel` panel as `PickList` and `RowMenu`.
   **It is an ICON**, which is the one deliberate exception to the design
   system's word-not-picture rule (Mark, 2026-07-31: "I know it goes against the
-  design, but would it kill us to use an icon here?"). It wouldn't: at that
-  spot a word reads as a column label, and three bars ARE the thing the control
-  acts on. State lives in the icon — the third bar goes hollow when something is
-  hidden — rather than in a badge, which would be a second thing to read. The
-  ⋯ of `RowMenu` is the same argument.
+  design, but would it kill us to use an icon here?"). It wouldn't: at that spot
+  a word reads as a column label, and the ⋯ of `RowMenu` already made the same
+  argument. The glyph is **Material Symbols Outlined `table_eye`** (Apache 2.0),
+  Mark's pick — inlined as one `currentColor` path rather than adding an icon
+  dependency for a single icon. An EYE and not the three bars a first pass drew,
+  because this menu only ever shows and hides, which is what an eye says. State
+  is the button's ink (muted at rest, black when something is hidden), not a
+  count beside it — that would be a second thing to read.
   `DataTable` reads the hidden set off its own
   `storageKey`, so a table gets this by having a key rather than by opting in,
   and it composes with `compactBelow`: the narrow-screen set still sheds, and
