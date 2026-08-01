@@ -1172,16 +1172,17 @@ weekday column, and 003 then silently made it per-vendor-item.
   system's word-not-picture rule (Mark, 2026-07-31: "I know it goes against the
   design, but would it kill us to use an icon here?"). It wouldn't: at that spot
   a word reads as a column label, and the ⋯ of `RowMenu` already made the same
-  argument. The glyph is **Material Symbols Outlined `table_eye`** (Apache 2.0),
-  Mark's pick — inlined as one `currentColor` path rather than adding an icon
-  dependency for a single icon. An EYE and not the three bars a first pass drew,
-  because this menu only ever shows and hides, which is what an eye says. State
-  is the button's ink (muted at rest, black when something is hidden), not a
-  count beside it — that would be a second thing to read. **30px at wght 300**
-  in a 38px button (Mark's numbers, 2026-07-31): a Material weight is a
-  DIFFERENT PATH, not a `stroke-width`, so changing it means fetching the
-  `wght300` artwork — and the button has to grow with the glyph or the hover
-  wash sits on the artwork instead of around it.
+  argument. The glyph is **Material Symbols Outlined `visibility`** — just an
+  eye — inlined as one `currentColor` path rather than adding an icon dependency
+  for a single icon. It went three-columns → `table_eye` → eye (Mark,
+  2026-07-31): the first two were saying "columns" as well as "show", which the
+  control's own position already says, since it sits directly above the table's
+  last column header. What's left for the glyph is the verb. State is the
+  button's ink (muted at rest, black when something is hidden), not a count
+  beside it — that would be a second thing to read. **24px at wght 300** in a
+  32px button: a Material weight is a DIFFERENT PATH, not a `stroke-width`, so
+  changing it means fetching the `wght300` artwork — and the button tracks the
+  glyph, or the hover wash sits on the artwork instead of around it.
   `DataTable` reads the hidden set off its own
   `storageKey`, so a table gets this by having a key rather than by opting in,
   and it composes with `compactBelow`: the narrow-screen set still sheds, and
