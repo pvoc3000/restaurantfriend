@@ -96,6 +96,8 @@ export function ItemLocationRows({
     },
     {
       key: "location",
+      // The row IS the location — never hideable.
+      pinned: true,
       label: "Location",
       width: 230,
       sortValue: (r) => r.location.code,
@@ -198,6 +200,7 @@ export function ItemLocationRows({
         columns={columns}
         rowKey={(r) => r.location.id}
         storageKey="rf.itemLocations.columnWidths.v1"
+        columnChooser
         defaultSort={{ key: "location" }}
         rowClassName={(r) => (r.il && !r.il.is_active ? "text-faint" : "")}
         expand={{

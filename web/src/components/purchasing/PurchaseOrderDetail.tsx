@@ -232,6 +232,8 @@ export function PurchaseOrderDetail({
     // what the vendor's invoice will say.
     {
       key: "item",
+      // The line's catalog name — the column that IS the row.
+      pinned: true,
       label: "Item",
       width: 215,
       wrap: true,
@@ -712,6 +714,7 @@ export function PurchaseOrderDetail({
         // (v2 was the same story for v1: Type replaced the item name, and the
         // name moved into the wrapping Item cell.)
         storageKey="rf.purchaseOrderLines.columnWidths.v4"
+        columnChooser
         // Type first (Mark, 2026-07-27): it groups the order the way the
         // vendor-facing PDF does, so the screen and the document read alike.
         defaultSort={{ key: "item_type" }}

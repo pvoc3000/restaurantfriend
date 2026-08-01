@@ -151,6 +151,8 @@ export function VendorItemsTable({
           {
             key: "vendor",
             label: "Vendor",
+            // ...and on the item's screen, this one is.
+            pinned: true,
             width: 180,
             sortValue: (vi: VendorItemWithItem) => vi.vendors?.name ?? null,
             render: (vi: VendorItemWithItem) => (
@@ -181,6 +183,8 @@ export function VendorItemsTable({
             key: "item",
             label: "Item",
             width: 205,
+            // On the vendor's screen this column IS the row.
+            pinned: true,
             sortValue: (vi: VendorItemWithItem) => vi.inventory_items?.name ?? null,
             render: (vi: VendorItemWithItem) =>
               vi.inventory_items ? (
@@ -342,6 +346,7 @@ export function VendorItemsTable({
       columns={columns}
       rowKey={(vi) => vi.id}
       storageKey={`rf.vendorItems.columnWidths.v1${showItem ? ".byVendor" : ".byItem"}`}
+      columnChooser
       rowClassName={(vi) => (vi.is_active ? "" : "text-faint")}
       scroll={scroll}
       // The filter bar eats about 9rem above the pane; without this the page

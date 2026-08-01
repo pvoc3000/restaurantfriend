@@ -187,6 +187,8 @@ export function VendorItemLocations({
   const columns: DataColumn<VendorItemLocationRow>[] = [
     {
       key: "location",
+      // The row IS the location — never hideable.
+      pinned: true,
       label: "Location",
       width: 180,
       sortValue: (r) => r.location.code,
@@ -270,6 +272,7 @@ export function VendorItemLocations({
       columns={columns}
       rowKey={(r) => r.location.id}
       storageKey="rf.vendorItemLocations.columnWidths.v1"
+        columnChooser
       defaultSort={{ key: "location" }}
       rowClassName={(r) =>
         r.itemLocationId && !r.itemLocationActive ? "text-faint" : ""

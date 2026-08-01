@@ -71,6 +71,8 @@ export function VendorLocationsTable({
     },
     {
       key: "location",
+      // The row IS the location — never hideable.
+      pinned: true,
       label: "Location",
       // Wide enough for the code, the "here" badge and the rep summary.
       width: 300,
@@ -156,6 +158,7 @@ export function VendorLocationsTable({
       columns={columns}
       rowKey={(r) => r.location_id}
       storageKey="rf.vendorLocations.columnWidths.v1"
+        columnChooser
       defaultSort={{ key: "location" }}
       expand={{
         summary: repSummary,
