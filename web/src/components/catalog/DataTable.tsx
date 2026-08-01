@@ -5,7 +5,7 @@ import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { makeComparator, nextSortDir, type SortDir, type SortValue } from "@/lib/tableSort";
 import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
-import { useColumnVisibility } from "@/lib/columnVisibility";
+import { isColumnVisible, useColumnVisibility } from "@/lib/columnVisibility";
 import {
   applyColumnOrder,
   isMovableColumn,
@@ -47,9 +47,11 @@ export type DataColumn<T> = {
    */
   header?: ReactNode;
   /**
-   * Drop this column when the table is compact — see DataTable's
+   * Drop this column BY DEFAULT when the table is compact — see DataTable's
    * `compactBelow`. For the reference data you'd read at a desk but not while
-   * standing in the shop; it's still on the record's own screen.
+   * standing in the shop; it's still on the record's own screen. A default
+   * only: the reader can bring it back from the Columns menu, whose checkbox
+   * beats the width tier in both directions (lib/columnVisibility).
    */
   hideWhenCompact?: boolean;
   /**
@@ -143,6 +145,11 @@ export function DataTable<T>({
    * Set it to the narrowest width at which the FULL set still fits, so nothing
    * is hidden while there's room for it. Omit for a table narrow enough
    * everywhere, or one on a detail screen.
+   *
+   * A DEFAULT, not a law (Mark's iPad report, 2026-08-01): the Columns menu
+   * shows what this tier dropped and an explicit check brings the column back.
+   * Before that, a width-dropped column looked exactly like a setting synced
+   * in from another device — missing, "visible" in the menu, untogglable.
    */
   compactBelow?: number;
   /**
@@ -186,11 +193,11 @@ export function DataTable<T>({
   // 0 always matches, so a table without a compact set still calls the hook.
   const wide = useViewportAtLeast(compactBelow ?? 0);
   const compact = compactBelow !== undefined && !wide;
-  // Two independent reasons a column can be absent, and they compose: the
-  // window is too narrow for it (compact), or the reader has unchecked it in
-  // the Columns menu (lib/columnVisibility, keyed by this same storageKey, so a
-  // table gets this by having a key rather than by opting in).
-  const { hidden } = useColumnVisibility(storageKey);
+  // Two reasons a column can be absent — the reader unchecked it, or the
+  // window is too narrow for it — and the reader's explicit choice beats the
+  // width default in BOTH directions (lib/columnVisibility, keyed by this same
+  // storageKey, so a table gets this by having a key rather than by opting in).
+  const { hidden, shown } = useColumnVisibility(storageKey);
   // WHERE the columns sit is the reader's too (lib/columnOrder, same key):
   // drag a header sideways to move it. Order is applied before the visibility
   // filters so all three compose — the compact set still sheds, your unchecked
@@ -201,9 +208,8 @@ export function DataTable<T>({
     () => applyColumnOrder(columns, storedOrder),
     [columns, storedOrder]
   );
-  const visibleColumns = orderedColumns.filter(
-    (col) =>
-      !(compact && col.hideWhenCompact) && !(hidden.has(col.key) && !col.pinned)
+  const visibleColumns = orderedColumns.filter((col) =>
+    isColumnVisible(col, compact, hidden, shown)
   );
 
   // The drag writes through the FULL movable order (hidden columns keep their
@@ -323,8 +329,9 @@ export function DataTable<T>({
       {columnChooser && (
         <div className="flex justify-end">
           {/* The ordered list, not the declared one — the checklist reads in
-              the same order as the table it acts on. */}
-          <ColumnsMenu storageKey={storageKey} columns={orderedColumns} />
+              the same order as the table it acts on. It gets `compact` so its
+              checkboxes can tell the truth about the width tier. */}
+          <ColumnsMenu storageKey={storageKey} columns={orderedColumns} compact={compact} />
         </div>
       )}
       <div ref={paneRef} className={wrapper}>

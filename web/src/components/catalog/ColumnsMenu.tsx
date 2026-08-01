@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredPanel } from "@/lib/anchoredPanel";
-import { useColumnVisibility } from "@/lib/columnVisibility";
+import { isColumnVisible, useColumnVisibility } from "@/lib/columnVisibility";
 import { Checkbox } from "@/components/ui/Checkbox";
 import type { DataColumn } from "./DataTable";
 
@@ -23,17 +23,23 @@ import type { DataColumn } from "./DataTable";
  * attributes belonging to nothing; control columns (the select-all checkbox,
  * the ⋯ menu) have no label to offer in the first place.
  *
- * The choice is remembered per table and per user, and composes with the
- * responsive `compactBelow` set: narrow screens still shed their marked
- * columns, and this takes out whatever you've unchecked on top of that.
+ * The checkboxes show EFFECTIVE visibility — what the table is doing, not just
+ * what the reader once stored (Mark's iPad report, 2026-08-01: the width tier
+ * had dropped two columns while every box sat checked, and checking did
+ * nothing). A column the `compactBelow` tier is holding off shows unchecked
+ * with a note saying so, and checking it genuinely brings it back — the
+ * explicit choice wins (lib/columnVisibility).
  */
 export function ColumnsMenu<T>({
   storageKey,
   columns,
+  compact,
 }: {
   /** The table's own key — the same one it stores column widths under. */
   storageKey: string;
   columns: DataColumn<T>[];
+  /** Whether the table is currently under its `compactBelow` width. */
+  compact: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -46,12 +52,13 @@ export function ColumnsMenu<T>({
     align: "right",
     onClose: close,
   });
-  const { hidden, toggle, showAll } = useColumnVisibility(storageKey);
+  const { hidden, shown, setVisible, showAll } = useColumnVisibility(storageKey);
 
   const offered = columns.filter((c) => c.label && !c.pinned);
   if (offered.length === 0) return null;
 
-  const hiddenHere = offered.filter((c) => hidden.has(c.key)).length;
+  const visibleOf = (c: DataColumn<T>) => isColumnVisible(c, compact, hidden, shown);
+  const missing = offered.filter((c) => !visibleOf(c)).length;
 
   return (
     <>
@@ -63,14 +70,17 @@ export function ColumnsMenu<T>({
         aria-label="Columns"
         onClick={() => setOpen((v) => !v)}
         title={
-          hiddenHere > 0
-            ? `Columns — ${offered.length - hiddenHere} of ${offered.length} shown`
+          missing > 0
+            ? `Columns — ${offered.length - missing} of ${offered.length} shown`
             : "Columns — choose which ones this list shows"
         }
         // 32px square around the 24px glyph: the button tracks the icon, or the
-        // hover wash sits on the artwork instead of around it.
+        // hover wash sits on the artwork instead of around it. Black whenever
+        // the table is showing fewer columns than it offers — by the reader's
+        // hand OR the width tier's — because this menu is where the answer to
+        // "where did that column go?" lives.
         className={`grid h-8 w-8 shrink-0 place-items-center transition-colors hover:bg-neutral-100 hover:text-ink ${
-          hiddenHere > 0 ? "text-ink" : "text-muted"
+          missing > 0 ? "text-ink" : "text-muted"
         }`}
       >
         <ColumnsIcon />
@@ -86,26 +96,37 @@ export function ColumnsMenu<T>({
             style={{ top: box.top, left: box.left, transform: "translateX(-100%)", minWidth: 220 }}
             className="fixed z-50 max-h-[70vh] overflow-y-auto border-2 border-ink bg-white text-ink"
           >
-            {offered.map((column) => (
-              // A label, not a button with a checkbox inside it: the whole row
-              // is the target, which is what you expect of a checklist and what
-              // a thumb needs.
-              <label
-                key={column.key}
-                className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-neutral-100"
-              >
-                <Checkbox
-                  checked={!hidden.has(column.key)}
-                  onChange={() => toggle(column.key)}
-                  label={`Show ${column.label}`}
-                />
-                <span>{column.label}</span>
-              </label>
-            ))}
+            {offered.map((column) => {
+              const visible = visibleOf(column);
+              // Off because of the width tier, not the reader — say so, or an
+              // unchecked box the reader never unchecked reads as a glitch.
+              const widthDropped = !visible && !hidden.has(column.key);
+              return (
+                // A label, not a button with a checkbox inside it: the whole
+                // row is the target, which is what you expect of a checklist
+                // and what a thumb needs.
+                <label
+                  key={column.key}
+                  className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-neutral-100"
+                >
+                  <Checkbox
+                    checked={visible}
+                    onChange={() => setVisible(column.key, !visible)}
+                    label={`Show ${column.label}`}
+                  />
+                  <span>{column.label}</span>
+                  {widthDropped && (
+                    <span className="ml-auto pl-3 text-[11px] text-faint">
+                      off to fit this screen
+                    </span>
+                  )}
+                </label>
+              );
+            })}
             <button
               type="button"
-              onClick={showAll}
-              disabled={hiddenHere === 0}
+              onClick={() => showAll(offered.map((c) => c.key))}
+              disabled={missing === 0}
               className="block w-full border-t border-hairline px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-ink hover:bg-neutral-100 disabled:opacity-35 disabled:hover:bg-white"
             >
               Show all

@@ -1155,7 +1155,8 @@ weekday column, and 003 then silently made it per-vendor-item.
   derived from column sums — which had shipped a laptop-shaped hole (thresholds
   of 1280 left Vendors and the PO list overflowing until 1386 and 1434) and a
   6px margin on the PO list that a visible scrollbar was enough to eat.
-  `compactBelow` survives but now means only "too many columns to READ here",
+  `compactBelow` survives but now means only "too many columns to READ here" —
+  and since 2026-08-01 it is a DEFAULT the Columns menu can override, not a law —
   so it's the app's ordinary `xl` everywhere.
   The `useOverflowOnlyWhenNeeded` guard stays as a safety net for a table that
   somehow still overflows, and it must also toggle the sticky POSITION off, not
@@ -1240,12 +1241,27 @@ weekday column, and 003 then silently made it per-vendor-item.
   Inventory's had always been and where every list's goes (Mark, 2026-07-31:
   "make it like Inventory. that's how they all should be"). No visible label —
   a checkbox at the head of a column of checkboxes has already said what it is.
-  `DataTable` reads the hidden set off its own
-  `storageKey`, so a table gets this by having a key rather than by opting in,
-  and it composes with `compactBelow`: the narrow-screen set still sheds, and
-  yours comes out on top of it. Stored as the HIDDEN keys, not the visible ones
-  — a column added next month then shows up for everyone instead of being
-  silently missing for anyone who ever opened the menu. `pinned` keeps the
+  `DataTable` reads the sets off its own
+  `storageKey`, so a table gets this by having a key rather than by opting in.
+  **Visibility is a TRI-STATE and the explicit choice beats the width tier in
+  both directions** (Mark's iPad report, 2026-08-01): explicitly hidden,
+  explicitly shown, or untouched — only the untouched fall to `compactBelow`'s
+  default. It used to be one hidden-set composed with an unconditional compact
+  drop, and the combination lied in a very specific way: Mark hid Order via and
+  Account on his desktop, and on the iPad the WIDTH TIER had dropped those same
+  two — so the columns were missing, the menu showed every box checked, and
+  un/rechecking did nothing, which reads exactly like per-device settings
+  having synced through the account. Nothing syncs; all of this is
+  localStorage, and Mark chose to keep it per-device (2026-08-01, after
+  weighing account-based: a desk and an iPad want different columns, which is
+  the whole reason the compact tier exists). The menu's checkboxes now show
+  EFFECTIVE visibility, a width-dropped column reads "off to fit this screen"
+  beside its unchecked box, checking it genuinely brings it back, "Show all"
+  means all, and the eye goes black whenever the table shows fewer columns
+  than it offers — by any hand. Stored as the HIDDEN keys plus the SHOWN keys
+  (`.hidden` / `.shown`), never an allowlist — a column added next month then
+  shows up for everyone instead of being silently missing for anyone who ever
+  opened the menu. `pinned` keeps the
   column that IS the row (Item, Name, Display name, PO number) out of the menu;
   control columns have no label to offer.
 - **Every multi-column table can also REORDER columns** (`lib/columnOrder`,

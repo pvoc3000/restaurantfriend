@@ -4,27 +4,65 @@
 // button that pops up a menu of the columns that the user can check and uncheck
 // to show/hide").
 //
-// A per-user DISPLAY preference, so localStorage and `useSyncExternalStore` —
-// the same rule and the same mechanism as column widths, which this sits beside
-// under the same table key. Not the URL: hiding Last ordered is a fact about
-// how you like to read the list, not about the view you'd share.
+// A per-user, PER-DEVICE display preference, so localStorage and
+// `useSyncExternalStore` — the same rule and the same mechanism as column
+// widths, which this sits beside under the same table key. Not the URL: hiding
+// Last ordered is a fact about how you like to read the list, not about the
+// view you'd share. And deliberately not the account (Mark's call, 2026-08-01,
+// after weighing both): a desk and an iPad want different columns — that's the
+// whole reason `compactBelow` exists — so one account-wide layout would fit
+// neither, and widths especially are device-shaped.
 //
-// Stored as the HIDDEN keys rather than the visible ones, which matters when
-// the app changes: a column added next month is visible for everyone by
-// default, where a stored allowlist would silently hide it from every user who
-// had ever opened the menu.
+// THREE states per column, two of them stored (Mark's iPad report, 2026-08-01).
+// Visibility used to be one hidden-set composed with the responsive compact
+// drop, and the combination lied: on an iPad the width tier removed "Order
+// via" and "Account" with no stored setting anywhere, so the menu showed them
+// CHECKED while the table didn't show them, and unchecking/rechecking changed
+// nothing — which reads exactly like desktop settings having followed the
+// account to the iPad. Now a column is either explicitly hidden, explicitly
+// shown, or untouched — and only the untouched fall to the compact default.
+// The reader's explicit choice always beats the width tier, and the menu's
+// checkboxes reflect what the table is actually doing.
+//
+// Stored as the HIDDEN keys and the SHOWN keys rather than one allowlist,
+// which matters when the app changes: a column added next month is untouched
+// for everyone by default, where a stored allowlist would silently hide it
+// from every user who had ever opened the menu. `shown` entries are written
+// whenever the reader checks a box — redundant on a wide screen, but they
+// record the intent that matters the day the same device is narrow.
 
 import { useCallback, useSyncExternalStore } from "react";
+
+// ---------------------------------------------------------------------------
+// Pure logic — fixture-tested (scripts/fixtures/columnVisibility.fixtures.ts).
+// ---------------------------------------------------------------------------
+
+/**
+ * Whether the table shows this column right now. Pinned columns always show;
+ * an explicit hide beats everything else; the compact drop applies only to
+ * columns the reader has never explicitly shown.
+ */
+export function isColumnVisible(
+  column: { key: string; pinned?: boolean; hideWhenCompact?: boolean },
+  compact: boolean,
+  hidden: ReadonlySet<string>,
+  shown: ReadonlySet<string>
+): boolean {
+  if (column.pinned) return true;
+  if (hidden.has(column.key)) return false;
+  if (compact && column.hideWhenCompact && !shown.has(column.key)) return false;
+  return true;
+}
+
+// ---------------------------------------------------------------------------
+// The store.
+// ---------------------------------------------------------------------------
 
 const listeners = new Set<() => void>();
 
 // Referentially stable snapshots — a new Set per read would re-render forever.
 const cache = new Map<string, { raw: string | null; parsed: Set<string> }>();
 const EMPTY: Set<string> = new Set();
-
-function key(storageKey: string) {
-  return `${storageKey}.hidden`;
-}
 
 function subscribe(onChange: () => void) {
   listeners.add(onChange);
@@ -39,14 +77,14 @@ function announce() {
   for (const listener of listeners) listener();
 }
 
-function read(storageKey: string): Set<string> {
+function read(fullKey: string): Set<string> {
   let raw: string | null = null;
   try {
-    raw = window.localStorage.getItem(key(storageKey));
+    raw = window.localStorage.getItem(fullKey);
   } catch {
-    return EMPTY; // Private mode — show everything rather than nothing.
+    return EMPTY; // Private mode — defaults rather than nothing.
   }
-  const hit = cache.get(storageKey);
+  const hit = cache.get(fullKey);
   if (hit && hit.raw === raw) return hit.parsed;
 
   let parsed = EMPTY;
@@ -60,40 +98,60 @@ function read(storageKey: string): Set<string> {
       parsed = EMPTY; // Corrupt entry — ignore rather than break the list.
     }
   }
-  cache.set(storageKey, { raw, parsed });
+  cache.set(fullKey, { raw, parsed });
   return parsed;
 }
 
-function write(storageKey: string, hidden: Set<string>) {
+function write(fullKey: string, keys: Set<string>) {
   try {
-    if (hidden.size === 0) window.localStorage.removeItem(key(storageKey));
-    else window.localStorage.setItem(key(storageKey), JSON.stringify([...hidden]));
+    if (keys.size === 0) window.localStorage.removeItem(fullKey);
+    else window.localStorage.setItem(fullKey, JSON.stringify([...keys]));
   } catch {
     // Not being able to persist shouldn't stop the menu working this session.
   }
   announce();
 }
 
-/** The hidden column keys for a table, and the two ways to change them. */
+/** A table's explicit hide/show sets, and the two ways to change them. */
 export function useColumnVisibility(storageKey: string) {
   const hidden = useSyncExternalStore(
     subscribe,
-    () => read(storageKey),
-    () => EMPTY // The server has no localStorage: everything shows, then the
-    // stored set arrives at hydration. Same contract as column widths.
+    () => read(`${storageKey}.hidden`),
+    () => EMPTY // The server has no localStorage: defaults, then the stored
+    // sets arrive at hydration. Same contract as column widths.
+  );
+  const shown = useSyncExternalStore(
+    subscribe,
+    () => read(`${storageKey}.shown`),
+    () => EMPTY
   );
 
-  const toggle = useCallback(
-    (columnKey: string) => {
-      const next = new Set(read(storageKey));
-      if (next.has(columnKey)) next.delete(columnKey);
-      else next.add(columnKey);
-      write(storageKey, next);
+  const setVisible = useCallback(
+    (columnKey: string, visible: boolean) => {
+      const nextHidden = new Set(read(`${storageKey}.hidden`));
+      const nextShown = new Set(read(`${storageKey}.shown`));
+      if (visible) {
+        nextHidden.delete(columnKey);
+        nextShown.add(columnKey);
+      } else {
+        nextHidden.add(columnKey);
+        nextShown.delete(columnKey);
+      }
+      write(`${storageKey}.hidden`, nextHidden);
+      write(`${storageKey}.shown`, nextShown);
     },
     [storageKey]
   );
 
-  const showAll = useCallback(() => write(storageKey, new Set()), [storageKey]);
+  // "Show all" means ALL — including the columns the width tier would drop, or
+  // on a narrow screen the button's own label is a second lie.
+  const showAll = useCallback(
+    (keys: readonly string[]) => {
+      write(`${storageKey}.hidden`, new Set());
+      write(`${storageKey}.shown`, new Set(keys));
+    },
+    [storageKey]
+  );
 
-  return { hidden, toggle, showAll };
+  return { hidden, shown, setVisible, showAll };
 }

@@ -4,6 +4,7 @@
 // exits non-zero on the first failure it reports.
 
 import "./columnOrder.fixtures";
+import "./columnVisibility.fixtures";
 import "./invoiceMatch.fixtures";
 import "./receiving.fixtures";
 import { runAll } from "./harness";
