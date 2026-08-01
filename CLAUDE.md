@@ -1207,8 +1207,15 @@ weekday column, and 003 then silently made it per-vendor-item.
   Vendor-item detail is wired and stays blank until something publishes for it —
   its only inbound link is the order guide, whose "set" would be that day's
   walk lines rather than a list of records.
-- **Every list can hide columns** (`catalog/ColumnsMenu` + `lib/columnVisibility`,
-  Mark, 2026-07-31). `DataTable` renders it itself, `columnChooser`-gated,
+- **Every multi-column table can hide columns** (`catalog/ColumnsMenu` +
+  `lib/columnVisibility`, Mark, 2026-07-31) — the four list screens, the
+  locations list, AND the tables embedded in detail screens (Mark, 2026-08-01:
+  "even the ones that appear on detail sheets"). That last part was one word per
+  table, because those were already `DataTable`s: an item's per-location config,
+  a vendor's config and its items, a vendor item's per-location prices, a PO's
+  lines. Each carries its own `storageKey`, so hiding Notes on a vendor's items
+  says nothing about the config table three inches above it.
+  `DataTable` renders it itself, `columnChooser`-gated,
   **directly above the LAST column header at the table's right edge** (Mark's
   placement — it acts on these columns, and each list putting it somewhere
   slightly different is how you end up hunting for it). It opens the same
