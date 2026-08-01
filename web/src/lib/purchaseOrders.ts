@@ -24,13 +24,25 @@ export const PO_STATUS_LABEL: Record<PoStatus, string> = {
   void: "Void",
 };
 
-// Badge colours: draft is in-progress, sent is awaiting delivery, received is
-// done, void/closed are inert.
+/**
+ * Badge colours (Mark, 2026-07-31: "sent = yellow, received = green,
+ * closed = white").
+ *
+ * They run with the DELIVERY: sent is outstanding and wears the mark colour
+ * that means "worth your eye" everywhere else; received is green, the settled
+ * colour; and closed is quiet white, because a closed order is finished
+ * business and shouldn't compete for attention in a list of live ones.
+ *
+ * `draft` keeps the neutral treatment closed used to have. White is closed's
+ * now, and the two statuses that need telling apart at a glance are the one
+ * that hasn't gone anywhere and the one that's completely done. Void keeps its
+ * own faint one.
+ */
 export const PO_STATUS_CLASS: Record<PoStatus, string> = {
-  draft: "border border-ink bg-white text-ink",
+  draft: "border border-neutral-300 bg-neutral-100 text-muted",
   sent: "border border-ink bg-[var(--rf-yellow-200)] text-ink",
   received: "border border-ink bg-[var(--rf-green-200)] text-ink",
-  closed: "border border-neutral-300 bg-neutral-100 text-muted",
+  closed: "border border-ink bg-white text-ink",
   void: "border border-neutral-300 bg-white text-faint",
 };
 

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import type { RawSearchParams } from "@/lib/itemFilters";
-import { parseTrail } from "@/lib/breadcrumbs";
+import { parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import {
   fetchPoWithLines,
@@ -49,7 +49,19 @@ export async function ReceivingView({
   const poHref = `/purchase-orders/${id}`;
   const trail = parsed.some((c) => c.href.split("?")[0] === poHref)
     ? parsed
-    : [...parsed, { href: poHref, label: order.po_number }];
+    : [
+        ...parsed,
+        // Stamped, not bare. Arriving at this URL directly, the order crumb
+        // would otherwise lead to a detail screen that knows nothing about the
+        // list — and the trail would get shorter every round trip.
+        { href: withFrom(poHref, parsed[parsed.length - 1]), label: order.po_number },
+      ];
+
+  // The bar's Close goes exactly where the order's breadcrumb goes, trail and
+  // all. It used to be a bare href, which is how the trail got shorter: leave
+  // by the button, and the detail screen you land on has no `from` to pass on.
+  const closeHref =
+    trail.find((c) => c.href.split("?")[0] === poHref)?.href ?? poHref;
 
   return (
     <div className="space-y-6">
@@ -74,6 +86,7 @@ export async function ReceivingView({
           // columns, an empty document pane would read as "no invoice yet"
           // instead of "this isn't wired up at this end".
           attachmentError={attachmentError}
+          closeHref={closeHref}
         />
       )}
     </div>

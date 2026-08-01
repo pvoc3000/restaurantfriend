@@ -116,6 +116,7 @@ export function Receiving({
   canReceive,
   attachments,
   attachmentError,
+  closeHref,
 }: {
   order: PurchaseOrder & { vendors: { id: string; name: string } | null };
   lines: PoLine[];
@@ -125,6 +126,9 @@ export function Receiving({
   canReceive: boolean;
   attachments: SignedAttachment[];
   attachmentError: string | null;
+  /** Where the bar's Close goes: the order, carrying the trail that led here.
+   *  Built on the server, which is the only side that has the query string. */
+  closeHref: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -659,8 +663,17 @@ export function Receiving({
                 Finalize
               </ActionBarButton>
             )}
+            {/* The SAME href as the order's breadcrumb, trail and all. It was
+                a bare `/purchase-orders/{id}`, which threw the trail away and
+                then quietly shortened it for good: leaving by this button gave
+                a detail screen that no longer knew it came from the list, and
+                its Receive link could only stamp one crumb, so the next visit
+                here went back one place instead of two (Mark, 2026-07-31 —
+                "the breadcrumb only goes back one place. Is that
+                intentional?"). Breadcrumbs live in the query string precisely
+                so every link has to carry them. */}
             <Link
-              href={`/purchase-orders/${order.id}`}
+              href={closeHref}
               className="flex min-w-40 items-center justify-center px-5 text-center text-[12px] font-semibold uppercase tracking-[0.06em] text-white no-underline hover:bg-neutral-800 xl:min-w-48 xl:px-8"
             >
               Close
