@@ -7,7 +7,6 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { TextInput } from "@/components/ui/TextInput";
 import { AddShopSection } from "./AddShopSection";
-import { ColumnsMenu } from "@/components/catalog/ColumnsMenu";
 
 const SECTION_WIDTHS_KEY = "rf.shopSections.columnWidths.v1";
 
@@ -218,9 +217,6 @@ export function ShopSectionsTable({
             ? `${rows.length} at ${locationCode}`
             : `${shown.length} of ${rows.length}`}
         </span>
-        <span className="ml-auto">
-          <ColumnsMenu storageKey={SECTION_WIDTHS_KEY} columns={columns} />
-        </span>
       </div>
 
       {failed && <p className="text-sm text-accent">Could not delete: {failed}</p>}
@@ -235,6 +231,7 @@ export function ShopSectionsTable({
         // My choice, not Mark's — the other three lists' sets are his.
         compactBelow={1280}
         storageKey={SECTION_WIDTHS_KEY}
+        columnChooser
         defaultSort={{ key: "sort_order" }}
         empty={
           <p className="text-sm text-muted">

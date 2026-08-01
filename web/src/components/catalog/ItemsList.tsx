@@ -17,7 +17,6 @@ import {
 import { makeComparator, type SortDir, type SortValue } from "@/lib/tableSort";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { DataTable, type DataColumn } from "./DataTable";
-import { ColumnsMenu } from "./ColumnsMenu";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { TextInput } from "@/components/ui/TextInput";
 import type { ItemRow } from "@/app/(app)/items/page";
@@ -345,9 +344,6 @@ export function ItemsList({
         <span className="ml-auto text-xs text-faint">
           Drag the dividers between column headers to resize
         </span>
-        {/* A view control, so it sits with the list rather than in the
-            ActionBar (CLAUDE.md). */}
-        <ColumnsMenu storageKey={WIDTHS_STORAGE_KEY} columns={columns} />
       </div>
 
       {/* Search + category */}
@@ -449,6 +445,7 @@ export function ItemsList({
         columns={columns}
         rowKey={(item) => item.id}
         storageKey={WIDTHS_STORAGE_KEY}
+        columnChooser
         // Below xl the list sheds Section and Last ordered (Mark, 2026-07-31),
         // taking the row from 1040px to 690 — which fits a portrait iPad's
         // 736px column, so the column labels can stick. Both are still on the

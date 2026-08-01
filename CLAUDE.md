@@ -778,7 +778,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/ProgressBand` | a word in a button's label | something slow on a screen that's ALREADY painted (an invoice read is 30s+); same indeterminate bar, never a Dialog — the work behind it must stay usable |
   | `ui/Pane` + `PaneHeader` | a bordered div with a header band you style yourself | a framed column standing beside another (receiving's document + lines): one FIXED-height band so the two rules line up, and `overflow-hidden` so nothing paints over the frame |
   | `ui/RecordNav` + `lib/recordSet` | going back to the list for the next record | FMP's book on a detail screen: the LIST publishes its found set, the detail walks it |
-  | `catalog/ColumnsMenu` | a bespoke checklist | show/hide columns on a list; pair it with `DataColumn.pinned` on the column that IS the row |
+  | `DataTable columnChooser` | a bespoke checklist, or placing `ColumnsMenu` yourself | show/hide columns on a list — the table puts it above its own last column header; pair it with `DataColumn.pinned` on the column that IS the row |
   | `ui/BackToTop` | — | long lists; already on the guide |
   | `components/Breadcrumbs` | a back link | every detail screen, unconditionally |
 
@@ -1163,9 +1163,19 @@ weekday column, and 003 then silently made it per-vendor-item.
   its only inbound link is the order guide, whose "set" would be that day's
   walk lines rather than a list of records.
 - **Every list can hide columns** (`catalog/ColumnsMenu` + `lib/columnVisibility`,
-  Mark, 2026-07-31). A Columns button beside each list's filters — never the
-  ActionBar, which carries commands — opening the same `lib/anchoredPanel` panel
-  as `PickList` and `RowMenu`. `DataTable` reads the hidden set off its own
+  Mark, 2026-07-31). `DataTable` renders it itself, `columnChooser`-gated,
+  **directly above the LAST column header at the table's right edge** (Mark's
+  placement — it acts on these columns, and each list putting it somewhere
+  slightly different is how you end up hunting for it). It opens the same
+  `lib/anchoredPanel` panel as `PickList` and `RowMenu`.
+  **It is an ICON**, which is the one deliberate exception to the design
+  system's word-not-picture rule (Mark, 2026-07-31: "I know it goes against the
+  design, but would it kill us to use an icon here?"). It wouldn't: at that
+  spot a word reads as a column label, and three bars ARE the thing the control
+  acts on. State lives in the icon — the third bar goes hollow when something is
+  hidden — rather than in a badge, which would be a second thing to read. The
+  ⋯ of `RowMenu` is the same argument.
+  `DataTable` reads the hidden set off its own
   `storageKey`, so a table gets this by having a key rather than by opting in,
   and it composes with `compactBelow`: the narrow-screen set still sheds, and
   yours comes out on top of it. Stored as the HIDDEN keys, not the visible ones

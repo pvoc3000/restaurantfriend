@@ -60,12 +60,16 @@ export function ColumnsMenu<T>({
         type="button"
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label="Columns"
         onClick={() => setOpen((v) => !v)}
-        title="Choose which columns this list shows"
-        className="h-8 shrink-0 border border-ink bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink transition-colors hover:bg-ink hover:text-white"
+        title={
+          hiddenHere > 0
+            ? `Columns — ${offered.length - hiddenHere} of ${offered.length} shown`
+            : "Columns — choose which ones this list shows"
+        }
+        className="grid h-8 w-8 shrink-0 place-items-center text-muted transition-colors hover:bg-neutral-100 hover:text-ink"
       >
-        Columns
-        {hiddenHere > 0 && ` · ${offered.length - hiddenHere}/${offered.length}`}
+        <ColumnsIcon someHidden={hiddenHere > 0} />
       </button>
 
       {open &&
@@ -106,5 +110,37 @@ export function ColumnsMenu<T>({
           document.body
         )}
     </>
+  );
+}
+
+/**
+ * Three columns, the third hollow when something is hidden.
+ *
+ * An icon, which the design system otherwise doesn't do (Mark, 2026-07-31 —
+ * "I know it goes against the design, but would it kill us to use an icon
+ * here?"). It wouldn't: the control now lives at the table's right edge where a
+ * word would be read as a column label, and this is the one place in the app
+ * where a picture of the thing is unambiguous — the icon IS the table's
+ * columns. Precedent exists in `RowMenu`'s ⋯, which is the same argument.
+ *
+ * The hollow third bar is the state, and it's the icon rather than a badge
+ * because a count beside it would be a second thing to read. Squares, no
+ * rounding, `currentColor` — it inherits the button's hover the way the ⋯ does.
+ */
+function ColumnsIcon({ someHidden }: { someHidden: boolean }) {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true">
+      <rect x="0.5" y="1.5" width="4" height="13" fill="currentColor" />
+      <rect x="6" y="1.5" width="4" height="13" fill="currentColor" />
+      <rect
+        x="11.5"
+        y="1.5"
+        width="4"
+        height="13"
+        fill={someHidden ? "none" : "currentColor"}
+        stroke="currentColor"
+        strokeDasharray={someHidden ? "2 2" : undefined}
+      />
+    </svg>
   );
 }

@@ -13,7 +13,6 @@ import {
   type VendorSortKey,
 } from "@/lib/vendorFilters";
 import { DataTable, type DataColumn } from "./DataTable";
-import { ColumnsMenu } from "./ColumnsMenu";
 import { VendorActiveToggle } from "@/components/VendorActiveToggle";
 import { TextInput } from "@/components/ui/TextInput";
 import type { VendorRow } from "@/app/(app)/vendors/page";
@@ -252,7 +251,6 @@ export function VendorsList({
         <span className="ml-auto text-xs text-faint">
           Drag the dividers between column headers to resize
         </span>
-        <ColumnsMenu storageKey={WIDTHS_STORAGE_KEY} columns={columns} />
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -298,6 +296,7 @@ export function VendorsList({
         columns={columns}
         rowKey={(v) => v.id}
         storageKey={WIDTHS_STORAGE_KEY}
+        columnChooser
         // Sheds Order via and Account below xl (Mark, 2026-07-31). Now that
         // columns are proportional this is purely about how many you can READ
         // on a tablet — the table fits either way — so it's the app's ordinary

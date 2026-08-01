@@ -13,6 +13,7 @@ import {
   useViewportAtLeast,
 } from "@/lib/tableHead";
 import { ColumnHeader } from "./ColumnHeader";
+import { ColumnsMenu } from "./ColumnsMenu";
 
 export type DataColumn<T> = {
   key: string;
@@ -94,6 +95,7 @@ export function DataTable<T>({
   compactBelow,
   sort: controlledSort,
   onSortChange,
+  columnChooser = false,
 }: {
   rows: T[];
   columns: DataColumn<T>[];
@@ -142,6 +144,13 @@ export function DataTable<T>({
    */
   sort?: { key: string; dir: SortDir } | null;
   onSortChange?: (next: { key: string; dir: SortDir }) => void;
+  /**
+   * Show the columns chooser above the table's right edge — for a LIST, the
+   * screen whose table is the point. Off by default so the tables embedded in
+   * detail screens (a vendor's items, an item's locations) don't each sprout a
+   * control for four columns.
+   */
+  columnChooser?: boolean;
 }) {
   const defaultWidths = useMemo<ColumnWidths>(
     () => Object.fromEntries(columns.map((c) => [c.key, c.width])),
@@ -265,6 +274,15 @@ export function DataTable<T>({
 
   return (
     <div className="space-y-1">
+      {/* Directly above the LAST column header, at the table's right edge
+          (Mark, 2026-07-31). It belongs to the table, not to each list's filter
+          row: it acts on these columns, and every list putting it somewhere
+          slightly different is how you end up hunting for it. */}
+      {columnChooser && (
+        <div className="flex justify-end">
+          <ColumnsMenu storageKey={storageKey} columns={columns} />
+        </div>
+      )}
       <div ref={paneRef} className={wrapper}>
         {/* 13px on a tablet, 15 at a desk (Mark, 2026-07-31) — the row has
             less width to give at the small end, and smaller type buys back

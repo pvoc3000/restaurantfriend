@@ -33,7 +33,6 @@ import {
 import { makeComparator, type SortValue } from "@/lib/tableSort";
 import { withFrom } from "@/lib/breadcrumbs";
 import { usePublishRecordSet } from "@/lib/recordSet";
-import { ColumnsMenu } from "@/components/catalog/ColumnsMenu";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
 import type { PoListRow } from "@/app/(app)/purchase-orders/page";
@@ -734,9 +733,6 @@ export function PurchaseOrderList({
         >
           <span className="text-subtle">Select all shown</span>
         </Checkbox>
-        <span className="ml-auto">
-          <ColumnsMenu storageKey={PO_WIDTHS_KEY} columns={columns} />
-        </span>
       </div>
 
       <DataTable
@@ -756,6 +752,7 @@ export function PurchaseOrderList({
         // now that the columns are proportional.
         compactBelow={1280}
         storageKey={PO_WIDTHS_KEY}
+        columnChooser
         sort={{ key: filters.sort, dir: filters.dir }}
         onSortChange={(next) =>
           update({ sort: next.key as PoSortKey, dir: next.dir })
