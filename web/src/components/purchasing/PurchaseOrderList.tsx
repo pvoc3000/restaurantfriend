@@ -410,6 +410,19 @@ export function PurchaseOrderList({
       key: "select",
       label: "",
       width: 48,
+      // The header cell carries the select-all, which is where every list in
+      // the app puts it (Mark, 2026-07-31: "make it like Inventory. that's how
+      // they all should be"). No visible label — a checkbox at the head of a
+      // column of checkboxes has already said what it does. See
+      // DataColumn.header.
+      header: (
+        <Checkbox
+          checked={allVisibleChecked}
+          onChange={toggleAllVisible}
+          label="Select all shown"
+          size={18}
+        />
+      ),
       render: (po) => (
         <Checkbox
           checked={checked.has(po.id)}
@@ -742,17 +755,6 @@ export function PurchaseOrderList({
         compactBelow={1280}
         storageKey={PO_WIDTHS_KEY}
         columnChooser
-        // Above the checkbox column, opposite the chooser — no visible label,
-        // because a checkbox sitting at the head of a column of checkboxes has
-        // already said what it does (Mark, 2026-07-31).
-        tools={
-          <Checkbox
-            checked={allVisibleChecked}
-            onChange={toggleAllVisible}
-            label="Select all shown"
-            size={18}
-          />
-        }
         sort={{ key: filters.sort, dir: filters.dir }}
         onSortChange={(next) =>
           update({ sort: next.key as PoSortKey, dir: next.dir })
