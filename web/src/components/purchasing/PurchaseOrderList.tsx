@@ -724,17 +724,6 @@ export function PurchaseOrderList({
         </div>
       )}
 
-      <div className="flex items-center gap-3 text-sm">
-        <Checkbox
-          checked={allVisibleChecked}
-          onChange={toggleAllVisible}
-          label="select all"
-          size={18}
-        >
-          <span className="text-subtle">Select all shown</span>
-        </Checkbox>
-      </div>
-
       <DataTable
         rows={sorted}
         columns={columns}
@@ -753,6 +742,17 @@ export function PurchaseOrderList({
         compactBelow={1280}
         storageKey={PO_WIDTHS_KEY}
         columnChooser
+        // Above the checkbox column, opposite the chooser — no visible label,
+        // because a checkbox sitting at the head of a column of checkboxes has
+        // already said what it does (Mark, 2026-07-31).
+        tools={
+          <Checkbox
+            checked={allVisibleChecked}
+            onChange={toggleAllVisible}
+            label="Select all shown"
+            size={18}
+          />
+        }
         sort={{ key: filters.sort, dir: filters.dir }}
         onSortChange={(next) =>
           update({ sort: next.key as PoSortKey, dir: next.dir })

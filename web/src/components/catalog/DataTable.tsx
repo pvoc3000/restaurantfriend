@@ -96,6 +96,7 @@ export function DataTable<T>({
   sort: controlledSort,
   onSortChange,
   columnChooser = false,
+  tools,
 }: {
   rows: T[];
   columns: DataColumn<T>[];
@@ -151,6 +152,12 @@ export function DataTable<T>({
    * control for four columns.
    */
   columnChooser?: boolean;
+  /**
+   * A control for the whole table, on the strip above its FIRST column — a
+   * select-all checkbox, in practice. It sits opposite the columns chooser, so
+   * the two things that act on the table as a whole share one line.
+   */
+  tools?: ReactNode;
 }) {
   const defaultWidths = useMemo<ColumnWidths>(
     () => Object.fromEntries(columns.map((c) => [c.key, c.width])),
@@ -274,13 +281,22 @@ export function DataTable<T>({
 
   return (
     <div className="space-y-1">
-      {/* Directly above the LAST column header, at the table's right edge
-          (Mark, 2026-07-31). It belongs to the table, not to each list's filter
-          row: it acts on these columns, and every list putting it somewhere
-          slightly different is how you end up hunting for it. */}
-      {columnChooser && (
-        <div className="flex justify-end">
-          <ColumnsMenu storageKey={storageKey} columns={columns} />
+      {/* The table's own strip: whatever acts on the WHOLE table, on one line
+          above it. The chooser sits at the right, directly over the last column
+          header; `tools` sits at the left, over the first — which is where the
+          PO list's select-all went (Mark, 2026-07-31: "right above the
+          checkboxes in the list across from the eye icon"). Both belong to the
+          table, not to each list's filter row: they act on these columns and
+          these rows, and every list putting them somewhere slightly different
+          is how you end up hunting for them.
+
+          `pl-3 xl:pl-4` is a cell's own padding, so a control here lands in the
+          same column of pixels as the cells beneath it. The chooser needs no
+          such thing: it's flush right, and so is the table. */}
+      {(columnChooser || tools) && (
+        <div className="flex items-center justify-between">
+          <span className="flex items-center pl-3 xl:pl-4">{tools}</span>
+          {columnChooser && <ColumnsMenu storageKey={storageKey} columns={columns} />}
         </div>
       )}
       <div ref={paneRef} className={wrapper}>

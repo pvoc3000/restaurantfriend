@@ -1191,6 +1191,14 @@ weekday column, and 003 then silently made it per-vendor-item.
   32px button: a Material weight is a DIFFERENT PATH, not a `stroke-width`, so
   changing it means fetching the `wght300` artwork — and the button tracks the
   glyph, or the hover wash sits on the artwork instead of around it.
+  The strip it sits on is the TABLE's, not the list's: `tools` fills the other
+  end, above the first column, which is where the PO list's select-all went
+  (Mark, 2026-07-31 — "right above the checkboxes in the list across from the
+  eye icon", and with no visible label, since a checkbox at the head of a column
+  of checkboxes has already said what it does). The slot carries a cell's own
+  `pl-3 xl:pl-4` so a control lands in the same column of pixels as the cells
+  under it. Inventory still keeps its select-all in the selection column's
+  `header` cell — one row lower, and unasked-for either way.
   `DataTable` reads the hidden set off its own
   `storageKey`, so a table gets this by having a key rather than by opting in,
   and it composes with `compactBelow`: the narrow-screen set still sheds, and
