@@ -43,10 +43,22 @@ export function WorkingHere({
   // border — only the fill changes. A chip that sized itself to its own words
   // moved the column's edge as the working location moved down the list.
   const box =
-    "inline-flex h-7 w-32 items-center justify-center border text-[11px] font-semibold uppercase tracking-[0.12em]";
+    "inline-flex items-center justify-center border text-[11px] font-semibold uppercase tracking-[0.12em]";
 
   if (isWorking) {
-    return <span className={`${box} border-ink bg-ink text-white`}>Working here</span>;
+    // OPTICALLY the same size, which is not the same as measuring the same
+    // (Mark, 2026-08-01: "the working here button still seems smaller"). It
+    // measured identically — 128×28, same left and right edge, both borders
+    // black. A solid dark block simply reads smaller than an outline around
+    // white, because light areas expand to the eye. So the filled one is drawn
+    // 1px larger all round and pulled back by the same pixel: the painted box
+    // is 130×30, the space it occupies is still 128×28, and nothing in the
+    // column moves.
+    return (
+      <span className={`${box} -m-px h-[30px] w-[130px] border-ink bg-ink text-white`}>
+        Working here
+      </span>
+    );
   }
 
   if (!isActive) return null;
@@ -60,7 +72,7 @@ export function WorkingHere({
           await setActiveLocation(locationId);
         })
       }
-      className={`${box} border-ink text-ink hover:bg-ink hover:text-white disabled:opacity-35`}
+      className={`${box} h-7 w-32 border-ink text-ink hover:bg-ink hover:text-white disabled:opacity-35`}
     >
       {pending ? "Switching…" : "Work here"}
     </button>
