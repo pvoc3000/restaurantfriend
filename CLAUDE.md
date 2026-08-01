@@ -1248,6 +1248,28 @@ weekday column, and 003 then silently made it per-vendor-item.
   silently missing for anyone who ever opened the menu. `pinned` keeps the
   column that IS the row (Item, Name, Display name, PO number) out of the menu;
   control columns have no label to offer.
+- **Every multi-column table can also REORDER columns** (`lib/columnOrder`,
+  Mark, 2026-08-01: "allow the user to drag columns to whatever position they
+  want them in") — drag a header sideways; a drop line shows where it lands and
+  a chip names what's in hand. Movable = exactly the set the Columns menu
+  offers (labelled, not `pinned`): pinned and control columns hold their
+  DECLARED slots, so Active stays first, the ⋯ stays at the right edge, and the
+  name column stays put. Stored under `${storageKey}.order` beside widths and
+  visibility, as the FULL movable key order — a removed column drops out, and a
+  column added later surfaces at its declared position instead of being shoved
+  to the end for anyone who ever dragged (fixture-tested, the reconciliation
+  cases especially). Three gestures share a header cell: the grip is excluded
+  by `data-resize-grip`, a press travelling <6px horizontally is still the sort
+  click (a capture-phase squelch eats the post-drag click), and the header is
+  `touch-pan-y` so a vertical touch stays a scroll — pointer events throughout,
+  never HTML5 DnD, because iPad Safari is the ordering stopgap. React state
+  changes twice per drag (activation, release); the per-move chip and drop-line
+  positions are written straight to the portalled overlay nodes through refs,
+  because a per-move setState would re-render Inventory's 790 rows. Geometry is
+  measured ONCE at pointer-down — nothing reorders live mid-drag. "Reset column
+  order" joins the widths reset under the table. Verified live on /vendors:
+  drag before/after, persistence across reload, sort click intact, store shape
+  `["active","order_days","type",…]`. Touch untested on real hardware yet.
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server

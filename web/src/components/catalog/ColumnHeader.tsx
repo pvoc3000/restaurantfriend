@@ -18,6 +18,8 @@ export function ColumnHeader({
   onSort,
   onResizeStart,
   onResizeReset,
+  onDragStart,
+  dragSource = false,
   children,
 }: {
   label: string;
@@ -27,6 +29,14 @@ export function ColumnHeader({
   onSort?: () => void;
   onResizeStart: (event: PointerEvent) => void;
   onResizeReset: () => void;
+  /**
+   * Makes the column movable: a sideways drag from anywhere in the header
+   * (except the resize grip) picks it up. A press that doesn't travel is still
+   * the sort click — see lib/columnOrder's threshold.
+   */
+  onDragStart?: (event: PointerEvent) => void;
+  /** This column is the one being dragged — dim it while its ghost travels. */
+  dragSource?: boolean;
   /** Replaces the sort button — used for the select-all checkbox column. */
   children?: ReactNode;
 }) {
@@ -40,16 +50,29 @@ export function ColumnHeader({
       aria-sort={sorted ? (sorted === "asc" ? "ascending" : "descending") : "none"}
     >
       <div
+        // touch-pan-y, not touch-none: vertical pans stay the browser's (the
+        // header is sticky at the top of a list you scroll), horizontal ones
+        // reach the drag as pointer moves instead of being taken for a scroll.
+        onPointerDown={
+          onDragStart
+            ? (e) => {
+                if ((e.target as Element).closest("[data-resize-grip]")) return;
+                onDragStart(e);
+              }
+            : undefined
+        }
         className={`relative flex items-center px-3 py-3 xl:px-4 ${
           align === "right" ? "justify-end" : ""
-        }`}
+        } ${onDragStart ? "touch-pan-y" : ""} ${dragSource ? "opacity-40" : ""}`}
       >
         {children ??
           (onSort ? (
             <button
               type="button"
               onClick={onSort}
-              title={`Sort by ${label.toLowerCase()}`}
+              title={`Sort by ${label.toLowerCase()}${
+                onDragStart ? " · drag sideways to move the column" : ""
+              }`}
               className={`inline-flex max-w-full items-center gap-1 px-1 uppercase tracking-[0.12em] hover:bg-neutral-100 ${
                 sorted ? "font-semibold text-ink" : "text-subtle"
               }`}
@@ -63,13 +86,19 @@ export function ColumnHeader({
               </span>
             </button>
           ) : (
-            <span className="truncate px-1 text-subtle">{label}</span>
+            <span
+              title={onDragStart ? "Drag sideways to move the column" : undefined}
+              className="truncate px-1 text-subtle"
+            >
+              {label}
+            </span>
           ))}
 
         {/* Resize grip: a visible divider on every column boundary so it's
             discoverable at rest, with a hit area wider than the line itself and
             straddling the boundary. `group` drives the line's hover state. */}
         <span
+          data-resize-grip
           onPointerDown={onResizeStart}
           onDoubleClick={onResizeReset}
           role="separator"

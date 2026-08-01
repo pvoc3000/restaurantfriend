@@ -12,6 +12,7 @@
   },
   "include": [
     "./**/*.ts",
+    "../../src/lib/columnOrder.ts",
     "../../src/lib/receiving.ts",
     "../../src/lib/invoiceMatch.ts",
     "../../src/lib/invoiceExtraction.ts",

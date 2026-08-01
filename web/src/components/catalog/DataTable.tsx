@@ -1,10 +1,19 @@
 "use client";
 
 import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import { makeComparator, nextSortDir, type SortDir, type SortValue } from "@/lib/tableSort";
 import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
 import { useColumnVisibility } from "@/lib/columnVisibility";
+import {
+  applyColumnOrder,
+  isMovableColumn,
+  movedColumnOrder,
+  useColumnDrag,
+  useColumnOrder,
+  type ColumnDropTarget,
+} from "@/lib/columnOrder";
 import { useScrollMemory } from "@/lib/scrollMemory";
 import {
   STICKY_HEAD_ROW,
@@ -182,10 +191,37 @@ export function DataTable<T>({
   // the Columns menu (lib/columnVisibility, keyed by this same storageKey, so a
   // table gets this by having a key rather than by opting in).
   const { hidden } = useColumnVisibility(storageKey);
-  const visibleColumns = columns.filter(
+  // WHERE the columns sit is the reader's too (lib/columnOrder, same key):
+  // drag a header sideways to move it. Order is applied before the visibility
+  // filters so all three compose — the compact set still sheds, your unchecked
+  // columns still come out, and what's left stands where you put it.
+  const { stored: storedOrder, setOrder, resetOrder, customized: orderCustomized } =
+    useColumnOrder(storageKey);
+  const orderedColumns = useMemo(
+    () => applyColumnOrder(columns, storedOrder),
+    [columns, storedOrder]
+  );
+  const visibleColumns = orderedColumns.filter(
     (col) =>
       !(compact && col.hideWhenCompact) && !(hidden.has(col.key) && !col.pinned)
   );
+
+  // The drag writes through the FULL movable order (hidden columns keep their
+  // places); the drop target always names a VISIBLE column, so the anchor is
+  // present in both.
+  const headRowRef = useRef<HTMLTableRowElement>(null);
+  const { dragging, startColumnDrag, indicatorRef, chipRef } = useColumnDrag({
+    headRowRef,
+    onDrop: (dragKey: string, target: ColumnDropTarget) => {
+      const movableKeys = orderedColumns.filter(isMovableColumn).map((c) => c.key);
+      setOrder(movedColumnOrder(movableKeys, dragKey, target));
+    },
+  });
+  const dragSlots = visibleColumns.map((c) => ({
+    key: c.key,
+    movable: isMovableColumn(c),
+  }));
+  const movableVisible = dragSlots.filter((s) => s.movable).length;
 
   const [internalSort, setInternalSort] = useState<{ key: string; dir: SortDir } | null>(
     defaultSort ? { key: defaultSort.key, dir: defaultSort.dir ?? "asc" } : null
@@ -286,7 +322,9 @@ export function DataTable<T>({
           as a second way to do the same thing. */}
       {columnChooser && (
         <div className="flex justify-end">
-          <ColumnsMenu storageKey={storageKey} columns={columns} />
+          {/* The ordered list, not the declared one — the checklist reads in
+              the same order as the table it acts on. */}
+          <ColumnsMenu storageKey={storageKey} columns={orderedColumns} />
         </div>
       )}
       <div ref={paneRef} className={wrapper}>
@@ -305,6 +343,7 @@ export function DataTable<T>({
                 inside itself. See lib/tableHead for both, and for why the
                 wrapper's overflow has to get out of the way. */}
             <tr
+              ref={headRowRef}
               className={`text-left ${scroll ? STICKY_HEAD_ROW_IN_PANE : STICKY_HEAD_ROW}`}
             >
               {visibleColumns.map((col) => (
@@ -316,6 +355,13 @@ export function DataTable<T>({
                   onSort={col.sortValue ? () => toggleSort(col.key) : undefined}
                   onResizeStart={(e) => startResize(e, col.key)}
                   onResizeReset={() => setWidth(col.key, col.width)}
+                  onDragStart={
+                    movableVisible > 1 && isMovableColumn(col)
+                      ? (e) =>
+                          startColumnDrag(e, { key: col.key, label: col.label }, dragSlots)
+                      : undefined
+                  }
+                  dragSource={dragging?.key === col.key}
                 >
                   {col.header}
                 </ColumnHeader>
@@ -422,17 +468,67 @@ export function DataTable<T>({
         </table>
       </div>
 
-      {customized && (
-        <div className="text-right">
-          <button
-            onClick={reset}
-            title="Restore the default column widths"
-            className="text-[12px] uppercase tracking-[0.12em] text-subtle hover:underline"
-          >
-            Reset column widths
-          </button>
+      {(customized || orderCustomized) && (
+        <div className="flex justify-end gap-4">
+          {orderCustomized && (
+            <button
+              onClick={resetOrder}
+              title="Restore the default column order"
+              className="text-[12px] uppercase tracking-[0.12em] text-subtle hover:underline"
+            >
+              Reset column order
+            </button>
+          )}
+          {customized && (
+            <button
+              onClick={reset}
+              title="Restore the default column widths"
+              className="text-[12px] uppercase tracking-[0.12em] text-subtle hover:underline"
+            >
+              Reset column widths
+            </button>
+          )}
         </div>
       )}
+
+      {/* The drag overlay: the drop line down the table's on-screen height and
+          a chip naming what's in hand. Portalled to the body — a fixed element
+          inside the table would still be clipped by a transformed ancestor —
+          and pointer-events-none so neither can swallow the pointerup. The
+          per-move positions are written through the refs (lib/columnOrder), so
+          nothing here re-renders while the pointer moves. */}
+      {dragging &&
+        createPortal(
+          <>
+            <div
+              ref={indicatorRef}
+              aria-hidden
+              className="pointer-events-none fixed z-50 w-0.5 bg-ink"
+              style={{
+                top: dragging.tableTop,
+                height: dragging.tableHeight,
+                display: "none",
+              }}
+            />
+            <div
+              ref={chipRef}
+              aria-hidden
+              className="pointer-events-none fixed z-50 border-2 border-ink bg-white px-2 py-1 text-[11px] font-semibold whitespace-nowrap uppercase tracking-[0.12em] text-ink"
+              style={{
+                left: dragging.x,
+                top: dragging.y,
+                // Above the finger — which is covering the drop area — but
+                // beside a mouse pointer, which isn't.
+                transform: dragging.touch
+                  ? "translate(-50%, calc(-100% - 16px))"
+                  : "translate(14px, 18px)",
+              }}
+            >
+              {dragging.label}
+            </div>
+          </>,
+          document.body
+        )}
     </div>
   );
 }
