@@ -39,12 +39,14 @@ export function WorkingHere({
 }) {
   const [pending, startTransition] = useTransition();
 
+  // ONE box for both states (Mark, 2026-08-01): same width, same height, same
+  // border — only the fill changes. A chip that sized itself to its own words
+  // moved the column's edge as the working location moved down the list.
+  const box =
+    "inline-flex h-7 w-32 items-center justify-center border text-[11px] font-semibold uppercase tracking-[0.12em]";
+
   if (isWorking) {
-    return (
-      <span className="inline-block bg-ink px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-white">
-        Working here
-      </span>
-    );
+    return <span className={`${box} border-ink bg-ink text-white`}>Working here</span>;
   }
 
   if (!isActive) return null;
@@ -58,7 +60,7 @@ export function WorkingHere({
           await setActiveLocation(locationId);
         })
       }
-      className="border border-ink px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink hover:bg-ink hover:text-white disabled:opacity-35"
+      className={`${box} border-ink text-ink hover:bg-ink hover:text-white disabled:opacity-35`}
     >
       {pending ? "Switching…" : "Work here"}
     </button>

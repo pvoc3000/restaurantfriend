@@ -547,12 +547,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Rebuilt 2026-08-01 on Mark's FileMaker shape, after living with the
    masthead's `<select>`: **the working location is CHOSEN FROM A LIST**, and
    `components/LocationSwitcher.tsx` is deleted. The list leads with the Active
-   toggle (purchaser+ only, per 001's policy), then a **Working** column —
+   toggle (purchaser+ only, per 001's policy) and ENDS with the **Working**
+   column (Mark, 2026-08-01 — read the row, then act on it, and the control you
+   press repeatedly sits against the right edge, like the guide's stepper) —
    `components/location/WorkingHere.tsx`, three states: a filled `WORKING HERE`
    chip on the one you're at (filled, where `VendorLocationsTable`'s `here`
    badge is only bordered — among six rows it has to be unmissable, and fill is
    the strongest mark available without spending colour), a `Work here` button
-   on any other ACTIVE one, and **nothing at all on an inactive one**. Only an
+   on any other ACTIVE one, and **nothing at all on an inactive one**. Chip and
+   button are ONE box — same width, height and border, only the fill differs —
+   or the column's edge moves as the working location moves down the list. The
+   working row is `font-bold`; a closed one is **not** dimmed (Mark,
+   2026-08-01): its links work like any other row's, and greying text you can
+   still click reads as disabled and lies. Only an
    open shop can be worked at (Mark, 2026-08-01): switching to a closed one
    used to be the only way to reach its record, and the list reaches it
    directly. That's a UI rule — `set_my_member_profile` checks only that the

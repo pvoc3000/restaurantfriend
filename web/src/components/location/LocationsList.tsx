@@ -94,15 +94,11 @@ export function LocationsList({
     useMemo(() => sorted.map((l) => ({ id: l.id, href: locationDetailHref(l.id) })), [sorted])
   );
 
-  // Fading has to be applied CELL by cell: every cell here sets its own colour
-  // (a link is text-ink, a value is text-muted), and those beat a class on the
-  // row. It matters most for staff, who don't get the Active column and would
-  // otherwise have nothing at all telling them why three rows offer no button.
-  const link = (r: LocationRow) =>
-    `underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900 ${
-      r.is_active ? "text-ink" : "text-faint"
-    }`;
-  const value = (r: LocationRow) => (r.is_active ? "text-muted" : "text-faint");
+  // A closed location is NOT greyed out (Mark, 2026-08-01): its links work like
+  // any other row's, and dimming text you can still click reads as "disabled"
+  // and lies. The Active toggle is what says closed.
+  const LINK =
+    "text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900";
 
   const columns: DataColumn<LocationRow>[] = [
     // Active leads on every catalog table (Mark, 2026-07-23).
@@ -125,6 +121,47 @@ export function LocationsList({
         ]
       : []),
     {
+      key: "code",
+      label: "Code",
+      width: 100,
+      sortValue: (r) => sortValue(r, "code"),
+      render: (r) => (
+        <Link href={locationDetailHref(r.id)} className={LINK}>
+          {r.code}
+        </Link>
+      ),
+    },
+    {
+      key: "name",
+      label: "Name",
+      width: 330,
+      pinned: true,
+      sortValue: (r) => sortValue(r, "name"),
+      render: (r) => (
+        <Link href={locationDetailHref(r.id)} className={LINK}>
+          {r.name}
+        </Link>
+      ),
+    },
+    {
+      key: "kind",
+      label: "Kind",
+      width: 120,
+      sortValue: (r) => sortValue(r, "kind"),
+      render: (r) => <span className="text-muted">{r.kind}</span>,
+    },
+    {
+      key: "city",
+      label: "City",
+      width: 180,
+      hideWhenCompact: true,
+      sortValue: (r) => sortValue(r, "city"),
+      render: (r) => <span className="text-muted">{r.city ?? "—"}</span>,
+    },
+    // LAST (Mark, 2026-08-01) — you read the row, then act on it, and the one
+    // control you press repeatedly sits against the right edge where a thumb
+    // lives. Same reasoning as the order guide's stepper.
+    {
       key: "working",
       label: "Working",
       width: 170,
@@ -138,44 +175,6 @@ export function LocationsList({
           isActive={r.is_active}
         />
       ),
-    },
-    {
-      key: "code",
-      label: "Code",
-      width: 100,
-      sortValue: (r) => sortValue(r, "code"),
-      render: (r) => (
-        <Link href={locationDetailHref(r.id)} className={link(r)}>
-          {r.code}
-        </Link>
-      ),
-    },
-    {
-      key: "name",
-      label: "Name",
-      width: 330,
-      pinned: true,
-      sortValue: (r) => sortValue(r, "name"),
-      render: (r) => (
-        <Link href={locationDetailHref(r.id)} className={link(r)}>
-          {r.name}
-        </Link>
-      ),
-    },
-    {
-      key: "kind",
-      label: "Kind",
-      width: 120,
-      sortValue: (r) => sortValue(r, "kind"),
-      render: (r) => <span className={value(r)}>{r.kind}</span>,
-    },
-    {
-      key: "city",
-      label: "City",
-      width: 180,
-      hideWhenCompact: true,
-      sortValue: (r) => sortValue(r, "city"),
-      render: (r) => <span className={value(r)}>{r.city ?? "—"}</span>,
     },
   ];
 
@@ -209,10 +208,11 @@ export function LocationsList({
         sort={sort}
         onSortChange={(next) => setSort({ key: next.key as SortKey, dir: next.dir })}
         // The working row is stated twice: the filled chip in its own column,
-        // and weight here. Deliberately not a background wash — DataTable's
-        // hover:bg-neutral-50 outranks a plain background, so the marked row
-        // would get LIGHTER under the pointer than its neighbours.
-        rowClassName={(r) => (r.id === workingLocationId ? "font-semibold" : "")}
+        // and weight here — BOLD, not semibold (Mark, 2026-08-01), because it
+        // is the one row you're looking for. Deliberately not a background wash
+        // — DataTable's hover:bg-neutral-50 outranks a plain background, so the
+        // marked row would get LIGHTER under the pointer than its neighbours.
+        rowClassName={(r) => (r.id === workingLocationId ? "font-bold" : "")}
         empty={<p className="text-sm text-muted">No locations match that search.</p>}
       />
     </div>
