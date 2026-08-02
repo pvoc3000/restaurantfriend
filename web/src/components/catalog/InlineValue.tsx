@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { evaluateNumeric, looksLikeExpression } from "@/lib/calc";
@@ -61,6 +61,29 @@ function setJsonPath(
   if (next === null) delete node[leaf];
   else node[leaf] = next;
   return root;
+}
+
+/**
+ * The calendar affordance, drawn rather than borrowed: Safari renders no icon
+ * on a date input at all, and Chrome's lives inside the field where it can't be
+ * styled to match anything. Square, hairline, `currentColor` — the house idiom,
+ * and the same call as the Columns eye (an icon earns its place where a word
+ * would read as a label).
+ */
+function CalendarIcon() {
+  return (
+    <svg
+      aria-hidden
+      viewBox="0 0 16 16"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.25"
+    >
+      <rect x="1.5" y="3" width="13" height="11.5" />
+      <path d="M1.5 6.5h13M5 1.5v3M11 1.5v3" />
+    </svg>
+  );
 }
 
 export function InlineValue({
@@ -138,8 +161,6 @@ export function InlineValue({
   const router = useRouter();
   const supabase = createClient();
   const dateRef = useRef<HTMLInputElement>(null);
-  /** A date write that's been sent but whose fresh prop hasn't arrived yet. */
-  const pending = useRef<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
@@ -227,46 +248,6 @@ export function InlineValue({
       ? evaluateNumeric(draft)
       : null;
 
-  /**
-   * Hold the date box to the column — after every render, and on the way out.
-   *
-   * `value` is what the row holds; a native date input is a control the BROWSER
-   * can also write to, and when it does React has no prop change to correct it
-   * with, because a controlled input only touches the DOM when the rendered
-   * value differs from the LAST RENDER's. That is how a PO whose
-   * `delivery_date` is null came to display today's date (Mark, 2026-08-02),
-   * and it's why a field meant to stay blank is the worst case: its prop can
-   * never change, so nothing ever puts it back.
-   *
-   * Two triggers, because neither is enough alone. The render pass catches a
-   * box that drifted while something else on the screen moved; but a page that
-   * simply sits there never renders again, so `onBlur` catches the box you just
-   * stepped a date into and walked away from. `onChange` still handles the
-   * rejected and no-op paths, which is the common case and the cheapest.
-   *
-   * `pending` is what stops the reset fighting a real edit: a write is async and
-   * `router.refresh()` lands after it, so between the two the prop still holds
-   * the OLD value and a blind reset would snap the box back to it. It clears
-   * itself once the prop catches up. A FAILED write leaves it set, which is
-   * deliberate — the typed value stays on screen with the error, same as every
-   * other kind here.
-   */
-  const stored = value === null ? "" : String(value);
-  if (pending.current !== null && pending.current === stored) pending.current = null;
-
-  const holdDateToColumn = () => {
-    const el = dateRef.current;
-    if (!el || pending.current !== null) return;
-    if (el.value !== stored) el.value = stored;
-  };
-
-  useLayoutEffect(() => {
-    const el = dateRef.current;
-    // Not while it has focus, or it would fight someone mid-edit.
-    if (kind !== "date" || !el || el === document.activeElement) return;
-    holdDateToColumn();
-  });
-
   // A chosen value writes on the spot: there's no draft to abandon and nothing
   // to confirm, which is the same call BaseUnitEditor made ("picking a unit IS
   // the edit") and the reason the control can live in a table cell at all.
@@ -290,73 +271,89 @@ export function InlineValue({
   }
 
   // A DATE ALWAYS SHOWS ITS CALENDAR (Mark, 2026-08-02: "always include a
-  // calendar picker for any date field" — the PO's delivery date had one and
-  // the order date beside it didn't, which is what made the pair look
-  // unfinished). So `kind="date"` is the second control that doesn't
-  // click-to-edit: the browser's own date input is already a box you can type
-  // into AND a picker, and hiding it behind a dotted underline bought nothing
-  // while costing the one affordance a date has that no other field does.
+  // calendar picker for any date field"). So `kind="date"` is the second kind
+  // that doesn't click-to-edit — a date input is already a box you can type
+  // into AND a picker, and hiding that behind a dotted underline cost the one
+  // affordance a date has that no other field does.
   //
   // Writes on change, like `kind="pick"` and for the same reason: a date input
   // emits "" until the whole date is valid, so a change event IS a finished
   // value — there's no half-typed state to protect and nothing to confirm.
+  //
+  // BUT THE NATIVE CHROME OF THIS CONTROL IS NOT USABLE AS SHIPPED, because the
+  // two engines disagree about both halves of it:
+  //
+  //   - SAFARI PAINTS TODAY'S DATE INTO AN EMPTY ONE. Its internal edit fields
+  //     render the current date as a ghost when the value is "", so a column
+  //     holding null reads as a delivery that already happened. The VALUE is
+  //     genuinely empty — this is paint, not data, which is why the database
+  //     stayed null through two rounds of Mark reporting it and why nothing in
+  //     the DOM value was ever wrong. It is long-standing WebKit behaviour with
+  //     no HTML-level opt-out (see mui/material-ui#37226 and the WeWeb thread).
+  //   - SAFARI DRAWS NO CALENDAR ICON, so the affordance Mark asked for exists
+  //     only in Chrome.
+  //
+  // So the chrome is ours: `.rf-date` in globals.css hides the native indicator
+  // and blanks the edit fields while `data-empty` is set, and the glyph beside
+  // the box is drawn here and opens the picker with `showPicker()`. What's left
+  // native is the value, the keyboard, and the picker itself.
   if (kind === "date") {
+    const empty = value === null || value === "";
     return (
       <span className="inline-flex flex-col items-start">
-        <input
-          ref={dateRef}
-          type="date"
-          value={value === null ? "" : String(value)}
-          disabled={saving}
-          required={!nullable}
-          aria-label={column}
-          // THE BROWSER MUST NOT PUT ANYTHING IN HERE ON ITS OWN. A date input
-          // is a form control, and browsers do two things to form controls that
-          // a database cell has no use for: they RESTORE the last value the
-          // field held across reloads (session history state, which survives a
-          // hard reload — it isn't the CSS or the JS), and they offer autofill.
-          // Either lands a value React never rendered and, on a field the row
-          // has no value for, one that looks exactly like data. Mark saw this
-          // twice on 132-181132-02, whose `delivery_date` is null: the field
-          // read 08/02/2026 — today — on a browser I can't reproduce it on.
-          //
-          // `autoComplete="off"` turns both off. It is the right attribute for
-          // every editor in this component: nothing here is a form field in the
-          // sense a browser means, and a remembered value is never wanted.
-          autoComplete="off"
-          onChange={(e) => {
-            const next = e.target.value || null;
-
-            // A rejected or no-op edit puts the box back by hand — see
-            // holdDateToColumn for why React can't.
-            if (next === null && !nullable) {
-              setError("required");
-              e.target.value = stored;
-              return;
-            }
-            if (next === (value ?? null)) {
-              e.target.value = stored;
-              return;
-            }
-            setError(null);
-            pending.current = next ?? "";
-            void write(next, false);
-          }}
-          onBlur={holdDateToColumn}
-          // NO BORDER (Mark, 2026-08-02: "I don't like the bounding box on the
-          // date fields, but I like the calendar icon"). A boxed field among
-          // dotted-underline cells read as a different class of control; the
-          // calendar glyph is the browser's own and survives losing the frame,
-          // so the affordance stays and the column goes quiet. Hover gets the
-          // same wash the resting button has, which is what's left saying the
-          // value takes an edit.
-          //
-          // px-1 py-0.5 is that button's padding, not a field's: these sit in a
-          // dl beside text cells, and a date indented 8px while the note beside
-          // it is indented 4px is exactly the misalignment Mark caught on
-          // `sent_via`.
-          className={`px-1 py-0.5 tabular-nums hover:bg-neutral-100 disabled:opacity-35 ${className}`}
-        />
+        {/* px-1 py-0.5 is the resting BUTTON's padding, not a field's: these sit
+            in a dl beside text cells, and a date indented 8px while the note
+            beside it is indented 4px is exactly the misalignment Mark caught on
+            `sent_via`. No border (Mark: "I don't like the bounding box on the
+            date fields, but I like the calendar icon") — the hover wash is what
+            says the value takes an edit. */}
+        <span className="inline-flex items-center gap-1 px-1 py-0.5 hover:bg-neutral-100">
+          <input
+            ref={dateRef}
+            type="date"
+            value={empty ? "" : String(value)}
+            disabled={saving}
+            required={!nullable}
+            aria-label={column}
+            data-empty={empty ? "" : undefined}
+            // Nothing here is a form field in the sense a browser means, so it
+            // should neither be autofilled nor restored from session history.
+            autoComplete="off"
+            onChange={(e) => {
+              const next = e.target.value || null;
+              if (next === null && !nullable) {
+                setError("required");
+                return;
+              }
+              if (next === (value ?? null)) return;
+              setError(null);
+              void write(next, false);
+            }}
+            className={`rf-date bg-transparent tabular-nums outline-none disabled:opacity-35 ${className}`}
+          />
+          {/* Ours, not the engine's — Safari draws none and Chrome's sits
+              inside the field. `showPicker` needs a user gesture, which a click
+              is; where it isn't available, focusing the field is what a reader
+              can act on. */}
+          <button
+            type="button"
+            disabled={saving}
+            aria-label={`Choose ${column}`}
+            title="Choose a date"
+            onClick={() => {
+              const el = dateRef.current;
+              if (!el) return;
+              try {
+                el.showPicker();
+              } catch {
+                el.focus();
+              }
+            }}
+            className="shrink-0 text-muted hover:text-ink disabled:opacity-35"
+          >
+            <CalendarIcon />
+          </button>
+        </span>
         {error && <span className="text-xs text-accent">{error}</span>}
       </span>
     );

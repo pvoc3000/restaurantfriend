@@ -46,6 +46,33 @@
   position: static;
 }
 
+/* The date cell's chrome is OURS, because the two engines don't agree on the
+   native version and one of them is actively misleading.
+
+   Safari paints TODAY'S DATE into an empty date input — its internal edit
+   fields render the current date as a ghost whenever the value is "". The value
+   really is empty, so the column stays null and nothing in the DOM is wrong;
+   it just reads as a delivery that already happened. That cost two rounds of
+   Mark reporting it (2026-08-02) and two fixes aimed at the wrong thing, since
+   in Chrome the same field renders the mm/dd/yyyy placeholder and looks
+   correct. WebKit gives no HTML-level opt-out, so the ghost is painted out
+   here: transparent while `data-empty` is set, which also retires Chrome's
+   placeholder and leaves both engines showing the blank field Mark asked for.
+
+   The native picker indicator goes too — Safari draws none, Chrome draws one
+   inside the field that can't be made to match anything — and InlineValue
+   supplies its own glyph beside the box.
+
+   Unlayered, like the sticky-head rule above: these have to beat Tailwind's
+   layered utilities, and a ::-webkit- pseudo-element can't be written as one. */
+.rf-date::-webkit-calendar-picker-indicator {
+  display: none;
+}
+
+.rf-date[data-empty]::-webkit-datetime-edit {
+  color: transparent;
+}
+
 /* The one animation in the system, and it earns it: the order guide spends
    ~3.5s on the server before the browser gets a byte, and until now the old
    page just sat there. A static "loading" label still reads as stuck — motion
