@@ -29,7 +29,7 @@ function subscribe(onChange: () => void) {
 
 /**
  * useSyncExternalStore rather than an effect + setState, the same choice as
- * chromeStore and columnWidths: the server has no scroll position, and a
+ * columnWidths: the server has no scroll position, and a
  * setState in an effect is what the lint config rejects. The snapshot is a
  * boolean, so it's referentially stable and can't loop.
  */

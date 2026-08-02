@@ -6,7 +6,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
-import { useChromeCollapsed } from "@/lib/chromeStore";
 import { useScrollMemoryKey } from "@/lib/scrollMemory";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
@@ -77,11 +76,6 @@ export function OrderGuide({
 }) {
   const router = useRouter();
   const supabase = createClient();
-
-  // The masthead's ▲ hides this screen's shelf too — title, day picker, vendor
-  // totals and filters — leaving the strip, the column labels and the list
-  // (Mark, 2026-07-29). Same flag, so it's one button and one memory, not two.
-  const chromeCollapsed = useChromeCollapsed();
 
   // Every screen is scroll-restored by the shell (components/ScrollMemory), but
   // the guide is the one screen its default key can't describe, so it names its
@@ -478,7 +472,7 @@ export function OrderGuide({
     // can scroll out from under it. Paired with the bar's own height — see
     // components/ui/ActionBar.
     <>
-    <div className={`space-y-4 pb-22 ${chromeCollapsed ? "-mt-8" : ""}`}>
+    <div className="space-y-4 pb-22">
       {/* ABOVE the shelf, and outside it: a due reminder is an alert, not a view
           control, so it must survive the collapse that hides everything else up
           here. Walking with the chrome collapsed is the normal way to walk —
@@ -495,179 +489,175 @@ export function OrderGuide({
         canWrite={canGeneratePos}
       />
 
-      {/* The shelf — everything above the list. It goes with the menu when the
-          chrome collapses: on a walk you're reading rows, and the title, the
-          day picker, the totals and the filters are all things you set BEFORE
-          you start (Mark, 2026-07-29). The strip keeps which location and which
-          page you're on, and brings the rest back in a tap. */}
-      {!chromeCollapsed && (
-        <>
-          {/* Title block. The context line that used to sit under the title is
-              gone (Mark, 2026-07-29) — the location is in the masthead and the
-              day is the lit chip in the picker, so all it added was the walked
-              date. What's left of it is the count, moved up BESIDE the title
-              where it reads as a subtitle, with the day picker taking the line
-              underneath. */}
-          <div className="space-y-3">
-            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-              <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-                Order Guide
-              </h1>
-              <p className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-                {visibleRows.length} of {rows.length} items
-              </p>
-              <button
-                onClick={() => router.refresh()}
-                className="ml-auto text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-              >
-                Refresh
-              </button>
-            </div>
+      {/* The shelf — everything above the list: the title, the day picker,
+          the vendor totals and the filters. It used to hide with the
+          masthead's collapse toggle, on the argument that these are all
+          things you set BEFORE you start walking; that toggle is gone
+          (Mark, 2026-08-02) and so is the hiding. */}
+      {/* Title block. The context line that used to sit under the title is
+          gone (Mark, 2026-07-29) — the location is in the masthead and the
+          day is the lit chip in the picker, so all it added was the walked
+          date. What's left of it is the count, moved up BESIDE the title
+          where it reads as a subtitle, with the day picker taking the line
+          underneath. */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Order Guide
+          </h1>
+          <p className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+            {visibleRows.length} of {rows.length} items
+          </p>
+          <button
+            onClick={() => router.refresh()}
+            className="ml-auto text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+          >
+            Refresh
+          </button>
+        </div>
 
-            {/* All seven days, always, as one segmented control, directly under
-                the title. The guide exists every day — picking one scopes the
-                list to what's orderable then, and a day with nothing scheduled
-                simply renders empty rather than disappearing. This control is
-                where TabPicker's look comes from (Mark, 2026-08-01). */}
-            <TabPicker
-              ariaLabel="Guide day"
-              value={String(weekday)}
-              options={[1, 2, 3, 4, 5, 6, 7].map((d) => ({
-                key: String(d),
-                label: WEEKDAY_LABELS[d - 1],
-                href: `/order-guide?day=${d}`,
-              }))}
-            />
-          </div>
+        {/* All seven days, always, as one segmented control, directly under
+            the title. The guide exists every day — picking one scopes the
+            list to what's orderable then, and a day with nothing scheduled
+            simply renders empty rather than disappearing. This control is
+            where TabPicker's look comes from (Mark, 2026-08-01). */}
+        <TabPicker
+          ariaLabel="Guide day"
+          value={String(weekday)}
+          options={[1, 2, 3, 4, 5, 6, 7].map((d) => ({
+            key: String(d),
+            label: WEEKDAY_LABELS[d - 1],
+            href: `/order-guide?day=${d}`,
+          }))}
+        />
+      </div>
 
-          {/* Vendor totals bar — the guide's central instrument (§4.2): square
-              boxes on a ruled bar, so it reads as an instrument panel rather
-              than a row of tags. */}
-          <div className="flex flex-wrap items-center gap-4 border-y border-ink py-4">
-            {totals.length === 0 ? (
-              <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-                Nothing ordered yet — quantities you enter total up here by
-                vendor
-              </span>
-            ) : (
-              totals.map((t) => (
-                <span
-                  key={t.vendor_id}
-                  title={
-                    t.short
-                      ? `Under the ${money(t.minimum)} minimum — this vendor generates no PO`
-                      : undefined
-                  }
-                  className={`inline-flex items-baseline gap-3 border border-ink px-4 py-2 ${
-                    t.short
-                      ? "bg-[var(--rf-red-200)]"
-                      : "bg-[var(--rf-green-200)]"
-                  }`}
-                >
-                  <span className="text-[12px] font-semibold uppercase tracking-[0.06em]">
-                    {t.vendor_name}
-                  </span>
-                  <span className="text-[13px] tabular-nums">
-                    {money(t.subtotal)}
-                    {t.minimum !== null ? ` / ${money(t.minimum)}` : ""}
-                  </span>
-                </span>
-              ))
-            )}
-
-            <span className="ml-auto inline-flex items-baseline gap-3">
-              <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-                Will order
-              </span>
-              <span className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
-                {money(grandTotal)}
-              </span>
-              {shortTotal > 0 && (
-                <span
-                  className="text-[12px] uppercase tracking-[0.12em] text-accent"
-                  title="Vendors under their minimum"
-                >
-                  +{money(shortTotal)} blocked
-                </span>
-              )}
-            </span>
-          </div>
-
-          <div className="flex flex-wrap items-center gap-4 text-sm">
-            <TextInput
-              value={term}
-              onValueChange={setTerm}
-              placeholder="Jump to item, vendor or section…"
-              clearLabel="Clear the search"
-              className="h-9 w-72"
-            />
-            {/* Segmented control: these four are one choice, so they read as
-                one object rather than four loose buttons. */}
-            <TabPicker
-              ariaLabel="Guide filter"
-              value={filter}
-              onChange={changeFilter}
-              options={GUIDE_FILTERS.map((f) => ({
-                key: f,
-                label: GUIDE_FILTER_LABEL[f],
-                count: filterCounts[f],
-              }))}
-            />
-
-            {/* The escape hatch from the day gates (FMP's "ignore order day"):
-                every orderable line, whenever you'd normally buy it. A switch,
-                not a button — it's a mode you leave on, not an action you fire.
-                It lives with the filters it changes, and matches the app's
-                other switches: black/white, off = the exact inverse of on
-                (Mark, 2026-07-25). */}
-            <button
-              type="button"
-              role="switch"
-              aria-checked={ignoreDays}
-              onClick={toggleIgnoreDays}
-              title="Show every orderable line, regardless of vendor or item ordering days"
-              className="inline-flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-body hover:text-ink"
+      {/* Vendor totals bar — the guide's central instrument (§4.2): square
+          boxes on a ruled bar, so it reads as an instrument panel rather
+          than a row of tags. */}
+      <div className="flex flex-wrap items-center gap-4 border-y border-ink py-4">
+        {totals.length === 0 ? (
+          <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+            Nothing ordered yet — quantities you enter total up here by
+            vendor
+          </span>
+        ) : (
+          totals.map((t) => (
+            <span
+              key={t.vendor_id}
+              title={
+                t.short
+                  ? `Under the ${money(t.minimum)} minimum — this vendor generates no PO`
+                  : undefined
+              }
+              className={`inline-flex items-baseline gap-3 border border-ink px-4 py-2 ${
+                t.short
+                  ? "bg-[var(--rf-red-200)]"
+                  : "bg-[var(--rf-green-200)]"
+              }`}
             >
-              <span
-                aria-hidden
-                className={`relative inline-flex h-[26px] w-[46px] shrink-0 items-center rounded-full border-[1.5px] border-ink transition-colors ${
-                  ignoreDays ? "bg-ink" : "bg-white"
-                }`}
-              >
-                <span
-                  className={`inline-block h-[18px] w-[18px] transform rounded-full transition-transform ${
-                    ignoreDays
-                      ? "translate-x-[22px] bg-white"
-                      : "translate-x-[2px] bg-ink"
-                  }`}
-                />
+              <span className="text-[12px] font-semibold uppercase tracking-[0.06em]">
+                {t.vendor_name}
               </span>
-              Ignore ordering days
-            </button>
-
-            {/* Pushed to the right edge (Mark, 2026-07-29). Everything left of
-                it narrows the list — search, the four tiers, the day gates —
-                and this one only rearranges what survived, so it reads better
-                as its own thing at the far end than as a fourth filter. ml-auto
-                eats the slack in the row; if the row wraps at a narrow width
-                this lands on its own line, still right-aligned. */}
-            <span className="ml-auto flex items-center gap-3">
-              <span className="text-xs uppercase tracking-[0.12em] text-subtle">
-                Group by
+              <span className="text-[13px] tabular-nums">
+                {money(t.subtotal)}
+                {t.minimum !== null ? ` / ${money(t.minimum)}` : ""}
               </span>
-              <TabPicker
-                ariaLabel="Group by"
-                value={grouping}
-                onChange={changeGrouping}
-                options={GUIDE_GROUPINGS.map((mode) => ({
-                  key: mode,
-                  label: GROUPING_LABEL[mode],
-                }))}
-              />
             </span>
-          </div>
-        </>
-      )}
+          ))
+        )}
+
+        <span className="ml-auto inline-flex items-baseline gap-3">
+          <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+            Will order
+          </span>
+          <span className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
+            {money(grandTotal)}
+          </span>
+          {shortTotal > 0 && (
+            <span
+              className="text-[12px] uppercase tracking-[0.12em] text-accent"
+              title="Vendors under their minimum"
+            >
+              +{money(shortTotal)} blocked
+            </span>
+          )}
+        </span>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-4 text-sm">
+        <TextInput
+          value={term}
+          onValueChange={setTerm}
+          placeholder="Jump to item, vendor or section…"
+          clearLabel="Clear the search"
+          className="h-9 w-72"
+        />
+        {/* Segmented control: these four are one choice, so they read as
+            one object rather than four loose buttons. */}
+        <TabPicker
+          ariaLabel="Guide filter"
+          value={filter}
+          onChange={changeFilter}
+          options={GUIDE_FILTERS.map((f) => ({
+            key: f,
+            label: GUIDE_FILTER_LABEL[f],
+            count: filterCounts[f],
+          }))}
+        />
+
+        {/* The escape hatch from the day gates (FMP's "ignore order day"):
+            every orderable line, whenever you'd normally buy it. A switch,
+            not a button — it's a mode you leave on, not an action you fire.
+            It lives with the filters it changes, and matches the app's
+            other switches: black/white, off = the exact inverse of on
+            (Mark, 2026-07-25). */}
+        <button
+          type="button"
+          role="switch"
+          aria-checked={ignoreDays}
+          onClick={toggleIgnoreDays}
+          title="Show every orderable line, regardless of vendor or item ordering days"
+          className="inline-flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-body hover:text-ink"
+        >
+          <span
+            aria-hidden
+            className={`relative inline-flex h-[26px] w-[46px] shrink-0 items-center rounded-full border-[1.5px] border-ink transition-colors ${
+              ignoreDays ? "bg-ink" : "bg-white"
+            }`}
+          >
+            <span
+              className={`inline-block h-[18px] w-[18px] transform rounded-full transition-transform ${
+                ignoreDays
+                  ? "translate-x-[22px] bg-white"
+                  : "translate-x-[2px] bg-ink"
+              }`}
+            />
+          </span>
+          Ignore ordering days
+        </button>
+
+        {/* Pushed to the right edge (Mark, 2026-07-29). Everything left of
+            it narrows the list — search, the four tiers, the day gates —
+            and this one only rearranges what survived, so it reads better
+            as its own thing at the far end than as a fourth filter. ml-auto
+            eats the slack in the row; if the row wraps at a narrow width
+            this lands on its own line, still right-aligned. */}
+        <span className="ml-auto flex items-center gap-3">
+          <span className="text-xs uppercase tracking-[0.12em] text-subtle">
+            Group by
+          </span>
+          <TabPicker
+            ariaLabel="Group by"
+            value={grouping}
+            onChange={changeGrouping}
+            options={GUIDE_GROUPINGS.map((mode) => ({
+              key: mode,
+              label: GROUPING_LABEL[mode],
+            }))}
+          />
+        </span>
+      </div>
 
       {/* Deliberately OUTSIDE the shelf: a failed write is the one thing up
           here that isn't a control, and it has to reach you whether or not the

@@ -86,7 +86,7 @@ export function useResetScrollOnLocationChange(locationId: string | null) {
 // `/order-guide` or `/order-guide?day=4` for the same one, so neither the path
 // nor the query identifies what you were looking at.
 //
-// A module store read through useSyncExternalStore, like chromeStore: the
+// A module store read through useSyncExternalStore, like columnWidths: the
 // override is published by a page deep in the tree and consumed by a component
 // in the layout, which no prop can reach.
 let override: string | null = null;

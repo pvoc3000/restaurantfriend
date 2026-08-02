@@ -227,7 +227,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    column is the row's LAST cell** — pack label, −, box, + against the right
    edge, with the line total moved inboard, because the stepper is the only
    thing on a line you touch and a thumb lives at the right edge; and the
-   **masthead collapses** (see Conventions).
+   **masthead was made to collapse** (since removed — see Conventions).
    Shipped 2026-07-28: **a PO is a working document, not a frozen record.**
    Three changes, all Mark's.
    (a) **Add item** on the line bar (`AddPoLines.tsx`, purchaser+) opens a panel
@@ -399,7 +399,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    lost in — and an empty document pane sizes to its own sentence instead of
    reserving 70vh of nothing to scroll past on an iPad. `Auto` / `Side by side`
    / `Stacked` and the split fraction persist in localStorage
-   (`lib/receivingLayout.ts`, the `chromeStore`/`columnWidths` idiom); the
+   (`lib/receivingLayout.ts`, the `columnWidths` idiom); the
    control sits with the view, never in the ActionBar.
    **Both columns are `ui/Pane`** (2026-07-31, after Mark: "the header areas of
    the two columns are different heights… the lines around each column look like
@@ -581,7 +581,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    wrong on the other five. `/location` survives as a redirect shim to
    `/locations/<working id>`; the nav's tier-2 item is now "Locations"
    (`lib/nav.ts` — one line), and the tier-1 tab still wears the working code,
-   which with the collapsed strip is now the only place it's always on screen.
+   which is now the only place it's always on screen.
 4c. 🚧 **HR + app access** — the second module outside Purchasing, and the one
    that makes the app multi-user (Mark, 2026-08-01: "It's time to add users to
    the app"). Specced in `docs/hr-access-brief.md`.
@@ -945,11 +945,11 @@ weekday column, and 003 then silently made it per-vendor-item.
 
   Free for nothing, because the shell already does it: **scroll restoration**
   (`components/ScrollMemory` in the (app) layout — a new screen is covered by
-  existing) and the **collapsing masthead** (`HeaderShell`, which publishes
+  existing) and the **sticky masthead** (`HeaderShell`, which publishes
   `--rf-header-h`). Vocabularies and conversion live in `lib/units.ts`
   (`UNIT_PICK_OPTIONS`, `PACKAGE_DESC_OPTIONS`); the other shared brains are
   `lib/breadcrumbs`, `lib/columnWidths`, `lib/tableSort`, `lib/calc`,
-  `lib/scrollMemory`, `lib/chromeStore`.
+  `lib/scrollMemory`.
 
   If something genuinely new is needed, build it in `components/ui/` as a
   general control, use it in at least the place that prompted it, and add a row
@@ -1051,22 +1051,22 @@ weekday column, and 003 then silently made it per-vendor-item.
   screen carrying a heavy dynamic client import (`@react-pdf/renderer`, imported
   at click in `ProcessPo` / `lib/poProcessing.ts`). Unconfirmed, but that's
   where to look first — and reproducing needs a real line deleted, so ASK.
-- **The masthead collapses to a strip** (Mark, 2026-07-27 — two black bands plus
-  the utilities row cost ~88px at the top of every screen, "too much space…
-  should probably scroll away… we would need a shortcut to bring it back").
-  Collapsing beats scrolling away, and is what that shortcut wants to be: the
-  strip is ALWAYS on screen, so the menu returns with one tap from anywhere in
-  an 800-line list instead of a scroll to the top. It also keeps the header
-  sticky. `components/HeaderShell.tsx` owns stickiness, the toggle
-  (▲ in the utilities cluster, "Menu ▾" in the strip) and the state; the strip
-  keeps the two things you'd otherwise lose — which app this is and WHICH
-  LOCATION you're ordering for. Remembered per user in localStorage
-  (`lib/chromeStore.ts`, `useSyncExternalStore` like columnWidths), because it's
-  a display preference. HeaderShell also publishes the header's MEASURED height
-  as `--rf-header-h` (seeded at 5.5rem in `globals.css`), and the order guide's
-  scroll pane subtracts that variable instead of a constant — so collapsing
-  hands those ~56px straight to the list, which is the point. Any other screen
-  sizing itself against the viewport should use the variable too.
+- **The masthead publishes its MEASURED height as `--rf-header-h`** (seeded at
+  5.5rem in `globals.css`). Every sticky table head offsets against it
+  (`lib/tableHead`) and the order guide's scroll pane subtracts it, so it stays
+  measured rather than becoming a constant — the masthead wraps to two or three
+  rows at iPad widths and any constant is wrong at some width. Any screen
+  sizing itself against the viewport should use the variable.
+  **It used to COLLAPSE to a strip** (Mark, 2026-07-27 — ~88px at the top of
+  every screen, "too much space… we would need a shortcut to bring it back"),
+  driven by a ▲ in the utilities cluster. **Removed 2026-08-02** ("I don't
+  think it's necessary any longer"), and the whole mechanism went with the
+  button rather than just the button: the same flag also hid the order guide's
+  shelf, so leaving the state behind with nothing to toggle it would have
+  stranded anyone who had collapsed it. Gone with it: `lib/chromeStore`, the
+  collapsed strip that restated where you were, and the guide's `-mt-8`
+  compensation. The stale `rf.chrome.menuCollapsed` key is simply never read
+  again — harmless, and cheaper than shipping code to erase it.
 - **An overlay INHERITS from wherever its trigger sits, and `position: fixed`
   doesn't save it.** Fixed moves the box, not its place in the DOM, so every
   inherited property cascades straight into the floating panel. Two have bitten,

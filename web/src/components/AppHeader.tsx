@@ -2,7 +2,7 @@ import { cookies } from "next/headers";
 
 import { signOut } from "@/app/actions";
 import { AppNav } from "@/components/AppNav";
-import { HeaderShell, MenuCollapseButton } from "@/components/HeaderShell";
+import { HeaderShell } from "@/components/HeaderShell";
 import { GearIcon, HomeIcon, IconButton } from "@/components/ui/IconButton";
 import { NAV_COOKIE, parseNavMemory } from "@/lib/navMemory";
 import { sectionsForRole } from "@/lib/nav";
@@ -15,20 +15,19 @@ export async function AppHeader({ session }: { session: AppSession }) {
   const initialMemory = parseNavMemory((await cookies()).get(NAV_COOKIE)?.value);
 
   return (
-    // The shell owns stickiness, the collapse toggle and the measured height —
-    // see components/HeaderShell.
-    <HeaderShell locationCode={session.activeLocation?.code ?? null}>
+    // The shell owns stickiness and the measured height — see
+    // components/HeaderShell.
+    <HeaderShell>
       <AppNav
         // Filtered HERE, on the server, where the session already is.
         sections={sectionsForRole(session.membership.role)}
         initialMemory={initialMemory}
         locationCode={session.activeLocation?.code ?? null}
-        // Row 1: what you're looking at. Where to go, and whether the chrome is
-        // showing (Mark, 2026-07-29 — the old single row is now two, to match
-        // the menu's two tiers). The location SWITCHER used to sit here; the
+        // Row 1: where to go. The location SWITCHER used to sit here; the
         // Locations list replaced it (Mark, 2026-08-01), and the code you're
         // working at is still on screen at all times — the tier-1 tab wears it
-        // (lib/nav sectionLabel) and so does the collapsed strip.
+        // (lib/nav sectionLabel). The chrome-collapse toggle sat here too until
+        // 2026-08-02; see components/HeaderShell.
         controls={
           <>
             <IconButton href="/" label="Home">
@@ -38,12 +37,6 @@ export async function AppHeader({ session }: { session: AppSession }) {
             <IconButton href="/settings" label="Settings">
               <GearIcon />
             </IconButton>
-
-            {/* Last in this row: it's the control you reach for once, when
-                you're about to start walking. It belongs with the view
-                controls rather than with the session ones — it changes what
-                you can see, not who you are. */}
-            <MenuCollapseButton />
           </>
         }
         // Row 2: who you are, and leaving.
