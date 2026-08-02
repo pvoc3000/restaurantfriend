@@ -509,7 +509,10 @@ export function DataTable<T>({
                       return (
                         <td
                           key={col.key}
-                          className={`h-14 px-3 py-4 xl:px-4 ${col.wrap ? "" : "truncate"} ${
+                          // px-3 at every width, matching the header (which
+                          // needed the 8px back — see ColumnHeader). The xl step
+                          // to px-4 was buying air a dense table can't afford.
+                          className={`h-14 px-3 py-4 ${col.wrap ? "" : "truncate"} ${
                             col.align === "right" ? "text-right tabular-nums" : ""
                           }`}
                         >

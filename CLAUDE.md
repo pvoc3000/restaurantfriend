@@ -1321,6 +1321,26 @@ weekday column, and 003 then silently made it per-vendor-item.
   rather than a catalog list. `/order-guide` is also not a `DataTable` and
   shouldn't become one — it's a walk-order document with nested item and line
   rows, shop-section bands and three-state quantity boxes.
+- **A column label WRAPS; it never truncates while there's room** (Mark,
+  2026-08-02: titles clip "even when it appears there is plenty of room").
+  There WAS room — in the cell, not in the label's share of it. Measured on PO
+  detail at 1440: a 113px Product ID header gave its label 57px, and the other
+  56 went on the cell's padding (32), the sort button's own padding (8), a gap
+  (4) and the sort arrow's reserved width (12) — while the BODY cell below
+  spends only its 32. **The header was working with 24px less room than the data
+  it labels**, which is why a column can look roomy and still clip its title.
+  Four changes in `ColumnHeader`, none of them enough alone: the button's `px-1`
+  went (it also started the label 20px in against the values' 16 — a 4px kink in
+  every column); the **sort marker moved out of the label's line into the cell's
+  padding**, where it costs nothing and still never jumps; cell padding is
+  `px-3` at EVERY width, header and body alike (the `xl:px-4` step was air a
+  dense table can't afford); and the label wraps — `table-fixed` means a wrapped
+  label can't widen its column, it just takes a second line. 57px of label room
+  became 89 on the same column. The one honest failure left is a SINGLE word
+  wider than its whole column, which is **clipped with an ellipsis, never split**
+  — at 834px the PO list's Files column rendered "FILE/S", which reads as a
+  rendering fault where "FILE…" reads as "there's more". If you see one, the
+  column is too narrow for its name: widen the weight or shorten the label.
 - **Column labels STICK, in every list** (Mark, 2026-07-31 — "scrolling in all
   current and future list views shouldn't hide the column titles"). The order
   guide had always done it; nothing else had. `lib/tableHead.ts` holds the two
