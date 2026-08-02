@@ -310,6 +310,20 @@ export function InlineValue({
           disabled={saving}
           required={!nullable}
           aria-label={column}
+          // THE BROWSER MUST NOT PUT ANYTHING IN HERE ON ITS OWN. A date input
+          // is a form control, and browsers do two things to form controls that
+          // a database cell has no use for: they RESTORE the last value the
+          // field held across reloads (session history state, which survives a
+          // hard reload — it isn't the CSS or the JS), and they offer autofill.
+          // Either lands a value React never rendered and, on a field the row
+          // has no value for, one that looks exactly like data. Mark saw this
+          // twice on 132-181132-02, whose `delivery_date` is null: the field
+          // read 08/02/2026 — today — on a browser I can't reproduce it on.
+          //
+          // `autoComplete="off"` turns both off. It is the right attribute for
+          // every editor in this component: nothing here is a form field in the
+          // sense a browser means, and a remembered value is never wanted.
+          autoComplete="off"
           onChange={(e) => {
             const next = e.target.value || null;
 
@@ -355,6 +369,8 @@ export function InlineValue({
           autoFocus
           value={draft}
           disabled={saving}
+          // Same reason as the date box above: no restored values, no autofill.
+          autoComplete="off"
           // No date here any more — `kind="date"` returned above with a picker
           // that's always on screen.
           inputMode={kind === "number" ? "decimal" : undefined}
