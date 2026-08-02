@@ -268,8 +268,22 @@ export function InlineValue({
           aria-label={column}
           onChange={(e) => {
             const next = e.target.value || null;
+            const stored = value === null ? "" : String(value);
+
+            // A REJECTED OR NO-OP EDIT MUST PUT THE BOX BACK BY HAND. This is
+            // a controlled input whose `value` prop didn't change, so React has
+            // nothing to re-render and the browser's own idea of the field
+            // survives — a date box left showing something the column doesn't
+            // hold and nothing will ever save. Found 2026-08-02 on a Chefs
+            // Warehouse PO whose delivery_date is null in the database while
+            // the field read 08/02/2026.
             if (next === null && !nullable) {
               setError("required");
+              e.target.value = stored;
+              return;
+            }
+            if (next === (value ?? null)) {
+              e.target.value = stored;
               return;
             }
             setError(null);

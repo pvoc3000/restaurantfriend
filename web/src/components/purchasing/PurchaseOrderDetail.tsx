@@ -697,35 +697,45 @@ export function PurchaseOrderDetail({
             read as a pair, which is the argument that beat putting it up in the
             bar beside Status.
 
-            And it stays EMPTY until the order is marked received or closed
-            (Mark, same message): this field says when the delivery ARRIVED, and
-            an expected date sitting in it before anything has turned up is a
-            claim about the past that hasn't happened. What generation worked
-            out (migration 016) is stated beside it instead, as "arrives …" —
-            a statement, not a button, because there is no longer a blank to
-            fill. NOTE the value is still STORED on draft/sent orders and is
-            what the vendor PDF prints; only this field withholds it. */}
+            BEFORE THE ORDER ARRIVES THERE IS NO FIELD AT ALL, only the "arrives
+            …" statement. The first cut rendered an EMPTY editable date box here
+            (Mark: it "should be empty until the PO is marked received or
+            closed") and that box lied: on 132-181132-02, whose `delivery_date`
+            is null in the database, it read 08/02/2026 — today. A native date
+            input is a control the browser is happy to fill on its own, and
+            because this passed the same empty value on every render React had
+            no prop change to reset it with, so whatever the browser put there
+            survived while nothing was ever saved. Mark read it exactly right:
+            "the delivery date is today until it is set by someone."
+
+            An empty box also invites the wrong gesture — this field records
+            when a delivery ARRIVED, so typing one before anything has turned up
+            is a claim about a past that hasn't happened. The expectation
+            (generation's, from migration 016, or failing that the vendor's next
+            delivery day) is a sentence beside the label instead, and the field
+            appears at `received` when there is a fact for it to hold. */}
         <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
           Delivery
         </dt>
         <dd className="flex flex-wrap items-center gap-2 tabular-nums">
-          {canEditLines ? (
+          {!arrived ? (
+            expectedDelivery ? (
+              <span className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink">
+                arrives {expectedDelivery}
+              </span>
+            ) : (
+              <span className={`${READ_ONLY_VALUE} text-muted`}>not yet</span>
+            )
+          ) : canEditLines ? (
             <InlineValue
               table="purchase_orders"
               id={order.id}
               column="delivery_date"
-              value={arrived ? order.delivery_date : null}
+              value={order.delivery_date}
               kind="date"
             />
           ) : (
-            <span className={READ_ONLY_VALUE}>
-              {(arrived && order.delivery_date) || "—"}
-            </span>
-          )}
-          {!arrived && expectedDelivery && (
-            <span className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink">
-              arrives {expectedDelivery}
-            </span>
+            <span className={READ_ONLY_VALUE}>{order.delivery_date ?? "—"}</span>
           )}
         </dd>
 
