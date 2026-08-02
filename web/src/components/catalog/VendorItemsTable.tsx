@@ -370,9 +370,11 @@ export function VendorItemsTable({
       }
       rowClassName={(vi) => (vi.is_active ? "" : "text-faint")}
       scroll={scroll}
-      // The filter bar eats about 9rem above the pane; without this the page
-      // starts scrolling again and the sticky config is pushed off-screen.
-      maxHeightClass={filters ? "max-h-[calc(100vh-36rem)]" : undefined}
+      // No maxHeightClass: DataTable measures the remaining window instead
+      // (lib/tableHead's useFillViewportHeight). The constant that used to live
+      // here — 100vh − 36rem, sized around the filter bar — was 101px too tall
+      // the moment this page's spacing changed, which is the argument against
+      // constants rather than against that particular number.
       empty={
         <p className="text-sm text-muted">
           {vendorItems.length === 0

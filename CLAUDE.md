@@ -1393,6 +1393,33 @@ weekday column, and 003 then silently made it per-vendor-item.
   Vendor detail's page rhythm went `space-y-6` → `space-y-16` to match: with
   8px inside each block, the gap BETWEEN them is the only thing left saying
   where one ends.
+- **A scrolling table pane ends where the WINDOW does, and the height is
+  measured** (`useFillViewportHeight` in `lib/tableHead`, Mark, 2026-08-01: it
+  "should only take up the remainder of the page"). It was
+  `max-h-[calc(100vh-36rem)]`, a constant tuned by hand around the filter bar of
+  the day; the moment this page's spacing changed it was 101px too tall and the
+  whole page scrolled. Anything above a pane can move its top, so the only
+  honest answer is to ask the DOM — the same lesson, and nearly the same code,
+  as the receiving screen's split columns. What sits BELOW is measured too (the
+  reset-widths footer comes and goes, and the layout's `py-8` is under that),
+  the height is written straight to the node so a resize doesn't re-render the
+  rows, and a >1px guard stops the ResizeObserver reacting to its own write —
+  which loops, because shrinking the pane removes the page's scrollbar, which
+  moves everything. Verified at 1200 (490.5px, page exactly one viewport) and
+  1000 (290.5px, re-measured on resize), both with 32px below.
+  **`min-h-64` went with it**: a minimum HEIGHT gave a one-item vendor a 256px
+  box around a 110px table. The floor belongs on the max-height — the hook
+  won't compute below 256 — so a short table is now as tall as its rows and a
+  long one stops at the window.
+- **A pane is `overflow-x-hidden`, never `overflow-auto`** (Mark, 2026-08-01: "a
+  bottom scroll bar when there shouldn't be"). Columns are fluid, so a table is
+  a percentage of its pane and can never exceed it — there is nothing to scroll
+  sideways to. What it scrolled to was 6px of nothing: a `ColumnHeader`'s resize
+  grip is `w-3` shifted `translate-x-1/2` so it straddles the column boundary,
+  which on the LAST column means it hangs 6px past the table's right edge
+  (measured: table 1314px in a 1314px pane, scrollWidth 1320). The unpaned path
+  is unaffected — `useOverflowOnlyWhenNeeded` compares the TABLE's width, not
+  scrollWidth, so the grip never fooled it.
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server

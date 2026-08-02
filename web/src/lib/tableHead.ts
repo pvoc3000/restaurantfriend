@@ -140,3 +140,60 @@ export function useOverflowOnlyWhenNeeded(
     return () => observer.disconnect();
   }, [ref, enabled]);
 }
+
+/**
+ * Make a scrolling table pane end at the bottom of the window — "it should only
+ * take up the remainder of the page" (Mark, 2026-08-01).
+ *
+ * The height is MEASURED, never a CSS constant. It was
+ * `max-h-[calc(100vh-36rem)]`, a number tuned by hand against the layout of the
+ * day; when the vendor page's spacing changed under it the pane ran 101px past
+ * the bottom of a 900px window and the whole page scrolled. Anything above the
+ * pane can change its top — a heading, a wrapping filter block, a reminder band
+ * — so the only honest answer is to ask the DOM. This is the same lesson, and
+ * nearly the same code, as the receiving screen's split columns.
+ *
+ * What's BELOW the pane is measured too, not assumed: the reset-widths footer
+ * comes and goes, and the app layout's own `py-8` sits under that. Hard-coding
+ * either is how the receiving screen first got this wrong.
+ *
+ * No state — the height is written straight to the node, so a window resize
+ * doesn't re-render a hundred rows and the `set-state-in-effect` lint has
+ * nothing to object to. The >1px guard stops the ResizeObserver reacting to the
+ * pane's own write, which would otherwise loop: shrinking the pane removes the
+ * page's scrollbar, which moves everything, which re-triggers the measure.
+ */
+export function useFillViewportHeight(
+  ref: React.RefObject<HTMLElement | null>,
+  enabled = true,
+  /** Never shrink below this; past it, let the page scroll instead. */
+  minHeight = 256
+) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (!enabled) {
+      el.style.maxHeight = "";
+      return;
+    }
+
+    const measure = () => {
+      const rect = el.getBoundingClientRect();
+      // Everything after the pane, whatever it turns out to be.
+      const below = document.body.getBoundingClientRect().bottom - rect.bottom;
+      const target = Math.max(minHeight, window.innerHeight - rect.top - below);
+      if (Math.abs(parseFloat(el.style.maxHeight || "0") - target) > 1) {
+        el.style.maxHeight = `${target}px`;
+      }
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [ref, enabled, minHeight]);
+}

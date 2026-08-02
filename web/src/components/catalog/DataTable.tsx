@@ -18,6 +18,7 @@ import { useScrollMemory } from "@/lib/scrollMemory";
 import {
   STICKY_HEAD_ROW,
   STICKY_HEAD_ROW_IN_PANE,
+  useFillViewportHeight,
   useOverflowOnlyWhenNeeded,
   useViewportAtLeast,
 } from "@/lib/tableHead";
@@ -203,6 +204,8 @@ export function DataTable<T>({
   // Only the unpaned case: a pane is a scroll container on purpose, and its
   // header sticks to the pane rather than to the masthead.
   useOverflowOnlyWhenNeeded(paneRef, !scroll);
+  // A pane ends where the window does, unless the caller named a height.
+  useFillViewportHeight(paneRef, scroll && !maxHeightClass);
 
   // COMPACT: below `compactBelow` the marked columns come out, so the table
   // narrows enough to fit — which is what lets its labels stick. A threshold of
@@ -299,8 +302,25 @@ export function DataTable<T>({
 
   // No outer box: the header's 2px black rule and the row hairlines are the
   // only structure a table gets.
+  //
+  // `overflow-x-hidden` on a pane, not `overflow-auto` (Mark, 2026-08-01: "a
+  // bottom scroll bar when there shouldn't be"). The columns are fluid — the
+  // table is a percentage of the pane and can never exceed it — so a pane has
+  // nothing to scroll sideways TO. What it was scrolling to was 6px of nothing:
+  // the LAST column's resize grip is `w-3` shifted `translate-x-1/2` so it
+  // straddles the column boundary, which on the final column means it hangs 6px
+  // past the table's right edge. Measured here: table 1314px in a 1314px pane,
+  // scrollWidth 1320. Hiding the axis costs nothing (the grip's outer half is
+  // dead space either way) and the pane stays a scroll container for y, so the
+  // sticky header still sticks to it.
+  //
+  // No `min-h-64` either. It existed to stop a pane collapsing, but it's a
+  // MINIMUM HEIGHT, so a vendor with one item got a 256px box around a 110px
+  // table — 146px of empty pane. The floor belongs on the max-height (the hook
+  // refuses to go below 256), not on the height itself: then a short table is
+  // as tall as its rows and a long one stops at the window.
   const wrapper = scroll
-    ? `${maxHeightClass ?? "max-h-[calc(100vh-27rem)]"} min-h-64 overflow-auto`
+    ? `${maxHeightClass ?? ""} overflow-y-auto overflow-x-hidden`
     : "overflow-x-auto";
 
   // FLUID COLUMNS. The table is exactly as wide as its container and the
