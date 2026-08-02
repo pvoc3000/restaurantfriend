@@ -643,10 +643,32 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    gate and each gated screen says so in a sentence. `/employees` is exempt from
    `InactiveLocationGate`: a person belongs to the ORG, not to a shop.
    Migration: `transform-hr.mjs` → `load-hr.mjs`, mirroring the purchasing
-   pipeline, output outside the repo. **The export in `FMP Export/HR/` is a
-   LAYOUT export and cannot be loaded** — 14 columns, no employee id, no
-   separate name fields, none of the ADMIN tab. The transform matches each
-   field against candidate column names and names what's missing.
+   pipeline, output outside the repo. The transform matches each field against
+   candidate column names and names what's missing, which is how the FIRST
+   export was caught: every file Mark exported on 2026-08-01 was a LAYOUT
+   export (Employees.mer had 14 columns, no employee id, no separate name
+   fields, none of the ADMIN tab). **Events, Ratings, Reviews, PayPeriods and
+   Timesheets in `FMP Export/HR/` are still those layout exports** — they need
+   redoing before any of them can be migrated.
+   The re-export is the full table, 89 columns, and it carries **SSN,
+   `_security_password`, `Account_password`, `Wage` and the `Bonus_*` fields**.
+   None of that is read: the transform declares the seventeen fields it wants
+   and ignores the rest, which is why the design is a field allow-list rather
+   than a drop-list. The file itself is outside the repo and should stay there.
+   Two things the full export settled:
+   **the user level is `_security_level`** (124 of 445 filled, values 1–5 —
+   NOT `Account_permission_level`, which is empty in every row, and NOT
+   `PermissionLevel_c`, a calculation that tracks the job rather than the
+   login). 11 current employees had access above staff; that's the invite
+   roster.
+   And **the eighth onboarding document is "Orientation", not "Training
+   Acknowledgement"** — the layout's checkbox label said the latter, but the
+   `Paperwork` value list holds both and the data is Orientation 45 to
+   Training Acknowledgement 3. Migration **022** widens 021's check constraint;
+   `training_ack` stays fileable but is no longer required.
+   Four employees are FMP location `DF00`, which isn't a location in this org
+   (Mark, two managers, a contractor — evidently "the company, not a shop").
+   They load with no main location, which renders as an em dash.
    **NOT migrated:** SSN (never exported — it's in FMP and Gusto, and a
    web-reachable database is the wrong home for it), pay rates and everything
    payroll-adjacent, and the Events/Ratings/Reviews/Timesheets tables, which
@@ -754,6 +776,9 @@ on `locations`; `extraction` / `extracted_at` / `extraction_model` select on
 `purchase_order_attachments` and hold a real Chefs' Warehouse reading). This
 line said "NOT applied yet" for a while after they were; **probe, don't read
 this file** — that's what the memory note says and it was right.
+**020 and 021 are APPLIED** (Mark, 2026-08-01) and the employee data is LOADED:
+445 rows, 26 active / 2 new hire / 417 inactive, matching the transform report,
+with Mark's row linked to his auth account. **022 is NOT applied yet.**
 
 Migration 019 gives the attachment somewhere to put what the invoice SAYS —
 `extraction` jsonb, `extracted_at`, `extraction_model`. On the attachment rather
@@ -1732,15 +1757,17 @@ weekday column, and 003 then silently made it per-vendor-item.
   that grants Work here, and every location-scoped screen. Don't build it
   speculatively; when it comes back, ask whether the rule is "may work at" or
   "may see", because they are different tables.
-- **`REQUIRED_ONBOARDING_KINDS` is a guess at FMP's eight checkboxes**
+- **`REQUIRED_ONBOARDING_KINDS` now matches FMP's own value list**
   (`web/src/lib/employeeDocuments.ts`) — Application, W-4, I-9, I-9 documents,
-  food handler card, handbook, notice to employee, training acknowledgement,
-  with the meal-break waiver deliberately optional. Worth confirming with Mark
-  before anyone treats "Paperwork complete" as a compliance statement. A
-  constant rather than `orgs.settings` on purpose: this is federal and
-  California employment paperwork, not org configuration. If a second org ever
-  needs a different set, that's the moment it moves — and design rule 2 will be
-  why.
+  food handler card, handbook, **Orientation**, notice to employee, with the
+  meal-break waiver deliberately optional (a separate FMP field, 51 of 445
+  signed). Read off the real data rather than the layout, which is how the
+  Orientation/Training-Acknowledgement mix-up surfaced. Still worth Mark's
+  confirmation before anyone treats "Paperwork complete" as a compliance
+  statement. A constant rather than `orgs.settings` on purpose: this is federal
+  and California employment paperwork, not org configuration. If a second org
+  ever needs a different set, that's the moment it moves — and design rule 2
+  will be why.
 - **Should-order counts don't match the brief's measurement.** The
   2026-07-23 build implements the settled model exactly (fixture-tested), and
   membership verifies at the brief's 883 — but the brief's should-order figures

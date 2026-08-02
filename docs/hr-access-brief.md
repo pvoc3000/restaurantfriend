@@ -222,9 +222,11 @@ phase 5 starts.
 1. **Export scope** — all of DF-Employees was exported; only Employees is
    transformed and loaded. The rest re-export at their own module's cutover, so
    nothing is loaded twice from a file that FileMaker is still writing to.
-   ⚠️ The Employees export is a LAYOUT export (14 columns, no employee id, no
-   separate names, none of the ADMIN tab) and **needs redoing** — see §4 and the
-   field list in `migration/field-map.md`.
+   ✅ Employees was re-exported as a full table (89 columns) and **loaded**:
+   445 rows, 26 active / 2 new hire / 417 inactive, Mark's row linked to his
+   auth account. ⚠️ The other five files (Events, Ratings, Reviews, PayPeriods,
+   Timesheets) are STILL layout exports and need redoing before their modules
+   can migrate.
 2. **Supervisor default role** — superseded: `supervisor` is now its own role,
    between staff and purchaser. Supervisors get the app for shift reports and
    production schedules; a supervisor who orders is given `purchaser`
@@ -239,8 +241,9 @@ phase 5 starts.
 
 ## §8 Still open
 
-- **`REQUIRED_ONBOARDING_KINDS`** (`web/src/lib/employeeDocuments.ts`) is read
-  off FMP's eight checkboxes, with the meal-break waiver deliberately optional.
-  Confirm with Mark before "Paperwork complete" is treated as a compliance
-  statement.
+- **`REQUIRED_ONBOARDING_KINDS`** (`web/src/lib/employeeDocuments.ts`) is now
+  read off FMP's actual `Paperwork` value list rather than its layout labels —
+  the eighth item is **Orientation** (45 uses) and not Training Acknowledgement
+  (3). Meal-break waiver stays optional. Still worth confirming before
+  "Paperwork complete" is treated as a compliance statement.
 - **Per-location access** — deferred, pinned in CLAUDE.md's open threads.

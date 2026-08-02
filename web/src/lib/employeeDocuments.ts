@@ -24,6 +24,7 @@ export type DocumentKind =
   | "food_handler_card"
   | "handbook"
   | "notice_to_employee"
+  | "orientation"
   | "training_ack"
   | "meal_break_waiver"
   | "review"
@@ -38,6 +39,7 @@ export const DOCUMENT_KIND_LABEL: Record<DocumentKind, string> = {
   food_handler_card: "Food handler card",
   handbook: "Employee handbook",
   notice_to_employee: "Notice to employee",
+  orientation: "Orientation",
   training_ack: "Training acknowledgement",
   meal_break_waiver: "Meal break waiver",
   review: "Performance review",
@@ -55,16 +57,28 @@ export const DOCUMENT_KIND_OPTIONS: PickOption[] = [
   { value: "food_handler_card", label: "Food handler card", group: "Onboarding" },
   { value: "handbook", label: "Employee handbook", hint: "signed receipt", group: "Onboarding" },
   { value: "notice_to_employee", label: "Notice to employee", hint: "Labor Code 2810.5", group: "Onboarding" },
-  { value: "training_ack", label: "Training acknowledgement", group: "Onboarding" },
+  { value: "orientation", label: "Orientation", group: "Onboarding" },
   { value: "meal_break_waiver", label: "Meal break waiver", group: "Other forms" },
+  { value: "training_ack", label: "Training acknowledgement", group: "Other forms" },
   { value: "review", label: "Performance review", group: "Other forms" },
   { value: "write_up", label: "Write-up", hint: "discipline, incident", group: "Other forms" },
   { value: "other", label: "Other", group: "Other forms" },
 ];
 
 /**
- * The paperwork a complete file has — FMP's eight onboarding checkboxes, in the
- * order that layout showed them.
+ * The paperwork a complete file has — FMP's eight onboarding ticks, ordered by
+ * how often they were actually used.
+ *
+ * Read off the real data (2026-08-01, 445 employees, 114 with any tick at all):
+ * Application 87 · W4 70 · I9 68 · Food Handlers Card 61 · I9 Documents 56 ·
+ * Employee Handbook 48 · Orientation 45 · Notice to Employee 41.
+ *
+ * **`orientation`, not `training_ack`.** The FMP layout's eighth checkbox was
+ * labelled "Training Acknowledgement", but its value list holds both and the
+ * data says which one is real: Orientation 45 uses against Training
+ * Acknowledgement's 3. The label was evidently changed without the value list
+ * following. `training_ack` survives as a fileable kind so those three have
+ * somewhere to go; it isn't required.
  *
  * A constant, not `orgs.settings`: this list is federal and California
  * employment paperwork, not Donut Friend's configuration. If a second org ever
@@ -72,7 +86,7 @@ export const DOCUMENT_KIND_OPTIONS: PickOption[] = [
  * into settings, and design rule 2 will be why.
  *
  * `meal_break_waiver` is deliberately NOT required: FMP kept it as a separate
- * checkbox because only some shifts need one.
+ * field (51 of 445 signed) because only some shifts need one.
  */
 export const REQUIRED_ONBOARDING_KINDS: DocumentKind[] = [
   "application",
@@ -81,8 +95,8 @@ export const REQUIRED_ONBOARDING_KINDS: DocumentKind[] = [
   "i9_docs",
   "food_handler_card",
   "handbook",
+  "orientation",
   "notice_to_employee",
-  "training_ack",
 ];
 
 /**

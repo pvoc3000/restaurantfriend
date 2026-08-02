@@ -29,12 +29,12 @@ test("one gap is reported, and only that one", () => {
 });
 
 test("missing kinds come back in the declared order, not the filed order", () => {
-  // Application is first in the list, training_ack last; filing them the other
-  // way round must not reorder the report.
-  eq(missingPaperwork(["i9", "i9_docs", "food_handler_card", "handbook", "notice_to_employee"]), [
+  // Application is first in the list, notice_to_employee last; filing them the
+  // other way round must not reorder the report.
+  eq(missingPaperwork(["i9", "i9_docs", "food_handler_card", "handbook", "orientation"]), [
     "application",
     "w4",
-    "training_ack",
+    "notice_to_employee",
   ]);
 });
 
@@ -51,12 +51,26 @@ test("`other` is never required and never satisfies", () => {
 });
 
 test("the meal break waiver is deliberately NOT required", () => {
-  // FMP kept it as a separate checkbox because only some shifts need one.
+  // FMP kept it as a separate field (51 of 445 signed) because only some
+  // shifts need one.
   ok(
     !REQUIRED_ONBOARDING_KINDS.includes("meal_break_waiver"),
     "meal_break_waiver is optional"
   );
   eq(missingPaperwork(ALL_REQUIRED), []);
+});
+
+test("the eighth onboarding document is orientation, not training_ack", () => {
+  // The FMP layout labelled the checkbox "Training Acknowledgement" but the
+  // data says Orientation 45 : Training Acknowledgement 3 — the label was
+  // changed and the value list never followed. training_ack stays FILEABLE
+  // (three people have one) and is not required.
+  ok(REQUIRED_ONBOARDING_KINDS.includes("orientation"), "orientation required");
+  ok(!REQUIRED_ONBOARDING_KINDS.includes("training_ack"), "training_ack optional");
+  // Filing a training acknowledgement does not tick the orientation box.
+  eq(missingPaperwork(ALL_REQUIRED.filter((k) => k !== "orientation").concat("training_ack")), [
+    "orientation",
+  ]);
 });
 
 test("duplicates of one kind still satisfy it exactly once", () => {

@@ -149,8 +149,18 @@ export async function EmployeeDetail({
 
       {/* ---- who this is ---------------------------------------------- */}
       <div className="space-y-3">
-        <div className="flex flex-wrap items-baseline gap-3">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+        {/* The name is READ-ONLY here and editable in the rows below. Two
+            InlineValues side by side don't work: the trigger is `w-full` of
+            its parent, so first and last each claim a line and the heading
+            wraps. Editing a name is rare enough that it belongs with the other
+            fields — which is also where FMP kept it. */}
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          {employeeName(person)}
+        </h1>
+
+        <dl className="grid max-w-md grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
+          <dt className="py-0.5 text-subtle">First name</dt>
+          <dd>
             <InlineValue
               table={table}
               id={person.id}
@@ -158,8 +168,10 @@ export async function EmployeeDetail({
               value={person.first_name}
               nullable={false}
               placeholder="First"
-              className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]"
-            />{" "}
+            />
+          </dd>
+          <dt className="py-0.5 text-subtle">Last name</dt>
+          <dd>
             <InlineValue
               table={table}
               id={person.id}
@@ -167,12 +179,8 @@ export async function EmployeeDetail({
               value={person.last_name}
               nullable={false}
               placeholder="Last"
-              className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]"
             />
-          </h1>
-        </div>
-
-        <dl className="grid max-w-md grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
+          </dd>
           <dt className="py-0.5 text-subtle">Status</dt>
           <dd>
             <InlineValue

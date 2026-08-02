@@ -96,7 +96,7 @@ const FIELDS = {
   status:               { required: true,  names: ['status'] },
   last_name:            { required: true,  names: ['name_last', 'last_name', 'lastname', 'last name', 'namelast'] },
   first_name:           { required: true,  names: ['name_first', 'first_name', 'firstname', 'first name', 'namefirst'] },
-  nickname:             { required: false, names: ['nicname', 'nickname', 'name_nickname', 'nick_name', 'nicname_t'] },
+  nickname:             { required: false, names: ['name_nic', 'nicname', 'nickname', 'name_nickname', 'nick_name'] },
   phone:                { required: false, names: ['phone'] },
   email:                { required: false, names: ['email'] },
   address:              { required: false, names: ['address', 'address_full', 'address_c', 'street'] },
@@ -111,7 +111,17 @@ const FIELDS = {
   food_handler_expires: { required: false, names: ['fhc_ex_date', 'fhc_exp_date', 'fhcexdate', 'food_handler_expires'] },
   // Never loaded into a column — it only tells us who had FMP access, to seed
   // the invite roster.
-  _fmp_user_level:      { required: false, names: ['userlevel', 'user_level', 'user level', 'level', 'privilege', 'userlevel_n'] },
+  //
+  // `_security_level` is the real one (124 of 445 filled, values 1–5, matching
+  // Mark's ladder). NOT `Account_permission_level`, which is empty in every
+  // row, and NOT `PermissionLevel_c`, which is a FileMaker calculation over
+  // three values that tracks the job rather than the login.
+  _fmp_user_level:      { required: false, names: ['_security_level', 'userlevel', 'user_level', 'user level', 'privilege'] },
+  // FMP's eight-checkbox onboarding field, as a repeating value list. NOT
+  // loaded — migration 021 derives completeness from the documents themselves —
+  // but reported, because it says which paperwork each person was ticked off
+  // for and is the only record of that until the files are scanned.
+  _fmp_paperwork:       { required: false, names: ['paperwork'] },
 };
 
 const index = {};
@@ -305,6 +315,9 @@ body.forEach((row, i) => {
     notes: text(get(row, 'notes')),
     food_handler_expires: date(get(row, 'food_handler_expires'), rowNo, 'Food handler expiry'),
     _fmp_user_level: text(get(row, '_fmp_user_level')),
+    // The repeating field split back into its ticks.
+    _fmp_paperwork: String(get(row, '_fmp_paperwork') ?? '')
+      .split(VT).map((s) => s.trim()).filter(Boolean),
   });
 });
 
@@ -342,9 +355,25 @@ console.log(
 
 const withUserLevel = employees.filter((e) => e._fmp_user_level);
 if (withUserLevel.length) {
-  console.log(`\nFMP user levels (who had access — for the invite roster, not loaded)`);
+  console.log(`\nFMP user levels — NOT loaded; this is the invite roster`);
+  console.log(`  (1 staff · 2 supervisor · 3 manager · 4 unused · 5 owner)`);
+  const active = employees.filter((e) => e.status !== 'inactive' && e._fmp_user_level);
   for (const [k, n] of count(withUserLevel, '_fmp_user_level')) {
-    console.log(`  ${String(n).padStart(4)}  level ${k}`);
+    const stillHere = active.filter((e) => e._fmp_user_level === k).length;
+    console.log(`  ${String(n).padStart(4)}  level ${k}   (${stillHere} still employed)`);
+  }
+  console.log(
+    `  → ${active.filter((e) => Number(e._fmp_user_level) >= 2).length} current employees ` +
+    `had FMP access above staff. Those are the people to invite.`
+  );
+}
+
+const paperworkTicks = new Map();
+for (const e of employees) for (const t of e._fmp_paperwork) tally(paperworkTicks, t);
+if (paperworkTicks.size) {
+  console.log(`\nFMP paperwork ticks — NOT loaded (021 derives this from the files)`);
+  for (const [k, n] of [...paperworkTicks.entries()].sort((a, b) => b[1] - a[1])) {
+    console.log(`  ${String(n).padStart(4)}  ${k}`);
   }
 }
 

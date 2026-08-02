@@ -130,6 +130,7 @@ export function AppAccess({
   }
 
   const state = !userId ? "none" : displayName ? "active" : "pending";
+  const isOwner = role === "owner";
 
   const BUTTON =
     "h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
@@ -199,29 +200,46 @@ export function AppAccess({
             <dd>{displayName}</dd>
             <dt className="py-0.5 text-subtle">Role</dt>
             <dd>
-              {/* Writes org_members.role directly, under 001's members_write
-                  policy — the same owner/admin gate this whole screen is
-                  behind. Matched on the FULL primary key: org_members is keyed
-                  (org_id, user_id) and has no `id` column at all. */}
-              <InlineValue
-                table="org_members"
-                column="role"
-                value={role}
-                kind="pick"
-                nullable={false}
-                options={ROLE_OPTIONS}
-                match={{ org_id: orgId, user_id: userId ?? "" }}
-              />
+              {isOwner ? (
+                // The owner is not editable from here, and that's deliberate
+                // twice over. ROLE_OPTIONS doesn't offer 'owner' — so a picker
+                // would render the raw stored value ("owner", lowercase, as
+                // PickList does for anything off its list) — and demoting the
+                // only owner is not something a personnel screen should make
+                // one tap away. Ownership moves in the SQL editor.
+                <span>{ROLE_LABEL.owner}</span>
+              ) : (
+                /* Writes org_members.role directly, under 001's members_write
+                   policy — the same owner/admin gate this whole screen is
+                   behind. Matched on the FULL primary key: org_members is
+                   keyed (org_id, user_id) and has no `id` column at all. */
+                <InlineValue
+                  table="org_members"
+                  column="role"
+                  value={role}
+                  kind="pick"
+                  nullable={false}
+                  options={ROLE_OPTIONS}
+                  match={{ org_id: orgId, user_id: userId ?? "" }}
+                />
+              )}
             </dd>
           </dl>
-          <button
-            type="button"
-            className={`${QUIET} ml-auto`}
-            disabled={busy}
-            onClick={revoke}
-          >
-            Remove access
-          </button>
+          {isOwner ? (
+            <p className="ml-auto max-w-xs text-xs text-subtle">
+              The owner&rsquo;s access can&rsquo;t be changed here — there would
+              be no way back in.
+            </p>
+          ) : (
+            <button
+              type="button"
+              className={`${QUIET} ml-auto`}
+              disabled={busy}
+              onClick={revoke}
+            >
+              Remove access
+            </button>
+          )}
         </div>
       )}
 

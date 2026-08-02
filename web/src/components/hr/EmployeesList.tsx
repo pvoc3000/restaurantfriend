@@ -165,7 +165,7 @@ export function EmployeesList({
     {
       key: "name",
       label: "Name",
-      width: 300,
+      width: 255,
       pinned: true,
       wrap: true,
       sortValue: (r) => sortValue(r, "name"),
@@ -183,7 +183,7 @@ export function EmployeesList({
     {
       key: "status",
       label: "Status",
-      width: 120,
+      width: 110,
       sortValue: (r) => sortValue(r, "status"),
       // Colour means record STATE, which this is: an inactive person is a
       // closed record, the same mark a deactivated catalog row carries.
@@ -196,21 +196,21 @@ export function EmployeesList({
     {
       key: "location",
       label: "Location",
-      width: 110,
+      width: 125,
       sortValue: (r) => sortValue(r, "location"),
       render: (r) => <span className="text-muted">{r.location_code ?? "—"}</span>,
     },
     {
       key: "position",
       label: "Position",
-      width: 170,
+      width: 150,
       sortValue: (r) => sortValue(r, "position"),
       render: (r) => r.position ?? <span className="text-subtle">—</span>,
     },
     {
       key: "schedule",
       label: "Schedule",
-      width: 130,
+      width: 125,
       hideWhenCompact: true,
       sortValue: (r) => sortValue(r, "schedule"),
       render: (r) => (
@@ -222,7 +222,7 @@ export function EmployeesList({
     {
       key: "phone",
       label: "Phone",
-      width: 150,
+      width: 140,
       hideWhenCompact: true,
       sortValue: (r) => sortValue(r, "phone"),
       render: (r) => <span className="text-muted">{r.phone ?? "—"}</span>,
@@ -230,7 +230,7 @@ export function EmployeesList({
     {
       key: "start",
       label: "Started",
-      width: 120,
+      width: 115,
       hideWhenCompact: true,
       sortValue: (r) => sortValue(r, "start"),
       render: (r) => <span className="text-muted">{r.start_date ?? "—"}</span>,
@@ -238,7 +238,7 @@ export function EmployeesList({
     {
       key: "fhc",
       label: "Food card",
-      width: 130,
+      width: 140,
       hideWhenCompact: true,
       sortValue: (r) => sortValue(r, "fhc"),
       render: (r) => {
@@ -258,8 +258,8 @@ export function EmployeesList({
     },
     {
       key: "access",
-      label: "App access",
-      width: 140,
+      label: "Access",
+      width: 110,
       sortValue: (r) => sortValue(r, "access"),
       render: (r) =>
         r.role ? (
@@ -334,7 +334,13 @@ export function EmployeesList({
         rowKey={(r) => r.id}
         storageKey={WIDTHS_STORAGE_KEY}
         columnChooser
-        compactBelow={1280}
+        // 1400, not the app's usual 1280. Nine columns is more than any other
+        // list carries, and measured at 1280 six of the nine LABELS truncated
+        // ("STAT…", "FOOD C…") — the columns fit, since they're fluid, but you
+        // can't read what they are. Below 1400 the compact set leaves five
+        // roomy ones; at 1440 and up all nine fit with their labels intact.
+        // Either way the Columns menu overrides it, per column.
+        compactBelow={1400}
         sort={sort}
         onSortChange={(next) => setSort({ key: next.key as SortKey, dir: next.dir })}
         empty={<p className="text-sm text-muted">No one matches those filters.</p>}
