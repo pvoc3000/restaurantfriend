@@ -35,10 +35,16 @@ export function OrderBar({
   /**
    * Row 2, right-aligned, one entry per GROUP (Mark, 2026-08-02): what you add
    * to the order · what you send to the vendor · what you do when it comes
-   * back. Buttons inside a group sit `gap-2` apart and the groups sit `gap-4`
-   * — exactly double, which is what makes them read as groups rather than as
-   * one long row. An empty group is dropped rather than rendered, or it would
-   * spend its gap saying nothing (a staff view has no Add item).
+   * back. Buttons inside a group sit `gap-2` (8px) apart and the groups
+   * `gap-x-8` (32px) — settled by eye over three tries (Mark, 2026-08-02): 16px
+   * read as arithmetic rather than a boundary, 64px pushed the groups so far
+   * apart they stopped reading as one row of commands. 4× the inner gap is the
+   * ratio that says "these belong together, those don't". The VERTICAL gap
+   * stays small: 32px between groups that have wrapped onto separate lines
+   * would read as three separate rows rather than one wrapped one.
+   *
+   * An empty group is dropped rather than rendered, or it would spend its gap
+   * saying nothing (a staff view has no Add item).
    */
   actionGroups?: React.ReactNode[];
   /** Under both rows: a sent note, an error. */
@@ -58,7 +64,7 @@ export function OrderBar({
       </div>
 
       {groups.length > 0 && (
-        <div className="flex flex-wrap items-center justify-end gap-4">
+        <div className="flex flex-wrap items-center justify-end gap-x-8 gap-y-2">
           {groups.map((group, i) => (
             <span key={i} className="flex flex-wrap items-center gap-2">
               {group}
