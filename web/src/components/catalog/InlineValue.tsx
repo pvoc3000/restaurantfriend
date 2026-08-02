@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { evaluateNumeric, looksLikeExpression } from "@/lib/calc";
@@ -137,6 +137,9 @@ export function InlineValue({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const dateRef = useRef<HTMLInputElement>(null);
+  /** A date write that's been sent but whose fresh prop hasn't arrived yet. */
+  const pending = useRef<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
@@ -224,6 +227,46 @@ export function InlineValue({
       ? evaluateNumeric(draft)
       : null;
 
+  /**
+   * Hold the date box to the column — after every render, and on the way out.
+   *
+   * `value` is what the row holds; a native date input is a control the BROWSER
+   * can also write to, and when it does React has no prop change to correct it
+   * with, because a controlled input only touches the DOM when the rendered
+   * value differs from the LAST RENDER's. That is how a PO whose
+   * `delivery_date` is null came to display today's date (Mark, 2026-08-02),
+   * and it's why a field meant to stay blank is the worst case: its prop can
+   * never change, so nothing ever puts it back.
+   *
+   * Two triggers, because neither is enough alone. The render pass catches a
+   * box that drifted while something else on the screen moved; but a page that
+   * simply sits there never renders again, so `onBlur` catches the box you just
+   * stepped a date into and walked away from. `onChange` still handles the
+   * rejected and no-op paths, which is the common case and the cheapest.
+   *
+   * `pending` is what stops the reset fighting a real edit: a write is async and
+   * `router.refresh()` lands after it, so between the two the prop still holds
+   * the OLD value and a blind reset would snap the box back to it. It clears
+   * itself once the prop catches up. A FAILED write leaves it set, which is
+   * deliberate — the typed value stays on screen with the error, same as every
+   * other kind here.
+   */
+  const stored = value === null ? "" : String(value);
+  if (pending.current !== null && pending.current === stored) pending.current = null;
+
+  const holdDateToColumn = () => {
+    const el = dateRef.current;
+    if (!el || pending.current !== null) return;
+    if (el.value !== stored) el.value = stored;
+  };
+
+  useLayoutEffect(() => {
+    const el = dateRef.current;
+    // Not while it has focus, or it would fight someone mid-edit.
+    if (kind !== "date" || !el || el === document.activeElement) return;
+    holdDateToColumn();
+  });
+
   // A chosen value writes on the spot: there's no draft to abandon and nothing
   // to confirm, which is the same call BaseUnitEditor made ("picking a unit IS
   // the edit") and the reason the control can live in a table cell at all.
@@ -261,6 +304,7 @@ export function InlineValue({
     return (
       <span className="inline-flex flex-col items-start">
         <input
+          ref={dateRef}
           type="date"
           value={value === null ? "" : String(value)}
           disabled={saving}
@@ -268,15 +312,9 @@ export function InlineValue({
           aria-label={column}
           onChange={(e) => {
             const next = e.target.value || null;
-            const stored = value === null ? "" : String(value);
 
-            // A REJECTED OR NO-OP EDIT MUST PUT THE BOX BACK BY HAND. This is
-            // a controlled input whose `value` prop didn't change, so React has
-            // nothing to re-render and the browser's own idea of the field
-            // survives — a date box left showing something the column doesn't
-            // hold and nothing will ever save. Found 2026-08-02 on a Chefs
-            // Warehouse PO whose delivery_date is null in the database while
-            // the field read 08/02/2026.
+            // A rejected or no-op edit puts the box back by hand — see
+            // holdDateToColumn for why React can't.
             if (next === null && !nullable) {
               setError("required");
               e.target.value = stored;
@@ -287,14 +325,23 @@ export function InlineValue({
               return;
             }
             setError(null);
+            pending.current = next ?? "";
             void write(next, false);
           }}
-          // px-1 py-0.5 is the resting BUTTON's padding, not a field's: these
-          // sit in a dl beside text cells, and a date indented 8px while the
-          // note beside it is indented 4px is exactly the misalignment Mark
-          // caught on `sent_via`. The border earns its place by saying the box
-          // takes input; the padding keeps the column straight.
-          className={`border border-ink px-1 py-0.5 tabular-nums disabled:opacity-35 ${className}`}
+          onBlur={holdDateToColumn}
+          // NO BORDER (Mark, 2026-08-02: "I don't like the bounding box on the
+          // date fields, but I like the calendar icon"). A boxed field among
+          // dotted-underline cells read as a different class of control; the
+          // calendar glyph is the browser's own and survives losing the frame,
+          // so the affordance stays and the column goes quiet. Hover gets the
+          // same wash the resting button has, which is what's left saying the
+          // value takes an edit.
+          //
+          // px-1 py-0.5 is that button's padding, not a field's: these sit in a
+          // dl beside text cells, and a date indented 8px while the note beside
+          // it is indented 4px is exactly the misalignment Mark caught on
+          // `sent_via`.
+          className={`px-1 py-0.5 tabular-nums hover:bg-neutral-100 disabled:opacity-35 ${className}`}
         />
         {error && <span className="text-xs text-accent">{error}</span>}
       </span>

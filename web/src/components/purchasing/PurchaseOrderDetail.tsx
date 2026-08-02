@@ -532,14 +532,14 @@ export function PurchaseOrderDetail({
     },
   ];
 
-  // Delivery is a fact about the PAST once it's true, so the field holds it
-  // only from `received` on. Before that the expectation — generation's, or
-  // failing that the vendor's next delivery day after the order date — is
-  // stated beside it. Same arithmetic as `nextDeliveryDate` everywhere else.
-  const arrived = order.status === "received" || order.status === "closed";
+  // The expectation, stated beside the Delivery field while that field is
+  // empty: the vendor's next delivery day after the order date, the same
+  // arithmetic migration 016 uses. Nothing to say if the vendor has no delivery
+  // days recorded, or if the date is already known.
   const expectedDelivery =
-    order.delivery_date ??
-    (processing ? nextDeliveryDate(order.order_date, processing.delivery_days) : null);
+    order.delivery_date === null && processing
+      ? nextDeliveryDate(order.order_date, processing.delivery_days)
+      : null;
 
   // --- The three slots of the one box above the lines. See OrderBar. --------
 
@@ -697,36 +697,30 @@ export function PurchaseOrderDetail({
             read as a pair, which is the argument that beat putting it up in the
             bar beside Status.
 
-            BEFORE THE ORDER ARRIVES THERE IS NO FIELD AT ALL, only the "arrives
-            …" statement. The first cut rendered an EMPTY editable date box here
-            (Mark: it "should be empty until the PO is marked received or
-            closed") and that box lied: on 132-181132-02, whose `delivery_date`
-            is null in the database, it read 08/02/2026 — today. A native date
-            input is a control the browser is happy to fill on its own, and
-            because this passed the same empty value on every render React had
-            no prop change to reset it with, so whatever the browser put there
-            survived while nothing was ever saved. Mark read it exactly right:
-            "the delivery date is today until it is set by someone."
+            The field is always there and blank until the date is actually set,
+            with the expectation beside it (Mark, 2026-08-02: "a blank field +
+            the 'arriving on…' text to the right of it").
 
-            An empty box also invites the wrong gesture — this field records
-            when a delivery ARRIVED, so typing one before anything has turned up
-            is a claim about a past that hasn't happened. The expectation
-            (generation's, from migration 016, or failing that the vendor's next
-            delivery day) is a sentence beside the label instead, and the field
-            appears at `received` when there is a fact for it to hold. */}
+            IT SHOWS THE COLUMN, not a version of the column. The previous cut
+            withheld the value until the order was received, and that's what
+            produced the 08/02/2026 on 132-181132-02: a control whose prop is
+            pinned to null can never be corrected by React, because a controlled
+            input only touches the DOM when the rendered value CHANGES. Every
+            guard against that had to special-case a field whose prop never
+            moves — including, once written, one that could never clear itself.
+            A field that shows what the row holds has none of those cases.
+
+            Consequence worth knowing: a PO generated since migration 016 has
+            `delivery_date` pre-filled from the vendor's delivery days, so it
+            shows that date here rather than a blank. Making it blank until the
+            delivery actually happens means generation should stop pre-filling
+            the column and the vendor PDF should derive the date instead — a
+            change to what the vendor document says, so it's Mark's call. */}
         <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
           Delivery
         </dt>
         <dd className="flex flex-wrap items-center gap-2 tabular-nums">
-          {!arrived ? (
-            expectedDelivery ? (
-              <span className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink">
-                arrives {expectedDelivery}
-              </span>
-            ) : (
-              <span className={`${READ_ONLY_VALUE} text-muted`}>not yet</span>
-            )
-          ) : canEditLines ? (
+          {canEditLines ? (
             <InlineValue
               table="purchase_orders"
               id={order.id}
@@ -736,6 +730,11 @@ export function PurchaseOrderDetail({
             />
           ) : (
             <span className={READ_ONLY_VALUE}>{order.delivery_date ?? "—"}</span>
+          )}
+          {expectedDelivery && (
+            <span className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink">
+              arrives {expectedDelivery}
+            </span>
           )}
         </dd>
 
