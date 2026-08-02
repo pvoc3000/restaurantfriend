@@ -87,9 +87,6 @@ export function ListFilters({
           <span className="text-xs uppercase tracking-[0.12em] text-subtle">
             Last ordered
           </span>
-          {/* A selected AGE bucket is yellow (accent) — the "look at this"
-              mark, since a stale filter left on is hiding everything fresh.
-              "Any age" is the neutral choice and stays black. */}
           <TabPicker
             ariaLabel="Last ordered"
             value={stale}
@@ -98,7 +95,6 @@ export function ListFilters({
               key: t,
               label: t === "any" ? "Any age" : STALE_LABEL[t],
               count: t === "any" ? totalCount ?? 0 : staleCounts?.[t] ?? 0,
-              accent: t !== "any",
             }))}
           />
         </div>

@@ -15,16 +15,21 @@ import type { ReactNode } from "react";
  * the cleanup queue each had their own; now they all render through here, so a
  * change lands everywhere at once, the DataTable rule.
  *
+ * **The selected cell is ALWAYS black.** There is no per-caller colour, on
+ * purpose (Mark, 2026-08-01, spotting a yellow selected cell on Inventory:
+ * "highlighted yellow instead of black like everywhere else"). The last-ordered
+ * age buckets carried a yellow selected fill over from the chip dialect this
+ * replaced — the argument being that a stale filter left on hides everything
+ * fresh, so it was worth a mark. Two things outrank that: one control has one
+ * selected state or it isn't one control, and the design system reserves colour
+ * for record STATE, which a filter is not — a filter is view state, and how
+ * much it's hiding is already said by the "401 of 790" count in the header.
+ *
  * Options:
  * - `count` puts the option's row count beside its label, dimmed and tabular —
  *   the guide's tier style.
  * - `href` renders the cell as a Link instead of a button (the guide's day
  *   picker navigates; everything else sets state).
- * - `accent: true` fills the SELECTED cell yellow instead of black. For the
- *   last-ordered age buckets, where the design system's rule is that colour
- *   means record state: a stale filter left on is hiding everything fresh, and
- *   yellow is the "worth your eye" mark. Neutral choices ("Any age") stay
- *   black.
  *
  * `size="sm"` (h-8, 11px) is for tight bands like the receiving screen's
  * fixed-height pane header; everything in an ordinary filter row is `md`.
@@ -42,8 +47,6 @@ export type TabPickerOption<K extends string = string> = {
   title?: string;
   /** Navigate instead of set state — the cell renders as a Link. */
   href?: string;
-  /** Selected fill is yellow (the mark colour) instead of black. */
-  accent?: boolean;
 };
 
 export function TabPicker<K extends string>({
@@ -77,11 +80,7 @@ export function TabPicker<K extends string>({
         const cls = `inline-flex items-center gap-2 ${cell} font-semibold uppercase tracking-[0.06em] no-underline transition-colors ${
           i > 0 ? "border-l border-ink" : ""
         } ${
-          on
-            ? o.accent
-              ? "bg-[var(--rf-yellow-500)] text-ink"
-              : "bg-ink text-white"
-            : "bg-white text-ink hover:bg-neutral-100"
+          on ? "bg-ink text-white" : "bg-white text-ink hover:bg-neutral-100"
         }`;
         const count =
           o.count !== undefined ? (

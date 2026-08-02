@@ -801,7 +801,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons |
   | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands; shares `lib/anchoredPanel` with PickList, so it escapes scroll panes the same way |
   | `catalog/InlineValue` | a hand-wired edit-in-place | any editable cell — `kind` text / number / date / **pick**; `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column |
-  | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style, with `count`, `href` (link cells) and `accent` (yellow selected fill) options |
+  | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style. Selected cell is ALWAYS black; `count` and `href` are the only options |
   | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
   | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory |
@@ -1298,9 +1298,16 @@ weekday column, and 003 then silently made it per-vendor-item.
   filter). Consumers: the guide's day strip (href/Link cells), tier filter
   (counts) and grouping; ListFilters; both big lists; the PO list; cleanup ×3;
   receiving's layout control (`size="sm"` for its fixed-height band).
-  `accent: true` fills the SELECTED cell yellow instead of black — used by the
-  last-ordered age buckets, where a stale filter left on is hiding everything
-  fresh; "Any age"/"All" stay black. The root is `flex w-fit`, never
+  **The selected cell is ALWAYS black — there is no per-caller colour.** The
+  first cut kept an `accent` option that filled a selected last-ordered AGE
+  bucket yellow, carried over from the chip dialect on the argument that a
+  stale filter left on hides everything fresh. Mark caught it within the hour
+  (2026-08-01, on Inventory: "highlighted yellow instead of black like
+  everywhere else") and it's gone, option and all: one control has one selected
+  state or it isn't one control, and the design system reserves colour for
+  record STATE — a filter is VIEW state, and how much it's hiding is already
+  said by the "401 of 790" count in the header. `count` and `href` are the only
+  options left. The root is `flex w-fit`, never
   `inline-flex` (the descender-space trap in block parents). If a new screen
   needs a choose-one control, this is it — a `<select>` is still fine for a
   long vocabulary, and `PickList` for choosing a VALUE.

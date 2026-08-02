@@ -377,9 +377,7 @@ export function ItemsList({
         />
       </div>
 
-      {/* Last-ordered filter — same buckets as the cleanup queue. A selected
-          AGE bucket is yellow (accent): a stale filter left on is hiding
-          everything fresh. */}
+      {/* Last-ordered filter — same buckets as the cleanup queue. */}
       <div className="flex flex-wrap items-center gap-3">
         <span className="text-xs uppercase tracking-[0.12em] text-faint">
           Last ordered
@@ -392,7 +390,6 @@ export function ItemsList({
             key: t,
             label: t === "any" ? "Any age" : STALE_LABEL[t],
             count: t === "any" ? items.length : staleCounts[t] ?? 0,
-            accent: t !== "any",
           }))}
         />
       </div>
