@@ -923,7 +923,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary — a VALUE or a filter's VIEW; `variant="inline"` in a cell, `variant="field"` as a standalone box. Opens below the field, portals so panes can't clip it |
   | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons |
   | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands; shares `lib/anchoredPanel` with PickList, so it escapes scroll panes the same way |
-  | `catalog/InlineValue` | a hand-wired edit-in-place | any editable cell — `kind` text / number / date / **pick**; `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column |
+  | `catalog/InlineValue` | a hand-wired edit-in-place, or a bare `<input type="date">` | any editable cell — `kind` text / number / date / **pick**; `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column |
   | `ui/SectionHeading` | a hand-styled `<h2>` | the heading over a block on a detail screen (16px bold black, optional `count`) |
   | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style. Selected cell is ALWAYS black; `count` and `href` are the only options |
   | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
@@ -1151,6 +1151,30 @@ weekday column, and 003 then silently made it per-vendor-item.
 - **The Active toggle is the FIRST column** on every catalog table (Mark,
   2026-07-23) — vendors list, vendor/item per-location config, vendor items.
   "Stock here" shares that slot where a row doesn't exist yet.
+- **EVERY date field shows a calendar picker** (Mark, 2026-08-02: "always
+  include a calendar picker for any date field"). Not a rule to remember at
+  each call site — `InlineValue kind="date"` renders the browser's own
+  `<input type="date">` permanently, so a date cell is a picker by
+  construction. It is the second `kind` that does NOT click-to-edit (the first
+  is `pick`): the native control is already a box you can type into AND a
+  calendar, so hiding it behind a dotted underline bought nothing and cost the
+  one affordance a date has that no other field does. It writes ON CHANGE for
+  the same reason `pick` does — a date input emits `""` until the whole date is
+  valid, so a change event IS a finished value, and there's no half-typed state
+  to protect. Its padding is the resting BUTTON's `px-1 py-0.5`, not a field's
+  `px-2`: these sit in a `dl` beside text cells, and a date indented 8px next to
+  a note indented 4px is a visibly crooked column. What triggered it was that
+  PO detail's Delivery date was a hand-rolled `<input type="date">` (a picker)
+  while the Ordered date beside it was an `InlineValue` (not), which is exactly
+  the drift the parts table exists to prevent.
+- **A read-only value in a detail `dl` wears the editable one's padding.**
+  `InlineValue`'s resting button is `px-1 py-0.5`, so a plain string rendered
+  beside it starts 4px to its left and the whole column looks broken — Mark
+  caught it on an emailed order's `sent_via` (2026-08-02: "'email' isn't
+  aligned with the ordered date and note, probably having something to do with
+  it not being editable", which was precisely the cause). PO detail keeps the
+  class as `READ_ONLY_VALUE`; anywhere a value is conditionally editable, the
+  non-editable branch needs it too.
 - **A known vocabulary is CHOSEN, never typed** (`components/ui/PickList.tsx`,
   Mark, 2026-07-30: "the user can enter literally anything… sweep the app").
   One control everywhere: a small list that opens directly BELOW the field —

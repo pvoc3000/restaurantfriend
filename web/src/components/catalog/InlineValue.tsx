@@ -246,6 +246,47 @@ export function InlineValue({
     );
   }
 
+  // A DATE ALWAYS SHOWS ITS CALENDAR (Mark, 2026-08-02: "always include a
+  // calendar picker for any date field" — the PO's delivery date had one and
+  // the order date beside it didn't, which is what made the pair look
+  // unfinished). So `kind="date"` is the second control that doesn't
+  // click-to-edit: the browser's own date input is already a box you can type
+  // into AND a picker, and hiding it behind a dotted underline bought nothing
+  // while costing the one affordance a date has that no other field does.
+  //
+  // Writes on change, like `kind="pick"` and for the same reason: a date input
+  // emits "" until the whole date is valid, so a change event IS a finished
+  // value — there's no half-typed state to protect and nothing to confirm.
+  if (kind === "date") {
+    return (
+      <span className="inline-flex flex-col items-start">
+        <input
+          type="date"
+          value={value === null ? "" : String(value)}
+          disabled={saving}
+          required={!nullable}
+          aria-label={column}
+          onChange={(e) => {
+            const next = e.target.value || null;
+            if (next === null && !nullable) {
+              setError("required");
+              return;
+            }
+            setError(null);
+            void write(next, false);
+          }}
+          // px-1 py-0.5 is the resting BUTTON's padding, not a field's: these
+          // sit in a dl beside text cells, and a date indented 8px while the
+          // note beside it is indented 4px is exactly the misalignment Mark
+          // caught on `sent_via`. The border earns its place by saying the box
+          // takes input; the padding keeps the column straight.
+          className={`border border-ink px-1 py-0.5 tabular-nums disabled:opacity-35 ${className}`}
+        />
+        {error && <span className="text-xs text-accent">{error}</span>}
+      </span>
+    );
+  }
+
   if (editing) {
     return (
       <span className="inline-flex flex-col">
@@ -253,7 +294,8 @@ export function InlineValue({
           autoFocus
           value={draft}
           disabled={saving}
-          type={kind === "date" ? "date" : undefined}
+          // No date here any more — `kind="date"` returned above with a picker
+          // that's always on screen.
           inputMode={kind === "number" ? "decimal" : undefined}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={save}

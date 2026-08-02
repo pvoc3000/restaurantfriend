@@ -11,7 +11,6 @@ import {
   downloadBlob,
   fetchPoDocData,
   mailtoFromParts,
-  nextDeliveryDate,
   openWindowNow,
   sendPoEmail,
   sharePdf,
@@ -56,9 +55,9 @@ export function ProcessPo({
   /**
    * The order's own three slots, handed in by PurchaseOrderDetail so all of it
    * lands in ONE box (Mark, 2026-08-02). They can't be composed the other way
-   * round: the Delivery control and every button below live off this
-   * component's `busy` / `compose` state, so whoever draws the frame has to be
-   * inside it. See OrderBar, which is the frame both callers share.
+   * round: every button below lives off this component's `busy` / `compose`
+   * state, so whoever draws the frame has to be inside it. See OrderBar, which
+   * is the frame both callers share.
    */
   statement?: React.ReactNode;
   status?: React.ReactNode;
@@ -87,10 +86,6 @@ export function ProcessPo({
   }
 
   const sentVia = SENT_VIA_FOR_ORDER_TYPE[context.order_type] ?? "print";
-  const suggestion =
-    order.delivery_date === null
-      ? nextDeliveryDate(order.order_date, context.delivery_days)
-      : null;
 
   async function loadDocs() {
     const [{ pdf }, docs, { org, pos }] = await Promise.all([
@@ -207,16 +202,6 @@ export function ProcessPo({
       router.refresh();
     });
 
-  const setDelivery = (date: string | null) =>
-    run("delivery", async () => {
-      const { error } = await supabase
-        .from("purchase_orders")
-        .update({ delivery_date: date })
-        .eq("id", order.id);
-      if (error) throw new Error(error.message);
-      router.refresh();
-    });
-
   const btn =
     "h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
   const primaryBtn =
@@ -224,6 +209,10 @@ export function ProcessPo({
 
   return (
     <>
+      {/* `trailing` is just Status: the delivery date went back under Ordered
+          in the dl (Mark, 2026-08-02) — the two dates read as a pair — and with
+          it went this card's second editor for the same column and the
+          "arrives …" chip that used to sit beside it. */}
       <OrderBar
         statement={
           <>
@@ -233,41 +222,7 @@ export function ProcessPo({
             {statement}
           </>
         }
-        trailing={
-          <>
-            {/* THE order's delivery date — there is only one now (Mark,
-                2026-08-02). A second, identical editor sat in the dl above and
-                wrote the same column; this is the copy that survived because
-                it's the one carrying the suggestion chip. Generation fills the
-                date in from the vendor's delivery days (migration 016), so it's
-                usually already right — this is here for the exceptions (a
-                holiday, a special run, a vendor with no delivery days
-                recorded), and the chip only appears while it's still empty. */}
-            <label className="flex items-center gap-2 text-muted">
-              <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-                Delivery
-              </span>
-              <input
-                type="date"
-                value={order.delivery_date ?? ""}
-                disabled={busy !== null}
-                onChange={(e) => setDelivery(e.target.value || null)}
-                className="h-9 border border-ink px-2"
-              />
-            </label>
-            {suggestion && (
-              <button
-                disabled={busy !== null}
-                onClick={() => setDelivery(suggestion)}
-                title="The vendor's next delivery day after the order date"
-                className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink hover:bg-[var(--rf-yellow-100)] disabled:opacity-35"
-              >
-                arrives {suggestion}
-              </button>
-            )}
-            {status}
-          </>
-        }
+        trailing={status}
         footer={
           <>
             {sentNote && (

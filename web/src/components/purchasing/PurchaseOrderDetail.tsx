@@ -30,6 +30,17 @@ import { PickList } from "@/components/ui/PickList";
 import { AddPoLines } from "./AddPoLines";
 import { OrderBar } from "./OrderBar";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
+import { nextDeliveryDate } from "@/lib/poProcessing";
+
+/**
+ * A value in the detail `dl` that ISN'T editable, wearing the padding that
+ * `InlineValue`'s resting button wears. Every editable value in that column
+ * starts 4px in; a plain string started at 0 and broke the column (Mark,
+ * 2026-08-02, on an emailed order: "'email' isn't aligned with the ordered date
+ * and note, probably having something to do with it not being editable" —
+ * which was exactly the cause).
+ */
+const READ_ONLY_VALUE = "inline-block px-1 py-0.5";
 
 /**
  * Reserve, in the page's flow, exactly the height of a `position: fixed` footer.
@@ -521,6 +532,15 @@ export function PurchaseOrderDetail({
     },
   ];
 
+  // Delivery is a fact about the PAST once it's true, so the field holds it
+  // only from `received` on. Before that the expectation — generation's, or
+  // failing that the vendor's next delivery day after the order date — is
+  // stated beside it. Same arithmetic as `nextDeliveryDate` everywhere else.
+  const arrived = order.status === "received" || order.status === "closed";
+  const expectedDelivery =
+    order.delivery_date ??
+    (processing ? nextDeliveryDate(order.order_date, processing.delivery_days) : null);
+
   // --- The three slots of the one box above the lines. See OrderBar. --------
 
   /* How many DISTINCT products, and how many packages they add up to — the
@@ -658,12 +678,6 @@ export function PurchaseOrderDetail({
         <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
           Ordered
         </dt>
-        {/* Order date only. Delivery had a SECOND editor here — same column,
-            same write, two controls (Mark, 2026-08-02: "can we just use one").
-            The one that survived is the bar's, because it's the one carrying
-            the "arrives …" suggestion chip; this row would have been the copy
-            you fix a date on without ever seeing what the vendor's delivery
-            days imply. Order date stays because nothing else edits it. */}
         <dd className="tabular-nums">
           {canEditLines ? (
             <InlineValue
@@ -675,13 +689,56 @@ export function PurchaseOrderDetail({
               nullable={false}
             />
           ) : (
-            order.order_date
+            <span className={READ_ONLY_VALUE}>{order.order_date}</span>
           )}
         </dd>
+
+        {/* Delivery sits back under Ordered (Mark, 2026-08-02) — the two dates
+            read as a pair, which is the argument that beat putting it up in the
+            bar beside Status.
+
+            And it stays EMPTY until the order is marked received or closed
+            (Mark, same message): this field says when the delivery ARRIVED, and
+            an expected date sitting in it before anything has turned up is a
+            claim about the past that hasn't happened. What generation worked
+            out (migration 016) is stated beside it instead, as "arrives …" —
+            a statement, not a button, because there is no longer a blank to
+            fill. NOTE the value is still STORED on draft/sent orders and is
+            what the vendor PDF prints; only this field withholds it. */}
+        <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+          Delivery
+        </dt>
+        <dd className="flex flex-wrap items-center gap-2 tabular-nums">
+          {canEditLines ? (
+            <InlineValue
+              table="purchase_orders"
+              id={order.id}
+              column="delivery_date"
+              value={arrived ? order.delivery_date : null}
+              kind="date"
+            />
+          ) : (
+            <span className={READ_ONLY_VALUE}>
+              {(arrived && order.delivery_date) || "—"}
+            </span>
+          )}
+          {!arrived && expectedDelivery && (
+            <span className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink">
+              arrives {expectedDelivery}
+            </span>
+          )}
+        </dd>
+
         <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
           Sent via
         </dt>
-        <dd>{order.sent_via ?? "—"}</dd>
+        {/* The same padding the editable cells wear. Without it a read-only
+            value starts 4px left of every value above and below it, which is
+            what Mark saw on an email order: "'email' isn't aligned with the
+            ordered date and note". */}
+        <dd>
+          <span className={READ_ONLY_VALUE}>{order.sent_via ?? "—"}</span>
+        </dd>
         <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
           Notes
         </dt>
@@ -695,7 +752,7 @@ export function PurchaseOrderDetail({
               placeholder="none"
             />
           ) : (
-            (order.notes ?? "—")
+            <span className={READ_ONLY_VALUE}>{order.notes ?? "—"}</span>
           )}
         </dd>
       </dl>
@@ -797,8 +854,15 @@ export function PurchaseOrderDetail({
           written here (see useStickyFooterClearance) rather than guessed: the
           card is 62px empty and taller with files in it, and this number is
           also what useFillViewportHeight reads as "everything below the pane",
-          so a guess would show up as the line list running under the band. */}
-      <div ref={footerSpacerRef} aria-hidden />
+          so a guess would show up as the line list running under the band.
+
+          `-mt-6` cancels the page's own space-y-6 above it (Mark, 2026-08-02:
+          "you can tighten the white space at the bottom"). A spacer is a
+          measurement, not a block of content, so the rhythm that separates the
+          real blocks shouldn't apply to it — and the gap it was adding sat
+          on top of the band's own padding, which is where the breathing room
+          belongs. */}
+      <div ref={footerSpacerRef} className="-mt-6" aria-hidden />
 
       {/* PINNED to the bottom of the window (Mark, 2026-08-02), and last in the
           order of the screen (Mark, earlier the same day — declutter). It used
@@ -834,7 +898,7 @@ export function PurchaseOrderDetail({
         //
         // z-30 is the ActionBar's rung: above the table and its sticky column
         // labels (20), below the masthead (50) and anchored panels (70).
-        className="fixed inset-x-0 bottom-0 z-30 bg-white px-4 py-4 xl:px-12"
+        className="fixed inset-x-0 bottom-0 z-30 bg-white px-4 pb-4 pt-2 xl:px-12"
       >
         {attachmentError ? (
           <p className="border border-accent px-4 py-3 text-sm text-accent">
