@@ -341,11 +341,6 @@ export function ItemsList({
           {visible.length} of {items.length}
           {activeLocationCode ? ` · ${activeLocationCode}` : ""}
         </span>
-        {/* The reset-widths control lives in the table now, where every other
-            list in the app already puts it. The hint stays here. */}
-        <span className="ml-auto text-xs text-faint">
-          Drag the dividers between column headers to resize
-        </span>
       </div>
 
       {/* Search + category */}
