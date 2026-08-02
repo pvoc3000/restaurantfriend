@@ -57,7 +57,21 @@ const READ_ONLY_VALUE = "inline-block px-1 py-0.5";
  * straight to the node — no state, so a resize doesn't re-render the line
  * table, and the `set-state-in-effect` lint has nothing to object to. The >1px
  * guard stops the observer reacting to its own write.
+ *
+ * IT RESERVES THE FOOTER MINUS WHAT ALREADY FOLLOWS IT. The spacer's own bottom
+ * margin and the app layout's `py-8` sit under it and are already covered by
+ * the band, so reserving the full height on top of them left 56px of white
+ * between the last row and the card (Mark, 2026-08-02: "reduce the whitespace
+ * between the datatable and the paperwork area"). Both are read straight off
+ * computed style rather than measured from the layout, which keeps this free of
+ * the feedback loop it would otherwise have with `useFillViewportHeight` —
+ * that hook sizes the pane from this spacer, so a spacer that measured the
+ * page would be measuring its own effect.
  */
+/** White left between the line table and the card. The page's own block rhythm
+ *  (space-y-6), so the gap above the card matches every other gap on it. */
+const FOOTER_GAP = 16;
+
 function useStickyFooterClearance(
   footerRef: React.RefObject<HTMLElement | null>,
   spacerRef: React.RefObject<HTMLElement | null>
@@ -68,9 +82,23 @@ function useStickyFooterClearance(
     if (!footer || !spacer) return;
 
     const measure = () => {
-      const target = footer.getBoundingClientRect().height;
+      const below =
+        (parseFloat(getComputedStyle(spacer).marginBottom) || 0) +
+        (parseFloat(getComputedStyle(spacer.closest("main")!).paddingBottom) || 0);
+      const target = Math.max(
+        0,
+        footer.getBoundingClientRect().height + FOOTER_GAP - below
+      );
       if (Math.abs(parseFloat(spacer.style.height || "0") - target) > 1) {
         spacer.style.height = `${target}px`;
+        // Tell the pane its floor moved. `useFillViewportHeight` re-measures on
+        // window resize and on `document.body` resizing — and body is
+        // `min-h-full`, so when this spacer SHRINKS (a file removed from the
+        // card) the body's box doesn't change at all and the pane never
+        // reclaims the space. Measured: the card going 188px -> 86px left the
+        // pane at 263px with 118px of white under it. A resize event is exactly
+        // the signal "the amount of page below you changed".
+        window.dispatchEvent(new Event("resize"));
       }
     };
 
