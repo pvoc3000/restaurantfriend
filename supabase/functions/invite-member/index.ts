@@ -533,9 +533,18 @@ Deno.serve(async (req) => {
     // The link points at OUR page, not at Supabase's verify endpoint: /welcome
     // is where the password gets set, and it deliberately doesn't spend the
     // token until the form is submitted (mail scanners follow links).
+    // `org` and `name` are COSMETIC — the welcome page has no session and so
+    // can't read either from the database. They let it say "Welcome to Donut
+    // Friend" and prefill the person's first name instead of greeting them
+    // with a bare form for a product they've never heard of. Nothing is
+    // authorised by them; only `token_hash` is.
     const inviteUrl =
       `${appUrl.replace(/\/$/, "")}/welcome` +
-      `?token_hash=${encodeURIComponent(hashedToken)}&type=${linkType}`;
+      `?token_hash=${encodeURIComponent(hashedToken)}&type=${linkType}` +
+      (org?.name ? `&org=${encodeURIComponent(org.name)}` : "") +
+      (employee.first_name
+        ? `&name=${encodeURIComponent(String(employee.first_name))}`
+        : "");
 
     const ROLE_LABEL: Record<string, string> = {
       admin: "a manager",

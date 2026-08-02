@@ -32,7 +32,14 @@ function Welcome() {
   const tokenHash = params.get("token_hash");
   const type = params.get("type") === "magiclink" ? "magiclink" : "invite";
 
-  const [displayName, setDisplayName] = useState("");
+  // Cosmetic, and passed in the link because this page has no session and so
+  // can't read the org or the employee itself. Trimmed to a sane length: it
+  // goes in a heading, and nothing is authorised by it.
+  const org = (params.get("org") ?? "").trim().slice(0, 60);
+
+  const [displayName, setDisplayName] = useState(
+    () => (params.get("name") ?? "").trim().slice(0, 60)
+  );
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -130,8 +137,12 @@ function Welcome() {
         onSubmit={handleSubmit}
         className="w-full max-w-sm border-2 border-ink bg-white"
       >
+        {/* The ORG's name, not the product's — the person joining works at
+            Donut Friend and has very likely never heard of Restaurant Friend.
+            It comes down the link rather than being hardcoded (design rule 2);
+            a plain "Welcome" is the fallback when it isn't there. */}
         <h1 className="bg-ink px-6 py-4 text-[15px] font-bold uppercase tracking-[0.06em] text-white">
-          Welcome
+          {org ? `Welcome to ${org}` : "Welcome"}
         </h1>
 
         <div className="space-y-5 p-6">
@@ -141,7 +152,8 @@ function Welcome() {
               quietly can't work, and one that tells you straight away. */}
           {tokenHash ? (
             <p className="text-sm text-muted">
-              Choose a password and you&rsquo;re in.
+              Choose a password and you&rsquo;re in. You&rsquo;ll sign in with
+              the email address this invitation was sent to.
             </p>
           ) : (
             <p className="text-sm text-accent">
@@ -151,9 +163,15 @@ function Welcome() {
             </p>
           )}
 
+          {/* Their NAME, not a username — there is no username here; you sign
+              in with the email this invitation was sent to. It writes
+              org_members.display_name, which is what the masthead shows, so
+              the hint says exactly that rather than leaving them to guess
+              (Mark, 2026-08-02, asking which one it wanted). Prefilled from
+              the employee record when the link carries it. */}
           <label className="block space-y-1.5">
             <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
-              Your name
+              What should we call you?
             </span>
             <input
               type="text"
@@ -163,6 +181,9 @@ function Welcome() {
               onChange={(e) => setDisplayName(e.target.value)}
               className="h-9 w-full border border-ink px-3 outline-none focus:border-2"
             />
+            <span className="block text-xs text-subtle">
+              Shown at the top of the app. Your first name is fine.
+            </span>
           </label>
 
           <label className="block space-y-1.5">
