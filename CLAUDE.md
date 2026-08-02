@@ -801,9 +801,11 @@ on `locations`; `extraction` / `extracted_at` / `extraction_model` select on
 `purchase_order_attachments` and hold a real Chefs' Warehouse reading). This
 line said "NOT applied yet" for a while after they were; **probe, don't read
 this file** — that's what the memory note says and it was right.
-**020 and 021 are APPLIED** (Mark, 2026-08-01) and the employee data is LOADED:
-445 rows, 26 active / 2 new hire / 417 inactive, matching the transform report,
-with Mark's row linked to his auth account. **022 is NOT applied yet.**
+**020, 021 and 022 are APPLIED** (Mark, 2026-08-01/02) and the employee data is
+LOADED: 445 rows, 26 active / 2 new hire / 417 inactive, matching the transform
+report, with Mark's row linked to his auth account. 022 verified 2026-08-02 by
+inserting an `orientation` document and removing it again — the constraint
+accepts the value, so the widened check is live.
 
 Migration 019 gives the attachment somewhere to put what the invoice SAYS —
 `extraction` jsonb, `extracted_at`, `extraction_model`. On the attachment rather

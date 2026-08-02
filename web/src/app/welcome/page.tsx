@@ -154,7 +154,7 @@ function Welcome() {
             It comes down the link rather than being hardcoded (design rule 2);
             a plain "Welcome" is the fallback when it isn't there. */}
         <h1 className="bg-ink px-6 py-4 text-[15px] font-bold uppercase tracking-[0.06em] text-white">
-          {org ? `Welcome to ${org}` : "Welcome"}
+          {org ? `Welcome to ${org}!` : "Welcome"}
         </h1>
 
         <div className="space-y-5 p-6">
