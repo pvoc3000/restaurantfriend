@@ -37,9 +37,11 @@ function Welcome() {
   // goes in a heading, and nothing is authorised by it.
   const org = (params.get("org") ?? "").trim().slice(0, 60);
 
-  const [displayName, setDisplayName] = useState(
-    () => (params.get("name") ?? "").trim().slice(0, 60)
-  );
+  // Their name is NOT asked for (Mark, 2026-08-02: "we know their name
+  // already. Let's keep it simple"). It rides the link from the employee
+  // record and is written for them, so the only thing this page asks is the
+  // one thing we genuinely can't know.
+  const invitedName = (params.get("name") ?? "").trim().slice(0, 60);
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -117,10 +119,20 @@ function Welcome() {
 
     // migration 002's two-column definer function — the only way a member may
     // write their own row, since a self-update policy would also let them
-    // change their own role. Setting the name is also what flips the App
-    // access block on their employee record from "invited" to "signed in".
+    // change their own role.
+    //
+    // This MUST end up non-empty: a null display_name is what the App access
+    // block reads as "invited, hasn't signed in", so leaving it blank would
+    // report someone who is demonstrably using the app as still pending. The
+    // name comes down the link; the email's local part is the fallback for a
+    // link that predates that, or one an old client mangled.
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    const name = invitedName || (user?.email ?? "").split("@")[0] || "Member";
+
     const { error: profileError } = await supabase.rpc("set_my_member_profile", {
-      p_display_name: displayName.trim(),
+      p_display_name: name,
     });
     if (profileError) {
       // The account works; only the name didn't stick. Not worth blocking on.
@@ -162,29 +174,6 @@ function Welcome() {
               fresh one.
             </p>
           )}
-
-          {/* Their NAME, not a username — there is no username here; you sign
-              in with the email this invitation was sent to. It writes
-              org_members.display_name, which is what the masthead shows, so
-              the hint says exactly that rather than leaving them to guess
-              (Mark, 2026-08-02, asking which one it wanted). Prefilled from
-              the employee record when the link carries it. */}
-          <label className="block space-y-1.5">
-            <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
-              What should we call you?
-            </span>
-            <input
-              type="text"
-              required
-              autoComplete="name"
-              value={displayName}
-              onChange={(e) => setDisplayName(e.target.value)}
-              className="h-9 w-full border border-ink px-3 outline-none focus:border-2"
-            />
-            <span className="block text-xs text-subtle">
-              Shown at the top of the app. Your first name is fine.
-            </span>
-          </label>
 
           <label className="block space-y-1.5">
             <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
