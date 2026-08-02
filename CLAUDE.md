@@ -582,6 +582,77 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `/locations/<working id>`; the nav's tier-2 item is now "Locations"
    (`lib/nav.ts` — one line), and the tier-1 tab still wears the working code,
    which with the collapsed strip is now the only place it's always on screen.
+4c. 🚧 **HR + app access** — the second module outside Purchasing, and the one
+   that makes the app multi-user (Mark, 2026-08-01: "It's time to add users to
+   the app"). Specced in `docs/hr-access-brief.md`.
+   **An EMPLOYEE and a USER are two records, linked.** FMP conflated them:
+   login credentials were two fields on the employee's ADMIN tab — the password
+   stored and DISPLAYED in plain text, beside the SSN on the INFO tab of the
+   same record — and access was implied by a 1–5 "user level" radio whose
+   meaning lived only in script logic. Now `employees` is the HR record (all
+   ~445 people, almost all terminated, the referent every rating/timesheet/order
+   will hang off) and `org_members` stays the access record; the link is
+   `employees.user_id`, nullable and unique. Granting access is an ACTION an
+   admin takes on a record, not a job category — so a supervisor who does
+   ordering gets `purchaser` without being reclassified.
+   Schema: **020** (employees + the supervisor role + `org_members.invited_at`)
+   and **021** (employee_documents + a private bucket). Split so a storage
+   problem can't hold the data load hostage — 018's precedent.
+   **`employees` is the first table where READ is role-gated** (owner/admin, not
+   any-member): it carries a home address, a date of birth and eventually a
+   write-up. It has **no delete policy at all** — an employee is TERMINATED,
+   never deleted, and absence of the policy is the enforcement (the Clear-guide
+   lesson). A supervisor phone list and a "my own record" view are both real
+   future needs and both COLUMN-scoped, so each arrives as a definer function
+   naming the safe columns (the `set_my_member_profile` pattern), never by
+   loosening this.
+   **Onboarding paperwork is DERIVED, never stored** (Mark: it "should not be a
+   check list but flags that are set when those documents are uploaded"). FMP
+   had eight checkboxes and the documents themselves nowhere in the system; a
+   checkbox is a claim about paper in a drawer and goes stale the moment it's
+   ticked optimistically. `missingPaperwork()` asks which kinds exist, so
+   "complete" cannot be true without the files. FMP's Events table had already
+   been repurposed as a filing cabinet for exactly this reason (81 rows typed
+   `Document` since 2024, 73 with a paper original) — those land here at cutover.
+   **Access is an INVITATION.** `invite-member` (edge function) mints a
+   one-time Supabase link with the admin API and mails it through the SAME
+   three-tier provider layer the PO sender uses (org tier only — no location is
+   in scope for a member). `/welcome` is where the invitee sets their own
+   password; no credential is ever stored, displayed, or known to whoever
+   granted access. Revoke = delete the membership FIRST (it's what every policy
+   reads, so the door shuts even if the rest fails), then **ban** the auth user,
+   then null the link — **never DELETE an auth user**, because 001's audit
+   columns reference `auth.users` with no cascade and the history should keep
+   its author. Needs one new secret: `APP_URL`.
+   Two things the plan had wrong, both worth remembering:
+   **`proxy.ts` bounces every signed-out request to `/login`**, which would have
+   landed the invite on a password page for an account that has no password —
+   `/welcome` is exempted alongside `/login`. And **`InlineValue` hardcoded
+   `.eq("id", id)`** while `org_members` is keyed `(org_id, user_id)` with no
+   `id` column at all; it takes an optional `match` now, with a hard stop when a
+   cell has neither (a cell with no row to write to would otherwise update every
+   row in the table).
+   **`/welcome` spends the token on SUBMIT, never on load.** Mail scanners and
+   link previewers follow URLs in email as a matter of course, so verifying in
+   an effect would let a corporate spam filter burn the invitation before the
+   person ever clicked it.
+   Screens: `/employees` (defaults to Active — 26 of 445) and `/employees/[id]`,
+   both cloned from the locations pattern including the `key={id}` shell. The
+   nav gained per-role visibility (`NavSub.roles` + `sectionsForRole`, filtered
+   server-side in AppHeader) — a TIDINESS rule, never a security one; RLS is the
+   gate and each gated screen says so in a sentence. `/employees` is exempt from
+   `InactiveLocationGate`: a person belongs to the ORG, not to a shop.
+   Migration: `transform-hr.mjs` → `load-hr.mjs`, mirroring the purchasing
+   pipeline, output outside the repo. **The export in `FMP Export/HR/` is a
+   LAYOUT export and cannot be loaded** — 14 columns, no employee id, no
+   separate name fields, none of the ADMIN tab. The transform matches each
+   field against candidate column names and names what's missing.
+   **NOT migrated:** SSN (never exported — it's in FMP and Gusto, and a
+   web-reachable database is the wrong home for it), pay rates and everything
+   payroll-adjacent, and the Events/Ratings/Reviews/Timesheets tables, which
+   FMP keeps writing until their own modules are built. See
+   `migration/field-map.md` for the per-field reasons and the traps in each
+   child file.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -1571,9 +1642,23 @@ weekday column, and 003 then silently made it per-vendor-item.
   `item_location_id` remain). The migration JSON files also keep old names.
 - Weekdays: ISO smallint, 1 = Monday … 7 = Sunday (all ordering currently
   happens Monday; don't foreground the day dimension in UI).
-- Roles: owner / admin / purchaser / staff (in `org_members.role`).
+- Roles: owner / admin / purchaser / **supervisor** / staff (in
+  `org_members.role`; supervisor added by 020). The ladder is Mark's mapping of
+  FMP's 1–5 user levels — staff · supervisor · purchaser · manager · owner —
+  with purchasing slotted between supervisor and manager.
   Staff can create purchase requests + guide entries; catalog/PO writes need
-  purchaser+.
+  purchaser+; HR and member management need admin+.
+  **`admin` displays as "Manager"** and is NOT renamed in the DB — it's the
+  value every policy names. Labels and the gate predicates live in
+  `web/src/lib/roles.ts` (`ROLE_LABEL`, `canWriteCatalog`, `canManageMembers`,
+  `canReadHr`); never re-inline `["owner","admin","purchaser"].includes(...)`,
+  which was copy-pasted at ten sites before 020.
+  **A supervisor is DB-equivalent to staff in v1**, deliberately: every policy
+  is either membership-only (role-blind, so they inherit it — all reads, guide
+  entries, purchase requests, `set_my_member_profile`) or names the purchaser+
+  array explicitly (so they're excluded). Adding the role therefore edited NO
+  existing policy. When shift reports and production schedules arrive, those
+  tables' own policies name the role.
 - RLS filters ROWS, not COLUMNS. When the rule is "a user may change *this
   field* on their own row", write a `security definer` function naming those
   columns (see `set_my_member_profile`, migration 002) — a self-update policy
@@ -1637,6 +1722,25 @@ weekday column, and 003 then silently made it per-vendor-item.
 
 ## Open threads (pinned by Mark — don't act without asking)
 
+- **Per-location app access is deferred, and Mark wants to revisit it**
+  (2026-08-01: "defer for now but it is something I definitely want to
+  revisit"). FMP's ADMIN tab had a DEFAULT LOCATION and an ACCESS LOCATIONS
+  checkbox grid per user; today every member can work at every location and
+  only their ROLE limits them. 001 anticipated this — "per-location roles can
+  be added later (`location_members`) without disturbing this" — but it now
+  touches more than it did: `getAppSession`'s two lists, the `/locations` list
+  that grants Work here, and every location-scoped screen. Don't build it
+  speculatively; when it comes back, ask whether the rule is "may work at" or
+  "may see", because they are different tables.
+- **`REQUIRED_ONBOARDING_KINDS` is a guess at FMP's eight checkboxes**
+  (`web/src/lib/employeeDocuments.ts`) — Application, W-4, I-9, I-9 documents,
+  food handler card, handbook, notice to employee, training acknowledgement,
+  with the meal-break waiver deliberately optional. Worth confirming with Mark
+  before anyone treats "Paperwork complete" as a compliance statement. A
+  constant rather than `orgs.settings` on purpose: this is federal and
+  California employment paperwork, not org configuration. If a second org ever
+  needs a different set, that's the moment it moves — and design rule 2 will be
+  why.
 - **Should-order counts don't match the brief's measurement.** The
   2026-07-23 build implements the settled model exactly (fixture-tested), and
   membership verifies at the brief's 883 — but the brief's should-order figures

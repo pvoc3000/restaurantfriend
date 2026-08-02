@@ -105,6 +105,70 @@ Table names here reflect **migration 005** (2026-07-22 renames: `item_locations`
 | `Location_OpenDays`, `OperatingHours_Open/Close_time`, `Email_Billing`, `LaborRate_n` | `settings` jsonb | kept for later modules |
 | `smtp_*`, `Path_PO_Dir`, `ShiftReportPages_*`, `commuterBenefit_*`, etc. | **dropped** | dead infra / other modules will re-model |
 
+## Employee (DF-Employees) → `employees`
+
+Migration 020. Loaded by `transform-hr.mjs` → `load-hr.mjs`.
+
+**The export in `FMP Export/HR/` is a LAYOUT export and cannot be loaded** — 14
+columns, no employee id, no names as separate fields. Re-export from
+DF-Employees with **File → Export Records → Merge**, choosing the fields
+EXPLICITLY in the dialog (not whatever the current layout shows), character set
+**UTF-8** (there are accented names). `transform-hr.mjs` names any column it
+can't find and stops.
+
+| FMP | Schema | Notes |
+|---|---|---|
+| EMPLOYEE ID | `legacy_id` | **the join key** every child table uses (Events, Reviews, Ratings, Timesheets). The most important field in the export |
+| `Status` | `status` | Active / New Hire / Inactive → `active` / `new_hire` / `inactive`. FMP: 26 / 2 / 417 |
+| LAST NAME / FIRST NAME | `last_name` / `first_name` | the separate fields, NOT `Name_Full_c` — both NOT NULL |
+| NICNAME *(sic)* | `nickname` | |
+| `Phone` / `Email` | `phone` / `email` | |
+| ADDRESS | `address` | one text blob; nothing reads it structurally, so it isn't split |
+| DATE OF BIRTH | `date_of_birth` | M/D/YYYY → ISO |
+| `Location` | `main_location_id` | DF00–DF03 codes, resolved against `locations` at load. Where they mostly work — NOT an access restriction |
+| `Schedule` | `schedule` | Part Time / Full Time / ± → `part_time` etc. FMP's "N-A" → null |
+| EMPLOYMENT TYPE | `employment_type` | free text |
+| `Start_Date` | `start_date` | |
+| END DATE | `end_date` | **FMP has none** — 417 former employees and no record of when they left. Nullable, filled going forward |
+| `Position` | `position` | 20 free-typed values; the transform folds typo-duplicates (`Sr.DF` → `Sr. DF`) and prints the before→after table for review. Not a check constraint — the vocabulary grows |
+| NOTES | `notes` | |
+| `FHC_Ex_Date` | `food_handler_expires` | legally relevant, maintained (dates run to 2028) |
+| USER LEVEL (ADMIN tab) | *(roster only)* | kept in the JSON as `_fmp_user_level` to seed the invite list; never loaded into a column |
+| — | `user_id` | **derived**: null for everyone at load except Mark, whose row is linked to his existing auth account. Access is granted afterwards, per person, by invitation |
+| **SSN** | **dropped** | never exported. It is in FMP and in Gusto, which needs it for W-2s; nothing this app does requires it, and a web-reachable database is the wrong home for it |
+| pay rates, rate card, EARNS TIPS, CalSavers, commuter benefit, POS PIN, payroll name overrides | **dropped** | the payroll module's business — rates are also on every timesheet row |
+| USERNAME / PASSWORD (ADMIN tab) | **dropped** | stored in plain text in FMP. Replaced entirely by the invite flow; no credential is ever stored here |
+| DEFAULT LOCATION / ACCESS LOCATIONS | **dropped** | per-location access is deliberately not built yet (Mark wants to revisit it) |
+| COVID19 vaccination status, `hasHealthCare_b` | **dropped** | 2021 artifact; the healthcare flag only ever stored `1`, so an unchecked box is indistinguishable from an unanswered one |
+| `cTenure`, `cRatingSummary`, `ReviewLast_Date` | **dropped** | FileMaker calculations, not stored data. Derivable once the ratings and reviews tables migrate |
+| onboarding paperwork checkboxes (Application, W4, I9, I9 Documents, Food Handlers Card, Handbook, Notice to Employee, Training Acknowledgement), MEALBREAK WAIVER | **dropped** | replaced by `employee_documents` (021) — the flags are DERIVED from which documents are actually on file, so "complete" can't be true without them |
+
+## Not migrated yet (DF-Employees)
+
+`Events` (2,398), `Ratings` (44,214), `Reviews` (121), `PayPeriods` (283),
+`Timesheets` (75,381) all stay in FileMaker for now — FMP keeps writing them
+until each module is built, so they're re-exported at that module's cutover
+rather than loaded twice. Notes for when that happens:
+
+- **Events** key on `EmployeeID`; `Name_Full_c` there is the AUTHOR, not the
+  subject. Its `EventType` vocabulary drifted over twelve years and has three
+  merge pairs (`Negative`/`Negative Event`, `Positive`/`Positive Event`,
+  `Incident`/`Incident Report`). The 81 rows typed **`Document`** (2024+, 73 of
+  them flagged as having a paper original) are the filing-cabinet use that
+  `employee_documents` now covers — those migrate there, not into an events
+  table.
+- **Ratings** has **two columns literally named `Name_Full_c`** (subject and
+  rater); a header-to-dict parser silently drops one. `break_confirmed_b` is
+  corrupt in 59% of rows (`0\x0b1`, two values flattened together), and
+  `Document_Category_txt` is entirely empty.
+- **Reviews**' category labels (`PA_Cat01`–`PA_Cat10`) are NOT in the export —
+  they were layout text — so the scores are meaningless until the rubric is
+  recovered.
+- **PayPeriods.mer** is 99.99% padding: 2.7M blank records around 283 real ones.
+  Filter while streaming.
+- **Timesheets** carries 16 columns that are file-wide totals repeated on all
+  75,381 rows (~15 MB of the 43 MB). Discard them.
+
 ## PO → `purchase_orders`
 
 | FMP | Schema | Notes |

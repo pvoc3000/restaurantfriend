@@ -103,3 +103,25 @@ default sender), and optional `subject` / `body` templates with placeholders
 `{po_number}` `{vendor_name}` `{location_name}` `{location_code}`
 `{order_date}` `{delivery_date}` `{account_number}` `{rep_name}` `{rep_first}`
 `{rep_first_comma}` `{account_line}` `{delivery_line}`.
+
+## The invite mail rides the same transport
+
+`invite-member` (HR — giving someone access to the app) sends through this same
+provider layer and the same `EMAIL_CREDS_*` secrets, so **nothing here needs
+setting up twice**. Two differences worth knowing:
+
+- **Org tier only.** A purchase order belongs to a location, so its transport
+  resolves location → org → app default. An invitation belongs to the ORG —
+  there's no location in scope — so it resolves org → app default. Donut
+  Friend's org-level Gmail override covers it already.
+- **One new secret, `APP_URL`** — where `/welcome` lives, e.g.
+  `supabase secrets set APP_URL=https://app.example.com`. Platform config, not
+  org config: a deploy URL isn't business terminology. Without it the function
+  refuses to send rather than mailing out a link to nowhere.
+
+Content templates live in `orgs.settings.invite_email` (`subject` / `body`,
+same shape as `po_email`), with placeholders `{first_name}` `{org}`
+`{role_label}` `{invite_url}`. Generic English is built into the function, so
+this is optional.
+
+Deploy: `supabase functions deploy invite-member`.
