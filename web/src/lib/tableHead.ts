@@ -162,6 +162,18 @@ export function useOverflowOnlyWhenNeeded(
  * nothing to object to. The >1px guard stops the ResizeObserver reacting to the
  * pane's own write, which would otherwise loop: shrinking the pane removes the
  * page's scrollbar, which moves everything, which re-triggers the measure.
+ *
+ * IT MEASURES WITH THE PANE UNCONSTRAINED, which is not fussiness — without it
+ * the pane can only ever SHRINK. `body` is `min-h-full`, so the moment the page
+ * stops overflowing, its box stretches to the window and its bottom stops
+ * saying where the content actually ends. `below` then absorbs the slack, the
+ * arithmetic returns the height the pane already has, and it sits there. Found
+ * 2026-08-02 on PO detail: loaded at 1000px the pane took 295px and the
+ * Paperwork card ended exactly at the window's bottom; dragged to 1200px it
+ * stayed at 295 and left 232px of dead space under the card. Dropping the cap
+ * first makes the page overflow again, so `body` reports the truth. When the
+ * table is short enough to fit either way the answer comes out as its own
+ * natural height, which is what a pane around a three-line order should be.
  */
 export function useFillViewportHeight(
   ref: React.RefObject<HTMLElement | null>,
@@ -178,11 +190,18 @@ export function useFillViewportHeight(
     }
 
     const measure = () => {
+      const previous = el.style.maxHeight;
+      // See the note above: read the page as it would be with no cap at all,
+      // then put the cap back before anyone can paint the uncapped frame.
+      el.style.maxHeight = "none";
       const rect = el.getBoundingClientRect();
       // Everything after the pane, whatever it turns out to be.
       const below = document.body.getBoundingClientRect().bottom - rect.bottom;
       const target = Math.max(minHeight, window.innerHeight - rect.top - below);
-      if (Math.abs(parseFloat(el.style.maxHeight || "0") - target) > 1) {
+      // Restored unconditionally — the guard below can decide to write nothing,
+      // and leaving `none` behind would be the very cap we just removed.
+      el.style.maxHeight = previous;
+      if (Math.abs(parseFloat(previous || "0") - target) > 1) {
         el.style.maxHeight = `${target}px`;
       }
     };

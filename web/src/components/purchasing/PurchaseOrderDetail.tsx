@@ -698,6 +698,19 @@ export function PurchaseOrderDetail({
         // name moved into the wrapping Item cell.)
         storageKey="rf.purchaseOrderLines.columnWidths.v4"
         columnChooser
+        // The lines scroll in their own pane so the Paperwork card below them
+        // lands at the bottom of the WINDOW (Mark, 2026-08-02 — on
+        // 142-181119-01 the list ran off the screen and took the card with it).
+        // `scroll` is all it takes: DataTable then sizes the pane with
+        // useFillViewportHeight, which measures its own top AND everything
+        // below it, so the card is what the arithmetic ends on. No constant to
+        // go stale when the Process card or the line bar changes height.
+        //
+        // Past the hook's 256px floor it stops shrinking and lets the page
+        // scroll instead, which is the honest answer: a 19-line order in a
+        // short window can't have both a readable list and a visible card, and
+        // a 60px pane would be neither.
+        scroll
         // Type first (Mark, 2026-07-27): it groups the order the way the
         // vendor-facing PDF does, so the screen and the document read alike.
         defaultSort={{ key: "item_type" }}
