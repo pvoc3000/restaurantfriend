@@ -20,6 +20,7 @@ import { DataTable, type DataColumn } from "./DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
 import type { ItemRow } from "@/app/(app)/items/page";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
@@ -356,18 +357,20 @@ export function ItemsList({
           clearLabel="Clear the search"
           className="h-9 w-72 text-sm"
         />
-        <select
+        {/* A PickList, not a native <select> (Mark, 2026-08-01 — he named this
+            one). Past 8 categories it also gains the find box, which the OS
+            menu could never offer on an iPad. */}
+        <PickList
+          variant="field"
+          ariaLabel="Category"
           value={filters.category}
-          onChange={(e) => update({ category: e.target.value })}
-          className="h-9 border border-ink bg-white px-2 text-sm"
-        >
-          <option value="">All categories</option>
-          {categories.map((c) => (
-            <option key={c} value={c}>
-              {c}
-            </option>
-          ))}
-        </select>
+          onPick={(category) => update({ category })}
+          options={[
+            { value: "", label: "All categories" },
+            ...categories.map((c) => ({ value: c, label: c })),
+          ]}
+          className="w-56"
+        />
 
         <TabPicker
           ariaLabel="Active state"

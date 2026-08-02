@@ -26,6 +26,7 @@ import { PoAttachments } from "./PoAttachments";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { PickList } from "@/components/ui/PickList";
 import { AddPoLines } from "./AddPoLines";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 
@@ -663,18 +664,18 @@ export function PurchaseOrderDetail({
           <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
             Status
           </span>
-          <select
+          <PickList
+            variant="field"
+            ariaLabel="Status"
             value={order.status}
             disabled={busy}
-            onChange={(e) => setStatus(e.target.value as PoStatus)}
-            className="h-9 border border-ink bg-white px-2"
-          >
-            {PO_STATUS_ORDER.map((s) => (
-              <option key={s} value={s}>
-                {PO_STATUS_LABEL[s]}
-              </option>
-            ))}
-          </select>
+            onPick={(s) => setStatus(s as PoStatus)}
+            options={PO_STATUS_ORDER.map((s) => ({
+              value: s,
+              label: PO_STATUS_LABEL[s],
+            }))}
+            className="w-40"
+          />
         </label>
       </div>
 

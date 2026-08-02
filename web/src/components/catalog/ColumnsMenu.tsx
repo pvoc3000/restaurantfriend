@@ -2,7 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useAnchoredPanel } from "@/lib/anchoredPanel";
+import { MENU_ITEM_CLASS, MENU_PANEL_CLASS, useAnchoredPanel } from "@/lib/anchoredPanel";
 import { isColumnVisible, useColumnVisibility } from "@/lib/columnVisibility";
 import { Checkbox } from "@/components/ui/Checkbox";
 import type { DataColumn } from "./DataTable";
@@ -94,7 +94,7 @@ export function ColumnsMenu<T>({
             role="menu"
             aria-label="Columns"
             style={{ top: box.top, left: box.left, transform: "translateX(-100%)", minWidth: 220 }}
-            className="fixed z-50 max-h-[70vh] overflow-y-auto border-2 border-ink bg-white text-ink"
+            className={MENU_PANEL_CLASS}
           >
             {offered.map((column) => {
               const visible = visibleOf(column);
@@ -107,7 +107,9 @@ export function ColumnsMenu<T>({
                 // and what a thumb needs.
                 <label
                   key={column.key}
-                  className="flex cursor-pointer items-center gap-3 px-3 py-2 text-sm hover:bg-neutral-100"
+                  // items-center, not baseline: a checkbox is a box, and a
+                  // baseline would hang it below the label.
+                  className={`${MENU_ITEM_CLASS} flex cursor-pointer items-center gap-3 hover:bg-neutral-100`}
                 >
                   <Checkbox
                     checked={visible}

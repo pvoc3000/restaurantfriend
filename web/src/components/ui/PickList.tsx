@@ -2,7 +2,14 @@
 
 import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useAnchoredPanel } from "@/lib/anchoredPanel";
+import {
+  MENU_HEADER_CLASS,
+  MENU_ITEM_CLASS,
+  MENU_PANEL_CLASS,
+  MENU_SEARCH_CLASS,
+  menuItemState,
+  useAnchoredPanel,
+} from "@/lib/anchoredPanel";
 
 export type PickOption = {
   value: string;
@@ -32,6 +39,14 @@ export type PickOption = {
  * holds values this vocabulary doesn't (FMP wrote sizes into package_desc), and
  * a control that silently swapped one for a neighbour would be an edit nobody
  * asked for. It's listed first, marked as the current value.
+ *
+ * TWO TRIGGERS, one list (Mark, 2026-08-01). `inline` is the original: the
+ * dotted underline `InlineValue` rests in, for a cell whose value you edit in
+ * place. `field` is a bordered h-9 box matching `TextInput` and `TabPicker`,
+ * for a control standing on its own in a filter row or a form — which is what
+ * finally retired the last native `<select>`s in the app. The panel is
+ * identical either way, because the thing being chosen from doesn't change with
+ * how the trigger is dressed.
  */
 export function PickList({
   value,
@@ -42,6 +57,7 @@ export function PickList({
   allowNew = false,
   ariaLabel,
   align = "left",
+  variant = "inline",
   className = "",
 }: {
   value: string | null;
@@ -58,6 +74,12 @@ export function PickList({
   allowNew?: boolean;
   ariaLabel?: string;
   align?: "left" | "right";
+  /**
+   * `inline` — a dotted-underline value inside a cell (the default, and what
+   * `InlineValue kind="pick"` uses). `field` — a bordered box standing on its
+   * own, for filter rows and forms.
+   */
+  variant?: "inline" | "field";
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -119,6 +141,10 @@ export function PickList({
 
   const current = options.find((o) => o.value === value);
   const shownLabel = current?.label ?? (value || placeholder);
+  // Faint means "nothing chosen". An option that legitimately IS the empty
+  // string — a filter's "All categories" — is a real choice with a real label,
+  // so it reads at full strength; only a value with no option behind it fades.
+  const empty = !value && !current;
 
   // Headers computed up front rather than tracked with a running variable
   // during render — the list stays flat, so one keyboard index still walks it,
@@ -143,18 +169,30 @@ export function PickList({
           setOpen((v) => !v);
         }}
         onKeyDown={onTriggerKey}
-        // The same dotted underline InlineValue rests in, so an editable cell
-        // reads as editable whether it takes typing or a choice.
-        className={`flex w-full items-center gap-1 px-1 py-0.5 text-left underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 disabled:opacity-35 ${
-          value ? "" : "text-faint"
-        } ${className}`}
+        className={
+          variant === "field"
+            ? // A box like TextInput's and TabPicker's, so a filter row reads as
+              // one set of controls at one height.
+              `flex h-9 items-center gap-2 border border-ink bg-white px-3 text-left text-sm hover:bg-neutral-100 disabled:opacity-35 ${
+                empty ? "text-faint" : ""
+              } ${className}`
+            : // The same dotted underline InlineValue rests in, so an editable
+              // cell reads as editable whether it takes typing or a choice.
+              `flex w-full items-center gap-1 px-1 py-0.5 text-left underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 disabled:opacity-35 ${
+                empty ? "text-faint" : ""
+              } ${className}`
+        }
       >
-        {/* The caret sits WITH the value, not pushed to the far edge of the
-            cell: in a definition list the field is as wide as the column, and a
+        {/* Inline: the caret sits WITH the value, not pushed to the far edge —
+            in a definition list the field is as wide as the column, and a
             marker floating 400px from the word it belongs to reads as a
-            different control. The button stays full width for the hit area. */}
+            different control. As a FIELD it goes to the right edge, which is
+            where a box's own marker belongs and where a `<select>` put it. */}
         <span className="truncate">{shownLabel}</span>
-        <span aria-hidden className="shrink-0 text-[9px] text-muted">
+        <span
+          aria-hidden
+          className={`shrink-0 text-[9px] text-muted ${variant === "field" ? "ml-auto" : ""}`}
+        >
           ▼
         </span>
       </button>
@@ -181,10 +219,7 @@ export function PickList({
               // 528px panel and the cap did nothing at all.
               minWidth: Math.min(Math.max(box.width, 168), 340),
             }}
-            // 2px black edge and no shadow: depth is edges here (the design
-            // system's elevation rule). z-50 clears the ActionBar and sits with
-            // the masthead, which is the only thing above it.
-            className="fixed z-50 max-h-72 overflow-auto border-2 border-ink bg-white text-ink"
+            className={MENU_PANEL_CLASS}
           >
             {searchable && (
               <input
@@ -195,29 +230,25 @@ export function PickList({
                   setActive(0);
                 }}
                 placeholder={allowNew ? "Find or add…" : "Find…"}
-                className="sticky top-0 z-10 w-full border-b border-hairline bg-white px-2 py-1.5 text-sm outline-none"
+                className={MENU_SEARCH_CLASS}
               />
             )}
             {shown.length === 0 && !offerNew && (
-              <p className="px-2 py-2 text-sm text-muted">Nothing matches.</p>
+              <p className="px-3 py-2 text-sm text-muted">Nothing matches.</p>
             )}
             {rows.map(({ option: o, header }, i) => {
               return (
                 <div key={`${o.group ?? ""}:${o.value}`}>
-                  {header && (
-                    <p className="border-b border-hairline bg-neutral-50 px-2 py-1 text-[11px] uppercase tracking-[0.12em] text-subtle">
-                      {header}
-                    </p>
-                  )}
+                  {header && <p className={MENU_HEADER_CLASS}>{header}</p>}
                   <button
                     type="button"
                     role="option"
                     aria-selected={o.value === value}
                     onMouseEnter={() => setActive(i)}
                     onClick={() => choose(o.value)}
-                    className={`flex w-full items-baseline gap-2 px-2 py-1.5 text-left text-sm ${
-                      i === active ? "bg-ink text-white" : "hover:bg-neutral-100"
-                    }`}
+                    className={`${MENU_ITEM_CLASS} flex items-baseline gap-2 ${menuItemState(
+                      i === active
+                    )}`}
                   >
                     <span className={o.value === value ? "font-semibold" : ""}>
                       {o.label}
@@ -245,9 +276,9 @@ export function PickList({
                 aria-selected={false}
                 onMouseEnter={() => setActive(shown.length)}
                 onClick={() => choose(term.trim())}
-                className={`flex w-full items-baseline gap-2 border-t border-hairline px-2 py-1.5 text-left text-sm ${
-                  active === shown.length ? "bg-ink text-white" : "hover:bg-neutral-100"
-                }`}
+                className={`${MENU_ITEM_CLASS} flex items-baseline gap-2 border-t border-hairline ${menuItemState(
+                  active === shown.length
+                )}`}
               >
                 <span>Add “{term.trim()}”</span>
               </button>

@@ -16,6 +16,7 @@ import { DataTable, type DataColumn } from "./DataTable";
 import { VendorActiveToggle } from "@/components/VendorActiveToggle";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
 import type { VendorRow } from "@/app/(app)/vendors/page";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
@@ -262,18 +263,21 @@ export function VendorsList({
           clearLabel="Clear the search"
           className="h-9 w-72 text-sm"
         />
-        <select
+        {/* A PickList, not a native <select> (Mark, 2026-08-01 — he named this
+            one): the OS menu was the last thing on this row that didn't look
+            like the app. "All types" is a real choice with a real label, so it
+            reads at full strength rather than as a placeholder. */}
+        <PickList
+          variant="field"
+          ariaLabel="Vendor type"
           value={filters.type}
-          onChange={(e) => update({ type: e.target.value })}
-          className="h-9 border border-ink bg-white px-2 text-sm"
-        >
-          <option value="">All types</option>
-          {types.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          onPick={(type) => update({ type })}
+          options={[
+            { value: "", label: "All types" },
+            ...types.map((t) => ({ value: t, label: t })),
+          ]}
+          className="w-48"
+        />
 
         <TabPicker
           ariaLabel="Active state"

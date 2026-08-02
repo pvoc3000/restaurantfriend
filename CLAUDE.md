@@ -797,7 +797,7 @@ weekday column, and 003 then silently made it per-vendor-item.
 
   | Reach for | Instead of | For |
   | --- | --- | --- |
-  | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary; opens below the field, portals so panes can't clip it |
+  | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary — a VALUE or a filter's VIEW; `variant="inline"` in a cell, `variant="field"` as a standalone box. Opens below the field, portals so panes can't clip it |
   | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons |
   | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands; shares `lib/anchoredPanel` with PickList, so it escapes scroll panes the same way |
   | `catalog/InlineValue` | a hand-wired edit-in-place | any editable cell — `kind` text / number / date / **pick**; `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column |
@@ -1051,9 +1051,33 @@ weekday column, and 003 then silently made it per-vendor-item.
   isn't — generation snapshots the COMPOSED pack there ("1 × 5 lbs", migration
   013), so a nine-token list couldn't express what belongs in it. Free text
   stays free text for names, brands, product IDs and notes.
-  Filter dropdowns are still native `<select>`s: they choose a VIEW, not a
-  value, and nothing about them was broken. Convert them if the split ever
-  reads as inconsistent.
+  **There are no native `<select>`s left** (Mark, 2026-08-01: our popup menus
+  "look different stylistically from our other elements", naming the vendor
+  TYPE and inventory CATEGORY dropdowns). Filter dropdowns had been left native
+  on the reasoning that they choose a VIEW rather than a value — that split is
+  now retired, because the reader doesn't experience "view vs value", they
+  experience an OS menu landing in the middle of an app that looks nothing like
+  it. Converted: vendor type, inventory category, the vendor-items category
+  (`ListFilters`), and PO detail's status. `PickList` grew
+  **`variant="field"`** for them — an h-9 bordered box matching `TextInput` and
+  `TabPicker`, caret at the right edge — beside the original `inline` dotted
+  underline for cells. Same panel either way. Two things fell out of it: a
+  filter's "All categories" is a real option whose value is `""`, so the
+  trigger only greys out when NO option matches (`empty`), not merely when the
+  value is falsy; and past 8 options the find box appears, which is what the
+  native menu could never give an iPad.
+  **All four popup menus now share one dress** — `MENU_PANEL_CLASS`,
+  `MENU_ITEM_CLASS`, `menuItemState`, `MENU_HEADER_CLASS`, `MENU_SEARCH_CLASS`
+  in `lib/anchoredPanel`, beside the positioning hook they already shared. They
+  had drifted (PickList's rows `px-2 py-1.5` against the other two's
+  `px-3 py-2`; only PickList marked the keyboard row) — the `ui/Dialog` story
+  again. **`MENU_ITEM_CLASS` deliberately carries NO `display`**: the three
+  menus lay rows out differently (option = hint beside the label, command =
+  hint under it, checkbox row = centred), and a `display` in the shared string
+  can't be overridden at the call site — Tailwind resolves competing utilities
+  by STYLESHEET order, not class-string order, so `${MENU_ITEM_CLASS} block`
+  stayed `flex` and put the ⋯ menu's hints beside their labels. Caught in the
+  browser the same day; each caller states its own `flex`/`block`.
 - **The unit menu offers PACKAGES as well as measurements** (`lib/units.ts`,
   Mark, 2026-07-30) — case, bag, tub, box, sleeve, tray, flat, roll, in a
   fourth `<optgroup>` after Count / Weight / Volume. Not invented: the list is

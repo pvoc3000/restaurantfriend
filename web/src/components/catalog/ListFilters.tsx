@@ -3,6 +3,7 @@
 import { STALE_ORDER, STALE_LABEL, type StaleBucket } from "@/lib/lastOrdered";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
 
 export type ActiveFilter = "active" | "inactive" | "all";
 export type StaleFilter = StaleBucket | "any";
@@ -58,18 +59,17 @@ export function ListFilters({
         />
 
         {categories && onCategory && (
-          <select
+          <PickList
+            variant="field"
+            ariaLabel="Category"
             value={category ?? ""}
-            onChange={(e) => onCategory(e.target.value)}
-            className="h-9 border border-ink bg-white px-2 text-sm"
-          >
-            <option value="">All categories</option>
-            {categories.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
+            onPick={onCategory}
+            options={[
+              { value: "", label: "All categories" },
+              ...categories.map((c) => ({ value: c, label: c })),
+            ]}
+            className="w-56"
+          />
         )}
 
         {active && onActive && (

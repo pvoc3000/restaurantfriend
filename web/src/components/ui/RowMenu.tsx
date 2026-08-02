@@ -2,7 +2,12 @@
 
 import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { useAnchoredPanel } from "@/lib/anchoredPanel";
+import {
+  MENU_ITEM_CLASS,
+  MENU_PANEL_CLASS,
+  menuItemState,
+  useAnchoredPanel,
+} from "@/lib/anchoredPanel";
 
 export type RowMenuItem = {
   label: string;
@@ -77,7 +82,7 @@ export function RowMenu({
               // a short list of verbs, not a browser.
               minWidth: 200,
             }}
-            className="fixed z-50 border-2 border-ink bg-white text-ink"
+            className={MENU_PANEL_CLASS}
           >
             {items.map((item) => (
               <button
@@ -89,7 +94,9 @@ export function RowMenu({
                   setOpen(false);
                   item.onSelect();
                 }}
-                className={`block w-full px-3 py-2 text-left text-sm hover:bg-neutral-100 disabled:opacity-35 disabled:hover:bg-white ${
+                // A command stacks its hint UNDER the label, where an option
+                // sets one beside it — hence `block` here (see MENU_ITEM_CLASS).
+                className={`${MENU_ITEM_CLASS} block ${menuItemState(false)} ${
                   item.danger ? "text-accent" : ""
                 }`}
               >
