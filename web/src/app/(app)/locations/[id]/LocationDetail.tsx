@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { canWriteCatalog } from "@/lib/roles";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { LOCATIONS_CRUMB } from "@/lib/locations";
 import type { RawSearchParams } from "@/lib/itemFilters";
@@ -64,7 +65,7 @@ export async function LocationDetail({
   // Writes on `locations` need purchaser+ (the generic policy from 001). Below
   // that every field renders as plain text rather than offering an edit the
   // database will refuse.
-  const editable = ["owner", "admin", "purchaser"].includes(session.membership.role);
+  const editable = canWriteCatalog(session.membership.role);
 
   const [
     { data: row, error },

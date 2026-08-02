@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { canWriteCatalog } from "@/lib/roles";
 import { VENDOR_ITEM_SELECT } from "@/lib/catalog";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { crumbPath, currentQuery, parseTrail } from "@/lib/breadcrumbs";
@@ -174,7 +175,7 @@ export async function VendorDetail({
               on the ACTIVE location's guide, which is the one you'd be
               walking. */}
           {session.activeLocation &&
-            ["owner", "admin", "purchaser"].includes(session.membership.role) && (
+            canWriteCatalog(session.membership.role) && (
               <span className="ml-auto">
                 <AddVendorReminder
                   vendorId={v.id}
@@ -216,7 +217,7 @@ export async function VendorDetail({
             from={here}
             filters
             showLastOrdered={session.activeLocation !== null}
-            canEdit={["owner", "admin", "purchaser"].includes(session.membership.role)}
+            canEdit={canWriteCatalog(session.membership.role)}
           />
         )}
       </section>

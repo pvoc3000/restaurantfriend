@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { canWriteCatalog } from "@/lib/roles";
 import {
   ShopSectionsTable,
   type ShopSectionRow,
@@ -21,7 +22,7 @@ export default async function ShopSectionsPage() {
     return <p className="text-sm text-muted">No location is set up for this org yet.</p>;
   }
 
-  const editable = ["owner", "admin", "purchaser"].includes(session.membership.role);
+  const editable = canWriteCatalog(session.membership.role);
 
   const { data: sections, error } = await supabase
     .from("shop_sections")

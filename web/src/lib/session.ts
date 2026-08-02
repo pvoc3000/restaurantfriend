@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import type { Role } from "@/lib/roles";
 
 export type Location = {
   id: string;
@@ -12,7 +13,7 @@ export type Location = {
 
 export type Membership = {
   org_id: string;
-  role: "owner" | "admin" | "purchaser" | "staff";
+  role: Role;
   display_name: string | null;
   last_active_location_id: string | null;
 };

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { canWriteCatalog } from "@/lib/roles";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -44,7 +45,7 @@ export async function ReceivingView({
   // allow. Below that it renders read-only rather than 404ing: a staff member
   // seeing what arrived is legitimate, and offering controls the database would
   // reject is not.
-  const canReceive = ["owner", "admin", "purchaser"].includes(session.membership.role);
+  const canReceive = canWriteCatalog(session.membership.role);
 
   const poHref = `/purchase-orders/${id}`;
   const trail = parsed.some((c) => c.href.split("?")[0] === poHref)

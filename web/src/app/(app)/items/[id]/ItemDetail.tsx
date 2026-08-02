@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { canWriteCatalog } from "@/lib/roles";
 import {
   VENDOR_ITEM_SELECT_ACTIVE_VENDOR,
   type CatalogItem,
@@ -130,7 +131,7 @@ export async function ItemDetail({
             baseUnit={row.base_unit}
             showVendor
             from={{ href: `/items/${id}${queryString}`, label: row.name }}
-            canEdit={["owner", "admin", "purchaser"].includes(session.membership.role)}
+            canEdit={canWriteCatalog(session.membership.role)}
           />
         )}
       </section>

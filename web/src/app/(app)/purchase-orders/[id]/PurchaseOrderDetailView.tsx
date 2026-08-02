@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { canWriteCatalog } from "@/lib/roles";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { crumbPath, currentQuery, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -42,7 +43,7 @@ export async function PurchaseOrderDetailView({
 
   // Processing writes (status, delivery date), so the card is purchaser+ only —
   // matching the RLS policy that would reject a staff member's click anyway.
-  const canProcess = ["owner", "admin", "purchaser"].includes(session.membership.role);
+  const canProcess = canWriteCatalog(session.membership.role);
 
   // The vendor-location row carries the processing context: where the mail
   // draft goes and which weekday the delivery-date suggestion lands on.

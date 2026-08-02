@@ -6,6 +6,7 @@ import { HeaderShell, MenuCollapseButton } from "@/components/HeaderShell";
 import { GearIcon, HomeIcon, IconButton } from "@/components/ui/IconButton";
 import { NAV_COOKIE, parseNavMemory } from "@/lib/navMemory";
 import type { AppSession } from "@/lib/session";
+import { ROLE_LABEL } from "@/lib/roles";
 
 export async function AppHeader({ session }: { session: AppSession }) {
   // Seeds the menu's memory on first paint. The client owns it from there —
@@ -47,7 +48,7 @@ export async function AppHeader({ session }: { session: AppSession }) {
           <>
             <span className="whitespace-nowrap text-[12px] uppercase tracking-[0.12em] text-white/55">
               {session.membership.display_name ?? session.email}
-              <span> · {session.membership.role}</span>
+              <span> · {ROLE_LABEL[session.membership.role]}</span>
             </span>
 
             {/* No box (Mark, 2026-07-29). It's type in the same idiom as the

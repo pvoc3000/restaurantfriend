@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { canWriteCatalog } from "@/lib/roles";
 import { money } from "@/lib/catalog";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { crumbPath, currentQuery, parseTrail } from "@/lib/breadcrumbs";
@@ -180,7 +181,7 @@ export async function VendorItemDetail({
           current={label}
           trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
         />
-        {["owner", "admin", "purchaser"].includes(session.membership.role) && (
+        {canWriteCatalog(session.membership.role) && (
           <VendorItemActions
             vendorItemId={id}
             label={label}

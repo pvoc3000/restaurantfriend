@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { getAppSession } from "@/lib/session";
+import { ROLE_LABEL } from "@/lib/roles";
 
 export default async function HomePage() {
   const session = await getAppSession();
@@ -13,7 +14,7 @@ export default async function HomePage() {
             : "No location"}
         </h1>
         <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
-          {session.email} · {session.membership.role}
+          {session.email} · {ROLE_LABEL[session.membership.role]}
         </p>
       </div>
 

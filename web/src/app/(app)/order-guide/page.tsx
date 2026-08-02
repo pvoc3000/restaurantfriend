@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { canWriteCatalog } from "@/lib/roles";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import {
   guideToday,
@@ -157,9 +158,7 @@ export default async function OrderGuidePage({
       locationId={locationId}
       locationCode={session.activeLocation.code}
       orgId={session.membership.org_id}
-      canGeneratePos={["owner", "admin", "purchaser"].includes(
-        session.membership.role
-      )}
+      canGeneratePos={canWriteCatalog(session.membership.role)}
     />
   );
 }
