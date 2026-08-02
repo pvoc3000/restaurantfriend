@@ -618,29 +618,31 @@ export function PurchaseOrderDetail({
     </label>
   );
 
-  const lineActions = (
-    <>
-      {/* Adding a line is a write to the order, so it's purchaser+ for the same
-          reason the delete bar is. */}
-      {canEditLines && <AddPoLines order={order} orgId={orgId} lines={lines} />}
+  /* THE ACTION ROW IS THREE GROUPS (Mark, 2026-08-02), each separated by twice
+     the gap that separates the buttons inside it: what you add to the order ·
+     what you send to the vendor · what you do when it comes back. The middle
+     group is ProcessPo's own and varies by order_type, so the two ends are
+     handed to it and it lays all three out — see OrderBar. */
+  const addItemAction = canEditLines ? (
+    <AddPoLines order={order} orgId={orgId} lines={lines} />
+  ) : null;
 
+  const closingActions = (
+    <>
       {/* Receiving is a screen, not a button. The old "Receive all as ordered"
           wrote the ordered quantities from here — which is what made reading an
           invoice look pointless — and it wasn't role-gated either, so staff got
           an enabled button whose writes RLS rejected.
 
-          px-6 where its neighbours take px-4 (Mark, 2026-08-02: "a little wider
-          so the label isn't truncated"). The trailing ellipsis is NOT
-          truncation — it's the house mark for a command that opens something
-          rather than acting where it stands, the same one "Add item…" and
-          "Email PO…" wear — but read against two neighbours that end in whole
-          words it looks like a clipped label, and the extra width makes it read
-          as deliberate. */}
+          Labelled "Reconcile PO" since 2026-08-02 (Mark's ordering, where it
+          takes this slot): that screen's work is the ORDER against the invoice —
+          quantities, prices, SKUs — and "Receive…" named only the first of the
+          three. Same destination, and the route keeps its own name. */}
       <Link
         href={receiveHref}
-        className="flex h-9 items-center border border-ink bg-white px-6 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white"
+        className="flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white"
       >
-        Receive&hellip;
+        Reconcile PO
       </Link>
 
       {/* The end of the order's life, and the only route to it that means
@@ -807,7 +809,8 @@ export function PurchaseOrderDetail({
           context={processing}
           statement={statement}
           status={statusControl}
-          lineActions={lineActions}
+          actionsBefore={addItemAction}
+          actionsAfter={closingActions}
         />
       ) : (
         <OrderBar
@@ -823,7 +826,7 @@ export function PurchaseOrderDetail({
               {statusControl}
             </>
           }
-          actions={lineActions}
+          actionGroups={[addItemAction, closingActions]}
         />
       )}
 

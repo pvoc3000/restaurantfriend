@@ -25,18 +25,26 @@
 export function OrderBar({
   statement,
   trailing,
-  actions,
+  actionGroups,
   footer,
 }: {
   /** Left of row 1: what the order is — counts, the process mode. */
   statement?: React.ReactNode;
   /** Right of row 1: Delivery and Status. */
   trailing?: React.ReactNode;
-  /** Row 2, right-aligned. Omitted entirely when there's nothing to do. */
-  actions?: React.ReactNode;
+  /**
+   * Row 2, right-aligned, one entry per GROUP (Mark, 2026-08-02): what you add
+   * to the order · what you send to the vendor · what you do when it comes
+   * back. Buttons inside a group sit `gap-2` apart and the groups sit `gap-4`
+   * — exactly double, which is what makes them read as groups rather than as
+   * one long row. An empty group is dropped rather than rendered, or it would
+   * spend its gap saying nothing (a staff view has no Add item).
+   */
+  actionGroups?: React.ReactNode[];
   /** Under both rows: a sent note, an error. */
   footer?: React.ReactNode;
 }) {
+  const groups = (actionGroups ?? []).filter(Boolean);
   return (
     <div className="space-y-3 border border-ink bg-white px-4 py-3 text-sm">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -49,8 +57,14 @@ export function OrderBar({
         </span>
       </div>
 
-      {actions && (
-        <div className="flex flex-wrap items-center justify-end gap-2">{actions}</div>
+      {groups.length > 0 && (
+        <div className="flex flex-wrap items-center justify-end gap-4">
+          {groups.map((group, i) => (
+            <span key={i} className="flex flex-wrap items-center gap-2">
+              {group}
+            </span>
+          ))}
+        </div>
       )}
 
       {footer}

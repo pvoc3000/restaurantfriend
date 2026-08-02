@@ -48,7 +48,8 @@ export function ProcessPo({
   context,
   statement,
   status,
-  lineActions,
+  actionsBefore,
+  actionsAfter,
 }: {
   order: PurchaseOrder;
   context: ProcessingContext;
@@ -61,7 +62,10 @@ export function ProcessPo({
    */
   statement?: React.ReactNode;
   status?: React.ReactNode;
-  lineActions?: React.ReactNode;
+  /** The action groups either side of this card's own — Add item before,
+   *  Reconcile/Close after. See OrderBar for why the groups are separated. */
+  actionsBefore?: React.ReactNode;
+  actionsAfter?: React.ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -231,7 +235,8 @@ export function ProcessPo({
             {error && !compose && <p className="text-accent">{error}</p>}
           </>
         }
-        actions={
+        actionGroups={[
+          actionsBefore,
           <>
           {context.order_type === "email_po" && (
             <>
@@ -296,12 +301,9 @@ export function ProcessPo({
             </button>
           )}
 
-          {/* The order's own commands close the row: prepare and send first,
-              then work the order, ending at Close — the terminal action, and
-              so the one nearest the right edge. */}
-          {lineActions}
-          </>
-        }
+          </>,
+          actionsAfter,
+        ]}
       />
 
       {/* The compose dialog: what you see is exactly what sends. Floats over
