@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -28,7 +28,47 @@ import { InlineValue } from "@/components/catalog/InlineValue";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { PickList } from "@/components/ui/PickList";
 import { AddPoLines } from "./AddPoLines";
+import { OrderBar } from "./OrderBar";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
+
+/**
+ * Reserve, in the page's flow, exactly the height of a `position: fixed` footer.
+ *
+ * The Paperwork band is pinned to the bottom of the window, so it takes no
+ * space — and two things then need to know how much space it WOULD have taken:
+ * the last of the page's content, which must not slide under it, and
+ * `useFillViewportHeight`, which sizes the line pane from "everything below me"
+ * and would otherwise run the table under the band.
+ *
+ * Measured, not a constant, for the reason every other measurement on this
+ * screen is: the card is 62px with nothing attached and taller with files in
+ * it, and a wrong guess is invisible until someone files an invoice. Written
+ * straight to the node — no state, so a resize doesn't re-render the line
+ * table, and the `set-state-in-effect` lint has nothing to object to. The >1px
+ * guard stops the observer reacting to its own write.
+ */
+function useStickyFooterClearance(
+  footerRef: React.RefObject<HTMLElement | null>,
+  spacerRef: React.RefObject<HTMLElement | null>
+) {
+  useLayoutEffect(() => {
+    const footer = footerRef.current;
+    const spacer = spacerRef.current;
+    if (!footer || !spacer) return;
+
+    const measure = () => {
+      const target = footer.getBoundingClientRect().height;
+      if (Math.abs(parseFloat(spacer.style.height || "0") - target) > 1) {
+        spacer.style.height = `${target}px`;
+      }
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(footer);
+    return () => observer.disconnect();
+  }, [footerRef, spacerRef]);
+}
 
 /**
  * PO detail: what was ordered, what arrived, and the gap between them.
@@ -85,6 +125,9 @@ export function PurchaseOrderDetail({
   const supabase = createClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const footerRef = useRef<HTMLDivElement>(null);
+  const footerSpacerRef = useRef<HTMLDivElement>(null);
+  useStickyFooterClearance(footerRef, footerSpacerRef);
   const [checkedLines, setCheckedLines] = useState<Set<string>>(new Set());
 
   // Line selection (and deletion) is purchaser+ work — `processing` is
@@ -478,6 +521,95 @@ export function PurchaseOrderDetail({
     },
   ];
 
+  // --- The three slots of the one box above the lines. See OrderBar. --------
+
+  /* How many DISTINCT products, and how many packages they add up to — the
+     second is what you count off the truck, and the line count alone never told
+     you (Mark, 2026-07-27). Packages of each line's own vendor item, so a case
+     and an each both count as one; that's the intended reading for a delivery
+     check. Received is shown only once something has been, so the bar stays
+     quiet on a draft. */
+  const statement = (
+    <span className="text-subtle">
+      {lines.length} {lines.length === 1 ? "product" : "products"} ·{" "}
+      <span className="tabular-nums text-body">{qty(orderedPackages)}</span>{" "}
+      {orderedPackages === 1 ? "package" : "packages"}
+      {receivedPackages > 0 && (
+        <>
+          {" · "}
+          <span
+            className={`tabular-nums ${
+              receivedPackages < orderedPackages ? "text-accent" : "text-body"
+            }`}
+          >
+            {qty(receivedPackages)}
+          </span>{" "}
+          received
+        </>
+      )}
+    </span>
+  );
+
+  const statusControl = (
+    <label className="flex items-center gap-2">
+      <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+        Status
+      </span>
+      <PickList
+        variant="field"
+        ariaLabel="Status"
+        value={order.status}
+        disabled={busy}
+        onPick={(s) => setStatus(s as PoStatus)}
+        options={PO_STATUS_ORDER.map((s) => ({
+          value: s,
+          label: PO_STATUS_LABEL[s],
+        }))}
+        className="w-40"
+      />
+    </label>
+  );
+
+  const lineActions = (
+    <>
+      {/* Adding a line is a write to the order, so it's purchaser+ for the same
+          reason the delete bar is. */}
+      {canEditLines && <AddPoLines order={order} orgId={orgId} lines={lines} />}
+
+      {/* Receiving is a screen, not a button. The old "Receive all as ordered"
+          wrote the ordered quantities from here — which is what made reading an
+          invoice look pointless — and it wasn't role-gated either, so staff got
+          an enabled button whose writes RLS rejected.
+
+          px-6 where its neighbours take px-4 (Mark, 2026-08-02: "a little wider
+          so the label isn't truncated"). The trailing ellipsis is NOT
+          truncation — it's the house mark for a command that opens something
+          rather than acting where it stands, the same one "Add item…" and
+          "Email PO…" wear — but read against two neighbours that end in whole
+          words it looks like a clipped label, and the extra width makes it read
+          as deliberate. */}
+      <Link
+        href={receiveHref}
+        className="flex h-9 items-center border border-ink bg-white px-6 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white"
+      >
+        Receive&hellip;
+      </Link>
+
+      {/* The end of the order's life, and the only route to it that means
+          anything — the status menu can always set `closed`, but says nothing
+          about what closing asserts. */}
+      {canEditLines && canClose(order.status) && (
+        <button
+          disabled={busy}
+          onClick={close}
+          className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+        >
+          Close order
+        </button>
+      )}
+    </>
+  );
+
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
@@ -526,8 +658,12 @@ export function PurchaseOrderDetail({
         <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
           Ordered
         </dt>
-        {/* The two dates edit here as well as in the Process card — this is
-            where they're READ, so it's where a wrong one gets noticed. */}
+        {/* Order date only. Delivery had a SECOND editor here — same column,
+            same write, two controls (Mark, 2026-08-02: "can we just use one").
+            The one that survived is the bar's, because it's the one carrying
+            the "arrives …" suggestion chip; this row would have been the copy
+            you fix a date on without ever seeing what the vendor's delivery
+            days imply. Order date stays because nothing else edits it. */}
         <dd className="tabular-nums">
           {canEditLines ? (
             <InlineValue
@@ -540,22 +676,6 @@ export function PurchaseOrderDetail({
             />
           ) : (
             order.order_date
-          )}
-        </dd>
-        <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-          Delivery
-        </dt>
-        <dd className="tabular-nums">
-          {canEditLines ? (
-            <InlineValue
-              table="purchase_orders"
-              id={order.id}
-              column="delivery_date"
-              value={order.delivery_date}
-              kind="date"
-            />
-          ) : (
-            (order.delivery_date ?? "—")
           )}
         </dd>
         <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
@@ -582,84 +702,36 @@ export function PurchaseOrderDetail({
 
       {error && <p className="text-sm text-accent">{error}</p>}
 
-      {processing && <ProcessPo order={order} context={processing} />}
-
-      {/* How many DISTINCT products, and how many packages they add up to —
-          the second is what you count off the truck, and the line count alone
-          never told you (Mark, 2026-07-27). Packages of each line's own vendor
-          item, so a case and an each both count as one; that's the intended
-          reading for a delivery check. Received is shown only once something
-          has been, so the bar stays quiet on a draft. */}
-      <div className="flex flex-wrap items-center gap-4 border border-ink px-4 py-3 text-sm">
-        <span className="text-subtle">
-          {lines.length} {lines.length === 1 ? "product" : "products"} ·{" "}
-          <span className="tabular-nums text-body">{qty(orderedPackages)}</span>{" "}
-          {orderedPackages === 1 ? "package" : "packages"}
-          {receivedPackages > 0 && (
+      {/* ONE box above the lines (Mark, 2026-08-02). The Process card and the
+          line bar were two stacked frames saying things about the same order;
+          `OrderBar` is the shared layout and these three are its slots. When
+          there's no `processing` — i.e. below purchaser+ — the bar renders here
+          instead, without the Delivery editor or any of the send buttons. */}
+      {processing ? (
+        <ProcessPo
+          order={order}
+          context={processing}
+          statement={statement}
+          status={statusControl}
+          lineActions={lineActions}
+        />
+      ) : (
+        <OrderBar
+          statement={statement}
+          trailing={
             <>
-              {" · "}
-              <span
-                className={`tabular-nums ${
-                  receivedPackages < orderedPackages ? "text-accent" : "text-body"
-                }`}
-              >
-                {qty(receivedPackages)}
-              </span>{" "}
-              received
+              <span className="flex items-center gap-2 text-muted">
+                <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+                  Delivery
+                </span>
+                <span className="tabular-nums">{order.delivery_date ?? "—"}</span>
+              </span>
+              {statusControl}
             </>
-          )}
-        </span>
-
-        {/* Adding a line is a write to the order, so it sits with the other
-            two — and it's purchaser+ for the same reason the delete bar is. */}
-        {canEditLines && (
-          <span className="ml-auto">
-            <AddPoLines order={order} orgId={orgId} lines={lines} />
-          </span>
-        )}
-
-        {/* Receiving is a screen, not a button. The old "Receive all as
-            ordered" wrote the ordered quantities from here — which is what made
-            reading an invoice look pointless — and it wasn't role-gated either,
-            so staff got an enabled button whose writes RLS rejected. */}
-        <Link
-          href={receiveHref}
-          className={`${canEditLines ? "" : "ml-auto "}flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white`}
-        >
-          Receive&hellip;
-        </Link>
-
-        {/* The end of the order's life, and the only route to it that means
-            anything — the status menu beside it can always set `closed`, but
-            says nothing about what closing asserts. */}
-        {canEditLines && canClose(order.status) && (
-          <button
-            disabled={busy}
-            onClick={close}
-            className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-          >
-            Close order
-          </button>
-        )}
-
-        <label className="flex items-center gap-2">
-          <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-            Status
-          </span>
-          <PickList
-            variant="field"
-            ariaLabel="Status"
-            value={order.status}
-            disabled={busy}
-            onPick={(s) => setStatus(s as PoStatus)}
-            options={PO_STATUS_ORDER.map((s) => ({
-              value: s,
-              label: PO_STATUS_LABEL[s],
-            }))}
-            className="w-40"
-          />
-        </label>
-      </div>
+          }
+          actions={lineActions}
+        />
+      )}
 
       {checkedLines.size > 0 && (
         <div className="flex flex-wrap items-center gap-4 border border-ink px-4 py-3 text-sm">
@@ -698,17 +770,16 @@ export function PurchaseOrderDetail({
         // name moved into the wrapping Item cell.)
         storageKey="rf.purchaseOrderLines.columnWidths.v4"
         columnChooser
-        // The lines scroll in their own pane so the Paperwork card below them
-        // lands at the bottom of the WINDOW (Mark, 2026-08-02 — on
-        // 142-181119-01 the list ran off the screen and took the card with it).
-        // `scroll` is all it takes: DataTable then sizes the pane with
+        // The lines scroll in their own pane so the page ends where the window
+        // does (Mark, 2026-08-02 — on 142-181119-01 the list ran off the
+        // screen). `scroll` is all it takes: DataTable then sizes the pane with
         // useFillViewportHeight, which measures its own top AND everything
-        // below it, so the card is what the arithmetic ends on. No constant to
-        // go stale when the Process card or the line bar changes height.
+        // below it — including the clearance left for the pinned Paperwork
+        // band. No constant to go stale when the bar above changes height.
         //
         // Past the hook's 256px floor it stops shrinking and lets the page
         // scroll instead, which is the honest answer: a 19-line order in a
-        // short window can't have both a readable list and a visible card, and
+        // short window can't have both a readable list and everything else, and
         // a 60px pane would be neither.
         scroll
         // Type first (Mark, 2026-07-27): it groups the order the way the
@@ -722,34 +793,62 @@ export function PurchaseOrderDetail({
         empty={<p className="text-sm text-muted">This order has no lines.</p>}
       />
 
-      {/* LAST on the screen (Mark, 2026-08-02 — declutter). It used to sit with
-          Process, on the reasoning that sending the order and filing what came
-          back are the two things you DO to an order while the lines are what
-          you read. True, but it put a card you touch once — at delivery, and
-          then never again — between the Process card and the order itself, so
-          every visit paid for it. The order is what you came for; the filing
-          cabinet goes at the end.
+      {/* Clearance for the pinned band below. Its height is MEASURED and
+          written here (see useStickyFooterClearance) rather than guessed: the
+          card is 62px empty and taller with files in it, and this number is
+          also what useFillViewportHeight reads as "everything below the pane",
+          so a guess would show up as the line list running under the band. */}
+      <div ref={footerSpacerRef} aria-hidden />
 
-          Receiving is where this card is actually WORKED anyway: the receiving
-          screen has its own document pane, and auto-read-on-attach lives in the
-          shared useAttachmentActions, so filing an invoice from there behaves
-          exactly as it does from here. This copy is for looking one up later.
+      {/* PINNED to the bottom of the window (Mark, 2026-08-02), and last in the
+          order of the screen (Mark, earlier the same day — declutter). It used
+          to sit with Process, on the reasoning that sending the order and
+          filing what came back are the two things you DO to an order while the
+          lines are what you read. True, but it put a card you touch once — at
+          delivery, then never again — between the Process card and the order
+          itself, so every visit paid for it.
+
+          It keeps its BOUNDING BOX (Mark, 2026-08-02, on seeing it as a
+          full-bleed band with a top rule: he "preferred the paperwork section
+          in a bounding box and the datatable without a bottom border" — the
+          band's rule ran the full width directly under the line table, so it
+          read as a border the table had grown). So the card draws its own frame
+          as it always did, and the fixed wrapper contributes only position and
+          an opaque white backdrop — which it still needs, because once the pane
+          hits its floor the rows scroll UNDER this.
+
+          Receiving is where this card is actually WORKED anyway: that screen has
+          its own document pane, and auto-read-on-attach lives in the shared
+          useAttachmentActions, so filing an invoice from there behaves exactly
+          as it does from here. This copy is for looking one up later.
 
           Visible to everyone — the invoice is the answer to "what did we
           actually pay" — but only purchaser+ can add or remove, matching
           migration 018's storage policies. */}
-      {attachmentError ? (
-        <p className="border border-accent px-4 py-3 text-sm text-accent">
-          Could not load this order&rsquo;s paperwork: {attachmentError}
-        </p>
-      ) : (
-        <PoAttachments
-          poId={order.id}
-          orgId={orgId}
-          attachments={attachments}
-          canEdit={canEditLines}
-        />
-      )}
+      <div
+        ref={footerRef}
+        // Full-bleed and opaque, but with NO border of its own — it carries the
+        // page's own gutters as padding so the card lines up with the table
+        // above it, and the white is what stops rows showing through when the
+        // page scrolls behind it.
+        //
+        // z-30 is the ActionBar's rung: above the table and its sticky column
+        // labels (20), below the masthead (50) and anchored panels (70).
+        className="fixed inset-x-0 bottom-0 z-30 bg-white px-4 py-4 xl:px-12"
+      >
+        {attachmentError ? (
+          <p className="border border-accent px-4 py-3 text-sm text-accent">
+            Could not load this order&rsquo;s paperwork: {attachmentError}
+          </p>
+        ) : (
+          <PoAttachments
+            poId={order.id}
+            orgId={orgId}
+            attachments={attachments}
+            canEdit={canEditLines}
+          />
+        )}
+      </div>
     </div>
   );
 }

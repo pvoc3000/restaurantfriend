@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TextInput } from "@/components/ui/TextInput";
 import { Dialog } from "@/components/ui/Dialog";
+import { OrderBar } from "./OrderBar";
 import {
   buildEmailParts,
   downloadBlob,
@@ -46,9 +47,22 @@ export type ProcessingContext = {
 export function ProcessPo({
   order,
   context,
+  statement,
+  status,
+  lineActions,
 }: {
   order: PurchaseOrder;
   context: ProcessingContext;
+  /**
+   * The order's own three slots, handed in by PurchaseOrderDetail so all of it
+   * lands in ONE box (Mark, 2026-08-02). They can't be composed the other way
+   * round: the Delivery control and every button below live off this
+   * component's `busy` / `compose` state, so whoever draws the frame has to be
+   * inside it. See OrderBar, which is the frame both callers share.
+   */
+  statement?: React.ReactNode;
+  status?: React.ReactNode;
+  lineActions?: React.ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -209,41 +223,61 @@ export function ProcessPo({
     "h-9 bg-ink px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300";
 
   return (
-    <div className="space-y-3 border border-ink bg-white p-6 text-sm">
-      <div className="flex flex-wrap items-center gap-4">
-        <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
-          Process · {context.order_type.replace("_", " ")}
-        </span>
-
-        {/* Delivery date first: it prints on the document. Generation fills it
-            in from the vendor's delivery days (migration 016), so this is
-            usually already correct — it's here for the exceptions (a holiday, a
-            special run, a vendor with no delivery days recorded). The
-            suggestion chip only appears when the date is still empty. */}
-        <label className="flex items-center gap-2 text-muted">
-          <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-            Delivery
-          </span>
-          <input
-            type="date"
-            value={order.delivery_date ?? ""}
-            disabled={busy !== null}
-            onChange={(e) => setDelivery(e.target.value || null)}
-            className="h-9 border border-ink px-2"
-          />
-        </label>
-        {suggestion && (
-          <button
-            disabled={busy !== null}
-            onClick={() => setDelivery(suggestion)}
-            title="The vendor's next delivery day after the order date"
-            className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink hover:bg-[var(--rf-yellow-100)] disabled:opacity-35"
-          >
-            arrives {suggestion}
-          </button>
-        )}
-
-        <span className="ml-auto flex flex-wrap items-center gap-2">
+    <>
+      <OrderBar
+        statement={
+          <>
+            <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
+              Process · {context.order_type.replace("_", " ")}
+            </span>
+            {statement}
+          </>
+        }
+        trailing={
+          <>
+            {/* THE order's delivery date — there is only one now (Mark,
+                2026-08-02). A second, identical editor sat in the dl above and
+                wrote the same column; this is the copy that survived because
+                it's the one carrying the suggestion chip. Generation fills the
+                date in from the vendor's delivery days (migration 016), so it's
+                usually already right — this is here for the exceptions (a
+                holiday, a special run, a vendor with no delivery days
+                recorded), and the chip only appears while it's still empty. */}
+            <label className="flex items-center gap-2 text-muted">
+              <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+                Delivery
+              </span>
+              <input
+                type="date"
+                value={order.delivery_date ?? ""}
+                disabled={busy !== null}
+                onChange={(e) => setDelivery(e.target.value || null)}
+                className="h-9 border border-ink px-2"
+              />
+            </label>
+            {suggestion && (
+              <button
+                disabled={busy !== null}
+                onClick={() => setDelivery(suggestion)}
+                title="The vendor's next delivery day after the order date"
+                className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink hover:bg-[var(--rf-yellow-100)] disabled:opacity-35"
+              >
+                arrives {suggestion}
+              </button>
+            )}
+            {status}
+          </>
+        }
+        footer={
+          <>
+            {sentNote && (
+              <p className="text-xs text-[var(--rf-green-600)]">{sentNote}</p>
+            )}
+            {error && !compose && <p className="text-accent">{error}</p>}
+          </>
+        }
+        actions={
+          <>
           {context.order_type === "email_po" && (
             <>
               <button disabled={busy !== null} onClick={previewPdf} className={btn}>
@@ -267,10 +301,16 @@ export function ProcessPo({
               <button disabled={busy !== null} onClick={previewPdf} className={btn}>
                 {busy === "preview" ? "Rendering…" : "Preview PDF"}
               </button>
+              {/* White like the rest of the row (Mark, 2026-08-02). It was the
+                  black `primaryBtn`, marking it as the thing to press on an
+                  online order — but in one combined box that put a filled cell
+                  in the middle of a row of outlined ones, which reads as a
+                  different KIND of control rather than as the important one.
+                  The same argument the ActionBar settled in July. */}
               <button
                 disabled={busy !== null || !context.vendor_url}
                 onClick={openVendorSite}
-                className={primaryBtn}
+                className={btn}
                 title={context.vendor_url ?? "No URL on the vendor record"}
               >
                 Open vendor site
@@ -300,10 +340,14 @@ export function ProcessPo({
               {busy === "sent" ? "Saving…" : "Mark as sent"}
             </button>
           )}
-        </span>
-      </div>
 
-      {sentNote && <p className="text-xs text-[var(--rf-green-600)]">{sentNote}</p>}
+          {/* The order's own commands close the row: prepare and send first,
+              then work the order, ending at Close — the terminal action, and
+              so the one nearest the right edge. */}
+          {lineActions}
+          </>
+        }
+      />
 
       {/* The compose dialog: what you see is exactly what sends. Floats over
           the PO like the Generate POs confirm — same overlay pattern. */}
@@ -413,8 +457,6 @@ export function ProcessPo({
             )}
         </Dialog>
       )}
-
-      {error && !compose && <p className="text-accent">{error}</p>}
-    </div>
+    </>
   );
 }

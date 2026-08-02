@@ -65,7 +65,7 @@ export function PoAttachments({
   });
 
   return (
-    <div className="space-y-3 border border-ink px-4 py-3">
+    <div className="space-y-3 border border-ink bg-white px-4 py-3">
       <div className="flex flex-wrap items-center gap-4">
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Paperwork
