@@ -5,6 +5,7 @@ import { AppNav } from "@/components/AppNav";
 import { HeaderShell, MenuCollapseButton } from "@/components/HeaderShell";
 import { GearIcon, HomeIcon, IconButton } from "@/components/ui/IconButton";
 import { NAV_COOKIE, parseNavMemory } from "@/lib/navMemory";
+import { sectionsForRole } from "@/lib/nav";
 import type { AppSession } from "@/lib/session";
 import { ROLE_LABEL } from "@/lib/roles";
 
@@ -18,6 +19,8 @@ export async function AppHeader({ session }: { session: AppSession }) {
     // see components/HeaderShell.
     <HeaderShell locationCode={session.activeLocation?.code ?? null}>
       <AppNav
+        // Filtered HERE, on the server, where the session already is.
+        sections={sectionsForRole(session.membership.role)}
         initialMemory={initialMemory}
         locationCode={session.activeLocation?.code ?? null}
         // Row 1: what you're looking at. Where to go, and whether the chrome is

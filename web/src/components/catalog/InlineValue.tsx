@@ -80,9 +80,12 @@ export function InlineValue({
   jsonColumn,
   jsonPath,
   jsonDocument,
+  match,
 }: {
   table: string;
-  id: string;
+  /** The row's uuid — the identity of every table in the catalog. Omit it only
+   *  when passing `match` instead, for a table keyed some other way. */
+  id?: string;
   /** The column this cell writes — unless `jsonPath` is set, in which case
    *  this is only the field's name for error messages and aria labels. */
   column: string;
@@ -121,6 +124,16 @@ export function InlineValue({
   jsonPath?: string[];
   /** That column's CURRENT value — the object the new one is derived from. */
   jsonDocument?: Record<string, unknown> | null;
+  /**
+   * How to find the row, when its identity ISN'T a column called `id`.
+   *
+   * Every table in the catalog has a uuid `id`, so `id` alone is the normal
+   * case and stays the default. `org_members` doesn't: it is keyed
+   * `(org_id, user_id)`, which is what the App access block edits a role
+   * through. Passing the full key rather than matching on `user_id` alone
+   * keeps this correct the day someone belongs to two orgs.
+   */
+  match?: Record<string, string>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -178,6 +191,14 @@ export function InlineValue({
 
     setSaving(true);
     setError(null);
+    // One or the other; a cell with neither would silently update every row in
+    // the table, so this is a hard stop rather than a default.
+    const where = match ?? (id ? { id } : null);
+    if (!where) {
+      setSaving(false);
+      setError("this field has no row to write to");
+      return;
+    }
     const { error } = await supabase
       .from(table)
       .update(
@@ -185,7 +206,7 @@ export function InlineValue({
           ? { [jsonColumn]: setJsonPath(jsonDocument, jsonPath, next) }
           : { [column]: next, ...(alsoUpdate?.(next) ?? {}) }
       )
-      .eq("id", id);
+      .match(where);
     setSaving(false);
     if (error) {
       setError(error.message);

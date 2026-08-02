@@ -5,11 +5,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import {
-  SECTIONS,
-  findSection,
   resolveRoute,
   sectionHref,
   sectionLabel,
+  type NavSection,
 } from "@/lib/nav";
 import type { NavMemory } from "@/lib/navMemory";
 import { remember, useNavMemory } from "@/lib/navMemoryStore";
@@ -50,11 +49,15 @@ const TIER_MIN = "min-h-7";
  * simply the brightest thing in the band.
  */
 export function AppNav({
+  sections,
   initialMemory,
   locationCode,
   controls,
   identity,
 }: {
+  /** The menu as THIS role should see it — filtered on the server by
+   *  `sectionsForRole`, so no role ever reaches the client bundle. */
+  sections: NavSection[];
   initialMemory: NavMemory;
   locationCode: string | null;
   /** Row 1 of the right-hand column: things that change what you're looking at
@@ -76,7 +79,11 @@ export function AppNav({
     if (sectionSlug && subSlug) remember(sectionSlug, subSlug);
   }, [sectionSlug, subSlug]);
 
-  const currentSection = sectionSlug ? findSection(sectionSlug) : undefined;
+  // From the FILTERED list, not the full one: a section this role can't see
+  // must not render its sub-tier either.
+  const currentSection = sectionSlug
+    ? sections.find((s) => s.slug === sectionSlug)
+    : undefined;
 
   return (
     // The wordmark used to be a first column here, with both tiers in a second
@@ -103,7 +110,7 @@ export function AppNav({
             aria-label="Sections"
             className={`flex flex-wrap items-center gap-y-1 text-[12px] font-semibold uppercase tracking-[0.06em] ${TIER_MIN}`}
           >
-            {SECTIONS.map((section) => {
+            {sections.map((section) => {
               const active = section.slug === sectionSlug;
               return (
                 <Link

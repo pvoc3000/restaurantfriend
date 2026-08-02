@@ -32,8 +32,13 @@ export default async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname.startsWith("/login");
+  // An invited person arrives at /welcome with NO session — the one-time token
+  // in the URL isn't spent until they submit the form. Without this exemption
+  // they'd be bounced to /login, which is a password page for an account whose
+  // password doesn't exist yet: the invite link would simply never work.
+  const isWelcomePage = request.nextUrl.pathname.startsWith("/welcome");
 
-  if (!user && !isLoginPage) {
+  if (!user && !isLoginPage && !isWelcomePage) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";

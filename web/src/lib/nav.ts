@@ -10,6 +10,8 @@
 // module drops into a slot that already has a name. To ship one: set `built`
 // and give it a real `href`.
 
+import type { Role } from "./roles";
+
 export type NavSub = {
   /** Stable id. This is what the remembered-menu cookie stores — renaming it
    *  invalidates that entry, which is harmless (it falls back to the first). */
@@ -21,6 +23,15 @@ export type NavSub = {
   /** Extra pathname prefixes that keep this sub lit — detail routes that don't
    *  sit under the sub's own href. */
   also?: string[];
+  /**
+   * Who sees this in the menu. Absent means everyone.
+   *
+   * This is a TIDINESS rule, never a security one: RLS decides what a screen
+   * can actually load, and each gated screen says so in a sentence rather than
+   * rendering an empty table. Hiding the tab only keeps the menu honest about
+   * what's worth tapping.
+   */
+  roles?: Role[];
 };
 
 export type NavSection = {
@@ -68,7 +79,16 @@ export const SECTIONS: NavSection[] = [
     slug: "hr",
     label: "HR",
     subs: [
-      stub("hr", "employees", "Employees"),
+      {
+        slug: "employees",
+        label: "Employees",
+        href: "/employees",
+        built: true,
+        // Migration 020 gates the employee record at owner/admin. The screen
+        // says so itself for anyone who reaches it by URL — this only keeps
+        // the tab out of the menu for people it would never open for.
+        roles: ["owner", "admin"],
+      },
       stub("hr", "team-events", "Team Events"),
       stub("hr", "team-ratings", "Team Ratings"),
       stub("hr", "team-reviews", "Team Reviews"),
@@ -140,6 +160,21 @@ export const SECTIONS: NavSection[] = [
 
 export function findSection(slug: string): NavSection | undefined {
   return SECTIONS.find((s) => s.slug === slug);
+}
+
+/**
+ * The menu as this role should see it — subs whose `roles` exclude them are
+ * dropped, and a section left with nothing goes too.
+ *
+ * Computed on the SERVER (AppHeader holds the session) and handed to AppNav as
+ * a prop, so the role never has to cross into the client bundle and the
+ * decision lives in one place.
+ */
+export function sectionsForRole(role: Role): NavSection[] {
+  return SECTIONS.map((section) => ({
+    ...section,
+    subs: section.subs.filter((sub) => !sub.roles || sub.roles.includes(role)),
+  })).filter((section) => section.subs.length > 0);
 }
 
 export function findSub(section: NavSection, slug: string): NavSub | undefined {

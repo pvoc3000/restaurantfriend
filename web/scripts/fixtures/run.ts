@@ -5,6 +5,7 @@
 
 import "./columnOrder.fixtures";
 import "./columnVisibility.fixtures";
+import "./employeeDocuments.fixtures";
 import "./invoiceMatch.fixtures";
 import "./receiving.fixtures";
 import { runAll } from "./harness";

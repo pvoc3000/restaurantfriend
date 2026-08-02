@@ -7,11 +7,23 @@ import { createClient } from "@/lib/supabase/client";
 
 const LOCATIONS_ROUTE = "/locations";
 
-/** The screens an inactive location still answers for: its own record, and the
- *  list. BOTH — with the switcher gone the list is the only way to another
- *  location, so gating it would strand you here. */
-function isLocationRoute(pathname: string): boolean {
-  return pathname === LOCATIONS_ROUTE || pathname.startsWith(`${LOCATIONS_ROUTE}/`);
+/**
+ * The routes this gate lets through.
+ *
+ * `/locations` and its records, because an inactive location still answers for
+ * its own record — and with the switcher gone the list is the only way to
+ * another location, so gating it would strand you here.
+ *
+ * `/employees`, because it isn't location-scoped at all: a person belongs to
+ * the ORG. Gating it would say "there is nothing here to show" about a screen
+ * that would have shown the whole roster.
+ */
+const UNSCOPED_ROUTES = [LOCATIONS_ROUTE, "/employees"];
+
+function isUnscopedRoute(pathname: string): boolean {
+  return UNSCOPED_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
 }
 
 /**
@@ -46,7 +58,7 @@ export function InactiveLocationGate({
   const pathname = usePathname();
 
   if (isActive || !locationId) return <>{children}</>;
-  if (isLocationRoute(pathname)) return <>{children}</>;
+  if (isUnscopedRoute(pathname)) return <>{children}</>;
 
   return (
     <div>
