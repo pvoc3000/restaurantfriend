@@ -347,6 +347,27 @@ export function VendorItemsTable({
       rowKey={(vi) => vi.id}
       storageKey={`rf.vendorItems.columnWidths.v1${showItem ? ".byVendor" : ".byItem"}`}
       columnChooser
+      // The filters ride in the table's own strip, beside the columns eye
+      // (Mark, 2026-08-01) — they work on this table, so they sit on it. See
+      // DataTable's `leading`.
+      leading={
+        filters ? (
+          <ListFilters
+            term={term}
+            onTerm={setTerm}
+            placeholder="Search item, product ID, brand, description…"
+            categories={categories}
+            category={category}
+            onCategory={setCategory}
+            active={active}
+            onActive={setActive}
+            stale={showLastOrdered ? stale : undefined}
+            onStale={showLastOrdered ? setStale : undefined}
+            staleCounts={staleCounts}
+            totalCount={vendorItems.length}
+          />
+        ) : undefined
+      }
       rowClassName={(vi) => (vi.is_active ? "" : "text-faint")}
       scroll={scroll}
       // The filter bar eats about 9rem above the pane; without this the page
@@ -362,27 +383,7 @@ export function VendorItemsTable({
     />
   );
 
-  if (!filters) return table;
-
-  return (
-    <div className="space-y-3">
-      <ListFilters
-        term={term}
-        onTerm={setTerm}
-        placeholder="Search item, product ID, brand, description…"
-        categories={categories}
-        category={category}
-        onCategory={setCategory}
-        active={active}
-        onActive={setActive}
-        stale={showLastOrdered ? stale : undefined}
-        onStale={showLastOrdered ? setStale : undefined}
-        staleCounts={staleCounts}
-        totalCount={vendorItems.length}
-      />
-      {/* No "n of n" line here (Mark, 2026-08-01): the section heading already
-          carries the count, and the filter tabs carry their own. */}
-      {table}
-    </div>
-  );
+  // No wrapper and no "n of n" line (Mark, 2026-08-01): the filters are inside
+  // the table now, and the section heading already carries the count.
+  return table;
 }

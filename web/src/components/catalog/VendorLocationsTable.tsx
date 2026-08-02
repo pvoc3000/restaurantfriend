@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { money } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
 import { InlineValue } from "./InlineValue";
@@ -48,10 +49,13 @@ export function VendorLocationsTable({
   rows,
   codeById,
   activeLocationId,
+  leading,
 }: {
   rows: VendorLocationRow[];
   codeById: Record<string, string>;
   activeLocationId: string | null;
+  /** Passed straight through to the table's strip — see DataTable's `leading`. */
+  leading?: ReactNode;
 }) {
   const columns: DataColumn<VendorLocationRow>[] = [
     // Active leads on every catalog table (Mark, 2026-07-23).
@@ -158,7 +162,8 @@ export function VendorLocationsTable({
       columns={columns}
       rowKey={(r) => r.location_id}
       storageKey="rf.vendorLocations.columnWidths.v1"
-        columnChooser
+      columnChooser
+      leading={leading}
       defaultSort={{ key: "location" }}
       expand={{
         summary: repSummary,

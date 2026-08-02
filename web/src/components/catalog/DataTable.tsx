@@ -107,6 +107,7 @@ export function DataTable<T>({
   sort: controlledSort,
   onSortChange,
   columnChooser = false,
+  leading,
 }: {
   rows: T[];
   columns: DataColumn<T>[];
@@ -167,6 +168,21 @@ export function DataTable<T>({
    * control for four columns.
    */
   columnChooser?: boolean;
+  /**
+   * Content for the strip that runs above the table, to the LEFT of the columns
+   * eye — this table's own filters, or its heading.
+   *
+   * It exists because that strip was otherwise an EMPTY 32px band wherever the
+   * chooser was on (Mark, 2026-08-01: the filters should "feel more a part of
+   * the datatable... since that's what they work on", and a table's heading
+   * "could come closer to the table"). Measured on vendor detail before this:
+   * 44px between a heading and its table and 48px between the filters and
+   * theirs, of which 32px was the eye's band in both cases — so no amount of
+   * margin tuning could close them. Sharing the row removes the band entirely
+   * and says something true besides: what's on that strip belongs to this
+   * table.
+   */
+  leading?: ReactNode;
 }) {
   const defaultWidths = useMemo<ColumnWidths>(
     () => Object.fromEntries(columns.map((c) => [c.key, c.width])),
@@ -315,7 +331,12 @@ export function DataTable<T>({
   };
 
   return (
-    <div className="space-y-1">
+    // space-y-2, not 1 (Mark, 2026-08-01): once the strip above carried real
+    // content — a heading, a filter bar — sitting 4px off the column labels it
+    // read as crowding them rather than belonging to them. This is the gap
+    // between the strip and the table, and between the table and the
+    // reset-widths footer.
+    <div className="space-y-2">
       {/* Directly above the LAST column header, at the table's right edge
           (Mark, 2026-07-31). It belongs to the table, not to each list's filter
           row: it acts on these columns, and every list putting it somewhere
@@ -326,12 +347,29 @@ export function DataTable<T>({
           checkbox belongs in the selection column's `header` cell, where every
           list's has always gone, so the slot went with it rather than staying
           as a second way to do the same thing. */}
-      {columnChooser && (
-        <div className="flex justify-end">
+      {(columnChooser || leading) && (
+        // `leading` on the left, the eye on the right, one row — and the eye
+        // gets a cell of its OWN (Mark, 2026-08-01: "so when the screen gets
+        // smaller the other elements wrap but the eye stays in place"). NOT
+        // flex-wrap on this row: the leading content is what wraps, inside its
+        // own `min-w-0 flex-1` box, so the eye never breaks onto a line of its
+        // own and never leaves the table's right edge. Measured before the
+        // fix at 1440: the filters overflowed and pushed the eye to a second
+        // line, left-aligned, which looked like a stray button.
+        // items-end: the eye belongs to the column headers directly beneath it
+        // (Mark, 2026-08-01), so it sits at the BOTTOM of the strip — beside
+        // the last row of a wrapping filter block, not floating at the top of
+        // it.
+        <div className="flex items-end justify-between gap-x-4">
+          <div className="min-w-0 flex-1">{leading}</div>
           {/* The ordered list, not the declared one — the checklist reads in
               the same order as the table it acts on. It gets `compact` so its
               checkboxes can tell the truth about the width tier. */}
-          <ColumnsMenu storageKey={storageKey} columns={orderedColumns} compact={compact} />
+          {columnChooser && (
+            <div className="shrink-0">
+              <ColumnsMenu storageKey={storageKey} columns={orderedColumns} compact={compact} />
+            </div>
+          )}
         </div>
       )}
       <div ref={paneRef} className={wrapper}>

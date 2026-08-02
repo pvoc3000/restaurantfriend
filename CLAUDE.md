@@ -1355,18 +1355,44 @@ weekday column, and 003 then silently made it per-vendor-item.
   label to its left starts 130px in, so it no longer lines up with the search
   box and the other filters above it; stacked, every filter row begins at the
   same left margin. The label is a `block` in a `space-y-1.5` wrapper.
-  **On vendor detail (`ListFilters`) the label is gone entirely** and the bar
-  is `stretch`ed instead (Mark, same day) — every cell already names an age
-  ("Never ordered", "2+ years", "Within a year"), so the caption repeated what
-  the bar spells out; it survives as the group's `ariaLabel`. The width match
-  needs no measuring and no magic number: the filter block is `w-fit
-  max-w-full`, so it takes the width of its widest row — the controls — and
-  `TabPicker stretch` fills that. Measured on vendor detail: both rows 16 →
-  780px exactly, and at 760px the block gives way to the viewport with no
-  horizontal overflow. `stretch` is what made `whitespace-nowrap` necessary on
-  every TabPicker cell: equal shares wrapped "Never ordered" onto two lines
-  inside a 36px bar. With nowrap a flex cell can't shrink below its own label,
-  so the shares come out as equal as the words allow.
+  **On vendor detail (`ListFilters`) the label is gone entirely** (Mark, same
+  day) — every cell already names an age ("Never ordered", "2+ years", "Within
+  a year"), so the caption repeated what the bar spells out; it survives as the
+  group's `ariaLabel`. That block is now TWO rows and which control sits on
+  which is deliberate: the typing controls (search, category) on one, **both
+  TabPickers on the other** ("the same line as the active/inactive tab
+  picker"), because they are the same kind of control answering the same
+  question. Pairing them explicitly rather than letting one `flex-wrap` row
+  sort it out is load-bearing — measured at 1440 the four wanted 1441px against
+  1329 available, so the age bar broke away from Active on its own.
+  `TabPicker`'s `stretch` is left over from the one-row-each arrangement this
+  replaced and nothing uses it today; `whitespace-nowrap` came from the same
+  episode and stays, because a wrapped tab label is wrong everywhere.
+- **The strip above a table carries that table's heading or filters**
+  (`DataTable`'s `leading`, Mark, 2026-08-01: the filters should "feel more a
+  part of the datatable… since that's what they work on", and a heading "could
+  come closer to the table"). Before this the strip held only the columns eye,
+  so it was an EMPTY 32px band: measured on vendor detail, 44px between a
+  heading and its table and 48px between the filters and theirs, of which 32
+  was the band in both cases — no margin tuning could have closed them. With
+  the heading (locations table) and the filter block (`VendorItemsTable`) moved
+  into it, both gaps are 8px and the eye keeps its place above the last column
+  header. Three details are load-bearing:
+  **the eye gets its own `shrink-0` cell and the strip row does NOT wrap**
+  (Mark: "so when the screen gets smaller the other elements wrap but the eye
+  stays in place") — the leading content wraps inside its own `min-w-0 flex-1`
+  box, so the eye can never break onto a line of its own, which it did at 1440
+  before the fix and looked like a stray button; **`items-end`**, because the
+  eye belongs to the column labels directly beneath it, so it sits beside the
+  LAST row of a wrapping filter block rather than floating at the top; and
+  `DataTable`'s root spacing went `space-y-1` → `space-y-2`, since 4px off the
+  column labels read as crowding them once the strip held real content.
+  Only vendor detail passes a heading so far — the LIST screens (Inventory,
+  Vendors, PO list) still put their filters above the table with the eye's band
+  between, which is the obvious next place for this if it earns its keep.
+  Vendor detail's page rhythm went `space-y-6` → `space-y-16` to match: with
+  8px inside each block, the gap BETWEEN them is the only thing left saying
+  where one ends.
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server

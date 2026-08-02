@@ -48,13 +48,15 @@ export function ListFilters({
   totalCount?: number;
 }) {
   return (
-    // `w-fit` so the block is exactly as wide as its widest row — the controls
-    // below — and `max-w-full` so it still gives way on a narrow screen. That's
-    // what lets the stale bar match the row above it (Mark, 2026-08-01): the
-    // wrapper takes the top row's width and the bar fills the wrapper, with no
-    // measuring and no magic number to keep in step.
-    <div className="w-fit max-w-full space-y-2">
-      <div className="flex flex-wrap items-center gap-2">
+    // TWO ROWS, and which control sits on which is deliberate (Mark,
+    // 2026-08-01: put the age bar "on the same line as the active/inactive tab
+    // picker"). The two TabPickers are one row because they're the same kind of
+    // control answering the same question — which rows count — and the typing
+    // controls are the other. Left to `flex-wrap` on a single row the four
+    // wanted 1441px against 1329 available at 1440, so the age bar broke away
+    // from Active on its own; pairing them explicitly holds at any width.
+    <div className="space-y-2">
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         <TextInput
           value={term}
           onValueChange={onTerm}
@@ -76,7 +78,9 @@ export function ListFilters({
             className="w-56"
           />
         )}
+      </div>
 
+      <div className="flex min-w-0 flex-wrap items-center gap-2">
         {active && onActive && (
           <TabPicker
             ariaLabel="Active state"
@@ -85,25 +89,24 @@ export function ListFilters({
             options={ACTIVE_TABS}
           />
         )}
-      </div>
 
-      {/* No "Last ordered" caption (Mark, 2026-08-01): every cell already says
-          an age — "Never ordered", "2+ years", "Within a year" — so the label
-          was repeating what the bar spells out. It survives as the group's
-          `ariaLabel`, which is the reader who genuinely can't see the cells. */}
-      {stale && onStale && (
-        <TabPicker
-          stretch
-          ariaLabel="Last ordered"
-          value={stale}
-          onChange={onStale}
-          options={(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => ({
-            key: t,
-            label: t === "any" ? "Any age" : STALE_LABEL[t],
-            count: t === "any" ? totalCount ?? 0 : staleCounts?.[t] ?? 0,
-          }))}
-        />
-      )}
+        {/* No "Last ordered" caption (Mark, 2026-08-01): every cell already
+            says an age — "Never ordered", "2+ years", "Within a year" — so the
+            label was repeating what the bar spells out. It survives as the
+            group's `ariaLabel`, the reader who genuinely can't see the cells. */}
+        {stale && onStale && (
+          <TabPicker
+            ariaLabel="Last ordered"
+            value={stale}
+            onChange={onStale}
+            options={(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => ({
+              key: t,
+              label: t === "any" ? "Any age" : STALE_LABEL[t],
+              count: t === "any" ? totalCount ?? 0 : staleCounts?.[t] ?? 0,
+            }))}
+          />
+        )}
+      </div>
     </div>
   );
 }

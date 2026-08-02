@@ -135,7 +135,12 @@ export async function VendorDetail({
   const here = { href: `/vendors/${id}${queryString}`, label: v.name };
 
   return (
-    <div className="space-y-6">
+    // space-y-16, not 6 (Mark, 2026-08-01, twice — 10 wasn't enough): with each
+    // table's heading and filters now sitting ON the table, 4px from its column
+    // headers, the gap BETWEEN the blocks is the only thing left saying where
+    // one ends and the next begins. It has to beat the gaps inside them by a
+    // wide margin or the two tables read as one run.
+    <div className="space-y-16">
       <Breadcrumbs
         trail={trail}
         current={v.name}
@@ -176,12 +181,15 @@ export async function VendorDetail({
           )}
       </div>
 
-      <section className="space-y-2">
-        <SectionHeading>Per-location config</SectionHeading>
+      {/* The heading rides in the table's own strip, opposite the columns eye
+          (Mark, 2026-08-01: it "could come closer to the table") — the strip
+          was an empty 32px band otherwise, which is what held the two apart. */}
+      <section>
         <VendorLocationsTable
           rows={v.vendor_locations}
           codeById={Object.fromEntries(codeById)}
           activeLocationId={session.activeLocation?.id ?? null}
+          leading={<SectionHeading>Per-location config</SectionHeading>}
         />
       </section>
 
