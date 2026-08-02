@@ -449,14 +449,22 @@ export function DataTable<T>({
 
               return (
                 <Fragment key={key}>
+                  {/* BLACK, white text (Mark, 2026-08-02, with a screenshot of
+                      the FileMaker employee list beside it). It was a grey
+                      wash, which at 56px row height read as one more row rather
+                      than as a break between runs. Black is what the app
+                      already uses for a band that DELIMITS — the masthead, the
+                      ActionBar — and it's the mark FMP used for exactly this.
+                      One style for every list that groups, not a per-caller
+                      option: the same argument the TabPicker settled. */}
                   {startsGroup && (
-                    <tr className="border-b border-hairline bg-neutral-100">
+                    <tr className="bg-ink text-white">
                       <td
                         colSpan={visibleColumns.length}
-                        className="px-2 py-1 text-xs font-semibold tracking-[0.12em] text-body uppercase"
+                        className="px-3 py-2 text-xs font-semibold tracking-[0.12em] uppercase"
                       >
                         {label}
-                        <span className="ml-2 font-normal tracking-normal text-subtle normal-case">
+                        <span className="ml-2 font-normal tracking-normal text-white/55 normal-case">
                           {groupCounts.get(label) ?? 0}
                         </span>
                       </td>

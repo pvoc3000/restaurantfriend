@@ -114,6 +114,23 @@ export function EmployeesList({
     }
   }
 
+  /**
+   * The four columns that band their runs when you sort by them (Mark,
+   * 2026-08-02, from FileMaker's employee list, which broke on location).
+   *
+   * Only these four: a band earns its place when the column has FEW values and
+   * many rows per value, so the run it opens is worth naming. Sorting by name,
+   * phone or a date would put a heading above nearly every row, which is why
+   * Vendors and Inventory band on the same condition.
+   */
+  const GROUP_LABEL: Partial<Record<SortKey, (row: EmployeeRow) => string>> = {
+    location: (r) => r.location_code ?? "No location",
+    status: (r) => STATUS_LABEL[r.status],
+    position: (r) => r.position ?? "No position",
+    schedule: (r) => (r.schedule ? SCHEDULE_LABEL[r.schedule] : "No schedule"),
+  };
+  const groupLabel = GROUP_LABEL[sort.key];
+
   const counts = useMemo(() => {
     const c: Record<StatusFilter, number> = {
       active: 0,
@@ -343,6 +360,10 @@ export function EmployeesList({
         compactBelow={1400}
         sort={sort}
         onSortChange={(next) => setSort({ key: next.key as SortKey, dir: next.dir })}
+        // Bands only when the sort IS a groupable column — see GROUP_LABEL. The
+        // rows are already contiguous by that label, since it's the primary
+        // sort and `sorted` tie-breaks on name inside it.
+        group={groupLabel ? { label: groupLabel } : undefined}
         empty={<p className="text-sm text-muted">No one matches those filters.</p>}
       />
     </div>

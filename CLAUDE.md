@@ -1321,6 +1321,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   rather than a catalog list. `/order-guide` is also not a `DataTable` and
   shouldn't become one — it's a walk-order document with nested item and line
   rows, shop-section bands and three-state quantity boxes.
+- **A group band is BLACK with white text** (`DataTable`'s `group`, Mark,
+  2026-08-02, with a screenshot of FileMaker's employee list beside it). It was
+  a grey wash, which against 56px rows read as one more row rather than as a
+  break between runs; black is what the app already uses for a band that
+  DELIMITS (the masthead, the ActionBar), and it's the mark FMP used for exactly
+  this. ONE style for every list that groups — the same argument the TabPicker
+  settled — so Vendors (by Type) and Inventory (by Category or Section) changed
+  with it. **Bands appear only when the SORT is the grouped column**, which is
+  what keeps them from becoming a heading every few rows.
+  `/employees` bands on **location, status, position or schedule** — the four
+  columns with few values and many rows each. Sorting by name, phone or a date
+  bands nothing, deliberately.
 - **A column label WRAPS; it never truncates while there's room** (Mark,
   2026-08-02: titles clip "even when it appears there is plenty of room").
   There WAS room — in the cell, not in the label's share of it. Measured on PO
