@@ -48,7 +48,12 @@ export function ListFilters({
   totalCount?: number;
 }) {
   return (
-    <div className="space-y-2">
+    // `w-fit` so the block is exactly as wide as its widest row — the controls
+    // below — and `max-w-full` so it still gives way on a narrow screen. That's
+    // what lets the stale bar match the row above it (Mark, 2026-08-01): the
+    // wrapper takes the top row's width and the bar fills the wrapper, with no
+    // measuring and no magic number to keep in step.
+    <div className="w-fit max-w-full space-y-2">
       <div className="flex flex-wrap items-center gap-2">
         <TextInput
           value={term}
@@ -82,24 +87,22 @@ export function ListFilters({
         )}
       </div>
 
+      {/* No "Last ordered" caption (Mark, 2026-08-01): every cell already says
+          an age — "Never ordered", "2+ years", "Within a year" — so the label
+          was repeating what the bar spells out. It survives as the group's
+          `ariaLabel`, which is the reader who genuinely can't see the cells. */}
       {stale && onStale && (
-        // Label on its own line above the tabs (Mark, 2026-08-01) — see the
-        // same arrangement on the Inventory list.
-        <div className="space-y-1.5">
-          <span className="block text-xs uppercase tracking-[0.12em] text-subtle">
-            Last ordered
-          </span>
-          <TabPicker
-            ariaLabel="Last ordered"
-            value={stale}
-            onChange={onStale}
-            options={(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => ({
-              key: t,
-              label: t === "any" ? "Any age" : STALE_LABEL[t],
-              count: t === "any" ? totalCount ?? 0 : staleCounts?.[t] ?? 0,
-            }))}
-          />
-        </div>
+        <TabPicker
+          stretch
+          ariaLabel="Last ordered"
+          value={stale}
+          onChange={onStale}
+          options={(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => ({
+            key: t,
+            label: t === "any" ? "Any age" : STALE_LABEL[t],
+            count: t === "any" ? totalCount ?? 0 : staleCounts?.[t] ?? 0,
+          }))}
+        />
       )}
     </div>
   );

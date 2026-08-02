@@ -1351,11 +1351,22 @@ weekday column, and 003 then silently made it per-vendor-item.
   sits in a pane header that is fixed-height by design and would break if its
   type grew.
 - **A filter's label sits ABOVE its TabPicker, not beside it** (Mark,
-  2026-08-01, for "Last ordered" on Inventory and vendor detail). A five-cell
-  bar with a label to its left starts 130px in, so it no longer lines up with
-  the search box and the other filters above it; stacked, every filter row
-  begins at the same left margin. The label is a `block` in a `space-y-1.5`
-  wrapper.
+  2026-08-01, for "Last ordered" on the Inventory list). A five-cell bar with a
+  label to its left starts 130px in, so it no longer lines up with the search
+  box and the other filters above it; stacked, every filter row begins at the
+  same left margin. The label is a `block` in a `space-y-1.5` wrapper.
+  **On vendor detail (`ListFilters`) the label is gone entirely** and the bar
+  is `stretch`ed instead (Mark, same day) — every cell already names an age
+  ("Never ordered", "2+ years", "Within a year"), so the caption repeated what
+  the bar spells out; it survives as the group's `ariaLabel`. The width match
+  needs no measuring and no magic number: the filter block is `w-fit
+  max-w-full`, so it takes the width of its widest row — the controls — and
+  `TabPicker stretch` fills that. Measured on vendor detail: both rows 16 →
+  780px exactly, and at 760px the block gives way to the viewport with no
+  horizontal overflow. `stretch` is what made `whitespace-nowrap` necessary on
+  every TabPicker cell: equal shares wrapped "Never ordered" onto two lines
+  inside a 36px bar. With nowrap a flex cell can't shrink below its own label,
+  so the shares come out as equal as the words allow.
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server

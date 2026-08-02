@@ -54,6 +54,7 @@ export function TabPicker<K extends string>({
   value,
   onChange,
   size = "md",
+  stretch = false,
   ariaLabel,
   className = "",
 }: {
@@ -62,6 +63,14 @@ export function TabPicker<K extends string>({
   /** Omit only when every option carries an href. */
   onChange?: (key: K) => void;
   size?: "md" | "sm";
+  /**
+   * Fill the container's width, dividing it evenly between the cells, instead
+   * of sizing to the labels. For a bar that has to line up with the controls
+   * above it (Mark, 2026-08-01, on the vendor's item filters) — put it in a
+   * `w-fit` wrapper alongside those controls and the wrapper takes the widest
+   * row's width, which this then matches exactly.
+   */
+  stretch?: boolean;
   ariaLabel?: string;
   className?: string;
 }) {
@@ -73,13 +82,23 @@ export function TabPicker<K extends string>({
     <span
       role="group"
       aria-label={ariaLabel}
-      className={`flex ${height} w-fit items-stretch border border-ink ${className}`}
+      className={`flex ${height} ${
+        stretch ? "w-full" : "w-fit"
+      } items-stretch border border-ink ${className}`}
     >
       {options.map((o, i) => {
         const on = o.key === value;
-        const cls = `inline-flex items-center gap-2 ${cell} font-semibold uppercase tracking-[0.06em] no-underline transition-colors ${
-          i > 0 ? "border-l border-ink" : ""
-        } ${
+        // whitespace-nowrap: a cell label is a name, never a paragraph. It
+        // only bites when stretched — equal shares made "Never ordered" wrap to
+        // two lines inside a 36px bar — but a wrapped tab is wrong everywhere,
+        // and with nowrap a flex cell can't shrink below its own label, so the
+        // shares come out as-equal-as-the-words-allow instead.
+        const cls = `inline-flex items-center gap-2 whitespace-nowrap ${cell} font-semibold uppercase tracking-[0.06em] no-underline transition-colors ${
+          // Equal shares, centred — a stretched bar whose cells were sized by
+          // their labels would put "Never ordered" three times the width of
+          // "2+ years" and read as a mistake.
+          stretch ? "flex-1 justify-center" : ""
+        } ${i > 0 ? "border-l border-ink" : ""} ${
           on ? "bg-ink text-white" : "bg-white text-ink hover:bg-neutral-100"
         }`;
         const count =
