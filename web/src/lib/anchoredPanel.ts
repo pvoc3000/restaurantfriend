@@ -17,11 +17,23 @@ export type AnchorBox = { top: number; left: number; width: number };
 
 /**
  * The floating panel itself. 2px black edge and NO shadow — depth is edges in
- * this design system — square corners, and `z-50` to clear the ActionBar while
- * sitting under the masthead, which is the only thing above it.
+ * this design system — square corners.
+ *
+ * **`z-[70]` — above everything, including `ui/Dialog`'s `z-[60]` overlay.**
+ * It was `z-50`, chosen to clear the ActionBar and sit under the masthead, and
+ * that was fine until a PickList appeared INSIDE a dialog: the role picker in
+ * the invite panel opened its list *behind* the dialog it belongs to (Mark,
+ * 2026-08-02). The rule this now follows is the honest one — an anchored panel
+ * is transient and is always attached to a control the reader just pressed, so
+ * while it is open nothing should ever cover it. It portals to the body, so
+ * its own DOM position can't establish that; only the z-index can.
+ *
+ * The ladder, for anyone adding to it: 20 sticky table heads · 30 ActionBar
+ * and BackToTop · 40 drawer scrim · 50 masthead and drawers · 60 dialogs ·
+ * 70 these panels.
  */
 export const MENU_PANEL_CLASS =
-  "fixed z-50 max-h-[70vh] overflow-auto border-2 border-ink bg-white text-ink";
+  "fixed z-[70] max-h-[70vh] overflow-auto border-2 border-ink bg-white text-ink";
 
 /**
  * One row: a command, an option, a checkbox line. Metrics and type only —

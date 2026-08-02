@@ -1163,7 +1163,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   trigger only greys out when NO option matches (`empty`), not merely when the
   value is falsy; and past 8 options the find box appears, which is what the
   native menu could never give an iPad.
-  **All four popup menus now share one dress** — `MENU_PANEL_CLASS`,
+  **An anchored panel is `z-[70]` — above everything, dialogs included.** It
+  was `z-50`, chosen to clear the ActionBar, and that held until a `PickList`
+  appeared INSIDE a `ui/Dialog` (`z-[60]`): the invite panel's role picker
+  opened its list *behind* the dialog it belongs to (Mark, 2026-08-02). The
+  rule is now the honest one — a panel is transient and anchored to a control
+  the reader just pressed, so nothing should ever cover it while it's open. It
+  portals to the body, so DOM order can't establish that; only the z-index can.
+  The ladder: 20 sticky table heads · 30 ActionBar and BackToTop · 40 drawer
+  scrim · 50 masthead and drawers · 60 dialogs · 70 anchored panels. Fixing it
+  in `MENU_PANEL_CLASS` fixed all four menus at once, which is the whole reason
+  they share a dress.
+  **All four popup menus share one dress** — `MENU_PANEL_CLASS`,
   `MENU_ITEM_CLASS`, `menuItemState`, `MENU_HEADER_CLASS`, `MENU_SEARCH_CLASS`
   in `lib/anchoredPanel`, beside the positioning hook they already shared. They
   had drifted (PickList's rows `px-2 py-1.5` against the other two's
