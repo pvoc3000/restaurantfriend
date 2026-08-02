@@ -801,6 +801,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons |
   | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands; shares `lib/anchoredPanel` with PickList, so it escapes scroll panes the same way |
   | `catalog/InlineValue` | a hand-wired edit-in-place | any editable cell — `kind` text / number / date / **pick**; `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column |
+  | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style, with `count`, `href` (link cells) and `accent` (yellow selected fill) options |
   | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
   | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory |
@@ -1286,6 +1287,23 @@ weekday column, and 003 then silently made it per-vendor-item.
   order" joins the widths reset under the table. Verified live on /vendors:
   drag before/after, persistence across reload, sort click intact, store shape
   `["active","order_days","type",…]`. Touch untested on real hardware yet.
+- **Every one-of-N choice is a `ui/TabPicker`** (Mark, 2026-08-01: the order
+  guide's filter tabs "should be replicated stylistically throughout the app…
+  the default moving forward") — the guide's segmented bar: one box, cells
+  divided by rules, the chosen cell filled black. This RETIRED two whole
+  dialects in one sweep: the underline-marker tabs (Vendors/Inventory active
+  state, PO status + window, cleanup's scope — and their "underline means
+  filter, fill means command" rationale, which this decision supersedes) and
+  the loose bordered chips (the three last-ordered rows, cleanup's problem
+  filter). Consumers: the guide's day strip (href/Link cells), tier filter
+  (counts) and grouping; ListFilters; both big lists; the PO list; cleanup ×3;
+  receiving's layout control (`size="sm"` for its fixed-height band).
+  `accent: true` fills the SELECTED cell yellow instead of black — used by the
+  last-ordered age buckets, where a stale filter left on is hiding everything
+  fresh; "Any age"/"All" stay black. The root is `flex w-fit`, never
+  `inline-flex` (the descender-space trap in block parents). If a new screen
+  needs a choose-one control, this is it — a `<select>` is still fine for a
+  long vocabulary, and `PickList` for choosing a VALUE.
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server

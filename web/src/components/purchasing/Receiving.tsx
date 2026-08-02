@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ActionBar, ActionBarButton } from "@/components/ui/ActionBar";
+import { TabPicker } from "@/components/ui/TabPicker";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { Pane, PaneHeader } from "@/components/ui/Pane";
 import { BackToTop } from "@/components/ui/BackToTop";
@@ -583,9 +584,18 @@ export function Receiving({
           <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">
             Layout
           </span>
-          <LayoutButton current={layout} value="auto" label="Auto" />
-          <LayoutButton current={layout} value="split" label="Side by side" />
-          <LayoutButton current={layout} value="stacked" label="Stacked" />
+          {/* size="sm": this sits beside a fixed-height pane band. */}
+          <TabPicker
+            ariaLabel="Layout"
+            size="sm"
+            value={layout}
+            onChange={setReceivingLayout}
+            options={[
+              { key: "auto", label: "Auto" },
+              { key: "split", label: "Side by side" },
+              { key: "stacked", label: "Stacked" },
+            ]}
+          />
         </div>
 
         {stacked ? (
@@ -767,26 +777,3 @@ function Stat({
   );
 }
 
-function LayoutButton({
-  current,
-  value,
-  label,
-}: {
-  current: string;
-  value: "auto" | "split" | "stacked";
-  label: string;
-}) {
-  const on = current === value;
-  return (
-    <button
-      type="button"
-      onClick={() => setReceivingLayout(value)}
-      aria-pressed={on}
-      className={`h-8 border border-ink px-3 text-[11px] font-semibold uppercase tracking-[0.06em] transition-colors ${
-        on ? "bg-ink text-white" : "bg-white text-ink hover:bg-neutral-100"
-      }`}
-    >
-      {label}
-    </button>
-  );
-}

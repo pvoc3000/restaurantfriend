@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TextInput } from "@/components/ui/TextInput";
+import { TabPicker } from "@/components/ui/TabPicker";
 import {
   fetchPoDocData,
   openWindowNow,
@@ -603,41 +604,27 @@ export function PurchaseOrderList({
           className="h-9 w-64 text-sm"
         />
 
-        {/* Status tabs: an underline marker, not a fill — they scope the view. */}
-        <div className="flex items-center gap-4 text-[12px] font-semibold uppercase tracking-[0.06em]">
-          {statusTabs.map((s) => (
-            <button
-              key={s}
-              onClick={() => update({ status: s })}
-              className={`border-b-2 px-1 pb-0.5 ${
-                filters.status === s
-                  ? "border-ink text-ink"
-                  : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {s === "all" ? "All" : PO_STATUS_LABEL[s as PoStatus]}
-              <span className="ml-1.5 font-normal tabular-nums text-faint">
-                {s === "all" ? orders.length : statusCounts[s] ?? 0}
-              </span>
-            </button>
-          ))}
-        </div>
+        <TabPicker
+          ariaLabel="Status"
+          value={filters.status}
+          onChange={(status) => update({ status })}
+          options={statusTabs.map((s) => ({
+            key: s,
+            label: s === "all" ? "All" : PO_STATUS_LABEL[s as PoStatus],
+            count: s === "all" ? orders.length : statusCounts[s] ?? 0,
+          }))}
+        />
 
-        <div className="ml-auto flex items-center gap-4 text-[12px] font-semibold uppercase tracking-[0.06em]">
-          <span className="font-normal tracking-[0.12em] text-subtle">Window</span>
-          {RANGES.map((r) => (
-            <button
-              key={r.key}
-              onClick={() => setRange(r.key)}
-              className={`border-b-2 px-1 pb-0.5 ${
-                filters.range === r.key
-                  ? "border-ink text-ink"
-                  : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {r.label}
-            </button>
-          ))}
+        <div className="ml-auto flex items-center gap-3">
+          <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+            Window
+          </span>
+          <TabPicker
+            ariaLabel="Date window"
+            value={filters.range}
+            onChange={setRange}
+            options={RANGES.map((r) => ({ key: r.key, label: r.label }))}
+          />
         </div>
       </div>
 

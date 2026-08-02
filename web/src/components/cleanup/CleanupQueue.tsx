@@ -12,6 +12,7 @@ import {
 } from "@/lib/lastOrdered";
 import type { QueueItem } from "@/app/(app)/cleanup/page";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { TabPicker } from "@/components/ui/TabPicker";
 import { FixDrawer } from "./FixDrawer";
 
 type ProblemTab = ProblemKind | "all";
@@ -178,28 +179,16 @@ export function CleanupQueue({
         <span className="text-sm text-subtle">
           {items.length} {items.length === 1 ? "row needs" : "rows need"} attention
         </span>
-        <div className="ml-auto flex items-center gap-1 text-sm">
-          <button
-            onClick={() => setScope(false)}
-            className={`border-b-2 px-1 pb-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] ${
-              allLocations
-                ? "border-transparent text-muted hover:text-ink"
-                : "border-ink text-ink"
-            }`}
-          >
-            {activeLocationCode ?? "This location"}
-          </button>
-          <button
-            onClick={() => setScope(true)}
-            className={`border-b-2 px-1 pb-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] ${
-              allLocations
-                ? "border-ink text-ink"
-                : "border-transparent text-muted hover:text-ink"
-            }`}
-          >
-            All locations
-          </button>
-        </div>
+        <TabPicker
+          ariaLabel="Scope"
+          className="ml-auto"
+          value={allLocations ? "all" : "location"}
+          onChange={(scope) => setScope(scope === "all")}
+          options={[
+            { key: "location", label: activeLocationCode ?? "This location" },
+            { key: "all", label: "All locations" },
+          ]}
+        />
       </div>
 
       <p className="text-sm text-subtle">
@@ -208,56 +197,34 @@ export function CleanupQueue({
       </p>
 
       {/* Problem filter */}
-      <div className="flex flex-wrap gap-2">
-        {problemTabs.map((t) => {
-          const count = t === "all" ? items.length : problemCounts[t] ?? 0;
-          const label = t === "all" ? "All" : PROBLEM_LABEL[t];
-          const on = problemTab === t;
-          return (
-            <button
-              key={t}
-              onClick={() => setProblemTab(t)}
-              className={`border px-3 py-1 text-sm ${
-                on
-                  ? "border-neutral-900 bg-neutral-900 text-white"
-                  : "border-ink text-body hover:bg-neutral-100"
-              }`}
-            >
-              {label}
-              <span className={`ml-1.5 ${on ? "text-neutral-300" : "text-faint"}`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
+      <TabPicker
+        ariaLabel="Problem"
+        value={problemTab}
+        onChange={setProblemTab}
+        options={problemTabs.map((t) => ({
+          key: t,
+          label: t === "all" ? "All" : PROBLEM_LABEL[t],
+          count: t === "all" ? items.length : problemCounts[t] ?? 0,
+        }))}
+      />
 
-      {/* Last-ordered (staleness) filter */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Last-ordered (staleness) filter. A selected AGE bucket is yellow
+          (accent): a stale filter left on is hiding everything fresh. */}
+      <div className="flex flex-wrap items-center gap-3">
         <span className="text-xs uppercase tracking-[0.12em] text-faint">
           Last ordered
         </span>
-        {(["any", ...STALE_ORDER] as StaleTab[]).map((t) => {
-          const count = t === "any" ? items.length : staleCounts[t] ?? 0;
-          const label = t === "any" ? "Any age" : STALE_LABEL[t];
-          const on = staleTab === t;
-          return (
-            <button
-              key={t}
-              onClick={() => setStaleTab(t)}
-              className={`border px-3 py-1 text-sm ${
-                on
-                  ? (t === "any" ? "border-ink bg-ink text-white" : "border-ink bg-[var(--rf-yellow-500)] text-ink")
-                  : "border-ink text-body hover:bg-neutral-100"
-              }`}
-            >
-              {label}
-              <span className={`ml-1.5 ${on && t === "any" ? "text-white/60" : "text-faint"}`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
+        <TabPicker
+          ariaLabel="Last ordered"
+          value={staleTab}
+          onChange={setStaleTab}
+          options={(["any", ...STALE_ORDER] as StaleTab[]).map((t) => ({
+            key: t,
+            label: t === "any" ? "Any age" : STALE_LABEL[t],
+            count: t === "any" ? items.length : staleCounts[t] ?? 0,
+            accent: t !== "any",
+          }))}
+        />
       </div>
 
       {/* Bulk action bar */}

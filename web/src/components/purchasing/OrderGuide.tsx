@@ -9,6 +9,7 @@ import { withFrom } from "@/lib/breadcrumbs";
 import { useChromeCollapsed } from "@/lib/chromeStore";
 import { useScrollMemoryKey } from "@/lib/scrollMemory";
 import { TextInput } from "@/components/ui/TextInput";
+import { TabPicker } from "@/components/ui/TabPicker";
 import {
   applyExpansions,
   daySourceIndex,
@@ -526,28 +527,17 @@ export function OrderGuide({
             {/* All seven days, always, as one segmented control, directly under
                 the title. The guide exists every day — picking one scopes the
                 list to what's orderable then, and a day with nothing scheduled
-                simply renders empty rather than disappearing.
-                flex + w-fit, not inline-flex: an inline-level box in a block
-                parent sits in a line box and collects its descender space, which
-                is 4px of nothing under the control (the same trap that put Sign
-                out off its baseline). */}
-            <div className="flex h-9 w-fit items-stretch border border-ink">
-              {[1, 2, 3, 4, 5, 6, 7].map((d) => (
-                <Link
-                  key={d}
-                  href={`/order-guide?day=${d}`}
-                  className={`inline-flex items-center px-3 text-[12px] font-semibold uppercase tracking-[0.06em] no-underline ${
-                    d > 1 ? "border-l border-ink" : ""
-                  } ${
-                    d === weekday
-                      ? "bg-ink text-white"
-                      : "bg-white text-ink hover:bg-neutral-100"
-                  }`}
-                >
-                  {WEEKDAY_LABELS[d - 1]}
-                </Link>
-              ))}
-            </div>
+                simply renders empty rather than disappearing. This control is
+                where TabPicker's look comes from (Mark, 2026-08-01). */}
+            <TabPicker
+              ariaLabel="Guide day"
+              value={String(weekday)}
+              options={[1, 2, 3, 4, 5, 6, 7].map((d) => ({
+                key: String(d),
+                label: WEEKDAY_LABELS[d - 1],
+                href: `/order-guide?day=${d}`,
+              }))}
+            />
           </div>
 
           {/* Vendor totals bar — the guide's central instrument (§4.2): square
@@ -613,26 +603,16 @@ export function OrderGuide({
             />
             {/* Segmented control: these four are one choice, so they read as
                 one object rather than four loose buttons. */}
-            <span className="inline-flex h-9 items-stretch border border-ink">
-              {GUIDE_FILTERS.map((f, i) => (
-                <button
-                  key={f}
-                  onClick={() => changeFilter(f)}
-                  className={`inline-flex items-center gap-2 px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
-                    i > 0 ? "border-l border-ink" : ""
-                  } ${
-                    filter === f
-                      ? "bg-ink text-white"
-                      : "bg-white text-ink hover:bg-neutral-100"
-                  }`}
-                >
-                  {GUIDE_FILTER_LABEL[f]}
-                  <span className="font-normal tabular-nums opacity-55">
-                    {filterCounts[f]}
-                  </span>
-                </button>
-              ))}
-            </span>
+            <TabPicker
+              ariaLabel="Guide filter"
+              value={filter}
+              onChange={changeFilter}
+              options={GUIDE_FILTERS.map((f) => ({
+                key: f,
+                label: GUIDE_FILTER_LABEL[f],
+                count: filterCounts[f],
+              }))}
+            />
 
             {/* The escape hatch from the day gates (FMP's "ignore order day"):
                 every orderable line, whenever you'd normally buy it. A switch,
@@ -675,23 +655,15 @@ export function OrderGuide({
               <span className="text-xs uppercase tracking-[0.12em] text-subtle">
                 Group by
               </span>
-              <span className="inline-flex h-9 items-stretch border border-ink">
-                {GUIDE_GROUPINGS.map((mode, i) => (
-                  <button
-                    key={mode}
-                    onClick={() => changeGrouping(mode)}
-                    className={`inline-flex items-center px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
-                      i > 0 ? "border-l border-ink" : ""
-                    } ${
-                      grouping === mode
-                        ? "bg-ink text-white"
-                        : "bg-white text-ink hover:bg-neutral-100"
-                    }`}
-                  >
-                    {GROUPING_LABEL[mode]}
-                  </button>
-                ))}
-              </span>
+              <TabPicker
+                ariaLabel="Group by"
+                value={grouping}
+                onChange={changeGrouping}
+                options={GUIDE_GROUPINGS.map((mode) => ({
+                  key: mode,
+                  label: GROUPING_LABEL[mode],
+                }))}
+              />
             </span>
           </div>
         </>

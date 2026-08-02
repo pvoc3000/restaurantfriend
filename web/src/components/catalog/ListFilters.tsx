@@ -2,6 +2,7 @@
 
 import { STALE_ORDER, STALE_LABEL, type StaleBucket } from "@/lib/lastOrdered";
 import { TextInput } from "@/components/ui/TextInput";
+import { TabPicker } from "@/components/ui/TabPicker";
 
 export type ActiveFilter = "active" | "inactive" | "all";
 export type StaleFilter = StaleBucket | "any";
@@ -72,59 +73,34 @@ export function ListFilters({
         )}
 
         {active && onActive && (
-          // FilterTabs: an underline marker, not a black fill — filters change
-          // what you see, commands change the data.
-          <div className="flex items-center gap-4 text-[12px] font-semibold uppercase tracking-[0.06em]">
-            {ACTIVE_TABS.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => onActive(t.key)}
-                className={`border-b-2 px-1 pb-0.5 ${
-                  active === t.key
-                    ? "border-ink text-ink"
-                    : "border-transparent text-muted hover:text-ink"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+          <TabPicker
+            ariaLabel="Active state"
+            value={active}
+            onChange={onActive}
+            options={ACTIVE_TABS}
+          />
         )}
       </div>
 
       {stale && onStale && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="text-xs uppercase tracking-[0.12em] text-subtle">
             Last ordered
           </span>
-          {(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => {
-            const count = t === "any" ? totalCount ?? 0 : staleCounts?.[t] ?? 0;
-            const label = t === "any" ? "Any age" : STALE_LABEL[t];
-            const on = stale === t;
-            // "Any age" selected is a neutral black fill; a selected AGE
-            // bucket is yellow — the "look at this" accent, since a stale
-            // filter is on and hiding everything fresh.
-            const selected =
-              t === "any"
-                ? "border-ink bg-ink text-white"
-                : "border-ink bg-[var(--rf-yellow-500)] text-ink";
-            return (
-              <button
-                key={t}
-                onClick={() => onStale(t)}
-                className={`border px-3 py-1 text-sm ${
-                  on
-                    ? selected
-                    : "border-ink text-body hover:bg-neutral-100"
-                }`}
-              >
-                {label}
-                <span className={`ml-1.5 ${on && t === "any" ? "text-white/60" : "text-faint"}`}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
+          {/* A selected AGE bucket is yellow (accent) — the "look at this"
+              mark, since a stale filter left on is hiding everything fresh.
+              "Any age" is the neutral choice and stays black. */}
+          <TabPicker
+            ariaLabel="Last ordered"
+            value={stale}
+            onChange={onStale}
+            options={(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => ({
+              key: t,
+              label: t === "any" ? "Any age" : STALE_LABEL[t],
+              count: t === "any" ? totalCount ?? 0 : staleCounts?.[t] ?? 0,
+              accent: t !== "any",
+            }))}
+          />
         </div>
       )}
     </div>

@@ -15,6 +15,7 @@ import {
 import { DataTable, type DataColumn } from "./DataTable";
 import { VendorActiveToggle } from "@/components/VendorActiveToggle";
 import { TextInput } from "@/components/ui/TextInput";
+import { TabPicker } from "@/components/ui/TabPicker";
 import type { VendorRow } from "@/app/(app)/vendors/page";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
@@ -274,21 +275,12 @@ export function VendorsList({
           ))}
         </select>
 
-        <div className="flex items-center gap-1 text-sm">
-          {ACTIVE_TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => update({ active: t.key })}
-              className={`border-b-2 px-1 pb-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] ${
-                filters.active === t.key
-                  ? "border-ink text-ink"
-                  : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <TabPicker
+          ariaLabel="Active state"
+          value={filters.active}
+          onChange={(active) => update({ active })}
+          options={ACTIVE_TABS}
+        />
       </div>
 
       <DataTable

@@ -19,6 +19,7 @@ import { usePublishRecordSet } from "@/lib/recordSet";
 import { DataTable, type DataColumn } from "./DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { TextInput } from "@/components/ui/TextInput";
+import { TabPicker } from "@/components/ui/TabPicker";
 import type { ItemRow } from "@/app/(app)/items/page";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
@@ -368,49 +369,32 @@ export function ItemsList({
           ))}
         </select>
 
-        <div className="flex items-center gap-1 text-sm">
-          {ACTIVE_TABS.map((t) => (
-            <button
-              key={t.key}
-              onClick={() => update({ active: t.key })}
-              className={`border-b-2 px-1 pb-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] ${
-                filters.active === t.key
-                  ? "border-ink text-ink"
-                  : "border-transparent text-muted hover:text-ink"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
+        <TabPicker
+          ariaLabel="Active state"
+          value={filters.active}
+          onChange={(active) => update({ active })}
+          options={ACTIVE_TABS}
+        />
       </div>
 
-      {/* Last-ordered filter — same buckets as the cleanup queue */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* Last-ordered filter — same buckets as the cleanup queue. A selected
+          AGE bucket is yellow (accent): a stale filter left on is hiding
+          everything fresh. */}
+      <div className="flex flex-wrap items-center gap-3">
         <span className="text-xs uppercase tracking-[0.12em] text-faint">
           Last ordered
         </span>
-        {(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => {
-          const count = t === "any" ? items.length : staleCounts[t] ?? 0;
-          const label = t === "any" ? "Any age" : STALE_LABEL[t];
-          const on = filters.stale === t;
-          return (
-            <button
-              key={t}
-              onClick={() => update({ stale: t })}
-              className={`border px-3 py-1 text-sm ${
-                on
-                  ? (t === "any" ? "border-ink bg-ink text-white" : "border-ink bg-[var(--rf-yellow-500)] text-ink")
-                  : "border-ink text-body hover:bg-neutral-100"
-              }`}
-            >
-              {label}
-              <span className={`ml-1.5 ${on && t === "any" ? "text-white/60" : "text-faint"}`}>
-                {count}
-              </span>
-            </button>
-          );
-        })}
+        <TabPicker
+          ariaLabel="Last ordered"
+          value={filters.stale}
+          onChange={(stale) => update({ stale })}
+          options={(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => ({
+            key: t,
+            label: t === "any" ? "Any age" : STALE_LABEL[t],
+            count: t === "any" ? items.length : staleCounts[t] ?? 0,
+            accent: t !== "any",
+          }))}
+        />
       </div>
 
       {checked.size > 0 && (
