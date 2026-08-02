@@ -636,20 +636,31 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    link previewers follow URLs in email as a matter of course, so verifying in
    an effect would let a corporate spam filter burn the invitation before the
    person ever clicked it.
-   **Its submit button is disabled until React hydrates, and that is not
-   politeness — it stops the page eating the invitation** (Mark, 2026-08-02:
-   "nothing happens after entering a name and password… the fields just
-   clear"). Before hydration `onSubmit` isn't attached, so the press makes the
-   BROWSER submit the form natively; the inputs carry no `name`, so a native
-   GET rewrites the query to nothing (`/welcome?`), the one-time token vanishes
-   from the URL, the page reloads empty, and not a line of our code has run —
-   no error, because nothing errored. Same mechanism as the sub-16.4 Safari
-   login failure documented under the browser floor, and it can bite any
-   browser on a slow first paint. The guard is `useSyncExternalStore`
-   (server snapshot false, client true), not an effect, which is also what the
-   `set-state-in-effect` lint wants. Belt and braces: a `/welcome` with no
-   `token_hash` now says so ON ARRIVAL rather than looking normal and failing
-   at submit — reading the parameter doesn't spend it.
+   **The submit button is disabled until React hydrates**, which is cheap
+   insurance rather than a fix for anything observed: on a browser that never
+   hydrates it stays disabled instead of letting the browser submit the form
+   natively and strip the token out of the URL. Note this page CAN'T suffer
+   that in the normal case — `Suspense fallback={null}` means the server sends
+   no form at all, so there is nothing to press until React has rendered it.
+   (A 2026-08-02 report of "nothing happens, the fields just clear" was blamed
+   on exactly that mechanism and the blame was wrong; the flow was then walked
+   end-to-end against a real admin-API token and completed correctly. If it
+   recurs, get the URL after the failure — a bare `/welcome?` would prove a
+   native submit, anything else rules it out.) The guard uses
+   `useSyncExternalStore` (server snapshot false, client true) rather than an
+   effect, which is what the `set-state-in-effect` lint wants.
+   **A `/welcome` with no `token_hash` says so on ARRIVAL** rather than looking
+   normal and failing at submit — reading the parameter doesn't spend it — and
+   a failed verify now carries the server's own message instead of a blanket
+   "expired or already used", which read as certainty while hiding the reason.
+   **It does NOT ask for a name** (Mark, 2026-08-02: "we know their name
+   already"). The org name and the person's first name ride the link as
+   cosmetic params — the page has no session and so can't read either — so it
+   greets them with "Welcome to Donut Friend" rather than a product name they
+   have never heard of, and writes `display_name` for them. That write matters:
+   a null one is what the App access block reads as "invited, hasn't signed
+   in", so it falls back to the email's local part for links minted before the
+   param existed. Only `token_hash` carries any authority.
    Screens: `/employees` (defaults to Active — 26 of 445) and `/employees/[id]`,
    both cloned from the locations pattern including the `key={id}` shell. The
    nav gained per-role visibility (`NavSub.roles` + `sectionsForRole`, filtered
