@@ -1167,22 +1167,27 @@ weekday column, and 003 then silently made it per-vendor-item.
   PO detail's Delivery date was a hand-rolled `<input type="date">` (a picker)
   while the Ordered date beside it was an `InlineValue` (not), which is exactly
   the drift the parts table exists to prevent.
-  **The control's CHROME is ours, because the engines disagree and one of them
-  lies.** **Safari paints TODAY'S DATE into an empty date input** — its internal
-  edit fields render the current date as a ghost whenever the value is `""`, so
-  a null column reads as a delivery that already happened. The value really is
-  empty: the DB stays null, the DOM value is `""`, and nothing is wrong except
-  the paint. That is what makes it expensive — **in Chrome the same field shows
-  `mm/dd/yyyy` and looks perfect**, so it cost Mark two reports and two fixes
-  aimed at the wrong thing (a React controlled-input drift guard, then
-  `autoComplete="off"` against form-state restoration) before the cause was
-  found. WebKit offers no HTML-level opt-out. `globals.css` paints the ghost out
-  (`.rf-date[data-empty]::-webkit-datetime-edit { color: transparent }`, which
-  also retires Chrome's placeholder — both engines now show a genuinely blank
-  field) and hides the native indicator, and `InlineValue` draws its own
-  calendar glyph beside the box, opening the picker with `showPicker()`. Safari
-  draws no indicator at all, so without this the icon existed only in Chrome.
-  **Verify any date-field change in BOTH engines** — this class of bug is
+  **AN EMPTY DATE INPUT IS NEVER SHOWN, because Safari paints TODAY'S DATE into
+  one.** WebKit's internal edit fields render the current date as a ghost
+  whenever the value is `""`, so a null column reads as a delivery that already
+  happened. The value really is empty — the DB stays null, the DOM value is
+  `""`, Chrome renders `mm/dd/yyyy` and looks perfect — so only the paint lies,
+  which is what made it expensive: it cost Mark three reports (2026-08-02) and
+  three failed fixes. Two were aimed at other things (a React controlled-input
+  drift guard, then `autoComplete="off"` against form-state restoration); the
+  third tried to style it away with
+  `color: transparent` on `::-webkit-datetime-edit` and did nothing, because
+  the value is drawn by per-segment SUB-pseudo-elements that don't take the
+  colour from their parent. **Don't try to style WebKit's date internals.** What
+  works asks nothing of them: when there's no value the input is still in the
+  DOM — `showPicker()` throws `InvalidStateError` on an element that isn't
+  rendered, and it has to stay focusable — but it's `opacity-0`, absolutely
+  positioned over a blank of our own width, so nothing WebKit paints can be
+  seen in any version. `globals.css` also hides
+  `::-webkit-calendar-picker-indicator` (Safari draws none, Chrome draws one
+  inside the field) and `InlineValue` draws its own calendar glyph, which is
+  what opens the picker.
+    **Verify any date-field change in BOTH engines** — this class of bug is
   invisible in one of them.
 - **A read-only value in a detail `dl` wears the editable one's padding.**
   `InlineValue`'s resting button is `px-1 py-0.5`, so a plain string rendered

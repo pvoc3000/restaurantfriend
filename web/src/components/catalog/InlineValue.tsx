@@ -280,25 +280,34 @@ export function InlineValue({
   // emits "" until the whole date is valid, so a change event IS a finished
   // value — there's no half-typed state to protect and nothing to confirm.
   //
-  // BUT THE NATIVE CHROME OF THIS CONTROL IS NOT USABLE AS SHIPPED, because the
-  // two engines disagree about both halves of it:
+  // AN EMPTY DATE INPUT IS NEVER SHOWN, because Safari paints TODAY'S DATE into
+  // one. Its internal edit fields render the current date as a ghost whenever
+  // the value is "", so a null column reads as a delivery that already
+  // happened; the value really is empty, so the database, the DOM value and
+  // Chrome are all correct and only the paint lies. That took three reports to
+  // pin down (Mark, 2026-08-02), and two earlier attempts failed because they
+  // were fixes to OTHER things — a React drift guard, then autoComplete="off"
+  // — and a third failed because `color: transparent` on
+  // `::-webkit-datetime-edit` does not reach WebKit's per-segment sub-pseudo-
+  // elements.
   //
-  //   - SAFARI PAINTS TODAY'S DATE INTO AN EMPTY ONE. Its internal edit fields
-  //     render the current date as a ghost when the value is "", so a column
-  //     holding null reads as a delivery that already happened. The VALUE is
-  //     genuinely empty — this is paint, not data, which is why the database
-  //     stayed null through two rounds of Mark reporting it and why nothing in
-  //     the DOM value was ever wrong. It is long-standing WebKit behaviour with
-  //     no HTML-level opt-out (see mui/material-ui#37226 and the WeWeb thread).
-  //   - SAFARI DRAWS NO CALENDAR ICON, so the affordance Mark asked for exists
-  //     only in Chrome.
-  //
-  // So the chrome is ours: `.rf-date` in globals.css hides the native indicator
-  // and blanks the edit fields while `data-empty` is set, and the glyph beside
-  // the box is drawn here and opens the picker with `showPicker()`. What's left
-  // native is the value, the keyboard, and the picker itself.
+  // So this does not try to style WebKit's internals at all. When there is no
+  // value the input is still THERE — `showPicker()` throws on an element that
+  // isn't rendered, and it must stay focusable and keyboard-reachable — but it
+  // is transparent and laid over a blank of our own. Nothing WebKit paints can
+  // be seen, whatever it decides to paint, in any version.
   if (kind === "date") {
     const empty = value === null || value === "";
+    const openPicker = () => {
+      const el = dateRef.current;
+      if (!el) return;
+      // Needs transient activation, which a click is. Not every engine has it.
+      try {
+        el.showPicker();
+      } catch {
+        el.focus();
+      }
+    };
     return (
       <span className="inline-flex flex-col items-start">
         {/* px-1 py-0.5 is the resting BUTTON's padding, not a field's: these sit
@@ -308,47 +317,46 @@ export function InlineValue({
             date fields, but I like the calendar icon") — the hover wash is what
             says the value takes an edit. */}
         <span className="inline-flex items-center gap-1 px-1 py-0.5 hover:bg-neutral-100">
-          <input
-            ref={dateRef}
-            type="date"
-            value={empty ? "" : String(value)}
-            disabled={saving}
-            required={!nullable}
-            aria-label={column}
-            data-empty={empty ? "" : undefined}
-            // Nothing here is a form field in the sense a browser means, so it
-            // should neither be autofilled nor restored from session history.
-            autoComplete="off"
-            onChange={(e) => {
-              const next = e.target.value || null;
-              if (next === null && !nullable) {
-                setError("required");
-                return;
-              }
-              if (next === (value ?? null)) return;
-              setError(null);
-              void write(next, false);
-            }}
-            className={`rf-date bg-transparent tabular-nums outline-none disabled:opacity-35 ${className}`}
-          />
-          {/* Ours, not the engine's — Safari draws none and Chrome's sits
-              inside the field. `showPicker` needs a user gesture, which a click
-              is; where it isn't available, focusing the field is what a reader
-              can act on. */}
+          {/* One fixed width in both states, so the glyph doesn't move when a
+              date lands and the two rows of a dl line up with each other. */}
+          <span className="relative inline-flex h-6 w-28 items-center">
+            <input
+              ref={dateRef}
+              type="date"
+              value={empty ? "" : String(value)}
+              disabled={saving}
+              required={!nullable}
+              aria-label={column}
+              // Nothing here is a form field in the sense a browser means, so
+              // it should neither be autofilled nor restored from history.
+              autoComplete="off"
+              // Clicking the blank opens the picker: with the field invisible
+              // there is nothing to aim a caret at, and the indicator that
+              // would normally do this is hidden (Chrome) or absent (Safari).
+              onClick={empty ? openPicker : undefined}
+              onChange={(e) => {
+                const next = e.target.value || null;
+                if (next === null && !nullable) {
+                  setError("required");
+                  return;
+                }
+                if (next === (value ?? null)) return;
+                setError(null);
+                void write(next, false);
+              }}
+              className={`rf-date h-6 w-28 bg-transparent tabular-nums outline-none disabled:opacity-35 ${
+                empty ? "absolute inset-0 cursor-pointer opacity-0" : ""
+              } ${className}`}
+            />
+          </span>
+          {/* Ours, not the engine's — Safari draws no indicator and Chrome's
+              sits inside the field where it can't be made to match anything. */}
           <button
             type="button"
             disabled={saving}
             aria-label={`Choose ${column}`}
             title="Choose a date"
-            onClick={() => {
-              const el = dateRef.current;
-              if (!el) return;
-              try {
-                el.showPicker();
-              } catch {
-                el.focus();
-              }
-            }}
+            onClick={openPicker}
             className="shrink-0 text-muted hover:text-ink disabled:opacity-35"
           >
             <CalendarIcon />
