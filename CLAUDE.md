@@ -1420,6 +1420,31 @@ weekday column, and 003 then silently made it per-vendor-item.
   (measured: table 1314px in a 1314px pane, scrollWidth 1320). The unpaned path
   is unaffected — `useOverflowOnlyWhenNeeded` compares the TABLE's width, not
   scrollWidth, so the grip never fooled it.
+- **Vendor detail has an editable field block** (`catalog/VendorFields.tsx`,
+  Mark, 2026-08-01: type, description, order type, url and notes "are not
+  reachable/visible… and should be"). `description` and `notes` weren't even
+  QUERIED before this — fully invisible, not just read-only — and `vendor_type`
+  / `order_type` / `url` were a single line of plain text with no way to change
+  them without leaving the page. Every other detail screen (item, vendor item,
+  location) has had an inline-editable `dl` since it shipped; vendor detail was
+  the outlier. Matches `ItemFields` exactly: **Type** is `kind="pick" allowNew`
+  sourced from every `vendor_type` already in the org (one extra `Promise.all`
+  query, same move as the item category picker); **Order via** is
+  `kind="pick"` with NO `allowNew` — `order_type` is a closed set, the DB's own
+  check constraint, not a growing vocabulary — labelled via the new
+  `ORDER_TYPE_LABEL`/`ORDER_TYPE_OPTIONS` in `lib/catalog.ts` (hardcoding these
+  four values is fine per design rule 2: they're schema, not org config, the
+  same reasoning `PO_STATUS_LABEL` already relies on); **Website** pairs the
+  `InlineValue` text field with an "Open ↗" link that only renders when a URL
+  is stored, wrapped `min-w-0 flex-1` since InlineValue's own trigger is
+  `w-full` of ITS parent, not of the row. No role gate, matching
+  `ItemFields`/`VendorItemFields`: the write is tried and RLS answers below
+  purchaser+, with the error shown beside the field rather than the control
+  vanishing. Verified against Amoretti's real (pre-existing, previously
+  invisible) `description` — "Flavorings & Extracts" — surfacing correctly, and
+  round-tripped a write on Chefs Warehouse's four fields, reverted via a
+  one-off local service_role script afterward (never committed) rather than
+  left as test data on a live record.
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server

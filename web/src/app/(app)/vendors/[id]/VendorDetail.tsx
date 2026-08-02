@@ -15,6 +15,7 @@ import {
 import { AddVendorReminder } from "@/components/purchasing/Reminders";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { VendorFields } from "@/components/catalog/VendorFields";
 
 type VendorLocationRow = {
   id: string;
@@ -33,8 +34,10 @@ type Vendor = {
   id: string;
   name: string;
   vendor_type: string | null;
+  description: string | null;
   order_type: string;
   url: string | null;
+  notes: string | null;
   is_active: boolean;
   vendor_locations: VendorLocationRow[];
 };
@@ -60,12 +63,12 @@ export async function VendorDetail({
   // Every location's config is listed (not just the active one) — the vendor's
   // account number and minimum differ per shop, and seeing them together is the
   // point of the detail screen.
-  const [{ data: vendor, error }, { data: vendorItems, error: viError }] =
+  const [{ data: vendor, error }, { data: vendorItems, error: viError }, { data: typeRows }] =
     await Promise.all([
       supabase
         .from("vendors")
         .select(
-          `id, name, vendor_type, order_type, url, is_active,
+          `id, name, vendor_type, description, order_type, url, notes, is_active,
            vendor_locations ( id, location_id, account_number, minimum_order,
                               order_days, delivery_days, is_active,
                               sales_rep, rep_phone, rep_email )`
@@ -78,6 +81,10 @@ export async function VendorDetail({
         .eq("vendor_id", id)
         .order("is_active", { ascending: false })
         .order("description"),
+      // What the Type picker offers — every vendor_type already in use, fired
+      // alongside the other two so it costs no extra round trip (the same
+      // move ItemDetail makes for the item category picker).
+      supabase.from("vendors").select("vendor_type"),
     ]);
 
   if (error) {
@@ -87,6 +94,13 @@ export async function VendorDetail({
 
   const v = vendor as unknown as Vendor;
   const items = (vendorItems ?? []) as unknown as VendorItemWithItem[];
+  const vendorTypes = [
+    ...new Set(
+      ((typeRows ?? []) as { vendor_type: string | null }[])
+        .map((r) => r.vendor_type)
+        .filter((t): t is string => t !== null && t !== "")
+    ),
+  ].sort((a, b) => a.localeCompare(b));
 
   // Last-ordered for the age filter. Semantics match the Inventory list: when
   // the linked ITEM was last ordered at the active location, from any vendor —
@@ -147,38 +161,33 @@ export async function VendorDetail({
         trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
       />
 
-      <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">{v.name}</h1>
-        <span className="text-sm text-subtle">
-          {v.vendor_type ?? "—"} · orders via {v.order_type}
-          {v.is_active ? "" : " · inactive"}
-        </span>
-        {v.url && (
-          <a
-            href={v.url}
-            target="_blank"
-            rel="noreferrer"
-            className="text-sm text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-          >
-            website
-          </a>
-        )}
+      {/* space-y-3, matching ItemFields' own rhythm: the name row and the
+          field block below it both describe what this record IS, so they sit
+          closer to each other than to the two tables that follow. */}
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-baseline gap-3">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">{v.name}</h1>
+          {!v.is_active && <span className="text-sm text-subtle">Inactive</span>}
 
-        {/* "Next time we order from these people…" — recorded where the thought
-            happens rather than remembered until Monday. It surfaces on the
-            ACTIVE location's guide, which is the one you'd be walking. */}
-        {session.activeLocation &&
-          ["owner", "admin", "purchaser"].includes(session.membership.role) && (
-            <span className="ml-auto">
-              <AddVendorReminder
-                vendorId={v.id}
-                vendorName={v.name}
-                locationId={session.activeLocation.id}
-                orgId={session.membership.org_id}
-                today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
-              />
-            </span>
-          )}
+          {/* "Next time we order from these people…" — recorded where the
+              thought happens rather than remembered until Monday. It surfaces
+              on the ACTIVE location's guide, which is the one you'd be
+              walking. */}
+          {session.activeLocation &&
+            ["owner", "admin", "purchaser"].includes(session.membership.role) && (
+              <span className="ml-auto">
+                <AddVendorReminder
+                  vendorId={v.id}
+                  vendorName={v.name}
+                  locationId={session.activeLocation.id}
+                  orgId={session.membership.org_id}
+                  today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
+                />
+              </span>
+            )}
+        </div>
+
+        <VendorFields vendor={v} vendorTypes={vendorTypes} />
       </div>
 
       {/* The heading rides in the table's own strip, opposite the columns eye

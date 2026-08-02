@@ -311,3 +311,24 @@ export function parPackageLabel(
   // Number() drops the trailing zero toFixed leaves, so 3.0 reads "3".
   return `${Number(packages.toFixed(1))} ${unit}`;
 }
+
+/**
+ * `vendors.order_type` — a CLOSED set (migration 001's own check constraint),
+ * unlike `vendor_type`, which is free text. Labelling it here is not the
+ * "zero business hardcoding" rule's business (CLAUDE.md): these four values
+ * are schema, not org configuration, the same way `PO_STATUS_LABEL` labels the
+ * purchase_orders.status constraint.
+ */
+export const ORDER_TYPE_LABEL: Record<string, string> = {
+  email_po: "Email PO",
+  online: "Online",
+  in_person: "In person",
+  none: "None — directory only",
+};
+
+export const ORDER_TYPE_OPTIONS: { value: string; label: string }[] = [
+  { value: "email_po", label: "Email PO" },
+  { value: "online", label: "Online" },
+  { value: "in_person", label: "In person" },
+  { value: "none", label: "None — directory only" },
+];
