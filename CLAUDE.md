@@ -1334,8 +1334,11 @@ weekday column, and 003 then silently made it per-vendor-item.
   many rows each**, so the run it opens is worth naming. `/employees` bands on
   location, status, position or schedule; the PO list on the order date, the
   vendor or the status (a date qualifies there because ordering happens in
-  batches, so a day's band is a day's run of POs); the vendor's items table on
-  the inventory **Type**. Sorting by a name, a phone, a PO number or a figure
+  batches, so a day's band is a day's run of POs); the vendor's items table and
+  a PO's own lines on the inventory **Type** (on PO detail that's also the
+  default sort, so an order opens grouped — and it's the same grouping the
+  vendor-facing PDF has printed since §4.9, which the screen had only been
+  implying through the sort). Sorting by a name, a phone, a PO number or a figure
   bands nothing, deliberately.
   **`DataGroup.sortKey`** is for a table that leaves its sort to `DataTable`
   rather than lifting it into the URL (the vendor's items): the caller can't

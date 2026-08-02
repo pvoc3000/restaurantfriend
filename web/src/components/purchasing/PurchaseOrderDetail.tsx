@@ -896,6 +896,15 @@ export function PurchaseOrderDetail({
         // Type first (Mark, 2026-07-27): it groups the order the way the
         // vendor-facing PDF does, so the screen and the document read alike.
         defaultSort={{ key: "item_type" }}
+        // And BANDS by it (Mark, 2026-08-02), which finishes that thought — the
+        // PDF has been printing category headings since §4.9, and the screen
+        // was only implying them through the sort. Since Type is also the
+        // default sort, an order opens grouped. This table leaves its sort to
+        // DataTable, so the banding is resolved there; see DataGroup.
+        group={{
+          sortKey: "item_type",
+          label: (l) => l.vendor_items?.inventory_items?.category ?? "No type",
+        }}
         rowClassName={(l) =>
           l.qty_received !== null && Number(l.qty_received) < Number(l.qty_ordered)
             ? "bg-[var(--rf-yellow-50)]"
