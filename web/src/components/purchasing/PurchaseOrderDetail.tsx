@@ -21,6 +21,7 @@ import {
   type PoStatus,
   type PurchaseOrder,
 } from "@/lib/purchaseOrders";
+import { withFrom } from "@/lib/breadcrumbs";
 import type { SignedAttachment } from "@/lib/attachments";
 import { PoAttachments } from "./PoAttachments";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
@@ -296,18 +297,50 @@ export function PurchaseOrderDetail({
       label: "Product ID",
       width: 110,
       sortValue: (l) => l.product_id,
-      render: (l) =>
-        canEditLines ? (
-          <InlineValue
-            table="purchase_order_items"
-            id={l.id}
-            column="product_id"
-            value={l.product_id}
-            className="text-muted"
-          />
-        ) : (
-          <span className="text-muted">{l.product_id ?? "—"}</span>
-        ),
+      // THE WAY TO THE VENDOR ITEM (Mark, 2026-08-02). It hangs off Product ID
+      // because that column IS the vendor item's identity — the SKU this
+      // vendor sells it under — where the Item cell beside it belongs to the
+      // catalog and already leads to `/items`. Same shape as vendor detail's
+      // Website field: the editor keeps the value, an "Open ↗" sits beside it,
+      // and the wrapper is `min-w-0 flex-1` because InlineValue's trigger is
+      // `w-full` of ITS parent rather than of the cell.
+      //
+      // Missing on a line whose vendor item has been deleted — the snapshot is
+      // still the historical record, but there's nothing left to open. That's
+      // also the only inbound link this screen gives `/vendor-items`, which
+      // until now the order guide alone reached.
+      render: (l) => (
+        <span className="flex items-baseline gap-1">
+          <span className="min-w-0 flex-1">
+            {canEditLines ? (
+              <InlineValue
+                table="purchase_order_items"
+                id={l.id}
+                column="product_id"
+                value={l.product_id}
+                className="text-muted"
+              />
+            ) : (
+              <span className={`${READ_ONLY_VALUE} text-muted`}>
+                {l.product_id ?? "—"}
+              </span>
+            )}
+          </span>
+          {l.vendor_items?.id && (
+            <Link
+              href={withFrom(`/vendor-items/${l.vendor_items.id}`, {
+                href: `/purchase-orders/${order.id}`,
+                label: order.po_number,
+              })}
+              title="Open this vendor item"
+              aria-label="Open this vendor item"
+              className="shrink-0 text-xs text-muted no-underline hover:text-ink"
+            >
+              ↗
+            </Link>
+          )}
+        </span>
+      ),
     },
     // What the item IS and what you ordered it as, in one wrapping cell —
     // two columns' worth of information in one column's width. The catalog
@@ -376,8 +409,14 @@ export function PurchaseOrderDetail({
                   of ITS parent. */}
               {brand && <span className="min-w-0 flex-1 text-xs text-muted">{brand}</span>}
             </span>
+            {/* -ml-1 pulls the editor's own px-1 back off the left edge, so
+                the description's TEXT starts where the item name's does
+                (Mark, 2026-08-02). The name is plain text at the cell's edge;
+                without this the line below it sat 4px in. The hover wash moves
+                with it, which is right — it should sit around the text, not
+                4px to its right. */}
             {description && (
-              <span className="block text-xs text-muted">{description}</span>
+              <span className="-ml-1 block text-xs text-muted">{description}</span>
             )}
           </span>
         );

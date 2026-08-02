@@ -32,7 +32,21 @@ export function Checkbox({
       aria-label={label}
       disabled={disabled}
       onClick={() => onChange?.(!checked)}
-      className="inline-flex cursor-pointer items-center gap-3 text-left disabled:cursor-default disabled:opacity-35"
+      // A LABELLED checkbox is a line of text and stays inline; a BARE one is a
+      // control that owns its space and goes block-level (Mark, 2026-08-02: in
+      // a PO's line table the box "doesn't align with the item type").
+      //
+      // The difference is the line box. An inline-level box sits on the
+      // baseline of a line whose height comes from the CELL's strut, not from
+      // the box — so in a table cell (`vertical-align: middle` centres the
+      // LINE, not the control) an 18px box rode 3px high on a 74px row, and
+      // `vertical-align: middle` on the button only moved it 2px the other way.
+      // Block-level removes the line box entirely: the cell's content becomes
+      // the control, and centring the content centres it exactly. Measured at
+      // 662 against a cell midpoint of 662, on rows of every height.
+      className={`cursor-pointer items-center gap-3 text-left disabled:cursor-default disabled:opacity-35 ${
+        children ? "inline-flex" : "flex"
+      }`}
     >
       <span
         aria-hidden
