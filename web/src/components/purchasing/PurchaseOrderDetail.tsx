@@ -326,45 +326,59 @@ export function PurchaseOrderDetail({
       sortTiebreaks: [(l) => l.description ?? "", (l) => l.brand ?? ""],
       render: (l) => {
         const name = l.vendor_items?.inventory_items?.name ?? null;
-        const orderedAs = [l.brand, l.description].filter(Boolean).join(" · ");
-        // The second line is the SNAPSHOT — brand and description as they'll
-        // print on the vendor's copy — so it's the half that's editable. The
-        // name above it belongs to the catalog and isn't the order's to change.
-        const snapshot = canEditLines ? (
-          <span className="flex items-baseline gap-1 text-xs text-muted">
-            <InlineValue
-              table="purchase_order_items"
-              id={l.id}
-              column="brand"
-              value={l.brand}
-              placeholder="brand"
-            />
-            <span className="shrink-0 text-faint">·</span>
-            <InlineValue
-              table="purchase_order_items"
-              id={l.id}
-              column="description"
-              value={l.description}
-              placeholder="description"
-            />
-          </span>
-        ) : orderedAs ? (
-          <span className="block text-xs text-muted">{orderedAs}</span>
+
+        // TWO LINES, split name+brand / description (Mark, 2026-08-02).
+        // Brand and description used to share the second line, and description
+        // is much the longest of the three — a vendor's own wording, often a
+        // whole phrase — so it was wrapping inside half a cell while the brand
+        // beside it used a fraction of its half. Brand is short and belongs
+        // with the name it qualifies; description gets the width it needs.
+        //
+        // Both are the SNAPSHOT — what prints on the vendor's copy — so both
+        // stay editable. The catalog name above isn't the order's to change.
+        const brand = canEditLines ? (
+          <InlineValue
+            table="purchase_order_items"
+            id={l.id}
+            column="brand"
+            value={l.brand}
+            placeholder="brand"
+          />
+        ) : l.brand ? (
+          <span className={READ_ONLY_VALUE}>{l.brand}</span>
+        ) : null;
+
+        const description = canEditLines ? (
+          <InlineValue
+            table="purchase_order_items"
+            id={l.id}
+            column="description"
+            value={l.description}
+            placeholder="description"
+          />
+        ) : l.description ? (
+          <span className={READ_ONLY_VALUE}>{l.description}</span>
         ) : null;
 
         // A line whose vendor item is gone still has its snapshot — that's the
         // historical record, so it leads instead of an em dash.
-        if (!name) {
-          return canEditLines ? (
-            snapshot
-          ) : (
-            <span className="text-muted">{orderedAs || "—"}</span>
-          );
+        if (!name && !brand && !description) {
+          return <span className="text-muted">—</span>;
         }
+
         return (
           <span className="block leading-snug">
-            <span className="block text-ink">{name}</span>
-            {snapshot}
+            <span className="flex items-baseline gap-1">
+              {name && <span className="min-w-0 text-ink">{name}</span>}
+              {name && brand && <span className="shrink-0 text-faint">·</span>}
+              {/* flex-1 so the brand's own editor fills what's left of the line
+                  rather than the whole cell — InlineValue's trigger is w-full
+                  of ITS parent. */}
+              {brand && <span className="min-w-0 flex-1 text-xs text-muted">{brand}</span>}
+            </span>
+            {description && (
+              <span className="block text-xs text-muted">{description}</span>
+            )}
           </span>
         );
       },
