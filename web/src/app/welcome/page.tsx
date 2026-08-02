@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useState, useSyncExternalStore } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -38,14 +38,44 @@ function Welcome() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  /**
+   * Hydration guard, and it is the whole reason this page failed silently
+   * (Mark, 2026-08-02: "nothing happens… the fields just clear").
+   *
+   * Until React hydrates, `onSubmit` isn't attached and the button is still a
+   * plain `type="submit"` inside a plain form — so pressing it makes the
+   * BROWSER submit natively. These inputs carry no `name`, so a native GET
+   * rewrites the query string to nothing: `/welcome?`. The one-time token is
+   * gone, the page reloads with empty fields, and not a line of our code ever
+   * ran — which is exactly "no feedback, and the fields cleared".
+   *
+   * Disabled until mounted, the press does nothing instead of destroying the
+   * invitation. (It also makes the sub-16.4 Safari case visible rather than
+   * silent — see CLAUDE.md's browser floor: there the button simply never
+   * enables, instead of eating the link.)
+   */
+  // `useSyncExternalStore` rather than an effect: the server snapshot is
+  // false, the client snapshot is true, so this flips exactly when hydration
+  // happens — and it doesn't trip the `set-state-in-effect` lint the way
+  // `useEffect(() => setReady(true), [])` does. Same reason columnWidths reads
+  // its store this way.
+  const ready = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  );
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password !== confirm) {
-      setError("Those two passwords aren't the same.");
+    if (!tokenHash) {
+      setError(
+        "This link is missing its token. That usually means it was opened, " +
+          "reloaded or forwarded — ask a manager to send a fresh one."
+      );
       return;
     }
-    if (!tokenHash) {
-      setError("This link is incomplete. Ask a manager to send another.");
+    if (password !== confirm) {
+      setError("Those two passwords aren't the same.");
       return;
     }
 
@@ -61,8 +91,12 @@ function Welcome() {
     });
     if (verifyError) {
       setBusy(false);
+      // The likely cause first, then what the server actually said. A blanket
+      // "expired or already used" reads as certainty and hides the real
+      // reason, which is the last thing you want when someone is stuck on
+      // their own invitation and you're not in the room.
       setError(
-        "This invitation has expired or has already been used. Ask a manager to send another."
+        `This invitation didn't work — it has probably expired or been used already. (${verifyError.message})`
       );
       return;
     }
@@ -101,9 +135,21 @@ function Welcome() {
         </h1>
 
         <div className="space-y-5 p-6">
-          <p className="text-sm text-muted">
-            Choose a password and you&rsquo;re in.
-          </p>
+          {/* Said on ARRIVAL, not on submit. Reading the parameter doesn't
+              spend the token — only `verifyOtp` does — so this costs nothing
+              and it's the difference between a page that looks normal and
+              quietly can't work, and one that tells you straight away. */}
+          {tokenHash ? (
+            <p className="text-sm text-muted">
+              Choose a password and you&rsquo;re in.
+            </p>
+          ) : (
+            <p className="text-sm text-accent">
+              This link is missing its token, so it can&rsquo;t sign you in.
+              Open the link from the email again — or ask a manager to send a
+              fresh one.
+            </p>
+          )}
 
           <label className="block space-y-1.5">
             <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
@@ -150,12 +196,15 @@ function Welcome() {
 
           {error && <p className="text-sm text-accent">{error}</p>}
 
+          {/* `!ready` is the hydration guard — see the note by its state.
+              Pressing this before React has attached onSubmit would make the
+              browser submit natively and strip the token out of the URL. */}
           <button
             type="submit"
-            disabled={busy}
+            disabled={busy || !ready}
             className="h-11 w-full bg-ink text-[13px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300"
           >
-            {busy ? "Setting up…" : "Set my password"}
+            {busy ? "Setting up…" : ready ? "Set my password" : "Loading…"}
           </button>
         </div>
       </form>

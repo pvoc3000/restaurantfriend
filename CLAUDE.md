@@ -636,6 +636,20 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    link previewers follow URLs in email as a matter of course, so verifying in
    an effect would let a corporate spam filter burn the invitation before the
    person ever clicked it.
+   **Its submit button is disabled until React hydrates, and that is not
+   politeness — it stops the page eating the invitation** (Mark, 2026-08-02:
+   "nothing happens after entering a name and password… the fields just
+   clear"). Before hydration `onSubmit` isn't attached, so the press makes the
+   BROWSER submit the form natively; the inputs carry no `name`, so a native
+   GET rewrites the query to nothing (`/welcome?`), the one-time token vanishes
+   from the URL, the page reloads empty, and not a line of our code has run —
+   no error, because nothing errored. Same mechanism as the sub-16.4 Safari
+   login failure documented under the browser floor, and it can bite any
+   browser on a slow first paint. The guard is `useSyncExternalStore`
+   (server snapshot false, client true), not an effect, which is also what the
+   `set-state-in-effect` lint wants. Belt and braces: a `/welcome` with no
+   `token_hash` now says so ON ARRIVAL rather than looking normal and failing
+   at submit — reading the parameter doesn't spend it.
    Screens: `/employees` (defaults to Active — 26 of 445) and `/employees/[id]`,
    both cloned from the locations pattern including the `key={id}` shell. The
    nav gained per-role visibility (`NavSub.roles` + `sectionsForRole`, filtered
