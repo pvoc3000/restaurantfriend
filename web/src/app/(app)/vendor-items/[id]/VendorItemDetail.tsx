@@ -15,6 +15,7 @@ import {
   type VendorItemLocationRow,
 } from "@/components/catalog/VendorItemLocations";
 import { VendorItemActions } from "@/components/catalog/VendorItemActions";
+import { SectionHeading } from "@/components/ui/SectionHeading";
 
 const SELECT = `
   id, brand, description, product_id, package_desc, package_content, price,
@@ -197,9 +198,7 @@ export async function VendorItemDetail({
       <VendorItemFields vi={vi} here={here} />
 
       <section className="space-y-2">
-        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
-          Per-location
-        </h2>
+        <SectionHeading>Per-location</SectionHeading>
         <VendorItemLocations
           rows={locationRows}
           vendorItemId={id}
@@ -215,9 +214,7 @@ export async function VendorItemDetail({
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
-          Price history
-        </h2>
+        <SectionHeading>Price history</SectionHeading>
         {(history ?? []).length === 0 ? (
           <p className="text-sm text-muted">No recorded price changes.</p>
         ) : (

@@ -14,6 +14,7 @@ import {
 } from "@/components/catalog/VendorItemsTable";
 import { AddVendorReminder } from "@/components/purchasing/Reminders";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
+import { SectionHeading } from "@/components/ui/SectionHeading";
 
 type VendorLocationRow = {
   id: string;
@@ -176,9 +177,7 @@ export async function VendorDetail({
       </div>
 
       <section className="space-y-2">
-        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
-          Per-location config
-        </h2>
+        <SectionHeading>Per-location config</SectionHeading>
         <VendorLocationsTable
           rows={v.vendor_locations}
           codeById={Object.fromEntries(codeById)}
@@ -187,12 +186,7 @@ export async function VendorDetail({
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
-          Vendor items{" "}
-          <span className="font-normal normal-case tracking-normal text-faint">
-            {vendorItems?.length ?? 0}
-          </span>
-        </h2>
+        <SectionHeading count={vendorItems?.length ?? 0}>Vendor items</SectionHeading>
         {viError ? (
           <p className="text-sm text-accent">
             Could not load vendor items: {viError.message}

@@ -12,6 +12,7 @@ import { OperationsFields } from "@/components/location/OperationsFields";
 import { OperatingHours } from "@/components/location/OperatingHours";
 import { ProductionMapping } from "@/components/location/ProductionMapping";
 import { WorkingHere } from "@/components/location/WorkingHere";
+import { SectionHeading } from "@/components/ui/SectionHeading";
 
 /** The columns migration 017 added, plus what 001 always had. */
 type LocationRecord = {
@@ -34,13 +35,9 @@ type LocationRecord = {
 
 type EmailProvider = { kind?: string; from?: string; reply_to?: string; secret_ref?: string };
 
-function Heading({ children }: { children: React.ReactNode }) {
-  return (
-    <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
-      {children}
-    </h2>
-  );
-}
+// Was a local copy of the section-heading style; it's `ui/SectionHeading` now,
+// so this screen's headings change with everyone else's.
+const Heading = SectionHeading;
 
 /**
  * Everything the app knows about ONE location — any of them, not just the one

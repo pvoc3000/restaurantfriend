@@ -380,9 +380,12 @@ export function ItemsList({
         />
       </div>
 
-      {/* Last-ordered filter — same buckets as the cleanup queue. */}
-      <div className="flex flex-wrap items-center gap-3">
-        <span className="text-xs uppercase tracking-[0.12em] text-faint">
+      {/* Last-ordered filter — same buckets as the cleanup queue. The label
+          sits ON ITS OWN LINE above the tabs (Mark, 2026-08-01): the bar is
+          five cells wide and a label beside it pushed the whole thing off the
+          left margin every other filter row starts at. */}
+      <div className="space-y-1.5">
+        <span className="block text-xs uppercase tracking-[0.12em] text-faint">
           Last ordered
         </span>
         <TabPicker

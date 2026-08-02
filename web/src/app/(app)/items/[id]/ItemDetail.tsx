@@ -13,6 +13,7 @@ import { RecordNav } from "@/components/ui/RecordNav";
 import { ItemFields } from "@/components/catalog/ItemFields";
 import { ItemLocationRows } from "@/components/catalog/ItemLocationRows";
 import { VendorItemsTable } from "@/components/catalog/VendorItemsTable";
+import { SectionHeading } from "@/components/ui/SectionHeading";
 
 // Item detail is per-ITEM, not per-location: every location's row is listed so
 // the differences between shops are visible in one place (spec §4.8 — the
@@ -99,9 +100,7 @@ export async function ItemDetail({
       <ItemFields item={row} categories={categories} />
 
       <section className="space-y-2">
-        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
-          Per-location config
-        </h2>
+        <SectionHeading>Per-location config</SectionHeading>
         {/* `activeLocations`: this is the "stock here" list, and you don't
             stock a closed shop. The code lookups above use session.locations,
             which carries every location. */}
@@ -116,9 +115,7 @@ export async function ItemDetail({
       </section>
 
       <section className="space-y-2">
-        <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
-          Vendor items
-        </h2>
+        <SectionHeading>Vendor items</SectionHeading>
         <p className="text-xs text-subtle">
           Items from deactivated vendors are hidden. Reactivate the vendor on its
           detail screen to bring them back.

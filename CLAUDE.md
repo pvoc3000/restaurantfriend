@@ -801,6 +801,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons |
   | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands; shares `lib/anchoredPanel` with PickList, so it escapes scroll panes the same way |
   | `catalog/InlineValue` | a hand-wired edit-in-place | any editable cell — `kind` text / number / date / **pick**; `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column |
+  | `ui/SectionHeading` | a hand-styled `<h2>` | the heading over a block on a detail screen (16px bold black, optional `count`) |
   | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style. Selected cell is ALWAYS black; `count` and `href` are the only options |
   | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
@@ -1335,6 +1336,26 @@ weekday column, and 003 then silently made it per-vendor-item.
   `inline-flex` (the descender-space trap in block parents). If a new screen
   needs a choose-one control, this is it — a `<select>` is still fine for a
   long vocabulary, and `PickList` for choosing a VALUE.
+- **A detail screen's section headings are `ui/SectionHeading`** (Mark,
+  2026-08-01: make "per location config" and "vendor items" larger and bold).
+  They were 12px semibold grey — the same size, weight and colour as a table's
+  own column labels — so a heading that owns a whole block read as one more
+  caption inside it. Now 16px bold black at 0.08em (the 0.12em small-caps
+  tracking is there to open up text that's nearly too small to read; at 16px it
+  only looks loose), which puts a clear step below the screen's 28px h1 and a
+  clear step above the 11–12px labels underneath. Applied to all SEVEN headings
+  that own a block — vendor, item, vendor-item and location detail — not just
+  the two named, or the change would have been the drift it was fixing.
+  Deliberately NOT applied to the three that look similar but are LABELS INSIDE
+  A ROW: the Paperwork and Invoice card bands, and receiving's "n lines", which
+  sits in a pane header that is fixed-height by design and would break if its
+  type grew.
+- **A filter's label sits ABOVE its TabPicker, not beside it** (Mark,
+  2026-08-01, for "Last ordered" on Inventory and vendor detail). A five-cell
+  bar with a label to its left starts 130px in, so it no longer lines up with
+  the search box and the other filters above it; stacked, every filter row
+  begins at the same left margin. The label is a `block` in a `space-y-1.5`
+  wrapper.
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server

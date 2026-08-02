@@ -380,9 +380,8 @@ export function VendorItemsTable({
         staleCounts={staleCounts}
         totalCount={vendorItems.length}
       />
-      <p className="text-xs text-subtle">
-        {visible.length} of {vendorItems.length}
-      </p>
+      {/* No "n of n" line here (Mark, 2026-08-01): the section heading already
+          carries the count, and the filter tabs carry their own. */}
       {table}
     </div>
   );

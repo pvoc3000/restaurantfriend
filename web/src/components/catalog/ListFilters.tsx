@@ -83,8 +83,10 @@ export function ListFilters({
       </div>
 
       {stale && onStale && (
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="text-xs uppercase tracking-[0.12em] text-subtle">
+        // Label on its own line above the tabs (Mark, 2026-08-01) — see the
+        // same arrangement on the Inventory list.
+        <div className="space-y-1.5">
+          <span className="block text-xs uppercase tracking-[0.12em] text-subtle">
             Last ordered
           </span>
           <TabPicker

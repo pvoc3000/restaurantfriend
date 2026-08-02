@@ -247,12 +247,6 @@ export function VendorsList({
           {visible.length} of {vendors.length}
           {activeLocationCode ? ` · ${activeLocationCode}` : ""}
         </span>
-        {/* The reset-widths control moved into the table itself, where every
-            other list in the app already puts it — DataTable renders it below
-            the rows once you've dragged something. The hint stays here. */}
-        <span className="ml-auto text-xs text-faint">
-          Drag the dividers between column headers to resize
-        </span>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
