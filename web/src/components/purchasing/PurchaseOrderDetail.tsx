@@ -584,24 +584,6 @@ export function PurchaseOrderDetail({
 
       {processing && <ProcessPo order={order} context={processing} />}
 
-      {/* Sits with Process, not with the lines: sending the order and filing
-          what came back are the two things you DO to an order, and the lines
-          are what you read. Visible to everyone — the invoice is the answer to
-          "what did we actually pay" — but only purchaser+ can add or remove,
-          matching migration 018's storage policies. */}
-      {attachmentError ? (
-        <p className="border border-accent px-4 py-3 text-sm text-accent">
-          Could not load this order&rsquo;s paperwork: {attachmentError}
-        </p>
-      ) : (
-        <PoAttachments
-          poId={order.id}
-          orgId={orgId}
-          attachments={attachments}
-          canEdit={canEditLines}
-        />
-      )}
-
       {/* How many DISTINCT products, and how many packages they add up to —
           the second is what you count off the truck, and the line count alone
           never told you (Mark, 2026-07-27). Packages of each line's own vendor
@@ -726,6 +708,35 @@ export function PurchaseOrderDetail({
         }
         empty={<p className="text-sm text-muted">This order has no lines.</p>}
       />
+
+      {/* LAST on the screen (Mark, 2026-08-02 — declutter). It used to sit with
+          Process, on the reasoning that sending the order and filing what came
+          back are the two things you DO to an order while the lines are what
+          you read. True, but it put a card you touch once — at delivery, and
+          then never again — between the Process card and the order itself, so
+          every visit paid for it. The order is what you came for; the filing
+          cabinet goes at the end.
+
+          Receiving is where this card is actually WORKED anyway: the receiving
+          screen has its own document pane, and auto-read-on-attach lives in the
+          shared useAttachmentActions, so filing an invoice from there behaves
+          exactly as it does from here. This copy is for looking one up later.
+
+          Visible to everyone — the invoice is the answer to "what did we
+          actually pay" — but only purchaser+ can add or remove, matching
+          migration 018's storage policies. */}
+      {attachmentError ? (
+        <p className="border border-accent px-4 py-3 text-sm text-accent">
+          Could not load this order&rsquo;s paperwork: {attachmentError}
+        </p>
+      ) : (
+        <PoAttachments
+          poId={order.id}
+          orgId={orgId}
+          attachments={attachments}
+          canEdit={canEditLines}
+        />
+      )}
     </div>
   );
 }
