@@ -69,17 +69,21 @@ export type DataColumn<T> = {
  * Turns a sorted list into a grouped report: a full-width band before each run
  * of rows sharing a label, with the size of the run.
  *
- * The CALLER decides whether grouping applies — pass `undefined` and there are
- * no bands. That's because it only makes sense on a column with repeated values
- * (a category, a section, a type), so both lists that use it switch it on only
- * when the sort is one of those columns.
+ * Grouping only makes sense on a column with repeated values — a category, a
+ * section, a type — and only while THAT column is the sort, or you get a heading
+ * every few rows instead of a break between runs. Two ways to say so:
  *
- * It assumes the rows arrive already grouped, which follows from them being
- * sorted by the same column. A caller sorting by something else while grouping
- * by a category would get a band every few rows — correct, and a sign the two
- * are out of step.
+ *   - The caller decides, passing `undefined` when it doesn't apply. That's what
+ *     the lists keeping their sort in the URL do (Inventory, Vendors,
+ *     Employees), since they already hold the sort.
+ *   - `sortKey`, for a table that leaves its sort to DataTable — the vendor's
+ *     items. The caller has no way to know what the sort currently is, so it
+ *     names the column and the table decides.
+ *
+ * Either way the rows must arrive already grouped, which follows from being
+ * sorted by the same column.
  */
-export type DataGroup<T> = { label: (row: T) => string };
+export type DataGroup<T> = { label: (row: T) => string; sortKey?: string };
 
 /**
  * The standard list table: sortable headers, drag-resizable columns persisted
@@ -279,16 +283,21 @@ export function DataTable<T>({
   // How many rows sit under each band. Recomputed whenever the order changes,
   // which is cheap even on Inventory's 790 rows and keeps the count honest when
   // a filter narrows the list.
+  // A `sortKey` group bands only while that column is the sort. Resolved here
+  // rather than at the call site because for an internally-sorted table the
+  // caller has no way to know what the sort currently is.
+  const banding = group && (!group.sortKey || group.sortKey === sort?.key) ? group : null;
+
   const groupCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    if (group) {
+    if (banding) {
       for (const row of sorted) {
-        const label = group.label(row);
+        const label = banding.label(row);
         counts.set(label, (counts.get(label) ?? 0) + 1);
       }
     }
     return counts;
-  }, [sorted, group]);
+  }, [sorted, banding]);
 
   if (rows.length === 0) {
     return empty ? <>{empty}</> : null;
@@ -442,10 +451,10 @@ export function DataTable<T>({
               // A band opens each new run. Comparing with the PREVIOUS row's
               // label rather than tracking a running value keeps this a pure
               // function of the sorted array.
-              const label = group ? group.label(row) : null;
+              const label = banding ? banding.label(row) : null;
               const startsGroup =
                 label !== null &&
-                (index === 0 || group!.label(sorted[index - 1]) !== label);
+                (index === 0 || banding!.label(sorted[index - 1]) !== label);
 
               return (
                 <Fragment key={key}>

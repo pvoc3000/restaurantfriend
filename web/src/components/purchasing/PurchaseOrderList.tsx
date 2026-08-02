@@ -59,6 +59,22 @@ function sortValue(po: PoListRow, key: PoSortKey): SortValue {
 }
 
 /**
+ * The columns that band their runs when the list is sorted by them (Mark,
+ * 2026-08-02) — the ordering day, the vendor, the state.
+ *
+ * Not the others, and the test is the same one everywhere: a band is worth its
+ * row when the column has few values and many rows each. `po_number` is unique
+ * per row, and `lines` and `total` are figures — banding either would put a
+ * heading above nearly every order. A date passes because ordering happens in
+ * batches, so a day's band is a day's run of POs.
+ */
+const GROUP_LABEL: Partial<Record<PoSortKey, (po: PoListRow) => string>> = {
+  order_date: (po) => po.order_date,
+  vendor: (po) => po.vendors?.name ?? "No vendor",
+  status: (po) => PO_STATUS_LABEL[po.status],
+};
+
+/**
  * The PO list — the Monday workflow surface (spec §4.8): status at a glance,
  * a totals row, and selection for the batch operations that follow once PDF
  * generation exists.
@@ -746,6 +762,12 @@ export function PurchaseOrderList({
         onSortChange={(next) =>
           update({ sort: next.key as PoSortKey, dir: next.dir })
         }
+        // Bands on the three columns whose runs are worth naming (Mark,
+        // 2026-08-02): the ordering day, the vendor, the state. This list sorts
+        // through the URL, so the caller decides — see DataGroup. Ordering
+        // happens in batches, so a date band is a day's run of POs; the other
+        // two are small vocabularies by construction.
+        group={GROUP_LABEL[filters.sort] ? { label: GROUP_LABEL[filters.sort]! } : undefined}
         empty={<p className="text-sm text-muted">No orders in this window.</p>}
       />
     </div>

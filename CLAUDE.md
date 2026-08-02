@@ -1330,9 +1330,17 @@ weekday column, and 003 then silently made it per-vendor-item.
   settled — so Vendors (by Type) and Inventory (by Category or Section) changed
   with it. **Bands appear only when the SORT is the grouped column**, which is
   what keeps them from becoming a heading every few rows.
-  `/employees` bands on **location, status, position or schedule** — the four
-  columns with few values and many rows each. Sorting by name, phone or a date
+  The test for whether a column earns a band is always the same: **few values,
+  many rows each**, so the run it opens is worth naming. `/employees` bands on
+  location, status, position or schedule; the PO list on the order date, the
+  vendor or the status (a date qualifies there because ordering happens in
+  batches, so a day's band is a day's run of POs); the vendor's items table on
+  the inventory **Type**. Sorting by a name, a phone, a PO number or a figure
   bands nothing, deliberately.
+  **`DataGroup.sortKey`** is for a table that leaves its sort to `DataTable`
+  rather than lifting it into the URL (the vendor's items): the caller can't
+  know what the sort currently is, so it names the column and the table decides.
+  The URL-sorted lists keep deciding for themselves.
 - **A column label WRAPS; it never truncates while there's room** (Mark,
   2026-08-02: titles clip "even when it appears there is plenty of room").
   There WAS room — in the cell, not in the label's share of it. Measured on PO

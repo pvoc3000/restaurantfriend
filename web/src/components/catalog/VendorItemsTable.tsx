@@ -146,6 +146,27 @@ export function VendorItemsTable({
         />
       ),
     },
+    // The INVENTORY item's category, second (Mark, 2026-08-02) — the same
+    // column PO detail calls Type and groups its lines by, from the same
+    // `inventory_items.category`. It sits before the item's name for the reason
+    // it does there: it's what a run of rows has in common, so it reads as the
+    // heading of the run rather than as a fact about each row. Nothing new is
+    // fetched — the category filter above this table already reads it.
+    {
+      key: "item_category",
+      label: "Type",
+      width: 150,
+      sortValue: (vi) => vi.inventory_items?.category ?? null,
+      // Inside a type, by name — a category sort alone leaves the run in
+      // whatever order it arrived, which reads as unsorted.
+      sortTiebreaks: [(vi) => vi.inventory_items?.name ?? ""],
+      render: (vi) =>
+        vi.inventory_items?.category ? (
+          <span className="text-muted">{vi.inventory_items.category}</span>
+        ) : (
+          <span className="text-subtle">—</span>
+        ),
+    },
     ...(showVendor
       ? [
           {
@@ -345,8 +366,16 @@ export function VendorItemsTable({
       rows={visible}
       columns={columns}
       rowKey={(vi) => vi.id}
-      storageKey={`rf.vendorItems.columnWidths.v1${showItem ? ".byVendor" : ".byItem"}`}
+      // v2: the Type column arrived second, so a stored v1 layout has no width
+      // for it and keeps the old ones where they were.
+      storageKey={`rf.vendorItems.columnWidths.v2${showItem ? ".byVendor" : ".byItem"}`}
       columnChooser
+      // Bands when — and only when — Type IS the sort. DataTable owns the sort
+      // on this table, so it resolves that itself; see DataGroup.
+      group={{
+        sortKey: "item_category",
+        label: (vi) => vi.inventory_items?.category ?? "No type",
+      }}
       // The filters ride in the table's own strip, beside the columns eye
       // (Mark, 2026-08-01) — they work on this table, so they sit on it. See
       // DataTable's `leading`.
