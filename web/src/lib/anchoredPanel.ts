@@ -19,6 +19,14 @@ export type AnchorBox = { top: number; left: number; width: number };
  * The floating panel itself. 2px black edge and NO shadow — depth is edges in
  * this design system — square corners.
  *
+ * **320px tall at most, not 70vh** (Mark, 2026-08-02: the item screen's section
+ * picker "extends all the way to the bottom of the screen… way too tall"). 70vh
+ * grows with the display, so on a big monitor a list of 77 shelves became a
+ * full-height column anchored to one table cell. A menu should read as a menu:
+ * ~8 rows under the find box, which appears past 8 options anyway, so a long
+ * vocabulary is TYPED at rather than scrolled through. The `min()` keeps it
+ * from overflowing a short viewport, where 60vh is the smaller number.
+ *
  * **`z-[70]` — above everything, including `ui/Dialog`'s `z-[60]` overlay.**
  * It was `z-50`, chosen to clear the ActionBar and sit under the masthead, and
  * that was fine until a PickList appeared INSIDE a dialog: the role picker in
@@ -33,7 +41,7 @@ export type AnchorBox = { top: number; left: number; width: number };
  * 70 these panels.
  */
 export const MENU_PANEL_CLASS =
-  "fixed z-[70] max-h-[70vh] overflow-auto border-2 border-ink bg-white text-ink";
+  "fixed z-[70] max-h-[min(20rem,60vh)] overflow-auto border-2 border-ink bg-white text-ink";
 
 /**
  * One row: a command, an option, a checkbox line. Metrics and type only —
@@ -81,10 +89,12 @@ export const MENU_SEARCH_CLASS =
  *   off the trigger escape both that and WebKit's rule that a table cell under
  *   `border-collapse` is not a containing block (CLAUDE.md). The hook returns
  *   the box; the CALLER does the portal, since only it knows what to draw.
- * - **Close on scroll.** Fixed coordinates go stale the moment the page moves,
- *   and a list left floating over unrelated rows is worse than one that shut.
- *   The listener is registered in CAPTURE so a scroll inside a pane closes it
- *   too, not just the window's own. `resize` closes it for the same reason.
+ * - **Close on scroll — except the panel's own.** Fixed coordinates go stale the
+ *   moment the page moves, and a list left floating over unrelated rows is worse
+ *   than one that shut. The listener is registered in CAPTURE so a scroll inside
+ *   a pane closes it too, not just the window's own; `resize` closes it for the
+ *   same reason. Scrolling the PANEL is exempt — see `onScroll` below, and note
+ *   that capture is exactly why the exemption has to be explicit.
  *
  * Escape also closes and returns focus to the trigger; an outside mousedown
  * closes without stealing focus.
@@ -129,6 +139,30 @@ export function useAnchoredPanel({
   useEffect(() => {
     if (!open) return;
     const close = () => onClose();
+    /**
+     * A scroll closes the panel — EXCEPT a scroll of the panel itself.
+     *
+     * The listener is in capture precisely so a scrolling PANE closes it, but
+     * that also caught the panel's own `overflow-auto`, so a long list shut the
+     * moment you reached for it. Mark hit this on the item screen's section
+     * picker, which offers 77 shelves: wheel over the list, or grab its
+     * scrollbar, and it vanished.
+     *
+     * The distinction is what MOVED. If the page or a pane scrolled, the
+     * trigger has moved and the fixed coordinates are stale — close. If the
+     * panel scrolled, nothing moved but the reader's eye.
+     */
+    const onScroll = (e: Event) => {
+      const panel = panelRef.current;
+      // `instanceof Node` is not defensive tidying — it is the whole thing
+      // working. A PANE's scroll reports an Element as its target, but the
+      // PAGE's reports `document` or `window`, and `Node.contains()` THROWS a
+      // TypeError on a non-Node. Without the check the handler died on every
+      // page scroll and the panel stayed open — which is precisely the case
+      // closing on scroll exists for. Caught by testing both halves.
+      if (panel && e.target instanceof Node && panel.contains(e.target)) return;
+      onClose();
+    };
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         // Stopped here so an Escape aimed at the panel doesn't also reach a
@@ -143,12 +177,12 @@ export function useAnchoredPanel({
       if (panelRef.current?.contains(t) || triggerRef.current?.contains(t)) return;
       onClose();
     };
-    window.addEventListener("scroll", close, true);
+    window.addEventListener("scroll", onScroll, true);
     window.addEventListener("resize", close);
     window.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onDown);
     return () => {
-      window.removeEventListener("scroll", close, true);
+      window.removeEventListener("scroll", onScroll, true);
       window.removeEventListener("resize", close);
       window.removeEventListener("keydown", onKey);
       document.removeEventListener("mousedown", onDown);

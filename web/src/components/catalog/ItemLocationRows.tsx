@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Location } from "@/lib/session";
-import { type CatalogItemLocation } from "@/lib/catalog";
+import { type CatalogItemLocation, HERE_BADGE_CLASS } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
@@ -31,6 +31,7 @@ export function ItemLocationRows({
   orgId,
   activeLocationId,
   sectionsByLocation,
+  leading,
 }: {
   rows: CatalogItemLocation[];
   locations: Location[];
@@ -41,6 +42,9 @@ export function ItemLocationRows({
   /** That shop's shelves, in walk order, keyed by location id. Each row is a
    *  different shop, and a shelf belongs to exactly one of them. */
   sectionsByLocation: Record<string, { value: string; label: string }[]>;
+  /** The section heading, so it sits ON the table rather than 40px above
+   *  it — see DataTable's `leading`. */
+  leading?: ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -109,7 +113,7 @@ export function ItemLocationRows({
         <>
           {r.location.code}
           {r.location.id === activeLocationId && (
-            <span className="ml-1.5 border border-ink px-1 text-[10px] uppercase tracking-[0.12em] text-ink">
+            <span className={HERE_BADGE_CLASS}>
               here
             </span>
           )}
@@ -223,6 +227,7 @@ export function ItemLocationRows({
         rows={tableRows}
         columns={columns}
         rowKey={(r) => r.location.id}
+        leading={leading}
         storageKey="rf.itemLocations.columnWidths.v1"
         columnChooser
         defaultSort={{ key: "location" }}

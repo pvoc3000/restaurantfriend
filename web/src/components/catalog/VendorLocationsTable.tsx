@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { money } from "@/lib/catalog";
+import { money, HERE_BADGE_CLASS } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
@@ -85,7 +85,7 @@ export function VendorLocationsTable({
         <>
           {codeById[r.location_id] ?? "—"}
           {r.location_id === activeLocationId && (
-            <span className="ml-1.5 border border-ink px-1 text-[10px] uppercase tracking-[0.12em] text-ink">
+            <span className={HERE_BADGE_CLASS}>
               here
             </span>
           )}

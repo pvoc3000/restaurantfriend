@@ -395,7 +395,14 @@ export function DataTable<T>({
               the same order as the table it acts on. It gets `compact` so its
               checkboxes can tell the truth about the width tier. */}
           {columnChooser && (
-            <div className="shrink-0">
+            // `-mb-1` because `items-end` aligns BOXES and the eye is a 32px
+            // button centring a 24px glyph, so its artwork stops 4px short of
+            // its own bottom edge. Against a ~20px heading that read as the eye
+            // floating above the line rather than sitting on it (Mark,
+            // 2026-08-02). Nudging the button rather than shifting the glyph
+            // inside it keeps the hover wash centred on the artwork, which is
+            // the thing the button's size exists to do.
+            <div className="-mb-1 shrink-0">
               <ColumnsMenu storageKey={storageKey} columns={orderedColumns} compact={compact} />
             </div>
           )}

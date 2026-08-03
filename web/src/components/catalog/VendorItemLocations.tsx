@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import type { Location } from "@/lib/session";
-import { money, qty } from "@/lib/catalog";
+import { money, qty, HERE_BADGE_CLASS } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
 import { WEEKDAY_PICKER_WIDTH } from "./WeekdayPicker";
 
@@ -196,7 +196,7 @@ export function VendorItemLocations({
         <>
           {r.location.code}
           {r.location.id === activeLocationId && (
-            <span className="ml-1.5 border border-ink px-1 text-[10px] uppercase tracking-[0.12em] text-ink">
+            <span className={HERE_BADGE_CLASS}>
               here
             </span>
           )}

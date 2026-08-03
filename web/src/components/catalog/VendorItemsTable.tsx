@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { qty, unitPrice, unitPriceLabel, type CatalogVendorItem } from "@/lib/catalog";
 import { withFrom, type Crumb } from "@/lib/breadcrumbs";
@@ -46,6 +46,7 @@ export function VendorItemsTable({
   scroll = false,
   from,
   filters = false,
+  heading,
   showLastOrdered = false,
   canEdit = false,
 }: {
@@ -59,6 +60,10 @@ export function VendorItemsTable({
   from?: Crumb;
   /** Search + category + active + last-ordered bar, as on the Inventory list. */
   filters?: boolean;
+  /** Sits in the table's own strip, above the last column header —
+   *  see DataTable's `leading`. The heading belongs ON the table it names,
+   *  not floating 40px above it (Mark, 2026-08-01 and again 2026-08-02). */
+  heading?: ReactNode;
   showLastOrdered?: boolean;
   /**
    * Purchaser+, which is what the RLS policy on `vendor_items` allows. Only the
@@ -380,21 +385,26 @@ export function VendorItemsTable({
       // (Mark, 2026-08-01) — they work on this table, so they sit on it. See
       // DataTable's `leading`.
       leading={
-        filters ? (
-          <ListFilters
-            term={term}
-            onTerm={setTerm}
-            placeholder="Search item, product ID, brand, description…"
-            categories={categories}
-            category={category}
-            onCategory={setCategory}
-            active={active}
-            onActive={setActive}
-            stale={showLastOrdered ? stale : undefined}
-            onStale={showLastOrdered ? setStale : undefined}
-            staleCounts={staleCounts}
-            totalCount={vendorItems.length}
-          />
+        heading || filters ? (
+          <div className="space-y-3">
+            {heading}
+            {filters ? (
+              <ListFilters
+                term={term}
+                onTerm={setTerm}
+                placeholder="Search item, product ID, brand, description…"
+                categories={categories}
+                category={category}
+                onCategory={setCategory}
+                active={active}
+                onActive={setActive}
+                stale={showLastOrdered ? stale : undefined}
+                onStale={showLastOrdered ? setStale : undefined}
+                staleCounts={staleCounts}
+                totalCount={vendorItems.length}
+              />
+            ) : null}
+          </div>
         ) : undefined
       }
       rowClassName={(vi) => (vi.is_active ? "" : "text-faint")}

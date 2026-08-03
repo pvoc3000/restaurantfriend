@@ -157,7 +157,11 @@ export function BaseUnitEditor({
   return (
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2">
-        <span className="inline-block w-32 border border-ink px-1">
+        {/* No box (Mark, 2026-08-02). The width stays, so the "Saving…" beside
+            it doesn't jump as the unit changes, but the border went: Category
+            directly above is a bare `InlineValue kind="pick"` and a framed
+            field beside an unframed one reads as a different KIND of control. */}
+        <span className="inline-block w-32">
           <PickList
             value={next}
             options={UNIT_PICK_OPTIONS}

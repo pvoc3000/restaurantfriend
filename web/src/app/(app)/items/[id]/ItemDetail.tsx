@@ -121,7 +121,10 @@ export async function ItemDetail({
   });
 
   return (
-    <div className="space-y-6">
+    // space-y-16, matching vendor detail: with only 8px inside each block, the
+    // gap BETWEEN them is the only thing left saying where one ends and the
+    // next begins.
+    <div className="space-y-16">
       {/* The book walks the Inventory list's found set — see ui/RecordNav. */}
       <Breadcrumbs
         trail={trail}
@@ -131,42 +134,49 @@ export async function ItemDetail({
 
       <ItemFields item={row} categories={categories} />
 
-      <section className="space-y-2">
-        <SectionHeading>Per-location config</SectionHeading>
-        {/* `activeLocations`: this is the "stock here" list, and you don't
-            stock a closed shop. The code lookups above use session.locations,
-            which carries every location. */}
-        <ItemLocationRows
-          rows={locationRows}
-          locations={session.activeLocations}
-          inventoryItemId={row.id}
-          baseUnit={row.base_unit}
-          orgId={session.membership.org_id}
-          activeLocationId={session.activeLocation?.id ?? null}
-          sectionsByLocation={sectionsByLocation}
-        />
-      </section>
+      {/* Both headings ride in their table's own strip rather than sitting in a
+          <section> above it (Mark, 2026-08-02: too much air under each heading,
+          not enough between the blocks). That strip existed either way — it
+          holds the columns eye — so a heading above it meant heading, 8px, an
+          empty 32px band, 8px, table. Inside it, the gap is 8px and the band
+          earns its height. Vendor detail did this on 2026-08-01; this is the
+          same fix on the screen next door. */}
+      <ItemLocationRows
+        // `activeLocations`: this is the "stock here" list, and you don't stock
+        // a closed shop. The code lookups above use session.locations, which
+        // carries every location.
+        leading={<SectionHeading>Per-location config</SectionHeading>}
+        rows={locationRows}
+        locations={session.activeLocations}
+        inventoryItemId={row.id}
+        baseUnit={row.base_unit}
+        orgId={session.membership.org_id}
+        activeLocationId={session.activeLocation?.id ?? null}
+        sectionsByLocation={sectionsByLocation}
+      />
 
-      <section className="space-y-2">
-        <SectionHeading>Vendor items</SectionHeading>
-        <p className="text-xs text-subtle">
-          Items from deactivated vendors are hidden. Reactivate the vendor on its
-          detail screen to bring them back.
+      {viError ? (
+        <p className="text-sm text-accent">
+          Could not load vendor items: {viError.message}
         </p>
-        {viError ? (
-          <p className="text-sm text-accent">
-            Could not load vendor items: {viError.message}
-          </p>
-        ) : (
-          <VendorItemsTable
-            vendorItems={(vendorItems ?? []) as unknown as CatalogVendorItem[]}
-            baseUnit={row.base_unit}
-            showVendor
-            from={{ href: `/items/${id}${queryString}`, label: row.name }}
-            canEdit={canWriteCatalog(session.membership.role)}
-          />
-        )}
-      </section>
+      ) : (
+        <VendorItemsTable
+          heading={
+            <div className="space-y-1">
+              <SectionHeading>Vendor items</SectionHeading>
+              <p className="text-xs text-subtle">
+                Items from deactivated vendors are hidden. Reactivate the vendor
+                on its detail screen to bring them back.
+              </p>
+            </div>
+          }
+          vendorItems={(vendorItems ?? []) as unknown as CatalogVendorItem[]}
+          baseUnit={row.base_unit}
+          showVendor
+          from={{ href: `/items/${id}${queryString}`, label: row.name }}
+          canEdit={canWriteCatalog(session.membership.role)}
+        />
+      )}
     </div>
   );
 }

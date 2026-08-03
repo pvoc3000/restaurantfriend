@@ -335,3 +335,19 @@ export const ORDER_TYPE_OPTIONS: { value: string; label: string }[] = [
   { value: "in_person", label: "In person" },
   { value: "none", label: "None — directory only" },
 ];
+
+/**
+ * The "here" badge that marks the working location's row in a per-location
+ * table — the item's, the vendor's, and the vendor item's price rows.
+ *
+ * FILLED YELLOW since 2026-08-02 (Mark: "the 'here' label should be filled with
+ * yellow not white"). Same mark, same meaning, and now the same colour as the
+ * WORKING HERE chip on the Locations list and the code in the masthead: yellow
+ * is this app's answer to "which one am I at". Bordered-and-white left it
+ * reading as a small button.
+ *
+ * One constant because there were three identical copies of the string and this
+ * change had to find all of them — the `ui/Dialog` story in miniature.
+ */
+export const HERE_BADGE_CLASS =
+  "ml-1.5 border border-ink bg-mark-fill px-1 text-[10px] uppercase tracking-[0.12em] text-ink";
