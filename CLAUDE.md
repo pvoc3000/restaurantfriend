@@ -1844,6 +1844,31 @@ weekday column, and 003 then silently made it per-vendor-item.
   (c) **It flushes on re-key and on unmount**, because the throttle can swallow
   the last move and leaving is the moment that matters. There is no `pagehide`
   flush any more — see below.
+  (d) **Recording STOPS when you leave the screen, and React says so far too
+  late** (Mark, 2026-08-03 — the guide "no longer" restored after opening an
+  item). Next scrolls the window to 0 in a layout effect of the INCOMING page,
+  and the browser dispatches a scroll event for that within a frame — into a
+  listener still armed for the screen you're leaving. `onScroll` recorded it,
+  so 20,000px down the walk was overwritten with 0 and the return trip
+  restored to the top, which reads as the feature simply being off. `flush()`
+  had been protected against exactly this (it writes the cached `latest`
+  rather than reading the scroller — "the router may already have scrolled the
+  page somewhere else"); the guard just never reached the thing that WRITES
+  `latest`. It compares `location.pathname` against the pathname the effect
+  started with — **pathname, not href**, because filters and sort ride the
+  query string via `history.replaceState`, so a keystroke in a search box
+  changes `href` while you are still on the screen being measured.
+  It bit EVERY list (measured: Inventory lost 4,000px the same way), but the
+  order guide worst, because it is the only screen that names its own key:
+  clearing that override notifies a store from inside a passive effect, so the
+  shell re-keys a whole render cycle later than a plain path change does —
+  measured 216–516ms of exposure against a scroll event every frame.
+  **Note the reproduction, because the pane can't do it by itself**: a hidden
+  browser pane never dispatches a scroll event for a programmatic `scrollTo`,
+  so the round trip looks healthy there. Deliver the event yourself from a
+  `MutationObserver` callback — those are microtasks, which the pane does NOT
+  throttle, so it lands inside the navigation commit, exactly where the real
+  one does.
   **It RESETS on launch and on changing location** (Mark, 2026-07-31). The store
   is a module-level `Map`, not sessionStorage: sessionStorage survives a reload
   and a sign-out in the same tab, so opening the app could drop you two thousand

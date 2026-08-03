@@ -24,6 +24,12 @@
 // Changing LOCATION also wipes it (see clearScrollMemory), because the lists
 // are location-scoped and where you were in DF01's is not a fact about DF02's.
 //
+// RECORDING STOPS THE MOMENT YOU LEAVE THE SCREEN. Not when React says so —
+// it says so a full render cycle late, and in the meantime the router has
+// scrolled the window to the top and the browser has dispatched a scroll event
+// for it. Recording that overwrites where you actually were with 0, which reads
+// as scroll memory simply not working. See onScroll.
+//
 // Restoring is a NEGOTIATION, not a single scrollTo. The list isn't at its full
 // height the instant the component mounts (fonts land, the sticky bars measure
 // themselves), so an early scrollTo silently clamps to whatever the document
@@ -160,6 +166,11 @@ export function useScrollMemory(key: string, ref?: RefObject<HTMLElement | null>
 
     const target = read(key);
 
+    // The screen this effect is measuring, as of now. See onScroll: leaving it
+    // scrolls the window to the top long before React tears this effect down,
+    // and that scroll is the router's, not the reader's.
+    const measuring = location.pathname;
+
     // While we're still putting the position back, don't record: the values
     // going past are the ones we're scrolling THROUGH, and recording a 0 from
     // the top of a half-built list is exactly how the memory gets erased.
@@ -179,6 +190,30 @@ export function useScrollMemory(key: string, ref?: RefObject<HTMLElement | null>
     // remembered, and it was the thing being dropped (measured 2026-07-30).
     const onScroll = () => {
       if (restoring) return;
+      // THE SCROLL TO THE TOP ON THE WAY OUT IS THE ROUTER'S, NOT THE READER'S.
+      // Next scrolls the window to 0 in a layout effect of the incoming page,
+      // so by the time React gets round to tearing this effect down the window
+      // has been at the top for a full render cycle — and the browser dispatches
+      // a scroll event for it, into a listener still armed for the screen we're
+      // leaving. That recorded 0 as "where you were", which is why walking
+      // 20,000px down the guide, opening an item and coming back landed you at
+      // the top (Mark, 2026-08-03).
+      //
+      // flush() was already protected against this — it writes the cached
+      // `latest` rather than reading the scroller, precisely because "the
+      // router may already have scrolled the page somewhere else". The guard
+      // just never reached the thing that WRITES `latest`.
+      //
+      // The order guide feels it worst because it is the one screen that names
+      // its own key (useScrollMemoryKey): clearing that override notifies a
+      // store from inside a passive effect, so the shell re-keys one render
+      // cycle later than a plain path change does, holding the window open
+      // wider. Measured at 216–516ms, against a scroll event every frame.
+      //
+      // Pathname, not href: filters and sort ride the query string via
+      // history.replaceState, so a keystroke in a search box changes href while
+      // you are very much still on the screen being measured.
+      if (location.pathname !== measuring) return;
       latest = getY();
       moved = true;
       const now = performance.now();
