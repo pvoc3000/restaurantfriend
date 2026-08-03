@@ -992,6 +992,28 @@ weekday column, and 003 then silently made it per-vendor-item.
   buttons. Retiring the black fill also cost ProcessPo's `processed` state,
   which had promoted "Mark as sent" once you'd generated the document — that
   nudge was carried entirely by the colour.
+  **The `DIALOG_COMMIT_CLASS` exception is ENDORSED, not merely tolerated**
+  (Mark, 2026-08-02: "I agree with you on panels where there is a commit
+  button"). A panel exists to produce ONE outcome, so it genuinely has a
+  primary and its footer is a two-weight decision — black commit beside a text
+  Cancel — where a screen full of peer buttons is not. That is the whole of the
+  exception: a commit inside a panel. It does not license a black button on a
+  screen.
+  **"But which button is primary on a SCREEN, then?" — none, and the question
+  dissolves** (re-opened 2026-08-02 and closed the same way). Outside a panel
+  footer there is no primary to find, so there is nothing to decide per screen.
+  A DETAIL screen makes that plainest: what you came to do is edit the inline
+  cells, so every discrete button on it — Delete, Invite to app, Attach — is
+  peripheral by construction. Lists are the same; New employee is outlined.
+  **Check this rule before reasoning about button weight from first
+  principles.** It was re-derived backwards once (black = "the primary action,
+  one per screen") from the ActionBar's own July note, which argues the
+  opposite and is quoted above — the sweep generalised "a filled cell reads as
+  a different KIND of control" outward, it did not carve out an exception. The
+  tell that something is wrong is a `bg-ink` fill on anything that isn't a set
+  filter, a delimiting band, or `DIALOG_COMMIT_CLASS`.
+  Known stragglers the sweep missed, both still `bg-ink` and both wrong:
+  `InactiveLocationGate`'s Activate and `AddShopSection`'s Add.
 - **The menu is two tiers, from FMP** (Mark, 2026-07-25 — overrides the design
   system, which had killed the sub-nav): sections on top, that section's
   sub-sections under it, both bands black, **both marking active in yellow**

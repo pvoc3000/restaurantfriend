@@ -19,6 +19,7 @@ import {
 import { ROLE_LABEL, type Role } from "@/lib/roles";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { makeComparator, type SortDir, type SortValue } from "@/lib/tableSort";
+import { NewEmployee } from "./NewEmployee";
 
 const WIDTHS_STORAGE_KEY = "rf.employees.columnWidths.v1";
 
@@ -69,16 +70,26 @@ type SortKey =
 export function EmployeesList({
   rows,
   locationCodes,
+  locationOptions,
   positions,
   today,
+  orgId,
 }: {
   rows: EmployeeRow[];
   /** Every location code in the org, for the filter. */
   locationCodes: string[];
+  /**
+   * Where someone can be HIRED to — active locations only (design rule 3).
+   * Deliberately not the same set as `locationCodes`, which comes from the full
+   * list so a row whose shop has closed still shows DF03 rather than an em dash.
+   * You filter by a closed shop; you don't hire into one.
+   */
+  locationOptions: { id: string; code: string; name: string }[];
   /** Every position already in use — the vocabulary, derived from the data. */
   positions: string[];
   /** The org's today, from the server (orgs.settings.timezone). */
   today: string;
+  orgId: string;
 }) {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState<StatusFilter>("active");
@@ -335,6 +346,19 @@ export function EmployeesList({
               ? `${rows.length} ${rows.length === 1 ? "person" : "people"}`
               : `${shown.length} of ${rows.length}`}
           </span>
+
+          {/* Right-aligned against the filters (Mark's placement), and
+              `shrink-0` so it never squeezes: when the row wraps it goes with
+              the last line rather than being crushed between two pickers.
+              `roster` is the FULL set, not `shown` — the rehire check has to see
+              the 417 former employees a filter is hiding. */}
+          <NewEmployee
+            orgId={orgId}
+            roster={rows}
+            locationOptions={locationOptions}
+            positions={positions}
+            today={today}
+          />
         </div>
 
         <TabPicker

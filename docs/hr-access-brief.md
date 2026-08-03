@@ -90,8 +90,26 @@ history, eventually write-ups — and this will be the first table where READ is
 role-gated:
 
 - select / insert / update: `owner`,`admin` only.
-- No delete policy (the Clear-guide lesson: absence of a policy is the
-  enforcement). Employees are never deleted; they're terminated.
+- ~~No delete policy (the Clear-guide lesson: absence of a policy is the
+  enforcement). Employees are never deleted; they're terminated.~~
+  **Revised 2026-08-02 by migration 023** — delete is open to `owner`,`admin`,
+  the same pair as every other policy here. The original rule was right about a
+  PERSON and wrong about a TYPO: once the app grew a "New employee" form there
+  was a second kind of row in this table, created by hand seconds ago with a
+  misspelt name and no history at all, and the rule condemned it to be carried
+  on the roster forever marked inactive. The judgment moved from the schema to
+  the confirm — `components/hr/EmployeeActions.tsx` counts what a delete would
+  cost (migrated `legacy_id`, app access, documents on file), defaults to
+  Deactivate whenever any of those fired, and lets you through anyway. Deleting
+  your OWN record is refused outright and is the one guard that isn't passable:
+  revoke removes the `org_members` row every policy reads, so you would be
+  locked out with no screen able to restore you.
+  Consequence worth knowing: **a delete against this table must `.select()` its
+  result.** Before 023 is applied Postgres removes zero rows and PostgREST
+  returns no error, so a bare `.delete()` reports a cheerful success and leaves
+  the person on the roster — observed in the browser on 2026-08-02, the screen
+  navigated back to a roster that had grown by one. That is the Clear-guide
+  lesson surviving its own repeal.
 - A self-read ("my own record") and a supervisor-facing phone list are real
   future needs (master plan: rosters, phone lists) — both are column-scoped,
   so they arrive as definer functions or views naming exactly the safe

@@ -1,0 +1,66 @@
+-- ============================================================================
+-- 023 — employees can be deleted, by owner and manager, with the guard in the UI
+-- ============================================================================
+-- This REVERSES a deliberate decision in 020, so it is worth saying why rather
+-- than leaving the next reader to think the absent policy was an oversight.
+--
+-- 020 shipped `employees` with no delete policy at all, on the reasoning that an
+-- employee is TERMINATED (status = 'inactive'), never deleted — they are the
+-- referent of every rating, timesheet and purchase order they ever touched, and
+-- enforcement-by-absence is the strongest form there is (the order_guide_entries
+-- lesson: a DELETE that matches zero rows reports success).
+--
+-- That reasoning holds for a PERSON and not for a TYPO. Since the app grew a
+-- "New employee" form there is a second kind of row in this table: one created
+-- by hand, seconds ago, with a misspelt name and no history whatsoever. 020's
+-- rule condemned it to be carried on the roster forever, marked inactive, which
+-- is exactly the kind of untruth a roster stops being trusted for.
+--
+-- So delete is opened for owner and admin — the SAME pair every other policy on
+-- this table already names, so this adds no one who couldn't already read a home
+-- address and rewrite a start date — and the judgment moves from the schema to
+-- the confirm. `components/hr/EmployeeActions.tsx` counts what a delete would
+-- cost before offering it:
+--
+--   * legacy_id set  — migrated from FileMaker, and `migration/field-map.md`
+--                      calls that "the join key every child table uses". Events,
+--                      ratings, reviews and timesheets ALL reference it and NONE
+--                      are migrated yet, so a delete today breaks records that
+--                      aren't here to protest.
+--   * user_id set    — deleting revokes their app access.
+--   * documents      — the I-9s and food handler cards cascade away with the row
+--                      (021), and those are the records you're required to keep.
+--
+-- Any of those and the dialog defaults to Deactivate, with Delete still
+-- reachable beside the real counts — the VendorItemActions posture, and the
+-- closeReadiness one: name what's unresolved and let the human decide, because a
+-- confirm that blocks on something you can't act on teaches people to stop
+-- reading confirms.
+--
+-- The one thing NOT left to the UI's judgment is deleting yourself, which the
+-- screen refuses outright. Revoking your own access deletes the org_members row
+-- that every policy in this schema reads, so you would be locked out with no
+-- screen able to restore you. RLS can't express "any row but your own" usefully
+-- here — a definer function would be the tool — and it isn't worth one for a
+-- guard the only two people who can reach it will meet once.
+--
+-- Adds no new FUNCTION, so there is nothing to revoke from anon (the 002 / 018
+-- lesson applies to functions, not tables).
+
+create policy employees_delete on employees for delete
+  using (user_has_role(org_id, array['owner', 'admin']));
+
+-- ============================================================================
+-- Verify (in the SQL editor, after running):
+--
+--   select polname, polcmd
+--     from pg_policy
+--    where polrelid = 'public.employees'::regclass
+--    order by polname;
+--   -- expect four rows now: _delete (d), _insert (a), _select (r), _update (w)
+--
+-- And from the app, as a manager: deleting a hand-created employee with no
+-- documents should remove exactly one row. Deleting one WITH documents should
+-- also empty their folder in the employee-documents bucket — the rows cascade
+-- (021), the Storage objects do not, so the app removes those itself.
+-- ============================================================================

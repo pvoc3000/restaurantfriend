@@ -24,6 +24,7 @@ import { InlineValue } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { EmployeeDocuments } from "@/components/hr/EmployeeDocuments";
 import { AppAccess } from "@/components/hr/AppAccess";
+import { EmployeeActions } from "@/components/hr/EmployeeActions";
 
 const Heading = SectionHeading;
 
@@ -141,11 +142,14 @@ export async function EmployeeDetail({
 
   return (
     <div className="space-y-8">
-      <Breadcrumbs
-        trail={trail}
-        current={employeeName(person)}
-        trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
-      />
+      {/* The record book sits at the FAR right of the crumb row (Mark,
+          2026-08-02). It comes OUT of the Breadcrumbs `trailing` slot to get
+          there: as a flex item the crumb row is only as wide as its text, so
+          "the row's right-hand end" was three inches from the left margin. */}
+      <div className="flex items-start justify-between gap-4">
+        <Breadcrumbs trail={trail} current={employeeName(person)} />
+        <RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />
+      </div>
 
       {/* ---- who this is ---------------------------------------------- */}
       <div className="space-y-3">
@@ -404,6 +408,35 @@ export async function EmployeeDetail({
           invitedAt={(membership?.invited_at ?? null) as string | null}
         />
       </section>
+
+      {/* ---- the end of the record ------------------------------------- */}
+      {/* Bottom LEFT, after everything (Mark, 2026-08-02, having tried it
+          beside the name, then under the record book, then bottom right).
+          The end of the record is the right place for it — you pass the
+          paperwork on file and whether they can sign in before you reach the
+          one control that destroys the thing, which is where a destructive
+          action belongs in any document. Left is where it lines up: every
+          other block on this screen starts at the left margin, so the button
+          sits under the content it acts on instead of floating off in a corner
+          of its own.
+          A plain button rather than a `ui/ActionBar`: the bar is a fixed black
+          band that would follow you up the whole record for the sake of one
+          command used a few times a year, and it costs every screen carrying
+          it 88px of bottom clearance. */}
+      <div className="flex justify-start pt-4">
+        <EmployeeActions
+          employee={{
+            id: person.id,
+            legacy_id: person.legacy_id,
+            user_id: person.user_id,
+            status: person.status,
+          }}
+          name={employeeName(person)}
+          role={(membership?.role ?? null) as Role | null}
+          currentUserId={session.userId}
+          afterDelete={{ href: "/employees" }}
+        />
+      </div>
     </div>
   );
 }

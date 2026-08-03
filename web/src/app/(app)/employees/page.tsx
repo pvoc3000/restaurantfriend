@@ -84,6 +84,15 @@ export default async function EmployeesPage() {
     ...new Set(rows.map((r) => r.position).filter((p): p is string => !!p)),
   ].sort();
   const locationCodes = session.locations.map((l) => l.code);
+  // ENUMERATED rather than looked up, so this one is activeLocations (design
+  // rule 3): you don't hire someone into a shop that's closed. The filter above
+  // still uses the full list, because an existing person's shop may have closed
+  // under them.
+  const locationOptions = session.activeLocations.map((l) => ({
+    id: l.id,
+    code: l.code,
+    name: l.name,
+  }));
 
   const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
 
@@ -102,8 +111,10 @@ export default async function EmployeesPage() {
       <EmployeesList
         rows={rows}
         locationCodes={locationCodes}
+        locationOptions={locationOptions}
         positions={positions}
         today={today}
+        orgId={session.membership.org_id}
       />
     </div>
   );

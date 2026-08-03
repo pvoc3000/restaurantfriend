@@ -212,6 +212,11 @@ create policy employees_update on employees for update
 -- deleted: they are the referent of every rating, timesheet and purchase order
 -- they ever touched. A delete from the app matches zero rows.
 --
+-- SUPERSEDED BY MIGRATION 023 (2026-08-02): delete is now open to owner/admin,
+-- because this reasoning covers a person and not a typo — see 023's own header
+-- for the argument and for where the guard went instead. Left standing rather
+-- than edited: this is what the table was, and 023 is why it changed.
+--
 -- Note this migration adds no new FUNCTION, so there is nothing to revoke from
 -- anon (the 002 / 018 lesson applies to functions, not tables).
 
