@@ -854,7 +854,9 @@ reversing 020's deliberate absence. See build step 4c for the argument and for
 the `.select()`-your-own-delete rule it taught. Probe with
 `select polname, polcmd from pg_policy where polrelid = 'public.employees'::regclass`
 — four rows, not three.
-**024 is WRITTEN, NOT YET APPLIED** (2026-08-03) — it drops
+**024 is APPLIED** (Mark, 2026-08-03; verified by probe the same day — a
+count-with-no-size update was accepted on a throwaway inactive row, which the
+constraint would have refused, and the row was restored) — it drops
 `vendor_items_pack_shape`, 010's `check (pack_count is null or pack_size is not
 null)`. That statement is true about finished data and wrong as a constraint,
 because the pack is edited ONE COLUMN AT A TIME: the vendor-item screen writes
@@ -862,9 +864,9 @@ because the pack is edited ONE COLUMN AT A TIME: the vendor-item screen writes
 laid out the way a pack is written — count × size unit — so on an item with no
 pack yet, **the first cell you reach reading left to right is the one column
 this constraint forbids on its own**. Mark hit it on Restaurant Depot's Non
-Stick Spray and got the raw Postgres text in the cell. Until it's applied the
-workaround is to enter the SIZE first, which is not a rule anyone could guess
-from a row reading "1 × size EA". Dropping it costs nothing because **no reader
+Stick Spray and got the raw Postgres text in the cell. (Before it was applied
+the workaround was to enter the SIZE first — not a rule anyone could guess from
+a row reading "1 × size EA".) Dropping it costs nothing because **no reader
 has ever looked at `pack_count` without `pack_size`** — `packLabel` and 013's
 generation function both gate on the size and fall back to `package_content` /
 `package_desc` — so a count on its own is invisible rather than wrong and can
