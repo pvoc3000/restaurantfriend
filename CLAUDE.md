@@ -854,6 +854,25 @@ reversing 020's deliberate absence. See build step 4c for the argument and for
 the `.select()`-your-own-delete rule it taught. Probe with
 `select polname, polcmd from pg_policy where polrelid = 'public.employees'::regclass`
 — four rows, not three.
+**024 is WRITTEN, NOT YET APPLIED** (2026-08-03) — it drops
+`vendor_items_pack_shape`, 010's `check (pack_count is null or pack_size is not
+null)`. That statement is true about finished data and wrong as a constraint,
+because the pack is edited ONE COLUMN AT A TIME: the vendor-item screen writes
+`pack_count` / `pack_size` / `pack_unit` as three separate `InlineValue` cells
+laid out the way a pack is written — count × size unit — so on an item with no
+pack yet, **the first cell you reach reading left to right is the one column
+this constraint forbids on its own**. Mark hit it on Restaurant Depot's Non
+Stick Spray and got the raw Postgres text in the cell. Until it's applied the
+workaround is to enter the SIZE first, which is not a rule anyone could guess
+from a row reading "1 × size EA". Dropping it costs nothing because **no reader
+has ever looked at `pack_count` without `pack_size`** — `packLabel` and 013's
+generation function both gate on the size and fall back to `package_content` /
+`package_desc` — so a count on its own is invisible rather than wrong and can
+never put "6 ×" on a purchase order. Pinned by
+`scripts/fixtures/packLabel.fixtures.ts`, which was checked by breaking the
+guard: it prints `"6 × 0 EA"`, which is exactly the garbage the constraint was
+imagined to be preventing and which the reader prevents by itself. Probe with
+`select conname from pg_constraint where conrelid = 'public.vendor_items'::regclass`.
 
 Migration 019 gives the attachment somewhere to put what the invoice SAYS —
 `extraction` jsonb, `extracted_at`, `extraction_model`. On the attachment rather
@@ -1389,6 +1408,22 @@ weekday column, and 003 then silently made it per-vendor-item.
   by STYLESHEET order, not class-string order, so `${MENU_ITEM_CLASS} block`
   stayed `flex` and put the ⋯ menu's hints beside their labels. Caught in the
   browser the same day; each caller states its own `flex`/`block`.
+- **The "Sold as" vocabulary is the CONTAINER, never the size** (`lib/units.ts`
+  `PACKAGE_DESC_OPTIONS`). GAL and QT were dropped from it on 2026-07-30 as two
+  of the sizes FileMaker had been writing into `package_desc`, and restored on
+  2026-08-03 (Mark: "we use it all the time"): a gallon or quart jug is a thing
+  a vendor hands you, exactly like a case or a tub, where 1.5G / 3G / LBS /
+  "1 × 50 lbs" really are a size in the wrong field and stay off. The counts
+  agreed — 20 active vendor items each, ahead of SLEEVE (18), FLAT (9) and ROLL
+  (6), all of which had made the cut. **The omission wasn't cosmetic**: this
+  field was free text until the pick lists landed, and the picker has no
+  `allowNew`, so leaving a value out doesn't merely hide it from the menu, it
+  makes it UNENTERABLE — while anything already stored keeps rendering, which is
+  what hid the gap for four days. Check that asymmetry before trimming any
+  `allowNew`-less vocabulary.
+  The vendor-item screen's pack row is labelled **"Package"**, not "Contains"
+  (Mark, 2026-08-03) — the row IS the pack, and only the base-unit total in
+  parentheses answers "contains".
 - **The unit menu offers PACKAGES as well as measurements** (`lib/units.ts`,
   Mark, 2026-07-30) — case, bag, tub, box, sleeve, tray, flat, roll, in a
   fourth `<optgroup>` after Count / Weight / Volume. Not invented: the list is

@@ -115,10 +115,10 @@ export const UNIT_OPTIONS: { value: string; label: string; family: UnitFamily }[
  * landed, so the omission didn't just hide GAL from the menu, it made GAL
  * unenterable — the picker has no `allowNew`.
  *
- * QT sits in the same position on the same argument (20 active rows, a quart
- * container) and is deliberately NOT added here without being asked for: this
- * is a controlled vocabulary, and the reason it is controlled is that widening
- * it by inference is how it filled up with sizes in the first place.
+ * QT joined it the same day on the same argument — 20 active rows, a quart
+ * container. What stays off is the genuinely-a-size residue: 1.5G (17), 3G
+ * (11), LBS (8), "1 × 50 lbs". Those are a SIZE written into the wrong field,
+ * and the fields for them are the three beside this one.
  */
 export const PACKAGE_DESC_OPTIONS: { value: string; label: string; hint: string }[] = [
   { value: "CS", label: "CS", hint: "case" },
@@ -127,6 +127,7 @@ export const PACKAGE_DESC_OPTIONS: { value: string; label: string; hint: string 
   { value: "TUB", label: "TUB", hint: "tub" },
   { value: "BOX", label: "BOX", hint: "box" },
   { value: "GAL", label: "GAL", hint: "gallon" },
+  { value: "QT", label: "QT", hint: "quart" },
   { value: "SLEEVE", label: "SLEEVE", hint: "sleeve" },
   { value: "TRAY", label: "TRAY", hint: "tray" },
   { value: "FLAT", label: "FLAT", hint: "flat" },

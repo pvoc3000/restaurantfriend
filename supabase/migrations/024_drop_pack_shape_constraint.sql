@@ -1,0 +1,40 @@
+-- ============================================================================
+-- 024 — drop vendor_items_pack_shape
+--
+-- 010 added:
+--
+--   check (pack_count is null or pack_size is not null)
+--
+-- on the reasoning that "a pack count with nothing to count is meaningless".
+-- The statement is true about finished data and wrong as a constraint, because
+-- the pack is edited ONE COLUMN AT A TIME.
+--
+-- The vendor-item screen writes `pack_count`, `pack_size` and `pack_unit` as
+-- three separate InlineValue cells, laid out the way a pack is written —
+-- count × size unit. So on a vendor item with no pack yet, the FIRST cell you
+-- reach, reading left to right, is the one column this constraint forbids on
+-- its own. Mark hit it on Restaurant Depot's Non Stick Spray (2026-08-03) and
+-- got the raw Postgres text in the cell:
+--
+--   new row for relation "vendor_items" violates check constraint
+--   "vendor_items_pack_shape"
+--
+-- Entering the size first happens to work, which is not a rule anyone could
+-- guess from a row that reads "1 × size EA".
+--
+-- Dropping it costs nothing, because NO READER HAS EVER LOOKED AT pack_count
+-- WITHOUT pack_size. Both places that compose a pack label gate on the size:
+--
+--   web/src/lib/catalog.ts packLabel()   `if (vi.pack_size !== null …)`
+--   013's generation function            `when vi.pack_size is not null then`
+--
+-- and each falls back to package_content / package_desc otherwise. A count
+-- sitting on its own is therefore invisible rather than wrong — it cannot put
+-- "6 ×" on a purchase order — and it becomes meaningful the moment the size
+-- beside it is filled in, which is the very next thing you do.
+--
+-- Nothing else depends on the constraint: no view, function or policy names it.
+-- ============================================================================
+
+alter table vendor_items
+  drop constraint if exists vendor_items_pack_shape;

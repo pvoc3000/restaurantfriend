@@ -269,7 +269,10 @@ export function VendorItemFields({
             started being counted in bottles. It stays editable because the
             conversion can't always be done: a case of 16 oz bottles counted in
             `ea` holds 12, and no amount of unit maths gets there from ounces. */}
-        <dt className="py-0.5 text-subtle">Contains</dt>
+        {/* "Package", not "Contains" (Mark, 2026-08-03). The row IS the pack —
+            count × size unit — and the base-unit total in parentheses is the
+            only part of it that answers "contains". */}
+        <dt className="py-0.5 text-subtle">Package</dt>
         {/* Each cell is width-boxed. InlineValue's resting state is a `w-full`
             button, so left to themselves in a flex row they all demand 100%
             and either squash to ragged widths or wrap one-per-line. */}
