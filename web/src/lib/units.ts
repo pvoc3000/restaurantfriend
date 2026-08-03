@@ -101,9 +101,24 @@ export const UNIT_OPTIONS: { value: string; label: string; family: UnitFamily }[
  * order, while units stay lowercase because they feed conversion.
  *
  * Frequency order, measured over 2,888 vendor items, so the two answers that
- * cover 75% of the catalog are the first two you see. Historical values not on
- * this list (GAL, 1.5G, "1 × 50 lbs" — FMP put sizes in this field) are kept
- * wherever they're already stored; this is what NEW ones may be.
+ * cover 75% of the catalog are the first two you see. Values not on this list
+ * (1.5G, 3G, "1 × 50 lbs" — FMP put SIZES in this field) are kept wherever
+ * they're already stored; this is what NEW ones may be.
+ *
+ * **GAL belongs here** (Mark, 2026-08-03: "we use it all the time"). It was
+ * dropped on 2026-07-30 as one of those FMP sizes, and that was wrong: a
+ * gallon jug is a thing a vendor sells you, exactly like a case or a tub, where
+ * 1.5G and 3G really are a size written into the wrong field. The counts say so
+ * too — 20 ACTIVE vendor items are sold by the gallon, ahead of SLEEVE (18),
+ * FLAT (9) and ROLL (6), all of which made the cut. Worth knowing how it went
+ * unnoticed for four days: this field was free text until the pick lists
+ * landed, so the omission didn't just hide GAL from the menu, it made GAL
+ * unenterable — the picker has no `allowNew`.
+ *
+ * QT sits in the same position on the same argument (20 active rows, a quart
+ * container) and is deliberately NOT added here without being asked for: this
+ * is a controlled vocabulary, and the reason it is controlled is that widening
+ * it by inference is how it filled up with sizes in the first place.
  */
 export const PACKAGE_DESC_OPTIONS: { value: string; label: string; hint: string }[] = [
   { value: "CS", label: "CS", hint: "case" },
@@ -111,6 +126,7 @@ export const PACKAGE_DESC_OPTIONS: { value: string; label: string; hint: string 
   { value: "BAG", label: "BAG", hint: "bag" },
   { value: "TUB", label: "TUB", hint: "tub" },
   { value: "BOX", label: "BOX", hint: "box" },
+  { value: "GAL", label: "GAL", hint: "gallon" },
   { value: "SLEEVE", label: "SLEEVE", hint: "sleeve" },
   { value: "TRAY", label: "TRAY", hint: "tray" },
   { value: "FLAT", label: "FLAT", hint: "flat" },
