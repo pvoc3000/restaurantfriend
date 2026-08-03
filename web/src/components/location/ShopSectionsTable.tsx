@@ -217,6 +217,13 @@ export function ShopSectionsTable({
             ? `${rows.length} at ${locationCode}`
             : `${shown.length} of ${rows.length}`}
         </span>
+
+        {/* Right-aligned with the filters, like the roster's New employee —
+            a command at the TOP of the screen (Mark, 2026-08-02), where it
+            used to be a form strip stranded under 168 rows. */}
+        {editable && (
+          <AddShopSection orgId={orgId} locationId={locationId} areas={areas} />
+        )}
       </div>
 
       {failed && <p className="text-sm text-accent">Could not delete: {failed}</p>}
@@ -240,10 +247,6 @@ export function ShopSectionsTable({
           </p>
         }
       />
-
-      {editable && (
-        <AddShopSection orgId={orgId} locationId={locationId} areas={areas} />
-      )}
     </div>
   );
 }
