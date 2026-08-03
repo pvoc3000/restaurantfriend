@@ -118,7 +118,7 @@ function Activate({ locationId, code }: { locationId: string; code: string | nul
             router.refresh();
           })
         }
-        className="border-2 border-ink bg-ink px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.12em] text-white disabled:opacity-35"
+        className="inline-flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
       >
         {pending ? "Activating…" : `Activate ${code}`}
       </button>

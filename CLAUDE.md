@@ -1879,9 +1879,23 @@ weekday column, and 003 then silently made it per-vendor-item.
 ## Domain cheat-sheet (why screens look the way they do)
 
 - The order guide walks the physical shop: grouped by `shop_sections`
-  (sort_order, e.g. "31 Storage - R1 S1" — maintained at `/shop-sections`,
+  (sort_order, e.g. "Storage - R1 S1" — maintained at `/shop-sections`,
   per location), item headers show par, vendor items
   nested with pack + unit price ($/oz comparison matters — pack sizes differ).
+  **The names used to carry FileMaker's leading number** ("31 Storage - R1 S1")
+  and no longer do (Mark, 2026-08-02, `migration/strip-section-prefix.mjs`):
+  the number duplicated `sort_order`, which is what the walk actually orders
+  by, so it had to be kept in step by hand and lied the moment a shelf moved.
+  125 renamed across DF01 and DF02.
+  It also surfaced four DUPLICATE shelves the prefix had been hiding — the
+  same place entered twice, once numbered and once not, with items split across
+  both. Three at DF02 were merged into the copy holding the real walk position
+  (`Mop Room` 50, `Kitchen` 60, `Office` 80, 12 item-locations moved); Mark
+  deleted DF01's himself. **`display_name` is unique per location AND is the
+  key the guide groups by**, so any future bulk edit of these names has to
+  check for collisions BEFORE writing — a half-applied rename is worse than
+  none, which is why that script refuses the whole run rather than stopping
+  partway.
 - Favorites = plan rows (`order_guide_plan_days`): the preferred source per
   weekday, ★-marked, overridable in the moment. Since 008 a favorite is one of
   four should-order conditions, not guide membership. The real vendor decision
