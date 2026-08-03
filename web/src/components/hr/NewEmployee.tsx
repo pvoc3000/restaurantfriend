@@ -323,7 +323,7 @@ export function NewEmployee({
  */
 function RehireNotice({ matches }: { matches: EmployeeRow[] }) {
   return (
-    <div className="border border-ink bg-[var(--rf-yellow-200)] px-3 py-2 text-sm text-ink">
+    <div className="border border-ink bg-mark-fill px-3 py-2 text-sm text-ink">
       <p className="font-semibold">
         {matches.length === 1
           ? "Someone by that name is already on the roster."

@@ -255,7 +255,7 @@ export function EmployeeActions({
           ) : (
             <div className="mt-3 space-y-3 text-sm">
               {warnings.any ? (
-                <div className="space-y-2 border border-ink bg-[var(--rf-yellow-200)] px-3 py-2 text-ink">
+                <div className="space-y-2 border border-ink bg-mark-fill px-3 py-2 text-ink">
                   {warnings.migrated !== null && (
                     <p>
                       <span className="font-semibold">

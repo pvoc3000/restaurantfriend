@@ -9,10 +9,11 @@ import { setActiveLocation } from "@/app/actions";
  *
  * Three states, and the third is the interesting one:
  *
- * - the working location: an inert FILLED chip. The `here` badge on
+ * - the working location: an inert YELLOW chip. The `here` badge on
  *   VendorLocationsTable is only bordered; among six rows this one has to be
- *   unmissable, and fill is the strongest mark available without spending
- *   colour, which in this app only ever means record state.
+ *   unmissable. It was a BLACK fill until 2026-08-02, which read as a button —
+ *   see the note at that branch for why yellow is the right mark and not an
+ *   indulgence.
  * - any other ACTIVE location: the button.
  * - an INACTIVE location: nothing at all. Only an open shop can be worked at
  *   (Mark, 2026-08-01) — the reason a closed one was ever selectable was that
@@ -46,16 +47,31 @@ export function WorkingHere({
     "inline-flex items-center justify-center border text-[11px] font-semibold uppercase tracking-[0.12em]";
 
   if (isWorking) {
-    // OPTICALLY the same size, which is not the same as measuring the same
-    // (Mark, 2026-08-01: "the working here button still seems smaller"). It
-    // measured identically — 128×28, same left and right edge, both borders
-    // black. A solid dark block simply reads smaller than an outline around
-    // white, because light areas expand to the eye. So the filled one is drawn
-    // 1px larger all round and pulled back by the same pixel: the painted box
-    // is 130×30, the space it occupies is still 128×28, and nothing in the
-    // column moves.
+    // YELLOW, not black (Mark, 2026-08-02: a black label "make[s] it look like
+    // a button when it's not"). He was right twice over.
+    //
+    // Read: down a table column the boxes are 56px apart, so they aren't read
+    // as one segmented control the way a TabPicker's abutting cells are —
+    // each is read on its own, and on its own a filled box with a label is a
+    // button. The original note called fill "the strongest mark available
+    // without spending colour"; the mistake was treating colour as the more
+    // expensive of the two, when black fill was already spoken for.
+    //
+    // Rule: since the button sweep, a black fill means a SET FILTER, a
+    // delimiting band, or a panel commit. A chip in a table column is none of
+    // those, so this was off-rule as well as ambiguous.
+    //
+    // Why yellow specifically: it is already this app's mark for WHICH ONE
+    // YOU ARE AT — `AppNav` marks the active section `text-mark`, "the yellow
+    // says which module you're in". Same sentence, different noun. And no
+    // button anywhere is filled yellow, so it cannot be misread as one.
+    //
+    // The 130×30 optical compensation went with the black: a solid dark block
+    // reads smaller than an outline around white, but a pale yellow fill is a
+    // light area like the outlined box beside it, so the two now match at the
+    // same measured size and the column's edge still doesn't move.
     return (
-      <span className={`${box} -m-px h-[30px] w-[130px] border-ink bg-ink text-white`}>
+      <span className={`${box} h-7 w-32 border-ink bg-mark-fill text-ink`}>
         Working here
       </span>
     );
