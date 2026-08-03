@@ -23,6 +23,7 @@ const SELECT = `
   id, name, category, base_unit, note, is_active,
   inventory_item_locations (
     id, location_id, default_par, order_days, note, is_active,
+    shop_section_id,
     shop_sections ( display_name, sort_order )
   )
 `;
@@ -50,6 +51,7 @@ export async function ItemDetail({
     { data: item, error },
     { data: vendorItems, error: viError },
     { data: categoryRows },
+    { data: sectionRows },
   ] = await Promise.all([
       supabase.from("inventory_items").select(SELECT).eq("id", id).maybeSingle(),
       // Deactivated vendors are gone from this screen entirely — you can't
@@ -66,6 +68,19 @@ export async function ItemDetail({
       // trip of its own — there's no `distinct` in PostgREST, and 790 short
       // strings is cheaper than the view of them would be.
       supabase.from("inventory_items").select("category"),
+      // Every shelf at every shop this screen lists a row for, so the Section
+      // picker on each row offers THAT shop's shelves. One query for all of
+      // them rather than one per row, and in WALK order — which is the order
+      // you think about shelves in, and not the order their names sort in.
+      supabase
+        .from("shop_sections")
+        .select("id, location_id, display_name, sort_order")
+        .in(
+          "location_id",
+          session.activeLocations.map((l) => l.id)
+        )
+        .order("sort_order")
+        .order("display_name"),
     ]);
 
   if (error) {
@@ -82,6 +97,22 @@ export async function ItemDetail({
         .filter((c): c is string => c !== null && c !== "")
     ),
   ].sort((a, b) => a.localeCompare(b));
+
+  // Keyed by location, because each row of the table is a different shop and a
+  // shelf belongs to exactly one of them — offering DF01's shelves on DF02's
+  // row would write a section the guide there can never group by.
+  // A plain object, not a Map: this crosses into a client component.
+  const sectionsByLocation: Record<string, { value: string; label: string }[]> = {};
+  for (const s of (sectionRows ?? []) as {
+    id: string;
+    location_id: string;
+    display_name: string;
+  }[]) {
+    (sectionsByLocation[s.location_id] ??= []).push({
+      value: s.id,
+      label: s.display_name,
+    });
+  }
 
   const locationRows = [...row.inventory_item_locations].sort((a, b) => {
     const codeA = session.locations.find((l) => l.id === a.location_id)?.code ?? "";
@@ -112,6 +143,7 @@ export async function ItemDetail({
           baseUnit={row.base_unit}
           orgId={session.membership.org_id}
           activeLocationId={session.activeLocation?.id ?? null}
+          sectionsByLocation={sectionsByLocation}
         />
       </section>
 

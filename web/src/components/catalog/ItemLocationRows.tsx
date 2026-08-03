@@ -30,6 +30,7 @@ export function ItemLocationRows({
   baseUnit,
   orgId,
   activeLocationId,
+  sectionsByLocation,
 }: {
   rows: CatalogItemLocation[];
   locations: Location[];
@@ -37,6 +38,9 @@ export function ItemLocationRows({
   baseUnit: string;
   orgId: string;
   activeLocationId: string | null;
+  /** That shop's shelves, in walk order, keyed by location id. Each row is a
+   *  different shop, and a shelf belongs to exactly one of them. */
+  sectionsByLocation: Record<string, { value: string; label: string }[]>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -116,13 +120,33 @@ export function ItemLocationRows({
       key: "section",
       label: "Section",
       width: 205,
+      // Still sorts on the shelf's WALK position, not its name — "what order do
+      // I meet these shops' copies of this item in" is the question.
       sortValue: (r) => r.il?.shop_sections?.sort_order ?? null,
-      render: (r) =>
-        r.il ? (
-          <span className="text-muted">{r.il.shop_sections?.display_name ?? "—"}</span>
-        ) : (
-          dash
-        ),
+      render: (r) => {
+        if (!r.il) return dash;
+        const options = sectionsByLocation[r.location.id] ?? [];
+        // A shop with no shelves yet has nothing to offer, and an empty picker
+        // panel is worse than a sentence.
+        if (options.length === 0) {
+          return <span className="text-faint">no sections at {r.location.code}</span>;
+        }
+        return (
+          <InlineValue
+            table="inventory_item_locations"
+            id={r.il.id}
+            column="shop_section_id"
+            kind="pick"
+            value={r.il.shop_section_id}
+            // "No section" is a real choice with an empty value, not the
+            // absence of one — without it in the list there'd be no way to take
+            // an item OFF a shelf, and it's the label the guide uses for the
+            // items that land nowhere.
+            options={[{ value: "", label: "No section" }, ...options]}
+            placeholder="No section"
+          />
+        );
+      },
     },
     {
       key: "order_days",

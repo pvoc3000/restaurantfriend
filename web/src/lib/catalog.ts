@@ -31,6 +31,9 @@ export type CatalogItemLocation = {
   order_days: number[];
   note: string | null;
   is_active: boolean;
+  /** The shelf this item lives on at this shop. The embed below is for READING
+   *  (name and walk position); this is what the section picker writes. */
+  shop_section_id: string | null;
   shop_sections: { display_name: string; sort_order: number } | null;
 };
 
