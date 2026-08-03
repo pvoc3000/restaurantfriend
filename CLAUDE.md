@@ -550,10 +550,15 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    toggle (purchaser+ only, per 001's policy) and ENDS with the **Working**
    column (Mark, 2026-08-01 — read the row, then act on it, and the control you
    press repeatedly sits against the right edge, like the guide's stepper) —
-   `components/location/WorkingHere.tsx`, three states: a filled `WORKING HERE`
-   chip on the one you're at (filled, where `VendorLocationsTable`'s `here`
-   badge is only bordered — among six rows it has to be unmissable, and fill is
-   the strongest mark available without spending colour), a `Work here` button
+   `components/location/WorkingHere.tsx`, three states: a YELLOW `WORKING HERE`
+   chip on the one you're at (`bg-mark-fill`; it was a BLACK fill until
+   2026-08-02, when Mark read it as a button — down a table column the boxes sit
+   56px apart, so they aren't read as one segmented control the way a
+   TabPicker's abutting cells are, and alone a filled box with a label is a
+   button. Yellow is already this app's mark for WHICH ONE YOU ARE AT: `AppNav`
+   marks the active section `text-mark`, and no button anywhere is filled
+   yellow. The 130×30 optical compensation went with the black — a pale fill is
+   a light area like the outlined box beside it), a `Work here` button
    on any other ACTIVE one, and **nothing at all on an inactive one**. Chip and
    button are ONE box — same width, height and border, only the fill differs —
    or the column's edge moves as the working location moves down the list. The
@@ -694,6 +699,44 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Four employees are FMP location `DF00`, which isn't a location in this org
    (Mark, two managers, a contractor — evidently "the company, not a shop").
    They load with no main location, which renders as an em dash.
+   Shipped 2026-08-02: **hiring someone, and deleting the typo you made doing
+   it** — the app's first CREATE and first DELETE of a top-level record. Until
+   this, every `.insert()` in `web/src` was a child row and nothing inserted a
+   vendor, an item or a location either, so **this is the template those will
+   follow**: a command right-aligned in the list's filter row → `ui/Dialog` →
+   insert → land on the new record. `components/hr/NewEmployee.tsx` asks for the
+   ROSTER fields only (the columns the list groups and filters by — a record
+   missing those is invisible in the roster's own organizing scheme) and leaves
+   the rest to the detail screen's `InlineValue`s rather than keeping a second
+   editor in step. It warns on a surname already present, searching ALL 445
+   including the 417 former employees, since a rehire is by definition inactive;
+   clicking through to their record IS the rehire flow, so no reactivation UI
+   was needed. `findPossibleRehires` is pure and fixture-tested.
+   **Delete needed migration 023**, which REVERSES 020's "no delete policy,
+   deliberately" for owner/admin — that rule was right about a PERSON and wrong
+   about a TYPO, and the guard moved from the schema into the confirm
+   (`EmployeeActions.tsx` counts `legacy_id`, app access and documents, defaults
+   to Deactivate, lets you through). Deleting YOURSELF is refused outright and
+   is the one guard that isn't passable: revoke removes the `org_members` row
+   every policy reads. Order is revoke → delete row → remove Storage objects;
+   `employee_documents` cascades but Storage does not, and revoke-then-fail is
+   recoverable where delete-then-fail leaves someone able to sign in with no HR
+   record.
+   **A DELETE MUST `.select()` ITS OWN RESULT.** With no matching RLS policy
+   Postgres removes zero rows and PostgREST returns no error, so a bare
+   `.delete()` reports a cheerful success — caught in the browser here, the
+   screen navigated back to a roster that had grown by one. The
+   `order_guide_entries` lesson, alive on any table whose delete policy might
+   not be applied yet.
+   Shipped 2026-08-02: **an item's shop section is chosen from a list**
+   (`ItemLocationRows`, `InlineValue kind="pick"` on
+   `inventory_item_locations.shop_section_id`). The options are keyed BY
+   LOCATION and that is the whole of the care: each row of that table is a
+   different shop and a shelf belongs to exactly one of them, so offering DF01's
+   shelves on DF02's row would write a section the guide there can never group
+   by. Ordered by `sort_order` — walk order is how you think about shelves.
+   "No section" is a real option with an empty value, not the absence of one;
+   without it there is no way to take an item OFF a shelf.
    **NOT migrated:** SSN (never exported — it's in FMP and Gusto, and a
    web-reachable database is the wrong home for it), pay rates and everything
    payroll-adjacent, and the Events/Ratings/Reviews/Timesheets tables, which
@@ -806,6 +849,11 @@ LOADED: 445 rows, 26 active / 2 new hire / 417 inactive, matching the transform
 report, with Mark's row linked to his auth account. 022 verified 2026-08-02 by
 inserting an `orientation` document and removing it again — the constraint
 accepts the value, so the widened check is live.
+**023 is APPLIED** (Mark, 2026-08-02) — `employees_delete` for owner/admin,
+reversing 020's deliberate absence. See build step 4c for the argument and for
+the `.select()`-your-own-delete rule it taught. Probe with
+`select polname, polcmd from pg_policy where polrelid = 'public.employees'::regclass`
+— four rows, not three.
 
 Migration 019 gives the attachment somewhere to put what the invoice SAYS —
 `extraction` jsonb, `extracted_at`, `extraction_model`. On the attachment rather
@@ -927,6 +975,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/SectionHeading` | a hand-styled `<h2>` | the heading over a block on a detail screen (16px bold black, optional `count`) |
   | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style. Selected cell is ALWAYS black; `count` and `href` are the only options |
   | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
+  | `ui/DateField` | `<input type="date">` | EVERY date box. Carries the Safari empty-date apparatus (see the date bullet); `InlineValue kind="date"` wraps it, and a create form uses it directly |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
   | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory |
   | `catalog/ActiveToggle` | a bespoke switch | the Active column, which leads every catalog table |
@@ -1189,7 +1238,14 @@ weekday column, and 003 then silently made it per-vendor-item.
   2026-07-23) — vendors list, vendor/item per-location config, vendor items.
   "Stock here" shares that slot where a row doesn't exist yet.
 - **EVERY date field shows a calendar picker** (Mark, 2026-08-02: "always
-  include a calendar picker for any date field"). Not a rule to remember at
+  include a calendar picker for any date field"). **The box itself is
+  `ui/DateField`** — extracted from `InlineValue` on 2026-08-02 when the
+  new-employee form needed a date that isn't an edit-in-place cell. Everything
+  below is a bug a second implementation would reintroduce, and a CREATE form is
+  the worst place to reintroduce it, since its date starts EMPTY. Never write a
+  bare `<input type="date">`; `InlineValue kind="date"` wraps `DateField` in its
+  write logic, and a form uses `DateField` directly.
+  Not a rule to remember at
   each call site — `InlineValue kind="date"` renders the browser's own
   `<input type="date">` permanently, so a date cell is a picker by
   construction. It is the second `kind` that does NOT click-to-edit (the first
@@ -1273,6 +1329,24 @@ weekday column, and 003 then silently made it per-vendor-item.
   trigger only greys out when NO option matches (`empty`), not merely when the
   value is falsy; and past 8 options the find box appears, which is what the
   native menu could never give an iPad.
+  **An anchored panel is at most 320px tall, and it closes on scroll EXCEPT its
+  own** (2026-08-02, both from the item screen's section picker offering 77
+  shelves). `MENU_PANEL_CLASS` was `max-h-[70vh]`, which grows with the display,
+  so on a large monitor a long list ran to the bottom of the screen anchored to
+  one table cell; it's `max-h-[min(20rem,60vh)]` now — ~8 rows under the find
+  box, and past 8 options that box exists, so a long vocabulary is TYPED at
+  rather than scrolled through.
+  The scroll rule is the subtler one. The listener is in CAPTURE so a scrolling
+  PANE closes the panel, and that also caught the panel's own `overflow-auto` —
+  so reaching for a long list dismissed it. What matters is whether the TRIGGER
+  moved, not whether pixels did, so a scroll originating inside the panel is
+  exempt. **`e.target instanceof Node` before `contains()` is load-bearing, not
+  defensive tidying**: a PANE's scroll reports an Element, but the PAGE's
+  reports `document`/`window`, and `Node.contains()` THROWS a TypeError on a
+  non-Node — the first cut of the exemption killed the handler on every page
+  scroll and stopped the panel closing at all, which is the case the listener
+  exists for. Test BOTH halves after touching this; each one hides the other's
+  failure.
   **An anchored panel is `z-[70]` — above everything, dialogs included.** It
   was `z-50`, chosen to clear the ActionBar, and that held until a `PickList`
   appeared INSIDE a `ui/Dialog` (`z-[60]`): the invite panel's role picker
@@ -1647,12 +1721,27 @@ weekday column, and 003 then silently made it per-vendor-item.
   LAST row of a wrapping filter block rather than floating at the top; and
   `DataTable`'s root spacing went `space-y-1` → `space-y-2`, since 4px off the
   column labels read as crowding them once the strip held real content.
-  Only vendor detail passes a heading so far — the LIST screens (Inventory,
-  Vendors, PO list) still put their filters above the table with the eye's band
-  between, which is the obvious next place for this if it earns its keep.
-  Vendor detail's page rhythm went `space-y-6` → `space-y-16` to match: with
-  8px inside each block, the gap BETWEEN them is the only thing left saying
-  where one ends.
+  **This is now THE convention for a heading over a table, not a vendor-detail
+  quirk** — item detail followed on 2026-08-02 when Mark reported the same three
+  symptoms unprompted ("too much space between 'per location config' and the
+  datatable below it… not enough space between 'vendor items' and the datatable
+  above it"), which is what a repeated mistake feels like from the outside. So:
+  **a section heading over a `DataTable` goes in that table's `leading`, never
+  in a `<section>` above it**, and the page that holds them is `space-y-16`.
+  Measured on item detail after: 8px heading-to-table, 64px between the blocks,
+  against ~48 and 24 before. A caption belongs in the `leading` too, under the
+  heading (`VendorItemsTable` grew a `heading` prop that renders above its
+  filters; `ItemLocationRows` just forwards `leading`).
+  `space-y-16` applies to the WHOLE page including the breadcrumb row — vendor
+  detail has always done that and it reads fine; don't special-case the top.
+  The LIST screens (Inventory, Vendors, PO list) still put their filters above
+  the table with the eye's band between, and are the obvious next place for this.
+  **The eye's cell carries `-mb-1`** (2026-08-02): `items-end` aligns BOXES, and
+  the eye is a 32px button centring a 24px glyph, so its artwork stops 4px short
+  of its own bottom edge and against a ~20px heading it read as floating above
+  the line. The nudge moves the BUTTON rather than the glyph inside it, which
+  keeps the hover wash centred on the artwork — the thing the button's size
+  exists to do.
 - **A scrolling table pane ends where the WINDOW does, and the height is
   measured** (`useFillViewportHeight` in `lib/tableHead`, Mark, 2026-08-01: it
   "should only take up the remainder of the page"). It was
