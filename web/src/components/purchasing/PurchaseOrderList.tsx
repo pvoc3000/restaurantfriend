@@ -153,7 +153,16 @@ export function PurchaseOrderList({
         makeComparator<PoListRow>({
           value: (po) => sortValue(po, filters.sort),
           dir: filters.dir,
-          tiebreaks: [(po) => po.po_number],
+          // VENDOR IS THE SECONDARY SORT, whatever the primary is (Mark,
+          // 2026-08-03): Ordered then vendor, Status then vendor. A day's
+          // orders and a status's orders are both read vendor by vendor, so
+          // the run under each band arrives in the order you'd read it out.
+          //
+          // No need to special-case sorting BY vendor — equal primaries there
+          // are the same vendor, so this returns 0 and falls through to the PO
+          // number, which stays the last word because it is unique per row and
+          // so makes the whole order deterministic.
+          tiebreaks: [(po) => po.vendors?.name ?? "", (po) => po.po_number],
         })
       ),
     [visible, filters.sort, filters.dir]

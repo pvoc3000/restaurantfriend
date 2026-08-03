@@ -10,6 +10,7 @@ import "./employees.fixtures";
 import "./invoiceMatch.fixtures";
 import "./packLabel.fixtures";
 import "./receiving.fixtures";
+import "./tableSort.fixtures";
 import { runAll } from "./harness";
 
 runAll();

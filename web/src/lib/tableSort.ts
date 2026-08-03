@@ -16,6 +16,19 @@ export function nextSortDir(active: boolean, current: SortDir): SortDir {
  * the largest value shouldn't fill the top with rows that have no value at all.
  * `tiebreaks` run in order when the primary values are equal, and are only used
  * to break ties, never to override the chosen column.
+ *
+ * **A TIEBREAK ALWAYS READS ASCENDING, whichever way the primary points.** It
+ * used to take the primary's sign, which meant "Ordered newest first, then
+ * vendor" listed each day's vendors Z→A — not what "then vendor" means to
+ * anyone (Mark, 2026-08-03, asking for vendor as the secondary sort on the PO
+ * list). Flipping a column reverses the ORDER YOU CHOSE, not the stable
+ * fallback used where that column can't decide.
+ *
+ * The function already agreed with this in one branch and not the other: two
+ * null primaries have always returned the tiebreak unsigned, four lines below.
+ * That inconsistency is the tell that the sign was a slip rather than a
+ * decision. Every caller passes a name or a code — vendors, employees,
+ * locations, items, PO lines — and none of them wants it reversed.
  */
 export function makeComparator<T>({
   value,
@@ -49,6 +62,7 @@ export function makeComparator<T>({
         ? va - vb
         : String(va).localeCompare(String(vb), undefined, { numeric: true });
 
-    return (primary === 0 ? tieBreak() : primary) * sign;
+    // The sign is the PRIMARY's alone — see the note above.
+    return primary === 0 ? tieBreak() : primary * sign;
   };
 }

@@ -1468,7 +1468,15 @@ weekday column, and 003 then silently made it per-vendor-item.
   header (which remembers its own scroll — see scroll restoration), optional
   expandable rows, 56px rows and no rule between them. Give it columns + rows; don't hand-roll a
   `<table>`. Supporting pieces: `ColumnHeader` (the header cell + resize grip),
-  `lib/tableSort.ts` (comparator — empty cells sink last in BOTH directions),
+  `lib/tableSort.ts` (comparator — empty cells sink last in BOTH directions, and
+  **a tiebreak always reads ascending whichever way the primary points**: it
+  used to take the primary's sign, so "Ordered newest first, then vendor" gave
+  each day's vendors Z→A, which is not what "then vendor" means. The function
+  had already agreed with this in one branch — two null primaries returned the
+  tiebreak unsigned — and that inconsistency was the tell. Every caller passes a
+  name or a code as its tiebreak, so the fix reads the same everywhere: flipping
+  a column reverses the order you CHOSE, not the stable fallback used where that
+  column can't decide. Pinned in `scripts/fixtures/tableSort.fixtures.ts`),
   `lib/columnWidths.ts` (`useResizableColumns`). **`/vendors` and `/items` were
   converted 2026-07-31** — they predated the component (built at commits 13 and
   24, `DataTable` extracted at 26) and had kept their own `<table>` ever since,
@@ -1501,7 +1509,12 @@ weekday column, and 003 then silently made it per-vendor-item.
   many rows each**, so the run it opens is worth naming. `/employees` bands on
   location, status, position or schedule; the PO list on the order date, the
   vendor or the status (a date qualifies there because ordering happens in
-  batches, so a day's band is a day's run of POs); the vendor's items table and
+  batches, so a day's band is a day's run of POs — and **vendor is that list's
+  secondary sort whatever the primary is** (Mark, 2026-08-03), so the run under
+  each band arrives in the order you'd read it out; sorting BY vendor needs no
+  special case, since equal primaries are then the same vendor and it falls
+  through to the PO number, which stays the last word because it is unique per
+  row); the vendor's items table and
   a PO's own lines on the inventory **Type** (on PO detail that's also the
   default sort, so an order opens grouped — and it's the same grouping the
   vendor-facing PDF has printed since §4.9, which the screen had only been
