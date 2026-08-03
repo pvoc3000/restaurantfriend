@@ -977,6 +977,21 @@ weekday column, and 003 then silently made it per-vendor-item.
   (Mark, 2026-07-26): `ActionBarButton` still has a `primary` white-fill
   variant, but nothing uses it, because against the bar's own black a white cell
   read as a different kind of object rather than as the important one.
+- **EVERY BUTTON IS WHITE; only a SET FILTER is black** (Mark, 2026-08-02, after
+  a sweep). The outlined cell — `border border-ink bg-white`, filling black on
+  hover — is the only button weight the app has. There is no "primary": a filled
+  cell among outlined ones reads as a different KIND of control rather than as
+  the important one, which is the conclusion the ActionBar reached in July and
+  the sweep then applied everywhere else (ProcessPo's send buttons, the cleanup
+  drawer's three saves, sign-in, /welcome). Black still means SELECTED — a
+  TabPicker cell, a WeekdayPicker day, a checked box, a switch knob — and it
+  still means a band that DELIMITS (masthead, ActionBar, dialog title bar, group
+  band). **The one exception is `DIALOG_COMMIT_CLASS`**, flagged and left black
+  on Mark's instruction to flag rather than change: a modal footer is a
+  two-weight decision (a text Cancel beside the commit), not a row of peer
+  buttons. Retiring the black fill also cost ProcessPo's `processed` state,
+  which had promoted "Mark as sent" once you'd generated the document — that
+  nudge was carried entirely by the colour.
 - **The menu is two tiers, from FMP** (Mark, 2026-07-25 — overrides the design
   system, which had killed the sub-nav): sections on top, that section's
   sub-sections under it, both bands black, **both marking active in yellow**

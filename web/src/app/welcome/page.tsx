@@ -212,7 +212,7 @@ function Welcome() {
           <button
             type="submit"
             disabled={busy || !ready}
-            className="h-11 w-full bg-ink text-[13px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300"
+            className="h-11 w-full border border-ink bg-white text-[13px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
           >
             {busy ? "Setting up…" : ready ? "Set my password" : "Loading…"}
           </button>

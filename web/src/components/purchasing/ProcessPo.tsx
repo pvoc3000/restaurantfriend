@@ -71,7 +71,6 @@ export function ProcessPo({
   const supabase = createClient();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [processed, setProcessed] = useState(false);
   // The compose card's editable fields; null = closed.
   const [compose, setCompose] = useState<EmailParts | null>(null);
   const [sentNote, setSentNote] = useState<string | null>(null);
@@ -163,7 +162,6 @@ export function ProcessPo({
         downloadBlob(attachment.blob, attachment.filename);
         window.location.href = mailtoFromParts(compose);
       }
-      setProcessed(true);
     });
 
   const previewPdf = () => {
@@ -187,13 +185,11 @@ export function ProcessPo({
       const { pdf, docs, org, po } = await loadDocs();
       const blob = await pdf(<docs.ShoppingListPdf pos={[po]} org={org} />).toBlob();
       downloadBlob(blob, `Shopping list ${po.po_number}.pdf`);
-      setProcessed(true);
     });
 
   const openVendorSite = () =>
     run("online", async () => {
       if (context.vendor_url) window.open(context.vendor_url, "_blank");
-      setProcessed(true);
     });
 
   const markSent = () =>
@@ -206,10 +202,14 @@ export function ProcessPo({
       router.refresh();
     });
 
+  // ONE button shape. `primaryBtn` — the black fill — is gone (Mark,
+  // 2026-08-02: "all buttons should be white. Only set filters are black"),
+  // which finishes what Open vendor site started a few hours earlier: against a
+  // row of outlined cells a filled one reads as a different KIND of control
+  // rather than as the important one, the same conclusion the ActionBar reached
+  // in July.
   const btn =
     "h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
-  const primaryBtn =
-    "h-9 bg-ink px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300";
 
   return (
     <>
@@ -238,55 +238,44 @@ export function ProcessPo({
         actionGroups={[
           actionsBefore,
           <>
-          {context.order_type === "email_po" && (
-            <>
-              <button disabled={busy !== null} onClick={previewPdf} className={btn}>
-                {busy === "preview" ? "Rendering…" : "Preview PDF"}
-              </button>
-              {compose === null && (
-                <button
-                  disabled={busy !== null}
-                  onClick={openCompose}
-                  className={primaryBtn}
-                  title="Compose here — the PDF attaches itself on send"
-                >
-                  {busy === "compose" ? "Loading…" : "Email PO…"}
-                </button>
-              )}
-            </>
-          )}
+          {/* PREVIEW PDF ON EVERY ORDER TYPE, including in_person (Mark,
+              2026-08-02: it "should always be available even when it's a
+              shopping list"). It used to be per-branch and the in_person branch
+              omitted it, on the reasoning that a shopping list is the document
+              you want when you're the one buying. But the §4.9 vendor document
+              is what says what was ORDERED, and wanting to read that has
+              nothing to do with how the order gets placed. Unconditional here
+              rather than repeated in each branch — it was already written out
+              three times. */}
+          <button disabled={busy !== null} onClick={previewPdf} className={btn}>
+            {busy === "preview" ? "Rendering…" : "Preview PDF"}
+          </button>
 
-          {context.order_type === "online" && (
-            <>
-              <button disabled={busy !== null} onClick={previewPdf} className={btn}>
-                {busy === "preview" ? "Rendering…" : "Preview PDF"}
-              </button>
-              {/* White like the rest of the row (Mark, 2026-08-02). It was the
-                  black `primaryBtn`, marking it as the thing to press on an
-                  online order — but in one combined box that put a filled cell
-                  in the middle of a row of outlined ones, which reads as a
-                  different KIND of control rather than as the important one.
-                  The same argument the ActionBar settled in July. */}
-              <button
-                disabled={busy !== null || !context.vendor_url}
-                onClick={openVendorSite}
-                className={btn}
-                title={context.vendor_url ?? "No URL on the vendor record"}
-              >
-                Open vendor site
-              </button>
-            </>
-          )}
-
-          {context.order_type === "in_person" && (
-            <button disabled={busy !== null} onClick={shoppingList} className={primaryBtn}>
-              {busy === "shopping" ? "Rendering…" : "Shopping list PDF"}
+          {context.order_type === "email_po" && compose === null && (
+            <button
+              disabled={busy !== null}
+              onClick={openCompose}
+              className={btn}
+              title="Compose here — the PDF attaches itself on send"
+            >
+              {busy === "compose" ? "Loading…" : "Email PO…"}
             </button>
           )}
 
-          {context.order_type === "none" && (
-            <button disabled={busy !== null} onClick={previewPdf} className={btn}>
-              {busy === "preview" ? "Rendering…" : "Preview PDF"}
+          {context.order_type === "online" && (
+            <button
+              disabled={busy !== null || !context.vendor_url}
+              onClick={openVendorSite}
+              className={btn}
+              title={context.vendor_url ?? "No URL on the vendor record"}
+            >
+              Open vendor site
+            </button>
+          )}
+
+          {context.order_type === "in_person" && (
+            <button disabled={busy !== null} onClick={shoppingList} className={btn}>
+              {busy === "shopping" ? "Rendering…" : "Shopping list PDF"}
             </button>
           )}
 
@@ -294,7 +283,7 @@ export function ProcessPo({
             <button
               disabled={busy !== null}
               onClick={markSent}
-              className={processed ? primaryBtn : btn}
+              className={btn}
               title={`Sets status to Sent, sent via ${sentVia}`}
             >
               {busy === "sent" ? "Saving…" : "Mark as sent"}
@@ -379,7 +368,7 @@ export function ProcessPo({
               <button
                 disabled={busy !== null || !compose.to.trim()}
                 onClick={send}
-                className={primaryBtn}
+                className={btn}
                 title={
                   compose.to.trim()
                     ? "Send now — the PO is marked sent automatically"

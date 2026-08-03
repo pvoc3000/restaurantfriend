@@ -125,6 +125,15 @@ export function Dialog({
  * The two button shapes a dialog footer uses, so five callers don't each write
  * out the same tracking and disabled states. `Cancel` is text, the commit is a
  * black cell — the design system's only two weights of action.
+ *
+ * THE BLACK FILL HERE SURVIVED the 2026-08-02 sweep that turned every other
+ * button white ("all buttons should be white. Only set filters are black"),
+ * and it's the one Mark asked to have flagged rather than changed: inside a
+ * modal the footer is a two-weight decision — a text Cancel and the commit —
+ * and that pairing is the whole reason the commit is filled. The argument that
+ * retired the black button everywhere else was about a filled cell sitting in a
+ * ROW of outlined ones, which is not what a dialog footer is. Flip it if Mark
+ * says so; it's one line, and GeneratePos's hand-rolled twin now uses it too.
  */
 export const DIALOG_CANCEL_CLASS =
   "text-[12px] font-semibold uppercase tracking-[0.06em] text-muted hover:text-ink disabled:opacity-35";

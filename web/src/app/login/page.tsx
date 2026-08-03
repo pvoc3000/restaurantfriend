@@ -77,7 +77,7 @@ export default function LoginPage() {
           <button
             type="submit"
             disabled={busy}
-            className="h-11 w-full bg-ink text-[13px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300"
+            className="h-11 w-full border border-ink bg-white text-[13px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
           >
             {busy ? "Signing in…" : "Sign in"}
           </button>

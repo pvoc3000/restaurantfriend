@@ -334,7 +334,7 @@ function PackageContentEditor({
       <button
         disabled={busy || content === null}
         onClick={save}
-        className="bg-ink px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300"
+        className="border border-ink bg-white px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
       >
         Save package content
       </button>
@@ -389,7 +389,7 @@ function PriceEditor({
       <button
         disabled={busy || !valid}
         onClick={save}
-        className="bg-ink px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300"
+        className="border border-ink bg-white px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
       >
         Save price
       </button>
@@ -447,7 +447,7 @@ function ParEditor({
       <button
         disabled={busy || !valid}
         onClick={save}
-        className="bg-ink px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:bg-neutral-300"
+        className="border border-ink bg-white px-4 py-2 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
       >
         Save par
       </button>

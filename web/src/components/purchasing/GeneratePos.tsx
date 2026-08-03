@@ -159,9 +159,12 @@ export function GeneratePos({
           footer={
             !loading &&
             (created ? (
+              // A hand-rolled twin of DIALOG_COMMIT_CLASS. Folded into the
+              // shared one (2026-08-02) so a dialog footer's commit has ONE
+              // definition to change — see the note on that constant.
               <Link
                 href="/purchase-orders"
-                className="inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white no-underline hover:bg-neutral-800"
+                className={`${DIALOG_COMMIT_CLASS} no-underline`}
               >
                 Open purchase orders
               </Link>
