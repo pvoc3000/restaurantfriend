@@ -18,7 +18,12 @@
 // with it visible. `overflow-y: clip` doesn't rescue it either; also measured.
 // Hence useOverflowOnlyWhenNeeded below.
 
-import { useCallback, useLayoutEffect, useSyncExternalStore } from "react";
+import {
+  useCallback,
+  useLayoutEffect,
+  useSyncExternalStore,
+  type RefObject,
+} from "react";
 
 // One MediaQueryList per threshold, cached: matchMedia objects are cheap but
 // not free, and every table on a screen asks the same question.
@@ -88,6 +93,50 @@ export const STICKY_HEAD_ROW =
  */
 export const STICKY_HEAD_ROW_IN_PANE =
   "[&>th]:sticky [&>th]:top-0 [&>th]:z-10 [&>th]:bg-white [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]";
+
+/**
+ * Publish an element's measured height as a CSS variable on `<html>`, and keep
+ * it honest as the element reflows.
+ *
+ * This is how anything sticky knows where the thing above it ends. It is
+ * MEASURED and never a constant for the reason the masthead taught: these bands
+ * wrap — the masthead to two or three rows at iPad widths, the order guide's
+ * controls to a second line whenever "Group by" can't share the row — so any
+ * constant is right at one width and wrong at another, and being wrong means a
+ * header sitting on top of the rows it labels.
+ *
+ * Written straight to the document rather than held in state: a resize must not
+ * re-render the eight hundred rows underneath, and there is nothing here for
+ * the set-state-in-effect lint to object to. Seed each variable in globals.css
+ * so the first paint — before this has run — is close rather than zero.
+ *
+ * Extracted from HeaderShell, which had the only copy, when the guide needed a
+ * second sticky band beneath the masthead.
+ */
+export function usePublishedHeight(
+  ref: RefObject<HTMLElement | null>,
+  cssVar: string
+) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const publish = () =>
+      document.documentElement.style.setProperty(
+        cssVar,
+        `${Math.round(el.getBoundingClientRect().height)}px`
+      );
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(el);
+    return () => {
+      observer.disconnect();
+      // Hand the variable back to its seed on the way out. The guide's band
+      // exists on one screen, and a height left behind on <html> would be a
+      // measurement of something that is no longer on the page.
+      document.documentElement.style.removeProperty(cssVar);
+    };
+  }, [ref, cssVar]);
+}
 
 /**
  * Make the wrapper a horizontal-scroll container ONLY when the table genuinely

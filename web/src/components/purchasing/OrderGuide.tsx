@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -35,6 +35,7 @@ import { GeneratePos } from "./GeneratePos";
 import { Reminders } from "./Reminders";
 import { ActionBar, ActionBarButton } from "@/components/ui/ActionBar";
 import { BackToTop } from "@/components/ui/BackToTop";
+import { usePublishedHeight } from "@/lib/tableHead";
 
 /**
  * The order guide (spec §4.6): the shop in walk order, item headers with par,
@@ -53,6 +54,7 @@ export function OrderGuide({
   initialFilter,
   initialGrouping,
   initialIgnoreDays,
+  initialTerm,
   guideDate,
   locationId,
   locationCode,
@@ -67,6 +69,8 @@ export function OrderGuide({
   initialFilter: GuideFilter;
   initialGrouping: GuideGrouping;
   initialIgnoreDays: boolean;
+  /** The remembered search term — see GuideView.term. */
+  initialTerm: string;
   guideDate: string;
   locationId: string;
   locationCode: string;
@@ -76,6 +80,11 @@ export function OrderGuide({
 }) {
   const router = useRouter();
   const supabase = createClient();
+
+  // The sticky controls band publishes its own height, so the column labels
+  // know where to stop. See the band itself, further down.
+  const controlsRef = useRef<HTMLDivElement>(null);
+  usePublishedHeight(controlsRef, "--rf-guide-controls-h");
 
   // Every screen is scroll-restored by the shell (components/ScrollMemory), but
   // the guide is the one screen its default key can't describe, so it names its
@@ -113,9 +122,11 @@ export function OrderGuide({
   // something up regardless of when you'd order it. The walked day still
   // decides which day's pars and favorites the rows carry.
   const [ignoreDays, setIgnoreDays] = useState(initialIgnoreDays);
-  // The search box is deliberately NOT remembered — coming back to a list
-  // silently narrowed by a term you've forgotten typing is its own trap.
-  const [term, setTerm] = useState("");
+  // Remembered with the rest of the view since 2026-08-03 (Mark). Seeded from
+  // the server like the others, so the first paint is already narrowed rather
+  // than showing the whole walk and then snapping — see GuideView.term for why
+  // this stopped being a trap.
+  const [term, setTerm] = useState(initialTerm);
   // Grouping is client-side only — the rows are already loaded, so switching
   // between the walk, an A–Z list and a per-vendor view costs nothing.
   const [grouping, setGrouping] = useState<GuideGrouping>(initialGrouping);
@@ -180,8 +191,9 @@ export function OrderGuide({
       filter,
       grouping,
       ignoreDays,
+      term,
     })}; path=/; SameSite=Lax`;
-  }, [weekday, filter, grouping, ignoreDays]);
+  }, [weekday, filter, grouping, ignoreDays, term]);
 
   async function commit(row: GuideRow, patch: Partial<EntryState>) {
     const current = entries.get(row.vendor_item_id) ?? { on_hand: null, qty_to_order: null };
@@ -281,9 +293,13 @@ export function OrderGuide({
    */
   function scrollToNext(selector: string) {
     const header = document.querySelector("header");
+    // The controls band joined this stack on 2026-08-03. Miss it out and every
+    // jump lands its row underneath the search box.
+    const controls = document.querySelector("[data-guide-controls]");
     const labels = document.querySelector("thead th");
     const offset =
       (header?.getBoundingClientRect().height ?? 0) +
+      (controls?.getBoundingClientRect().height ?? 0) +
       (labels?.getBoundingClientRect().height ?? 0);
 
     const targets = Array.from(document.querySelectorAll<HTMLElement>(selector));
@@ -585,6 +601,27 @@ export function OrderGuide({
         </span>
       </div>
 
+      {/* THE CONTROLS STAY ON SCREEN FOR THE WHOLE WALK (Mark, 2026-08-03:
+          "I would like to still have access to the search and filters when
+          scrolling down the order guide"). Everything else in the shelf — the
+          title, the day picker, the totals bar — is something you set before
+          you take a step, so it scrolls away; these three you reach for
+          mid-walk, and the guide is 66,000px long.
+
+          It publishes its measured height (see usePublishedHeight) and the
+          column labels below offset against the SUM, so the two bands stack
+          instead of overlapping. Measured, not a constant: this row wraps to a
+          second line the moment "Group by" can't share it, which at 1440 it
+          already can't.
+
+          z-30 puts it over the labels (20) and under the masthead (50). The
+          ActionBar and BackToTop share 30 and never meet it — they live at the
+          bottom of the viewport. */}
+      <div
+        ref={controlsRef}
+        data-guide-controls=""
+        className="sticky top-[var(--rf-header-h)] z-30 bg-white py-3"
+      >
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <TextInput
           value={term}
@@ -658,6 +695,7 @@ export function OrderGuide({
           />
         </span>
       </div>
+      </div>
 
       {/* Deliberately OUTSIDE the shelf: a failed write is the one thing up
           here that isn't a control, and it has to reach you whether or not the
@@ -726,7 +764,7 @@ export function OrderGuide({
               ].map(([label, extra]) => (
                 <th
                   key={label}
-                  className={`sticky top-[var(--rf-header-h)] z-20 bg-white px-4 py-3 font-normal shadow-[inset_0_-2px_0_var(--rf-neutral-900)] max-[1180px]:px-2 ${extra}`}
+                  className={`sticky top-[calc(var(--rf-header-h)_+_var(--rf-guide-controls-h))] z-20 bg-white px-4 py-3 font-normal shadow-[inset_0_-2px_0_var(--rf-neutral-900)] max-[1180px]:px-2 ${extra}`}
                 >
                   {label}
                 </th>

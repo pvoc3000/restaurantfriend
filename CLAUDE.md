@@ -1142,7 +1142,26 @@ weekday column, and 003 then silently made it per-vendor-item.
   (`lib/tableHead`) and the order guide's scroll pane subtracts it, so it stays
   measured rather than becoming a constant — the masthead wraps to two or three
   rows at iPad widths and any constant is wrong at some width. Any screen
-  sizing itself against the viewport should use the variable.
+  sizing itself against the viewport should use the variable. The measuring is
+  `usePublishedHeight` in `lib/tableHead` — reach for that rather than a second
+  ResizeObserver, and seed the new variable in `globals.css` so the first paint
+  is close rather than zero.
+  **The order guide's SEARCH AND FILTERS stay on screen for the whole walk**
+  (Mark, 2026-08-03: "I would like to still have access to the search and
+  filters when scrolling down the order guide"). The rest of the shelf — title,
+  day picker, totals bar — is what you set before taking a step, so it still
+  scrolls away; these three you reach for mid-walk, down 66,000px of list. The
+  band is `sticky top-[var(--rf-header-h)] z-30` (over the labels at 20, under
+  the masthead at 50 — the ActionBar and BackToTop share 30 and never meet it,
+  being at the bottom of the viewport) and publishes its own height as
+  **`--rf-guide-controls-h`**, which the guide's column labels ADD to their
+  offset. It has to be measured: the row wraps the moment "Group by" can't share
+  it, which at 1440 it already can't — 116px at 1440, 168px at 820, with the
+  masthead itself going 64 → 96. The variable is seeded 0 and cleared on
+  unmount, so every other list's labels keep offsetting against the masthead
+  alone. `scrollToNext` (Next favorite / Next section) sums the same three boxes
+  off the DOM, or every jump would land its row underneath the search box —
+  verified landing at exactly 222px, the labels' own bottom edge.
   **It used to COLLAPSE to a strip** (Mark, 2026-07-27 — ~88px at the top of
   every screen, "too much space… we would need a shortcut to bring it back"),
   driven by a ▲ in the utilities cluster. **Removed 2026-08-02** ("I don't
@@ -1805,7 +1824,17 @@ weekday column, and 003 then silently made it per-vendor-item.
   be known SERVER-side before the view is queried — a client store would paint
   the wrong day first. `signOut` deletes it, so it lasts "until you log out"
   (Mark, 2026-07-23). An explicit `?day=` still wins over the remembered day.
-  The search box is deliberately NOT remembered.
+  **The search box rides in that cookie too** (Mark, 2026-08-03: filters AND
+  searching should survive the trip to an item and back). It had been left out
+  on the argument that coming back to a list silently narrowed by a forgotten
+  term is its own trap; the sticky controls band retires that, since the term is
+  now on screen for as long as it's in force rather than scrolled away above the
+  walk. Server-seeded like the rest, so the first paint is already narrowed
+  instead of showing 717 items and snapping to 5. It also closes a mismatch
+  scroll memory could never see: the position was recorded against six search
+  hits and restored into seven hundred rows. Capped at 80 characters — a browser
+  drops an oversized cookie WHOLE, so a pasted paragraph would take the day and
+  the filters down with it.
   A list that persists sort in the URL must pass `sort`/`onSortChange` to
   `DataTable`, or the header arrow and the URL disagree.
 - **Scroll restoration is UNIVERSAL and nothing opts in** (`lib/scrollMemory.ts`

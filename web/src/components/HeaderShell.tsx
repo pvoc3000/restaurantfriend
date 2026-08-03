@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
+
+import { usePublishedHeight } from "@/lib/tableHead";
 
 /**
  * The masthead's shell: sticky, and the publisher of its own height.
@@ -23,19 +25,9 @@ import { useEffect, useRef } from "react";
 export function HeaderShell({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLElement>(null);
 
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const publish = () =>
-      document.documentElement.style.setProperty(
-        "--rf-header-h",
-        `${Math.round(el.getBoundingClientRect().height)}px`
-      );
-    publish();
-    const observer = new ResizeObserver(publish);
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
+  // The order guide publishes a second band the same way (--rf-guide-controls-h),
+  // so the measuring lives in one place — see lib/tableHead.
+  usePublishedHeight(ref, "--rf-header-h");
 
   return (
     // Sticky, and z-50 so it stays above anything a page floats over itself

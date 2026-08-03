@@ -32,6 +32,14 @@
      height — AppNav's py-1 (8px) + 2 × TIER_H (h-7 = 28px) = 64px. If either
      changes, change this. */
   --rf-header-h: 4rem;
+
+  /* The order guide's sticky search + filters band, republished by the guide
+     itself the same way. It is 0 on every other screen, which is exactly right:
+     the column labels everywhere else offset against the masthead alone, so
+     they can all share one expression without caring whether this band exists.
+     Seeded at 0 rather than at the guide's own height for the same reason — a
+     non-zero default would push every other list's labels down on first paint. */
+  --rf-guide-controls-h: 0px;
 }
 
 /* A table that has to scroll sideways gives up its sticky column labels — and

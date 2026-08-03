@@ -316,6 +316,20 @@ export type GuideView = {
   filter: GuideFilter;
   grouping: GuideGrouping;
   ignoreDays: boolean;
+  /**
+   * The search box (Mark, 2026-08-03: filters AND searching should survive the
+   * trip to an item and back). It was deliberately left out until now, on the
+   * argument that coming back to a list silently narrowed by a term you've
+   * forgotten typing is its own trap. Two things retire that argument: the
+   * controls are STICKY now, so the term is on screen for as long as it's in
+   * force rather than scrolled away above the walk, and the title's "N of 868
+   * items" was always there to say how much is being hidden.
+   *
+   * It also removes a mismatch scroll memory couldn't see: the position was
+   * recorded against a list of six search hits and restored into a list of
+   * seven hundred, which put you nowhere near where you left.
+   */
+  term: string;
 };
 
 export const DEFAULT_GUIDE_VIEW: GuideView = {
@@ -323,7 +337,16 @@ export const DEFAULT_GUIDE_VIEW: GuideView = {
   filter: "favorites",
   grouping: "section",
   ignoreDays: false,
+  term: "",
 };
+
+/**
+ * A search term long enough to threaten the 4KB cookie would take the DAY and
+ * the FILTERS down with it — a browser drops an oversized cookie whole, so a
+ * pasted paragraph would silently cost you the rest of the view. Nothing you
+ * would actually type comes close; this is only a fence against a paste.
+ */
+const MAX_REMEMBERED_TERM = 80;
 
 /** Tolerant of anything: a stale or hand-edited cookie falls back to defaults. */
 export function parseGuideView(raw: string | undefined | null): GuideView {
@@ -342,6 +365,7 @@ export function parseGuideView(raw: string | undefined | null): GuideView {
         ? grouping
         : DEFAULT_GUIDE_VIEW.grouping,
     ignoreDays: q.get("ignore") === "1",
+    term: (q.get("q") ?? "").slice(0, MAX_REMEMBERED_TERM),
   };
 }
 
@@ -351,6 +375,7 @@ export function serializeGuideView(view: GuideView): string {
     filter: view.filter,
     group: view.grouping,
     ignore: view.ignoreDays ? "1" : "0",
+    q: view.term.slice(0, MAX_REMEMBERED_TERM),
   }).toString();
 }
 

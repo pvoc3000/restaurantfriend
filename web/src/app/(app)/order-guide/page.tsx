@@ -154,6 +154,7 @@ export default async function OrderGuidePage({
       initialFilter={view.filter}
       initialGrouping={view.grouping}
       initialIgnoreDays={view.ignoreDays}
+      initialTerm={view.term}
       guideDate={guideDate}
       locationId={locationId}
       locationCode={session.activeLocation.code}
