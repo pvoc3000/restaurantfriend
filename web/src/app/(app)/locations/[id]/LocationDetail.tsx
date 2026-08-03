@@ -211,6 +211,25 @@ export async function LocationDetail({
         </dl>
       </div>
 
+      {/* ---- what hangs off this location ------------------------------ */}
+      {/* First after the identity (Mark, 2026-08-02). It's the fastest read on
+          the screen — four numbers that say how much of the business is at this
+          shop — and it answers "is this location real yet?" before you start
+          into the fields. Everything below it is detail you go looking for. */}
+      <section className="space-y-2">
+        <Heading>In the system</Heading>
+        {/* Figures, not links (Mark, 2026-08-01: "drop the links, but keep the
+            info. It's handy."). Every one of those screens is scoped to the
+            WORKING location, so a link from this record was only ever right by
+            coincidence — and wrong on the five records that aren't it. */}
+        <div className="flex flex-wrap gap-x-10 gap-y-4">
+          <Count label="Shop sections" value={sectionCount} />
+          <Count label="Vendors here" value={vendorCount} />
+          <Count label="Items stocked" value={itemCount} />
+          <Count label="Purchase orders" value={poCount} />
+        </div>
+      </section>
+
       {/* ---- addresses ------------------------------------------------ */}
       <div className="grid gap-8 lg:grid-cols-2">
         <section className="space-y-2">
@@ -280,21 +299,6 @@ export async function LocationDetail({
           shopsFor={location.shops_for}
           editable={editable}
         />
-      </section>
-
-      {/* ---- what hangs off this location ------------------------------ */}
-      <section className="space-y-2">
-        <Heading>In the system</Heading>
-        {/* Figures, not links (Mark, 2026-08-01: "drop the links, but keep the
-            info. It's handy."). Every one of those screens is scoped to the
-            WORKING location, so a link from this record was only ever right by
-            coincidence — and wrong on the five records that aren't it. */}
-        <div className="flex flex-wrap gap-x-10 gap-y-4">
-          <Count label="Shop sections" value={sectionCount} />
-          <Count label="Vendors here" value={vendorCount} />
-          <Count label="Items stocked" value={itemCount} />
-          <Count label="Purchase orders" value={poCount} />
-        </div>
       </section>
 
       {/* ---- who POs come from ----------------------------------------- */}
