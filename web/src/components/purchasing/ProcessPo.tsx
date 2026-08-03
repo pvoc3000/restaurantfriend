@@ -4,7 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { TextInput } from "@/components/ui/TextInput";
-import { Dialog } from "@/components/ui/Dialog";
+import {
+  Dialog,
+  DIALOG_CANCEL_CLASS,
+  DIALOG_COMMIT_CLASS,
+} from "@/components/ui/Dialog";
 import { OrderBar } from "./OrderBar";
 import {
   buildEmailParts,
@@ -304,8 +308,61 @@ export function ProcessPo({
           onClose={closeCompose}
           busy={busy !== null}
           width="max-w-5xl"
-          top="pt-[6vh]"
-          bodyClassName="grid gap-4 p-6 md:grid-cols-2"
+          // A DEFINITE height, not the default cap (Mark, 2026-08-03: "make
+          // that panel bigger… at least 1.5x taller"). It used to shrink-wrap
+          // its content, which meant the 26rem floor on the preview WAS the
+          // panel: measured 512px tall in a 720px window, well under the 85vh
+          // it was allowed. Giving the panel a real height and stretching the
+          // grid row (below) lets the preview take everything that's left, so
+          // the document you are about to send is the biggest thing on screen.
+          top="pt-[4vh]"
+          height="h-[88vh]"
+          // md:grid-rows-1 is what makes `h-full` on the preview mean anything:
+          // an implicit grid row is content-sized, so the pane was falling back
+          // to its own min-height no matter how tall the panel got.
+          bodyClassName="grid min-h-0 gap-4 p-6 md:grid-cols-2 md:grid-rows-1"
+          footer={
+            <>
+              <span className="mr-auto text-xs text-subtle">
+                Attached: {attachment?.filename} — the document shown here is
+                what sends
+              </span>
+              <button
+                disabled={busy !== null}
+                onClick={closeCompose}
+                className={DIALOG_CANCEL_CLASS}
+              >
+                Cancel
+              </button>
+              <button
+                disabled={busy !== null}
+                onClick={useMailApp}
+                className={btn}
+                title="Hand this email to your mail app instead (attachment via the share sheet where supported)"
+              >
+                {busy === "mailapp" ? "Rendering…" : "Use Mail app"}
+              </button>
+              {/* BLACK, and this is the endorsed exception rather than a
+                  departure (Mark, 2026-08-03). The 2026-08-02 sweep turned
+                  every button white because a filled cell in a ROW OF PEERS
+                  reads as a different kind of control — but a panel exists to
+                  produce ONE outcome, so its footer is a two-weight decision: a
+                  text Cancel beside the commit. The sweep caught this button
+                  along with the card's, and the card's was right to change. */}
+              <button
+                disabled={busy !== null || !compose.to.trim()}
+                onClick={send}
+                className={DIALOG_COMMIT_CLASS}
+                title={
+                  compose.to.trim()
+                    ? "Send now — the PO is marked sent automatically"
+                    : "Add a recipient first"
+                }
+              >
+                {busy === "send" ? "Sending…" : "Send"}
+              </button>
+            </>
+          }
         >
             <div className="space-y-2">
             <div className="grid grid-cols-[4rem_1fr] items-center gap-x-2 gap-y-1.5">
@@ -342,42 +399,6 @@ export function ProcessPo({
               onChange={(e) => setCompose({ ...compose, body: e.target.value })}
               className="border border-ink bg-white px-2 py-1 outline-none focus:border-2"
             />
-          </div>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <span className="text-xs text-subtle">
-              Attached: {attachment?.filename} — the document shown here is what
-              sends
-            </span>
-            <span className="ml-auto flex items-center gap-3">
-              <button
-                disabled={busy !== null}
-                onClick={closeCompose}
-                className="text-[12px] font-semibold uppercase tracking-[0.06em] text-muted hover:text-ink disabled:opacity-35"
-              >
-                Cancel
-              </button>
-              <button
-                disabled={busy !== null}
-                onClick={useMailApp}
-                className={btn}
-                title="Hand this email to your mail app instead (attachment via the share sheet where supported)"
-              >
-                {busy === "mailapp" ? "Rendering…" : "Use Mail app"}
-              </button>
-              <button
-                disabled={busy !== null || !compose.to.trim()}
-                onClick={send}
-                className={btn}
-                title={
-                  compose.to.trim()
-                    ? "Send now — the PO is marked sent automatically"
-                    : "Add a recipient first"
-                }
-              >
-                {busy === "send" ? "Sending…" : "Send"}
-              </button>
-            </span>
           </div>
 
             {/* A send failure must surface INSIDE the dialog — the card's own

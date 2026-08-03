@@ -1069,6 +1069,13 @@ weekday column, and 003 then silently made it per-vendor-item.
   Cancel — where a screen full of peer buttons is not. That is the whole of the
   exception: a commit inside a panel. It does not license a black button on a
   screen.
+  The 2026-08-02 sweep had over-applied itself here: it whitened BOTH of
+  ProcessPo's send buttons, and only one of them was on a screen. The PO email
+  compose is a `ui/Dialog`, so its **Send** is a panel commit and went back to
+  `DIALOG_COMMIT_CLASS` on 2026-08-03 at Mark's request ("the send button should
+  be black since it's the primary action") — which is the rule being applied,
+  not bent. The tell that a button qualifies is the footer beside it: a text
+  Cancel and a secondary escape hatch, not a row of peers.
   **"But which button is primary on a SCREEN, then?" — none, and the question
   dissolves** (re-opened 2026-08-02 and closed the same way). Outside a panel
   footer there is no primary to find, so there is nothing to decide per screen.
@@ -1215,6 +1222,21 @@ weekday column, and 003 then silently made it per-vendor-item.
   extracted from the three hand-rolled copies that had each learned a different
   subset of these lessons; `toolbar` is the pinned band under the title bar for a
   search box that must not scroll away.
+  **Use the `footer` PROP, not a last row in the body** — a commit row left in
+  the body scrolls away, which is the very thing this bullet exists to prevent.
+  The PO email compose had it in the body until 2026-08-03 and nobody had
+  noticed, because the panel had never been tall enough to scroll.
+  **`height` defaults to the CAP (`max-h-[85vh]`) and a caller may pass a
+  DEFINITE height instead** (Mark, 2026-08-03: "make that panel bigger… at least
+  1.5x taller"). A cap is right for a confirm — as tall as its content and no
+  taller — and wrong for a panel whose point is a big pane to look at: the email
+  compose shrink-wrapped to 512px in a 720px window, because the 26rem floor on
+  its PDF preview WAS the panel. It passes `h-[88vh]` now (880px at a 1000px
+  window, 1.72×). Pass one INSTEAD of the cap, never as well — `max-height`
+  beats `height`, so leaving the cap would silently clamp anything over 85vh.
+  A stretched pane also needs **`md:grid-rows-1`** on a grid body: an implicit
+  row is content-sized, so `h-full` on the pane means nothing and it falls back
+  to its own min-height however tall the panel gets.
 - **A DataTable column holding a day picker must be `WEEKDAY_PICKER_WIDTH`**
   (300px, exported from `WeekdayPicker.tsx`). The table is `table-fixed` with
   `truncate` cells, so a narrow column silently CLIPS the right-hand end rather

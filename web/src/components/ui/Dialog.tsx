@@ -45,6 +45,7 @@ export function Dialog({
   toolbar,
   width = "max-w-xl",
   top = "pt-[8vh]",
+  height = "max-h-[85vh]",
   bodyClassName = "p-6",
   busy = false,
   ariaLabel,
@@ -61,6 +62,17 @@ export function Dialog({
   width?: string;
   /** How far down the viewport the panel starts. */
   top?: string;
+  /**
+   * The panel's vertical size. Defaults to a CAP, so a dialog is as tall as its
+   * content and no taller — right for a confirm.
+   *
+   * A dialog whose whole point is a big pane to look at wants the opposite: a
+   * DEFINITE height (`h-[88vh]`), so the body has a real box to fill instead of
+   * shrink-wrapping a placeholder. Pass one instead of the cap, not as well —
+   * `max-height` beats `height`, so leaving the cap in place would silently
+   * clamp anything taller than 85vh.
+   */
+  height?: string;
   bodyClassName?: string;
   /** While true the dialog refuses to close — a write is in flight. */
   busy?: boolean;
@@ -88,7 +100,7 @@ export function Dialog({
         role="dialog"
         aria-label={ariaLabel ?? (typeof title === "string" ? title : undefined)}
         onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[85vh] w-full ${width} flex-col whitespace-normal border-2 border-ink bg-white text-ink`}
+        className={`flex ${height} w-full ${width} flex-col whitespace-normal border-2 border-ink bg-white text-ink`}
       >
         <div className="flex shrink-0 items-center justify-between gap-4 bg-ink px-6 py-3 text-white">
           <h2 className="text-[13px] font-bold uppercase tracking-[0.06em]">{title}</h2>
