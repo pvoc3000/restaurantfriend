@@ -82,9 +82,12 @@ export function useAttachmentActions({ poId, orgId }: { poId: string; orgId: str
     router.refresh();
   }
 
-  async function upload(files: FileList, kind: AttachmentKind) {
+  // `File[]`, not `FileList`: files reach this by two routes now — the picker,
+  // whose input hands back a FileList, and a drop, which hands back a plain
+  // array after the drop zone has vetted the types.
+  async function upload(files: readonly File[], kind: AttachmentKind) {
     setError(null);
-    for (const file of Array.from(files)) {
+    for (const file of files) {
       setPhase({ kind: "uploading", label: `Uploading ${file.name}…` });
       const path = attachmentPath(orgId, poId, file.name);
 

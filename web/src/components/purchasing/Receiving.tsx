@@ -9,7 +9,11 @@ import { TabPicker } from "@/components/ui/TabPicker";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { Pane, PaneHeader } from "@/components/ui/Pane";
 import { BackToTop } from "@/components/ui/BackToTop";
-import type { AttachmentKind, SignedAttachment } from "@/lib/attachments";
+import {
+  attachmentRejection,
+  type AttachmentKind,
+  type SignedAttachment,
+} from "@/lib/attachments";
 import { matchInvoiceToOrder } from "@/lib/invoiceMatch";
 import {
   canClose,
@@ -482,6 +486,7 @@ export function Receiving({
       busy={saving}
       onPick={setPickedId}
       onFilesPicked={(files) => void upload(files, kind)}
+      onDropRejected={(rejected) => setError(attachmentRejection(rejected))}
       onRemove={(a) => void remove(a)}
       fileRef={fileRef}
       kind={kind}

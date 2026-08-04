@@ -12,6 +12,53 @@ export const ATTACHMENT_BUCKET = "po-attachments";
  *  that a URL copied out of the page stops working by the end of the shift. */
 export const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
+/**
+ * What may be attached, named rather than wildcarded.
+ *
+ * `image/*` is wrong here: a photo taken from an iPhone's library arrives as
+ * HEIC, which the model API won't read, and naming the formats makes iOS
+ * transcode on the way out — so the failure happens at PICK time rather than at
+ * extraction time with the invoice already filed.
+ *
+ * One list, two consumers that see files by different routes: the file input's
+ * `accept`, and the drop zone, which gets no help from `accept` at all and has
+ * to check for itself. They must not drift — a format droppable but not
+ * pickable (or the reverse) is a bug nobody would think to look for.
+ */
+export const ATTACHMENT_ACCEPT = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "application/pdf",
+] as const;
+
+/** The same list in the form an `<input accept>` wants. */
+export const ATTACHMENT_ACCEPT_ATTR = ATTACHMENT_ACCEPT.join(",");
+
+/**
+ * What to say about files that can't be attached.
+ *
+ * HEIC gets its own sentence because it is the PREDICTABLE failure — it's what
+ * an iPhone photo is, it's the exact case `ATTACHMENT_ACCEPT` was written to
+ * head off, and "unsupported format" tells someone holding an invoice nothing
+ * about what to do next. It also names the way through that needs no other
+ * app: the Attach button asks iOS to transcode, which a drag out of Photos
+ * never will.
+ */
+export function attachmentRejection(
+  rejected: readonly { name: string; type: string }[]
+): string {
+  if (rejected.length === 0) return "";
+  const names = rejected.map((f) => f.name).join(", ");
+  const heic = rejected.some((f) => /heic|heif/i.test(f.type || f.name));
+  return (
+    `${names} can't be attached — use a JPEG, PNG, WebP or PDF.` +
+    (heic
+      ? " That's an iPhone HEIC photo: attach it with the Attach button, which asks iOS to convert it on the way out, or export a JPEG first."
+      : "")
+  );
+}
+
 export type AttachmentKind = "invoice" | "packing_slip" | "photo" | "other";
 
 /** Exactly 001's check constraint — a value outside it is a failed insert. */

@@ -567,6 +567,27 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `READ_ONLY_VALUE` moved to `catalog/InlineValue` when this made it a second
    caller — it's defined by that component's own resting padding, so it belongs
    beside it.
+   **A file can be DROPPED on the document pane** (Mark, 2026-08-03: "can the
+   user drag a pdf onto the pdf viewer… to attach it"), `ui/FileDropZone`
+   wrapping the viewer — not the whole pane, so the header band's controls keep
+   working mid-drag. It attaches as whatever KIND the band's picker currently
+   says, so a dropped invoice auto-reads like a picked one.
+   Two things it has to do that a naive `onDrop` wouldn't. **A PDF in an
+   `<object>` is a plugin and swallows drag events**, so aiming at the document
+   you are looking at — the obvious place to aim — would do nothing; the zone
+   arms off WINDOW drag events and puts an overlay over the region, and the
+   overlay is what takes the drop. **And `accept` does not apply to a drop** —
+   that attribute governs the PICKER only, so the HEIC guard the picker's format
+   list exists for is absent on this path and the zone re-checks types itself
+   (`lib/fileTypes`), before anything is uploaded. `ATTACHMENT_ACCEPT` in
+   `lib/attachments` is now the one list both routes read, and
+   `attachmentRejection` words the refusal — HEIC gets its own sentence naming
+   the Attach button, which asks iOS to transcode where a drag never will.
+   A file dropped ANYWHERE else on the page while a drag is live is swallowed
+   rather than opened, or the browser's own default would replace a half-counted
+   delivery with a PDF viewer. 17 fixtures.
+   NOT done: the same gesture on PO detail's Paperwork card — the zone is
+   general and it's a few lines, it just wasn't asked for.
    **Auto-read on attach, `invoice` kind only**, in `useAttachmentActions`
    (shared with PO detail's Paperwork card, because it's a decision about the
    ACT of attaching, not about a screen). The upload STANDS if the read fails.
@@ -1068,6 +1089,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/PageLoading` | a spinner | the body of every `loading.tsx` |
   | `ui/ProgressBand` | a word in a button's label | something slow on a screen that's ALREADY painted (an invoice read is 30s+); same indeterminate bar, never a Dialog — the work behind it must stay usable |
   | `ui/Pane` + `PaneHeader` | a bordered div with a header band you style yourself | a framed column standing beside another (receiving's document + lines): one FIXED-height band so the two rules line up, and `overflow-hidden` so nothing paints over the frame |
+  | `ui/FileDropZone` | `onDrop` on a div | dropping files onto a region. Its OVERLAY takes the drop (a PDF `<object>` is a plugin and swallows drag events), it arms off WINDOW drag events so it's up before the pointer arrives, it vets types itself (`accept` governs only the picker), and it stops a stray drop navigating the page away |
   | `ui/RecordNav` + `lib/recordSet` | going back to the list for the next record | FMP's book on a detail screen: the LIST publishes its found set, the detail walks it |
   | `DataTable columnChooser` | a bespoke checklist, or placing `ColumnsMenu` yourself | show/hide columns on a list — the table puts it above its own last column header; pair it with `DataColumn.pinned` on the column that IS the row |
   | `ui/BackToTop` | — | long lists; already on the guide |

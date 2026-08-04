@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { FileDropZone } from "@/components/ui/FileDropZone";
 import { PickList } from "@/components/ui/PickList";
 import { Pane, PaneHeader } from "@/components/ui/Pane";
 import {
   fileSize,
   isImage,
+  ATTACHMENT_ACCEPT,
+  ATTACHMENT_ACCEPT_ATTR,
   ATTACHMENT_KIND_LABEL,
   ATTACHMENT_KIND_OPTIONS,
   type AttachmentKind,
@@ -37,6 +40,7 @@ export function DocumentPane({
   busy,
   onPick,
   onFilesPicked,
+  onDropRejected,
   onRemove,
   fileRef,
   kind,
@@ -50,7 +54,10 @@ export function DocumentPane({
   canEdit: boolean;
   busy: boolean;
   onPick: (id: string) => void;
-  onFilesPicked: (files: FileList) => void;
+  onFilesPicked: (files: File[]) => void;
+  /** Files the drop zone refused — said where the screen says its other
+   *  errors, rather than inside a pane the file never entered. */
+  onDropRejected: (rejected: File[]) => void;
   onRemove: (a: SignedAttachment) => void;
   fileRef: React.RefObject<HTMLInputElement | null>;
   kind: AttachmentKind;
@@ -141,10 +148,10 @@ export function DocumentPane({
           // read. Naming these makes iOS transcode on the way out, so the
           // failure happens at pick time rather than at extraction time with
           // the invoice already filed.
-          accept="image/jpeg,image/png,image/webp,application/pdf"
+          accept={ATTACHMENT_ACCEPT_ATTR}
           className="hidden"
           onChange={(e) => {
-            if (e.target.files?.length) onFilesPicked(e.target.files);
+            if (e.target.files?.length) onFilesPicked(Array.from(e.target.files));
           }}
         />
       </PaneHeader>
@@ -153,7 +160,17 @@ export function DocumentPane({
           area reserved for a document that isn't there is 700px of nothing to
           scroll past before the first line — on exactly the device this screen
           is for. It sizes to its own sentence until there's something to show. */}
-      <div
+      {/* Drop a file straight onto the document (Mark, 2026-08-03). The zone
+          wraps the viewer rather than the whole pane so the header band's own
+          controls keep working mid-drag, and its overlay is what catches the
+          drop — a PDF is a plugin and swallows drag events, so without the
+          layer, aiming at the document you're looking at would do nothing. */}
+      <FileDropZone
+        disabled={!canEdit || busy}
+        accept={ATTACHMENT_ACCEPT}
+        label={`Drop to attach as ${ATTACHMENT_KIND_LABEL[kind].toLowerCase()}`}
+        onFiles={onFilesPicked}
+        onReject={onDropRejected}
         className={
           attachment === null
             ? "shrink-0"
@@ -165,7 +182,7 @@ export function DocumentPane({
         ) : (
           <Viewer key={attachment.id} attachment={attachment} />
         )}
-      </div>
+      </FileDropZone>
     </Pane>
   );
 }
@@ -175,7 +192,7 @@ function Empty({ canEdit }: { canEdit: boolean }) {
     <div className="px-6 py-8 text-center">
       <p className="text-sm text-muted">
         No invoice or packing slip on this order yet.
-        {canEdit && " Attach one and it'll be read automatically."}
+        {canEdit && " Drop one here, or use Attach — it'll be read automatically."}
         <br />
         <span className="text-xs">
           You can still receive against the ordered quantities.

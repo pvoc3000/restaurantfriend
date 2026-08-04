@@ -4,6 +4,7 @@ import { useState } from "react";
 import {
   fileSize,
   isImage,
+  ATTACHMENT_ACCEPT_ATTR,
   ATTACHMENT_KIND_LABEL,
   ATTACHMENT_KIND_OPTIONS,
   type AttachmentKind,
@@ -103,10 +104,10 @@ export function PoAttachments({
               ref={fileRef}
               type="file"
               multiple
-              accept="image/jpeg,image/png,image/webp,application/pdf"
+              accept={ATTACHMENT_ACCEPT_ATTR}
               className="hidden"
               onChange={(e) => {
-                if (e.target.files?.length) void upload(e.target.files, kind);
+                if (e.target.files?.length) void upload(Array.from(e.target.files), kind);
               }}
             />
           </span>

@@ -8,6 +8,7 @@ import "./columnVisibility.fixtures";
 import "./documentLines.fixtures";
 import "./employeeDocuments.fixtures";
 import "./employees.fixtures";
+import "./fileDrop.fixtures";
 import "./invoiceDate.fixtures";
 import "./invoiceMatch.fixtures";
 import "./packLabel.fixtures";
