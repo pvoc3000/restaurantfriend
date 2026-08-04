@@ -586,8 +586,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    A file dropped ANYWHERE else on the page while a drag is live is swallowed
    rather than opened, or the browser's own default would replace a half-counted
    delivery with a PDF viewer. 17 fixtures.
-   NOT done: the same gesture on PO detail's Paperwork card — the zone is
-   general and it's a few lines, it just wasn't asked for.
+   **PO detail's Paperwork card takes a drop too** (Mark, 2026-08-03), the
+   WHOLE card being the target. A refused drop is reported through
+   `useAttachmentActions.reportError` rather than either screen's own error
+   state, so it lands in the same line as an upload failure and reads the same
+   on both — the same argument auto-read lives in that hook for. Its empty
+   state says "Nothing attached — drop one here" only when you can actually
+   write.
    **Auto-read on attach, `invoice` kind only**, in `useAttachmentActions`
    (shared with PO detail's Paperwork card, because it's a decision about the
    ACT of attaching, not about a screen). The upload STANDS if the read fails.

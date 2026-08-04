@@ -173,6 +173,16 @@ export function useAttachmentActions({ poId, orgId }: { poId: string; orgId: str
     phase,
     busy: phase.kind !== "idle",
     error,
+    /**
+     * Say something went wrong with attaching, without having attached
+     * anything — a drop this surface refused before it reached Storage.
+     *
+     * It goes through the hook so a refused drop reads the same on both
+     * surfaces, in the same line as an upload failure. That's the same argument
+     * auto-read is here for: it's a fact about the ACT of attaching, and two
+     * screens owning two copies is how they drift.
+     */
+    reportError: (message: string) => setError(message),
     clearError: () => setError(null),
     fileRef,
     upload,

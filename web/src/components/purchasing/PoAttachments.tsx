@@ -2,14 +2,17 @@
 
 import { useState } from "react";
 import {
+  attachmentRejection,
   fileSize,
   isImage,
+  ATTACHMENT_ACCEPT,
   ATTACHMENT_ACCEPT_ATTR,
   ATTACHMENT_KIND_LABEL,
   ATTACHMENT_KIND_OPTIONS,
   type AttachmentKind,
   type SignedAttachment,
 } from "@/lib/attachments";
+import { FileDropZone } from "@/components/ui/FileDropZone";
 import { PickList } from "@/components/ui/PickList";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { useAttachmentActions } from "./useAttachmentActions";
@@ -45,6 +48,12 @@ import { useAttachmentActions } from "./useAttachmentActions";
  * receiving screen's document pane — including AUTO-READ, which fires here too
  * because it's a decision about attaching an invoice rather than about a
  * screen.
+ *
+ * The whole CARD is a drop target (`ui/FileDropZone`), matching the receiving
+ * screen's document pane. Note what that buys beyond convenience: the format
+ * check the picker gets free from `accept` does not exist on a drop, so without
+ * the zone doing it, dropping the HEIC that the paragraph above is entirely
+ * about would work, and fail hours later at extraction.
  */
 export function PoAttachments({
   poId,
@@ -60,21 +69,28 @@ export function PoAttachments({
   canEdit: boolean;
 }) {
   const [kind, setKind] = useState<AttachmentKind>("invoice");
-  const { phase, busy, error, fileRef, upload, read, remove } = useAttachmentActions({
-    poId,
-    orgId,
-  });
+  const { phase, busy, error, fileRef, upload, read, remove, reportError } =
+    useAttachmentActions({ poId, orgId });
 
   return (
-    <div className="space-y-3 border border-ink bg-white px-4 py-3">
+    <FileDropZone
+      disabled={!canEdit || busy}
+      accept={ATTACHMENT_ACCEPT}
+      label={`Drop to attach as ${ATTACHMENT_KIND_LABEL[kind].toLowerCase()}`}
+      onFiles={(files) => void upload(files, kind)}
+      onReject={(rejected) => reportError(attachmentRejection(rejected))}
+      className="space-y-3 border border-ink bg-white px-4 py-3"
+    >
       <div className="flex flex-wrap items-center gap-4">
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Paperwork
         </h2>
         <span className="text-sm text-muted">
-          {attachments.length === 0
-            ? "Nothing attached"
-            : `${attachments.length} ${attachments.length === 1 ? "file" : "files"}`}
+          {attachments.length > 0
+            ? `${attachments.length} ${attachments.length === 1 ? "file" : "files"}`
+            : canEdit
+              ? "Nothing attached — drop one here"
+              : "Nothing attached"}
         </span>
 
         {canEdit && (
@@ -196,6 +212,6 @@ export function PoAttachments({
           ))}
         </ul>
       )}
-    </div>
+    </FileDropZone>
   );
 }

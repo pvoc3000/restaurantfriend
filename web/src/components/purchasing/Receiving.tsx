@@ -157,6 +157,7 @@ export function Receiving({
     fileRef,
     upload,
     remove,
+    reportError,
   } = useAttachmentActions({ poId: order.id, orgId });
 
   const saving = pending || attachBusy;
@@ -201,6 +202,14 @@ export function Receiving({
     after?.();
     startTransition(() => router.refresh());
     return true;
+  }
+
+  /** A drop the zone refused. Reported through the attachment hook rather than
+   *  this screen's own error state, so a refused drop reads identically here
+   *  and on PO detail's Paperwork card — the same argument auto-read is in that
+   *  hook for. */
+  function rejectDrop(rejected: File[]) {
+    reportError(attachmentRejection(rejected));
   }
 
   function setReceived(line: PoLine, value: number | null) {
@@ -486,7 +495,7 @@ export function Receiving({
       busy={saving}
       onPick={setPickedId}
       onFilesPicked={(files) => void upload(files, kind)}
-      onDropRejected={(rejected) => setError(attachmentRejection(rejected))}
+      onDropRejected={rejectDrop}
       onRemove={(a) => void remove(a)}
       fileRef={fileRef}
       kind={kind}
