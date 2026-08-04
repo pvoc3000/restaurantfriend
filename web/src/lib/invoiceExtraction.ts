@@ -36,6 +36,20 @@ export type InvoiceLine = {
   unit_price: number | null;
   extended: number | null;
   pack: string | null;
+  /**
+   * OUR purchase order number as printed on THIS line, when the page prints one
+   * per line rather than once at the top.
+   *
+   * That per-line form is what a consolidated invoice looks like — a
+   * distributor filling two of our orders off one truck bills them on one page
+   * and prints the PO beside each line. Where the header number is a hint about
+   * the whole document, this one is a hint about where a single line belongs,
+   * which is where the split actually happens.
+   *
+   * Optional here and required in the edge function's schema, for
+   * `alt_product_id`'s reason: readings stored before 2026-08-04 don't carry it.
+   */
+  purchase_order_number?: string | null;
 };
 
 export type InvoiceExtraction = {
@@ -51,6 +65,51 @@ export type InvoiceExtraction = {
    * `unreadable` gets below.
    */
   ship_date?: string | null;
+  /**
+   * When payment is due, if the page prints such a field — never derived from
+   * the terms, which are words rather than a date.
+   *
+   * Optional here, required in the schema: the same both-sides treatment
+   * `ship_date` gets, and for the same reason.
+   */
+  due_date?: string | null;
+  /** Payment terms as PRINTED ("Net 30", "COD"). Not normalized — the words are
+   *  the vendor's. */
+  terms?: string | null;
+  /**
+   * OUR purchase order number, printed back to us at the top of the page.
+   *
+   * A free and exact join key: `purchase_orders.po_number` is the same string.
+   * It is a PROPOSAL like everything else here — one OCR digit away from
+   * someone else's order — so it is offered, never taken (see
+   * `matchPrintedPoNumber`).
+   */
+  purchase_order_number?: string | null;
+  /**
+   * The foot of the invoice.
+   *
+   * These exist because a delivery fee, a fuel surcharge or a container deposit
+   * is on the invoice and on NO purchase order line. Without somewhere to put
+   * them `invoice_total` never equals the sum of the lines and every invoice
+   * looks like it fails reconciliation.
+   *
+   * Null means NOT PRINTED, which is a different claim from zero — see
+   * `invoiceCharges`, which preserves the distinction.
+   */
+  subtotal?: number | null;
+  tax?: number | null;
+  freight?: number | null;
+  other_charges?: number | null;
+  /**
+   * This document is a credit rather than a bill.
+   *
+   * The reading transcribes amounts exactly as printed, negatives included; the
+   * RECORD normalizes to a flag plus positive magnitudes. That seam is
+   * `invoiceHeaderFromExtraction`, and it exists because OCR returns "-142.10",
+   * "142.10 CR" and a positive number on a page headed CREDIT MEMO
+   * interchangeably.
+   */
+  is_credit?: boolean | null;
   invoice_total: number | null;
   lines: InvoiceLine[];
   /**
@@ -108,8 +167,12 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
  * The round-trip is the part that matters: `new Date("2026-02-31")` does not
  * fail, it rolls over to March 2nd. Formatting the parsed date back and
  * comparing is what catches a day that doesn't exist.
+ *
+ * Exported since 2026-08-04, when `due_date` arrived: it lands in a `date`
+ * column too and needs exactly this check, and a second copy of a round trip
+ * this subtle is precisely the drift the parts inventory exists to prevent.
  */
-function isoDate(raw: string | null | undefined): string | null {
+export function isoDate(raw: string | null | undefined): string | null {
   if (!raw || !ISO_DATE.test(raw)) return null;
   const parsed = new Date(`${raw}T00:00:00Z`);
   if (Number.isNaN(parsed.getTime())) return null;
@@ -131,6 +194,57 @@ export function invoiceDeliveryDate(e: InvoiceExtraction): InvoiceDeliveryDate |
   const invoiced = isoDate(e.invoice_date);
   if (invoiced) return { date: invoiced, source: "invoice" };
   return null;
+}
+
+/**
+ * The due date this invoice printed, if it printed a real one.
+ *
+ * Same round trip as every other date here, and for the same reason:
+ * `vendor_invoices.due_date` is a `date` column, and the aging buckets that
+ * read it would otherwise sort a bill by a day that doesn't exist.
+ */
+export function invoiceDueDate(e: InvoiceExtraction): string | null {
+  return isoDate(e.due_date);
+}
+
+/** The invoice's foot, with null kept as null. */
+export type InvoiceCharges = {
+  subtotal: number | null;
+  tax: number | null;
+  freight: number | null;
+  other: number | null;
+  total: number | null;
+};
+
+/**
+ * The amounts at the foot of the invoice, read straight through.
+ *
+ * Nulls are NOT coerced to zero at this layer, deliberately: "no tax line was
+ * printed" and "tax was $0.00" are different claims, and the totals check
+ * downstream words itself differently depending on which it's looking at.
+ * Coercing here would throw that away before anyone could ask.
+ */
+export function invoiceCharges(e: InvoiceExtraction): InvoiceCharges {
+  return {
+    subtotal: e.subtotal ?? null,
+    tax: e.tax ?? null,
+    freight: e.freight ?? null,
+    other: e.other_charges ?? null,
+    total: e.invoice_total,
+  };
+}
+
+/**
+ * Is this reading a CREDIT rather than a bill?
+ *
+ * Two signals, either of which is enough. The flag is the direct answer, but a
+ * model that misses the words at the top of the page still hands back a
+ * negative total — and one signal alone would let a credit memo be filed as a
+ * bill for the same amount, which is a payment in the wrong direction.
+ */
+export function isCreditReading(e: InvoiceExtraction): boolean {
+  if (e.is_credit === true) return true;
+  return e.invoice_total !== null && e.invoice_total < 0;
 }
 
 /**

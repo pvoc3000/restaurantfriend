@@ -70,6 +70,14 @@ const INVOICE_SCHEMA = {
     "invoice_number",
     "invoice_date",
     "ship_date",
+    "due_date",
+    "terms",
+    "purchase_order_number",
+    "subtotal",
+    "tax",
+    "freight",
+    "other_charges",
+    "is_credit",
     "invoice_total",
     "lines",
     "notes",
@@ -83,6 +91,28 @@ const INVOICE_SCHEMA = {
     // day, and receiving cares about the day — this is what the receiving
     // screen offers as the order's delivery date.
     ship_date: nullable("string"),
+    // When the money is owed. The single highest-value field for the Invoices
+    // module: it is what turns a list of bills into an aging report.
+    due_date: nullable("string"),
+    terms: nullable("string"),
+    // OUR purchase order number, as the vendor printed it back to us — a free,
+    // exact join key that turns "which order is this?" into a lookup. Also
+    // declared per LINE below, because a distributor consolidating two orders
+    // prints the PO per line, which is precisely the one-invoice-two-orders
+    // case the Invoices module has to handle.
+    purchase_order_number: nullable("string"),
+    // The foot of the invoice. These matter because a delivery fee, a fuel
+    // surcharge or a container deposit is on the invoice and on NO purchase
+    // order line — without somewhere to put them, invoice_total never equals
+    // the sum of the lines and reconciliation looks broken on every order.
+    subtotal: nullable("number"),
+    tax: nullable("number"),
+    freight: nullable("number"),
+    other_charges: nullable("number"),
+    // A credit memo rather than a bill. Reported as a FLAG, with the amounts
+    // still transcribed exactly as printed — the record normalizes the sign
+    // (see `invoiceHeaderFromExtraction`), the reading never does.
+    is_credit: nullable("boolean"),
     invoice_total: nullable("number"),
     lines: {
       type: "array",
@@ -97,6 +127,7 @@ const INVOICE_SCHEMA = {
           "unit_price",
           "extended",
           "pack",
+          "purchase_order_number",
         ],
         properties: {
           // The vendor's own SKU. This is the join key — a purchase order line
@@ -116,6 +147,10 @@ const INVOICE_SCHEMA = {
           unit_price: nullable("number"),
           extended: nullable("number"),
           pack: nullable("string"),
+          // OUR purchase order number for THIS line, when the page prints one
+          // per line rather than once at the top. That disagreement between
+          // lines is exactly where a consolidated invoice splits.
+          purchase_order_number: nullable("string"),
         },
       },
     },
@@ -157,14 +192,39 @@ tidy: if the arithmetic on the page is wrong, report what is printed.
 - pack is the pack or size text if the line shows one ("12 x 32 oz", "CS").
 - Use null for any field not printed on that line. Do not guess.
 - Skip subtotal, tax, delivery, and total rows — those are not line items.
-  Put the invoice's grand total in invoice_total.
+  Put the invoice's grand total in invoice_total, and the foot amounts in the
+  header fields described below.
 - ship_date is the date the goods MOVED, taken from a field the page labels as
   such: Ship Date, Date Shipped, Delivered, Delivery Date, Service Date. Many
   invoices print no such field — use null then. Never copy the invoice date
   into it, and never take an order date, a due date, or a payment-terms date:
   those are different facts and one of them being wrong here would put the
   wrong day on a purchase order.
-- invoice_date and ship_date as YYYY-MM-DD.
+- due_date is the date payment is DUE, taken only from a field the page labels
+  as such: Due Date, Payment Due, Pay By. Never derive it from the terms — "Net
+  30" is not a date, and computing one would put an invented deadline on a bill.
+  Use null when no due date is printed.
+- terms is the payment terms exactly as printed ("Net 30", "COD", "2% 10 Net
+  30"). Transcribe, do not normalize: "30 days" stays "30 days".
+- invoice_date, ship_date and due_date as YYYY-MM-DD.
+- purchase_order_number is the CUSTOMER'S purchase order number as printed —
+  the number we gave the vendor when ordering, from a field labelled PO, PO
+  Number, Purchase Order, Customer Order, Order No. or similar. It is NOT the
+  invoice number, and it is NOT an internal order, pick, route or reference
+  number the vendor generated for itself. If one number at the top covers the
+  whole page, put it in the header field and leave every line's null. If the
+  page prints a purchase order number per LINE and they differ, report each on
+  its own line. Use null when no customer order number appears at all.
+- subtotal, tax, freight and other_charges are the amounts printed at the FOOT
+  of the invoice. Never compute them and never derive one from the others. A
+  delivery charge, fuel surcharge or drop fee is freight; a container deposit,
+  bottle deposit or anything else added at the foot that is neither tax nor
+  freight is other_charges. Use null for any the page does not print — null
+  means "not printed", which is different from zero.
+- is_credit is true when this document is a credit rather than a bill: the page
+  says Credit Memo, Credit Note, Return or Adjustment, or the total is negative.
+  When it is true, STILL report every quantity and amount exactly as printed,
+  negative signs included — do not flip signs to make them positive.
 
 Use "notes" for anything the reader of this data should know before trusting it,
 naming the lines involved: text you couldn't make out, a choice you had to make
