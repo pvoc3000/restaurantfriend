@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ATTACHMENT_BUCKET } from "@/lib/attachments";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { InvoiceStatus } from "@/lib/invoices";
 
@@ -49,6 +51,7 @@ export function InvoiceFooter({
   supabase: SupabaseClient;
   onDone: () => void;
 }) {
+  const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -123,6 +126,69 @@ export function InvoiceFooter({
     onDone();
   }
 
+  /**
+   * Delete the invoice — for the one you filed by mistake, not for the one you
+   * decided not to pay. That's Void, and the confirm says so.
+   *
+   * The order matters and it's 018's rule read backwards. `invoice_id` is
+   * `on delete set null`, so a document that ALSO belongs to a purchase order
+   * survives and simply stops naming this invoice — which is right; the
+   * delivery's paperwork isn't the bookkeeping. A document that belongs ONLY to
+   * this invoice would be orphaned instead, so it goes first: row, then object,
+   * exactly the direction `useAttachmentActions.remove` uses and for the same
+   * reason (an orphan object is invisible and harmless; a row pointing at a
+   * missing file renders broken).
+   */
+  async function destroy() {
+    if (
+      !window.confirm(
+        `Delete this invoice?\n\n` +
+          `Its lines go with it. Any document filed only here is removed; a ` +
+          `document that also belongs to a purchase order stays on that order.\n\n` +
+          `This is for an invoice filed by mistake. To keep the record but stop ` +
+          `it counting toward what you owe, use Void instead.\n\nThis cannot be undone.`
+      )
+    ) {
+      return;
+    }
+    setBusy("delete");
+    setError(null);
+
+    // Invoice-only documents: the rows first, then their objects.
+    const { data: own } = await supabase
+      .from("purchase_order_attachments")
+      .select("id, storage_path")
+      .eq("invoice_id", invoiceId)
+      .is("po_id", null);
+    if (own && own.length > 0) {
+      await supabase
+        .from("purchase_order_attachments")
+        .delete()
+        .in("id", own.map((a) => a.id));
+      await supabase.storage
+        .from(ATTACHMENT_BUCKET)
+        .remove(own.map((a) => a.storage_path as string));
+    }
+
+    // `.select()` so a delete matching no policy can't report a cheerful
+    // success and then navigate — the employee-delete lesson.
+    const { data, error: deleteError } = await supabase
+      .from("vendor_invoices")
+      .delete()
+      .eq("id", invoiceId)
+      .select("id");
+    setBusy(null);
+    if (deleteError) {
+      setError(deleteError.message);
+      return;
+    }
+    if (!data || data.length === 0) {
+      setError("Nothing was deleted — you may not have permission to do that.");
+      return;
+    }
+    router.push(closeHref);
+  }
+
   const button =
     "h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
 
@@ -167,6 +233,17 @@ export function InvoiceFooter({
 
         {/* Approving is Manager and Owner only. Below that the control is
             absent rather than offering a write the function would refuse. */}
+        {canEdit && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void destroy()}
+            className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
+          >
+            {busy === "delete" ? "Deleting…" : "Delete"}
+          </button>
+        )}
+
         {canApprove && status === "open" && (
           <button
             type="button"
