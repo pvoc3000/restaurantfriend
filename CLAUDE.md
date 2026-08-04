@@ -502,8 +502,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    BakeMark had renumbered, and Coconut failed on a plural ("Coconut Flakes" vs
    "COCONUT FLAKE SWEET" share one word, and the fallback needs three). After a
    manual match: 8 of 8.
-   Shipped 2026-08-04 (**needs `extract-invoice` redeployed AND the invoice
-   re-read**): **a line can print TWO item numbers, and we only read one.**
+   Shipped 2026-08-04, **DEPLOYED and confirmed against the real invoice the
+   same day** (Mark: "the Dawn invoice mapped perfectly after the fix"):
+   **a line can print TWO item numbers, and we only read one.**
    Dawn Foods invoice 96461403 (PO 135-181118-01) has separate `PRODUCT ID` and
    `MATERIAL` columns; three of its four lines leave PRODUCT ID blank and carry
    OUR sku under MATERIAL, while the fourth has ours under PRODUCT ID and a
@@ -532,7 +533,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    If a pairing ever has to be recorded for a line with no number anywhere, that
    needs somewhere to STORE it — a column on `purchase_order_items` — and is a
    migration, not a tweak. Not built; ask first.
-   Shipped 2026-08-03 (**needs `extract-invoice` redeployed**): **the invoice
+   Shipped 2026-08-03, deployed 2026-08-04: **the invoice
    says when the delivery happened**, and you can take it. The extraction schema
    gained **`ship_date`** — a field the page labels Ship Date / Delivered /
    Service Date, never the invoice date wearing a different hat — declared on
@@ -587,7 +588,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Two consequences. The container's `pb-*` is GONE — every value it ever held
    was clearance for a fixed bar — and the footer being the last IN-FLOW child
    is what keeps the split row honest, since `spaceBelow` measures whatever
-   follows the row and now something really does. The ActionBar's leading
+   follows the row and now something really does. Confirmed by Mark the same
+   day ("split columns look good"): the columns still end level, which was the
+   one thing this change put at risk. The ActionBar's leading
    command went with it: **`Receive n from invoice` now sits in the lines pane
    band, next to Add item** (Mark's placement), which is the thing it acts on.
    Both are `shrink-0` in a band that cannot wrap, so a hard-dragged narrow
@@ -1155,7 +1158,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/PageLoading` | a spinner | the body of every `loading.tsx` |
   | `ui/ProgressBand` | a word in a button's label | something slow on a screen that's ALREADY painted (an invoice read is 30s+); same indeterminate bar, never a Dialog — the work behind it must stay usable |
   | `ui/Pane` + `PaneHeader` | a bordered div with a header band you style yourself | a framed column standing beside another (receiving's document + lines): one FIXED-height band so the two rules line up, and `overflow-hidden` so nothing paints over the frame |
-  | `ui/FileDropZone` | `onDrop` on a div | dropping files onto a region. Its OVERLAY takes the drop (a PDF `<object>` is a plugin and swallows drag events), it arms off WINDOW drag events so it's up before the pointer arrives, it vets types itself (`accept` governs only the picker), and it stops a stray drop navigating the page away |
+  | `ui/FileDropZone` | `onDrop` on a div | dropping files onto a region. Its OVERLAY takes the drop (a PDF `<object>` is a plugin and swallows drag events — confirmed working over a live PDF, Mark 2026-08-04), it arms off WINDOW drag events so it's up before the pointer arrives, it vets types itself (`accept` governs only the picker), and it stops a stray drop navigating the page away |
   | `ui/RecordNav` + `lib/recordSet` | going back to the list for the next record | FMP's book on a detail screen: the LIST publishes its found set, the detail walks it |
   | `DataTable columnChooser` | a bespoke checklist, or placing `ColumnsMenu` yourself | show/hide columns on a list — the table puts it above its own last column header; pair it with `DataColumn.pinned` on the column that IS the row |
   | `ui/BackToTop` | — | long lists; already on the guide |
@@ -2351,14 +2354,6 @@ weekday column, and 003 then silently made it per-vendor-item.
   and California employment paperwork, not org configuration. If a second org
   ever needs a different set, that's the moment it moves — and design rule 2
   will be why.
-- **Should-order counts don't match the brief's measurement.** The
-  2026-07-23 build implements the settled model exactly (fixture-tested), and
-  membership verifies at the brief's 883 — but the brief's should-order figures
-  (Mon 229 / Wed 118 at DF01) could not be reproduced from any data source
-  during pre-flight; the model over live data gives Mon 394 / Wed 222. Wed 222
-  matches the earlier draft's same-day vendor-gate measurement, so the gate
-  behaves as measured. Judge the guide by the per-vendor breakdown vs the real
-  ~11 Monday POs (query 4 in migration 008's comments), not the brief's totals.
 - ~~**"Default vendor item" may be the wrong concept."**~~ **RESOLVED
   2026-07-23 — retired (migration 012).** It stopped having any reader when 008
   killed the null-plan-row indirection, leaving a closed loop: the only writer
@@ -2390,12 +2385,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   and price reconciliation need. Anything ever ordered defaults to
   **Deactivate**, with Delete still reachable beside the real counts. It's a
   `ui/Dialog`, not `window.confirm`, precisely because it needs three answers.
-- **`rep_email` looks mis-mapped by the migration** — Restaurant Depot's rows
-  carry `info@donutfriend.com` (our address, not the vendor's). Check the other
-  79 vendors before trusting the column.
+
+CLOSED 2026-08-04, all three by Mark ("these are all fine") — kept as answers,
+not as questions:
+- **Should-order counts.** The brief's figures (Mon 229 / Wed 118 at DF01) never
+  reproduced; the model over live data gives Mon 394 / Wed 222. The MODEL is
+  right and the brief's totals were wrong. Judge the guide by the per-vendor
+  breakdown against the real Monday POs.
+- **`rep_email` carrying `info@donutfriend.com`** on Restaurant Depot's rows is
+  not a mis-mapping to chase.
 - **"Last ordered" on the vendor screen** means "this item, at this location,
-  from any vendor" — the Inventory semantics. A true per-vendor-item last-order
-  date needs a small view over `purchase_order_items` (migration 006).
+  from any vendor" — the Inventory semantics — and that is the intended reading.
+  It does NOT need a per-vendor-item view.
 
 ## What NOT to build (deliberately killed or deferred)
 
