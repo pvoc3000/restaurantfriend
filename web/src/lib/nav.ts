@@ -143,6 +143,10 @@ export const SECTIONS: NavSection[] = [
         href: "/purchase-orders",
         built: true,
       },
+      // After Purchase Orders, which is the order the work happens in: you
+      // order, you receive, you owe. `resolveRoute` prefix-matches, so
+      // /invoices/[id] lights this without an `also`.
+      { slug: "invoices", label: "Invoices", href: "/invoices", built: true },
       // Last on purpose: a migration-era tool, easy to drop when the catalog
       // is clean.
       { slug: "cleanup", label: "Cleanup", href: "/cleanup", built: true },
