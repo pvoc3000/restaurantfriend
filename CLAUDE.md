@@ -893,6 +893,40 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    FMP keeps writing until their own modules are built. See
    `migration/field-map.md` for the per-field reasons and the traps in each
    child file.
+4d. 📋 **Timesheets / payroll prep** — SPECCED 2026-08-04, NOT built (next
+   migration is 025). Full brief: **`docs/timesheets-brief.md`** — read it before
+   touching anything here. The three things worth knowing without opening it:
+   **the module exports HOURS and TIP DOLLARS and nothing else** (Mark: "leave
+   rates out. They're already set in two places: Homebase and Gusto"), so no wage
+   rate is ever stored and no paycheck is ever computed — a meal premium exports
+   as 1.00 *hours* on an earning code, which also dodges *Ferra v. Loews*
+   regular-rate arithmetic. **Overtime is imported and VERIFIED, never computed
+   as authority** — Homebase's split is stored beside ours, a human adjudicates,
+   the decision is stored with a reason. And **a timesheet is editable iff its
+   pay period is open**, which is the module's one read-only rule: no `locked`
+   flag, no archive concept, and historical loads land in already-closed periods.
+   Two boundaries drawn once: Homebase owns punches, this app owns decisions,
+   Gusto owns money and tax; and **sick hours are a reconciliation column that is
+   DELIBERATELY OMITTED from the export file**, because Gusto already pays them
+   and including them double-pays.
+   The reason the module exists at all is that **Homebase splits a shift at
+   midnight, which systematically UNDER-counts California daily overtime** (a
+   6pm–4am shift is 10h and owes 2h; split into 6h+4h it owes none). Measured in
+   the FMP export: 4,308 of 23,673 shifts cross midnight (18.2%), 1,071 carrying
+   OT — and `ts_Date_End` was declared and used on ZERO rows, because FileMaker
+   stored a crossing shift as one row dated by its start day. So the importer
+   reassembles them, `clock_in`/`clock_out` are `timestamptz` (DST-correct
+   duration for free — 10pm→6am is 7h on spring-forward, 9h on fall-back), and
+   `workday` / `business_date` are two fields rather than one.
+   **Blocked on three files from Mark** (brief's last section): one real Homebase
+   CSV — whether Homebase emits a stable shift id decides the idempotency key,
+   and the FMP natural key is provably NOT unique (23,220 distinct over 23,673
+   rows, so keying on it silently drops 64 byte-identical rows) — plus full
+   re-exports of `Timesheets.mer` **with a record id** and `PayPeriods.mer`
+   **with its key**. Both files on disk are inadequate: Timesheets is a partial
+   found set (2015-09-28 → 2019-03-23, no Homebase era at all) and PayPeriods is
+   a LAYOUT export with ten columns. That's the `hr-export-is-a-layout-export`
+   trap for the second time.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
