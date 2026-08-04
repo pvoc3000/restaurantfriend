@@ -927,6 +927,88 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    found set (2015-09-28 → 2019-03-23, no Homebase era at all) and PayPeriods is
    a LAYOUT export with ten columns. That's the `hr-export-is-a-layout-export`
    trap for the second time.
+4d. 🚧 **Invoices** — the third module, and the one that finishes the purchasing
+   loop (Mark, 2026-08-04, after using the receiving screen: "this reconcile PO
+   workflow is new to me and I love it… Every time we upload an invoice to a
+   purchase order we could create an invoice record… It would complete the work
+   flow"). Specced in `docs/invoices-brief.md`. **NEEDS MIGRATIONS 025 + 026.**
+   The reading half already worked; what never existed was a RECORD — something
+   with a status, a due date, and an identity independent of one attachment on
+   one PO. That absence is also why two limitations the receiving brief flagged
+   stayed open (nothing routes you to orders awaiting receiving; one invoice,
+   one PO).
+   Mark's six locked decisions: **all vendor bills**, not just PO-born ones (the
+   landlord and the plumber are already vendors with `order_type: 'none'` and
+   never produce an order); **record + list + approval in v1, no QuickBooks
+   sync** but leave the seams; an **explicit approval, Manager and Owner only**;
+   **many-to-many is real**; the tables are **`vendor_invoices` /
+   `vendor_invoice_lines`** (a bare `invoices` is a name the unbuilt Quotes &
+   Orders module will want — the collision `purchase_orders` already dodged);
+   and **attaching + reading an invoice on a PO files it automatically**.
+   **The many-to-many lives on the LINE** — `purchase_order_id` +
+   `purchase_order_item_id` on `vendor_invoice_lines`, no header FK and no join
+   table. It is the same granularity `matchInvoiceToOrder` already produces, so
+   persisting a match is a one-column write; both directions are one index; and
+   a derived link cannot claim a relationship none of its lines support. **Split
+   and merge then need no schema at all**, and only the MERGE direction costs
+   any UI: one order invoiced in two parts is two invoices with disjoint
+   subsets, and there is no unique constraint to collide on. The coarser
+   `purchase_order_id` covers a freight line and an order you know is right when
+   every line match failed. Safe to denormalize — `purchase_order_items.po_id`
+   is written at insert and never updated anywhere in `web/src` (verified).
+   **Lines are real rows, not the jsonb reading.** 019's `extraction` keeps its
+   own meaning as the raw reading on the document row; the chain is document →
+   raw reading → seeded lines → corrected lines. The decisive argument is that a
+   line gets EDITED and a jsonb path is POSITIONAL, so a re-read renumbers the
+   positions and silently retargets every correction — data loss with no symptom.
+   **The document reuses the PO attachments table and bucket.** 018's four
+   policies read `(storage.foldername(name))[1]` — the FIRST segment — and test
+   nothing else, so `{org_id}/invoices/{invoice_id}/…` is authorized as it
+   stands. 021's separate-bucket precedent doesn't apply, and the deciding test
+   is RLS: 021 needed its own bucket because employee documents have a DIFFERENT
+   audience. `extract-invoice` needed no structural change at all.
+   **Approval cannot be a policy** — RLS filters rows and "only a manager may
+   set `approved_at`" is a column rule — so `set_vendor_invoice_approval` is a
+   definer function (the `set_my_member_profile` pattern) that returns rows so
+   the caller can tell refusal from success. `lib/roles.ts` gains
+   `canApprovePayment`.
+   **No `paid` status and no payments table**: payment is a fact QuickBooks will
+   own, and two truths about the same money is worse than one truth elsewhere.
+   The check constraint widens in one line later. **Duplicate detection warns
+   and never blocks** (`findPossibleRehires`' rule): a credit memo legitimately
+   repeats the number it credits, and Postgres allows unlimited NULLs in a
+   unique index, so a constraint would silently skip the numberless rent bill —
+   the row most likely to be entered twice.
+   Shipped: `/invoices` (aging tiers, three totals, group bands by status /
+   vendor / due-date BUCKET, default `open` + due-date ascending) and
+   `/invoices/[id]` (document left, sticky NOT measured — receiving earned its
+   ResizeObserver by being a standing task; this is a desk screen). Approve is a
+   WHITE button in the page's own flow: the buttons here are a row of peers,
+   which CLAUDE.md names as exactly the case that is NOT the
+   `DIALOG_COMMIT_CLASS` exception. Plus creation from a reading, "File as
+   invoice" for the ~10 stored extractions (no backfill — a PL/pgSQL matcher for
+   ten rows is unthinkable, and those readings predate the new fields anyway),
+   a New invoice dialog, the printed-PO-number proposal, "Link to PO…", and a
+   per-line RowMenu.
+   **The extraction schema grew eight header fields and one per line** — due
+   date, terms, the customer's PO number (header AND line, because a
+   consolidated invoice prints it per line), subtotal/tax/freight/other, and
+   `is_credit`. Tax and freight matter because a delivery fee is on the invoice
+   and on NO purchase order line, so without them `invoice_total` never equals
+   the sum of the lines. **Needs `supabase functions deploy extract-invoice`.**
+   **Receiving prefers the FILED invoice over the last read** (`matchesFromLinks`),
+   falling back to `latestRead` so day one is a no-op. `closeReadiness` gained a
+   fourth argument and its paperwork caveat split in two — nothing attached, vs
+   paperwork on file that isn't recorded as a bill — and it deliberately does
+   NOT ask whether the bill is approved: a delivery can be complete Friday and
+   the bill approved Tuesday.
+   276 fixtures pass. **Verified only as far as the migrations allow**: the
+   routes render and degrade honestly ("Could not find the table
+   'public.vendor_invoices' in the schema cache"), the nav item lights, and the
+   receiving screen is byte-identical before and after (checked by stashing the
+   work and screenshotting both through identical navigation). The client trees
+   for invoice detail, approval, creation and linking are typechecked and linted
+   but have not been exercised against real rows.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -1033,6 +1115,20 @@ LOADED: 445 rows, 26 active / 2 new hire / 417 inactive, matching the transform
 report, with Mark's row linked to his auth account. 022 verified 2026-08-02 by
 inserting an `orientation` document and removing it again — the constraint
 accepts the value, so the widened check is live.
+**025 and 026 are NOT APPLIED as of 2026-08-04** — written, tested on the
+Docker harness (all 26 apply; the `po_consistent` check fires; the status and
+kind vocabularies are closed; duplicate invoice numbers are allowed; and the
+approval function refuses a purchaser, an outsider and a void invoice while
+letting an owner through both ways — each refusal re-checked by breaking the
+function and confirming the assertion went red), and waiting on Mark. **Probe,
+don't trust this line** — it has been wrong in both directions before. Cheap
+probes: `select count(*) from vendor_invoices` for 025, and
+`select is_nullable from information_schema.columns where table_name =
+'purchase_order_attachments' and column_name = 'po_id'` for 026.
+Until 026 is applied, PO detail's Paperwork card and the receiving screen's
+document pane are replaced by "column purchase_order_attachments.invoice_id
+does not exist" — 018's own behaviour, and everything else on those screens is
+unaffected.
 **023 is APPLIED** (Mark, 2026-08-02) — `employees_delete` for owner/admin,
 reversing 020's deliberate absence. See build step 4c for the argument and for
 the `.select()`-your-own-delete rule it taught. Probe with
