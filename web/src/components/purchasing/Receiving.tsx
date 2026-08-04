@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -8,6 +8,8 @@ import { TabPicker } from "@/components/ui/TabPicker";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { Pane, PaneHeader } from "@/components/ui/Pane";
 import { BackToTop } from "@/components/ui/BackToTop";
+import { useFillToBottom } from "@/lib/fillHeight";
+import { useViewportAtLeast } from "@/lib/tableHead";
 import {
   attachmentRejection,
   type AttachmentKind,
@@ -53,54 +55,6 @@ import { DocumentPane } from "./DocumentPane";
 import { InvoiceSummary } from "./InvoiceSummary";
 import { ReceivingRow } from "./ReceivingRow";
 import { useAttachmentActions } from "./useAttachmentActions";
-
-const px = (value: string) => parseFloat(value) || 0;
-
-/**
- * How much layout sits BELOW a node, measured by walking up to the body.
- *
- * The obvious answer — `documentElement.scrollHeight - node.bottom` — is wrong
- * in exactly the case the split row cares about, and wrong SILENTLY. `html` is
- * `h-full` and `body` is `min-h-full`, so a page whose content doesn't fill the
- * window reports the window's own height: `below` becomes
- * `viewportBottom - node.bottom`, and `innerHeight - top - below` reduces to the
- * node's CURRENT height. A fixed point. A five-line order therefore kept the
- * height five lines gave it and the columns stopped at the middle of the screen
- * (Mark, 2026-07-31), while a long order — whose page really does scroll —
- * measured correctly, which is why this looked like it worked.
- *
- * So sum the real boxes instead: at each level, whatever follows the node
- * (taken from the LAST following sibling's rect, so collapsed margins are
- * counted once and only once), then that parent's own bottom padding and
- * border. Out-of-flow siblings are skipped because they occupy no layout space
- * — `BackToTop` is fixed, and so was the ActionBar this was written against,
- * which is why the container needed a `pb-*` clearance in those days.
- */
-function spaceBelow(node: HTMLElement): number {
-  let total = 0;
-  let el: HTMLElement | null = node;
-  while (el && el !== document.body && el.parentElement) {
-    const parent: HTMLElement = el.parentElement;
-    let last: HTMLElement | null = null;
-    for (let sib = el.nextElementSibling; sib; sib = sib.nextElementSibling) {
-      const style = getComputedStyle(sib);
-      if (style.display === "none") continue;
-      if (style.position === "fixed" || style.position === "absolute") continue;
-      last = sib as HTMLElement;
-    }
-    if (last) {
-      total +=
-        last.getBoundingClientRect().bottom - el.getBoundingClientRect().bottom +
-        px(getComputedStyle(last).marginBottom);
-    } else {
-      total += px(getComputedStyle(el).marginBottom);
-    }
-    const parentStyle = getComputedStyle(parent);
-    total += px(parentStyle.paddingBottom) + px(parentStyle.borderBottomWidth);
-    el = parent;
-  }
-  return total;
-}
 
 /**
  * Receiving a delivery: the invoice on one side, the order's lines on the
@@ -159,6 +113,10 @@ export function Receiving({
 
   const layout = useReceivingLayout();
   const split = useReceivingSplit();
+  // Was `window.innerWidth >= 1280` read inside the measure callback; the hook
+  // is the app's own part for the same question and re-renders when the tier
+  // actually changes, where the old form only noticed on a resize event.
+  const wideEnoughToSplit = useViewportAtLeast(1280);
 
   const {
     phase,
@@ -478,50 +436,10 @@ export function Receiving({
    * nothing scrolls and the measurement can't drift underneath itself.
    */
   const rowRef = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const el = rowRef.current;
-    if (!el) return;
-    const MIN = 280;
-
-    function measure() {
-      if (!el) return;
-      // Stacked — chosen, or implied by a window narrower than `xl` — sizes
-      // itself and scrolls the page, which is the point of stacking.
-      const splitting =
-        layout === "split" || (layout === "auto" && window.innerWidth >= 1280);
-      if (!splitting) {
-        if (el.style.height) el.style.height = "";
-        return;
-      }
-      const rect = el.getBoundingClientRect();
-      const next = Math.max(
-        MIN,
-        Math.round(
-          window.innerHeight - rect.top - window.scrollY - spaceBelow(el)
-        )
-      );
-      // Only write on a real change: the ResizeObserver below watches boxes
-      // that setting our own height changes.
-      if (Math.abs(parseFloat(el.style.height || "0") - next) > 1) {
-        el.style.height = `${next}px`;
-      }
-    }
-
-    measure();
-    // The body AND the row's own container. The body alone was enough while the
-    // page always scrolled, but a page sized to exactly one viewport keeps a
-    // `min-h-full` body at a constant height — so a band appearing above the row
-    // (a progress band, an undo band, the invoice summary growing) would move
-    // the row's top without the observer hearing a thing.
-    const observer = new ResizeObserver(measure);
-    observer.observe(document.body);
-    if (el.parentElement) observer.observe(el.parentElement);
-    window.addEventListener("resize", measure);
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", measure);
-    };
-  }, [layout]);
+  // Stacked — chosen, or implied by a window narrower than `xl` — sizes itself
+  // and scrolls the page, which is the point of stacking.
+  const splitting = layout === "split" || (layout === "auto" && wideEnoughToSplit);
+  useFillToBottom(rowRef, splitting);
 
   /** Drag the divider. Fractions rather than pixels, so the split survives a
    *  window resize meaning something different. */

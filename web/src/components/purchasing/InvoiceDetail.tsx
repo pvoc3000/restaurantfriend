@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -8,6 +8,8 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { withFrom } from "@/lib/breadcrumbs";
+import { useFillToBottom } from "@/lib/fillHeight";
+import { useViewportAtLeast } from "@/lib/tableHead";
 import { money } from "@/lib/purchaseOrders";
 import {
   agingBucket,
@@ -58,34 +60,26 @@ const INVOICE_LINE_WIDTHS_KEY = "rf.invoiceLines.columnWidths.v1";
 const DL_CLASS = "grid grid-cols-[8rem_1fr] items-baseline gap-y-1 text-sm";
 
 /**
- * How tall the lines table may get before it scrolls inside itself.
- *
- * An explicit cap rather than `useFillViewportHeight` (which every other paned
- * table here uses), and the reason is where this pane SITS: the hook measures
- * "the window, less everything above and below me", which is the right question
- * for a table near the top of the screen and the wrong one for a table that
- * starts two thirds of the way down a record. It would compute a negative
- * remainder and clamp to its 256px floor on every invoice.
- */
-const LINES_MAX_HEIGHT = "max-h-[60vh]";
-
-/**
  * One invoice: what we were billed, what it belongs to, and whether it should
  * be paid.
  *
- * LAYOUT — a two-column grid, document left, that is deliberately NOT draggable
- * and NOT viewport-measured. The receiving screen earned its ResizeObserver,
- * `spaceBelow` measurement and drag divider by being a single-viewport STANDING
- * task; this is a desk screen that scrolls, so a sticky ceiling twenty pixels
- * off just leaves a little air rather than running columns off the bottom.
- * Don't "fix" it by lifting that machinery in.
+ * LAYOUT — document left, record right, ONE viewport, with the buttons in a
+ * footer both columns end at (Mark, 2026-08-05: "the buttons under the invoice
+ * item datatable should be in the footer area of the screen. The bottoms of the
+ * pdf preview pane and the invoice items datatable should extend to the top of
+ * the footer"). The same shape as the receiving screen, and it now shares that
+ * screen's measuring hook rather than owning a second copy — see
+ * lib/fillHeight.
  *
- * It IS kept short, though (Mark, 2026-08-05 — "too tall and extends below the
- * bottom of my screen"), by three things rather than by measuring: Bill and
- * Amounts pair up instead of stacking, the lines table scrolls in a capped
- * pane, and the screen's own chrome uses a normal rhythm rather than the
- * `space-y-16` a stacked detail screen puts between blocks. Measured on a
- * 15-line invoice at 1280×720: 2,463px → 1,212px, 3.4 screens → 1.7.
+ * Within the record column, Bill and Amounts pair up and Purchase orders sits
+ * under them, all fixed; the lines table takes whatever is left and scrolls its
+ * own rows under its own labels.
+ *
+ * This started as a page that scrolled, on the reasoning that a desk screen
+ * isn't a standing task. That was wrong about the READER rather than about the
+ * task: an invoice is a document you check against a record, and a page three
+ * screens tall means the thing you are checking has scrolled away. Measured on
+ * a 15-line invoice at 1280×720: 2,463px → one viewport.
  */
 export function InvoiceDetail({
   invoice,
@@ -127,6 +121,17 @@ export function InvoiceDetail({
   const supabase = createClient();
   const [shownId, setShownId] = useState<string | null>(null);
   const [kind, setKind] = useState<AttachmentKind>("invoice");
+
+  // The split row fills the window down to the footer; below `xl` the columns
+  // stack and the page scrolls instead, which is what stacking is for.
+  const rowRef = useRef<HTMLDivElement>(null);
+  // The floor is what stops the lines table being squeezed out of existence.
+  // Bill+Amounts and Purchase orders are ~433px of fixed blocks above it, so a
+  // row shorter than that leaves the pane NOTHING: measured at a 720px window,
+  // the row computed 409px and the table rendered 0px tall while its content
+  // spilled past the column. Below this the page scrolls instead, which is the
+  // same trade receiving makes with its own 280.
+  useFillToBottom(rowRef, useViewportAtLeast(1280), 660);
 
   const {
     phase,
@@ -539,10 +544,19 @@ export function InvoiceDetail({
         <p className="text-sm text-muted">{phase.label}</p>
       )}
 
-      {/* Document left, record right. Sticky rather than measured — see the
-          note on this component. */}
-      <div className="grid gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <div className="min-w-0 xl:sticky xl:top-[calc(var(--rf-header-h)+1rem)] xl:max-h-[calc(100vh-var(--rf-header-h)-6rem)]">
+      {/* Document left, record right, both ending level at the footer (Mark,
+          2026-08-05). The row's height is MEASURED — see lib/fillHeight — for
+          the reason receiving measures its own: what sits above varies (the
+          duplicate band comes and goes, the masthead wraps at narrow widths), so
+          any `100vh - <guess>` is right at exactly one size.
+
+          Below `xl` the columns stack and the page scrolls, which is the point
+          of stacking; `useFillToBottom` clears the height itself. */}
+      <div
+        ref={rowRef}
+        className="grid min-h-0 gap-4 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]"
+      >
+        <div className="flex min-h-0 min-w-0 flex-col">
           <DocumentPane
             attachment={shown}
             attachments={attachments}
@@ -562,7 +576,7 @@ export function InvoiceDetail({
           />
         </div>
 
-        <div className="min-w-0 space-y-10">
+        <div className="flex min-h-0 min-w-0 flex-col gap-y-10 xl:overflow-hidden">
           {/* Bill and Amounts side by side (Mark, 2026-08-05, on the page being
               too tall): they are two SHORT lists — seven rows and five — and
               stacking them spent a whole block's height plus a gap on nothing.
@@ -572,7 +586,7 @@ export function InvoiceDetail({
               them: below `xl` the record column is full width and has even more
               room for two. Below `md` they stack, which is the only width where
               a 7rem label and a value genuinely don't share a line. */}
-          <div className="grid gap-x-8 gap-y-10 md:grid-cols-2">
+          <div className="grid shrink-0 gap-x-8 gap-y-10 md:grid-cols-2">
             {/* The bill itself. */}
             <section className="min-w-0 space-y-2">
               <SectionHeading>Bill</SectionHeading>
@@ -722,7 +736,7 @@ export function InvoiceDetail({
           </div>
 
           {/* What it belongs to. */}
-          <section className="space-y-2">
+          <section className="shrink-0 space-y-2">
             <SectionHeading count={linkedOrders.length}>
               Purchase orders
             </SectionHeading>
@@ -823,7 +837,7 @@ export function InvoiceDetail({
             storageKey={INVOICE_LINE_WIDTHS_KEY}
             columnChooser
             scroll
-            maxHeightClass={LINES_MAX_HEIGHT}
+            fill
             // 1536, not the app's usual `xl`: this table lives in the RECORD
             // column, so it gets ~55% of the window rather than all of it. At a
             // 1280 laptop that is 677px for eight columns and every single

@@ -104,6 +104,7 @@ export function DataTable<T>({
   defaultSort,
   rowClassName,
   scroll = false,
+  fill = false,
   maxHeightClass,
   empty,
   expand,
@@ -122,6 +123,20 @@ export function DataTable<T>({
   defaultSort?: { key: string; dir?: SortDir };
   rowClassName?: (row: T) => string;
   scroll?: boolean;
+  /**
+   * With `scroll`: fill the parent instead of capping at a height.
+   *
+   * For a table that is one column of a row sized to the window — invoice
+   * detail's lines beside its document — where the answer to "how tall" is
+   * "whatever is left", and the parent already knows. The root becomes a flex
+   * column and the pane takes the slack, so the column labels stay put and the
+   * rows scroll under them.
+   *
+   * `min-h-0` on both is the load-bearing part: without it a flex child takes
+   * its CONTENT height and overflows its parent rather than scrolling — the
+   * same trap the receiving screen's lines pane documents.
+   */
+  fill?: boolean;
   maxHeightClass?: string;
   empty?: ReactNode;
   /**
@@ -329,7 +344,7 @@ export function DataTable<T>({
   // refuses to go below 256), not on the height itself: then a short table is
   // as tall as its rows and a long one stops at the window.
   const wrapper = scroll
-    ? `${maxHeightClass ?? ""} overflow-y-auto overflow-x-hidden`
+    ? `${fill ? "min-h-0 flex-1" : maxHeightClass ?? ""} overflow-y-auto overflow-x-hidden`
     : "overflow-x-auto";
 
   // FLUID COLUMNS. The table is exactly as wide as its container and the
@@ -365,7 +380,11 @@ export function DataTable<T>({
     // read as crowding them rather than belonging to them. This is the gap
     // between the strip and the table, and between the table and the
     // reset-widths footer.
-    <div className="space-y-2">
+    <div
+      className={
+        fill ? "flex h-full min-h-0 flex-col gap-y-2" : "space-y-2"
+      }
+    >
       {/* Directly above the LAST column header, at the table's right edge
           (Mark, 2026-07-31). It belongs to the table, not to each list's filter
           row: it acts on these columns, and every list putting it somewhere
