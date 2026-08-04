@@ -5,10 +5,16 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   attachmentPath,
+  invoiceOwner,
   ATTACHMENT_BUCKET,
   type AttachmentKind,
   type PoAttachment,
 } from "@/lib/attachments";
+import {
+  createInvoiceFromReading,
+  type InvoiceCreationOrder,
+} from "@/lib/invoiceFromExtraction";
+import type { InvoiceExtraction } from "@/lib/invoiceExtraction";
 
 /**
  * Attaching, reading and removing a PO's paperwork — the writes, shared by the
@@ -31,11 +37,28 @@ import {
 
 export type AttachPhase =
   | { kind: "idle" }
-  | { kind: "uploading" | "reading" | "removing"; label: string };
+  | { kind: "uploading" | "reading" | "removing" | "filing"; label: string };
 
 const IDLE: AttachPhase = { kind: "idle" };
 
-export function useAttachmentActions({ poId, orgId }: { poId: string; orgId: string }) {
+export function useAttachmentActions({
+  poId,
+  orgId,
+  order,
+  invoiceId,
+}: {
+  /** The purchase order these documents hang off, or null on an invoice with
+   *  no order behind it (migration 026 made `po_id` nullable). */
+  poId: string | null;
+  orgId: string;
+  /** What an auto-filed invoice needs to know: whose vendor, whose location,
+   *  and the lines to match against. Absent on the Invoices section's own
+   *  upload, which supplies a vendor directly. */
+  order?: InvoiceCreationOrder | null;
+  /** Where an invoice-owned upload's objects go, and the vendor/location a
+   *  reading is filed under when there is no order. */
+  invoiceId?: string | null;
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [phase, setPhase] = useState<AttachPhase>(IDLE);
@@ -51,15 +74,17 @@ export function useAttachmentActions({ poId, orgId }: { poId: string; orgId: str
    * Nothing about the ORDER changes here — an extraction is only ever a
    * proposal to compare against, which a person then accepts line by line.
    */
-  async function read(attachment: Pick<PoAttachment, "id" | "file_name">) {
+  async function read(
+    attachment: Pick<PoAttachment, "id" | "file_name" | "invoice_id">
+  ) {
     setPhase({ kind: "reading", label: `Reading ${attachment.file_name ?? "the invoice"}…` });
     setError(null);
     const { data, error: fnError } = await supabase.functions.invoke("extract-invoice", {
       body: { attachment_id: attachment.id },
     });
-    setPhase(IDLE);
 
     if (fnError) {
+      setPhase(IDLE);
       // The function returns a readable message in the body; the SDK surfaces
       // only "non-2xx status code" unless we go and get it.
       let message = fnError.message;
@@ -76,9 +101,35 @@ export function useAttachmentActions({ poId, orgId }: { poId: string; orgId: str
       return;
     }
     if (data?.error) {
+      setPhase(IDLE);
       setError(data.error);
       return;
     }
+
+    // File the reading as an invoice RECORD — but only if this document isn't
+    // already filed as one. That check is the structural guard the design leans
+    // on instead of a unique constraint: a document row carries at most one
+    // invoice_id, so "Read again" on a filed invoice refreshes the raw reading
+    // and can never mint a second record over someone's corrections.
+    if (!attachment.invoice_id) {
+      const extraction = (data?.extraction ?? null) as InvoiceExtraction | null;
+      if (extraction) {
+        setPhase({ kind: "filing", label: "Filing it as an invoice…" });
+        const result = await createInvoiceFromReading(supabase, {
+          orgId,
+          attachmentId: attachment.id,
+          extraction,
+          order: order ?? null,
+          fallback: null,
+        });
+        // The READ still stands if filing fails, exactly as the upload stands
+        // if the read fails: the extraction is on the row, and "File as
+        // invoice" is right there to try again.
+        if ("error" in result) setError(result.error);
+      }
+    }
+
+    setPhase(IDLE);
     router.refresh();
   }
 
@@ -89,7 +140,16 @@ export function useAttachmentActions({ poId, orgId }: { poId: string; orgId: str
     setError(null);
     for (const file of files) {
       setPhase({ kind: "uploading", label: `Uploading ${file.name}…` });
-      const path = attachmentPath(orgId, poId, file.name);
+      // An order's own paperwork keeps 018's key; an invoice with no order
+      // behind it files under `invoices/{id}`. Both are authorised by the same
+      // policies, which read the first segment only.
+      const owner = poId ?? (invoiceId ? invoiceOwner(invoiceId) : null);
+      if (!owner) {
+        setPhase(IDLE);
+        setError("Nothing to attach this to.");
+        return;
+      }
+      const path = attachmentPath(orgId, owner, file.name);
 
       const { error: uploadError } = await supabase.storage
         .from(ATTACHMENT_BUCKET)
@@ -107,6 +167,7 @@ export function useAttachmentActions({ poId, orgId }: { poId: string; orgId: str
         .insert({
           org_id: orgId,
           po_id: poId,
+          invoice_id: invoiceId ?? null,
           storage_path: path,
           kind,
           file_name: file.name,
@@ -132,11 +193,51 @@ export function useAttachmentActions({ poId, orgId }: { poId: string; orgId: str
       // "Read invoice" is still there to try again. Losing a successfully
       // stored invoice because a model call timed out would be the worse trade.
       if (kind === "invoice") {
-        await read({ id: row.id as string, file_name: file.name });
+        // `invoice_id` is whatever this upload was filed under: null on a PO's
+        // Paperwork card (so the read goes on to create a record), and set when
+        // the Invoices section uploaded into an invoice that already exists.
+        await read({
+          id: row.id as string,
+          file_name: file.name,
+          invoice_id: invoiceId ?? null,
+        });
       }
     }
     setPhase(IDLE);
     if (fileRef.current) fileRef.current.value = "";
+    router.refresh();
+  }
+
+  /**
+   * File an ALREADY-READ document as an invoice record.
+   *
+   * The manual counterpart to auto-filing, and it earns its place three ways:
+   * it clears the readings stored before this module existed, it recovers a
+   * read whose auto-file failed, and it handles a document filed as a `photo`
+   * that turns out to be the invoice.
+   */
+  async function fileAsInvoice(
+    attachment: Pick<PoAttachment, "id" | "file_name" | "invoice_id" | "extraction">
+  ) {
+    if (attachment.invoice_id) return;
+    if (!attachment.extraction) {
+      setError("Read the invoice first — there's nothing to file yet.");
+      return;
+    }
+    setPhase({ kind: "filing", label: "Filing it as an invoice…" });
+    setError(null);
+    const result = await createInvoiceFromReading(supabase, {
+      orgId,
+      attachmentId: attachment.id,
+      extraction: attachment.extraction,
+      order: order ?? null,
+      fallback: null,
+    });
+    setPhase(IDLE);
+    if ("error" in result) {
+      setError(result.error);
+      return;
+    }
     router.refresh();
   }
 
@@ -187,6 +288,7 @@ export function useAttachmentActions({ poId, orgId }: { poId: string; orgId: str
     fileRef,
     upload,
     read,
+    fileAsInvoice,
     remove,
   };
 }

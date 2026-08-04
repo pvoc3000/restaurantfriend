@@ -1,6 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
+import { withFrom } from "@/lib/breadcrumbs";
 import {
   attachmentRejection,
   fileSize,
@@ -16,6 +18,7 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 import { PickList } from "@/components/ui/PickList";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { useAttachmentActions } from "./useAttachmentActions";
+import type { InvoiceCreationOrder } from "@/lib/invoiceFromExtraction";
 
 /**
  * The paperwork for a delivery (spec §2 step 5). Until now receiving wrote
@@ -60,6 +63,7 @@ export function PoAttachments({
   orgId,
   attachments,
   canEdit,
+  order,
 }: {
   poId: string;
   /** Not null on the table and the first segment of every object key. */
@@ -67,10 +71,22 @@ export function PoAttachments({
   /** Signed by the server at render — see PurchaseOrderDetailView. */
   attachments: SignedAttachment[];
   canEdit: boolean;
+  /** The order these belong to, so a read invoice can be filed as a record
+   *  against the right vendor and matched to the right lines. */
+  order: InvoiceCreationOrder;
 }) {
   const [kind, setKind] = useState<AttachmentKind>("invoice");
-  const { phase, busy, error, fileRef, upload, read, remove, reportError } =
-    useAttachmentActions({ poId, orgId });
+  const {
+    phase,
+    busy,
+    error,
+    fileRef,
+    upload,
+    read,
+    fileAsInvoice,
+    remove,
+    reportError,
+  } = useAttachmentActions({ poId, orgId, order });
 
   return (
     <FileDropZone
@@ -187,6 +203,23 @@ export function PoAttachments({
                     {a.extraction.lines.length === 1 ? "line read" : "lines read"}
                   </p>
                 )}
+                {/* Where the reading ended up. A filed document links to its
+                    record; one that's been read but not filed offers the
+                    button, which is how the readings stored before this module
+                    existed get cleared and how a failed auto-file recovers. */}
+                {a.invoice_id && (
+                  <p className="text-[11px] uppercase tracking-[0.12em]">
+                    <Link
+                      href={withFrom(`/invoices/${a.invoice_id}`, {
+                        href: `/purchase-orders/${poId}`,
+                        label: "PO",
+                      })}
+                      className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+                    >
+                      Invoice →
+                    </Link>
+                  </p>
+                )}
                 {canEdit && (
                   <p className="flex flex-wrap items-baseline gap-2">
                     <button
@@ -197,6 +230,16 @@ export function PoAttachments({
                     >
                       {a.extraction ? "Read again" : "Read invoice"}
                     </button>
+                    {a.extraction && !a.invoice_id && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void fileAsInvoice(a)}
+                        className="text-[11px] uppercase tracking-[0.06em] text-ink hover:underline disabled:opacity-35"
+                      >
+                        File as invoice
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={busy}

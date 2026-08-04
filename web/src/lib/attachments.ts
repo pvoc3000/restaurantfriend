@@ -77,8 +77,14 @@ export const ATTACHMENT_KIND_LABEL: Record<AttachmentKind, string> = {
 };
 
 export type PoAttachment = {
+  /** Nullable since migration 026: a document can belong to an invoice with no
+   *  purchase order behind it — rent, a plumber, a walk-in receipt. */
+  po_id: string | null;
+  /** The vendor invoice this document was filed as, if any (migration 026).
+   *  Auto-creation fires only while this is null, which is the structural guard
+   *  that stops a re-read producing a second invoice record. */
+  invoice_id: string | null;
   id: string;
-  po_id: string;
   storage_path: string;
   kind: AttachmentKind;
   file_name: string | null;
@@ -96,7 +102,24 @@ export type PoAttachment = {
 export type SignedAttachment = PoAttachment & { url: string | null };
 
 /**
- * `{org_id}/{po_id}/{uuid}.{ext}`.
+ * Who a document is filed under, in the object key's second segment.
+ *
+ * A purchase order is its id; an invoice with no order behind it is the literal
+ * `invoices/{id}`, which makes segment 2 a word where the PO form has a uuid.
+ * That small irregularity is deliberate and safe: migration 018's storage
+ * policies authorise on the FIRST segment only, so both forms are covered with
+ * no new policy — verified against 018's own SQL.
+ */
+export function poOwner(poId: string): string {
+  return poId;
+}
+
+export function invoiceOwner(invoiceId: string): string {
+  return `invoices/${invoiceId}`;
+}
+
+/**
+ * `{org_id}/{owner}/{uuid}.{ext}`.
  *
  * The org leads because that's what migration 018's storage policies authorise
  * on — they read the first folder segment and check it the same way every table
@@ -104,8 +127,12 @@ export type SignedAttachment = PoAttachment & { url: string | null };
  * the original filename: two invoices called "scan.pdf" must not collide, and a
  * filename typed by a vendor has no business becoming part of an object key.
  * The real name is kept on the row.
+ *
+ * A file keeps the key it landed at. One attached to an order and later filed
+ * as an invoice is NOT moved — the path records where it was uploaded, not a
+ * claim about who owns it now.
  */
-export function attachmentPath(orgId: string, poId: string, fileName: string): string {
+export function attachmentPath(orgId: string, owner: string, fileName: string): string {
   const dot = fileName.lastIndexOf(".");
   // Only a short, plausible extension — "my.invoice.from.june" must not end up
   // with an extension of "from.june".
@@ -113,7 +140,7 @@ export function attachmentPath(orgId: string, poId: string, fileName: string): s
     dot > 0 && dot < fileName.length - 1 && fileName.length - dot <= 6
       ? fileName.slice(dot).toLowerCase()
       : "";
-  return `${orgId}/${poId}/${crypto.randomUUID()}${ext}`;
+  return `${orgId}/${owner}/${crypto.randomUUID()}${ext}`;
 }
 
 /** Whether to draw a thumbnail or a document row. */

@@ -1002,6 +1002,14 @@ export function PurchaseOrderDetail({
             orgId={orgId}
             attachments={attachments}
             canEdit={canEditLines}
+            // What an auto-filed invoice needs: whose vendor, whose location,
+            // and the lines to match its own against.
+            order={{
+              id: order.id,
+              vendor_id: order.vendor_id,
+              location_id: order.location_id,
+              lines,
+            }}
           />
         )}
       </div>

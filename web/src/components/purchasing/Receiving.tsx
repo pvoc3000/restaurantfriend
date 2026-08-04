@@ -163,7 +163,20 @@ export function Receiving({
     read,
     remove,
     reportError,
-  } = useAttachmentActions({ poId: order.id, orgId });
+  } = useAttachmentActions({
+    poId: order.id,
+    orgId,
+    // So an invoice attached at the delivery is filed as a record against this
+    // order's vendor and matched to these lines — the same gesture as on PO
+    // detail, which is the reason auto-filing lives in the hook and not in
+    // either screen.
+    order: {
+      id: order.id,
+      vendor_id: order.vendor_id,
+      location_id: order.location_id,
+      lines,
+    },
+  });
 
   const saving = pending || attachBusy;
 

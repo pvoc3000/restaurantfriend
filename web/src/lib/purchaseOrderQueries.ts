@@ -42,8 +42,9 @@ export const PO_LINE_SELECT = `id, vendor_item_id, description, brand, product_i
                   vendor_item_location_prices ( location_id, price ),
                   inventory_items ( id, name, category ) )`;
 
-export const PO_ATTACHMENT_SELECT = `id, po_id, storage_path, kind, file_name,
-   content_type, byte_size, created_at, extraction, extracted_at, extraction_model`;
+export const PO_ATTACHMENT_SELECT = `id, po_id, invoice_id, storage_path, kind,
+   file_name, content_type, byte_size, created_at, extraction, extracted_at,
+   extraction_model`;
 
 export type PoWithLines = {
   order: (PurchaseOrder & { vendors: { order_type: string; url: string | null } | null }) | null;
