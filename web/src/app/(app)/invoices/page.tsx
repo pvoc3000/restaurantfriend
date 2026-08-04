@@ -1,6 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { canWriteCatalog } from "@/lib/roles";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import {
   parseInvoiceFilters,
@@ -148,6 +149,15 @@ export default async function InvoicesPage({
     document_count: documentCounts.get(i.id) ?? 0,
   }));
 
+  // Every active vendor, order_type 'none' included — the landlord and the
+  // plumber are precisely why this screen can create an invoice at all.
+  const { data: vendors } = await supabase
+    .from("vendors")
+    .select("id, name")
+    .eq("org_id", session.membership.org_id)
+    .eq("is_active", true)
+    .order("name");
+
   return (
     <InvoiceList
       invoices={rows}
@@ -155,6 +165,10 @@ export default async function InvoicesPage({
       activeLocationCode={session.activeLocation.code}
       today={today}
       capped={rows.length === 500}
+      orgId={session.membership.org_id}
+      locationId={session.activeLocation.id}
+      vendors={(vendors ?? []) as { id: string; name: string }[]}
+      canEdit={canWriteCatalog(session.membership.role)}
     />
   );
 }

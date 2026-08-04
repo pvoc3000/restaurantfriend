@@ -36,6 +36,7 @@ import { withFrom } from "@/lib/breadcrumbs";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { NewInvoice } from "./NewInvoice";
 import type { InvoiceListRow } from "@/app/(app)/invoices/page";
 
 const INVOICE_WIDTHS_KEY = "rf.invoices.columnWidths.v1";
@@ -103,6 +104,10 @@ export function InvoiceList({
   activeLocationCode,
   today,
   capped,
+  orgId,
+  locationId,
+  vendors,
+  canEdit,
 }: {
   invoices: InvoiceListRow[];
   initialFilters: InvoiceFilters;
@@ -110,6 +115,12 @@ export function InvoiceList({
   /** The org's calendar day, computed once on the server — see lib/today. */
   today: string;
   capped: boolean;
+  orgId: string;
+  locationId: string;
+  /** Every ACTIVE vendor, order_type 'none' included — the landlord and the
+   *  plumber are the whole reason this screen can create anything. */
+  vendors: { id: string; name: string }[];
+  canEdit: boolean;
 }) {
   const router = useRouter();
   const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
@@ -523,6 +534,28 @@ export function InvoiceList({
               count: s === "all" ? invoices.length : statusCounts[s] ?? 0,
             }))}
           />
+
+          {/* The create command, right-aligned in the list's filter row — where
+              New employee sits, which is the template this follows. */}
+          {canEdit && (
+            <NewInvoice
+              orgId={orgId}
+              locationId={locationId}
+              vendors={vendors}
+              today={today}
+              // The vendor's id lives on the embed, not as its own column on
+              // the row — the duplicate check only ever compares within one
+              // vendor, so that's the shape it wants.
+              existing={invoices.map((i) => ({
+                id: i.id,
+                vendor_id: i.vendors?.id ?? "",
+                invoice_number: i.invoice_number,
+                invoice_date: i.invoice_date,
+                total: i.total,
+                status: i.status,
+              }))}
+            />
+          )}
         </div>
 
         <div className="flex flex-wrap items-end gap-4">
