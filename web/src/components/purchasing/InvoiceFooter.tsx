@@ -1,0 +1,193 @@
+"use client";
+
+import { useState } from "react";
+import Link from "next/link";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { InvoiceStatus } from "@/lib/invoices";
+
+/**
+ * The invoice's own footer — Close · Void · Approve, right-aligned, in the
+ * page's own flow.
+ *
+ * WHY IT IS NOT AN ACTIONBAR: Mark had the black band removed from the
+ * receiving screen on 2026-08-04 ("get rid of the black band at the bottom…
+ * just two buttons"). Reintroducing one on a brand-new detail screen would be
+ * reintroducing the thing he just took out.
+ *
+ * WHY APPROVE IS NOT BLACK: `DIALOG_COMMIT_CLASS` is "a commit inside a panel",
+ * extended to the receiving screen because that screen produces ONE outcome and
+ * its footer is a text-weight escape beside a commit. This screen isn't that —
+ * what you came to do is edit the inline cells, and Void, Approve and Close are
+ * a row of peers. CLAUDE.md names exactly this case as NOT the exception:
+ * "every discrete button on it is peripheral by construction".
+ *
+ * WHY IT DOESN'T NAVIGATE ON SUCCESS: receiving's Finalize leaves because
+ * finalizing ENDS the task and everything left on screen is for a delivery you
+ * have declared done. Approving leaves you looking at a record you may still
+ * want to read, so the state is the feedback — the button is replaced by who
+ * approved it and when.
+ */
+export function InvoiceFooter({
+  invoiceId,
+  status,
+  approvedAt,
+  caveats,
+  canApprove,
+  canEdit,
+  closeHref,
+  supabase,
+  onDone,
+}: {
+  invoiceId: string;
+  status: InvoiceStatus;
+  approvedAt: string | null;
+  /** What `approvalReadiness` found — named in the confirm, never blocking. */
+  caveats: string[];
+  canApprove: boolean;
+  canEdit: boolean;
+  closeHref: string;
+  supabase: SupabaseClient;
+  onDone: () => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function setApproval(approved: boolean) {
+    if (approved && caveats.length > 0) {
+      const ok = window.confirm(
+        `Approve this invoice for payment?\n\n` +
+          caveats.map((c) => `• ${c}`).join("\n") +
+          `\n\nApproving anyway is fine — it just records that you've said this ` +
+          `bill is payable.`
+      );
+      if (!ok) return;
+    }
+
+    setBusy(approved ? "approve" : "unapprove");
+    setError(null);
+
+    // The RPC, not an update: RLS filters rows and "only a manager may set
+    // approved_at" is a COLUMN rule, so migration 025 names those columns in a
+    // security definer function instead.
+    const { data, error: rpcError } = await supabase.rpc(
+      "set_vendor_invoice_approval",
+      { p_invoice: invoiceId, p_approved: approved }
+    );
+    setBusy(null);
+
+    if (rpcError) {
+      setError(rpcError.message);
+      return;
+    }
+    // ROW COUNT, not the absence of an error. The function returns no rows when
+    // it refuses — wrong role, wrong org, a voided invoice — and PostgREST
+    // reports that as a perfectly successful call. A cheerful false success
+    // about money is the employee-delete lesson with more at stake.
+    if (!Array.isArray(data) || data.length === 0) {
+      setError(
+        approved
+          ? "That wasn't approved — a voided invoice can't be, and approving needs a manager."
+          : "That wasn't changed — approval can only be withdrawn by a manager."
+      );
+      return;
+    }
+    onDone();
+  }
+
+  async function setStatus(next: "void" | "open") {
+    if (
+      next === "void" &&
+      !window.confirm(
+        "Void this invoice?\n\nIt stays on file and stops counting toward what " +
+          "you owe. A voided invoice can't be approved until it's reopened."
+      )
+    ) {
+      return;
+    }
+    setBusy(next);
+    setError(null);
+    const { data, error: updateError } = await supabase
+      .from("vendor_invoices")
+      .update({ status: next })
+      .eq("id", invoiceId)
+      .select("id");
+    setBusy(null);
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+    if (!data || data.length === 0) {
+      setError("Nothing changed — you may not have permission to do that.");
+      return;
+    }
+    onDone();
+  }
+
+  const button =
+    "h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+
+  return (
+    <div className="space-y-2">
+      {error && <p className="text-sm text-accent">{error}</p>}
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {status === "approved" && (
+          <span className="mr-auto text-sm text-muted">
+            Approved for payment
+            {approvedAt ? ` on ${approvedAt.slice(0, 10)}` : ""}.
+          </span>
+        )}
+
+        <Link
+          href={closeHref}
+          className="text-sm text-muted underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+        >
+          Close
+        </Link>
+
+        {canEdit && status !== "void" && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void setStatus("void")}
+            className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
+          >
+            {busy === "void" ? "Voiding…" : "Void"}
+          </button>
+        )}
+        {canEdit && status === "void" && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void setStatus("open")}
+            className={button}
+          >
+            {busy === "open" ? "Reopening…" : "Reopen"}
+          </button>
+        )}
+
+        {/* Approving is Manager and Owner only. Below that the control is
+            absent rather than offering a write the function would refuse. */}
+        {canApprove && status === "open" && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void setApproval(true)}
+            className={button}
+          >
+            {busy === "approve" ? "Approving…" : "Approve for payment"}
+          </button>
+        )}
+        {canApprove && status === "approved" && (
+          <button
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void setApproval(false)}
+            className={button}
+          >
+            {busy === "unapprove" ? "Withdrawing…" : "Withdraw approval"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}

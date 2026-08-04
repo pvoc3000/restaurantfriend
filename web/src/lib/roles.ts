@@ -69,3 +69,16 @@ export function canManageMembers(role: Role): boolean {
  * that happen to have the same answer, and one of them will move first.
  */
 export const canReadHr = canManageMembers;
+
+/**
+ * Approve a vendor invoice for payment — migration 025's
+ * `set_vendor_invoice_approval`, which checks this same set inside the
+ * function because RLS filters rows and this is a COLUMN rule.
+ *
+ * Purchaser+ can create and edit an invoice; saying "we owe this money" is
+ * manager work in FMP's own 1–5 ladder. Named separately from
+ * `canManageMembers` for the reason `canReadHr` is: "may grant app access" and
+ * "may approve a payment" are different questions with the same answer today,
+ * and one of them will move first.
+ */
+export const canApprovePayment = canManageMembers;
