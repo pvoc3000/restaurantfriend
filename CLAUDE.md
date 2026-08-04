@@ -546,6 +546,27 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    through anyway — and Close is the way back to PO detail. They sit together in
    the TRAILING group, reading as a form's footer, which is the one deliberate
    exception to the bar's act-here / move-there split.
+   **Finalize LEAVES on success** (Mark, 2026-08-03) — it closes the order and
+   navigates to `closeHref`, because finalizing is the end of the task and every
+   control left on screen is for a delivery you have just declared done; staying
+   put made you press Close afterwards for the same destination, two taps for
+   one decision. The write now takes **`.select("id")`** and checks the row
+   count: an update matching no RLS policy changes nothing and PostgREST
+   returns NO error, and a cheerful false success that also NAVIGATES reads as
+   the order having been closed. Same lesson as the employee delete.
+   **The strip under the bands carries the RECEIVED DATE**, with the layout
+   picker pushed to the right edge by `ml-auto` (Mark, 2026-08-03 — the layout
+   is set once and then left alone; the date is checked every time). It is
+   `InlineValue kind="date"` on **`delivery_date`** — the same column the
+   invoice band's `→` writes, so a machine's reading of a photograph lands in a
+   field you can see and correct rather than one you take on trust. Labelled
+   **Received** here where PO detail labels it Delivery: one column, and the
+   honest label depends on which end of the order you're standing at. The
+   header's `· due <date>` went with it, since the same value reading "due" in
+   one place and "Received" 100px below is two claims about one column.
+   `READ_ONLY_VALUE` moved to `catalog/InlineValue` when this made it a second
+   caller — it's defined by that component's own resting padding, so it belongs
+   beside it.
    **Auto-read on attach, `invoice` kind only**, in `useAttachmentActions`
    (shared with PO detail's Paperwork card, because it's a decision about the
    ACT of attaching, not about a screen). The upload STANDS if the read fails.

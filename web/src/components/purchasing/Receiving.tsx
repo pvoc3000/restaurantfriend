@@ -39,6 +39,7 @@ import {
   useReceivingLayout,
   useReceivingSplit,
 } from "@/lib/receivingLayout";
+import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { AddPoLines } from "./AddPoLines";
 import { DocumentPane } from "./DocumentPane";
 import { InvoiceSummary } from "./InvoiceSummary";
@@ -347,6 +348,20 @@ export function Receiving({
     );
   }
 
+  /**
+   * Finalize: close the order, then LEAVE (Mark, 2026-08-03).
+   *
+   * Finalizing is the end of the task, and the screen it ends has nothing left
+   * to say — every control on it is for a delivery you've just declared done.
+   * Staying put made you press Close afterwards to get the same place, which is
+   * two taps for one decision.
+   *
+   * `.select("id")` is not decoration. An update that matches no RLS policy
+   * removes nothing and PostgREST returns NO error, so a bare update reports a
+   * cheerful success — and now that success NAVIGATES, which would read as the
+   * order having been closed. Same lesson as the employee delete: make the
+   * write tell you what it actually did.
+   */
   async function close() {
     const caveats = closeReadiness(lines, attachments.length, order.location_id);
     const message =
@@ -355,9 +370,23 @@ export function Receiving({
         ? `\n\nStill unresolved:\n· ${caveats.join("\n· ")}\n\nClosing anyway is fine — it just means you're done with this order.`
         : "\n\nEverything is received, reconciled and filed.");
     if (!window.confirm(message)) return;
-    await write(() =>
-      supabase.from("purchase_orders").update({ status: "closed" }).eq("id", order.id)
-    );
+    setError(null);
+    const { data, error: closeError } = await supabase
+      .from("purchase_orders")
+      .update({ status: "closed" })
+      .eq("id", order.id)
+      .select("id");
+    if (closeError) {
+      setError(closeError.message);
+      return;
+    }
+    if (!data || data.length === 0) {
+      setError("That didn't close — you may not have permission to close this order.");
+      return;
+    }
+    // No `router.refresh()` first: the order screen is a fresh server render
+    // and will show the closed status by itself.
+    startTransition(() => router.push(closeHref));
   }
 
   /**
@@ -533,9 +562,11 @@ export function Receiving({
           >
             {PO_STATUS_LABEL[order.status]}
           </span>
+          {/* No date here any more: `delivery_date` now has a labelled, editable
+              home on the strip below, and the same value reading "due 08-01"
+              here and "Received 08-01" there is two claims about one column. */}
           <span className="text-sm text-muted">
             {order.vendors?.name ?? "—"} · {locationCode}
-            {order.delivery_date && ` · due ${order.delivery_date}`}
           </span>
           <span className="ml-auto flex items-baseline gap-4 tabular-nums">
             <Stat label="Ordered" value={money(ordered)} />
@@ -601,24 +632,58 @@ export function Receiving({
           </div>
         )}
 
-        {/* The layout control. A VIEW control, so it lives with the view and
-            not in the ActionBar, which carries commands only. */}
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">
-            Layout
-          </span>
-          {/* size="sm": this sits beside a fixed-height pane band. */}
-          <TabPicker
-            ariaLabel="Layout"
-            size="sm"
-            value={layout}
-            onChange={setReceivingLayout}
-            options={[
-              { key: "auto", label: "Auto" },
-              { key: "split", label: "Side by side" },
-              { key: "stacked", label: "Stacked" },
-            ]}
-          />
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+          {/* The day it arrived, editable, sitting where you'd check it — the
+              → in the invoice band writes this same column, and a machine's
+              reading of a photograph is exactly the kind of value you want to
+              see in a field rather than take on trust (Mark, 2026-08-03).
+
+              It's `delivery_date`, which PO detail labels "Delivery" and the
+              vendor PDF prints as such. Here it's "Received", because that is
+              what the column MEANS on a screen where you're recording an
+              arrival — one column, and the honest label for it depends on
+              which end of the order you're standing at. */}
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+              Received
+            </span>
+            {canReceive ? (
+              <InlineValue
+                table="purchase_orders"
+                id={order.id}
+                column="delivery_date"
+                value={order.delivery_date}
+                kind="date"
+              />
+            ) : (
+              <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+                {order.delivery_date ?? "—"}
+              </span>
+            )}
+          </div>
+
+          {/* The layout control. A VIEW control, so it lives with the view and
+              not in the ActionBar, which carries commands only. `ml-auto` puts
+              it against the right edge (Mark, 2026-08-03) — it's the one thing
+              on this strip you set once and stop touching, so it gets out of
+              the way of the field you actually check. */}
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+              Layout
+            </span>
+            {/* size="sm": this sits beside a fixed-height pane band. */}
+            <TabPicker
+              ariaLabel="Layout"
+              size="sm"
+              value={layout}
+              onChange={setReceivingLayout}
+              options={[
+                { key: "auto", label: "Auto" },
+                { key: "split", label: "Side by side" },
+                { key: "stacked", label: "Stacked" },
+              ]}
+            />
+          </div>
         </div>
 
         {stacked ? (

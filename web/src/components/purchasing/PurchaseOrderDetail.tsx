@@ -25,23 +25,13 @@ import { withFrom } from "@/lib/breadcrumbs";
 import type { SignedAttachment } from "@/lib/attachments";
 import { PoAttachments } from "./PoAttachments";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
-import { InlineValue } from "@/components/catalog/InlineValue";
+import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { PickList } from "@/components/ui/PickList";
 import { AddPoLines } from "./AddPoLines";
 import { OrderBar } from "./OrderBar";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 import { nextDeliveryDate } from "@/lib/poProcessing";
-
-/**
- * A value in the detail `dl` that ISN'T editable, wearing the padding that
- * `InlineValue`'s resting button wears. Every editable value in that column
- * starts 4px in; a plain string started at 0 and broke the column (Mark,
- * 2026-08-02, on an emailed order: "'email' isn't aligned with the ordered date
- * and note, probably having something to do with it not being editable" —
- * which was exactly the cause).
- */
-const READ_ONLY_VALUE = "inline-block px-1 py-0.5";
 
 /**
  * Reserve, in the page's flow, exactly the height of a `position: fixed` footer.

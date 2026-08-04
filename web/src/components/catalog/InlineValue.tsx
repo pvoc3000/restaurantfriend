@@ -64,6 +64,19 @@ function setJsonPath(
   return root;
 }
 
+/**
+ * A value that ISN'T editable, wearing the padding `InlineValue`'s resting
+ * button wears. Every editable value starts 4px in; a plain string started at 0
+ * and broke the column (Mark, 2026-08-02, on an emailed order: "'email' isn't
+ * aligned with the ordered date and note, probably having something to do with
+ * it not being editable" — which was exactly the cause).
+ *
+ * It lives HERE rather than beside either caller because it is defined by this
+ * component's own resting padding: change `px-1 py-0.5` below and this is what
+ * has to change with it.
+ */
+export const READ_ONLY_VALUE = "inline-block px-1 py-0.5";
+
 export function InlineValue({
   table,
   id,
