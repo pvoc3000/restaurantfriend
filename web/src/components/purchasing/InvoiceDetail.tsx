@@ -44,16 +44,48 @@ type InvoiceRecord = VendorInvoice & {
 const INVOICE_LINE_WIDTHS_KEY = "rf.invoiceLines.columnWidths.v1";
 
 /**
+ * The label column for the Bill and Amounts lists.
+ *
+ * 8rem, not the 9rem a full-width `dl` uses: side by side inside the record
+ * column these boxes are ~330px at `xl`, and 144px of that spent on a label
+ * leaves a vendor name nowhere to go.
+ *
+ * Not 7rem either, which was the first try: "Invoice number" wrapped to two
+ * lines at 112px while every other label sat on one, so that row alone stood
+ * 17px taller and the column read as ragged beside Amounts. 128px clears it —
+ * measured, not guessed.
+ */
+const DL_CLASS = "grid grid-cols-[8rem_1fr] items-baseline gap-y-1 text-sm";
+
+/**
+ * How tall the lines table may get before it scrolls inside itself.
+ *
+ * An explicit cap rather than `useFillViewportHeight` (which every other paned
+ * table here uses), and the reason is where this pane SITS: the hook measures
+ * "the window, less everything above and below me", which is the right question
+ * for a table near the top of the screen and the wrong one for a table that
+ * starts two thirds of the way down a record. It would compute a negative
+ * remainder and clamp to its 256px floor on every invoice.
+ */
+const LINES_MAX_HEIGHT = "max-h-[60vh]";
+
+/**
  * One invoice: what we were billed, what it belongs to, and whether it should
  * be paid.
  *
  * LAYOUT — a two-column grid, document left, that is deliberately NOT draggable
  * and NOT viewport-measured. The receiving screen earned its ResizeObserver,
  * `spaceBelow` measurement and drag divider by being a single-viewport STANDING
- * task whose lines pane scrolls inside itself; this is a desk screen that
- * scrolls the page like every other detail screen, so a sticky ceiling that is
- * twenty pixels off just leaves a little air rather than running columns off
- * the bottom of the window. Don't "fix" this by lifting that machinery in.
+ * task; this is a desk screen that scrolls, so a sticky ceiling twenty pixels
+ * off just leaves a little air rather than running columns off the bottom.
+ * Don't "fix" it by lifting that machinery in.
+ *
+ * It IS kept short, though (Mark, 2026-08-05 — "too tall and extends below the
+ * bottom of my screen"), by three things rather than by measuring: Bill and
+ * Amounts pair up instead of stacking, the lines table scrolls in a capped
+ * pane, and the screen's own chrome uses a normal rhythm rather than the
+ * `space-y-16` a stacked detail screen puts between blocks. Measured on a
+ * 15-line invoice at 1280×720: 2,463px → 1,212px, 3.4 screens → 1.7.
  */
 export function InvoiceDetail({
   invoice,
@@ -227,6 +259,7 @@ export function InvoiceDetail({
       key: "product_id",
       label: "Product ID",
       width: 150,
+      hideWhenCompact: true,
       sortValue: (l) => l.product_id,
       render: (l) =>
         canEdit ? (
@@ -263,6 +296,7 @@ export function InvoiceDetail({
       key: "pack",
       label: "Pack",
       width: 110,
+      hideWhenCompact: true,
       sortValue: (l) => l.pack,
       render: (l) =>
         canEdit ? (
@@ -528,11 +562,21 @@ export function InvoiceDetail({
           />
         </div>
 
-        <div className="min-w-0 space-y-16">
-          {/* The bill itself. */}
-          <section className="space-y-2">
-            <SectionHeading>Bill</SectionHeading>
-            <dl className="grid grid-cols-[9rem_1fr] items-baseline gap-y-1 text-sm">
+        <div className="min-w-0 space-y-10">
+          {/* Bill and Amounts side by side (Mark, 2026-08-05, on the page being
+              too tall): they are two SHORT lists — seven rows and five — and
+              stacking them spent a whole block's height plus a gap on nothing.
+
+              They pair at `md` rather than at the page's own `xl` because this
+              is a fact about THESE two boxes, not about the document beside
+              them: below `xl` the record column is full width and has even more
+              room for two. Below `md` they stack, which is the only width where
+              a 7rem label and a value genuinely don't share a line. */}
+          <div className="grid gap-x-8 gap-y-10 md:grid-cols-2">
+            {/* The bill itself. */}
+            <section className="min-w-0 space-y-2">
+              <SectionHeading>Bill</SectionHeading>
+              <dl className={DL_CLASS}>
               <Field label="Invoice number">
                 <Cell canEdit={canEdit} value={invoice.invoice_number}>
                   <InlineValue
@@ -622,9 +666,9 @@ export function InvoiceDetail({
           </section>
 
           {/* The money. */}
-          <section className="space-y-2">
+          <section className="min-w-0 space-y-2">
             <SectionHeading>Amounts</SectionHeading>
-            <dl className="grid grid-cols-[9rem_1fr] items-baseline gap-y-1 text-sm">
+            <dl className={DL_CLASS}>
               {(
                 [
                   ["Subtotal", "subtotal", invoice.subtotal],
@@ -674,7 +718,8 @@ export function InvoiceDetail({
                 <strong className="tabular-nums">{money(lineSums.stated)}</strong>.
               </p>
             )}
-          </section>
+            </section>
+          </div>
 
           {/* What it belongs to. */}
           <section className="space-y-2">
@@ -766,13 +811,28 @@ export function InvoiceDetail({
             )}
           </section>
 
-          {/* The lines. */}
+          {/* The lines, in a pane of their own. Fifteen rows is 1,319px — more
+              than the rest of the record put together — so left to run they
+              are what makes this page three screens tall. Paned, the column
+              labels stick to the top of the pane and the sticky document beside
+              you stays in view while you read them. */}
           <DataTable
             rows={lines}
             columns={columns}
             rowKey={(l) => l.id}
             storageKey={INVOICE_LINE_WIDTHS_KEY}
             columnChooser
+            scroll
+            maxHeightClass={LINES_MAX_HEIGHT}
+            // 1536, not the app's usual `xl`: this table lives in the RECORD
+            // column, so it gets ~55% of the window rather than all of it. At a
+            // 1280 laptop that is 677px for eight columns and every single
+            // header clipped to an ellipsis — which CLAUDE.md names as the tell
+            // that a column is too narrow for its name. Product ID and Pack
+            // drop first because the description carries their sense; the eye
+            // brings either back, and an explicit choice beats this default in
+            // both directions.
+            compactBelow={1536}
             leading={<SectionHeading count={lines.length}>Lines</SectionHeading>}
             empty={
               <p className="text-sm text-muted">

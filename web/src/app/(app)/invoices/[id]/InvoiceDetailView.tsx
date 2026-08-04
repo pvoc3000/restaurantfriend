@@ -76,7 +76,12 @@ export async function InvoiceDetailView({
     .order("name");
 
   return (
-    <div className="space-y-16">
+    // space-y-6, not the space-y-16 a stacked detail screen uses: InvoiceDetail
+    // returns a FRAGMENT, so its band, header, grid and footer are all direct
+    // children of this box — 64px between each of them put 192px of air into a
+    // screen whose problem was height. The blocks INSIDE the record column keep
+    // their own generous rhythm.
+    <div className="space-y-6">
       <Breadcrumbs
         trail={trail}
         current={invoice.invoice_number ?? "No number"}
