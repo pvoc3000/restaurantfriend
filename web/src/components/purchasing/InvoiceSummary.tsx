@@ -1,7 +1,11 @@
 "use client";
 
 import { money } from "@/lib/purchaseOrders";
-import { extractionNotes, type InvoiceExtraction } from "@/lib/invoiceExtraction";
+import {
+  extractionNotes,
+  invoiceDeliveryDate,
+  type InvoiceExtraction,
+} from "@/lib/invoiceExtraction";
 import type { MatchResult } from "@/lib/invoiceMatch";
 
 /**
@@ -17,12 +21,39 @@ import type { MatchResult } from "@/lib/invoiceMatch";
  * further down, so the first thing you learn on arriving is that a machine has
  * proposed something and that nothing has been written.
  */
+/**
+ * What the → would do, in a sentence — including what it replaces.
+ *
+ * Naming the date already on the order is the part that earns its keep: a
+ * generated PO arrives with `delivery_date` pre-filled from the vendor's
+ * delivery days (migration 016), so this button is usually overwriting a
+ * PREDICTION with a fact, and the person tapping should be able to see that's
+ * what's happening rather than discovering it afterwards.
+ */
+function takeLabel(
+  source: "ship" | "invoice",
+  date: string,
+  current: string | null
+): string {
+  const from = current
+    ? `This order says it arrives ${current}.`
+    : "This order has no delivery date.";
+  const provenance =
+    source === "ship"
+      ? "the ship date printed on this invoice"
+      : "this invoice's own date — it prints no ship date";
+  return `${from} Set it to ${date}, ${provenance}.`;
+}
+
 export function InvoiceSummary({
   extraction,
   match,
   fileName,
   model,
   receivedTotal,
+  deliveryDate,
+  onTakeDeliveryDate,
+  saving,
   addItemSlot,
 }: {
   extraction: InvoiceExtraction;
@@ -32,6 +63,13 @@ export function InvoiceSummary({
   /** What's been counted so far, in money — shown against the invoice total so
    *  a delivery that doesn't add up is visible without doing the arithmetic. */
   receivedTotal: number;
+  /** What the order currently says. The invoice's own date is offered only
+   *  when it disagrees with this — a date that already matches is a fact, not
+   *  a decision. */
+  deliveryDate: string | null;
+  /** Undefined below purchaser+, which is what turns the offer back into text. */
+  onTakeDeliveryDate?: (date: string) => void;
+  saving: boolean;
   /** An `AddPoLines` trigger, rendered inside the billed-but-not-ordered block
    *  where it's actually needed. */
   addItemSlot?: React.ReactNode;
@@ -42,6 +80,15 @@ export function InvoiceSummary({
   const total = extraction.invoice_total;
   const short = total !== null && receivedTotal < Number(total) - 0.005;
 
+  // The date the goods moved, and whether taking it would change anything.
+  const delivered = invoiceDeliveryDate(extraction);
+  const takeable =
+    delivered !== null && delivered.date !== deliveryDate && onTakeDeliveryDate !== undefined;
+  /** The offer below is about to print the invoice's own date, so the invoice's
+   *  identity shouldn't print it too — "73341407 · 2026-08-03  Invoiced
+   *  2026-08-03" reads as two dates that happen to agree. */
+  const restatesInvoiceDate = delivered?.source === "invoice" && takeable;
+
   return (
     <div className="space-y-3 border-2 border-ink px-4 py-3 text-sm">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -50,8 +97,42 @@ export function InvoiceSummary({
         </h2>
         <span className="text-ink">
           {extraction.invoice_number ?? "no number"}
-          {extraction.invoice_date && ` · ${extraction.invoice_date}`}
+          {extraction.invoice_date &&
+            !restatesInvoiceDate &&
+            ` · ${extraction.invoice_date}`}
         </span>
+
+        {/* When the delivery happened, and a → that puts it on the order —
+            the same take-it-or-leave-it shape as a line's Invoiced quantity,
+            and for the same reason: a machine's reading of a photograph never
+            writes itself.
+
+            A SHIP date is always worth showing, because it's a fact the order
+            doesn't otherwise have. The invoice DATE is only shown here when
+            taking it would change something — otherwise it's already sitting
+            two inches to the left in the invoice's own identity, and printing
+            it twice in a band this tight reads as two different dates. */}
+        {delivered && (delivered.source === "ship" || takeable) && (
+          <span className="flex items-center gap-1.5">
+            <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+              {delivered.source === "ship" ? "Shipped" : "Invoiced"}
+            </span>
+            <span className="tabular-nums text-ink">{delivered.date}</span>
+            {takeable && (
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => onTakeDeliveryDate?.(delivered.date)}
+                aria-label={takeLabel(delivered.source, delivered.date, deliveryDate)}
+                title={takeLabel(delivered.source, delivered.date, deliveryDate)}
+                className="grid h-7 w-7 place-items-center border border-ink bg-white text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+              >
+                →
+              </button>
+            )}
+          </span>
+        )}
+
         <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
           {matched} of {match.matches.length} lines matched
           {guessed > 0 && ` · ${guessed} by description`}

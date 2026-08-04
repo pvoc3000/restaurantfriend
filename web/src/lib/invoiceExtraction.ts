@@ -26,6 +26,15 @@ export type InvoiceExtraction = {
   vendor_name: string | null;
   invoice_number: string | null;
   invoice_date: string | null;
+  /**
+   * When the goods MOVED, if the invoice prints such a field (Ship Date,
+   * Delivered, Service Date). Optional in this type and required in the edge
+   * function's schema, which is not a contradiction: every invoice read before
+   * 2026-08-03 was stored without the key, and those readings stay valid — the
+   * date simply isn't offered until that invoice is read again. Same treatment
+   * `unreadable` gets below.
+   */
+  ship_date?: string | null;
   invoice_total: number | null;
   lines: InvoiceLine[];
   /**
@@ -43,6 +52,56 @@ export type InvoiceExtraction = {
 /** The reader's notes, whichever key this extraction was stored under. */
 export function extractionNotes(e: InvoiceExtraction): string | null {
   return e.notes ?? e.unreadable ?? null;
+}
+
+export type InvoiceDeliveryDate = {
+  /** A real calendar date in YYYY-MM-DD — safe to put in a `date` column. */
+  date: string;
+  /**
+   * Which field it was printed under. The UI labels it, because "the day it
+   * shipped" and "the day they billed us" are different claims and taking the
+   * second one as a delivery date is a judgement the person tapping should be
+   * making knowingly.
+   */
+  source: "ship" | "invoice";
+};
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * A date string only if it's a real date.
+ *
+ * The json_schema holds the model to a STRING; nothing enforces the format, and
+ * nothing at all stops it reading 09/13 off a page and calling it 2026-13-09.
+ * `purchase_orders.delivery_date` is a `date` column, so an unchecked value
+ * comes back as a raw Postgres error at the receiving desk.
+ *
+ * The round-trip is the part that matters: `new Date("2026-02-31")` does not
+ * fail, it rolls over to March 2nd. Formatting the parsed date back and
+ * comparing is what catches a day that doesn't exist.
+ */
+function isoDate(raw: string | null | undefined): string | null {
+  if (!raw || !ISO_DATE.test(raw)) return null;
+  const parsed = new Date(`${raw}T00:00:00Z`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10) === raw ? raw : null;
+}
+
+/**
+ * The date this invoice offers as the day the delivery happened.
+ *
+ * Ship date first, invoice date second. The fallback is deliberate rather than
+ * lax: most distributor invoices print only one date, and for a same-day
+ * delivery-and-invoice vendor it IS the delivery day — but it's a weaker claim,
+ * so it travels with its `source` and the screen says which one you're taking.
+ * Neither is ever written without someone tapping it.
+ */
+export function invoiceDeliveryDate(e: InvoiceExtraction): InvoiceDeliveryDate | null {
+  const shipped = isoDate(e.ship_date);
+  if (shipped) return { date: shipped, source: "ship" };
+  const invoiced = isoDate(e.invoice_date);
+  if (invoiced) return { date: invoiced, source: "invoice" };
+  return null;
 }
 
 /**

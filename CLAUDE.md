@@ -502,6 +502,37 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    BakeMark had renumbered, and Coconut failed on a plural ("Coconut Flakes" vs
    "COCONUT FLAKE SWEET" share one word, and the fallback needs three). After a
    manual match: 8 of 8.
+   Shipped 2026-08-03 (**needs `extract-invoice` redeployed**): **the invoice
+   says when the delivery happened**, and you can take it. The extraction schema
+   gained **`ship_date`** — a field the page labels Ship Date / Delivered /
+   Service Date, never the invoice date wearing a different hat — declared on
+   both sides as ever (the Deno function can't import from `web/`). Until the
+   function is redeployed the key is simply never written; every reading stored
+   before this has no `ship_date` either, which is why it's optional in the TS
+   type and required in the schema. Those fall back to the **invoice date**,
+   labelled `Invoiced` where a real ship date is labelled `Shipped`, because
+   "the day it moved" and "the day they billed us" are different claims and the
+   person taking one should see which. The identity line drops its own date in
+   that case — `73341407 · 2026-08-03  Invoiced 2026-08-03` reads as two dates
+   that happen to agree.
+   **It writes `delivery_date`** (Mark, 2026-08-03, choosing that over a
+   migration adding `received_date`). Known consequence, accepted: that column
+   is what the vendor PDF prints in its Delivery block, so taking a ship date
+   onto an emailed order leaves the record saying a different day than the
+   document the vendor holds — the same objection that stopped 016 backfilling
+   the 16 POs sent 2026-07-27. It's outweighed at the delivery, where the day it
+   actually came is the answer every later reader wants. Which is why nothing
+   prefills: it's the screen's `→` idiom, the date shown beside the date it
+   would replace (the tooltip names both, since a generated PO's `delivery_date`
+   is 016's PREDICTION and this usually overwrites one), and quiet text when
+   they already agree or you're below purchaser+.
+   **The date is format-checked before it goes near the column**
+   (`invoiceDeliveryDate` in `lib/invoiceExtraction`): the json_schema holds the
+   model to a STRING and says nothing about its shape, while `delivery_date` is
+   a `date` column, so an unchecked reading returns a raw Postgres error to
+   someone standing at a delivery holding paper. The check is a ROUND TRIP, not
+   a regex — `new Date("2026-02-31")` does not fail, it rolls over to March 2nd.
+   13 fixtures, most of them the refusals.
    **One receive control**, in the ActionBar: `Receive n from invoice` when an
    extraction exists, `Receive n as ordered` when not, filling only lines with
    NO quantity. With an invoice it fills MATCHED lines only — filling the rest

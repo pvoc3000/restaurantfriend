@@ -69,6 +69,7 @@ const INVOICE_SCHEMA = {
     "vendor_name",
     "invoice_number",
     "invoice_date",
+    "ship_date",
     "invoice_total",
     "lines",
     "notes",
@@ -77,6 +78,11 @@ const INVOICE_SCHEMA = {
     vendor_name: nullable("string"),
     invoice_number: nullable("string"),
     invoice_date: nullable("string"),
+    // When the goods actually moved, if the page says. Kept separate from
+    // invoice_date because a distributor bills on a cycle and delivers on a
+    // day, and receiving cares about the day — this is what the receiving
+    // screen offers as the order's delivery date.
+    ship_date: nullable("string"),
     invoice_total: nullable("number"),
     lines: {
       type: "array",
@@ -132,7 +138,13 @@ tidy: if the arithmetic on the page is wrong, report what is printed.
 - Use null for any field not printed on that line. Do not guess.
 - Skip subtotal, tax, delivery, and total rows — those are not line items.
   Put the invoice's grand total in invoice_total.
-- invoice_date as YYYY-MM-DD.
+- ship_date is the date the goods MOVED, taken from a field the page labels as
+  such: Ship Date, Date Shipped, Delivered, Delivery Date, Service Date. Many
+  invoices print no such field — use null then. Never copy the invoice date
+  into it, and never take an order date, a due date, or a payment-terms date:
+  those are different facts and one of them being wrong here would put the
+  wrong day on a purchase order.
+- invoice_date and ship_date as YYYY-MM-DD.
 
 Use "notes" for anything the reader of this data should know before trusting it,
 naming the lines involved: text you couldn't make out, a choice you had to make

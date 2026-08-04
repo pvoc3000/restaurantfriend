@@ -315,6 +315,26 @@ export function Receiving({
     );
   }
 
+  /**
+   * Put the invoice's delivery date on the order.
+   *
+   * It writes `delivery_date` — the same column the vendor PDF prints in its
+   * Delivery block and the PO list shows — rather than a received-date column
+   * of its own (Mark, 2026-08-03, choosing that over a migration). So on an
+   * order that was emailed, this can leave the record saying a different day
+   * than the document the vendor holds. That's accepted: by the time you're
+   * standing at the delivery, the day it actually came is the more useful of
+   * the two answers, and it's the one every later reader wants.
+   *
+   * Which is exactly why nothing here happens on its own. The date is shown
+   * with the date it would replace, and a person taps the arrow.
+   */
+  function takeDeliveryDate(date: string) {
+    void write(() =>
+      supabase.from("purchase_orders").update({ delivery_date: date }).eq("id", order.id)
+    );
+  }
+
   /** Stage 2: teach the CATALOG the vendor's new number, so the next order
    *  matches without anyone doing this again. */
   function adoptSku(line: PoLine) {
@@ -553,6 +573,9 @@ export function Receiving({
             fileName={source.file_name}
             model={source.extraction_model}
             receivedTotal={received}
+            deliveryDate={order.delivery_date}
+            onTakeDeliveryDate={canReceive ? takeDeliveryDate : undefined}
+            saving={saving}
             addItemSlot={
               canReceive ? (
                 <AddPoLines order={order} orgId={orgId} lines={lines} />
