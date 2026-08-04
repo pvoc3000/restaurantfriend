@@ -15,7 +15,10 @@ import {
   approvalReadiness,
   findPossibleDuplicates,
   lineSumReconciliation,
+  matchPrintedPoNumber,
+  printedPoNumbers,
   signedTotal,
+  toInvoiceLine,
   AGING_LABEL,
   INVOICE_STATUS_CLASS,
   INVOICE_STATUS_LABEL,
@@ -23,7 +26,10 @@ import {
   type VendorInvoice,
   type VendorInvoiceLine,
 } from "@/lib/invoices";
-import { matchesFromLinks } from "@/lib/invoiceMatch";
+import { matchInvoiceToOrder, matchesFromLinks } from "@/lib/invoiceMatch";
+import type { InvoiceLine } from "@/lib/invoiceExtraction";
+import { RowMenu } from "@/components/ui/RowMenu";
+import { LinkToPo, type LinkCandidate } from "./LinkToPo";
 import type { LinkedPurchaseOrder } from "@/lib/invoiceQueries";
 import type { SignedAttachment } from "@/lib/attachments";
 import { DocumentPane } from "./DocumentPane";
@@ -57,6 +63,7 @@ export function InvoiceDetail({
   attachments,
   documentError,
   duplicateCandidates,
+  linkCandidates,
   locationCode,
   orgId,
   vendors,
@@ -73,6 +80,8 @@ export function InvoiceDetail({
   attachments: SignedAttachment[];
   documentError: string | null;
   duplicateCandidates: VendorInvoice[];
+  /** This vendor's recent orders at this location, for Link to PO…. */
+  linkCandidates: LinkCandidate[];
   locationCode: string;
   orgId: string;
   vendors: { id: string; name: string }[];
@@ -113,13 +122,7 @@ export function InvoiceDetail({
           lines
             .filter((l) => l.purchase_order_id === order.id)
             .map((l) => ({
-              product_id: l.product_id,
-              alt_product_id: l.alt_product_id,
-              description: l.description ?? "",
-              qty: l.qty === null ? null : Number(l.qty),
-              unit_price: l.unit_price === null ? null : Number(l.unit_price),
-              extended: l.extended === null ? null : Number(l.extended),
-              pack: l.pack,
+              ...toInvoiceLine(l),
               purchase_order_item_id: l.purchase_order_item_id,
             }))
         ).matches,
@@ -148,6 +151,63 @@ export function InvoiceDetail({
     !normalizedEqual(readVendorName, invoice.vendors.name)
       ? readVendorName
       : null;
+
+  /**
+   * The purchase order this invoice PRINTS, when exactly one candidate answers
+   * to it — a proposal, never an automatic link. A printed number is one OCR
+   * digit from someone else's order, so the same uniqueness discipline the SKU
+   * join uses applies here one level up: two matches, another vendor or another
+   * location all refuse.
+   *
+   * Provenance is different and DOES link by itself: an invoice created from a
+   * purchase order's own Paperwork card is linked to that order because you
+   * attached it there.
+   */
+  const printedProposals = useMemo(() => {
+    if (!shown?.extraction) return [];
+    const alreadyLinked = new Set(
+      linkedOrders.map((o) => o.po_number.toUpperCase())
+    );
+    return printedPoNumbers(shown.extraction)
+      .map((printed) => ({
+        printed,
+        hit: matchPrintedPoNumber(printed, linkCandidates, {
+          vendor_id: invoice.vendor_id,
+          location_id: invoice.location_id,
+        }),
+      }))
+      .filter((p) => p.hit && !alreadyLinked.has(p.hit.po_number.toUpperCase()));
+  }, [shown, linkCandidates, invoice.vendor_id, invoice.location_id, linkedOrders]);
+
+  async function linkPrinted(orderId: string) {
+    const order = linkCandidates.find((c) => c.id === orderId);
+    if (!order) return;
+    // Keyed by the OBJECT the matcher was handed, so its answer maps back to a
+    // row with no index arithmetic to get wrong.
+    const rowOf = new Map<InvoiceLine, VendorInvoiceLine>();
+    const asInvoiceLines: InvoiceLine[] = lines
+      .filter((l) => l.purchase_order_id === null)
+      .map((l) => {
+        const shape = toInvoiceLine(l);
+        rowOf.set(shape, l);
+        return shape;
+      });
+
+    const { matches } = matchInvoiceToOrder(order.lines, asInvoiceLines);
+    for (const m of matches) {
+      if (!m.invoice) continue;
+      const row = rowOf.get(m.invoice);
+      if (!row) continue;
+      await supabase
+        .from("vendor_invoice_lines")
+        .update({
+          purchase_order_id: order.id,
+          purchase_order_item_id: m.line.id,
+        })
+        .eq("id", row.id);
+    }
+    router.refresh();
+  }
 
   const caveats = useMemo(
     () =>
@@ -318,6 +378,59 @@ export function InvoiceDetail({
       },
     },
   ];
+
+  if (canEdit) {
+    columns.push({
+      key: "menu",
+      label: "",
+      width: 56,
+      render: (l) => (
+        <RowMenu
+          label={`Actions for ${l.description ?? "this line"}`}
+          items={[
+            {
+              label: "Unlink",
+              hint: "Leave this line unattributed",
+              disabled: l.purchase_order_id === null,
+              onSelect: () => void setLineLink(l.id, null, null),
+            },
+            {
+              label: l.kind === "freight" ? "Mark as an item" : "Mark as freight",
+              // Kind is what keeps the totals honest: a freight LINE and a
+              // header freight amount are the same charge printed twice, so
+              // the subtotal check counts item lines only.
+              hint:
+                l.kind === "freight"
+                  ? "Count it toward the subtotal again"
+                  : "A delivery fee or fuel surcharge",
+              onSelect: () =>
+                void setLineKind(l.id, l.kind === "freight" ? "item" : "freight"),
+            },
+          ]}
+        />
+      ),
+    });
+  }
+
+  async function setLineLink(
+    lineId: string,
+    purchaseOrderId: string | null,
+    purchaseOrderItemId: string | null
+  ) {
+    await supabase
+      .from("vendor_invoice_lines")
+      .update({
+        purchase_order_id: purchaseOrderId,
+        purchase_order_item_id: purchaseOrderItemId,
+      })
+      .eq("id", lineId);
+    router.refresh();
+  }
+
+  async function setLineKind(lineId: string, kind: VendorInvoiceLine["kind"]) {
+    await supabase.from("vendor_invoice_lines").update({ kind }).eq("id", lineId);
+    router.refresh();
+  }
 
   return (
     <>
@@ -568,6 +681,29 @@ export function InvoiceDetail({
             <SectionHeading count={linkedOrders.length}>
               Purchase orders
             </SectionHeading>
+
+            {/* What the page PRINTS, offered rather than taken. Yellow, because
+                it's worth your eye and not a warning. */}
+            {canEdit &&
+              printedProposals.map((p) => (
+                <p
+                  key={p.printed}
+                  className="flex flex-wrap items-center gap-3 border border-ink bg-mark-fill px-4 py-2 text-sm"
+                >
+                  <span>
+                    This invoice prints{" "}
+                    <strong>{p.hit!.po_number}</strong>.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => void linkPrinted(p.hit!.id)}
+                    className="h-8 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
+                  >
+                    Link
+                  </button>
+                </p>
+              ))}
+
             {linkedOrders.length === 0 ? (
               // A landlord bill should not be nagged about a purchase order.
               invoice.vendors?.order_type === "none" ? (
@@ -617,6 +753,16 @@ export function InvoiceDetail({
                   );
                 })}
               </ul>
+            )}
+
+            {canEdit && (
+              <div className="pt-1">
+                <LinkToPo
+                  lines={lines}
+                  candidates={linkCandidates}
+                  onDone={() => router.refresh()}
+                />
+              </div>
             )}
           </section>
 

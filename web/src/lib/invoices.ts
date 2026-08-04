@@ -19,6 +19,7 @@ import {
   priceDiffers,
   qtyDiffers,
   type InvoiceExtraction,
+  type InvoiceLine,
 } from "./invoiceExtraction";
 import type { LineMatch } from "./invoiceMatch";
 
@@ -578,6 +579,28 @@ export function invoiceLinesFromExtraction(
     kind: "item" as const,
     notes: null,
   }));
+}
+
+/**
+ * A STORED line in the shape the matcher reads.
+ *
+ * `matchInvoiceToOrder` is pure over `InvoiceLine`, which is the READING's
+ * shape — so a stored row has to be presented in it before it can be matched.
+ * One conversion, here, because two callers need it and two copies is how the
+ * numeric coercions drift: `qty` and `unit_price` come back from PostgREST as
+ * strings on a numeric column, and a string quantity silently fails every
+ * comparison downstream.
+ */
+export function toInvoiceLine(line: VendorInvoiceLine): InvoiceLine {
+  return {
+    product_id: line.product_id,
+    alt_product_id: line.alt_product_id,
+    description: line.description ?? "",
+    qty: line.qty === null ? null : Number(line.qty),
+    unit_price: line.unit_price === null ? null : Number(line.unit_price),
+    extended: line.extended === null ? null : Number(line.extended),
+    pack: line.pack,
+  };
 }
 
 /**

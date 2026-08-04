@@ -106,6 +106,10 @@ export type LinkedPurchaseOrder = {
   po_number: string;
   order_date: string;
   status: string;
+  /** Present on a link CANDIDATE, where matchPrintedPoNumber checks the scope;
+   *  omitted on an already-linked order, where the scope is settled. */
+  vendor_id?: string;
+  location_id?: string;
   lines: PoLine[];
 };
 
@@ -167,6 +171,58 @@ export async function fetchLinkedOrders(
     })),
     error: null,
   };
+}
+
+/**
+ * This vendor's recent orders at this location — what "Link to PO…" offers,
+ * and what the printed-PO-number proposal is checked against.
+ *
+ * Scoped to the vendor AND the location because those are the two things that
+ * make a printed number unambiguous; `matchPrintedPoNumber` refuses anything
+ * outside that scope for the same reason. Void orders are excluded — you can't
+ * be billed against an order that was cancelled.
+ */
+export async function fetchLinkCandidates(
+  supabase: SupabaseClient,
+  {
+    vendorId,
+    locationId,
+    since,
+  }: { vendorId: string; locationId: string; since: string }
+): Promise<LinkedPurchaseOrder[]> {
+  const { data: orders } = await supabase
+    .from("purchase_orders")
+    .select("id, po_number, order_date, status, vendor_id, location_id")
+    .eq("vendor_id", vendorId)
+    .eq("location_id", locationId)
+    .neq("status", "void")
+    .gte("order_date", since)
+    .order("order_date", { ascending: false })
+    .limit(40);
+
+  const ids = (orders ?? []).map((o) => o.id as string);
+  if (ids.length === 0) return [];
+
+  const { data: poLines } = await supabase
+    .from("purchase_order_items")
+    .select(`po_id, ${PO_LINE_SELECT}`)
+    .in("po_id", ids);
+
+  const byOrder = new Map<string, PoLine[]>();
+  for (const row of (poLines ?? []) as unknown as (PoLine & { po_id: string })[]) {
+    const { po_id, ...line } = row;
+    byOrder.set(po_id, [...(byOrder.get(po_id) ?? []), line as PoLine]);
+  }
+
+  return (orders ?? []).map((o) => ({
+    id: o.id as string,
+    po_number: o.po_number as string,
+    order_date: o.order_date as string,
+    status: o.status as string,
+    vendor_id: o.vendor_id as string,
+    location_id: o.location_id as string,
+    lines: byOrder.get(o.id as string) ?? [],
+  }));
 }
 
 /**

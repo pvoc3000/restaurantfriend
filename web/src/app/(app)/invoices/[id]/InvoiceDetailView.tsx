@@ -10,8 +10,10 @@ import {
   fetchDuplicateCandidates,
   fetchInvoiceDocuments,
   fetchInvoiceWithLines,
+  fetchLinkCandidates,
   fetchLinkedOrders,
 } from "@/lib/invoiceQueries";
+import { daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { InvoiceDetail } from "@/components/purchasing/InvoiceDetail";
 
 /** The invoice detail's whole body — every query lives here. */
@@ -53,6 +55,16 @@ export async function InvoiceDetailView({
   const { attachments, error: documentError } = await documentsPromise;
   const duplicateCandidates = await candidatesPromise;
 
+  // A 60-day window of this vendor's orders at this location — what Link to PO…
+  // offers, and what a printed PO number is checked against. In the ORG's
+  // timezone, so the window doesn't shift under a UTC host.
+  const timeZone = session.orgSettings.timezone ?? serverTimeZone();
+  const linkCandidates = await fetchLinkCandidates(supabase, {
+    vendorId: invoice.vendor_id,
+    locationId: invoice.location_id,
+    since: daysBefore(todayInTimeZone(timeZone), 60),
+  });
+
   // Every active vendor, for the vendor picker — an invoice filed against the
   // wrong vendor is a likely mistake on a hand-created one, and the PO links
   // are per-line so changing it disturbs nothing.
@@ -86,6 +98,15 @@ export async function InvoiceDetailView({
           // read as "nothing filed yet" instead of "this isn't wired up here".
           documentError={documentError}
           duplicateCandidates={duplicateCandidates}
+          linkCandidates={linkCandidates.map((o) => ({
+            id: o.id,
+            po_number: o.po_number,
+            order_date: o.order_date,
+            status: o.status,
+            vendor_id: o.vendor_id ?? invoice.vendor_id,
+            location_id: o.location_id ?? invoice.location_id,
+            lines: o.lines,
+          }))}
           locationCode={locationCode}
           orgId={invoice.org_id}
           vendors={(vendors ?? []) as { id: string; name: string }[]}
