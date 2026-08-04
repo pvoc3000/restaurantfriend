@@ -7,7 +7,21 @@ import { withFrom } from "./breadcrumbs";
 import { PO_STATUS_ORDER, type PoStatus } from "./purchaseOrders";
 import { daysBefore, todayInTimeZone } from "./today";
 
-export type StatusFilter = PoStatus | "all";
+/**
+ * The chip row is the five statuses plus two roll-ups: `all`, and `open` —
+ * everything not yet closed (see isPoOpen), which is the list you work from.
+ */
+export type StatusFilter = PoStatus | "all" | "open";
+
+/** The roll-ups, told apart from the raw statuses wherever both are parsed. */
+const STATUS_ROLLUPS = ["all", "open"] as const;
+
+function isStatusFilter(value: string): value is StatusFilter {
+  return (
+    (STATUS_ROLLUPS as readonly string[]).includes(value) ||
+    (PO_STATUS_ORDER as string[]).includes(value)
+  );
+}
 
 /**
  * The list is bounded by a date window rather than paged: 16.8k POs exist, but
@@ -78,9 +92,7 @@ export function parsePoFilters(
     // coming back to a list silently narrowed by a term you've forgotten
     // typing is its own trap.
     q: one(params.q),
-    status: (PO_STATUS_ORDER as string[]).includes(status)
-      ? (status as PoStatus)
-      : fallback.status,
+    status: isStatusFilter(status) ? status : fallback.status,
     range: RANGES.some((r) => r.key === range)
       ? (range as RangeKey)
       : fallback.range,
@@ -118,8 +130,7 @@ export function parsePoView(raw: string | undefined | null): Partial<PoFilters> 
   const dir = q.get("dir");
 
   const view: Partial<PoFilters> = {};
-  if (status === "all" || (PO_STATUS_ORDER as string[]).includes(status))
-    view.status = status as StatusFilter;
+  if (isStatusFilter(status)) view.status = status;
   if (RANGES.some((r) => r.key === range)) view.range = range as RangeKey;
   if ((PO_SORT_KEYS as readonly string[]).includes(sort)) view.sort = sort as PoSortKey;
   if (dir === "asc" || dir === "desc") view.dir = dir;

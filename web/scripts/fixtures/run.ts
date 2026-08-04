@@ -9,6 +9,7 @@ import "./employeeDocuments.fixtures";
 import "./employees.fixtures";
 import "./invoiceMatch.fixtures";
 import "./packLabel.fixtures";
+import "./poFilters.fixtures";
 import "./receiving.fixtures";
 import "./tableSort.fixtures";
 import { runAll } from "./harness";

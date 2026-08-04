@@ -61,6 +61,14 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    two day-scoped filters.
    **Broken against the live DB until 008 is applied** — the page selects the
    view's new columns.
+   The status chips carry two ROLL-UPS beside the five raw statuses: `all`, and
+   **`open` — everything not yet closed** (Mark, 2026-08-03), which is the list
+   you work from. Open reads as NOT INERT rather than as "not closed"
+   (`isPoOpen`): a void order hasn't been closed either and is emphatically not
+   outstanding work, which is where `canClose` already draws the line. Both
+   roll-ups are shown ALWAYS, where an empty raw status is dropped from the row
+   — "Draft 0" says only that nothing is in that state right now, while
+   "Open 0" says nothing is outstanding, which is the answer you came for.
    Shipped: `/purchase-orders` list (location-scoped, date window, status chips,
    totals, selection) and PO detail (ordered-vs-received with dual totals,
    inline receiving, price reconciliation → catalog).

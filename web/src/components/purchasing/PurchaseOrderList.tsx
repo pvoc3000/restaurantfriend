@@ -17,6 +17,7 @@ import {
   PO_STATUS_CLASS,
   PO_STATUS_LABEL,
   PO_STATUS_ORDER,
+  isPoOpen,
   type PoStatus,
 } from "@/lib/purchaseOrders";
 import {
@@ -137,10 +138,20 @@ export function PurchaseOrderList({
     return counts;
   }, [orders]);
 
+  /** The roll-up behind the Open chip — see isPoOpen. */
+  const openCount = useMemo(
+    () => orders.filter((po) => isPoOpen(po.status)).length,
+    [orders]
+  );
+
   const visible = useMemo(() => {
     const words = filters.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return orders.filter((po) => {
-      if (filters.status !== "all" && po.status !== filters.status) return false;
+      if (filters.status === "open") {
+        if (!isPoOpen(po.status)) return false;
+      } else if (filters.status !== "all" && po.status !== filters.status) {
+        return false;
+      }
       if (words.length === 0) return true;
       const haystack = `${po.po_number} ${po.vendors?.name ?? ""} ${po.status}`.toLowerCase();
       return words.every((w) => haystack.includes(w));
@@ -593,8 +604,21 @@ export function PurchaseOrderList({
     },
   ];
 
+  /**
+   * All · Open · then whichever raw statuses are actually represented.
+   *
+   * The two roll-ups are ALWAYS shown, where an empty raw status is dropped,
+   * and the difference is what a zero means. "Draft 0" says only that no order
+   * happens to be in that state right now; "Open 0" says nothing is
+   * outstanding, which is the answer you came to the screen for. A standing
+   * view should be able to tell you it's empty.
+   *
+   * Open sits second because it's the working list — everything after it is a
+   * way of narrowing that, and All is the archive.
+   */
   const statusTabs: StatusFilter[] = [
     "all",
+    "open",
     ...PO_STATUS_ORDER.filter((s) => (statusCounts[s] ?? 0) > 0),
   ];
 
@@ -635,8 +659,18 @@ export function PurchaseOrderList({
           onChange={(status) => update({ status })}
           options={statusTabs.map((s) => ({
             key: s,
-            label: s === "all" ? "All" : PO_STATUS_LABEL[s as PoStatus],
-            count: s === "all" ? orders.length : statusCounts[s] ?? 0,
+            label:
+              s === "all"
+                ? "All"
+                : s === "open"
+                  ? "Open"
+                  : PO_STATUS_LABEL[s as PoStatus],
+            count:
+              s === "all"
+                ? orders.length
+                : s === "open"
+                  ? openCount
+                  : statusCounts[s] ?? 0,
           }))}
         />
 

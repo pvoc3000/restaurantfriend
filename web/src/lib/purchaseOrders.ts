@@ -255,6 +255,23 @@ export function canClose(status: PoStatus): boolean {
   return status === "received" || status === "sent";
 }
 
+/**
+ * An order you still have something to do with (Mark, 2026-08-03, asking for an
+ * Open filter on the list: "pos that haven't been closed yet").
+ *
+ * Read as NOT INERT rather than as "not closed", which is the same set today
+ * and won't stay that way. A void order hasn't been closed either, and it is
+ * emphatically not outstanding work — `canClose` above already draws the line
+ * in the same place, calling closed and void "already inert".
+ *
+ * There are no void orders in the data yet (16,850 rows, none), so this is
+ * about the definition rather than about a row anyone can point at — which is
+ * exactly when it's cheap to get right.
+ */
+export function isPoOpen(status: PoStatus): boolean {
+  return status !== "closed" && status !== "void";
+}
+
 export function money(value: number | null | undefined) {
   if (value === null || value === undefined) return "—";
   return `$${Number(value).toLocaleString("en-US", {
