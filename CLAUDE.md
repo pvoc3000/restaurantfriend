@@ -2297,6 +2297,39 @@ weekday column, and 003 then silently made it per-vendor-item.
 
 ## Open threads (pinned by Mark — don't act without asking)
 
+- **Weekday FAVORITES may belong on the vendor items table, not behind a
+  location row** (Mark, 2026-08-04, on item detail: "seems to me that setting
+  the daily favorites should be done in the vendor item section… part of me
+  feels like it's weird to be able to edit DF01 settings when we're working in
+  DF02"). Reconsider; don't build it unasked.
+  Where it sits today and why: a favorite is `order_guide_plan_days`, keyed
+  `item_location_id` + `weekday` + `vendor_item_id`, so it is a fact about a
+  vendor item **at a location**. Per-location config has one row per location
+  and therefore knows which `item_location_id` to write; the Vendor items
+  section below is ORG-level (its Price cell writes `vendor_items.price`, the
+  base, not the override), so it has no location in hand. That is the whole
+  reason the grid is behind the location row's disclosure.
+  What we concluded: the two halves of Mark's proposal are SEPARABLE. Moving
+  favorites down needs only *a* location, and the WORKING one is a fine choice
+  — a column labelled "Favorite days at DF01" is unambiguous and costs nothing
+  above it. It's arguably the better shape, too: a favorite is a cell in a grid
+  of vendor items × weekdays, and it currently hangs off the other axis.
+  Scoping the WHOLE screen to one location is the expensive half and probably
+  wrong: it loses shops side by side, and it loses **Stock here**, which is the
+  only way to add an item to a shop that doesn't carry it — you cannot act on a
+  location you can't see. It also cuts against the pattern Mark already settled
+  on 2026-08-01, where `/locations` edits any location's record from anywhere:
+  RECORD screens aren't bound to the working location, OPERATIONAL ones (guide,
+  POs, cleanup) are. Design rule 3 names "item detail's per-location rows" as
+  the example of enumerating over locations.
+  The better framing of the discomfort: it isn't that you can see DF01 from
+  DF02 — it's that **a favorite is an operational setting living on a record
+  screen**, which is why it feels like it should follow you while the par beside
+  it doesn't.
+  Wrinkle to design for either way: a favorites column would make a vendor item
+  row where most cells write org-wide and one writes only for your shop. That
+  has to be visible in the table, or it becomes the next "I edited this and it
+  only changed here".
 - **Per-location app access is deferred, and Mark wants to revisit it**
   (2026-08-01: "defer for now but it is something I definitely want to
   revisit"). FMP's ADMIN tab had a DEFAULT LOCATION and an ACCESS LOCATIONS
