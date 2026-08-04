@@ -623,6 +623,20 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    on both — the same argument auto-read lives in that hook for. Its empty
    state says "Nothing attached — drop one here" only when you can actually
    write.
+   **The document pane can RE-READ** (Mark, 2026-08-04: "there's no way to
+   'read invoice again' on the reconcile screen. there should be"). `read` was
+   in `useAttachmentActions` all along and only PO detail's Paperwork card ever
+   called it, so the one screen built for standing at a delivery couldn't retry
+   a reading. It sits with Remove — both act on the document SHOWN, where the
+   kind picker and Attach are about adding a new one — and reads "Read" or
+   "Read again" depending on whether there's an extraction. Auto-read covers
+   the ordinary case; this is for the ones it can't: a read that failed, a
+   photo retaken, and a reader that has since learned to see something it
+   didn't, which is what a redeployed `extract-invoice` is.
+   Known edge, not fixed: the band cannot wrap and every control in it is
+   `shrink-0`, so at a hard-dragged narrow split (~320px of document column)
+   the cluster outgrows the pane and `overflow-hidden` clips Remove. Five
+   controls is what that band can hold.
    **Auto-read on attach, `invoice` kind only**, in `useAttachmentActions`
    (shared with PO detail's Paperwork card, because it's a decision about the
    ACT of attaching, not about a screen). The upload STANDS if the read fails.

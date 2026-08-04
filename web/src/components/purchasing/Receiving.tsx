@@ -156,6 +156,7 @@ export function Receiving({
     error: attachError,
     fileRef,
     upload,
+    read,
     remove,
     reportError,
   } = useAttachmentActions({ poId: order.id, orgId });
@@ -497,6 +498,7 @@ export function Receiving({
       onPick={setPickedId}
       onFilesPicked={(files) => void upload(files, kind)}
       onDropRejected={rejectDrop}
+      onRead={(a) => void read(a)}
       onRemove={(a) => void remove(a)}
       fileRef={fileRef}
       kind={kind}

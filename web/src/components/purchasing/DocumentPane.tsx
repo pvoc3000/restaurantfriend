@@ -41,6 +41,7 @@ export function DocumentPane({
   onPick,
   onFilesPicked,
   onDropRejected,
+  onRead,
   onRemove,
   fileRef,
   kind,
@@ -58,6 +59,11 @@ export function DocumentPane({
   /** Files the drop zone refused — said where the screen says its other
    *  errors, rather than inside a pane the file never entered. */
   onDropRejected: (rejected: File[]) => void;
+  /** Read (or re-read) the document on screen. Auto-read covers the ordinary
+   *  case, so this is for the ones it can't: a read that failed, a photo that
+   *  came out badly and was retaken, and a reader that has since learned to
+   *  see something it didn't — which is what a redeployed extract-invoice is. */
+  onRead: (a: SignedAttachment) => void;
   onRemove: (a: SignedAttachment) => void;
   fileRef: React.RefObject<HTMLInputElement | null>;
   kind: AttachmentKind;
@@ -127,12 +133,28 @@ export function DocumentPane({
             >
               Attach&hellip;
             </button>
+            {/* Acts on the document SHOWN, which is why it sits with Remove
+                rather than with the kind picker and Attach — those two are
+                about adding a new file. The band can't wrap (see `ui/Pane`), so
+                what gives way is the filename, which is the one thing here that
+                is allowed to. */}
+            {attachment && (
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => onRead(attachment)}
+                title={`Have ${attachment.file_name ?? "this document"} read again`}
+                className="shrink-0 text-[12px] uppercase tracking-[0.06em] text-ink hover:underline disabled:opacity-35"
+              >
+                {attachment.extraction ? "Read again" : "Read"}
+              </button>
+            )}
             {attachment && (
               <button
                 type="button"
                 disabled={busy}
                 onClick={() => onRemove(attachment)}
-                className="text-[12px] uppercase tracking-[0.06em] text-accent hover:underline disabled:opacity-35"
+                className="shrink-0 text-[12px] uppercase tracking-[0.06em] text-accent hover:underline disabled:opacity-35"
               >
                 Remove
               </button>
