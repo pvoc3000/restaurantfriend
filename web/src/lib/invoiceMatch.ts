@@ -234,6 +234,95 @@ export function matchInvoiceToOrder(
   };
 }
 
+/**
+ * The same join, across SEVERAL purchase orders — a consolidated invoice.
+ *
+ * Additive: `matchInvoiceToOrder` above is untouched and is what does the work.
+ *
+ * The rule that matters is that this calls it ONCE PER ORDER, over what is
+ * still unclaimed, rather than concatenating the orders' lines into one call.
+ * Concatenating would be actively wrong: a SKU that is unique within each order
+ * is not necessarily unique across both, and the matcher's own uniqueness
+ * discipline would then correctly refuse a pair it would have made on either
+ * order alone. So the invoice's lines are consumed in order of confidence — the
+ * same shape as the four SKU passes inside.
+ *
+ * `orders` must therefore arrive MOST CONFIDENT FIRST. The caller's ordering is
+ * the tiebreak when two orders could each claim a line.
+ */
+export function matchInvoiceToOrders(
+  orders: { id: string; lines: PoLine[] }[],
+  invoiceLines: InvoiceLine[]
+): Map<string, MatchResult> {
+  const results = new Map<string, MatchResult>();
+  let remaining = invoiceLines;
+
+  for (const order of orders) {
+    const result = matchInvoiceToOrder(order.lines, remaining);
+    results.set(order.id, result);
+    remaining = result.unmatchedInvoice;
+  }
+  return results;
+}
+
+/**
+ * The pairing a human already settled, read back off the stored links.
+ *
+ * Preferred over a fresh match wherever it exists, and better in three ways at
+ * once: it honours a manual match someone made at a delivery, it survives a
+ * re-read of the document, and it sidesteps the duplicate-SKU problem entirely
+ * for lines that are already decided.
+ *
+ * `matchInvoiceToOrder` then runs over whatever is left, so an order that has
+ * never been linked behaves exactly as it does today.
+ */
+export function matchesFromLinks(
+  lines: PoLine[],
+  invoiceLines: (InvoiceLine & { purchase_order_item_id: string | null })[]
+): MatchResult {
+  const byPoLine = new Map<string, InvoiceLine>();
+  const claimed = new Set<InvoiceLine>();
+  for (const invoice of invoiceLines) {
+    const id = invoice.purchase_order_item_id;
+    // First writer wins, and a second link to the same PO line is left
+    // unclaimed rather than overwriting — two invoice lines against one order
+    // line is the partial-shipment case, and neither one speaks for the other.
+    if (!id || byPoLine.has(id)) continue;
+    byPoLine.set(id, invoice);
+    claimed.add(invoice);
+  }
+
+  const linked = lines.filter((l) => byPoLine.has(l.id));
+  const unlinked = lines.filter((l) => !byPoLine.has(l.id));
+  const rest = invoiceLines.filter((l) => !claimed.has(l));
+
+  // The unlinked half still gets the ordinary treatment.
+  const fresh = matchInvoiceToOrder(unlinked, rest);
+
+  const stored: LineMatch[] = linked.map((line) => {
+    const invoice = byPoLine.get(line.id)!;
+    const unitPrice = invoiceUnitPrice(invoice);
+    return {
+      line,
+      invoice,
+      by: "product_id",
+      qtyDiffers: qtyDiffers(invoice.qty, line.qty_received),
+      priceDiffers: priceDiffers(unitPrice, line.unit_price),
+      unitPrice,
+      priceUncertain: printedPriceDisagrees(invoice),
+    };
+  });
+
+  // Back into the caller's own line order, so the screen renders as given.
+  const byId = new Map<string, LineMatch>();
+  for (const m of [...stored, ...fresh.matches]) byId.set(m.line.id, m);
+
+  return {
+    matches: lines.map((line) => byId.get(line.id)!),
+    unmatchedInvoice: fresh.unmatchedInvoice,
+  };
+}
+
 /** Index by key, keeping only keys that appear exactly once. */
 function uniqueByKey<T>(items: T[], key: (item: T) => string | null): Map<string, T> {
   const counts = countKeys(items, key);

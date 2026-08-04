@@ -11,6 +11,7 @@ import "./employees.fixtures";
 import "./fileDrop.fixtures";
 import "./invoiceDate.fixtures";
 import "./invoiceMatch.fixtures";
+import "./invoices.fixtures";
 import "./packLabel.fixtures";
 import "./poFilters.fixtures";
 import "./receiving.fixtures";
