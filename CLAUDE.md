@@ -1002,13 +1002,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    paperwork on file that isn't recorded as a bill — and it deliberately does
    NOT ask whether the bill is approved: a delivery can be complete Friday and
    the bill approved Tuesday.
-   276 fixtures pass. **Verified only as far as the migrations allow**: the
-   routes render and degrade honestly ("Could not find the table
-   'public.vendor_invoices' in the schema cache"), the nav item lights, and the
-   receiving screen is byte-identical before and after (checked by stashing the
-   work and screenshotting both through identical navigation). The client trees
-   for invoice detail, approval, creation and linking are typechecked and linted
-   but have not been exercised against real rows.
+   Also shipped: **Delete on invoice detail**, found by using the module — Void
+   covers "this isn't payable" and not "this shouldn't exist", and filing was
+   one tap with no way back. EmployeeActions' template, and it removes
+   invoice-ONLY documents (row then object) while leaving a document that also
+   belongs to a purchase order on that order.
+   276 fixtures pass, and **the loop was walked end to end on real data and left
+   as found** — see the migrations-applied section below for what that measured,
+   including 15 of 15 lines joining by SKU on the real Chefs' Warehouse invoice.
+   Known pane artefact, not an app bug: `router.refresh()` after a write can
+   take several seconds, so a probe run 1.5s after a click reads as "nothing
+   happened" — wait longer or re-navigate before concluding anything.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -1115,20 +1119,30 @@ LOADED: 445 rows, 26 active / 2 new hire / 417 inactive, matching the transform
 report, with Mark's row linked to his auth account. 022 verified 2026-08-02 by
 inserting an `orientation` document and removing it again — the constraint
 accepts the value, so the widened check is live.
-**025 and 026 are NOT APPLIED as of 2026-08-04** — written, tested on the
-Docker harness (all 26 apply; the `po_consistent` check fires; the status and
-kind vocabularies are closed; duplicate invoice numbers are allowed; and the
-approval function refuses a purchaser, an outsider and a void invoice while
-letting an owner through both ways — each refusal re-checked by breaking the
-function and confirming the assertion went red), and waiting on Mark. **Probe,
-don't trust this line** — it has been wrong in both directions before. Cheap
-probes: `select count(*) from vendor_invoices` for 025, and
-`select is_nullable from information_schema.columns where table_name =
+**025 and 026 are APPLIED** (Mark, 2026-08-04) and `extract-invoice` is
+redeployed. Verified the same day by probe and then end to end against the live
+database: both tables and `purchase_order_attachments.invoice_id` /
+`vendor_locations.external_ref` select; the approval RPC is refused for `anon`
+with "permission denied for function" (so both revokes and the `authenticated`
+grant landed) and returns 1 row with `approved_by` stamped from `auth.uid()`
+for the owner; the edge function answers a bogus attachment id with a 404
+rather than doing model work. **Probe, don't trust this line** — it has been
+wrong in both directions before: `select count(*) from vendor_invoices` for
+025, and `select is_nullable from information_schema.columns where table_name =
 'purchase_order_attachments' and column_name = 'po_id'` for 026.
-Until 026 is applied, PO detail's Paperwork card and the receiving screen's
-document pane are replaced by "column purchase_order_attachments.invoice_id
-does not exist" — 018's own behaviour, and everything else on those screens is
-unaffected.
+**The whole loop was walked on real data and left as found**: the stored
+Chefs' Warehouse reading on `132-181132-02` filed as an invoice, **15 of 15
+lines joined by SKU** to that order, the receiving screen then reading the
+FILED invoice ("15 of 15 lines matched", `INVOICED 1 CS` beside `ORDERED 1 CS`,
+billed $472.13 against received $460.73), approved, and deleted — leaving 0
+invoices, 0 lines, and the PDF still on the order with `invoice_id` back to
+null and its extraction intact.
+Two things that verification settled. **A reading stored before the redeploy
+has no due date, tax, freight or PO number** — those cells render as em dashes,
+which is the both-sides contract working, and "Read again" is what fills them.
+And **"Read again" on a document with no `invoice_id` also FILES it**, because
+auto-file lives in `read()`; on an already-filed document it only refreshes the
+raw reading, which is the intended asymmetry.
 **023 is APPLIED** (Mark, 2026-08-02) — `employees_delete` for owner/admin,
 reversing 020's deliberate absence. See build step 4c for the argument and for
 the `.select()`-your-own-delete rule it taught. Probe with
