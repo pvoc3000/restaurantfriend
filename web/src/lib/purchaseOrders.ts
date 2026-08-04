@@ -272,6 +272,44 @@ export function isPoOpen(status: PoStatus): boolean {
   return status !== "closed" && status !== "void";
 }
 
+/**
+ * What a printed order line is ALPHABETISED by: the text that LEADS its
+ * description on the page, which is the vendor's own wording where we have it
+ * and our catalog name only as a fallback (see composedDescription in
+ * pdf/PoPdfDocs). Sorting by our name instead would order the page by words
+ * that aren't printed on it.
+ */
+export function documentLineSortKey(line: {
+  description?: string | null;
+  item_name?: string | null;
+}): string {
+  return (line.description ?? line.item_name ?? "").trim();
+}
+
+/**
+ * Order two lines within one printed group — the category on the vendor PO,
+ * the shop section on the shopping list (Mark, 2026-08-03: the PO PDF's
+ * secondary sort should be description).
+ *
+ * Before this the within-group order was whatever PostgREST returned. Nothing
+ * in the query asks for an order, so it looked deliberate without being
+ * reproducible — a reprint could deal the same lines out differently.
+ *
+ * Numeric-aware, so "Flour 10 lb" lands after "Flour 5 lb", and empty keys
+ * sink: both match `lib/tableSort`, so the whole app orders text one way.
+ */
+export function compareDocumentLines(
+  a: { description?: string | null; item_name?: string | null },
+  b: { description?: string | null; item_name?: string | null }
+): number {
+  const va = documentLineSortKey(a);
+  const vb = documentLineSortKey(b);
+  if (!va && !vb) return 0;
+  if (!va) return 1;
+  if (!vb) return -1;
+  return va.localeCompare(vb, undefined, { numeric: true });
+}
+
 export function money(value: number | null | undefined) {
   if (value === null || value === undefined) return "—";
   return `$${Number(value).toLocaleString("en-US", {

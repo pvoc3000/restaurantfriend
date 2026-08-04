@@ -20,6 +20,7 @@ import {
   type OrgDocData,
   type PoDocData,
 } from "@/lib/poProcessing";
+import { compareDocumentLines } from "@/lib/purchaseOrders";
 
 /**
  * FOUR sizes and TWO greys, and nothing else (Mark, 2026-07-27 — "I want to
@@ -185,10 +186,24 @@ function composedDescription(line: DocLine): string {
     .join("  //  ");
 }
 
+/**
+ * `sort` orders the GROUPS; `itemSort` orders the lines inside one.
+ *
+ * Both documents used to leave the within-group order to whatever PostgREST
+ * happened to return, which is stable enough to look deliberate and isn't:
+ * nothing in the query asks for an order, so a category's lines could come back
+ * differently on a reprint. Mark asked for description as the secondary sort
+ * (2026-08-03) and it belongs here rather than at one call site, because the
+ * vendor PO and the shopping list share this function and a document sorted
+ * only half the time is worse than one that never was.
+ *
+ * Empty keys sink, matching lib/tableSort's rule for every list in the app.
+ */
 function groupBy<T>(
   items: T[],
   key: (item: T) => string,
-  sort: (a: T) => number | string
+  sort: (a: T) => number | string,
+  itemSort?: (a: T, b: T) => number
 ): { label: string; items: T[] }[] {
   const groups = new Map<string, T[]>();
   for (const item of items) {
@@ -197,6 +212,7 @@ function groupBy<T>(
     list.push(item);
     groups.set(label, list);
   }
+  if (itemSort) for (const list of groups.values()) list.sort(itemSort);
   return [...groups.entries()]
     .map(([label, list]) => ({ label, items: list, sort: sort(list[0]) }))
     .sort((a, b) =>
@@ -205,6 +221,7 @@ function groupBy<T>(
         : String(a.sort).localeCompare(String(b.sort))
     );
 }
+
 
 function OrgBlock({ org }: { org: OrgDocData }) {
   const billing = org.billing;
@@ -295,7 +312,8 @@ export function PoPdf({ pos, org }: { pos: PoDocData[]; org: OrgDocData }) {
           {groupBy(
             po.lines,
             (l) => l.category ?? "Other",
-            (l) => l.category ?? "zzz"
+            (l) => l.category ?? "zzz",
+            compareDocumentLines
           ).map((group) => (
             <View key={group.label}>
               <Text style={styles.category}>{group.label}</Text>
@@ -361,7 +379,8 @@ export function ShoppingListPdf({ pos }: { pos: PoDocData[]; org: OrgDocData }) 
             {groupBy(
               po.lines,
               (l) => l.shop_section ?? "No section",
-              (l) => l.shop_section_sort ?? Number.MAX_SAFE_INTEGER
+              (l) => l.shop_section_sort ?? Number.MAX_SAFE_INTEGER,
+              compareDocumentLines
             ).map((group) => (
               <View key={group.label}>
                 <Text style={styles.category}>{group.label}</Text>

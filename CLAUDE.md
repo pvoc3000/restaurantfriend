@@ -2140,6 +2140,15 @@ weekday column, and 003 then silently made it per-vendor-item.
   order off their product list and our catalog name isn't on it. The per-line
   ordering note is the
   LINE's own `notes` (migration 015), not a live read of `vendor_items.notes`.
+  **Within a group the lines are alphabetical by that leading description**
+  (Mark, 2026-08-03) — `compareDocumentLines` in `lib/purchaseOrders`, numeric
+  aware and empty-last like `lib/tableSort`, so the whole app orders text one
+  way. It sorts by the VENDOR's wording, never our catalog name, or the page
+  would be ordered by words that aren't printed on it. Before this the
+  within-group order was whatever PostgREST returned: nothing in the query asks
+  for an order, so it looked deliberate without being reproducible. It lives in
+  `groupBy`, which both documents share, because one of them sorted and the
+  other not is the drift this file keeps warning about.
   The in_person **shopping list is internal** and keeps its prices, its
   estimated total, and the composed pack.
 - Receiving: per-line qty_received, invoice photo → Storage, and a one-tap

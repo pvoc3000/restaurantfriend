@@ -5,6 +5,7 @@
 
 import "./columnOrder.fixtures";
 import "./columnVisibility.fixtures";
+import "./documentLines.fixtures";
 import "./employeeDocuments.fixtures";
 import "./employees.fixtures";
 import "./invoiceMatch.fixtures";
