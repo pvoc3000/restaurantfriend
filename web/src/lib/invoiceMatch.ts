@@ -128,45 +128,62 @@ export function matchInvoiceToOrder(
   const claimed = new Set<InvoiceLine>();
   const found = new Map<string, { invoice: InvoiceLine; by: LineMatch["by"] }>();
 
-  // Pass 1 — exact SKU. Only lines whose normalized SKU is UNIQUE on each side
-  // take part: a vendor that prints the same item number on two lines (a split
+  // The SKU passes. Only lines whose normalized SKU is UNIQUE on each side take
+  // part: a vendor that prints the same item number on two lines (a split
   // delivery, a partial backorder) gives no basis for deciding which is which,
   // and pairing them arbitrarily would propose a quantity against the wrong
   // one. Those fall through to be reported unmatched, which is the honest
   // answer.
-  const bySku = uniqueByKey(invoiceLines, (l) => normalizeSku(l.product_id));
   const poSkuCounts = countKeys(lines, (l) => normalizeSku(l.product_id));
 
-  for (const line of lines) {
-    const sku = normalizeSku(line.product_id);
-    if (!sku || poSkuCounts.get(sku) !== 1) continue;
-    const hit = bySku.get(sku);
-    if (!hit || claimed.has(hit)) continue;
-    claimed.add(hit);
-    found.set(line.id, { invoice: hit, by: "product_id" });
-  }
+  // Four passes over the same idea, in descending order of confidence:
+  //
+  //   1. the invoice's PRIMARY number, exactly
+  //   2. its SECOND number, exactly — the MATERIAL/SAP column, which on some
+  //      invoices is where our SKU actually is (Dawn 96461403 printed it there
+  //      on three lines of four)
+  //   3. and 4. the same two ignoring leading zeros, which invoices and
+  //      catalogs disagree about constantly ("08843" vs "8843") in a way that
+  //      never means anything
+  //
+  // Primary before alternate MATTERS: if one invoice line prints our number as
+  // its product id and another happens to carry it as a material number, the
+  // column the vendor labelled as the item number is the better claim. And
+  // exact before relaxed, so a genuine "0100" vs "100" distinction survives
+  // wherever the strict form can decide.
+  const skuPasses: {
+    of: (l: InvoiceLine) => string | null;
+    key: (sku: string) => string;
+  }[] = [
+    { of: (l) => normalizeSku(l.product_id), key: (s) => s },
+    { of: (l) => normalizeSku(l.alt_product_id ?? null), key: (s) => s },
+    { of: (l) => normalizeSku(l.product_id), key: withoutLeadingZeros },
+    { of: (l) => normalizeSku(l.alt_product_id ?? null), key: withoutLeadingZeros },
+  ];
 
-  // Pass 2 — the same join ignoring leading zeros, for the still-unmatched.
-  // Invoices and catalogs disagree about zero-padding constantly ("08843" vs
-  // "8843") and that disagreement is never meaningful.
-  const byLooseSku = uniqueByKey(
-    invoiceLines.filter((l) => !claimed.has(l)),
-    (l) => {
-      const sku = normalizeSku(l.product_id);
-      return sku ? withoutLeadingZeros(sku) : null;
+  for (const pass of skuPasses) {
+    // Recomputed per pass over what's still unclaimed, so a number that is
+    // ambiguous among the REMAINING lines is still refused — the uniqueness
+    // guarantee has to hold within each pass, not just at the start.
+    const index = uniqueByKey(
+      invoiceLines.filter((l) => !claimed.has(l)),
+      (l) => {
+        const sku = pass.of(l);
+        return sku ? pass.key(sku) : null;
+      }
+    );
+    for (const line of lines) {
+      if (found.has(line.id)) continue;
+      const sku = normalizeSku(line.product_id);
+      if (!sku || poSkuCounts.get(sku) !== 1) continue;
+      const hit = index.get(pass.key(sku));
+      if (!hit || claimed.has(hit)) continue;
+      claimed.add(hit);
+      found.set(line.id, { invoice: hit, by: "product_id" });
     }
-  );
-  for (const line of lines) {
-    if (found.has(line.id)) continue;
-    const sku = normalizeSku(line.product_id);
-    if (!sku || poSkuCounts.get(sku) !== 1) continue;
-    const hit = byLooseSku.get(withoutLeadingZeros(sku));
-    if (!hit || claimed.has(hit)) continue;
-    claimed.add(hit);
-    found.set(line.id, { invoice: hit, by: "product_id" });
   }
 
-  // Pass 3 — description, for whatever is left. Best-scoring pair above the
+  // Last pass — description, for whatever is left. Best-scoring pair above the
   // threshold wins, one line at a time, so the strongest match is taken first
   // and can't be stolen by a weaker one later.
   const remainingPo = lines.filter((l) => !found.has(l.id));

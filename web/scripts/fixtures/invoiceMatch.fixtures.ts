@@ -293,3 +293,107 @@ test("an unmatched line carries no numbers and no uncertainty", () => {
   no(matches[0].priceDiffers);
   no(matches[0].priceUncertain);
 });
+
+// ── The SECOND item number ──────────────────────────────────────────────────
+//
+// Distributors running SAP print a catalog number AND an internal MATERIAL
+// number, and which one is the number WE ordered under varies line by line.
+// Everything here is drawn from Dawn Foods invoice 96461403 (PO 135-181118-01,
+// 2026-08-03), where three of four lines had a blank PRODUCT ID and carried our
+// SKU in the MATERIAL column instead.
+
+test("the alternate number joins when the primary column is blank", () => {
+  const { matches } = matchInvoiceToOrder(
+    [poLine({ product_id: "2464048" })],
+    [invoiceLine({ product_id: null, alt_product_id: "2464048" })]
+  );
+  eq(matches[0].by, "product_id");
+  ok(matches[0].invoice);
+});
+
+test("the PRIMARY number wins when two invoice lines could each claim ours", () => {
+  // The column the vendor labelled as the item number is the better claim.
+  const primary = invoiceLine({ product_id: "5011418", description: "the right one" });
+  const viaAlt = invoiceLine({ product_id: "9999", alt_product_id: "5011418" });
+  const { matches } = matchInvoiceToOrder(
+    [poLine({ product_id: "5011418" })],
+    [viaAlt, primary]
+  );
+  eq(matches[0].invoice, primary);
+});
+
+test("an alternate number appearing twice is refused, not guessed at", () => {
+  const { matches, unmatchedInvoice } = matchInvoiceToOrder(
+    [poLine({ product_id: "3012178" })],
+    [
+      invoiceLine({ product_id: null, alt_product_id: "3012178", description: "a" }),
+      invoiceLine({ product_id: null, alt_product_id: "3012178", description: "b" }),
+    ]
+  );
+  eq(matches[0].invoice, null);
+  eq(unmatchedInvoice.length, 2);
+});
+
+test("the alternate number gets the leading-zero relaxation too", () => {
+  const { matches } = matchInvoiceToOrder(
+    [poLine({ product_id: "08843" })],
+    [invoiceLine({ product_id: null, alt_product_id: "8843" })]
+  );
+  eq(matches[0].by, "product_id");
+});
+
+test("an exact primary is preferred over a zero-relaxed alternate", () => {
+  const exact = invoiceLine({ product_id: "100", description: "exact" });
+  const relaxed = invoiceLine({ product_id: null, alt_product_id: "0100" });
+  const { matches } = matchInvoiceToOrder([poLine({ product_id: "100" })], [relaxed, exact]);
+  eq(matches[0].invoice, exact);
+});
+
+test("a reading stored before alt_product_id existed behaves exactly as before", () => {
+  const legacy = invoiceLine({ product_id: "GT128F" });
+  delete (legacy as { alt_product_id?: unknown }).alt_product_id;
+  const { matches } = matchInvoiceToOrder([poLine({ product_id: "GT128F" })], [legacy]);
+  eq(matches[0].by, "product_id");
+});
+
+// The whole invoice, both ways round — this is the regression that prompted the
+// change, so it's pinned as a whole rather than only in pieces.
+const DAWN_PO = [
+  poLine({ product_id: "2464048", description: "Vegan Raised Mix" }),
+  poLine({ product_id: "2405191", description: "Gourmet Bavarian Cream Filling" }),
+  poLine({ product_id: "3012178", description: "ez open maple icing" }),
+  poLine({ product_id: "5011418", description: "Vream Classic 415 Eie Soy Donut Fry Shortening, 50#" }),
+];
+const DAWN_INVOICE = [
+  { alt: "2464048", desc: "DAWN BAL VEGAN ORIG RSD DNT MX 50# RSPO MB" },
+  { alt: "1231399", desc: "BUNGE VREAM CLSSC 415 DNT FRY SHORT 50#", primary: "5011418" },
+  { alt: "3012178", desc: "DAWN EXC E-Z OPEN MPLFV FLT ICG 40#" },
+  { alt: "2405191", desc: "DAWN EXC RCH BAVARIAN CREME FILL 35# RSPO MB" },
+];
+
+test("Dawn 96461403 joins 4 of 4 once the material number is read", () => {
+  const { matches, unmatchedInvoice } = matchInvoiceToOrder(
+    DAWN_PO,
+    DAWN_INVOICE.map((l) =>
+      invoiceLine({
+        product_id: l.primary ?? null,
+        alt_product_id: l.alt,
+        description: l.desc,
+      })
+    )
+  );
+  eq(matches.filter((m) => m.invoice !== null).length, 4);
+  eq(unmatchedInvoice.length, 0);
+});
+
+test("…and only 1 of 4 without it, which is the bug it was reported as", () => {
+  // The descriptions can't rescue these: "DAWN BAL VEGAN ORIG RSD DNT MX 50#"
+  // and "Vegan Raised Mix" share one word, and the fallback needs three.
+  const { matches } = matchInvoiceToOrder(
+    DAWN_PO,
+    DAWN_INVOICE.map((l) =>
+      invoiceLine({ product_id: l.primary ?? null, description: l.desc })
+    )
+  );
+  eq(matches.filter((m) => m.invoice !== null).length, 1);
+});

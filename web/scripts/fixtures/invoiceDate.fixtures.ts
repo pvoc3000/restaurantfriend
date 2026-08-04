@@ -9,9 +9,21 @@
 
 import {
   invoiceDeliveryDate,
+  matchableSku,
   type InvoiceExtraction,
+  type InvoiceLine,
 } from "../../src/lib/invoiceExtraction";
 import { eq, test } from "./harness";
+
+const line = (over: Partial<InvoiceLine>): InvoiceLine => ({
+  product_id: null,
+  description: "",
+  qty: null,
+  unit_price: null,
+  extended: null,
+  pack: null,
+  ...over,
+});
 
 function extraction(over: Partial<InvoiceExtraction> = {}): InvoiceExtraction {
   return {
@@ -110,4 +122,29 @@ test("a leap day in a leap year is a real date", () => {
 
 test("a leap day in a common year is not", () => {
   eq(invoiceDeliveryDate(extraction({ ship_date: "2026-02-29" })), null);
+});
+
+// ── What manual match can pair on ───────────────────────────────────────────
+//
+// Pairing IS copying a number onto the PO line, so a line printing none can't
+// be paired — which is what the receiving screen greys out, and the question
+// that surfaced the missing MATERIAL column in the first place.
+
+test("manual match pairs on the primary number", () => {
+  eq(matchableSku(line({ product_id: "5011418" })), "5011418");
+});
+
+test("manual match falls back to the second number", () => {
+  eq(matchableSku(line({ product_id: null, alt_product_id: "2464048" })), "2464048");
+});
+
+test("the primary is preferred when both are printed", () => {
+  eq(
+    matchableSku(line({ product_id: "5011418", alt_product_id: "1231399" })),
+    "5011418"
+  );
+});
+
+test("a line with no number at all can't be paired", () => {
+  eq(matchableSku(line({ product_id: null })), null);
 });

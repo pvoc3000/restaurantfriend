@@ -34,7 +34,7 @@ import {
   skuAction,
   type PriceAction,
 } from "@/lib/receiving";
-import type { InvoiceLine } from "@/lib/invoiceExtraction";
+import { matchableSku, type InvoiceLine } from "@/lib/invoiceExtraction";
 import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
 import {
   clampSplit,
@@ -320,12 +320,13 @@ export function Receiving({
    */
   function matchTo(line: PoLine, invoice: InvoiceLine) {
     setMatching(null);
-    if (!invoice.product_id) return;
+    // Either number will do. On an invoice that prints two identifier columns
+    // the one we ordered under can be in either, so refusing the second here
+    // would refuse the pairing on exactly the invoices that need it most.
+    const sku = matchableSku(invoice);
+    if (!sku) return;
     void write(() =>
-      supabase
-        .from("purchase_order_items")
-        .update({ product_id: invoice.product_id })
-        .eq("id", line.id)
+      supabase.from("purchase_order_items").update({ product_id: sku }).eq("id", line.id)
     );
   }
 
@@ -830,31 +831,41 @@ export function Receiving({
             ID to the vendor&rsquo;s, which is what makes the two sides join.
           </p>
           <ul className="space-y-2">
-            {match.unmatchedInvoice.map((l, i) => (
-              <li
-                key={`${l.product_id ?? "?"}-${i}`}
-                className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-hairline px-3 py-2 text-sm"
-              >
-                <span className="tabular-nums text-muted">{l.product_id ?? "no number"}</span>
-                <span className="text-ink">{l.description}</span>
-                <span className="tabular-nums text-muted">
-                  {l.qty ?? "—"} × {money(l.unit_price)}
-                </span>
-                <button
-                  type="button"
-                  disabled={saving || !l.product_id}
-                  onClick={() => matchTo(matching, l)}
-                  title={
-                    l.product_id
-                      ? `Set this line's product ID to ${l.product_id}`
-                      : "This invoice line printed no item number, so there's nothing to match on"
-                  }
-                  className="ml-auto h-9 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
+            {match.unmatchedInvoice.map((l, i) => {
+              const sku = matchableSku(l);
+              return (
+                <li
+                  key={`${sku ?? "?"}-${i}`}
+                  className="flex flex-wrap items-center gap-x-3 gap-y-1 border border-hairline px-3 py-2 text-sm"
                 >
-                  Match
-                </button>
-              </li>
-            ))}
+                  <span className="tabular-nums text-muted">{sku ?? "no number"}</span>
+                  <span className="text-ink">{l.description}</span>
+                  <span className="tabular-nums text-muted">
+                    {l.qty ?? "—"} × {money(l.unit_price)}
+                  </span>
+                  {/* A line with no number at all can't be paired, because
+                      pairing IS copying a number. Said on screen rather than in
+                      a tooltip — a disabled button explains itself only on
+                      hover, and the iPad this is used on has none (Mark,
+                      2026-08-04: "why are they disabled?"). */}
+                  {sku ? (
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => matchTo(matching, l)}
+                      title={`Set this line's product ID to ${sku}`}
+                      className="ml-auto h-9 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
+                    >
+                      Match
+                    </button>
+                  ) : (
+                    <span className="ml-auto text-[11px] uppercase tracking-[0.06em] text-subtle">
+                      no item number to match on
+                    </span>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </Dialog>
       )}

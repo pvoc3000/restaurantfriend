@@ -91,6 +91,7 @@ const INVOICE_SCHEMA = {
         additionalProperties: false,
         required: [
           "product_id",
+          "alt_product_id",
           "description",
           "qty",
           "unit_price",
@@ -102,6 +103,14 @@ const INVOICE_SCHEMA = {
           // snapshots the same value in `product_id` — so it matters far more
           // than anything else on the line.
           product_id: nullable("string"),
+          // A SECOND number for the same line, when the page prints more than
+          // one. Distributors running SAP print both a catalog number and an
+          // internal MATERIAL number, and WHICH of them is the one we ordered
+          // under varies line by line — Dawn invoice 96461403 printed our SKU
+          // under PRODUCT ID on one line and under MATERIAL on the other three.
+          // With one field the model has to choose, and a right answer sits on
+          // the page unused.
+          alt_product_id: nullable("string"),
           description: { type: "string" },
           qty: nullable("number"),
           unit_price: nullable("number"),
@@ -127,6 +136,17 @@ tidy: if the arithmetic on the page is wrong, report what is printed.
   It is the single most important field — it is what this invoice gets matched
   against. If a line has no printed item number, use null; never invent one and
   never substitute a different number from the row.
+- alt_product_id is a SECOND item number printed for the same line, when the
+  page carries more than one such column. Distributors commonly print both a
+  catalog/product number and an internal MATERIAL or SAP number, and either
+  one may be the number the customer ordered under. Put the column labelled as
+  the item or product number in product_id and the other in alt_product_id.
+  Report BOTH whenever both are printed, even if one column is blank on this
+  particular row — a blank PRODUCT ID with a filled MATERIAL means product_id
+  is null and alt_product_id carries the material number. Use null when the
+  line really does show only one number, and never repeat the same number in
+  both fields. Do not put a quantity, a price, a case count, a purchase order
+  number or a line number here; only an identifier for the ITEM.
 - qty is the quantity billed and extended is that line's total charge. Both are
   printed on the page — never compute them.
 - unit_price is the rate printed for ONE of whatever qty counts. Many lines show

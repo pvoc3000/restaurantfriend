@@ -15,6 +15,22 @@
 export type InvoiceLine = {
   /** The SUPPLIER's SKU, as printed. The join key — see lib/invoiceMatch. */
   product_id: string | null;
+  /**
+   * A SECOND number printed for the same line, when the page carries more than
+   * one identifier column.
+   *
+   * Not a nicety. A distributor running SAP prints its catalog number AND an
+   * internal MATERIAL number, and which of the two is the number WE ordered
+   * under varies line by line: Dawn invoice 96461403 printed our SKU under
+   * PRODUCT ID on one line and under MATERIAL on the other three. With a single
+   * field the reader has to choose a column, and on that invoice the right
+   * answer for three of four lines sat on the page unused.
+   *
+   * Optional in this type and required in the edge function's schema, for the
+   * same reason `ship_date` is: readings stored before 2026-08-04 don't carry
+   * it, and they stay valid — those lines simply match the way they did.
+   */
+  alt_product_id?: string | null;
   description: string;
   qty: number | null;
   unit_price: number | null;
@@ -48,6 +64,19 @@ export type InvoiceExtraction = {
    *  illegible text. Read through `extractionNotes`, never directly. */
   unreadable?: string | null;
 };
+
+/**
+ * The number this invoice line can be paired ON, if any.
+ *
+ * Manual match works by copying a number onto the PO line so the ordinary join
+ * finds it, so a line printing NO number can't be paired at all — that's what
+ * the receiving screen greys out, and why it says so in words. Either column
+ * will do: on an invoice with two identifier columns, the one we ordered under
+ * may be in either.
+ */
+export function matchableSku(line: InvoiceLine): string | null {
+  return line.product_id ?? line.alt_product_id ?? null;
+}
 
 /** The reader's notes, whichever key this extraction was stored under. */
 export function extractionNotes(e: InvoiceExtraction): string | null {

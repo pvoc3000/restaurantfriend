@@ -502,6 +502,36 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    BakeMark had renumbered, and Coconut failed on a plural ("Coconut Flakes" vs
    "COCONUT FLAKE SWEET" share one word, and the fallback needs three). After a
    manual match: 8 of 8.
+   Shipped 2026-08-04 (**needs `extract-invoice` redeployed AND the invoice
+   re-read**): **a line can print TWO item numbers, and we only read one.**
+   Dawn Foods invoice 96461403 (PO 135-181118-01) has separate `PRODUCT ID` and
+   `MATERIAL` columns; three of its four lines leave PRODUCT ID blank and carry
+   OUR sku under MATERIAL, while the fourth has ours under PRODUCT ID and a
+   different number under MATERIAL. Every number needed for a 4-of-4 join was
+   on the page — the schema had one field, so the reader chose the column
+   literally labelled PRODUCT ID and **said so in its notes**, which is how this
+   was found. So `alt_product_id` joins `product_id` on the line (declared on
+   both sides, optional in TS and required in the schema, exactly like
+   `ship_date`), and the SKU join is now FOUR passes: primary exact, alternate
+   exact, then each again ignoring leading zeros. **Primary before alternate is
+   deliberate** — the column a vendor labelled as the item number is the better
+   claim when two lines could each take ours — and uniqueness is recomputed per
+   pass over what's still unclaimed, so an ambiguous number is still refused
+   rather than paired arbitrarily. Every stored reading predates the field and
+   is unaffected; nothing changes for it until that invoice is read again.
+   Pinned by the whole Dawn invoice as a fixture, both ways round: **4 of 4 with
+   the material number, 1 of 4 without** — which is precisely the symptom Mark
+   reported, so the fixture is known to model the real thing.
+   Manual match now pairs on EITHER number (`matchableSku`), since on a
+   two-column invoice the one we ordered under can be in either. A line printing
+   NO number still can't be paired at all — pairing IS copying a number onto the
+   PO line — and the dialog now says "no item number to match on" **in place of**
+   the greyed button, because a disabled control explains itself only on hover
+   and the iPad has none. That greying is what prompted all of this (Mark,
+   2026-08-04: "why are they disabled?").
+   If a pairing ever has to be recorded for a line with no number anywhere, that
+   needs somewhere to STORE it — a column on `purchase_order_items` — and is a
+   migration, not a tweak. Not built; ask first.
    Shipped 2026-08-03 (**needs `extract-invoice` redeployed**): **the invoice
    says when the delivery happened**, and you can take it. The extraction schema
    gained **`ship_date`** — a field the page labels Ship Date / Delivered /
