@@ -8,6 +8,7 @@ import {
   type PoAttachment,
   type SignedAttachment,
 } from "./attachments";
+import type { InvoiceLine } from "./invoiceExtraction";
 import type { VendorInvoice, VendorInvoiceLine } from "./invoices";
 import { PO_LINE_SELECT } from "./purchaseOrderQueries";
 import type { PoLine } from "./purchaseOrders";
@@ -168,6 +169,79 @@ export async function fetchLinkedOrders(
       order_date: o.order_date as string,
       status: o.status as string,
       lines: byOrder.get(o.id as string) ?? [],
+    })),
+    error: null,
+  };
+}
+
+export type OrderInvoice = {
+  id: string;
+  invoice_number: string | null;
+  invoice_date: string | null;
+  /** This invoice's lines that point at THIS order, in the matcher's shape. */
+  lines: (InvoiceLine & { purchase_order_item_id: string | null })[];
+};
+
+/**
+ * The invoices filed against a purchase order — the receiving screen's
+ * question, answered by the same index the invoice screen uses in reverse.
+ *
+ * The link lives on the LINE (migration 025), so this is a `distinct` over one
+ * indexed column. Two invoices against one order is the backorder case and
+ * needs no special handling: each brings its own lines.
+ *
+ * Only the lines pointing at THIS order come back. An invoice covering two
+ * orders would otherwise offer the other order's lines to a matcher that has
+ * no business seeing them.
+ */
+export async function fetchInvoicesForOrder(
+  supabase: SupabaseClient,
+  poId: string
+): Promise<{ invoices: OrderInvoice[]; error: string | null }> {
+  const { data: lines, error } = await supabase
+    .from("vendor_invoice_lines")
+    .select(
+      `invoice_id, purchase_order_item_id, product_id, alt_product_id,
+       description, qty, unit_price, extended, pack`
+    )
+    .eq("purchase_order_id", poId);
+
+  if (error) return { invoices: [], error: error.message };
+  if (!lines || lines.length === 0) return { invoices: [], error: null };
+
+  const ids = [...new Set(lines.map((l) => l.invoice_id as string))];
+  const { data: headers, error: headerError } = await supabase
+    .from("vendor_invoices")
+    .select("id, invoice_number, invoice_date")
+    .in("id", ids)
+    // A voided invoice is not a claim about this delivery any more.
+    .neq("status", "void");
+  if (headerError) return { invoices: [], error: headerError.message };
+
+  const byInvoice = new Map<string, OrderInvoice["lines"]>();
+  for (const l of lines) {
+    const id = l.invoice_id as string;
+    byInvoice.set(id, [
+      ...(byInvoice.get(id) ?? []),
+      {
+        product_id: (l.product_id as string | null) ?? null,
+        alt_product_id: (l.alt_product_id as string | null) ?? null,
+        description: (l.description as string | null) ?? "",
+        qty: l.qty === null ? null : Number(l.qty),
+        unit_price: l.unit_price === null ? null : Number(l.unit_price),
+        extended: l.extended === null ? null : Number(l.extended),
+        pack: (l.pack as string | null) ?? null,
+        purchase_order_item_id: (l.purchase_order_item_id as string | null) ?? null,
+      },
+    ]);
+  }
+
+  return {
+    invoices: (headers ?? []).map((h) => ({
+      id: h.id as string,
+      invoice_number: h.invoice_number as string | null,
+      invoice_date: h.invoice_date as string | null,
+      lines: byInvoice.get(h.id as string) ?? [],
     })),
     error: null,
   };

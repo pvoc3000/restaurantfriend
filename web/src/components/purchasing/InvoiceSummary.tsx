@@ -46,6 +46,7 @@ function takeLabel(
 }
 
 export function InvoiceSummary({
+  invoiceCount = 0,
   extraction,
   match,
   fileName,
@@ -56,6 +57,10 @@ export function InvoiceSummary({
   saving,
   addItemSlot,
 }: {
+  /** How many invoices are FILED against this order. Named only when it's more
+   *  than one — that's the backorder case, and the band otherwise describes
+   *  the one document on screen without qualification. */
+  invoiceCount?: number;
   extraction: InvoiceExtraction;
   match: MatchResult;
   fileName: string | null;
@@ -101,6 +106,15 @@ export function InvoiceSummary({
             !restatesInvoiceDate &&
             ` · ${extraction.invoice_date}`}
         </span>
+
+        {/* Two invoices against one order is a partial shipment, and the
+            quantities below come from BOTH — so the band has to say so rather
+            than letting the one document on screen speak for the pair. */}
+        {invoiceCount > 1 && (
+          <span className="border border-ink bg-mark-fill px-2 text-[12px] uppercase tracking-[0.12em]">
+            {invoiceCount} invoices on this order
+          </span>
+        )}
 
         {/* When the delivery happened, and a → that puts it on the order —
             the same take-it-or-leave-it shape as a line's Invoiced quantity,

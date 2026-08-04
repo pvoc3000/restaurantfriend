@@ -215,7 +215,20 @@ export function closeReadiness(
   lines: PoLine[],
   attachmentCount: number,
   /** The order's own location — the price question is per-location. */
-  locationId: string
+  locationId: string,
+  /**
+   * How many invoices are FILED as records against this order (migration 025).
+   *
+   * A file on the order and a bill in the system are different facts, and the
+   * gap between them is real work: an invoice nobody filed never reaches the
+   * Invoices list, so it never gets approved and never gets paid.
+   *
+   * Deliberately does NOT ask whether those invoices are APPROVED. Approval
+   * runs on a different clock — a delivery can be complete on Friday and the
+   * bill approved next Tuesday — and gating a closed order on it would put the
+   * receiving screen at the mercy of the accounts calendar.
+   */
+  linkedInvoiceCount = 0
 ): string[] {
   const caveats: string[] = [];
   const unreceived = lines.filter((l) => l.qty_received === null).length;
@@ -246,7 +259,15 @@ export function closeReadiness(
       `${differing} ${differing === 1 ? "line's price differs" : "lines' prices differ"} from the catalog`
     );
   }
-  if (attachmentCount === 0) caveats.push("no invoice or packing slip is attached");
+  // Two clauses, because they're two different gaps and each has its own
+  // affordance on the screen that shows it: nothing filed at all → Attach;
+  // paperwork on file but no bill recorded → "File as invoice", which sits
+  // right there on the document.
+  if (attachmentCount === 0) {
+    caveats.push("no invoice or packing slip is attached");
+  } else if (linkedInvoiceCount === 0) {
+    caveats.push("the paperwork on file isn't recorded as a bill yet");
+  }
   return caveats;
 }
 

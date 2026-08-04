@@ -13,7 +13,8 @@ import {
   type AttachmentKind,
   type SignedAttachment,
 } from "@/lib/attachments";
-import { matchInvoiceToOrder } from "@/lib/invoiceMatch";
+import { matchInvoiceToOrder, matchesFromLinks } from "@/lib/invoiceMatch";
+import type { OrderInvoice } from "@/lib/invoiceQueries";
 import {
   canClose,
   closeReadiness,
@@ -126,6 +127,7 @@ export function Receiving({
   canReceive,
   attachments,
   attachmentError,
+  linkedInvoices,
   closeHref,
 }: {
   order: PurchaseOrder & { vendors: { id: string; name: string } | null };
@@ -136,6 +138,10 @@ export function Receiving({
   canReceive: boolean;
   attachments: SignedAttachment[];
   attachmentError: string | null;
+  /** Invoices FILED against this order (migration 025). Empty on every order
+   *  that predates the Invoices module, which is what makes the fallback to
+   *  `latestRead` below the ordinary path rather than a special case. */
+  linkedInvoices: OrderInvoice[];
   /** Where the bar's Close goes: the order, carrying the trail that led here.
    *  Built on the server, which is the only side that has the query string. */
   closeHref: string;
@@ -184,18 +190,44 @@ export function Receiving({
   // so it happens on every render; nothing about a match is worth persisting,
   // and recomputing means an edited product ID re-matches immediately.
   const source = useMemo(() => latestRead(attachments), [attachments]);
-  const match = useMemo(
-    () => (source?.extraction ? matchInvoiceToOrder(lines, source.extraction.lines) : null),
-    [lines, source]
-  );
+
+  /**
+   * The pairing this screen reconciles against.
+   *
+   * A FILED invoice wins over a fresh read of the attachment, and it is better
+   * three ways at once: it honours a manual match someone made standing at the
+   * delivery, it survives a re-read of the document, and it sidesteps the
+   * duplicate-SKU problem entirely for lines that are already decided.
+   *
+   * More than one invoice against one order is the BACKORDER case, and it needs
+   * no special handling here: each brings only the lines that point at this
+   * order, so they concatenate without competing. (Concatenating two ORDERS'
+   * lines would be wrong — see matchInvoiceToOrders — but this is one order's
+   * worth of billing, arriving in instalments.)
+   *
+   * With nothing filed it falls back to `latestRead` exactly as before, which
+   * is what makes day one a no-op and what still covers an attachment nobody
+   * ever filed as an invoice.
+   */
+  const match = useMemo(() => {
+    const filed = linkedInvoices.flatMap((i) => i.lines);
+    if (filed.length > 0) return matchesFromLinks(lines, filed);
+    if (source?.extraction) return matchInvoiceToOrder(lines, source.extraction.lines);
+    return null;
+  }, [lines, source, linkedInvoices]);
+
+  /** Whether anything at all is billed — what the fill control's wording and
+   *  `fillable`'s never-overwrite rule both turn on. */
+  const hasBilling = linkedInvoices.some((i) => i.lines.length > 0) ||
+    source?.extraction != null;
   const matchByLine = useMemo(
     () => new Map((match?.matches ?? []).map((m) => [m.line.id, m])),
     [match]
   );
   const rows = useMemo(() => receivingOrder(lines), [lines]);
   const toFill = useMemo(
-    () => fillable(rows, matchByLine, source?.extraction != null),
-    [rows, matchByLine, source]
+    () => fillable(rows, matchByLine, hasBilling),
+    [rows, matchByLine, hasBilling]
   );
 
   // `pickedId` falls through to the most recently read document, so an attach
@@ -395,7 +427,12 @@ export function Receiving({
    * write tell you what it actually did.
    */
   async function close() {
-    const caveats = closeReadiness(lines, attachments.length, order.location_id);
+    const caveats = closeReadiness(
+      lines,
+      attachments.length,
+      order.location_id,
+      linkedInvoices.length
+    );
     const message =
       `Close ${order.po_number}?` +
       (caveats.length > 0
@@ -556,7 +593,7 @@ export function Receiving({
             >
               {toFill.length === 0
                 ? "All counted"
-                : source?.extraction
+                : hasBilling
                   ? `Receive ${toFill.length} from invoice`
                   : `Receive ${toFill.length} as ordered`}
             </button>
@@ -641,6 +678,7 @@ export function Receiving({
 
         {source?.extraction && match && (
           <InvoiceSummary
+            invoiceCount={linkedInvoices.length}
             extraction={source.extraction}
             match={match}
             fileName={source.file_name}
@@ -661,7 +699,7 @@ export function Receiving({
           <div className="flex flex-wrap items-center gap-4 border border-ink bg-mark-fill px-4 py-2 text-sm text-ink">
             <span>
               Filled {lastBulk.length} {lastBulk.length === 1 ? "line" : "lines"} from{" "}
-              {source?.extraction ? "the invoice" : "the ordered quantities"}.
+              {hasBilling ? "the invoice" : "the ordered quantities"}.
             </span>
             <button
               type="button"

@@ -225,7 +225,15 @@ export function PurchaseOrderDetail({
    * would be the wrong call.
    */
   async function close() {
-    const caveats = closeReadiness(lines, attachments.length, order.location_id);
+    // The fourth argument is how many invoices are FILED against this order.
+    // PO detail does not query them, so it passes the count it can see: an
+    // attachment tagged with an invoice_id IS a filed invoice.
+    const caveats = closeReadiness(
+      lines,
+      attachments.length,
+      order.location_id,
+      new Set(attachments.map((a) => a.invoice_id).filter(Boolean)).size
+    );
     const message =
       `Close ${order.po_number}?` +
       (caveats.length > 0

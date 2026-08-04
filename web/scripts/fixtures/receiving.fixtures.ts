@@ -181,13 +181,13 @@ test("Finalize never names a price the row offers no way to settle", () => {
     overrides: [{ location_id: LOC, price: 92.8 }],
   });
   eq(priceAction(line, undefined, LOC), null, "settled at this location");
-  eq(closeReadiness([line], 1, LOC), [], "so nothing is unresolved");
+  eq(closeReadiness([line], 1, LOC, 1), [], "so nothing is unresolved");
 });
 
 test("a genuine catalog difference is still named", () => {
   const line = withCatalog(poLine({ qty_received: 1, unit_price: 92.8 }), { price: 68.8 });
   ok(priceAction(line, undefined, LOC));
-  eq(closeReadiness([line], 1, LOC), ["1 line's price differs from the catalog"]);
+  eq(closeReadiness([line], 1, LOC, 1), ["1 line's price differs from the catalog"]);
 });
 
 test("an override that disagrees is named, and the base price is ignored", () => {
@@ -196,7 +196,7 @@ test("an override that disagrees is named, and the base price is ignored", () =>
     overrides: [{ location_id: LOC, price: 80 }],
   });
   ok(priceAction(line, undefined, LOC), "the price in force is 80, not 92.80");
-  eq(closeReadiness([line], 1, LOC), ["1 line's price differs from the catalog"]);
+  eq(closeReadiness([line], 1, LOC, 1), ["1 line's price differs from the catalog"]);
 });
 
 test("an override at ANOTHER location doesn't speak for this one", () => {
@@ -205,15 +205,46 @@ test("an override at ANOTHER location doesn't speak for this one", () => {
     overrides: [{ location_id: OTHER, price: 80 }],
   });
   eq(priceAction(line, undefined, LOC), null);
-  eq(closeReadiness([line], 1, LOC), []);
+  eq(closeReadiness([line], 1, LOC, 1), []);
 });
 
 test("closeReadiness still reports unreceived lines and missing paperwork", () => {
   const line = withCatalog(poLine({ unit_price: 10 }), { price: 10 });
-  eq(closeReadiness([line], 0, LOC), [
+  eq(closeReadiness([line], 0, LOC, 0), [
     "1 line has no received quantity",
     "no invoice or packing slip is attached",
   ]);
+});
+
+// ── the paperwork clause has TWO gaps, and they are different work ──────────
+
+test("paperwork on file but no bill recorded is its own caveat", () => {
+  // A file on the order and a bill in the system are different facts. An
+  // invoice nobody filed never reaches the Invoices list, so it never gets
+  // approved and never gets paid — and "File as invoice" is right there on the
+  // document, which is what makes naming it fair.
+  const line = withCatalog(poLine({ qty_received: 1, unit_price: 10 }), { price: 10 });
+  eq(closeReadiness([line], 1, LOC, 0), [
+    "the paperwork on file isn't recorded as a bill yet",
+  ]);
+});
+
+test("the two paperwork clauses never both fire — nothing attached wins", () => {
+  const line = withCatalog(poLine({ qty_received: 1, unit_price: 10 }), { price: 10 });
+  eq(closeReadiness([line], 0, LOC, 0), ["no invoice or packing slip is attached"]);
+});
+
+test("a filed bill settles the paperwork question", () => {
+  const line = withCatalog(poLine({ qty_received: 1, unit_price: 10 }), { price: 10 });
+  eq(closeReadiness([line], 1, LOC, 1), []);
+});
+
+test("closing is NOT gated on approval — a delivery and a bill run on different clocks", () => {
+  // closeReadiness takes a COUNT, not a status: a delivery can be complete on
+  // Friday and the bill approved next Tuesday, and gating the receiving screen
+  // on the accounts calendar would be the wrong trade.
+  const line = withCatalog(poLine({ qty_received: 1, unit_price: 10 }), { price: 10 });
+  eq(closeReadiness([line], 2, LOC, 2), [], "two files, two bills, nothing pending");
 });
 
 // ── skuAction: stage 2 of a manual match ────────────────────────────────────

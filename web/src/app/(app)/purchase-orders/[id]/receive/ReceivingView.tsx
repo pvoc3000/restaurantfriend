@@ -9,6 +9,7 @@ import {
   fetchPoWithLines,
   fetchSignedAttachments,
 } from "@/lib/purchaseOrderQueries";
+import { fetchInvoicesForOrder } from "@/lib/invoiceQueries";
 import { Receiving } from "@/components/purchasing/Receiving";
 
 /** The receiving screen's whole body — every query lives here. */
@@ -27,8 +28,12 @@ export async function ReceivingView({
   // first is what puts these on the wire together rather than one after the
   // other.
   const attachmentsPromise = fetchSignedAttachments(supabase, id).then((r) => r);
+  // The invoices FILED against this order (migration 025). Third on the wire
+  // with the other two, for the same lazy-thenable reason.
+  const invoicesPromise = fetchInvoicesForOrder(supabase, id).then((r) => r);
   const { order, lines, error, lineError } = await fetchPoWithLines(supabase, id);
   const { attachments, error: attachmentError } = await attachmentsPromise;
+  const { invoices: linkedInvoices } = await invoicesPromise;
 
   if (error) {
     return <p className="text-sm text-accent">Could not load order: {error}</p>;
@@ -87,6 +92,10 @@ export async function ReceivingView({
           // columns, an empty document pane would read as "no invoice yet"
           // instead of "this isn't wired up at this end".
           attachmentError={attachmentError}
+          // Deliberately NOT surfaced as an error: an order that predates the
+          // Invoices module has none, and a failure here must not stop anyone
+          // receiving a delivery. The fallback is exactly today's behaviour.
+          linkedInvoices={linkedInvoices}
           closeHref={closeHref}
         />
       )}
