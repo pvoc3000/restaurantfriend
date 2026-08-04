@@ -571,11 +571,28 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the specific line ids it just set (held in state, not re-derived). Not a
    general undo stack — this is the only action that changes fifteen rows on one
    tap.
-   **The bar ends `Finalize` · `Close`** (Mark, 2026-07-31): Finalize is the old
-   "Close order" — `closeReadiness`, which names what's unresolved and lets you
-   through anyway — and Close is the way back to PO detail. They sit together in
-   the TRAILING group, reading as a form's footer, which is the one deliberate
-   exception to the bar's act-here / move-there split.
+   **There is no ActionBar on this screen** (Mark, 2026-08-04: "get rid of the
+   black band at the bottom… just two buttons"). The footer is `Close` ·
+   `Complete` in the page's own FLOW, right-aligned, and `Complete` is the old
+   Finalize renamed — still `closeReadiness`, which names what's unresolved and
+   lets you through anyway, still writing status `closed`. The status chip and
+   the PO list still say Closed; only the verb on the button changed.
+   **`Complete` is BLACK**, which is a real exception to "every button is white;
+   only a set filter is black" and a deliberate one: it's the panel-commit
+   exception (`DIALOG_COMMIT_CLASS`, which it literally reuses) applied to a
+   screen that behaves like a panel — receiving produces ONE outcome, and this
+   row is an escape beside a commit rather than a row of peers, which is exactly
+   the distinction that rule turns on. The bar had already called this pair "a
+   form's footer"; it is now actually one.
+   Two consequences. The container's `pb-*` is GONE — every value it ever held
+   was clearance for a fixed bar — and the footer being the last IN-FLOW child
+   is what keeps the split row honest, since `spaceBelow` measures whatever
+   follows the row and now something really does. The ActionBar's leading
+   command went with it: **`Receive n from invoice` now sits in the lines pane
+   band, next to Add item** (Mark's placement), which is the thing it acts on.
+   Both are `shrink-0` in a band that cannot wrap, so a hard-dragged narrow
+   split clips them — the same edge the document band has, and the reason five
+   controls is about that band's limit.
    **Finalize LEAVES on success** (Mark, 2026-08-03) — it closes the order and
    navigates to `closeHref`, because finalizing is the end of the task and every
    control left on screen is for a delivery you have just declared done; staying

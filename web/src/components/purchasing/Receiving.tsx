@@ -4,7 +4,6 @@ import { useLayoutEffect, useMemo, useRef, useState, useTransition } from "react
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { ActionBar, ActionBarButton } from "@/components/ui/ActionBar";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { Pane, PaneHeader } from "@/components/ui/Pane";
@@ -35,7 +34,11 @@ import {
   type PriceAction,
 } from "@/lib/receiving";
 import { matchableSku, type InvoiceLine } from "@/lib/invoiceExtraction";
-import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
+import {
+  Dialog,
+  DIALOG_CANCEL_CLASS,
+  DIALOG_COMMIT_CLASS,
+} from "@/components/ui/Dialog";
 import {
   clampSplit,
   setReceivingLayout,
@@ -68,8 +71,9 @@ const px = (value: string) => parseFloat(value) || 0;
  * So sum the real boxes instead: at each level, whatever follows the node
  * (taken from the LAST following sibling's rect, so collapsed margins are
  * counted once and only once), then that parent's own bottom padding and
- * border. Out-of-flow siblings are skipped — the ActionBar is `fixed` and
- * occupies no layout space, which is what its `pb-*` clearance is already for.
+ * border. Out-of-flow siblings are skipped because they occupy no layout space
+ * — `BackToTop` is fixed, and so was the ActionBar this was written against,
+ * which is why the container needed a `pb-*` clearance in those days.
  */
 function spaceBelow(node: HTMLElement): number {
   let total = 0;
@@ -418,7 +422,7 @@ export function Receiving({
    * object to.
    *
    * What's BELOW the row is measured too, rather than assumed. Hard-coding the
-   * container's `pb-22` left ~56px of empty page still scrolling, because the
+   * container's old `pb-22` left ~56px of empty page still scrolling, because the
    * app layout's own `py-8` sits under that as well. Subtracting whatever
    * actually follows the row makes the page land exactly one viewport tall, so
    * nothing scrolls and the measurement can't drift underneath itself.
@@ -522,8 +526,27 @@ export function Receiving({
         <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
           {lines.filter((l) => l.qty_received !== null).length} counted
         </span>
+        {/* The bulk receive sits with the rows it fills (Mark, 2026-08-04,
+            placing it "next to the add item button" when the ActionBar went).
+            It was the ActionBar's leading command; with no bar, the honest home
+            for a verb is the thing it acts on. Both are `shrink-0` in a band
+            that cannot wrap, so at a hard-dragged narrow split they clip —
+            the same edge the document band has. */}
         {canReceive && (
-          <span className="ml-auto shrink-0">
+          <span className="ml-auto flex shrink-0 items-center gap-3">
+            <button
+              type="button"
+              disabled={saving || toFill.length === 0}
+              onClick={() => void receiveBulk()}
+              title="Fills only lines with nothing counted yet. Anything already counted is left alone."
+              className="h-9 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+            >
+              {toFill.length === 0
+                ? "All counted"
+                : source?.extraction
+                  ? `Receive ${toFill.length} from invoice`
+                  : `Receive ${toFill.length} as ordered`}
+            </button>
             <AddPoLines order={order} orgId={orgId} lines={lines} />
           </span>
         )}
@@ -556,21 +579,10 @@ export function Receiving({
 
   return (
     <>
-      {/* `pb-22` is the ActionBar's usual clearance — it lets a scrolling page
-          finish above the fixed bar. Split doesn't scroll (the row is sized to
-          the space left), so that padding would just be 90px of dead air above
-          the bar; a smaller one lets the columns come down to meet it. The
-          height measurement reads whatever this resolves to, so the two can't
-          disagree. */}
-      <div
-        className={`space-y-4 ${
-          layout === "split"
-            ? "pb-8"
-            : layout === "stacked"
-              ? "pb-22"
-              : "pb-22 xl:pb-8"
-        }`}
-      >
+      {/* No `pb-*` here. Every value it ever held was clearance for the
+          fixed ActionBar; with the footer in the flow there is nothing to
+          scroll past, and the app layout's own py-8 is the breathing room. */}
+      <div className="space-y-4">
         {/* Header: which order, and the three numbers that say whether it adds up. */}
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-2">
           <h1 className="text-2xl font-semibold text-ink">Receive {order.po_number}</h1>
@@ -679,8 +691,8 @@ export function Receiving({
             )}
           </div>
 
-          {/* The layout control. A VIEW control, so it lives with the view and
-              not in the ActionBar, which carries commands only. `ml-auto` puts
+          {/* The layout control. A VIEW control, so it lives with the view
+              rather than with the footer's commands. `ml-auto` puts
               it against the right edge (Mark, 2026-08-03) — it's the one thing
               on this strip you set once and stop touching, so it gets out of
               the way of the field you actually check. */}
@@ -756,60 +768,53 @@ export function Receiving({
             </div>
           </div>
         )}
+        {/* The footer, in the page's own flow — no black bar (Mark, 2026-08-04:
+            "get rid of the black band at the bottom… just two buttons").
+            It is the LAST child of the space-y container, which matters: the
+            split row measures whatever follows it, so a footer here is counted
+            automatically and the columns still end level. A fixed bar had to
+            live outside this container and be paid for with `pb-22`, and that
+            clearance is gone with it.
+
+            COMPLETE IS BLACK, and that is a real exception to "every button is
+            white; only a set filter is black". It's the panel-commit exception
+            (`DIALOG_COMMIT_CLASS`) applied to a screen that behaves like one:
+            receiving produces a single outcome, and this row is a text-weight
+            escape beside the commit rather than a row of peer buttons — which
+            is precisely the distinction that rule turns on. Mark asked for it
+            (2026-08-04) and it is the same two-weight footer, so the rule is
+            being applied, not bent. Note the STATUS is still `closed` and the
+            chip still reads Closed; only the verb on this button changed. */}
+        <div className="flex items-center justify-end gap-6">
+          {/* The SAME href as the order's breadcrumb, trail and all. It was a
+              bare `/purchase-orders/{id}`, which threw the trail away and then
+              quietly shortened it for good: leaving by this button gave a
+              detail screen that no longer knew it came from the list, and its
+              Receive link could only stamp one crumb, so the next visit here
+              went back one place instead of two (Mark, 2026-07-31 — "the
+              breadcrumb only goes back one place. Is that intentional?").
+              Breadcrumbs live in the query string precisely so every link has
+              to carry them. */}
+          <Link
+            href={closeHref}
+            className="inline-flex h-9 items-center border border-ink bg-white px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white"
+          >
+            Close
+          </Link>
+          {canReceive && canClose(order.status) && (
+            <button
+              type="button"
+              disabled={saving}
+              onClick={() => void close()}
+              title="Mark this order received, reconciled and filed — it names anything still unresolved first."
+              className={DIALOG_COMMIT_CLASS}
+            >
+              Complete
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Fixed children OUTSIDE the space-y container: space-y puts a bottom
-          margin on every child but the last, and for a bottom:0 fixed box it's
-          the margin edge that lands on the viewport floor. */}
-      {/* Finalize then Close, at the right (Mark, 2026-07-31). The pair reads
-          as a form's footer — Finalize is the commit, Close is the way out —
-          which is why Finalize sits in the trailing group with it rather than
-          with the receive command on the left, where the ActionBar's usual
-          act-here / move-there split would have put it. */}
-      <ActionBar
-        trailing={
-          <>
-            {canReceive && canClose(order.status) && (
-              <ActionBarButton
-                disabled={saving}
-                onClick={() => void close()}
-                title="Mark this order received, reconciled and filed — it names anything still unresolved first."
-              >
-                Finalize
-              </ActionBarButton>
-            )}
-            {/* The SAME href as the order's breadcrumb, trail and all. It was
-                a bare `/purchase-orders/{id}`, which threw the trail away and
-                then quietly shortened it for good: leaving by this button gave
-                a detail screen that no longer knew it came from the list, and
-                its Receive link could only stamp one crumb, so the next visit
-                here went back one place instead of two (Mark, 2026-07-31 —
-                "the breadcrumb only goes back one place. Is that
-                intentional?"). Breadcrumbs live in the query string precisely
-                so every link has to carry them. */}
-            <Link
-              href={closeHref}
-              className="flex min-w-40 items-center justify-center px-5 text-center text-[12px] font-semibold uppercase tracking-[0.06em] text-white no-underline hover:bg-neutral-800 xl:min-w-48 xl:px-8"
-            >
-              Close
-            </Link>
-          </>
-        }
-      >
-        {canReceive && (
-          <ActionBarButton
-            disabled={saving || toFill.length === 0}
-            onClick={() => void receiveBulk()}
-            title="Fills only lines with nothing counted yet. Anything already counted is left alone."
-          >
-            {toFill.length === 0
-              ? "Nothing left to receive"
-              : source?.extraction
-                ? `Receive ${toFill.length} from invoice`
-                : `Receive ${toFill.length} as ordered`}
-          </ActionBarButton>
-        )}
-      </ActionBar>
       <BackToTop />
 
       {matching && match && (
