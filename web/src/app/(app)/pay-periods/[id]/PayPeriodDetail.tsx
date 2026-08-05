@@ -11,6 +11,9 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { StatusChip } from "@/components/payroll/PayPeriodsList";
 import { PayPeriodActions } from "@/components/payroll/PayPeriodActions";
 import { PayrollWorksheet } from "@/components/payroll/PayrollWorksheet";
+import { ExportPayroll } from "@/components/payroll/ExportPayroll";
+import { proposeOvertime } from "@/lib/overtime";
+import { workedHours } from "@/lib/timesheets";
 import {
   buildEmployeeRollup,
   buildFindings,
@@ -122,8 +125,8 @@ export async function PayPeriodDetail({
   // code path: the worksheet renders empty and the screen above it already
   // explains the gate.
   const [
-    { data: shiftRows },
-    { data: employeeRows },
+    { data: shiftRows, error: shiftError },
+    { data: employeeRows, error: employeeError },
     { data: premiumRows, error: premiumError },
     { data: poolRows, error: poolError },
     { data: waiverRows },
@@ -133,10 +136,11 @@ export async function PayPeriodDetail({
       .select(
         `id, employee_id, location_id, workday, business_date, clock_in, clock_out,
          unpaid_break_minutes, hours_regular, hours_overtime, hours_double_ot,
-         sick_hours, exclude_tips, source_payload`
+         sick_hours, exclude_tips, source_payload, wage_type, workweek_start,
+         tip_hours, tip_allocation`
       )
       .eq("pay_period_id", id),
-    supabase.from("employees").select("id, first_name, last_name, excludes_tips"),
+    supabase.from("employees").select("id, first_name, last_name, excludes_tips, primary_wage_type, gusto_id"),
     supabase
       .from("break_premiums")
       .select("employee_id, workday, kind, decision, hours")
@@ -222,11 +226,84 @@ export async function PayPeriodDetail({
   // decided — both of which look like real answers. Same reason PO detail
   // replaces its Paperwork card with the Postgres error rather than showing an
   // empty card. The hours view needs neither table and still works.
-  const worksheetError = premiumError ?? poolError;
+  // The shift and employee queries are in here too, because 031 added columns
+  // to BOTH (`wage_type`, `primary_wage_type`, `gusto_id`). Before it is applied
+  // those selects fail, and an unchecked failure would render a worksheet with
+  // no people and an export with no rows — two plausible-looking answers to
+  // questions nobody asked. Same lesson as the 029 case below it.
+  const worksheetError = shiftError ?? employeeError ?? premiumError ?? poolError;
 
   const findings = buildFindings(shifts, employeeMap, waiverIds, decidedByKey);
   const rollup = buildEmployeeRollup(shifts, employeeMap, findings, premiumHours);
   const pools = buildPools(shifts, employeeMap, codeById, poolMap);
+
+  // ---- the export's inputs ----------------------------------------------
+  // The raw rows again, because the export needs two columns the worksheet has
+  // no use for (`wage_type`, and the ids the freeze writes back to).
+  const raw = (shiftRows ?? []) as unknown as Array<Record<string, unknown>>;
+
+  // Only premiums actually DECIDED as owed reach the file. A finding with no
+  // decision is not a premium — that is decision 3's whole point, and
+  // exportReadiness names how many are still outstanding.
+  const owedHours = new Map<string, number>();
+  for (const p of premiumRows ?? []) {
+    if (p.decision !== "owed") continue;
+    const k = p.employee_id as string;
+    owedHours.set(k, (owedHours.get(k) ?? 0) + (num(p.hours) ?? 0));
+  }
+
+  // Overtime still disagreeing with our recompute, for the readiness list. Same
+  // one-cent tolerance and the same comparison against the DECISION that
+  // /time-sheets uses — see lib/overtime's EPSILON.
+  const proposals = proposeOvertime(
+    shifts
+      .map((s) => {
+        const hours = workedHours(s);
+        const wk = raw.find((r) => r.id === s.id)?.workweek_start as string | undefined;
+        return hours === null || !wk
+          ? null
+          : { id: s.id, employee_id: s.employee_id, workday: s.workday, workweek_start: wk, hours };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+  );
+  let overtimeNeedingReview = 0;
+  for (const s of shifts) {
+    const p = proposals.get(s.id);
+    if (!p) continue;
+    if (
+      Math.abs(p.regular - (s.hours_regular ?? 0)) >= 0.015 ||
+      Math.abs(p.overtime - (s.hours_overtime ?? 0)) >= 0.015 ||
+      Math.abs(p.double_ot - (s.hours_double_ot ?? 0)) >= 0.015
+    ) {
+      overtimeNeedingReview += 1;
+    }
+  }
+
+  const exportShifts = shifts.map((s) => {
+    const r = raw.find((x) => x.id === s.id);
+    return {
+      id: s.id,
+      employee_id: s.employee_id,
+      wage_type: (r?.wage_type ?? null) as string | null,
+      hours_regular: s.hours_regular,
+      hours_overtime: s.hours_overtime,
+      hours_double_ot: s.hours_double_ot,
+      sick_hours: s.sick_hours,
+      // The FROZEN allocation where there is one. On an unfrozen period the
+      // component recomputes from the pools instead, so the file and the
+      // worksheet can never disagree.
+      tip_allocation: num(r?.tip_allocation),
+      tip_hours: num(r?.tip_hours),
+    };
+  });
+
+  const exportEmployees = (employeeRows ?? []).map((e) => ({
+    id: e.id as string,
+    first_name: e.first_name as string,
+    last_name: e.last_name as string,
+    primary_wage_type: (e.primary_wage_type ?? null) as string | null,
+    gusto_id: (e.gusto_id ?? null) as string | null,
+  }));
 
   return (
     <div className="space-y-16">
@@ -345,8 +422,10 @@ export async function PayPeriodDetail({
         <section className="space-y-4">
           <SectionHeading>Payroll worksheet</SectionHeading>
           <p className="max-w-[72ch] border border-accent px-4 py-3 text-sm text-accent">
-            The break-premium and tip-pool tables are missing:{" "}
-            {worksheetError.message}. Migration 029 has not been applied yet.
+            {worksheetError.message}
+            {/^column/i.test(worksheetError.message)
+              ? " — migration 031 has not been applied yet."
+              : " — migration 029 has not been applied yet."}
           </p>
         </section>
       ) : (
@@ -359,14 +438,26 @@ export async function PayPeriodDetail({
       />
       )}
 
-      <p className="max-w-[72ch] border border-hairline px-4 py-3 text-sm text-muted">
-        The Gusto export is deliberately last: it is irreversible, and it must
-        not run until every input above is trustworthy. It also needs one
-        decision from Mark — whether a meal premium exports as HOURS on Gusto&rsquo;s
-        native <code>missed_break_hours</code> column or as dollars on
-        <code> custom_earning_premium</code>, which is what the FileMaker export
-        does today.
-      </p>
+      {!worksheetError && (
+        <ExportPayroll
+          periodId={period.id}
+          periodStart={period.start_date}
+          orgName={session.orgName}
+          status={period.status}
+          shifts={exportShifts}
+          employees={exportEmployees}
+          premiumHours={[...owedHours.entries()]}
+          pools={pools}
+          caveatInputs={{
+            shiftsWithoutClockOut: shifts.filter((s) => !s.clock_out).length,
+            undecidedBreakFindings: findings.filter((f) => !f.decided).length,
+            poolsWithoutFigure: pools.filter((p) => p.effectiveCents === null).length,
+            overtimeNeedingReview,
+          }}
+          canWrite={canWrite}
+          closeHref="/pay-periods"
+        />
+      )}
     </div>
   );
 }

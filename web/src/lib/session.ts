@@ -46,6 +46,8 @@ export type AppSession = {
    *  column reached through an FK the membership query already traverses, and
    *  a separate round trip for it cost the order guide ~110ms. */
   orgSettings: OrgSettings;
+  /** `orgs.name`. Empty only if the embed ever comes back null. */
+  orgName: string;
 };
 
 /**
@@ -79,9 +81,9 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
   ] = await Promise.all([
     supabase
       .from("org_members")
-      .select("org_id, role, display_name, last_active_location_id, orgs(settings)")
+      .select("org_id, role, display_name, last_active_location_id, orgs(name, settings)")
       .eq("user_id", user.id)
-      .maybeSingle<Membership & { orgs: { settings: OrgSettings | null } | null }>(),
+      .maybeSingle<Membership & { orgs: { name: string; settings: OrgSettings | null } | null }>(),
     // No is_active filter: the Locations list carries every one of them. See
     // the two fields on AppSession for which list a screen should reach for.
     supabase
@@ -117,5 +119,9 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
     activeLocations: active,
     activeLocation,
     orgSettings: membership.orgs?.settings ?? {},
+    // The org's own name, from the SAME embed rather than a second query.
+    // Design rule 2: business names live in the database, never in code — and
+    // the payroll export needs one to name its file.
+    orgName: membership.orgs?.name ?? "",
   };
 });

@@ -27,6 +27,7 @@
     "../../src/lib/overtime.ts",
     "../../src/lib/breakRules.ts",
     "../../src/lib/tipPool.ts",
-    "../../src/lib/homebaseImport.ts"
+    "../../src/lib/homebaseImport.ts",
+    "../../src/lib/gustoExport.ts"
   ]
 }

@@ -10,6 +10,7 @@ import "./documentLines.fixtures";
 import "./employeeDocuments.fixtures";
 import "./employees.fixtures";
 import "./fileDrop.fixtures";
+import "./gustoExport.fixtures";
 import "./homebaseImport.fixtures";
 import "./invoiceDate.fixtures";
 import "./invoiceMatch.fixtures";
