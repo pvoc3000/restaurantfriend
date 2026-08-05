@@ -34,7 +34,7 @@ export const PAY_PERIOD_STATUS_LABEL: Record<PayPeriodStatus, string> = {
  */
 export const PAY_PERIOD_STATUS_HINT: Record<PayPeriodStatus, string> = {
   open: "Punches are still arriving. Timesheets can be edited.",
-  review: "The fortnight has ended and is being adjudicated. Timesheets can still be edited.",
+  review: "The pay period has ended and is being adjudicated. Timesheets can still be edited.",
   exported: "The payroll file has been produced. Reopening discards it.",
   closed: "Payroll ran. This period is final.",
 };

@@ -95,6 +95,40 @@ function wallMinutes(v: unknown): number | null {
 }
 
 /**
+ * The first of these keys that holds a readable wall time.
+ *
+ * TWO SOURCES SPELL THE SAME PUNCH DIFFERENTLY, and reading only one spelling
+ * is a bug that hides itself. `transform-timesheets.mjs` writes FileMaker's
+ * punches as `break_start` / `break_end` / `time_in`; the Homebase importer
+ * spreads its own row shape, which spells them `breakStart` / `breakEnd` /
+ * `clockInTime`. Until 2026-08-05 this function read the snake_case names only,
+ * so on every IMPORTED shift the meal punches read as null and it fell through
+ * to `unpaid_break_minutes` — which meant `late_meal` could never fire on
+ * Homebase data at all, and a missed meal was detected only by the absence of a
+ * deduction (Mark, 2026-08-05: "missed break not flagged by app… what about
+ * late breaks?").
+ *
+ * The importer now writes the canonical snake_case names as well, so new
+ * imports need none of this. Reading both is what makes the fortnight ALREADY
+ * imported work without a backfill or a re-import.
+ */
+function firstWallMinutes(p: Record<string, unknown>, keys: readonly string[]): number | null {
+  for (const k of keys) {
+    const m = wallMinutes(p[k]);
+    if (m !== null) return m;
+  }
+  return null;
+}
+
+/** The five fields a break assessment actually reads. A narrow parameter so the
+ *  timesheet list can pass its own row type — which carries a location CODE
+ *  rather than an id — without either screen inventing a conversion. */
+export type BreakShiftFacts = Pick<
+  WorksheetShift,
+  "id" | "clock_in" | "clock_out" | "unpaid_break_minutes" | "source_payload"
+>;
+
+/**
  * The recorded meal, normalised out of whatever the source stored.
  *
  * FileMaker keeps break punches as wall-clock strings in `source_payload`;
@@ -102,11 +136,11 @@ function wallMinutes(v: unknown): number | null {
  * punches. Doing this here keeps `breakRules` pure over plain numbers rather
  * than teaching it every source's spelling.
  */
-export function toBreakShift(s: WorksheetShift): BreakShift {
+export function toBreakShift(s: BreakShiftFacts): BreakShift {
   const p = s.source_payload ?? {};
-  const start = wallMinutes(p.break_start);
-  const end = wallMinutes(p.break_end);
-  const clockIn = wallMinutes(p.time_in);
+  const start = firstWallMinutes(p, ["break_start", "breakStart"]);
+  const end = firstWallMinutes(p, ["break_end", "breakEnd"]);
+  const clockIn = firstWallMinutes(p, ["time_in", "clockInTime"]);
 
   let mealMinutes: number | null = null;
   let mealStartAfterMinutes: number | null = null;

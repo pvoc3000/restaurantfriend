@@ -10,8 +10,17 @@ import { PickList } from "@/components/ui/PickList";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { formatPeriodRange, type PayPeriodStatus } from "@/lib/payPeriods";
 import { PAY_PERIOD_STATUS_LABEL } from "@/lib/payPeriods";
-import { proposeOvertime, type ShiftProposal, type Split } from "@/lib/overtime";
+import {
+  REASON_LABEL,
+  proposeOvertime,
+  type OvertimeReason,
+  type ShiftProposal,
+  type Split,
+} from "@/lib/overtime";
+import { MEAL_CODE_LABEL, assessWorkday, type BreakFinding } from "@/lib/breakRules";
+import { toBreakShift } from "@/lib/payrollWorksheet";
 import { AdjudicateOvertime } from "./AdjudicateOvertime";
+import { NewShift } from "./NewShift";
 import {
   OT_DECISION_LABEL,
   effectiveExclusion,
@@ -21,7 +30,10 @@ import {
   type OtDecision,
 } from "@/lib/timesheets";
 
-const WIDTHS_STORAGE_KEY = "rf.timesheets.columnWidths.v1";
+// v2: the column set and its order changed (Mark, 2026-08-05) — Regular · OT ·
+// Double · Break · Worked, with a new Shift column after Shop. v1's widths key
+// the old columns and would leave the new ones unsized.
+const WIDTHS_STORAGE_KEY = "rf.timesheets.columnWidths.v2";
 
 export type TimesheetRow = {
   id: string;
@@ -88,8 +100,27 @@ function differsFromDecided(
 }
 
 type SortKey = "employee" | "workday" | "in" | "worked" | "regular" | "ot" | "location";
-type Grouping = "none" | "employee" | "workday";
+type Grouping = "none" | "employee" | "workday" | "location";
 type Review = "all" | "needs_review";
+
+/**
+ * The label a grouping puts on its band, and the value it orders runs by.
+ *
+ * THE GROUP IS ALWAYS THE PRIMARY SORT (Mark, 2026-08-05: "grouping by workday
+ * and shop should also have a black header band"). `DataTable` bands a run of
+ * like-labelled rows, so it can only band what the order already groups —
+ * before this, picking Day while the sort was still Employee produced no band
+ * at all and grouping looked broken.
+ *
+ * Making the group the primary sort and the chosen column the sort WITHIN each
+ * run is what a grouped report actually is, and it means every grouping bands,
+ * always. `DataGroup.sortKey` is deliberately not passed for the same reason.
+ */
+const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: TimesheetRow) => string> = {
+  employee: (r) => r.employee_name,
+  workday: (r) => r.workday,
+  location: (r) => r.location_code ?? "No shop",
+};
 
 /**
  * A fortnight of shifts.
@@ -109,6 +140,10 @@ export function TimesheetsList({
   periodId,
   canWrite,
   timeZone,
+  waiverEmployeeIds,
+  employees,
+  locations,
+  orgId,
 }: {
   rows: TimesheetRow[];
   periods: PeriodOption[];
@@ -117,6 +152,13 @@ export function TimesheetsList({
   /** The org's zone. Punches are instants; reading one back needs a zone, and
    *  the SERVER's is not it — a host in UTC would show every shift shifted. */
   timeZone: string;
+  /** Who has a signed meal-break waiver on file. It changes the ANSWER, not the
+   *  presentation: a waived meal on a six-hour day owes nothing at all. */
+  waiverEmployeeIds: string[];
+  /** The roster, for adding a shift by hand. */
+  employees: { id: string; name: string }[];
+  locations: { id: string; code: string }[];
+  orgId: string;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -203,7 +245,15 @@ export function TimesheetsList({
       }
     };
     const dir = sort.dir === "asc" ? 1 : -1;
+    const groupOf = grouping === "none" ? null : GROUP_LABEL[grouping];
     return [...shown].sort((a, b) => {
+      // The group leads, ALWAYS ascending — the runs are a table of contents,
+      // not the thing you sorted, and flipping a column shouldn't reverse the
+      // employee list. Inside a run the chosen column decides.
+      if (groupOf) {
+        const ag = groupOf(a), bg = groupOf(b);
+        if (ag !== bg) return ag < bg ? -1 : 1;
+      }
       const av = value(a), bv = value(b);
       if (av < bv) return -1 * dir;
       if (av > bv) return 1 * dir;
@@ -212,7 +262,39 @@ export function TimesheetsList({
       if (a.workday !== b.workday) return a.workday < b.workday ? -1 : 1;
       return (a.clock_in ?? "") < (b.clock_in ?? "") ? -1 : 1;
     });
-  }, [shown, sort]);
+  }, [shown, sort, grouping]);
+
+  /**
+   * The meal-break findings, derived here exactly as the worksheet derives them.
+   *
+   * Surfaced on THIS screen because it is where you are looking when you ask
+   * whether a break was missed (Mark, 2026-08-05: "missed break not flagged by
+   * app"). It was only ever on the pay-period worksheet's Breaks tab, which is
+   * where the DECISION still gets recorded — this is a flag, not a second place
+   * to decide, the same split receiving and PO detail already keep.
+   *
+   * Assessed per (employee, workday) because that is the grain the California
+   * one-per-day cap works at, then marked on every shift of that day.
+   */
+  const breakFindings = useMemo(() => {
+    const days = new Map<string, TimesheetRow[]>();
+    for (const r of rows) {
+      const key = `${r.employee_id}|${r.workday}`;
+      const list = days.get(key);
+      if (list) list.push(r);
+      else days.set(key, [r]);
+    }
+    const out = new Map<string, BreakFinding>();
+    for (const [key, dayRows] of days) {
+      const [employee_id] = key.split("|");
+      const found = assessWorkday(dayRows.map(toBreakShift), {
+        hasMealWaiver: waiverEmployeeIds.includes(employee_id),
+      });
+      if (found.length === 0) continue;
+      for (const r of dayRows) out.set(r.id, found[0]);
+    }
+    return out;
+  }, [rows, waiverEmployeeIds]);
 
   const totals = useMemo(() => {
     let regular = 0, ot = 0, dot = 0, sick = 0, worked = 0, unfinished = 0, disagreeing = 0;
@@ -229,12 +311,61 @@ export function TimesheetsList({
     return { regular, ot, dot, sick, worked, unfinished, disagreeing };
   }, [sorted]);
 
+  /** Distinct (employee, workday) pairs owing a meal finding, among what's shown. */
+  const mealDays = useMemo(() => {
+    const days = new Set<string>();
+    for (const r of sorted) {
+      if (breakFindings.has(r.id)) days.add(`${r.employee_id}|${r.workday}`);
+    }
+    return days.size;
+  }, [sorted, breakFindings]);
+
+  /**
+   * The band, with the run's hours in it (Mark, 2026-08-05: "hour subtotals for
+   * each grouping").
+   *
+   * No `sortKey`: the group is already the primary sort, so every grouping bands
+   * whatever column you then sort within it by. Regular · OT · Double · Worked,
+   * in the same order and with the same names as the columns beneath — a
+   * subtotal that reorders or renames its own figures is a second thing to read
+   * rather than the sum of the first.
+   */
   const group: DataGroup<TimesheetRow> | undefined =
     grouping === "none"
       ? undefined
-      : grouping === "employee"
-        ? { label: (r) => r.employee_name, sortKey: "employee" }
-        : { label: (r) => r.workday, sortKey: "workday" };
+      : {
+          label: GROUP_LABEL[grouping],
+          summary: (run) => {
+            let regular = 0, ot = 0, dot = 0, worked = 0;
+            for (const r of run) {
+              regular += r.hours_regular ?? 0;
+              ot += r.hours_overtime ?? 0;
+              dot += r.hours_double_ot ?? 0;
+              worked += workedHours(r) ?? 0;
+            }
+            return (
+              <span className="tabular-nums">
+                {regular.toFixed(2)} reg · {ot.toFixed(2)} OT · {dot.toFixed(2)} dbl ·{" "}
+                {worked.toFixed(2)} worked
+              </span>
+            );
+          },
+        };
+
+  /**
+   * Our recomputed figure for one field, but ONLY where it disagrees with the
+   * row and only past the same epsilon the review queue uses. A `≠` on every
+   * cent of rounding drift would be 9.9% of rows — see `lib/overtime`'s EPSILON,
+   * which is a measurement rather than a taste.
+   */
+  function proposedFor(r: TimesheetRow, field: keyof Split): number | null {
+    if (!needsReview.has(r.id)) return null;
+    const p = proposals.get(r.id);
+    if (!p) return null;
+    const stored =
+      field === "regular" ? r.hours_regular : field === "overtime" ? r.hours_overtime : r.hours_double_ot;
+    return Math.abs(p[field] - (stored ?? 0)) >= REVIEW_EPSILON ? p[field] : null;
+  }
 
   /** `10:07pm` from an instant, read back in the org's zone. */
   const clock = (iso: string | null) =>
@@ -250,7 +381,7 @@ export function TimesheetsList({
     {
       key: "employee",
       label: "Employee",
-      width: 240,
+      width: 196,
       pinned: true,
       sortValue: (r) => r.employee_name,
       render: (r) => (
@@ -267,22 +398,36 @@ export function TimesheetsList({
     {
       key: "workday",
       label: "Workday",
-      width: 130,
+      width: 126,
       sortValue: (r) => r.workday,
       render: (r) => <span className="tabular-nums">{r.workday}</span>,
     },
     {
       key: "location",
       label: "Shop",
-      width: 90,
+      width: 78,
       hideWhenCompact: true,
       sortValue: (r) => r.location_code ?? "",
       render: (r) => <span className="text-muted">{r.location_code ?? "—"}</span>,
     },
     {
+      // The role worked, which on a Homebase import is its `Role` column with
+      // FileMaker's numbering stripped ("01 Overnight Baker" → "Overnight
+      // Baker"). It lived only in the row's expansion until Mark asked for it
+      // beside Shop (2026-08-05) — two shifts on one day at one shop are told
+      // apart by what the person was doing.
+      key: "position",
+      label: "Shift",
+      width: 120,
+      hideWhenCompact: true,
+      sortValue: (r) => r.position ?? "",
+      render: (r) =>
+        r.position ? <span>{r.position}</span> : <span className="text-faint">—</span>,
+    },
+    {
       key: "in",
       label: "In → Out",
-      width: 190,
+      width: 168,
       sortValue: (r) => r.clock_in ?? "",
       render: (r) => (
         <span className="tabular-nums">
@@ -297,10 +442,74 @@ export function TimesheetsList({
         </span>
       ),
     },
+    // REGULAR · OT · DOUBLE · BREAK · WORKED (Mark, 2026-08-05). The three
+    // figures that sum to Worked come first, then what was deducted to get
+    // there, then the total they make — which reads left to right as the
+    // arithmetic actually runs.
+    {
+      key: "regular",
+      label: "Regular",
+      width: 112,
+      sortValue: (r) => r.hours_regular ?? -1,
+      render: (r) => (
+        <HoursCell
+          row={r}
+          column="hours_regular"
+          value={r.hours_regular}
+          editable={editable}
+          proposed={proposedFor(r, "regular")}
+        />
+      ),
+    },
+    {
+      key: "ot",
+      label: "OT",
+      width: 84,
+      sortValue: (r) => r.hours_overtime ?? -1,
+      render: (r) => (
+        <HoursCell
+          row={r}
+          column="hours_overtime"
+          value={r.hours_overtime}
+          editable={editable}
+          proposed={proposedFor(r, "overtime")}
+          // Why there is overtime at all. `proposeOvertime` already names its
+          // reasons — they were only ever shown after you opened a row AND the
+          // recompute disagreed, which is the rarest case rather than the
+          // ordinary one (Mark, 2026-08-05: "can tool tips over overtime field
+          // explain why there's overtime?").
+          reasons={proposals.get(r.id)?.reasons ?? []}
+        />
+      ),
+    },
+    {
+      key: "dot",
+      label: "Double",
+      width: 98,
+      hideWhenCompact: true,
+      sortValue: (r) => r.hours_double_ot ?? -1,
+      render: (r) => (
+        <HoursCell
+          row={r}
+          column="hours_double_ot"
+          value={r.hours_double_ot}
+          editable={editable}
+          proposed={proposedFor(r, "double_ot")}
+          reasons={proposals.get(r.id)?.reasons ?? []}
+        />
+      ),
+    },
+    {
+      key: "break",
+      label: "Break",
+      width: 124,
+      sortValue: (r) => r.unpaid_break_minutes ?? -1,
+      render: (r) => <BreakCell row={r} editable={editable} finding={breakFindings.get(r.id) ?? null} />,
+    },
     {
       key: "worked",
       label: "Worked",
-      width: 100,
+      width: 112,
       sortValue: (r) => workedHours(r) ?? -1,
       // DECIMAL, not a 5:13 clock reading, even though a clock reads more
       // naturally for a shift. Regular + OT + Double must visibly SUM to this,
@@ -310,52 +519,9 @@ export function TimesheetsList({
       ),
     },
     {
-      key: "break",
-      label: "Break",
-      width: 90,
-      hideWhenCompact: true,
-      sortValue: (r) => r.unpaid_break_minutes ?? -1,
-      render: (r) =>
-        editable ? (
-          <InlineValue
-            table="timesheets"
-            id={r.id}
-            column="unpaid_break_minutes"
-            kind="number"
-            value={r.unpaid_break_minutes}
-          />
-        ) : (
-          <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-            {r.unpaid_break_minutes === null ? "—" : `${r.unpaid_break_minutes}m`}
-          </span>
-        ),
-    },
-    {
-      key: "regular",
-      label: "Regular",
-      width: 100,
-      sortValue: (r) => r.hours_regular ?? -1,
-      render: (r) => <HoursCell row={r} column="hours_regular" value={r.hours_regular} editable={editable} />,
-    },
-    {
-      key: "ot",
-      label: "OT",
-      width: 95,
-      sortValue: (r) => r.hours_overtime ?? -1,
-      render: (r) => <HoursCell row={r} column="hours_overtime" value={r.hours_overtime} editable={editable} />,
-    },
-    {
-      key: "dot",
-      label: "Double",
-      width: 95,
-      hideWhenCompact: true,
-      sortValue: (r) => r.hours_double_ot ?? -1,
-      render: (r) => <HoursCell row={r} column="hours_double_ot" value={r.hours_double_ot} editable={editable} />,
-    },
-    {
       key: "sick",
       label: "Sick",
-      width: 90,
+      width: 82,
       hideWhenCompact: true,
       sortValue: (r) => r.sick_hours ?? -1,
       render: (r) => <HoursCell row={r} column="sick_hours" value={r.sick_hours} editable={editable} />,
@@ -363,7 +529,7 @@ export function TimesheetsList({
     {
       key: "tips",
       label: "Tips",
-      width: 130,
+      width: 100,
       hideWhenCompact: true,
       sortValue: (r) => String(r.exclude_tips),
       render: (r) => <TipsCell row={r} editable={editable} />,
@@ -394,7 +560,7 @@ export function TimesheetsList({
         <TextInput
           value={search}
           onValueChange={setSearch}
-          placeholder="Search this fortnight"
+          placeholder="Search this pay period"
           aria-label="Search timesheets"
           clearLabel="Clear the search"
           className="h-9 w-64 text-sm"
@@ -429,13 +595,28 @@ export function TimesheetsList({
             options={[
               { key: "employee", label: "Employee" },
               { key: "workday", label: "Day" },
-              { key: "none", label: "Neither" },
+              { key: "location", label: "Shop" },
+              { key: "none", label: "None" },
             ]}
           />
         </div>
+
+        {/* Right-aligned in the filter row — the NewEmployee template, which is
+            how every create in this app is reached. */}
+        {editable && (
+          <div className="ml-auto">
+            <NewShift
+              employees={employees}
+              locations={locations}
+              orgId={orgId}
+              timeZone={timeZone}
+              period={period}
+            />
+          </div>
+        )}
       </div>
 
-      {/* The fortnight in one line. Overtime is stated separately from regular
+      {/* The pay period in one line. Overtime is stated separately from regular
           because it is the number this module exists to get right. */}
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-y border-hairline py-2 text-sm">
         <span className="text-muted">
@@ -458,6 +639,14 @@ export function TimesheetsList({
         {totals.disagreeing > 0 && (
           <span className="bg-mark-fill px-2 text-ink">
             {totals.disagreeing} differ from what the source said
+          </span>
+        )}
+        {/* Counted over the SHOWN rows, like everything else on this line, and
+            counted per DAY rather than per shift — the premium is capped at one
+            a day, so counting shifts would overstate what is owed. */}
+        {mealDays > 0 && (
+          <span className="bg-mark-fill px-2 text-ink">
+            {mealDays} meal-break {mealDays === 1 ? "finding" : "findings"}
           </span>
         )}
       </div>
@@ -488,6 +677,8 @@ export function TimesheetsList({
             if (d.length) marks.push(`${d.length} differ${d.length === 1 ? "s" : ""} from source`);
             if (r.stitched) marks.push("stitched");
             if (needsReview.has(r.id)) marks.push("overtime differs from ours");
+            const meal = breakFindings.get(r.id);
+            if (meal) marks.push(MEAL_CODE_LABEL[meal.code].toLowerCase());
             if (r.source_payload?.local_time_ambiguity) marks.push("ambiguous clock time");
             if (r.employee_note || r.manager_note) marks.push("note");
             return marks.length ? <span className="text-mark">{marks.join(" · ")}</span> : null;
@@ -497,6 +688,7 @@ export function TimesheetsList({
               row={r}
               editable={editable}
               proposal={needsReview.has(r.id) ? (proposals.get(r.id) ?? null) : null}
+              finding={breakFindings.get(r.id) ?? null}
             />
           ),
         }}
@@ -513,21 +705,40 @@ export function TimesheetsList({
 }
 
 /**
- * One of the three decided-hours cells. Editable only while the period is, and
- * marked when it disagrees with what the source said — YELLOW, the app's "worth
- * your eye", because a disagreement is not an error. It is the thing a human is
- * supposed to adjudicate (decision 2).
+ * One of the decided-hours cells, carrying up to three things.
+ *
+ * The cell answers three different questions and they must not be conflated:
+ *
+ *   1. Does this differ from what the SOURCE said? Yellow fill — history, and
+ *      the thing decision 2 exists to keep visible.
+ *   2. Does OUR recompute disagree with what the row says? A `≠` chip naming
+ *      both figures. This is the one that was invisible in the grid until
+ *      2026-08-05: it lived behind the Needs-review tab and the row expansion,
+ *      so a fortnight looked settled while the app privately disagreed with
+ *      fifteen rows of it (Mark: "should be obvious when app recommends
+ *      something different for a particular time sheet. Need a way to flag").
+ *   3. WHY there is overtime at all — the reasons `proposeOvertime` already
+ *      names, on the cells that carry the hours they explain.
+ *
+ * All of it is YELLOW and none of it is red. A disagreement is not an error; it
+ * is work for a human, which is the distinction the receiving screen's markers
+ * already draw.
  */
 function HoursCell({
   row,
   column,
   value,
   editable,
+  reasons = [],
+  proposed = null,
 }: {
   row: TimesheetRow;
   column: "hours_regular" | "hours_overtime" | "hours_double_ot" | "sick_hours";
   value: number | null;
   editable: boolean;
+  reasons?: OvertimeReason[];
+  /** Our recomputed figure for THIS field, when it disagrees with the row. */
+  proposed?: number | null;
 }) {
   const differs =
     column !== "sick_hours" &&
@@ -546,7 +757,85 @@ function HoursCell({
     </span>
   );
 
-  return <span className={differs ? "bg-mark-fill px-1" : ""}>{body}</span>;
+  // Only on a cell that actually carries overtime — "over 8 hours in the day"
+  // hovering over a regular-hours cell explains nothing about that cell.
+  const why =
+    reasons.length > 0 && column !== "hours_regular" && column !== "sick_hours" && (value ?? 0) > 0
+      ? `Overtime because: ${reasons.map((r) => REASON_LABEL[r]).join("; ")}.`
+      : null;
+
+  return (
+    <span className={`flex items-center gap-1 ${differs ? "bg-mark-fill px-1" : ""}`}>
+      <span className={why ? "underline decoration-mark decoration-dotted underline-offset-4" : ""} title={why ?? undefined}>
+        {body}
+      </span>
+      {proposed !== null && (
+        <span
+          className="shrink-0 cursor-help bg-mark-fill px-1 text-[11px] tabular-nums"
+          title={`This says ${(value ?? 0).toFixed(2)}; recomputing from the punches gives ${proposed.toFixed(2)}.${
+            reasons.length ? ` ${reasons.map((r) => REASON_LABEL[r]).join("; ")}.` : ""
+          } Open the row to adopt or keep it.`}
+        >
+          ≠ {proposed.toFixed(2)}
+        </span>
+      )}
+    </span>
+  );
+}
+
+/**
+ * The unpaid meal, IN HOURS (Mark, 2026-08-05: "break times should be in
+ * fractions of an hour instead of minutes to fit with hours worked").
+ *
+ * The column is `unpaid_break_minutes` and stays minutes — it is what both
+ * sources send and what 028 declares. `InlineValue`'s `scale` converts at both
+ * ends, so the cell reads 0.50 and accepts 0.50 while the database keeps 30.
+ *
+ * It also carries the meal-break FINDING, which is why this is a cell of its own
+ * rather than another `HoursCell`: the break column is where you look when you
+ * ask whether a break was missed, and until now the answer lived on another
+ * screen entirely.
+ */
+function BreakCell({
+  row,
+  editable,
+  finding,
+}: {
+  row: TimesheetRow;
+  editable: boolean;
+  finding: BreakFinding | null;
+}) {
+  const hours = row.unpaid_break_minutes === null ? null : row.unpaid_break_minutes / 60;
+
+  return (
+    <span className="flex items-center gap-1">
+      {editable ? (
+        <InlineValue
+          table="timesheets"
+          id={row.id}
+          column="unpaid_break_minutes"
+          kind="number"
+          value={row.unpaid_break_minutes}
+          scale={{ toShown: (m) => Math.round((m / 60) * 100) / 100, toStored: (h) => Math.round(h * 60) }}
+          format={(v) => Number(v).toFixed(2)}
+        />
+      ) : (
+        <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+          {hours === null ? "—" : hours.toFixed(2)}
+        </span>
+      )}
+      {finding && (
+        <span
+          className="shrink-0 cursor-help bg-mark-fill px-1 text-[11px]"
+          title={`${MEAL_CODE_LABEL[finding.code]}. ${finding.detail}${
+            finding.waivable ? " A signed meal-break waiver would cover this day." : ""
+          } Record the decision on the pay period's worksheet.`}
+        >
+          meal
+        </span>
+      )}
+    </span>
+  );
 }
 
 /**
@@ -591,11 +880,14 @@ function ShiftDetail({
   row,
   editable,
   proposal,
+  finding,
 }: {
   row: TimesheetRow;
   editable: boolean;
   /** Non-null only when the recompute disagrees with the stored decision. */
   proposal: ShiftProposal | null;
+  /** The day's meal finding, if it owes one. Derived, never stored. */
+  finding: BreakFinding | null;
 }) {
   const disagreements = otDisagreements(row);
   const payload = row.source_payload ?? {};
@@ -701,6 +993,22 @@ function ShiftDetail({
 
       <div className="space-y-2">
         <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">Notes</h3>
+        {/* The finding in full, where the grid's chip only had room for a word.
+            It stops here: the DECISION is recorded on the pay period's
+            worksheet, because a premium is capped at one a day and this screen
+            is per shift — offering it here would be a second writer for a rule
+            whose whole shape is the cap. */}
+        {finding && (
+          <div className="space-y-1 border border-ink bg-mark-fill px-3 py-2 text-sm text-ink">
+            <p className="font-semibold">{MEAL_CODE_LABEL[finding.code]}</p>
+            <p>{finding.detail}</p>
+            {finding.waivable && <p>A signed meal-break waiver would cover this day.</p>}
+            <p className="text-[13px]">
+              Derived from the punches, never stored. Record the decision on the
+              pay period&rsquo;s worksheet.
+            </p>
+          </div>
+        )}
         {row.stitched && (
           <p className="text-sm text-mark">
             Reassembled from segments a source split at midnight.

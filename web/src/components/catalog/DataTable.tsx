@@ -82,8 +82,20 @@ export type DataColumn<T> = {
  *
  * Either way the rows must arrive already grouped, which follows from being
  * sorted by the same column.
+ *
+ * `summary` puts a SUBTOTAL in the band itself (Mark, 2026-08-05, for the
+ * timesheet list's "hour subtotals for each grouping"). In the band rather than
+ * on a closing row beneath each run: the band already exists and already carries
+ * the count, so the totals cost no extra rows, and a table of 56px rows can't
+ * afford one non-data row per group. It receives the run's own rows, so a
+ * caller sums whatever that table's numbers are without the table knowing what
+ * they mean.
  */
-export type DataGroup<T> = { label: (row: T) => string; sortKey?: string };
+export type DataGroup<T> = {
+  label: (row: T) => string;
+  sortKey?: string;
+  summary?: (rows: T[]) => ReactNode;
+};
 
 /**
  * The standard list table: sortable headers, drag-resizable columns persisted
@@ -319,15 +331,19 @@ export function DataTable<T>({
   // caller has no way to know what the sort currently is.
   const banding = group && (!group.sortKey || group.sortKey === sort?.key) ? group : null;
 
-  const groupCounts = useMemo(() => {
-    const counts = new Map<string, number>();
+  // The rows under each band, kept rather than just counted — a `summary` needs
+  // the run itself to total it, and the count is `.length` of the same thing.
+  const groupRows = useMemo(() => {
+    const runs = new Map<string, T[]>();
     if (banding) {
       for (const row of sorted) {
         const label = banding.label(row);
-        counts.set(label, (counts.get(label) ?? 0) + 1);
+        const run = runs.get(label);
+        if (run) run.push(row);
+        else runs.set(label, [row]);
       }
     }
-    return counts;
+    return runs;
   }, [sorted, banding]);
 
   if (rows.length === 0) {
@@ -514,9 +530,18 @@ export function DataTable<T>({
                         colSpan={visibleColumns.length}
                         className="px-3 py-2 text-xs font-semibold tracking-[0.12em] uppercase"
                       >
-                        {label}
-                        <span className="ml-2 font-normal tracking-normal text-white/55 normal-case">
-                          {groupCounts.get(label) ?? 0}
+                        <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+                          <span>
+                            {label}
+                            <span className="ml-2 font-normal tracking-normal text-white/55 normal-case">
+                              {groupRows.get(label)?.length ?? 0}
+                            </span>
+                          </span>
+                          {banding?.summary && (
+                            <span className="font-normal tracking-normal text-white/75 normal-case">
+                              {banding.summary(groupRows.get(label) ?? [])}
+                            </span>
+                          )}
                         </span>
                       </td>
                     </tr>

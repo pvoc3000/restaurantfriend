@@ -87,6 +87,12 @@ export default async function ImportTimesheetsPage() {
         periods={periods}
         locations={locations}
         orgId={session.membership.org_id}
+        // So the screen can OFFER to open the period a file needs instead of
+        // stating that none covers it and leaving you to go and find the other
+        // screen (Mark, 2026-08-05). The cadence still comes from
+        // `nextPeriodAfter` / `periodContaining`, which stay the one place that
+        // arithmetic lives — 016's `nextDeliveryDate` trap.
+        payrollSettings={session.orgSettings.payroll}
         // Punches are wall times in the file and instants in the database. The
         // ORG's zone converts them; the browser's would be wrong for anyone
         // travelling, and the server's would be wrong on a UTC host.

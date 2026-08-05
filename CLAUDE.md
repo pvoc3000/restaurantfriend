@@ -1173,6 +1173,73 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    rate Gusto actually pays `missed_break_hours` at**; if it ever disagrees with
    the base rate, the fallback is `custom_earning_premium` in dollars, and
    because this is a described format that switch is configuration.
+   **Reworked 2026-08-05 from Mark's first real test pass** (16 comments). Two
+   were bugs; the rest were the module not saying what it already knew.
+   **THE BREAK RULES COULD NOT SEE IMPORTED DATA.** `toBreakShift` read the meal
+   punches out of `source_payload` as `break_start` / `break_end` / `time_in` —
+   FileMaker's spelling, written by `transform-timesheets.mjs` — while the
+   Homebase importer spread its own row shape and got `breakStart` / `breakEnd`
+   / `clockInTime`. So on every IMPORTED shift the punches read as null, it fell
+   through to `unpaid_break_minutes`, and **`late_meal` could never fire at all**
+   while a missed meal was inferred from the absence of a deduction (Mark:
+   "missed break not flagged by app… what about late breaks?"). The reader now
+   accepts BOTH spellings — which is what makes the fortnight already imported
+   work with no backfill and no re-import — and the importer writes the canonical
+   snake_case names beside the raw row, so the two sources stop drifting. That
+   also fixes the row expansion, which reads the same keys and had shown em
+   dashes for every imported shift.
+   Measured on the real 07/06–07/19 fortnight: **61 late meals found where the
+   rule had been structurally silent**, against FileMaker's own
+   `cTimeSheetError` flagging 49 Late Break on the same 163 rows — the extras are
+   overnight shifts, where FMP's wall-clock arithmetic goes wrong and ours
+   doesn't. 14 fixtures run one shift through both spellings; checked by
+   reverting the fix, 8 go red and a late meal degrades to "no meal", which is
+   exactly the symptom.
+   **A grouping now always bands.** `DataTable` bands a run of like-labelled
+   rows, so it can only band what the ORDER already groups; the list passed
+   `sortKey`, so picking Day while the sort was Employee produced no band at all
+   and grouping looked broken. The group is now the PRIMARY sort with the chosen
+   column sorting WITHIN each run — which is what a grouped report is — so every
+   grouping bands, Shop included (new). `DataGroup` gained **`summary`**: hour
+   subtotals rendered IN the band rather than on a closing row, because the band
+   already exists and already carries the count, and a table of 56px rows cannot
+   afford one non-data row per group. Verified summing exactly to the period
+   totals.
+   **The cells now say what the app knows.** Columns are Regular · OT · Double ·
+   Break · Worked (Mark's order — the three figures that sum to Worked, then what
+   was deducted to get there, then the total), with a new **Shift** column after
+   Shop carrying `position`. A `≠` chip on an hours cell names our recomputed
+   figure beside the stored one, because "the app disagrees with 5 rows" had
+   lived only behind a tab and a row expansion; the OT cells carry
+   `proposeOvertime`'s own `reasons` as a tooltip; the Break cell carries the
+   meal finding. All yellow, none red — a disagreement is work for a human, not
+   an error. Adding a column cost every other one width, so all twelve were
+   rebalanced to 1402 and the labels checked for clipping in the browser; the
+   widths key is **v2**.
+   **Break reads in HOURS**, the column staying `unpaid_break_minutes`.
+   `InlineValue` gained **`scale`** for it — a stored-vs-shown unit pair
+   converting on BOTH read and write, where `format` is display-only and would
+   have put 30 in the box the moment you clicked a cell reading 0.50.
+   **`NewShift`** is the module's first write that isn't an import: a worked
+   shift nobody punched, or paid time that produced none (028's `adjustment`
+   kind), which is where a **sick day** finally lands — `sick_hours` had been
+   editable only on a shift the person had also worked, which is backwards. It
+   writes no overtime split and never touches `source_*`: there was no source,
+   and the list's recompute argues with it out loud instead. A reason is
+   required, like every other decision in this module.
+   Also: **Import time sheets** is a button on both screens (it had been a link
+   inside a paragraph); the importer OFFERS to open the period a file needs,
+   continuing the cadence from `nextPeriodAfter` rather than wrapping the file's
+   dates, where it used to state that none covered them and stop; the rows-with-
+   no-punches list is one collapsed line, because those rows are the NORMAL case
+   — Homebase prints one for every scheduled day — and ten warnings in front of
+   someone whose file is perfect teaches them to skim the section that also holds
+   the real failures; and **"fortnight" is "pay period"** in every visible
+   string.
+   Known and NOT a bug: 90 meal findings on that fortnight's 163 shifts reads as
+   a lot, and 28 of the 31 no-meal days would be covered by a signed waiver. Zero
+   waivers are loaded — FMP keeps them in its Events table, never migrated —
+   which is the same data gap already recorded under phase 5.
 4d. 🚧 **Invoices** — the third module, and the one that finishes the purchasing
    loop (Mark, 2026-08-04, after using the receiving screen: "this reconcile PO
    workflow is new to me and I love it… Every time we upload an invoice to a

@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canRunPayroll } from "@/lib/roles";
@@ -53,15 +55,29 @@ export default async function PayPeriodsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Pay Periods
-        </h1>
-        <p className="max-w-[72ch] text-sm text-muted">
-          Every fortnight payroll has run for. A timesheet can only be edited
-          while its period is open or in review — once the file has been
-          produced, the record stops moving.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Pay Periods
+          </h1>
+          <p className="max-w-[72ch] text-sm text-muted">
+            Every pay period payroll has run for. A timesheet can only be edited
+            while its period is open or in review — once the file has been
+            produced, the record stops moving.
+          </p>
+        </div>
+        {/* Here as well as on /time-sheets (Mark, 2026-08-05: "should be on pay
+            periods as well shouldn't it?"). It should: opening the period and
+            filling it are one errand, and this is the screen you are on when
+            you have just opened one. */}
+        {canRunPayroll(session.membership.role) && (
+          <Link
+            href="/time-sheets/import"
+            className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
+          >
+            Import time sheets
+          </Link>
+        )}
       </div>
 
       <PayPeriodsList

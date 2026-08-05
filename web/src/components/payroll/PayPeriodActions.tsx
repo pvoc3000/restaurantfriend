@@ -192,7 +192,7 @@ export function PayPeriodActions({
             <p className="max-w-[60ch] text-sm text-muted">
               If payroll has already RUN, don&rsquo;t reopen. Close the period
               instead and make the correction as an adjustment in the current
-              open one, so the fortnight Gusto paid keeps saying what was paid.
+              open one, so the period Gusto paid keeps saying what was paid.
             </p>
             <label className="block space-y-1.5">
               <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
@@ -201,7 +201,7 @@ export function PayPeriodActions({
               <TextInput
                 value={reason}
                 onValueChange={setReason}
-                placeholder="Homebase re-sent the fortnight with three corrected shifts"
+                placeholder="Homebase re-sent the period with three corrected shifts"
                 aria-label="Reason for reopening"
                 clearLabel="Clear the reason"
                 className="h-9 w-full text-sm"

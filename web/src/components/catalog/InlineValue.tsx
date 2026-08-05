@@ -95,6 +95,7 @@ export function InlineValue({
   jsonPath,
   jsonDocument,
   match,
+  scale,
 }: {
   table: string;
   /** The row's uuid — the identity of every table in the catalog. Omit it only
@@ -148,6 +149,22 @@ export function InlineValue({
    * keeps this correct the day someone belongs to two orgs.
    */
   match?: Record<string, string>;
+  /**
+   * A column STORED in one unit and read in another.
+   *
+   * `format` is display-only and editing deliberately shows the raw value, which
+   * is right for money but wrong for a unit change: showing 0.50 at rest and
+   * putting 30 in the box the moment you click it invites someone to type an
+   * hour figure into a minutes column. `scale` converts BOTH ways, so the cell
+   * is honestly in the reader's unit end to end and the database keeps its own.
+   *
+   * Built for `timesheets.unpaid_break_minutes`, which is minutes in the schema
+   * and has to read as hours beside Regular / OT / Worked (Mark, 2026-08-05:
+   * "break times should be in fractions of an hour instead of minutes to fit
+   * with hours worked"). Null passes through untouched at both ends — an empty
+   * cell has no unit.
+   */
+  scale?: { toShown: (stored: number) => number; toStored: (shown: number) => number };
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -158,8 +175,12 @@ export function InlineValue({
 
   // The draft only exists while editing — seeded on open, discarded on close —
   // so a fresh server value after router.refresh() needs no re-sync effect.
+  // What the reader sees and types. Identical to `value` unless `scale` is set.
+  const shown =
+    scale && typeof value === "number" && Number.isFinite(value) ? scale.toShown(value) : value;
+
   function open() {
-    setDraft(value === null ? "" : String(value));
+    setDraft(shown === null ? "" : String(shown));
     setError(null);
     setEditing(true);
   }
@@ -179,7 +200,8 @@ export function InlineValue({
         setError(looksLikeExpression(trimmed) ? "can't work that out" : "not a number");
         return;
       }
-      next = value;
+      // Back into the column's own unit before anything is compared or written.
+      next = scale ? scale.toStored(value) : value;
     } else {
       next = trimmed;
     }
@@ -336,13 +358,13 @@ export function InlineValue({
       // Dotted underline at rest — the quietest possible "this is editable".
       className={`w-full px-1 py-0.5 underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 ${
         align === "right" ? "text-right tabular-nums" : "text-left"
-      } ${value === null || value === "" ? "text-faint" : ""} ${className}`}
+      } ${shown === null || shown === "" ? "text-faint" : ""} ${className}`}
     >
-      {value === null || value === ""
+      {shown === null || shown === ""
         ? placeholder
         : format
-          ? format(value)
-          : String(value)}
+          ? format(shown)
+          : String(shown)}
     </button>
   );
 }

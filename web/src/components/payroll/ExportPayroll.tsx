@@ -257,7 +257,7 @@ export function ExportPayroll({
           ))}
           <p className="text-[13px]">
             None of this blocks the export. Gate it on a complete set and the
-            fortnight with one missing clock-out never exports, which is how a
+            period with one missing clock-out never exports, which is how a
             status stops meaning anything.
           </p>
         </div>

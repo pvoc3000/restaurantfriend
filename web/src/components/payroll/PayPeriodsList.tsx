@@ -272,7 +272,7 @@ export function PayPeriodsList({
             {rows.length === 0
               ? "No pay periods yet. Open the first one to start recording hours."
               : filter === "current"
-                ? "No period is open. Payroll has nowhere to record hours until you open the next fortnight."
+                ? "No period is open. Payroll has nowhere to record hours until you open the next pay period."
                 : "No pay periods match that filter."}
           </p>
         }

@@ -9,7 +9,15 @@ import { PickList } from "@/components/ui/PickList";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { planImport, type ImportPlan, type ParsedShift } from "@/lib/homebaseImport";
 import { resolveLocal } from "@/lib/timeZone";
-import { formatPeriodRange, type PayPeriodStatus } from "@/lib/payPeriods";
+import {
+  formatPeriodRange,
+  nextPeriodAfter,
+  overlapsAny,
+  payrollSettings as readPayrollSettings,
+  periodContaining,
+  type PayPeriodStatus,
+  type PeriodRange,
+} from "@/lib/payPeriods";
 
 const BUTTON =
   "inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
@@ -52,12 +60,15 @@ export function ImportTimesheets({
   locations,
   orgId,
   timeZone,
+  payrollSettings: rawPayrollSettings,
 }: {
   employees: ImportEmployee[];
   periods: ImportPeriod[];
   locations: { id: string; code: string }[];
   orgId: string;
   timeZone: string;
+  /** `orgs.settings.payroll` — the cadence, for proposing a missing period. */
+  payrollSettings?: unknown;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -150,6 +161,68 @@ export function ImportTimesheets({
   const blockedPeriods = targetPeriods.filter(
     (p) => p.status !== "open" && p.status !== "review"
   );
+
+  /**
+   * The period this file needs, when none exists yet.
+   *
+   * Blocking with "no pay period covers these dates" and no way forward was a
+   * dead end (Mark, 2026-08-05, asking whether creating one manually is even
+   * necessary). It stays a pay_periods row rather than something the import
+   * conjures implicitly — the boundary is org configuration (design rule 2) and
+   * `nextPeriodAfter` owns the arithmetic — but the screen can now propose it
+   * and open it for you, which is the whole of what was missing.
+   *
+   * The proposal CONTINUES THE CADENCE rather than wrapping the file's dates: it
+   * steps forward from the last period that exists until one covers the file's
+   * earliest workday, so importing an out-of-sequence export can't quietly
+   * invent a period that leaves a gap behind it.
+   */
+  const settings = useMemo(() => readPayrollSettings(rawPayrollSettings), [rawPayrollSettings]);
+
+  const proposedPeriod: PeriodRange | null = useMemo(() => {
+    if (!plan || plan.shifts.length === 0 || targetPeriods.length > 0) return null;
+    const earliest = plan.shifts.map((s) => s.workday).sort()[0];
+    if (!earliest) return null;
+
+    const last = periods.reduce<ImportPeriod | null>(
+      (best, p) => (best === null || p.end_date > best.end_date ? p : best),
+      null
+    );
+    if (!last) return periodContaining(earliest, settings);
+    // Bounded: a file more than ~4 years past the last period is not something
+    // to walk a loop over, and proposing nothing is the honest answer there.
+    let range = nextPeriodAfter(last.end_date, settings);
+    for (let i = 0; i < 120 && range.end_date < earliest; i++) {
+      range = nextPeriodAfter(range.end_date, settings);
+    }
+    if (earliest < range.start_date || earliest > range.end_date) return null;
+    return overlapsAny(range, periods) ? null : range;
+  }, [plan, targetPeriods, periods, settings]);
+
+  const [openingPeriod, setOpeningPeriod] = useState(false);
+
+  function openProposedPeriod() {
+    if (!proposedPeriod || openingPeriod) return;
+    setOpeningPeriod(true);
+    setError(null);
+    startTransition(async () => {
+      const { data, error: e } = await supabase
+        .from("pay_periods")
+        .insert({ ...proposedPeriod, status: "open" })
+        .select("id");
+      setOpeningPeriod(false);
+      if (e || !data || data.length === 0) {
+        setError(
+          e?.message ??
+            "The pay period was not created — opening one is a manager's write."
+        );
+        return;
+      }
+      // The plan is held in state and the periods come from the server, so the
+      // refresh is what lets the blocked section resolve itself.
+      router.refresh();
+    });
+  }
 
   const canCommit =
     plan !== null &&
@@ -254,6 +327,24 @@ export function ImportTimesheets({
             source_row_key: natural,
             source_payload: {
               ...s.source,
+              // THE CANONICAL SPELLING, beside the raw row.
+              //
+              // `payrollWorksheet.toBreakShift` reads the meal punches out of
+              // this object, and the FileMaker loader writes them as
+              // `break_start` / `break_end` / `time_in`. Spreading `s.source`
+              // alone gave them Homebase's camelCase names, so the break rules
+              // saw no punches on any imported shift: `late_meal` could never
+              // fire, and a missed meal was inferred from the deduction alone
+              // (Mark, 2026-08-05). The reader tolerates both spellings so the
+              // fortnight already imported works, but writing the canonical
+              // names is what stops the two sources drifting again.
+              time_in: s.source.clockInTime,
+              time_out: s.source.clockOutTime,
+              break_start: s.source.breakStart,
+              break_end: s.source.breakEnd,
+              date_start: s.source.clockInDate,
+              date_end: s.source.clockOutDate,
+              import_source: "homebase",
               matched_via: m.via,
               ...(inAt.ambiguity !== "none" ? { local_time_ambiguity: inAt.ambiguity } : {}),
             },
@@ -389,10 +480,35 @@ export function ImportTimesheets({
           <section className="space-y-3">
             <SectionHeading>Where it lands</SectionHeading>
             {targetPeriods.length === 0 ? (
-              <p className="border border-accent px-4 py-3 text-sm text-accent">
-                No pay period covers these dates. Open one first, or these shifts
-                would have nowhere to belong.
-              </p>
+              <div className="space-y-3 border border-accent px-4 py-3">
+                <p className="max-w-[72ch] text-sm text-accent">
+                  No pay period covers these dates, so these shifts would have
+                  nowhere to belong.
+                </p>
+                {proposedPeriod ? (
+                  <div className="flex flex-wrap items-center gap-4">
+                    <button
+                      type="button"
+                      onClick={openProposedPeriod}
+                      disabled={pending || openingPeriod}
+                      className={BUTTON}
+                    >
+                      {openingPeriod ? "Opening…" : `Open ${formatPeriodRange(proposedPeriod)}`}
+                    </button>
+                    <span className="text-sm text-muted tabular-nums">
+                      {proposedPeriod.start_date} → {proposedPeriod.end_date}, continuing
+                      the payroll calendar.
+                    </span>
+                  </div>
+                ) : (
+                  <p className="max-w-[72ch] text-sm text-muted">
+                    These dates don&rsquo;t sit on the next period in the
+                    sequence, so opening one here would leave a gap or an
+                    overlap. Open it on the Pay Periods screen, where both dates
+                    are editable.
+                  </p>
+                )}
+              </div>
             ) : (
               <ul className="space-y-1 text-sm">
                 {targetPeriods.map((p) => (
@@ -411,7 +527,7 @@ export function ImportTimesheets({
             )}
             {blockedPeriods.length > 0 && (
               <p className="max-w-[72ch] border border-accent px-4 py-3 text-sm text-accent">
-                This file covers a fortnight that is no longer open. Importing it
+                This file covers a pay period that is no longer open. Importing it
                 would silently write nothing — the database refuses the rows and
                 reports no error — so the commit is blocked instead.
               </p>
@@ -451,16 +567,27 @@ export function ImportTimesheets({
             </section>
           )}
 
+          {/* ONE LINE, not a list (Mark, 2026-08-05: "all the warning text when
+              importing says a lot of shifts with no punch in - seems like
+              noise"). He is right, and the noise was self-inflicted: these rows
+              are the NORMAL case — Homebase prints a row for every scheduled
+              day whether or not anybody punched, and the ten in a real DF01
+              fortnight are mostly salaried people who never punch at all.
+              Giving each one its own line put ten warnings in front of someone
+              whose file was perfect, which teaches them to skim the section
+              that also holds the rows that genuinely failed.
+
+              So it states the count and hides the detail behind a disclosure.
+              Nothing is dropped — the report written to `timesheet_imports`
+              still carries every row — it just stops shouting. */}
           {plan.skipped.length > 0 && (
-            <section className="space-y-3">
-              <SectionHeading count={plan.skipped.length}>Rows with nothing on them</SectionHeading>
-              <p className="max-w-[72ch] text-sm text-muted">
-                Homebase prints a row for a scheduled day even when nobody
-                punched. These are read correctly and hold no shift, so there is
-                nothing to import from them — they are listed here rather than
-                among the failures, which they are not.
-              </p>
-              <ul className="space-y-1 text-sm text-muted">
+            <details className="border border-hairline px-4 py-3">
+              <summary className="cursor-pointer text-sm text-muted marker:text-faint">
+                {plan.skipped.length} scheduled{" "}
+                {plan.skipped.length === 1 ? "day holds" : "days hold"} no punches
+                — nothing to import from {plan.skipped.length === 1 ? "it" : "them"}.
+              </summary>
+              <ul className="mt-2 space-y-1 text-sm text-muted">
                 {plan.skipped.map((r) => (
                   <li key={`${r.line}-${r.name}`}>
                     <span className="tabular-nums">line {r.line}</span> · {r.name}
@@ -468,7 +595,7 @@ export function ImportTimesheets({
                   </li>
                 ))}
               </ul>
-            </section>
+            </details>
           )}
 
           {plan.refused.length > 0 && (

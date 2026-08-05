@@ -97,7 +97,7 @@ export default async function TimeSheetsPage({
     periodId = (newest?.[0]?.pay_period_id as string | undefined) ?? periods[0].id;
   }
 
-  const [{ data: sheets, error }, { data: employees }] = await Promise.all([
+  const [{ data: sheets, error }, { data: employees }, { data: waiverRows }] = await Promise.all([
     supabase
       .from("timesheets")
       .select(
@@ -115,6 +115,11 @@ export default async function TimeSheetsPage({
     // embed: the same employee appears on ~20 shifts a fortnight, and embedding
     // would send their row twenty times.
     supabase.from("employees").select("id, first_name, last_name, excludes_tips"),
+    // The signed meal-break waivers. They change the ANSWER the break rules
+    // give, not just how it's presented — a waived meal on a six-hour day owes
+    // nothing at all. Returns zero rows today: FMP keeps its 51 waivers in the
+    // Events table, which has never been migrated.
+    supabase.from("employee_documents").select("employee_id").eq("kind", "meal_break_waiver"),
   ]);
 
   if (error) {
@@ -174,21 +179,25 @@ export default async function TimeSheetsPage({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Time Sheets
-        </h1>
-        <p className="max-w-[72ch] text-sm text-muted">
-          Every shift in one pay period. What the source said is kept beside what
-          we decided — open a row to see both, and why they differ.{" "}
-          <Link
-            href="/time-sheets/import"
-            className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-          >
-            Import a Homebase export
-          </Link>
-          .
-        </p>
+      {/* A COMMAND, not a sentence with a link in it (Mark, 2026-08-05: "No
+          'Import Timesheets' button on Timesheets"). Importing is the main way
+          rows get here, and it was reachable only by reading a paragraph. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Time Sheets
+          </h1>
+          <p className="max-w-[72ch] text-sm text-muted">
+            Every shift in one pay period. What the source said is kept beside
+            what we decided — open a row to see both, and why they differ.
+          </p>
+        </div>
+        <Link
+          href="/time-sheets/import"
+          className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
+        >
+          Import time sheets
+        </Link>
       </div>
 
       <TimesheetsList
@@ -199,6 +208,14 @@ export default async function TimeSheetsPage({
         // The org's zone, not the server's: a punch is an instant, and reading
         // one back on a UTC host would show every shift seven hours out.
         timeZone={session.orgSettings.timezone ?? "UTC"}
+        waiverEmployeeIds={(waiverRows ?? []).map((w) => w.employee_id as string)}
+        employees={[...employeeById.entries()]
+          .map(([id, e]) => ({ id, name: e.name }))
+          .sort((a, b) => (a.name < b.name ? -1 : 1))}
+        // ACTIVE locations only: this enumerates somewhere to put a new shift,
+        // and a closed shop is not one (design rule 3).
+        locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
+        orgId={session.membership.org_id}
       />
     </div>
   );

@@ -3,6 +3,7 @@
 // Importing a fixtures file registers its cases; runAll then runs them and
 // exits non-zero on the first failure it reports.
 
+import "./breakPunches.fixtures";
 import "./breakRules.fixtures";
 import "./columnOrder.fixtures";
 import "./columnVisibility.fixtures";
