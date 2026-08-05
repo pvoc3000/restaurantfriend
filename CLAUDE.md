@@ -1026,8 +1026,90 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    shows the export is **one row per (employee, WAGE TYPE)**, not per employee —
    tips and premiums ride the `(Primary)` row while hours split across rate
    cards — which `gustoExport.ts` has to model. Not built.
-   Next: phase 3 (the importer, now unblocked — but see the premise correction
-   above), phase 4 (`overtime.ts`), phase 5 (break rules + tip pooling).
+   **Shipped 2026-08-04, phases 3, 4 and 5 — migrations 029 + 030, both
+   APPLIED.** (Mark ran 030 before 029; they are independent — 029 references
+   only 027/028, 030 only 018's storage helper and 028 — and both verified
+   afterwards.)
+   **Phase 4, `lib/overtime.ts`** — CA daily (>8 at 1.5×, >12 at 2×), weekly
+   (>40) and the seventh-consecutive-day rule. **DAILY AND WEEKLY DO NOT
+   STACK**, and that is the rule a rewrite is most likely to break silently:
+   five 9h days is 45 hours and owes FIVE overtime hours, not ten. The weekly
+   pass looks only at hours still REGULAR after the daily pass, which is what
+   enforces it. A workday's answer is poured back over its shifts
+   chronologically, so a day holding two shifts gets ONE decision and it lands
+   on the shift that ran late. Seventh-day counts DAYS WORKED, not calendar days
+   with rows.
+   **`EPSILON` is 0.015 and that is a MEASUREMENT, not a taste.** Over all
+   44,537 real shifts: at a half-cent tolerance 4,388 rows (9.9%) disagree with
+   the source; at more than one cent, 267 (0.6%). The 4,121 difference is
+   rounding convention — ours is exact from instants, the source's is its own
+   rounded decimal — and a 9.9% disagreement rate is the same as flagging
+   nothing. 239 of the surviving 267 are a real movement between buckets.
+   Totals: overtime ours 5,071.57h vs source 4,911.62h, double-time 264.62 vs
+   165.70. **Only 5 seventh-day shifts exist in seven years and FileMaker
+   applied the rule to none of them.**
+   The adjudication UI is the receiving screen's idiom — nothing prefills, and
+   both buttons are a decision: Adopt writes `ot_decision='recomputed'`, Keep
+   writes `'manual'` with a REQUIRED reason (leaving it `'source'` would say
+   nobody had looked). The "needs review" queue compares against `hours_*`, NOT
+   `source_hours_*`, or a row already adjudicated to disagree with its source
+   would never leave the queue.
+   **Phase 5, migration 029** — `break_premiums` unique
+   `(org_id, employee_id, workday, kind)`, which IS the California one-per-day
+   cap; `reason` NOT NULL and non-empty; HOURS never dollars. `tip_pools` keeps
+   the reported AND corrected figure and works in integer CENTS throughout,
+   because the allocations must sum to the pool exactly or the shop pays out
+   more or less than Square collected every day. `report_pooled_tips` is a
+   definer function so a supervisor can write ONE column (RLS filters rows, not
+   columns); `freeze_pay_period` validates a client-computed payload and commits
+   it, because reimplementing the allocator in PL/pgSQL would be 016's
+   `nextDeliveryDate` trap.
+   `lib/breakRules` assesses the WORKDAY and returns at most one meal finding —
+   the cap as the function's shape. It NEVER returns a rest finding: a rest
+   break is paid, leaves no punch, and anything derived from shift length would
+   flag nearly every shift.
+   **Diffed against FileMaker's own `cTimeSheetError` over 44,284
+   employee-workdays** — the reference the brief said didn't exist: both flag
+   10,078 (same KIND on 9,911, 98.3%), neither flags 26,491, only FileMaker 24
+   (all on days under 5h that need no meal at all), only us 7,691 — 82.6%
+   agreement. **The excess is a DATA GAP, not a rule bug: 6,374 of the 6,562
+   excess no-meal days are six hours or less, exactly what a signed waiver
+   covers, and ZERO waivers are loaded** because FMP keeps them in its Events
+   table, which was never migrated. Loading them is the fix; nothing in this
+   module pays anybody meanwhile.
+   **Phase 3, migration 030 + `lib/homebaseImport.ts` + `/time-sheets/import`.**
+   Drop → plan → commit, with NOTHING WRITTEN BEFORE COMMIT, and a commit into a
+   closed period BLOCKED rather than left to fail silently. The parser is pinned
+   against an ACTUAL SLICE of the DF01 export (`scripts/fixtures/data/`),
+   preamble and totals rows and hyphen separators intact — a tidied-up imitation
+   passed the first version, which imported the separators as a person called
+   "-" with eighteen shifts. Two further classification bugs the real file
+   found: a bare `Totals` grand-total row (every block ends `Totals for <name>`,
+   the FILE ends `Totals`), and ten rows carrying a date with NO punches — a
+   scheduled day nobody clocked in for, which are read perfectly and hold
+   nothing, so they are listed apart from the failures. Every row of the real
+   file is now accounted for: 102 shifts + 10 empty + 17 repeated headers + 19
+   totals + 18 separators + 18 blank = 184, zero refusals.
+   **The idempotency key was tested reversibly against the live database** — a
+   throwaway open period, one row imported, the same row re-imported with a
+   changed figure, one row in the table with the value updated, FileMaker's
+   44,721 untouched, then everything deleted leaving 44,721 timesheets and 178
+   periods exactly as found. That is the case that matters: Homebase emits no
+   shift id and a fortnight is re-exported whenever somebody fixes a punch.
+   **393 fixtures pass**, and every rule above was checked by BREAKING it. Two
+   fixture gaps were found that way rather than by reading: the
+   one-premium-per-day case only asserted "at most one finding" (which the
+   function's shape guarantees anyway), and the zero-hour-day guard put its
+   empty day last, where `splitDay`'s own guard hides the bug. Both rewritten
+   and both now fail correctly.
+   **What remains is phase 6, the Gusto export, and it needs ONE DECISION from
+   Mark**: the template has a native `missed_break_hours` column, so a premium
+   CAN export as hours (decision 1 holds) — but the current FileMaker export
+   puts premiums in `custom_earning_premium` as DOLLARS (16–26, matching
+   `ts_Premium_Pay`). The template also shows the export is **one row per
+   (employee, WAGE TYPE)**, not per employee: hours split across rate cards
+   while tips and premiums ride the `(Primary)` row. Then phase 7's parallel
+   run, which `docs/master-plan.md` already requires.
 4d. 🚧 **Invoices** — the third module, and the one that finishes the purchasing
    loop (Mark, 2026-08-04, after using the receiving screen: "this reconcile PO
    workflow is new to me and I love it… Every time we upload an invoice to a
@@ -1220,8 +1302,15 @@ LOADED: 445 rows, 26 active / 2 new hire / 417 inactive, matching the transform
 report, with Mark's row linked to his auth account. 022 verified 2026-08-02 by
 inserting an `orientation` document and removing it again — the constraint
 accepts the value, so the widened check is live.
-**027 and 028 are APPLIED** (Mark, 2026-08-04) and both loads have run — 178
-pay periods and 44,721 timesheets. Probe with `select count(*) from
+**027, 028, 029 and 030 are ALL APPLIED** (Mark, 2026-08-04) and both loads
+have run — 178 pay periods and 44,721 timesheets. For 029/030 probe
+`select count(*) from break_premiums`, `from tip_pools`, `from
+timesheet_imports`, and check the `timesheet-imports` bucket exists and is
+PRIVATE. Note `report_pooled_tips` answers "Not your organisation" to a
+service_role probe — that is migration 014's footgun, not a fault: the function
+resolves `user_org_ids()` from `auth.uid()`, which service_role has none of.
+Test it from a signed-in session.
+**027 and 028** were applied earlier the same day. Probe with `select count(*) from
 pay_periods` (178) and `select count(*) from timesheets` (44,721); for 028's
 period gate, `select public.timesheet_period_editable(id), status from
 pay_periods order by start_date desc limit 3` — false on every closed one.
