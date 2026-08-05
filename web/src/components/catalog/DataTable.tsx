@@ -222,9 +222,25 @@ export function DataTable<T>({
   useScrollMemory(scroll ? `pane:${pathname}:${storageKey}` : "", paneRef);
   // Only the unpaned case: a pane is a scroll container on purpose, and its
   // header sticks to the pane rather than to the masthead.
-  useOverflowOnlyWhenNeeded(paneRef, !scroll);
-  // A pane ends where the window does, unless the caller named a height.
-  useFillViewportHeight(paneRef, scroll && !maxHeightClass);
+  //
+  // `rows.length > 0` is load-bearing, not a micro-optimisation. An empty table
+  // returns before the pane is rendered at all (see the early return below), so
+  // the layout effect measures a NULL ref and gives up — and its deps are only
+  // [ref, enabled], so when rows arrive later it never runs again. The wrapper
+  // then keeps its pre-JS `overflow-x-auto`, which the last column's resize grip
+  // overhangs by 6px, which makes it a scroll container, which pushes the sticky
+  // labels 64px DOWN — under the rows they label.
+  //
+  // Found on /pay-periods, whose default filter is legitimately empty until
+  // someone opens a fortnight: land on it, click All, and the header paints over
+  // the first row. No existing list defaults to an empty filter, which is the
+  // only reason this had never shown. Flipping `enabled` false → true when the
+  // first row appears is what re-runs the measurement.
+  useOverflowOnlyWhenNeeded(paneRef, !scroll && rows.length > 0);
+  // A pane ends where the window does, unless the caller named a height. Same
+  // hazard, same guard: a paned table that starts empty would otherwise keep
+  // whatever height it first computed against a pane that wasn't there.
+  useFillViewportHeight(paneRef, scroll && !maxHeightClass && rows.length > 0);
 
   // COMPACT: below `compactBelow` the marked columns come out, so the table
   // narrows enough to fit — which is what lets its labels stick. A threshold of

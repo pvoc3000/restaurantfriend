@@ -92,7 +92,17 @@ export const SECTIONS: NavSection[] = [
       stub("hr", "team-events", "Team Events"),
       stub("hr", "team-ratings", "Team Ratings"),
       stub("hr", "team-reviews", "Team Reviews"),
-      stub("hr", "pay-periods", "Pay Periods"),
+      {
+        slug: "pay-periods",
+        label: "Pay Periods",
+        href: "/pay-periods",
+        built: true,
+        // NOT role-gated, unlike Employees. Migration 027 makes pay_periods
+        // readable by any member on purpose — a period is two dates and a
+        // status, and a supervisor reporting Saturday's tips has to know which
+        // fortnight is open. Writing one is owner/admin, which the screen
+        // itself gates.
+      },
       stub("hr", "time-sheets", "Time Sheets"),
     ],
   },

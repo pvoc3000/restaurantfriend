@@ -82,3 +82,24 @@ export const canReadHr = canManageMembers;
  * and one of them will move first.
  */
 export const canApprovePayment = canManageMembers;
+
+/**
+ * Run payroll — read and correct timesheets, adjudicate break premiums and
+ * overtime, produce the export. Migration 028's policies, which are owner/admin
+ * on EVERY verb including select.
+ *
+ * That read gate is unusual in this schema, where reads are almost always
+ * membership-only, and it follows 020's reasoning about `employees`: what a
+ * named person was paid for is the same class of fact as their home address.
+ * Migration 027's `pay_periods` is deliberately NOT gated this way — a period
+ * is two dates and a status, and a supervisor reporting Saturday's tips has to
+ * know which fortnight is open.
+ *
+ * The same set as `canReadHr` today, and named separately for the reason that
+ * one already gives: "may read a home address" and "may see what someone was
+ * paid" are different questions with the same answer today, and one of them
+ * will move first. Loosening this for supervisors later is a definer function
+ * naming safe columns — 020's own comment anticipates it — never a policy
+ * change.
+ */
+export const canRunPayroll = canManageMembers;

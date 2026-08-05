@@ -13,6 +13,7 @@ import "./invoiceDate.fixtures";
 import "./invoiceMatch.fixtures";
 import "./invoices.fixtures";
 import "./packLabel.fixtures";
+import "./payPeriods.fixtures";
 import "./poFilters.fixtures";
 import "./receiving.fixtures";
 import "./tableSort.fixtures";
