@@ -1102,14 +1102,40 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    function's shape guarantees anyway), and the zero-hour-day guard put its
    empty day last, where `splitDay`'s own guard hides the bug. Both rewritten
    and both now fail correctly.
-   **What remains is phase 6, the Gusto export, and it needs ONE DECISION from
-   Mark**: the template has a native `missed_break_hours` column, so a premium
-   CAN export as hours (decision 1 holds) — but the current FileMaker export
-   puts premiums in `custom_earning_premium` as DOLLARS (16–26, matching
-   `ts_Premium_Pay`). The template also shows the export is **one row per
-   (employee, WAGE TYPE)**, not per employee: hours split across rate cards
-   while tips and premiums ride the `(Primary)` row. Then phase 7's parallel
-   run, which `docs/master-plan.md` already requires.
+   **What remains is phase 6, the Gusto export.** Its FILE SHAPE is now known
+   exactly, measured over the real template (24 people, 34 rows) and corrected
+   by Mark 2026-08-04 — it is finickier than "one row per employee":
+   - **One row per (employee, WAGE TYPE)**, and hours genuinely split across
+     them: 7 of the 34 rows are non-primary and carry hours.
+   - **The primary job title is IDENTIFIED BY THE SUFFIX `(Primary)`** on the
+     `title` column — it is not a separate flag. Every one of the 24 people has
+     exactly one such row. Getting this wrong doesn't mis-sort the file, it
+     leaves Gusto unable to tell which job is the primary one.
+   - **Every non-hours earning rides the `(Primary)` row and only that row** —
+     `paycheck_tips`, `custom_earning_premium`, `custom_earning_commuter_benefit`,
+     `bonus`, `reimbursement`. Measured: zero violations across the template.
+   - `gusto_employee_id` is in the file (6-char, e.g. `n4smoy`), which is what
+     028's `employees.gusto_id` exists to hold.
+   **Premiums export as HOURS on `missed_break_hours`** (Mark asked for a
+   recommendation, 2026-08-04; he was happy either way). The reasons are
+   decision 1 — dollars means somebody computes dollars, and this module stores
+   no wage rate — plus the fact that Gusto already knows every rate, so a dollar
+   figure would be a second copy of a number we deliberately don't keep, frozen
+   wrong the moment a rate changes retroactively.
+   The *Ferra v. Loews* worry that made the brief hesitate turns out to be
+   **largely theoretical here**: 60 of the 62 premiums FileMaker ever recorded
+   equal that row's base `ts_Rate` exactly, ZERO rows carry an
+   `hourlyBonusRate`, and none of the 20 rate cards actually used on timesheets
+   mentions a bonus. So the regular rate of compensation and the base rate
+   coincide for essentially everyone, and handing Gusto hours gives up no
+   arithmetic. (The brief's "nine rate cards including Morning Bonus" came from
+   the rate-card table, not from what the timesheets use.)
+   **Still worth confirming in the parallel run: what rate Gusto actually pays
+   `missed_break_hours` at.** If it ever disagrees with the base rate, the
+   fallback is `custom_earning_premium` in dollars — and because the export is a
+   DESCRIBED format in `orgs.settings.payroll_export` (design rule 2), that
+   switch is configuration rather than a rewrite.
+   Then phase 7's parallel run, which `docs/master-plan.md` already requires.
 4d. 🚧 **Invoices** — the third module, and the one that finishes the purchasing
    loop (Mark, 2026-08-04, after using the receiving screen: "this reconcile PO
    workflow is new to me and I love it… Every time we upload an invoice to a
