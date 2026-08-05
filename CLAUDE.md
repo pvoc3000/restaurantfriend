@@ -1200,14 +1200,23 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `sortKey`, so picking Day while the sort was Employee produced no band at all
    and grouping looked broken. The group is now the PRIMARY sort with the chosen
    column sorting WITHIN each run — which is what a grouped report is — so every
-   grouping bands, Shop included (new). `DataGroup` gained **`summary`**: hour
-   subtotals rendered IN the band rather than on a closing row, because the band
-   already exists and already carries the count, and a table of 56px rows cannot
-   afford one non-data row per group. Verified summing exactly to the period
-   totals.
-   **The cells now say what the app knows.** Columns are Regular · OT · Double ·
-   Break · Worked (Mark's order — the three figures that sum to Worked, then what
-   was deducted to get there, then the total), with a new **Shift** column after
+   grouping bands, Shop included (new). `DataGroup` gained **`summary`** — hour
+   subtotals, which first went IN the band on the reasoning that a table of 56px
+   rows cannot afford an extra row per group, and were moved the same day to a
+   CLOSING ROW under a rule once Mark used them: "subtotals should be trailing
+   the data, not leading in the header band, and the values should align with
+   their columns." Alignment is the whole argument — a subtotal is a number you
+   check against the column above it, and one set as a sentence in the band has
+   to be re-read to be placed. So `summary` returns a map KEYED BY COLUMN and the
+   table renders one cell per visible column, which keeps each figure under its
+   own heading when a column is hidden or dragged. Verified summing exactly to
+   the period totals (regular/OT/double to the cent; Worked and Break differ
+   ~0.02 from summing the DISPLAYED rows, because the subtotal sums raw and
+   rounds once — the more accurate of the two).
+   **The cells now say what the app knows.** Columns are Worked · Regular · OT ·
+   Double · Break (Mark gave the order twice the same day and the second is what
+   shipped: the total leads, the three figures that make it up follow, and Break
+   — what was deducted to REACH Worked rather than a part of it — sits last), with a new **Shift** column after
    Shop carrying `position`. A `≠` chip on an hours cell names our recomputed
    figure beside the stored one, because "the app disagrees with 5 rows" had
    lived only behind a tab and a row expansion; the OT cells carry
@@ -1215,7 +1224,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    meal finding. All yellow, none red — a disagreement is work for a human, not
    an error. Adding a column cost every other one width, so all twelve were
    rebalanced to 1402 and the labels checked for clipping in the browser; the
-   widths key is **v2**.
+   widths key is **v3**, which covers widths,
+   visibility AND ORDER — a stored order outranks the declared one, so without
+   the bump anyone who already had the table would keep the old arrangement.
    **Break reads in HOURS**, the column staying `unpaid_break_minutes`.
    `InlineValue` gained **`scale`** for it — a stored-vs-shown unit pair
    converting on BOTH read and write, where `format` is display-only and would
@@ -1227,11 +1238,23 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    writes no overtime split and never touches `source_*`: there was no source,
    and the list's recompute argues with it out loud instead. A reason is
    required, like every other decision in this module.
+   **Its button was REMOVED from `/time-sheets` hours later** (Mark, 2026-08-05)
+   and the component now sits on disk with no caller. Restoring it is one JSX
+   block plus the four props the list dropped with it — `employees`, `locations`,
+   `orgId` and the page's roster/active-location mapping. Ask where it belongs
+   before re-placing it, and delete the file if the answer is nowhere.
    Also: **Import time sheets** is a button on both screens (it had been a link
    inside a paragraph); the importer OFFERS to open the period a file needs,
    continuing the cadence from `nextPeriodAfter` rather than wrapping the file's
-   dates, where it used to state that none covered them and stop; the rows-with-
-   no-punches list is one collapsed line, because those rows are the NORMAL case
+   dates, where it used to state that none covered them and stop; the import screen ends with
+   a **black `Done`** at the lower right, OUTSIDE the `plan &&` block so it is
+   there both before a file is dropped and after one is committed — committing
+   clears the plan, so the screen had been leaving you on a success banner with
+   nothing to press. Black is the panel-commit exception rather than a breach of
+   it: importing produces ONE outcome and that row is a commit beside no peers,
+   which is the argument the receiving screen's Complete rests on, reusing the
+   same `DIALOG_COMMIT_CLASS`. The rows-with-no-punches list is one collapsed
+   line, because those rows are the NORMAL case
    — Homebase prints one for every scheduled day — and ten warnings in front of
    someone whose file is perfect teaches them to skim the section that also holds
    the real failures; and **"fortnight" is "pay period"** in every visible

@@ -209,13 +209,6 @@ export default async function TimeSheetsPage({
         // one back on a UTC host would show every shift seven hours out.
         timeZone={session.orgSettings.timezone ?? "UTC"}
         waiverEmployeeIds={(waiverRows ?? []).map((w) => w.employee_id as string)}
-        employees={[...employeeById.entries()]
-          .map(([id, e]) => ({ id, name: e.name }))
-          .sort((a, b) => (a.name < b.name ? -1 : 1))}
-        // ACTIVE locations only: this enumerates somewhere to put a new shift,
-        // and a closed shop is not one (design rule 3).
-        locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
-        orgId={session.membership.org_id}
       />
     </div>
   );

@@ -20,7 +20,6 @@ import {
 import { MEAL_CODE_LABEL, assessWorkday, type BreakFinding } from "@/lib/breakRules";
 import { toBreakShift } from "@/lib/payrollWorksheet";
 import { AdjudicateOvertime } from "./AdjudicateOvertime";
-import { NewShift } from "./NewShift";
 import {
   OT_DECISION_LABEL,
   effectiveExclusion,
@@ -30,10 +29,11 @@ import {
   type OtDecision,
 } from "@/lib/timesheets";
 
-// v2: the column set and its order changed (Mark, 2026-08-05) — Regular · OT ·
-// Double · Break · Worked, with a new Shift column after Shop. v1's widths key
-// the old columns and would leave the new ones unsized.
-const WIDTHS_STORAGE_KEY = "rf.timesheets.columnWidths.v2";
+// v3: the hours columns were reordered to Worked · Regular · OT · Double ·
+// Break (Mark, 2026-08-05). The key covers widths, visibility AND ORDER, and a
+// stored order outranks the declared one — so without the bump anyone who
+// already had this table would keep the previous arrangement and see no change.
+const WIDTHS_STORAGE_KEY = "rf.timesheets.columnWidths.v3";
 
 export type TimesheetRow = {
   id: string;
@@ -141,9 +141,6 @@ export function TimesheetsList({
   canWrite,
   timeZone,
   waiverEmployeeIds,
-  employees,
-  locations,
-  orgId,
 }: {
   rows: TimesheetRow[];
   periods: PeriodOption[];
@@ -155,10 +152,6 @@ export function TimesheetsList({
   /** Who has a signed meal-break waiver on file. It changes the ANSWER, not the
    *  presentation: a waived meal on a six-hour day owes nothing at all. */
   waiverEmployeeIds: string[];
-  /** The roster, for adding a shift by hand. */
-  employees: { id: string; name: string }[];
-  locations: { id: string; code: string }[];
-  orgId: string;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -324,14 +317,13 @@ export function TimesheetsList({
   }, [sorted, breakFindings]);
 
   /**
-   * The band, with the run's hours in it (Mark, 2026-08-05: "hour subtotals for
-   * each grouping").
+   * The run's hours, on a closing row beneath it (Mark, 2026-08-05: "subtotals
+   * should be trailing the data… and the values should align with their
+   * columns"). Keyed by column, so each figure lands under the column it sums
+   * and stays there when a column is hidden or dragged.
    *
    * No `sortKey`: the group is already the primary sort, so every grouping bands
-   * whatever column you then sort within it by. Regular · OT · Double · Worked,
-   * in the same order and with the same names as the columns beneath — a
-   * subtotal that reorders or renames its own figures is a second thing to read
-   * rather than the sum of the first.
+   * whatever column you then sort within it by.
    */
   const group: DataGroup<TimesheetRow> | undefined =
     grouping === "none"
@@ -339,19 +331,29 @@ export function TimesheetsList({
       : {
           label: GROUP_LABEL[grouping],
           summary: (run) => {
-            let regular = 0, ot = 0, dot = 0, worked = 0;
+            let regular = 0, ot = 0, dot = 0, worked = 0, brk = 0, sick = 0;
             for (const r of run) {
               regular += r.hours_regular ?? 0;
               ot += r.hours_overtime ?? 0;
               dot += r.hours_double_ot ?? 0;
               worked += workedHours(r) ?? 0;
+              brk += (r.unpaid_break_minutes ?? 0) / 60;
+              sick += r.sick_hours ?? 0;
             }
-            return (
-              <span className="tabular-nums">
-                {regular.toFixed(2)} reg · {ot.toFixed(2)} OT · {dot.toFixed(2)} dbl ·{" "}
-                {worked.toFixed(2)} worked
-              </span>
-            );
+            const n = (v: number) => v.toFixed(2);
+            return {
+              // The leftmost cell says what is being totalled. Without it the
+              // row is six numbers with no subject.
+              employee: <span className="text-muted">{run.length === 1 ? "1 shift" : `${run.length} shifts`}</span>,
+              worked: n(worked),
+              regular: n(regular),
+              ot: n(ot),
+              dot: n(dot),
+              break: n(brk),
+              // Only when there is any — a column of 0.00 down every group
+              // reads as a figure someone should check.
+              ...(sick > 0 ? { sick: n(sick) } : {}),
+            };
           },
         };
 
@@ -445,10 +447,23 @@ export function TimesheetsList({
         </span>
       ),
     },
-    // REGULAR · OT · DOUBLE · BREAK · WORKED (Mark, 2026-08-05). The three
-    // figures that sum to Worked come first, then what was deducted to get
-    // there, then the total they make — which reads left to right as the
-    // arithmetic actually runs.
+    // WORKED · REGULAR · OT · DOUBLE · BREAK (Mark, 2026-08-05, revising the
+    // order he gave earlier the same day). The total leads and the three
+    // figures that make it up follow, so the eye reads the answer and then its
+    // parts; Break, which is what was deducted to reach Worked rather than a
+    // part of it, sits last.
+    {
+      key: "worked",
+      label: "Worked",
+      width: 112,
+      sortValue: (r) => workedHours(r) ?? -1,
+      // DECIMAL, not a 5:13 clock reading, even though a clock reads more
+      // naturally for a shift. Regular + OT + Double must visibly SUM to this,
+      // and "5:13" beside "5.22" reads as two different numbers when it is one.
+      render: (r) => (
+        <span className="tabular-nums">{formatDecimalHours(workedHours(r))}</span>
+      ),
+    },
     {
       key: "regular",
       label: "Regular",
@@ -510,18 +525,6 @@ export function TimesheetsList({
       width: 124,
       sortValue: (r) => r.unpaid_break_minutes ?? -1,
       render: (r) => <BreakCell row={r} editable={editable} finding={breakFindings.get(r.id) ?? null} />,
-    },
-    {
-      key: "worked",
-      label: "Worked",
-      width: 112,
-      sortValue: (r) => workedHours(r) ?? -1,
-      // DECIMAL, not a 5:13 clock reading, even though a clock reads more
-      // naturally for a shift. Regular + OT + Double must visibly SUM to this,
-      // and "5:13" beside "5.22" reads as two different numbers when it is one.
-      render: (r) => (
-        <span className="tabular-nums">{formatDecimalHours(workedHours(r))}</span>
-      ),
     },
     {
       key: "sick",
@@ -605,20 +608,6 @@ export function TimesheetsList({
             ]}
           />
         </div>
-
-        {/* Right-aligned in the filter row — the NewEmployee template, which is
-            how every create in this app is reached. */}
-        {editable && (
-          <div className="ml-auto">
-            <NewShift
-              employees={employees}
-              locations={locations}
-              orgId={orgId}
-              timeZone={timeZone}
-              period={period}
-            />
-          </div>
-        )}
       </div>
 
       {/* The pay period in one line. Overtime is stated separately from regular
@@ -758,7 +747,19 @@ function HoursCell({
     );
 
   const body = editable ? (
-    <InlineValue table="timesheets" id={row.id} column={column} kind="number" value={value} />
+    // TWO DECIMALS, so a column of figures reads as one. `InlineValue` shows
+    // the raw stored value at rest, which put "0" beside "4.53" down the OT
+    // column while the read-only branch below already said "0.00". `format` is
+    // display-only — clicking the cell still hands you the raw number to edit,
+    // which is what you want in a box you type arithmetic into.
+    <InlineValue
+      table="timesheets"
+      id={row.id}
+      column={column}
+      kind="number"
+      value={value}
+      format={(v) => Number(v).toFixed(2)}
+    />
   ) : (
     <span className={`${READ_ONLY_VALUE} tabular-nums`}>
       {value === null ? "—" : value.toFixed(2)}

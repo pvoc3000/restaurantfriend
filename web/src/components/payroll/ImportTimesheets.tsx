@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { FileDropZone } from "@/components/ui/FileDropZone";
+import { DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { PickList } from "@/components/ui/PickList";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { planImport, type ImportPlan, type ParsedShift } from "@/lib/homebaseImport";
@@ -639,6 +640,28 @@ export function ImportTimesheets({
           </div>
         </div>
       )}
+
+      {/* The way OUT (Mark, 2026-08-05). Committing clears the plan, so the
+          screen went back to a drop zone and a green "102 shifts imported"
+          banner with nothing to press — the nav was the only way on from the
+          end of the task.
+          It sits OUTSIDE the `plan &&` block on purpose, so it is there before
+          a file is dropped and after one is committed; those are the two moments
+          you might want to leave, and the middle is the one where you wouldn't.
+          BLACK, which is the panel-commit exception rather than a breach of it:
+          importing produces ONE outcome and this row is a commit, not a row of
+          peers — the same argument the receiving screen's Complete rests on, and
+          it reuses the same class. */}
+      <div className="flex justify-end border-t border-hairline pt-6">
+        <button
+          type="button"
+          disabled={pending}
+          onClick={() => router.push("/time-sheets")}
+          className={DIALOG_COMMIT_CLASS}
+        >
+          Done
+        </button>
+      </div>
     </div>
   );
 }

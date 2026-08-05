@@ -83,18 +83,27 @@ export type DataColumn<T> = {
  * Either way the rows must arrive already grouped, which follows from being
  * sorted by the same column.
  *
- * `summary` puts a SUBTOTAL in the band itself (Mark, 2026-08-05, for the
- * timesheet list's "hour subtotals for each grouping"). In the band rather than
- * on a closing row beneath each run: the band already exists and already carries
- * the count, so the totals cost no extra rows, and a table of 56px rows can't
- * afford one non-data row per group. It receives the run's own rows, so a
- * caller sums whatever that table's numbers are without the table knowing what
- * they mean.
+ * `summary` puts a SUBTOTAL on a closing row beneath each run, above a rule.
+ *
+ * It first went in the BAND, on the reasoning that the band already exists and
+ * a table of 56px rows can't afford an extra row per group. Mark used it and
+ * said otherwise (2026-08-05): "subtotals should be trailing the data, not
+ * leading in the header band, and the values should align with their columns."
+ * He is right, and the alignment is the whole of the argument — a subtotal is a
+ * number you check against the column above it, and one rendered as a sentence
+ * in the band is a number you have to re-read to place. Trailing also matches
+ * how every printed register in this trade sets a total: under the run it sums,
+ * not over it.
+ *
+ * So it returns a map KEYED BY COLUMN KEY rather than a ReactNode. The table
+ * renders one cell per visible column and fills it from that map, which is what
+ * makes the figures line up automatically and keeps working when the reader
+ * hides or reorders a column.
  */
 export type DataGroup<T> = {
   label: (row: T) => string;
   sortKey?: string;
-  summary?: (rows: T[]) => ReactNode;
+  summary?: (rows: T[]) => Record<string, ReactNode>;
 };
 
 /**
@@ -513,6 +522,12 @@ export function DataTable<T>({
               const startsGroup =
                 label !== null &&
                 (index === 0 || banding!.label(sorted[index - 1]) !== label);
+              // The last row of a run — where the subtotal goes. The final row
+              // of the table always ends its run, which is what puts a subtotal
+              // under the last group as well as the ones with a band after them.
+              const endsGroup =
+                label !== null &&
+                (index === sorted.length - 1 || banding!.label(sorted[index + 1]) !== label);
 
               return (
                 <Fragment key={key}>
@@ -530,18 +545,9 @@ export function DataTable<T>({
                         colSpan={visibleColumns.length}
                         className="px-3 py-2 text-xs font-semibold tracking-[0.12em] uppercase"
                       >
-                        <span className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                          <span>
-                            {label}
-                            <span className="ml-2 font-normal tracking-normal text-white/55 normal-case">
-                              {groupRows.get(label)?.length ?? 0}
-                            </span>
-                          </span>
-                          {banding?.summary && (
-                            <span className="font-normal tracking-normal text-white/75 normal-case">
-                              {banding.summary(groupRows.get(label) ?? [])}
-                            </span>
-                          )}
+                        {label}
+                        <span className="ml-2 font-normal tracking-normal text-white/55 normal-case">
+                          {groupRows.get(label)?.length ?? 0}
                         </span>
                       </td>
                     </tr>
@@ -611,6 +617,33 @@ export function DataTable<T>({
                       <td colSpan={visibleColumns.length} className="px-4 py-5">
                         {expand.render(row)}
                       </td>
+                    </tr>
+                  )}
+
+                  {/* The run's subtotal, UNDER the run and aligned to the
+                      columns it sums. One cell per visible column, filled from
+                      the caller's map, so the figures land beneath their own
+                      headings however the reader has hidden or reordered them.
+
+                      The rule ABOVE it is the only rule between rows in this
+                      table, and it earns that: a rule which delimits is exactly
+                      what the design system keeps (the head's 2px, a group
+                      band), where a rule between every row is what it drops. */}
+                  {endsGroup && banding?.summary && (
+                    <tr className="border-t-2 border-ink">
+                      {(() => {
+                        const cells = banding.summary(groupRows.get(label!) ?? []);
+                        return visibleColumns.map((col) => (
+                          <td
+                            key={col.key}
+                            className={`h-11 px-3 py-2 text-[13px] font-semibold ${
+                              col.align === "right" ? "text-right" : ""
+                            } ${col.key in cells ? "tabular-nums" : ""}`}
+                          >
+                            {cells[col.key] ?? null}
+                          </td>
+                        ));
+                      })()}
                     </tr>
                   )}
                 </Fragment>
