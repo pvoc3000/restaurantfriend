@@ -103,7 +103,18 @@ export const SECTIONS: NavSection[] = [
         // fortnight is open. Writing one is owner/admin, which the screen
         // itself gates.
       },
-      stub("hr", "time-sheets", "Time Sheets"),
+      {
+        slug: "time-sheets",
+        label: "Time Sheets",
+        href: "/time-sheets",
+        built: true,
+        // Migration 028 gates timesheets at owner/admin on every verb, select
+        // included — what a named person was paid for is the same class of fact
+        // as their home address. The screen says so itself for anyone who
+        // reaches it by URL; this only keeps the tab out of the menu for people
+        // it would never open for.
+        roles: ["owner", "admin"],
+      },
     ],
   },
   {

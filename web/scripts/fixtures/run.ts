@@ -17,6 +17,8 @@ import "./payPeriods.fixtures";
 import "./poFilters.fixtures";
 import "./receiving.fixtures";
 import "./tableSort.fixtures";
+import "./timeZone.fixtures";
+import "./timesheets.fixtures";
 import { runAll } from "./harness";
 
 runAll();

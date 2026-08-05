@@ -1,0 +1,634 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
+import { TabPicker } from "@/components/ui/TabPicker";
+import { TextInput } from "@/components/ui/TextInput";
+import { PickList } from "@/components/ui/PickList";
+import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { formatPeriodRange, type PayPeriodStatus } from "@/lib/payPeriods";
+import { PAY_PERIOD_STATUS_LABEL } from "@/lib/payPeriods";
+import {
+  OT_DECISION_LABEL,
+  effectiveExclusion,
+  formatDecimalHours,
+  otDisagreements,
+  workedHours,
+  type OtDecision,
+} from "@/lib/timesheets";
+
+const WIDTHS_STORAGE_KEY = "rf.timesheets.columnWidths.v1";
+
+export type TimesheetRow = {
+  id: string;
+  employee_id: string;
+  employee_name: string;
+  employee_excludes_tips: boolean;
+  location_code: string | null;
+  workday: string;
+  business_date: string;
+  workweek_start: string;
+  clock_in: string | null;
+  clock_out: string | null;
+  source_hours_regular: number | null;
+  source_hours_overtime: number | null;
+  source_hours_double_ot: number | null;
+  source_hours_paid: number | null;
+  source_break_minutes: number | null;
+  hours_regular: number | null;
+  hours_overtime: number | null;
+  hours_double_ot: number | null;
+  ot_decision: OtDecision;
+  ot_reason: string | null;
+  unpaid_break_minutes: number | null;
+  sick_hours: number | null;
+  exclude_tips: boolean | null;
+  stitched: boolean;
+  kind: "shift" | "adjustment";
+  position: string | null;
+  employee_note: string | null;
+  manager_note: string | null;
+  source: string;
+  source_payload: Record<string, unknown> | null;
+};
+
+export type PeriodOption = {
+  id: string;
+  start_date: string;
+  end_date: string;
+  status: PayPeriodStatus;
+};
+
+type SortKey = "employee" | "workday" | "in" | "worked" | "regular" | "ot" | "location";
+type Grouping = "none" | "employee" | "workday";
+
+/**
+ * A fortnight of shifts.
+ *
+ * Scoped to ONE pay period and never to "everything": there are 44,721 rows in
+ * this table and the question is always about a particular fortnight. The
+ * picker is the screen's primary control, which is why it leads the filter row.
+ *
+ * NO `/time-sheets/[id]` ROUTE, deliberately. A shift is a row, not a record,
+ * and a second screen would be a second place to edit a timesheet — the
+ * receiving-screen mistake in reverse. What a detail screen would have shown
+ * lives in the row's expansion instead.
+ */
+export function TimesheetsList({
+  rows,
+  periods,
+  periodId,
+  canWrite,
+  timeZone,
+}: {
+  rows: TimesheetRow[];
+  periods: PeriodOption[];
+  periodId: string | null;
+  canWrite: boolean;
+  /** The org's zone. Punches are instants; reading one back needs a zone, and
+   *  the SERVER's is not it — a host in UTC would show every shift shifted. */
+  timeZone: string;
+}) {
+  const router = useRouter();
+  const [search, setSearch] = useState("");
+  const [grouping, setGrouping] = useState<Grouping>("employee");
+  const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
+    key: "employee",
+    dir: "asc",
+  });
+
+  const period = periods.find((p) => p.id === periodId) ?? null;
+
+  /**
+   * THE rule (decision 8), and it must agree with `isPayPeriodEditable` and
+   * with 028's write policies. Below it, every cell renders as plain text
+   * rather than offering a write the database will silently refuse — an update
+   * against a closed period matches zero rows and PostgREST returns NO error,
+   * so an offered-but-dead edit would look like it worked.
+   */
+  const editable =
+    canWrite && period !== null && (period.status === "open" || period.status === "review");
+
+  const shown = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter((r) =>
+      `${r.employee_name} ${r.workday} ${r.location_code ?? ""} ${r.position ?? ""}`
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [rows, search]);
+
+  const sorted = useMemo(() => {
+    const value = (r: TimesheetRow): string | number => {
+      switch (sort.key) {
+        case "employee": return r.employee_name;
+        case "workday": return r.workday;
+        case "in": return r.clock_in ?? "";
+        case "worked": return workedHours(r) ?? -1;
+        case "regular": return r.hours_regular ?? -1;
+        case "ot": return r.hours_overtime ?? -1;
+        case "location": return r.location_code ?? "";
+      }
+    };
+    const dir = sort.dir === "asc" ? 1 : -1;
+    return [...shown].sort((a, b) => {
+      const av = value(a), bv = value(b);
+      if (av < bv) return -1 * dir;
+      if (av > bv) return 1 * dir;
+      // Tiebreaks always read ascending whichever way the primary points —
+      // lib/tableSort's rule. Within one person, chronological.
+      if (a.workday !== b.workday) return a.workday < b.workday ? -1 : 1;
+      return (a.clock_in ?? "") < (b.clock_in ?? "") ? -1 : 1;
+    });
+  }, [shown, sort]);
+
+  const totals = useMemo(() => {
+    let regular = 0, ot = 0, dot = 0, sick = 0, worked = 0, unfinished = 0, disagreeing = 0;
+    for (const r of sorted) {
+      regular += r.hours_regular ?? 0;
+      ot += r.hours_overtime ?? 0;
+      dot += r.hours_double_ot ?? 0;
+      sick += r.sick_hours ?? 0;
+      const w = workedHours(r);
+      if (w === null) unfinished += 1;
+      else worked += w;
+      if (otDisagreements(r).length) disagreeing += 1;
+    }
+    return { regular, ot, dot, sick, worked, unfinished, disagreeing };
+  }, [sorted]);
+
+  const group: DataGroup<TimesheetRow> | undefined =
+    grouping === "none"
+      ? undefined
+      : grouping === "employee"
+        ? { label: (r) => r.employee_name, sortKey: "employee" }
+        : { label: (r) => r.workday, sortKey: "workday" };
+
+  /** `10:07pm` from an instant, read back in the org's zone. */
+  const clock = (iso: string | null) =>
+    iso === null
+      ? "—"
+      : new Date(iso).toLocaleTimeString("en-US", {
+          hour: "numeric",
+          minute: "2-digit",
+          timeZone,
+        });
+
+  const columns: DataColumn<TimesheetRow>[] = [
+    {
+      key: "employee",
+      label: "Employee",
+      width: 240,
+      pinned: true,
+      sortValue: (r) => r.employee_name,
+      render: (r) => (
+        <span className="flex items-center gap-2">
+          <span>{r.employee_name}</span>
+          {r.kind === "adjustment" && (
+            <span className="border border-ink bg-mark-fill px-1 text-[10px] uppercase tracking-[0.06em]">
+              adj
+            </span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "workday",
+      label: "Workday",
+      width: 130,
+      sortValue: (r) => r.workday,
+      render: (r) => <span className="tabular-nums">{r.workday}</span>,
+    },
+    {
+      key: "location",
+      label: "Shop",
+      width: 90,
+      hideWhenCompact: true,
+      sortValue: (r) => r.location_code ?? "",
+      render: (r) => <span className="text-muted">{r.location_code ?? "—"}</span>,
+    },
+    {
+      key: "in",
+      label: "In → Out",
+      width: 190,
+      sortValue: (r) => r.clock_in ?? "",
+      render: (r) => (
+        <span className="tabular-nums">
+          {clock(r.clock_in)} <span className="text-faint">→</span>{" "}
+          {r.clock_out ? (
+            clock(r.clock_out)
+          ) : (
+            // An unfinished shift is a real state (184 in the history), and the
+            // honest rendering is a gap you can see rather than a zero.
+            <span className="bg-mark-fill px-1">no clock-out</span>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "worked",
+      label: "Worked",
+      width: 100,
+      sortValue: (r) => workedHours(r) ?? -1,
+      // DECIMAL, not a 5:13 clock reading, even though a clock reads more
+      // naturally for a shift. Regular + OT + Double must visibly SUM to this,
+      // and "5:13" beside "5.22" reads as two different numbers when it is one.
+      render: (r) => (
+        <span className="tabular-nums">{formatDecimalHours(workedHours(r))}</span>
+      ),
+    },
+    {
+      key: "break",
+      label: "Break",
+      width: 90,
+      hideWhenCompact: true,
+      sortValue: (r) => r.unpaid_break_minutes ?? -1,
+      render: (r) =>
+        editable ? (
+          <InlineValue
+            table="timesheets"
+            id={r.id}
+            column="unpaid_break_minutes"
+            kind="number"
+            value={r.unpaid_break_minutes}
+          />
+        ) : (
+          <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+            {r.unpaid_break_minutes === null ? "—" : `${r.unpaid_break_minutes}m`}
+          </span>
+        ),
+    },
+    {
+      key: "regular",
+      label: "Regular",
+      width: 100,
+      sortValue: (r) => r.hours_regular ?? -1,
+      render: (r) => <HoursCell row={r} column="hours_regular" value={r.hours_regular} editable={editable} />,
+    },
+    {
+      key: "ot",
+      label: "OT",
+      width: 95,
+      sortValue: (r) => r.hours_overtime ?? -1,
+      render: (r) => <HoursCell row={r} column="hours_overtime" value={r.hours_overtime} editable={editable} />,
+    },
+    {
+      key: "dot",
+      label: "Double",
+      width: 95,
+      hideWhenCompact: true,
+      sortValue: (r) => r.hours_double_ot ?? -1,
+      render: (r) => <HoursCell row={r} column="hours_double_ot" value={r.hours_double_ot} editable={editable} />,
+    },
+    {
+      key: "sick",
+      label: "Sick",
+      width: 90,
+      hideWhenCompact: true,
+      sortValue: (r) => r.sick_hours ?? -1,
+      render: (r) => <HoursCell row={r} column="sick_hours" value={r.sick_hours} editable={editable} />,
+    },
+    {
+      key: "tips",
+      label: "Tips",
+      width: 130,
+      hideWhenCompact: true,
+      sortValue: (r) => String(r.exclude_tips),
+      render: (r) => <TipsCell row={r} editable={editable} />,
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-end gap-4">
+        <label className="space-y-1.5">
+          <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
+            Pay period
+          </span>
+          <PickList
+            variant="field"
+            ariaLabel="Pay period"
+            value={periodId ?? ""}
+            onPick={(id) => router.push(`/time-sheets?period=${id}`)}
+            options={periods.map((p) => ({
+              value: p.id,
+              label: formatPeriodRange(p),
+              hint: PAY_PERIOD_STATUS_LABEL[p.status],
+            }))}
+            className="w-64"
+          />
+        </label>
+
+        <TextInput
+          value={search}
+          onValueChange={setSearch}
+          placeholder="Search this fortnight"
+          aria-label="Search timesheets"
+          clearLabel="Clear the search"
+          className="h-9 w-64 text-sm"
+        />
+
+        <div className="space-y-1.5">
+          <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
+            Group by
+          </span>
+          <TabPicker
+            ariaLabel="Group by"
+            value={grouping}
+            onChange={setGrouping}
+            options={[
+              { key: "employee", label: "Employee" },
+              { key: "workday", label: "Day" },
+              { key: "none", label: "Neither" },
+            ]}
+          />
+        </div>
+      </div>
+
+      {/* The fortnight in one line. Overtime is stated separately from regular
+          because it is the number this module exists to get right. */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-y border-hairline py-2 text-sm">
+        <span className="text-muted">
+          {sorted.length === rows.length ? `${rows.length} shifts` : `${sorted.length} of ${rows.length} shifts`}
+        </span>
+        <span>Regular <strong className="tabular-nums">{totals.regular.toFixed(2)}</strong></span>
+        <span>OT <strong className="tabular-nums">{totals.ot.toFixed(2)}</strong></span>
+        <span>Double <strong className="tabular-nums">{totals.dot.toFixed(2)}</strong></span>
+        {totals.sick > 0 && (
+          <span className="text-muted">
+            Sick <strong className="tabular-nums">{totals.sick.toFixed(2)}</strong>
+            {/* Decision 7: recorded and reconciled, never exported — Gusto
+                already pays it, and including it pays the person twice. */}
+            <span className="ml-1 text-[12px]">(reconciliation only, not exported)</span>
+          </span>
+        )}
+        {totals.unfinished > 0 && (
+          <span className="bg-mark-fill px-2 text-ink">{totals.unfinished} with no clock-out</span>
+        )}
+        {totals.disagreeing > 0 && (
+          <span className="bg-mark-fill px-2 text-ink">
+            {totals.disagreeing} differ from what the source said
+          </span>
+        )}
+      </div>
+
+      {!editable && period && (
+        <p className="text-sm text-muted">
+          This period is {PAY_PERIOD_STATUS_LABEL[period.status].toLowerCase()}, so these shifts are
+          read-only. {period.status === "closed"
+            ? "A correction becomes an adjustment in the current open period."
+            : "Reopen the period to edit them."}
+        </p>
+      )}
+
+      <DataTable
+        rows={sorted}
+        columns={columns}
+        rowKey={(r) => r.id}
+        storageKey={WIDTHS_STORAGE_KEY}
+        columnChooser
+        compactBelow={1280}
+        group={group}
+        sort={sort}
+        onSortChange={(next) => setSort({ key: next.key as SortKey, dir: next.dir })}
+        expand={{
+          summary: (r) => {
+            const marks: string[] = [];
+            const d = otDisagreements(r);
+            if (d.length) marks.push(`${d.length} differ${d.length === 1 ? "s" : ""} from source`);
+            if (r.stitched) marks.push("stitched");
+            if (r.source_payload?.local_time_ambiguity) marks.push("ambiguous clock time");
+            if (r.employee_note || r.manager_note) marks.push("note");
+            return marks.length ? <span className="text-mark">{marks.join(" · ")}</span> : null;
+          },
+          render: (r) => <ShiftDetail row={r} editable={editable} />,
+        }}
+        empty={
+          <p className="text-sm text-muted">
+            {rows.length === 0
+              ? "No shifts in this pay period."
+              : "No shifts match that search."}
+          </p>
+        }
+      />
+    </div>
+  );
+}
+
+/**
+ * One of the three decided-hours cells. Editable only while the period is, and
+ * marked when it disagrees with what the source said — YELLOW, the app's "worth
+ * your eye", because a disagreement is not an error. It is the thing a human is
+ * supposed to adjudicate (decision 2).
+ */
+function HoursCell({
+  row,
+  column,
+  value,
+  editable,
+}: {
+  row: TimesheetRow;
+  column: "hours_regular" | "hours_overtime" | "hours_double_ot" | "sick_hours";
+  value: number | null;
+  editable: boolean;
+}) {
+  const differs =
+    column !== "sick_hours" &&
+    otDisagreements(row).some(
+      (d) =>
+        (d.field === "regular" && column === "hours_regular") ||
+        (d.field === "overtime" && column === "hours_overtime") ||
+        (d.field === "double_ot" && column === "hours_double_ot")
+    );
+
+  const body = editable ? (
+    <InlineValue table="timesheets" id={row.id} column={column} kind="number" value={value} />
+  ) : (
+    <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+      {value === null ? "—" : value.toFixed(2)}
+    </span>
+  );
+
+  return <span className={differs ? "bg-mark-fill px-1" : ""}>{body}</span>;
+}
+
+/**
+ * The tri-state (decision 4). A PickList with three options, never a checkbox —
+ * a checkbox cannot say the third thing, and the third thing ("included despite
+ * the default") is the whole reason the column is nullable.
+ */
+function TipsCell({ row, editable }: { row: TimesheetRow; editable: boolean }) {
+  const effective = effectiveExclusion(row.exclude_tips, row.employee_excludes_tips);
+  const label =
+    row.exclude_tips === null
+      ? effective
+        ? "Excluded (person)"
+        : "In pool"
+      : row.exclude_tips
+        ? "Excluded"
+        : "In pool (override)";
+
+  if (!editable) return <span className={`${READ_ONLY_VALUE} text-muted`}>{label}</span>;
+
+  return (
+    <InlineValue
+      table="timesheets"
+      id={row.id}
+      column="exclude_tips"
+      kind="pick"
+      value={row.exclude_tips === null ? "" : String(row.exclude_tips)}
+      options={[
+        { value: "", label: row.employee_excludes_tips ? "Inherit — excluded" : "Inherit — in pool" },
+        { value: "true", label: "Excluded from this shift" },
+        { value: "false", label: "In the pool despite the default" },
+      ]}
+    />
+  );
+}
+
+/**
+ * What a `/time-sheets/[id]` route would have shown: the raw source row, the
+ * stitch provenance, and the OT disagreement in full.
+ */
+function ShiftDetail({ row, editable }: { row: TimesheetRow; editable: boolean }) {
+  const disagreements = otDisagreements(row);
+  const payload = row.source_payload ?? {};
+  const raw = (k: string) => {
+    const v = payload[k];
+    return typeof v === "string" && v.trim() !== "" ? v : null;
+  };
+
+  return (
+    <div className="grid gap-8 md:grid-cols-3">
+      <div className="space-y-2">
+        <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">What the source said</h3>
+        <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
+          <dt className="text-subtle">Source</dt>
+          <dd>{raw("import_source") ?? row.source}</dd>
+          <dt className="text-subtle">Clock in</dt>
+          <dd className="tabular-nums">{raw("time_in") ?? "—"}</dd>
+          <dt className="text-subtle">Clock out</dt>
+          <dd className="tabular-nums">{raw("time_out") ?? "—"}</dd>
+          <dt className="text-subtle">Dates</dt>
+          <dd className="tabular-nums">
+            {raw("date_start") ?? "—"}
+            {raw("date_end") && raw("date_end") !== raw("date_start") ? ` → ${raw("date_end")}` : ""}
+          </dd>
+          {raw("break_start") && (
+            <>
+              <dt className="text-subtle">Break</dt>
+              <dd className="tabular-nums">
+                {raw("break_start")} → {raw("break_end") ?? "?"}
+                {raw("break_type") ? ` · ${raw("break_type")}` : ""}
+              </dd>
+            </>
+          )}
+          <dt className="text-subtle">Hours</dt>
+          <dd className="tabular-nums">
+            {(row.source_hours_regular ?? 0).toFixed(2)} reg ·{" "}
+            {(row.source_hours_overtime ?? 0).toFixed(2)} OT ·{" "}
+            {(row.source_hours_double_ot ?? 0).toFixed(2)} dbl
+          </dd>
+          {raw("timesheet_error") && (
+            <>
+              <dt className="text-subtle">FMP flagged</dt>
+              {/* FileMaker's own derived break-violation calc, carried along
+                  unaltered. Decision 3 says a violation is DERIVED and never
+                  stored, so this is not a column — it is the reference that
+                  phase 5's breakRules.ts gets checked against. */}
+              <dd className="text-mark">{raw("timesheet_error")}</dd>
+            </>
+          )}
+        </dl>
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">What we decided</h3>
+        {disagreements.length === 0 ? (
+          <p className="text-sm text-muted">
+            Nothing differs from the source. {OT_DECISION_LABEL[row.ot_decision]}.
+          </p>
+        ) : (
+          <div className="space-y-2">
+            <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
+              {disagreements.map((d) => (
+                <div key={d.field} className="contents">
+                  <dt className="text-subtle">{d.label}</dt>
+                  <dd className="tabular-nums">
+                    <span className="text-muted">{d.source.toFixed(2)}</span>
+                    <span className="mx-1 text-faint">→</span>
+                    <span className="bg-mark-fill px-1">{d.decided.toFixed(2)}</span>
+                  </dd>
+                </div>
+              ))}
+            </dl>
+            <p className="text-sm text-muted">{OT_DECISION_LABEL[row.ot_decision]}.</p>
+          </div>
+        )}
+        {row.ot_reason && <p className="text-sm">{row.ot_reason}</p>}
+        <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
+          <dt className="text-subtle">Workweek</dt>
+          <dd className="tabular-nums">{row.workweek_start}</dd>
+          <dt className="text-subtle">Tip pool day</dt>
+          <dd className="tabular-nums">{row.business_date}</dd>
+          {row.position && (
+            <>
+              <dt className="text-subtle">Position</dt>
+              <dd>{row.position}</dd>
+            </>
+          )}
+        </dl>
+      </div>
+
+      <div className="space-y-2">
+        <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">Notes</h3>
+        {row.stitched && (
+          <p className="text-sm text-mark">
+            Reassembled from segments a source split at midnight.
+          </p>
+        )}
+        {typeof payload.local_time_ambiguity === "string" && (
+          <p className="text-sm text-mark">
+            This punch&rsquo;s local time is {String(payload.local_time_ambiguity)} — the clock
+            {payload.local_time_ambiguity === "ambiguous"
+              ? " read the same hour twice that night, so the shift is an hour longer or shorter depending which is meant."
+              : " skipped that hour entirely, so the punch was moved forward."}
+          </p>
+        )}
+        <dl className="grid grid-cols-[5rem_1fr] gap-x-3 gap-y-0.5 text-sm">
+          <dt className="text-subtle">Employee</dt>
+          <dd>
+            {editable ? (
+              <InlineValue
+                table="timesheets"
+                id={row.id}
+                column="employee_note"
+                value={row.employee_note}
+                placeholder="—"
+              />
+            ) : (
+              <span className={READ_ONLY_VALUE}>{row.employee_note ?? "—"}</span>
+            )}
+          </dd>
+          <dt className="text-subtle">Manager</dt>
+          <dd>
+            {editable ? (
+              <InlineValue
+                table="timesheets"
+                id={row.id}
+                column="manager_note"
+                value={row.manager_note}
+                placeholder="—"
+              />
+            ) : (
+              <span className={READ_ONLY_VALUE}>{row.manager_note ?? "—"}</span>
+            )}
+          </dd>
+        </dl>
+      </div>
+    </div>
+  );
+}

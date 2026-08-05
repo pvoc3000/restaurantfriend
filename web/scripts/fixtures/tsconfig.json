@@ -20,6 +20,9 @@
     "../../src/lib/receiving.ts",
     "../../src/lib/invoiceMatch.ts",
     "../../src/lib/invoiceExtraction.ts",
-    "../../src/lib/purchaseOrders.ts"
+    "../../src/lib/purchaseOrders.ts",
+    "../../src/lib/payPeriods.ts",
+    "../../src/lib/timeZone.ts",
+    "../../src/lib/timesheets.ts"
   ]
 }
