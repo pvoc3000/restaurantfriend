@@ -104,9 +104,9 @@ export const SECTIONS: NavSection[] = [
         // itself gates.
       },
       {
-        slug: "time-sheets",
-        label: "Time Sheets",
-        href: "/time-sheets",
+        slug: "timesheets",
+        label: "Timesheets",
+        href: "/timesheets",
         built: true,
         // Migration 028 gates timesheets at owner/admin on every verb, select
         // included — what a named person was paid for is the same class of fact

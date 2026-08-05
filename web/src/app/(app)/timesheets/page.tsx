@@ -40,7 +40,7 @@ export default async function TimeSheetsPage({
     return (
       <div className="max-w-2xl space-y-2">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Time Sheets
+          Timesheets
         </h1>
         <p className="text-sm text-muted">
           Timesheets are open to managers and the owner. Ask a manager if you
@@ -73,7 +73,7 @@ export default async function TimeSheetsPage({
     return (
       <div className="max-w-2xl space-y-2">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Time Sheets
+          Timesheets
         </h1>
         <p className="text-sm text-muted">
           There are no pay periods yet, so there is nowhere to record hours. Open
@@ -185,7 +185,7 @@ export default async function TimeSheetsPage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Time Sheets
+            Timesheets
           </h1>
           <p className="max-w-[72ch] text-sm text-muted">
             Every shift in one pay period. What the source said is kept beside
@@ -193,10 +193,10 @@ export default async function TimeSheetsPage({
           </p>
         </div>
         <Link
-          href="/time-sheets/import"
+          href="/timesheets/import"
           className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
         >
-          Import time sheets
+          Import timesheets
         </Link>
       </div>
 
@@ -209,6 +209,13 @@ export default async function TimeSheetsPage({
         // one back on a UTC host would show every shift seven hours out.
         timeZone={session.orgSettings.timezone ?? "UTC"}
         waiverEmployeeIds={(waiverRows ?? []).map((w) => w.employee_id as string)}
+        employees={[...employeeById.entries()]
+          .map(([id, e]) => ({ id, name: e.name }))
+          .sort((a, b) => (a.name < b.name ? -1 : 1))}
+        // ACTIVE locations only: this enumerates somewhere to put a new shift,
+        // and a closed shop is not one (design rule 3).
+        locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
+        orgId={session.membership.org_id}
       />
     </div>
   );

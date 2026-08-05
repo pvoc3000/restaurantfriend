@@ -254,7 +254,7 @@ export async function PayPeriodDetail({
 
   // Overtime still disagreeing with our recompute, for the readiness list. Same
   // one-cent tolerance and the same comparison against the DECISION that
-  // /time-sheets uses — see lib/overtime's EPSILON.
+  // /timesheets uses — see lib/overtime's EPSILON.
   const proposals = proposeOvertime(
     shifts
       .map((s) => {

@@ -968,7 +968,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    corrections are MADE, and gating it would force a reviewer to step the period
    backwards to fix what they found. 028's write policies name the same pair;
    **they must change together.**
-   **Shipped, phase 2 — migration 028 `timesheets` + `/time-sheets`.** The punch
+   **Shipped, phase 2 — migration 028 `timesheets` + `/timesheets`.** The punch
    as real INSTANTS, what the SOURCE said beside what we DECIDED, and the two
    derived dates. Plus `employees.homebase_id` / `gusto_id` / `excludes_tips` —
    there was no external-id column anywhere in this schema, and an import that
@@ -1012,9 +1012,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    (decision 1). Its first crossing-midnight rule trusted `ts_Date_End` and
    produced a **30.58-hour shift**; the TIMES decide now (`minOut < minIn`) and
    `ts_Date_End` is corroboration only.
-   `/time-sheets` is scoped to ONE pay period (44,721 rows exist) and opens on
+   `/timesheets` is scoped to ONE pay period (44,721 rows exist) and opens on
    the most recent period that HAS shifts, not the newest — which after the load
-   is an empty current fortnight. **No `/time-sheets/[id]` route**: a shift is a
+   is an empty current fortnight. **No `/timesheets/[id]` route**: a shift is a
    row, not a record, and what a detail screen would show lives in the row's
    expansion. The Worked column is DECIMAL, not a `5:13` clock reading, because
    Regular + OT + Double must visibly sum to it.
@@ -1077,7 +1077,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    covers, and ZERO waivers are loaded** because FMP keeps them in its Events
    table, which was never migrated. Loading them is the fix; nothing in this
    module pays anybody meanwhile.
-   **Phase 3, migration 030 + `lib/homebaseImport.ts` + `/time-sheets/import`.**
+   **Phase 3, migration 030 + `lib/homebaseImport.ts` + `/timesheets/import`.**
    Drop → plan → commit, with NOTHING WRITTEN BEFORE COMMIT, and a commit into a
    closed period BLOCKED rather than left to fail silently. The parser is pinned
    against an ACTUAL SLICE of the DF01 export (`scripts/fixtures/data/`),
@@ -1231,18 +1231,31 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `InlineValue` gained **`scale`** for it — a stored-vs-shown unit pair
    converting on BOTH read and write, where `format` is display-only and would
    have put 30 in the box the moment you clicked a cell reading 0.50.
-   **`NewShift`** is the module's first write that isn't an import: a worked
+   **`NewTimesheet`** is the module's first write that isn't an import: a worked
    shift nobody punched, or paid time that produced none (028's `adjustment`
    kind), which is where a **sick day** finally lands — `sick_hours` had been
    editable only on a shift the person had also worked, which is backwards. It
    writes no overtime split and never touches `source_*`: there was no source,
    and the list's recompute argues with it out loud instead. A reason is
    required, like every other decision in this module.
-   **Its button was REMOVED from `/time-sheets` hours later** (Mark, 2026-08-05)
-   and the component now sits on disk with no caller. Restoring it is one JSX
-   block plus the four props the list dropped with it — `employees`, `locations`,
-   `orgId` and the page's roster/active-location mapping. Ask where it belongs
-   before re-placing it, and delete the file if the answer is nowhere.
+   Its button was pulled from the list and PUT BACK the same day (Mark,
+   2026-08-05) — "remove the add timesheet button on pay period sheet" meant a
+   different screen than the one it was on. It reads **New timesheet** now, per
+   the app's `New <thing>` create convention, and the component is
+   `NewTimesheet.tsx`.
+   **"TIMESHEET", ONE WORD, EVERYWHERE** (Mark, 2026-08-05: "I think
+   'timesheet' unless that is technically incorrect"). It isn't — both spellings
+   are dictionary-valid and one word is what payroll software uses — and it was
+   already the majority here: the tables are `timesheets` and
+   `timesheet_imports`, the modules `lib/timesheets`, the components
+   `TimesheetsList` / `ImportTimesheets`. Only the visible strings and the ROUTE
+   said "time sheets", so the route moved `/time-sheets` → `/timesheets` (with
+   `/timesheets/import`), and `lib/nav.ts`'s slug and label with it.
+   **A TIMESHEET AND A SHIFT ARE NOT THE SAME WORD** and both survive: a
+   timesheet is the RECORD, a shift is the period of work it describes. Hence
+   "New timesheet" on the button, "Worked shift" in its kind picker, and "163
+   shifts" in the list's totals — that last one counts periods worked and is
+   right as it stands.
    Also: **Import time sheets** is a button on both screens (it had been a link
    inside a paragraph); the importer OFFERS to open the period a file needs,
    continuing the cadence from `nextPeriodAfter` rather than wrapping the file's

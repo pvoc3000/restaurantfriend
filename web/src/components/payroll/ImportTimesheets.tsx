@@ -315,7 +315,7 @@ export function ImportTimesheets({
             source_hours_paid: s.source.totalPaidHours,
             source_break_minutes: s.breakMinutes,
             // The historical posture: take the source's word for it, and record
-            // that nobody has re-checked. The overtime queue on /time-sheets is
+            // that nobody has re-checked. The overtime queue on /timesheets is
             // where that gets argued with.
             hours_regular: s.source.regularHours,
             hours_overtime: s.source.overtimeHours,
@@ -656,7 +656,7 @@ export function ImportTimesheets({
         <button
           type="button"
           disabled={pending}
-          onClick={() => router.push("/time-sheets")}
+          onClick={() => router.push("/timesheets")}
           className={DIALOG_COMMIT_CLASS}
         >
           Done

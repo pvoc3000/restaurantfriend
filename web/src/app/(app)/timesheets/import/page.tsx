@@ -25,7 +25,7 @@ export default async function ImportTimesheetsPage() {
     return (
       <div className="max-w-2xl space-y-2">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Import time sheets
+          Import timesheets
         </h1>
         <p className="text-sm text-muted">
           Importing timesheets is open to managers and the owner.
@@ -66,14 +66,14 @@ export default async function ImportTimesheetsPage() {
     <div className="space-y-6">
       <div className="space-y-1">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Import time sheets
+          Import timesheets
         </h1>
         <p className="max-w-[72ch] text-sm text-muted">
           Drop the CSV Homebase exports. You&rsquo;ll see exactly what it
           contains, where it lands and who it can&rsquo;t match, before anything
           is written.{" "}
           <Link
-            href="/time-sheets"
+            href="/timesheets"
             className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
           >
             Back to the shifts

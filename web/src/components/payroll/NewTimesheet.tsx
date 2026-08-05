@@ -37,7 +37,7 @@ import { formatPeriodRange, type PayPeriodStatus } from "@/lib/payPeriods";
  * was no source, and writing our own figures into those columns would forge a
  * claim that Homebase said something.
  */
-export function NewShift({
+export function NewTimesheet({
   employees,
   locations,
   orgId,
@@ -232,12 +232,12 @@ export function NewShift({
         onClick={() => setOpen(true)}
         className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
       >
-        Add shift
+        New timesheet
       </button>
 
       {open && (
         <Dialog
-          title="Add a shift"
+          title="New timesheet"
           onClose={close}
           busy={pending}
           width="max-w-2xl"
@@ -247,7 +247,7 @@ export function NewShift({
                 Cancel
               </button>
               <button type="button" onClick={add} disabled={!ready} className={DIALOG_COMMIT_CLASS}>
-                {pending ? "Adding…" : kind === "shift" ? "Add shift" : "Add adjustment"}
+                {pending ? "Adding…" : kind === "shift" ? "Add timesheet" : "Add adjustment"}
               </button>
             </>
           }

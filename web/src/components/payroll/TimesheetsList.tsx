@@ -20,6 +20,7 @@ import {
 import { MEAL_CODE_LABEL, assessWorkday, type BreakFinding } from "@/lib/breakRules";
 import { toBreakShift } from "@/lib/payrollWorksheet";
 import { AdjudicateOvertime } from "./AdjudicateOvertime";
+import { NewTimesheet } from "./NewTimesheet";
 import {
   OT_DECISION_LABEL,
   effectiveExclusion,
@@ -129,7 +130,7 @@ const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: TimesheetRow) => string
  * this table and the question is always about a particular fortnight. The
  * picker is the screen's primary control, which is why it leads the filter row.
  *
- * NO `/time-sheets/[id]` ROUTE, deliberately. A shift is a row, not a record,
+ * NO `/timesheets/[id]` ROUTE, deliberately. A shift is a row, not a record,
  * and a second screen would be a second place to edit a timesheet — the
  * receiving-screen mistake in reverse. What a detail screen would have shown
  * lives in the row's expansion instead.
@@ -141,6 +142,9 @@ export function TimesheetsList({
   canWrite,
   timeZone,
   waiverEmployeeIds,
+  employees,
+  locations,
+  orgId,
 }: {
   rows: TimesheetRow[];
   periods: PeriodOption[];
@@ -152,6 +156,10 @@ export function TimesheetsList({
   /** Who has a signed meal-break waiver on file. It changes the ANSWER, not the
    *  presentation: a waived meal on a six-hour day owes nothing at all. */
   waiverEmployeeIds: string[];
+  /** The roster, for adding a shift by hand. */
+  employees: { id: string; name: string }[];
+  locations: { id: string; code: string }[];
+  orgId: string;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -555,7 +563,7 @@ export function TimesheetsList({
             variant="field"
             ariaLabel="Pay period"
             value={periodId ?? ""}
-            onPick={(id) => router.push(`/time-sheets?period=${id}`)}
+            onPick={(id) => router.push(`/timesheets?period=${id}`)}
             options={periods.map((p) => ({
               value: p.id,
               label: formatPeriodRange(p),
@@ -608,6 +616,22 @@ export function TimesheetsList({
             ]}
           />
         </div>
+
+        {/* Right-aligned in the filter row — the NewEmployee template, which is
+            how every create in this app is reached. Only while the period is
+            editable: below that the insert is one 028 refuses, and a control
+            that cannot work is worse than an absent one. */}
+        {editable && (
+          <div className="ml-auto">
+            <NewTimesheet
+              employees={employees}
+              locations={locations}
+              orgId={orgId}
+              timeZone={timeZone}
+              period={period}
+            />
+          </div>
+        )}
       </div>
 
       {/* The pay period in one line. Overtime is stated separately from regular
@@ -893,7 +917,7 @@ function TipsCell({ row, editable }: { row: TimesheetRow; editable: boolean }) {
 }
 
 /**
- * What a `/time-sheets/[id]` route would have shown: the raw source row, the
+ * What a `/timesheets/[id]` route would have shown: the raw source row, the
  * stitch provenance, and the OT disagreement in full.
  */
 function ShiftDetail({

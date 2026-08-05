@@ -391,19 +391,19 @@ A green suite that can't fail is worse than none on a module that moves money.
 ## Screens
 
 `lib/nav.ts` already carries `stub("hr","pay-periods",…)` and
-`stub("hr","time-sheets",…)`; shipping each is one line. Both are org-scoped, so
+`stub("hr","timesheets",…)`; shipping each is one line. Both are org-scoped, so
 both are exempt from `InactiveLocationGate` for the reason `/employees` is —
 payroll belongs to the company, not to a shop.
 
 - **`/pay-periods`** list + record. The record is the payroll worksheet:
   per-employee hours roll-up, the break-premium decisions, the tip pools with
   their rate and residual, and the export.
-- **`/time-sheets`** — the shift list, grouped by employee or workday, with the
+- **`/timesheets`** — the shift list, grouped by employee or workday, with the
   raw segments, the stitch provenance and the OT disagreement in the row's
-  `expand`. **No `/time-sheets/[id]` route**: a shift is a row, not a record, and
+  `expand`. **No `/timesheets/[id]` route**: a shift is a row, not a record, and
   a second screen would be a second place to edit a timesheet — the
   receiving-screen mistake in reverse.
-- **`/time-sheets/import`** — drop → plan → commit, with **nothing written before
+- **`/timesheets/import`** — drop → plan → commit, with **nothing written before
   Commit**. Unmatched employees get a picker that writes `homebase_id`, so every
   import matches better than the last.
 

@@ -14,7 +14,7 @@ import type { PayPeriodStatus } from "@/lib/payPeriods";
  * shop, so this screen doesn't key on the working location and isn't behind the
  * inactive-location gate. Same reasoning as `/employees`.
  *
- * Note the READ gate here is deliberately weaker than the one on `/time-sheets`
+ * Note the READ gate here is deliberately weaker than the one on `/timesheets`
  * will be. Migration 027 makes `pay_periods` readable by any member, because a
  * period is two dates and a status — no personal data at all — and a supervisor
  * reporting Saturday's tips has to know which fortnight is open. What needs
@@ -66,16 +66,16 @@ export default async function PayPeriodsPage() {
             produced, the record stops moving.
           </p>
         </div>
-        {/* Here as well as on /time-sheets (Mark, 2026-08-05: "should be on pay
+        {/* Here as well as on /timesheets (Mark, 2026-08-05: "should be on pay
             periods as well shouldn't it?"). It should: opening the period and
             filling it are one errand, and this is the screen you are on when
             you have just opened one. */}
         {canRunPayroll(session.membership.role) && (
           <Link
-            href="/time-sheets/import"
+            href="/timesheets/import"
             className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
           >
-            Import time sheets
+            Import timesheets
           </Link>
         )}
       </div>
