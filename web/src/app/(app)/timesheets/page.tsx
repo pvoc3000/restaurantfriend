@@ -95,7 +95,20 @@ export default async function TimeSheetsPage({
     periodId = (newest?.[0]?.pay_period_id as string | undefined) ?? periods[0].id;
   }
 
-  const [{ data: sheets, error }, { data: employees }, { data: waiverRows }] = await Promise.all([
+  // The chosen period's own dates. `break_premiums` and `tip_pools` are keyed by
+  // workday and business date, not by pay_period_id, so they are fetched by
+  // range rather than by id.
+  const chosen = periods.find((p) => p.id === periodId) ?? periods[0];
+  const periodStart = chosen.start_date;
+  const periodEnd = chosen.end_date;
+
+  const [
+    { data: sheets, error },
+    { data: employees },
+    { data: waiverRows },
+    { data: premiumRows },
+    { data: poolRows },
+  ] = await Promise.all([
     supabase
       .from("timesheets")
       .select(
@@ -118,6 +131,21 @@ export default async function TimeSheetsPage({
     // nothing at all. Returns zero rows today: FMP keeps its 51 waivers in the
     // Events table, which has never been migrated.
     supabase.from("employee_documents").select("employee_id").eq("kind", "meal_break_waiver"),
+    // The decisions and the pools, so the row expansions can show what is
+    // already on file rather than offering to record it again. Both are keyed
+    // by DATE rather than by pay_period_id — 029 keys them that way, since a
+    // premium belongs to a workday and a pool to a shop-day, neither of which
+    // knows about fortnights.
+    supabase
+      .from("break_premiums")
+      .select("id, employee_id, workday, kind, decision, hours, reason")
+      .gte("workday", periodStart)
+      .lte("workday", periodEnd),
+    supabase
+      .from("tip_pools")
+      .select("location_id, business_date, reported_cents, corrected_cents")
+      .gte("business_date", periodStart)
+      .lte("business_date", periodEnd),
   ]);
 
   if (error) {
@@ -147,6 +175,7 @@ export default async function TimeSheetsPage({
       employee_name: emp?.name ?? "(unknown)",
       employee_excludes_tips: emp?.excludes_tips ?? false,
       location_code: t.location_id ? (codeById.get(t.location_id as string) ?? null) : null,
+      location_id: (t.location_id ?? null) as string | null,
       workday: t.workday as string,
       business_date: t.business_date as string,
       workweek_start: t.workweek_start as string,
@@ -174,6 +203,26 @@ export default async function TimeSheetsPage({
       source_payload: (t.source_payload ?? null) as Record<string, unknown> | null,
     };
   });
+
+  // Keyed exactly as the expansion looks them up. A plain object rather than a
+  // Map because this crosses the server/client boundary.
+  const premiums: Record<string, { id: string; decision: string; hours: number; reason: string | null }> = {};
+  for (const p of premiumRows ?? []) {
+    premiums[`${p.employee_id}|${p.workday}|${p.kind}`] = {
+      id: p.id as string,
+      decision: p.decision as string,
+      hours: numOrNull(p.hours) ?? 0,
+      reason: (p.reason ?? null) as string | null,
+    };
+  }
+
+  const pools: Record<string, { reported_cents: number | null; corrected_cents: number | null }> = {};
+  for (const p of poolRows ?? []) {
+    pools[`${p.location_id}|${p.business_date}`] = {
+      reported_cents: numOrNull(p.reported_cents),
+      corrected_cents: numOrNull(p.corrected_cents),
+    };
+  }
 
   return (
     <div className="space-y-6">
@@ -205,6 +254,8 @@ export default async function TimeSheetsPage({
         // and a closed shop is not one (design rule 3).
         locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
         orgId={session.membership.org_id}
+        premiums={premiums}
+        pools={pools}
       />
     </div>
   );

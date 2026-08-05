@@ -19,6 +19,8 @@ import {
 } from "@/lib/overtime";
 import { MEAL_CODE_LABEL, assessWorkday, type BreakFinding } from "@/lib/breakRules";
 import { toBreakShift } from "@/lib/payrollWorksheet";
+import { allocateTips, type PoolResult } from "@/lib/tipPool";
+import { ShiftPremium, ShiftTips, type PremiumRow } from "./ShiftDecisions";
 import { AdjudicateOvertime } from "./AdjudicateOvertime";
 import { NewTimesheet } from "./NewTimesheet";
 import {
@@ -42,6 +44,8 @@ export type TimesheetRow = {
   employee_name: string;
   employee_excludes_tips: boolean;
   location_code: string | null;
+  /** Needed as well as the code: the tip pool and the premium are keyed by id. */
+  location_id: string | null;
   workday: string;
   business_date: string;
   workweek_start: string;
@@ -145,6 +149,8 @@ export function TimesheetsList({
   employees,
   locations,
   orgId,
+  premiums,
+  pools,
 }: {
   rows: TimesheetRow[];
   periods: PeriodOption[];
@@ -160,6 +166,10 @@ export function TimesheetsList({
   employees: { id: string; name: string }[];
   locations: { id: string; code: string }[];
   orgId: string;
+  /** Premium decisions already on file, keyed `employee|workday|kind`. */
+  premiums: Record<string, PremiumRow>;
+  /** Each shop-day's reported and corrected figure, keyed `location|date`. */
+  pools: Record<string, { reported_cents: number | null; corrected_cents: number | null }>;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -314,6 +324,63 @@ export function TimesheetsList({
     }
     return { regular, ot, dot, sick, worked, unfinished, disagreeing };
   }, [sorted]);
+
+  /**
+   * How many shifts each employee-workday holds — the premium control says so,
+   * because one hour per workday is the statutory cap and a control that looks
+   * per-shift would otherwise read as one premium per shift.
+   */
+  const shiftsPerWorkday = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const r of rows) {
+      const k = `${r.employee_id}|${r.workday}`;
+      n.set(k, (n.get(k) ?? 0) + 1);
+    }
+    return n;
+  }, [rows]);
+
+  /**
+   * Each shop-day's pool, divided.
+   *
+   * Computed over the WHOLE period rather than the filtered set, for the same
+   * reason the overtime recompute is: the rate is pooled dollars ÷ everyone's
+   * tip hours, so hiding half a shop-day behind a search box would change the
+   * share shown for the half still on screen.
+   */
+  const dayPools = useMemo(() => {
+    const days = new Map<string, TimesheetRow[]>();
+    for (const r of rows) {
+      if (!r.location_id) continue;
+      const k = `${r.location_id}|${r.business_date}`;
+      const list = days.get(k);
+      if (list) list.push(r);
+      else days.set(k, [r]);
+    }
+    const out = new Map<string, { result: PoolResult | null; reported: number | null; corrected: number | null }>();
+    for (const [k, dayRows] of days) {
+      const pool = pools[k];
+      const effective = pool ? (pool.corrected_cents ?? pool.reported_cents) : null;
+      out.set(k, {
+        reported: pool?.reported_cents ?? null,
+        corrected: pool?.corrected_cents ?? null,
+        result:
+          effective === null
+            ? null
+            : allocateTips(
+                effective,
+                dayRows.map((r) => ({
+                  id: r.id,
+                  // Tip hours are hours WORKED. Sick hours are a separate
+                  // column and never enter this sum.
+                  hours: workedHours(r) ?? 0,
+                  excludeShift: r.exclude_tips,
+                  excludePerson: r.employee_excludes_tips,
+                }))
+              ),
+      });
+    }
+    return out;
+  }, [rows, pools]);
 
   /** Distinct (employee, workday) pairs owing a meal finding, among what's shown. */
   const mealDays = useMemo(() => {
@@ -708,6 +775,10 @@ export function TimesheetsList({
               editable={editable}
               proposal={needsReview.has(r.id) ? (proposals.get(r.id) ?? null) : null}
               finding={breakFindings.get(r.id) ?? null}
+              dayShifts={shiftsPerWorkday.get(`${r.employee_id}|${r.workday}`) ?? 1}
+              premium={premiums[`${r.employee_id}|${r.workday}|meal`] ?? null}
+              pool={r.location_id ? (dayPools.get(`${r.location_id}|${r.business_date}`) ?? null) : null}
+              orgId={orgId}
             />
           ),
         }}
@@ -926,6 +997,10 @@ function ShiftDetail({
   editable,
   proposal,
   finding,
+  dayShifts,
+  premium,
+  pool,
+  orgId,
 }: {
   row: TimesheetRow;
   editable: boolean;
@@ -933,6 +1008,13 @@ function ShiftDetail({
   proposal: ShiftProposal | null;
   /** The day's meal finding, if it owes one. Derived, never stored. */
   finding: BreakFinding | null;
+  /** Shifts on this employee-workday — what the premium covers. */
+  dayShifts: number;
+  /** The decision already on file for this workday's meal, if any. */
+  premium: PremiumRow | null;
+  /** This shop-day's pool and its division. */
+  pool: { result: PoolResult | null; reported: number | null; corrected: number | null } | null;
+  orgId: string;
 }) {
   const disagreements = otDisagreements(row);
   const payload = row.source_payload ?? {};
@@ -1038,22 +1120,10 @@ function ShiftDetail({
 
       <div className="space-y-2">
         <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">Notes</h3>
-        {/* The finding in full, where the grid's chip only had room for a word.
-            It stops here: the DECISION is recorded on the pay period's
-            worksheet, because a premium is capped at one a day and this screen
-            is per shift — offering it here would be a second writer for a rule
-            whose whole shape is the cap. */}
-        {finding && (
-          <div className="space-y-1 border border-ink bg-mark-fill px-3 py-2 text-sm text-ink">
-            <p className="font-semibold">{MEAL_CODE_LABEL[finding.code]}</p>
-            <p>{finding.detail}</p>
-            {finding.waivable && <p>A signed meal-break waiver would cover this day.</p>}
-            <p className="text-[13px]">
-              Derived from the punches, never stored. Record the decision on the
-              pay period&rsquo;s worksheet.
-            </p>
-          </div>
-        )}
+        {/* The finding used to be restated here, with a line sending you to the
+            pay-period worksheet to decide it. Both are gone: the Meal premium
+            block below states it AND decides it, and saying the same thing
+            twice in one expansion is how a reader learns to skim one of them. */}
         {row.stitched && (
           <p className="text-sm text-mark">
             Reassembled from segments a source split at midnight.
@@ -1098,6 +1168,38 @@ function ShiftDetail({
           </dd>
         </dl>
       </div>
+
+      {/* THE TWO DECISIONS THAT USED TO LIVE ON THE PAY-PERIOD WORKSHEET.
+          They are here because this is where the evidence is (Mark,
+          2026-08-05): the punches, the recorded meal and the day's hours are
+          all above them, where on the worksheet a finding was a name, a date
+          and a sentence you had to leave the screen to check.
+
+          Five children in a three-column grid flow onto a second row by
+          themselves — there is no second layout to keep in step. */}
+      <ShiftPremium
+        employeeId={row.employee_id}
+        locationId={row.location_id}
+        workday={row.workday}
+        dayShifts={dayShifts}
+        finding={finding}
+        existing={premium}
+        editable={editable}
+        orgId={orgId}
+      />
+
+      <ShiftTips
+        locationId={row.location_id}
+        locationCode={row.location_code}
+        businessDate={row.business_date}
+        reportedCents={pool?.reported ?? null}
+        correctedCents={pool?.corrected ?? null}
+        result={pool?.result ?? null}
+        tipHours={pool?.result?.allocations.find((a) => a.id === row.id)?.tipHours ?? 0}
+        allocationCents={pool?.result?.allocations.find((a) => a.id === row.id)?.cents ?? null}
+        excluded={effectiveExclusion(row.exclude_tips, row.employee_excludes_tips)}
+        editable={editable}
+      />
     </div>
   );
 }

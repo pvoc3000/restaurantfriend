@@ -442,8 +442,8 @@ export async function PayPeriodDetail({
         employees={rollup}
         findings={findings}
         pools={pools}
-        editable={editable}
-        orgId={session.membership.org_id}
+        // The worksheet SHOWS; the timesheets screen DECIDES (Mark, 2026-08-05).
+        timesheetsHref={`/timesheets?period=${period.id}`}
       />
       )}
 

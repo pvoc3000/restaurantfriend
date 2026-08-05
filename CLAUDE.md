@@ -1352,6 +1352,44 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    written before it keep the wrong figure until the file is imported again —
    which corrects them in place, the upsert being on `source_row_key`. Measured
    on the 07/20–08/02 fortnight: 6 rows, all Gaspar's, 3.03 hours over-counted.
+   **ONE PLACE TO DO THE WORK, AND IT IS THE TIMESHEET ROW** (Mark, 2026-08-05:
+   "I'm not sure whether it's in pay periods or in timesheets, but there should
+   be one place to do what we need… Timesheets seems more natural to me because
+   there's more info there so you can judge errors more clearly. In Pay Periods
+   you have to just take the app's word for it"). The meal-premium decision and
+   the tip-pool figure moved out of the pay-period worksheet and into the row's
+   own expansion (`ShiftDecisions.tsx`), beside the punches, the recorded meal
+   and the day's hours. The worksheet KEPT its three totals and lost both
+   editors; it is now the view before you export — how many decisions are
+   outstanding and what they come to — with a link to the period's timesheets.
+   The export stays there regardless: `freeze_pay_period` is period-scoped.
+   **BOTH CONTROLS ARE COARSER THAN THE ROW THEY SIT IN, and each says so.** A
+   row is one SHIFT; a meal premium is per employee-WORKDAY (§226.7 pays one
+   hour per workday per CATEGORY — *UPS v. Superior Court* (2011) allows a meal
+   hour and a rest hour on one day but never two of either, which is exactly
+   029's `unique (org_id, employee_id, workday, kind)`); a tip pool is per
+   SHOP-DAY. So on a two-shift day both expansions show the same premium and
+   write the same row, and every shift at one shop on one day shows the same
+   pool. The premium UPSERTS on the cap's own key, so recording from the second
+   shift CHANGES the decision rather than returning a unique-violation to
+   somebody standing in a shop — verified: two sends, one row, the same id.
+   **Tips have a writer at last.** There was none outside the worksheet, and
+   the worksheet could not show you the shift the money was being divided over.
+   It goes through `report_pooled_tips`, the definer function 029 added, not a
+   direct update — RLS filters rows and not columns, and that function is what
+   will let a supervisor report the day's figure without also being able to
+   touch the corrected one beside it.
+   **Migration 032 — a reason is required only when the premium is OWED.** 029
+   made it NOT NULL with a non-empty check on the reasoning that a decision
+   nobody can audit is worthless; that is true of the one that PAYS and false of
+   the other two, and a fortnight carries ninety findings, most of them a short
+   shift that needed no meal at all. Demanding a sentence for each is how a
+   reviewer learns to stop reviewing (Mark: "don't make it required to enter a
+   'why' when waiving or declaring not owed"). The requirement moved onto the
+   decision: `check (decision <> 'owed' or reason is non-empty)`.
+   **Until 032 is applied a waiver with no reason is refused** with "null value
+   in column reason violates not-null constraint" — verified against the live
+   database, along with the owed-with-a-reason path and the upsert.
    **Audit scripts must `.order()` before paginating.** A `.range()` sweep with
    no ORDER BY returns rows in whatever order Postgres likes, so pages overlap:
    measured, 44,661 rows fetched held only 27,795 distinct ids. That fabricated

@@ -1,26 +1,14 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
+import Link from "next/link";
 
-import { createClient } from "@/lib/supabase/client";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { TabPicker } from "@/components/ui/TabPicker";
-import { TextInput } from "@/components/ui/TextInput";
-import { PickList } from "@/components/ui/PickList";
 import { MEAL_CODE_LABEL } from "@/lib/breakRules";
-import { formatCents, formatRate, parseDollarsToCents } from "@/lib/tipPool";
+import { formatCents, formatRate } from "@/lib/tipPool";
 import type { DayPool, WorkdayFinding, WorksheetEmployee } from "@/lib/payrollWorksheet";
-
-const BUTTON =
-  "inline-flex h-8 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
-
-const DECISION_OPTIONS = [
-  { value: "owed", label: "Owed", hint: "a premium hour is due" },
-  { value: "waived", label: "Waived", hint: "a signed waiver covers it" },
-  { value: "not_owed", label: "Not owed", hint: "looked at; the rule wasn't broken" },
-];
 
 /**
  * The payroll worksheet: one fortnight, in the three views a human needs before
@@ -35,14 +23,13 @@ export function PayrollWorksheet({
   employees,
   findings,
   pools,
-  editable,
-  orgId,
+  timesheetsHref,
 }: {
   employees: WorksheetEmployee[];
   findings: WorkdayFinding[];
   pools: DayPool[];
-  editable: boolean;
-  orgId: string;
+  /** Where the work is actually done — see the note on this component. */
+  timesheetsHref: string;
 }) {
   const [view, setView] = useState<"hours" | "breaks" | "tips">("hours");
 
@@ -67,13 +54,33 @@ export function PayrollWorksheet({
         ]}
       />
 
+      {/* THE WORKSHEET SHOWS; THE TIMESHEETS SCREEN DECIDES (Mark, 2026-08-05:
+          "there should be one place to do what we need… Timesheets seems more
+          natural to me because there's more info there so you can judge errors
+          more clearly").
+
+          So Breaks and Tips kept their totals and lost their editors. A finding
+          here is a name, a date and a sentence; everything you would need to
+          judge it is on the shift, one click away, which is where the controls
+          now live. What this screen is still for is the view before you export:
+          how many decisions are outstanding, and what the totals come to. */}
+      <p className="max-w-[80ch] text-sm text-muted">
+        A summary, before the file is produced. Premiums and tips are recorded on
+        the shift itself, where the punches are —{" "}
+        <Link
+          href={timesheetsHref}
+          className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+        >
+          open this period&rsquo;s timesheets
+        </Link>
+        .
+      </p>
+
       {view === "hours" && <HoursBlock employees={employees} />}
-      {view === "breaks" && (
-        <BreaksBlock findings={findings} editable={editable} orgId={orgId} />
-      )}
+      {view === "breaks" && <BreaksBlock findings={findings} />}
       {/* Every value in the worksheet is a DATE or an amount — no instants, so
           no time zone is needed anywhere below. */}
-      {view === "tips" && <TipsBlock pools={pools} editable={editable} />}
+      {view === "tips" && <TipsBlock pools={pools} />}
     </section>
   );
 }
@@ -171,15 +178,7 @@ function HoursBlock({ employees }: { employees: WorksheetEmployee[] }) {
 
 /* -------------------------------------------------------------------------- */
 
-function BreaksBlock({
-  findings,
-  editable,
-  orgId,
-}: {
-  findings: WorkdayFinding[];
-  editable: boolean;
-  orgId: string;
-}) {
+function BreaksBlock({ findings }: { findings: WorkdayFinding[] }) {
   const [showDecided, setShowDecided] = useState(false);
   const shown = useMemo(
     () => (showDecided ? findings : findings.filter((f) => !f.decided)),
@@ -201,10 +200,10 @@ function BreaksBlock({
       </div>
 
       <p className="max-w-[80ch] text-sm text-muted">
-        These are DERIVED from the punches every time this screen loads, never
+        Derived from the punches every time this screen loads, never
         stored — a flag about a punch goes stale the moment the punch is
-        corrected. What gets stored is your decision. Rest breaks are not
-        assessed at all: they are paid, so they leave no punch, and anything
+        corrected. What gets stored is your decision, and you record it on the
+        shift. Rest breaks are not assessed at all: they are paid, so they leave no punch, and anything
         derived from shift length alone would flag nearly every shift.
       </p>
 
@@ -217,12 +216,7 @@ function BreaksBlock({
       ) : (
         <ul className="space-y-2">
           {shown.map((f) => (
-            <FindingRow
-              key={`${f.employee_id}|${f.workday}|${f.finding.kind}`}
-              finding={f}
-              editable={editable}
-              orgId={orgId}
-            />
+            <FindingRow key={`${f.employee_id}|${f.workday}|${f.finding.kind}`} finding={f} />
           ))}
         </ul>
       )}
@@ -230,55 +224,7 @@ function BreaksBlock({
   );
 }
 
-function FindingRow({
-  finding,
-  editable,
-  orgId,
-}: {
-  finding: WorkdayFinding;
-  editable: boolean;
-  orgId: string;
-}) {
-  const router = useRouter();
-  const supabase = createClient();
-  const [pending, startTransition] = useTransition();
-  const [failed, setFailed] = useState<string | null>(null);
-  const [decision, setDecision] = useState("owed");
-  const [reason, setReason] = useState("");
-
-  function record() {
-    if (reason.trim() === "") return;
-    setFailed(null);
-    startTransition(async () => {
-      const { data, error } = await supabase
-        .from("break_premiums")
-        .insert({
-          org_id: orgId,
-          employee_id: finding.employee_id,
-          location_id: finding.location_id,
-          workday: finding.workday,
-          kind: finding.finding.kind,
-          decision,
-          // HOURS. One per premium; zero when nothing is owed, so the row still
-          // records that somebody looked.
-          hours: decision === "owed" ? 1 : 0,
-          reason: reason.trim(),
-        })
-        .select("id");
-
-      if (error) {
-        setFailed(error.message);
-        return;
-      }
-      if (!data || data.length === 0) {
-        setFailed("Nothing was written — the database refused it. This period may no longer be open.");
-        return;
-      }
-      setReason("");
-      router.refresh();
-    });
-  }
-
+function FindingRow({ finding }: { finding: WorkdayFinding }) {
   return (
     <li className="border border-hairline px-4 py-3 text-sm">
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
@@ -299,44 +245,13 @@ function FindingRow({
           A signed meal-break waiver would cover this day.
         </p>
       )}
-
-      {!finding.decided && editable && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <PickList
-            variant="field"
-            ariaLabel="Decision"
-            value={decision}
-            onPick={setDecision}
-            options={DECISION_OPTIONS}
-            className="w-44"
-          />
-          <TextInput
-            value={reason}
-            onValueChange={setReason}
-            placeholder="Why (required)"
-            aria-label="Reason for this decision"
-            clearLabel="Clear the reason"
-            className="h-8 w-80 text-[13px]"
-          />
-          <button
-            type="button"
-            disabled={pending || reason.trim() === ""}
-            onClick={record}
-            className={BUTTON}
-          >
-            {pending ? "Saving…" : "Record"}
-          </button>
-        </div>
-      )}
-
-      {failed && <p className="mt-2 border border-accent px-3 py-2 text-[13px] text-accent">{failed}</p>}
     </li>
   );
 }
 
 /* -------------------------------------------------------------------------- */
 
-function TipsBlock({ pools, editable }: { pools: DayPool[]; editable: boolean }) {
+function TipsBlock({ pools }: { pools: DayPool[] }) {
   const totalPooled = pools.reduce((n, p) => n + (p.effectiveCents ?? 0), 0);
   const totalResidual = pools.reduce((n, p) => n + (p.result?.residualCents ?? 0), 0);
   const missing = pools.filter((p) => p.effectiveCents === null);
@@ -364,44 +279,14 @@ function TipsBlock({ pools, editable }: { pools: DayPool[]; editable: boolean })
 
       <ul className="space-y-2">
         {pools.map((p) => (
-          <PoolRow key={`${p.location_id}|${p.business_date}`} pool={p} editable={editable} />
+          <PoolRow key={`${p.location_id}|${p.business_date}`} pool={p} />
         ))}
       </ul>
     </div>
   );
 }
 
-function PoolRow({ pool, editable }: { pool: DayPool; editable: boolean }) {
-  const router = useRouter();
-  const supabase = createClient();
-  const [pending, startTransition] = useTransition();
-  const [failed, setFailed] = useState<string | null>(null);
-  const [entry, setEntry] = useState("");
-
-  const cents = parseDollarsToCents(entry);
-  const ready = cents !== null && cents >= 0 && !pending;
-
-  function report() {
-    if (!ready) return;
-    setFailed(null);
-    startTransition(async () => {
-      // The definer function, not a direct write: it is what lets a supervisor
-      // record the figure without being able to touch the correction beside it.
-      // RLS filters rows, not columns.
-      const { error } = await supabase.rpc("report_pooled_tips", {
-        p_location_id: pool.location_id,
-        p_business_date: pool.business_date,
-        p_cents: cents,
-      });
-      if (error) {
-        setFailed(error.message);
-        return;
-      }
-      setEntry("");
-      router.refresh();
-    });
-  }
-
+function PoolRow({ pool }: { pool: DayPool }) {
   const r = pool.result;
 
   return (
@@ -449,28 +334,6 @@ function PoolRow({ pool, editable }: { pool: DayPool; editable: boolean }) {
         )}
       </div>
 
-      {editable && (
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <TextInput
-            value={entry}
-            onValueChange={setEntry}
-            placeholder={pool.effectiveCents === null ? "Card tips for the day, e.g. 423.50" : "Replace the reported figure"}
-            aria-label={`Pooled tips for ${pool.locationCode} on ${pool.business_date}`}
-            clearLabel="Clear"
-            className="h-8 w-56 text-[13px]"
-          />
-          <button type="button" disabled={!ready} onClick={report} className={BUTTON}>
-            {pending ? "Saving…" : "Report"}
-          </button>
-          {entry.trim() !== "" && cents === null && (
-            <span className="text-[13px] text-accent">
-              Enter dollars and cents, e.g. 423.50
-            </span>
-          )}
-        </div>
-      )}
-
-      {failed && <p className="mt-2 border border-accent px-3 py-2 text-[13px] text-accent">{failed}</p>}
     </li>
   );
 }
