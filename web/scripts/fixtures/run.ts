@@ -3,6 +3,7 @@
 // Importing a fixtures file registers its cases; runAll then runs them and
 // exits non-zero on the first failure it reports.
 
+import "./breakRules.fixtures";
 import "./columnOrder.fixtures";
 import "./columnVisibility.fixtures";
 import "./documentLines.fixtures";
@@ -18,6 +19,7 @@ import "./payPeriods.fixtures";
 import "./poFilters.fixtures";
 import "./receiving.fixtures";
 import "./tableSort.fixtures";
+import "./tipPool.fixtures";
 import "./timeZone.fixtures";
 import "./timesheets.fixtures";
 import { runAll } from "./harness";

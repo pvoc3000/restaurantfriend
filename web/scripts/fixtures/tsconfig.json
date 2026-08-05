@@ -24,6 +24,8 @@
     "../../src/lib/payPeriods.ts",
     "../../src/lib/timeZone.ts",
     "../../src/lib/timesheets.ts",
-    "../../src/lib/overtime.ts"
+    "../../src/lib/overtime.ts",
+    "../../src/lib/breakRules.ts",
+    "../../src/lib/tipPool.ts"
   ]
 }
