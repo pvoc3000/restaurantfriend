@@ -1240,6 +1240,48 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    a lot, and 28 of the 31 no-meal days would be covered by a signed waiver. Zero
    waivers are loaded — FMP keeps them in its Events table, never migrated —
    which is the same data gap already recorded under phase 5.
+   **A DAY'S OVERTIME WAS POURED OVER ITS SHIFTS IN UUID ORDER** (found by Mark
+   reading one row, 2026-08-05). `pourOverShifts` fills regular hours first and
+   then overtime, so the order it walks decides which shift CARRIES the premium
+   — and `proposeOvertime` sorted a workday's shifts by `id` while its own
+   comment said "chronologically". The day's TOTAL was always right, which is
+   why seven years of totals looked fine and nothing caught it; what was wrong
+   was the allocation, and it only shows when you read a single shift.
+   Eddy Salazar, workday 2026-07-26: 7.20h from 12:18am and 9.50h from 10:10pm.
+   The day is 16.70h → 8 regular, 4 OT, 4.70 double. Poured by uuid the LATE
+   shift sorted first and took the 8 regular hours, so the app proposed 2.50 OT
+   and 4.70 DOUBLE on the seven-hour shift and explained it with "over 8 hours
+   in the day; over 12 hours in the day". `ShiftHours` gained **`starts_at`**
+   and the pour is chronological, with a shift that has no punch sinking last
+   and `id` as the final tiebreak so the answer never depends on row arrival
+   order. Measured over all 178 periods: 174 shifts moved, the **needs-review
+   queue fell 267 → 135 (132 of it was this bug)**, and the totals did not
+   move at all (Δ 0.00), which is the invariant that says only the allocation
+   changed. 8 fixtures, checked by reverting: 5 go red and reproduce Mark's
+   exact numbers.
+   `ShiftProposal` also gained **`day_hours` / `day_shifts`**, and the tooltip
+   names them — "That day totals 16.70h across 2 shifts". Overtime belongs to
+   the DAY, so a five-hour shift can correctly be told "over 8 hours in the
+   day"; on a single row that reads as a contradiction unless the day's own
+   total is stated. 126 shifts under 8h still legitimately carry a daily reason.
+   **THE MEAL RULE WAS RIGHT AND ITS SENTENCE WAS WRONG.** Mark read "it must
+   begin before the end of the fifth hour" as meaning 6h00 and reported breaks
+   at 5h32m as wrongly flagged. The threshold is 5h00 — *Brinker* puts the meal
+   "no later than the end of the employee's fifth hour of work", and the fifth
+   hour RUNS FROM 4h00 TO 5h00 — but the phrasing invites exactly that
+   misreading. Settled empirically rather than by argument, over 28,385 real
+   shifts carrying both a clock-in and a meal punch: `cTimeSheetError` says
+   "Late Break" on **0 of the 18,314** beginning before 5h00 and on **93–95%**
+   of those after it, including 3,135 of 3,371 in the 5h00–5h30 band. Thirteen
+   years of FileMaker enforce exactly 5h00. Every message now says "within 5
+   hours" and never "the fifth hour".
+   **Audit scripts must `.order()` before paginating.** A `.range()` sweep with
+   no ORDER BY returns rows in whatever order Postgres likes, so pages overlap:
+   measured, 44,661 rows fetched held only 27,795 distinct ids. That fabricated
+   duplicate shifts, 45-hour workdays and 112,338 double-time hours, and read
+   exactly like a catastrophic data-integrity problem. The data is clean —
+   44,661 rows, 44,661 distinct `source_row_key`. Check `ids.size === rows.length`
+   before believing any whole-table audit.
 4d. 🚧 **Invoices** — the third module, and the one that finishes the purchasing
    loop (Mark, 2026-08-04, after using the receiving screen: "this reconcile PO
    workflow is new to me and I love it… Every time we upload an invoice to a

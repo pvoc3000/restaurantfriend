@@ -35,7 +35,28 @@ const MEAL_WAIVABLE_UP_TO_HOURS = 6;
 const SECOND_MEAL_REQUIRED_AFTER_HOURS = 10;
 const SECOND_MEAL_WAIVABLE_UP_TO_HOURS = 12;
 const MEAL_MINUTES = 30;
-/** The meal must BEGIN before the end of the fifth hour of work. */
+/**
+ * The meal must BEGIN within five hours of clocking in.
+ *
+ * NOT SIX, and the number is worth defending because the usual phrasing invites
+ * exactly one misreading. *Brinker v. Superior Court* (2012) puts the first meal
+ * period "no later than the end of the employee's fifth hour of work", and the
+ * fifth hour of work RUNS FROM the four-hour mark TO the five-hour mark — so it
+ * ends at 5h00 elapsed, not 6h00. Read as ordinary English, "before the end of
+ * the fifth hour" sounds like it means 6h00, which is how the old wording of
+ * this rule was read (Mark, 2026-08-05, on breaks starting 5h32m in: "these
+ * breaks are being improperly flagged as a violation when they are not").
+ *
+ * FileMaker settles it empirically, and it is the better evidence than any
+ * phrasing: measured over 28,385 real shifts carrying both a clock-in and a
+ * meal punch, `cTimeSheetError` says "Late Break" on 0 of the 18,314 breaks
+ * beginning before 5h00, and on 93–95% of those beginning after it — including
+ * 3,135 of 3,371 in the 5h00–5h30 band and 3,380 of 3,564 in 5h30–6h00. The
+ * threshold that system has enforced for thirteen years is exactly 5h00.
+ *
+ * So the rule was right and its SENTENCE was wrong. Every message below now
+ * says "within 5 hours" and never "the fifth hour".
+ */
 const MEAL_MUST_START_WITHIN_MINUTES = 5 * 60;
 
 export type BreakShift = {
@@ -70,7 +91,7 @@ export type BreakFinding = {
 export const MEAL_CODE_LABEL: Record<MealCode, string> = {
   no_meal: "No meal break recorded",
   short_meal: "Meal break under 30 minutes",
-  late_meal: "Meal break started after the fifth hour",
+  late_meal: "Meal break started more than 5 hours in",
   no_second_meal: "No second meal break on a day over 10 hours",
 };
 
@@ -130,7 +151,7 @@ export function assessWorkday(
     findings.push({
       kind: "meal",
       code: "late_meal",
-      detail: `Meal break began ${h}h ${m}m into the shift; it must begin before the end of the fifth hour.`,
+      detail: `Meal break began ${h}h ${m}m into the shift; California requires it to start within 5 hours of clocking in.`,
       waivable: false,
     });
   } else if (totalHours > SECOND_MEAL_REQUIRED_AFTER_HOURS && withMeal.length < 2) {

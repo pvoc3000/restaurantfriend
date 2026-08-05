@@ -262,7 +262,16 @@ export async function PayPeriodDetail({
         const wk = raw.find((r) => r.id === s.id)?.workweek_start as string | undefined;
         return hours === null || !wk
           ? null
-          : { id: s.id, employee_id: s.employee_id, workday: s.workday, workweek_start: wk, hours };
+          : {
+              id: s.id,
+              employee_id: s.employee_id,
+              workday: s.workday,
+              workweek_start: wk,
+              hours,
+              // Which shift carries the day's overtime depends on this. See
+              // `ShiftHours.starts_at`.
+              starts_at: s.clock_in,
+            };
       })
       .filter((x): x is NonNullable<typeof x> => x !== null)
   );

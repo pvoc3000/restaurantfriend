@@ -201,6 +201,9 @@ export function TimesheetsList({
                   workday: r.workday,
                   workweek_start: r.workweek_start,
                   hours,
+                  // Which shift carries the day's overtime depends on this.
+                  // See `ShiftHours.starts_at`.
+                  starts_at: r.clock_in,
                 };
           })
           // An unfinished shift has no hours to classify. Feeding it 0 would
@@ -473,6 +476,7 @@ export function TimesheetsList({
           value={r.hours_overtime}
           editable={editable}
           proposed={proposedFor(r, "overtime")}
+          day={proposals.get(r.id) ?? null}
           // Why there is overtime at all. `proposeOvertime` already names its
           // reasons — they were only ever shown after you opened a row AND the
           // recompute disagreed, which is the rarest case rather than the
@@ -495,6 +499,7 @@ export function TimesheetsList({
           value={r.hours_double_ot}
           editable={editable}
           proposed={proposedFor(r, "double_ot")}
+          day={proposals.get(r.id) ?? null}
           reasons={proposals.get(r.id)?.reasons ?? []}
         />
       ),
@@ -731,6 +736,7 @@ function HoursCell({
   editable,
   reasons = [],
   proposed = null,
+  day = null,
 }: {
   row: TimesheetRow;
   column: "hours_regular" | "hours_overtime" | "hours_double_ot" | "sick_hours";
@@ -739,6 +745,8 @@ function HoursCell({
   reasons?: OvertimeReason[];
   /** Our recomputed figure for THIS field, when it disagrees with the row. */
   proposed?: number | null;
+  /** The workday this shift sits in — what every daily reason is about. */
+  day?: { day_hours: number; day_shifts: number } | null;
 }) {
   const differs =
     column !== "sick_hours" &&
@@ -759,9 +767,20 @@ function HoursCell({
 
   // Only on a cell that actually carries overtime — "over 8 hours in the day"
   // hovering over a regular-hours cell explains nothing about that cell.
+  //
+  // It NAMES THE DAY'S OWN TOTAL, because overtime belongs to the workday and
+  // not to the shift carrying it: a five-hour shift can correctly be told "over
+  // 8 hours in the day" when it is the one that ran past the eighth hour, and
+  // read on a single row that looks like the app contradicting itself. Saying
+  // "16.70h across 2 shifts" is what lets the sentence be checked.
   const why =
     reasons.length > 0 && column !== "hours_regular" && column !== "sick_hours" && (value ?? 0) > 0
-      ? `Overtime because: ${reasons.map((r) => REASON_LABEL[r]).join("; ")}.`
+      ? `Overtime because: ${reasons.map((r) => REASON_LABEL[r]).join("; ")}.` +
+        (day && day.day_shifts > 1
+          ? ` That day totals ${day.day_hours.toFixed(2)}h across ${day.day_shifts} shifts.`
+          : day
+            ? ` That day totals ${day.day_hours.toFixed(2)}h.`
+            : "")
       : null;
 
   return (

@@ -53,6 +53,28 @@ export type ShiftHours = {
    *  worked hours and must not appear here: you weren't on the floor, and
    *  counting them would manufacture overtime out of paid leave. */
   hours: number;
+  /**
+   * When the shift began, as a sortable instant (an ISO string or epoch ms).
+   *
+   * REQUIRED FOR CORRECTNESS ON ANY DAY HOLDING MORE THAN ONE SHIFT, which is
+   * why it exists at all. `pourOverShifts` fills regular hours first and then
+   * overtime, so the ORDER it walks decides which shift carries the overtime —
+   * and until 2026-08-05 that order was the shift's `id`, a uuid, i.e. random.
+   *
+   * Measured on Eddy Salazar, workday 2026-07-26: a 7.20h shift at 12:18am and
+   * a 9.50h shift at 10:10pm. The day is 16.70h → 8 regular, 4 OT, 4.70 double,
+   * and that TOTAL was never in doubt. Poured chronologically the early shift
+   * takes 7.20 regular and the late one carries the overtime, which is what
+   * FileMaker stored. Poured by uuid the late shift sorted first, took the 8
+   * regular hours, and the app proposed 2.50 OT and 4.70 DOUBLE on a
+   * seven-hour shift — reporting "over 8 hours in the day; over 12 hours in the
+   * day" against a shift that was neither (Mark, 2026-08-05).
+   *
+   * Optional because a caller may have none — an adjustment row has no punch.
+   * Those sort last, and `id` is the final tiebreak so the answer is at least
+   * deterministic where nothing else can order it.
+   */
+  starts_at?: string | number | null;
 };
 
 export type Split = { regular: number; overtime: number; double_ot: number };
@@ -62,6 +84,20 @@ export type ShiftProposal = Split & {
   /** Why this shift got overtime at all — for the screen, so a proposal can be
    *  argued with rather than merely accepted. */
   reasons: OvertimeReason[];
+  /**
+   * The WORKDAY's total hours and shift count — the quantity every daily reason
+   * is actually about.
+   *
+   * Overtime belongs to the day, not to the shift that carries it, so a five-
+   * hour shift can correctly be told "over 8 hours in the day" when it is the
+   * one that ran past the eighth hour. Read on a single row that looks like a
+   * contradiction, and it is what sent Mark looking for a bug (2026-08-05) — he
+   * found a real one, but this reading would have been confusing even after it
+   * was fixed. Stating the day's own total is what makes the sentence check out
+   * against the row you are looking at.
+   */
+  day_hours: number;
+  day_shifts: number;
 };
 
 export type OvertimeReason = "daily_over_8" | "daily_over_12" | "weekly_over_40" | "seventh_day";
@@ -108,6 +144,22 @@ function splitDay(hours: number, isSeventhDay: boolean): { split: Split; reasons
 }
 
 /**
+ * Earliest first; a shift with no start time sinks; `id` breaks the tie so the
+ * result never depends on the order rows arrived in.
+ *
+ * The empty-sinks-last rule is `lib/tableSort`'s, and for the same reason: a
+ * missing value is not a small one.
+ */
+function compareByStart(a: ShiftHours, b: ShiftHours): number {
+  const av = a.starts_at ?? null;
+  const bv = b.starts_at ?? null;
+  if (av === null && bv !== null) return 1;
+  if (bv === null && av !== null) return -1;
+  if (av !== null && bv !== null && av !== bv) return av < bv ? -1 : 1;
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+
+/**
  * Pour a day's decided split back over its individual shifts, chronologically.
  *
  * A workday can hold more than one shift (a split shift, or a double at two
@@ -118,7 +170,8 @@ function splitDay(hours: number, isSeventhDay: boolean): { split: Split; reasons
 function pourOverShifts(
   shifts: ShiftHours[],
   split: Split,
-  reasons: OvertimeReason[]
+  reasons: OvertimeReason[],
+  dayHours: number
 ): ShiftProposal[] {
   let regularLeft = split.regular;
   let otLeft = split.overtime;
@@ -140,6 +193,8 @@ function pourOverShifts(
       regular: round2(regular),
       overtime: round2(overtime),
       double_ot: round2(double_ot),
+      day_hours: round2(dayHours),
+      day_shifts: shifts.length,
       // Only name a reason on a shift that actually carries the hours it
       // explains — otherwise every shift on a long day claims the overtime.
       reasons: reasons.filter(
@@ -227,9 +282,12 @@ export function proposeOvertime(shifts: readonly ShiftHours[]): Map<string, Shif
     // --- pour each day's answer back over its shifts ---
     for (const day of orderedDays) {
       const entry = perDay.get(day);
-      const dayShifts = (days.get(day) ?? []).slice().sort((a, b) => (a.id < b.id ? -1 : 1));
+      // CHRONOLOGICALLY — see `ShiftHours.starts_at`. Sorting by `id` here put
+      // a day's overtime on whichever shift happened to have the lower uuid.
+      const dayShifts = (days.get(day) ?? []).slice().sort(compareByStart);
       if (!entry) continue;
-      for (const p of pourOverShifts(dayShifts, entry.split, entry.reasons)) out.set(p.id, p);
+      const dayHours = dayShifts.reduce((n, s) => n + s.hours, 0);
+      for (const p of pourOverShifts(dayShifts, entry.split, entry.reasons, dayHours)) out.set(p.id, p);
     }
   }
 
