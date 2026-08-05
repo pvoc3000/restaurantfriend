@@ -52,6 +52,24 @@ export type HomebaseRow = {
   breakStart: string | null;
   breakEnd: string | null;
   breakMinutes: number | null;
+  /**
+   * The "Unpaid breaks" column, in MINUTES — the total Homebase actually
+   * deducted, which is NOT the "Break length" beside the punch pair.
+   *
+   * Homebase records at most one Break start / Break end pair per row, but it
+   * totals every unpaid break in this column. On a long overnight a second meal
+   * is taken and deducted while the punch columns still show only the first, so
+   * the two disagree: Gaspar López, 2026-07-23, punched 6:01pm → 8:10am with
+   * "Break length" 30 min and "Unpaid breaks" 1.00 — and 14.15 − 1.00 is exactly
+   * the 13.15 Homebase paid (Mark, 2026-08-05).
+   *
+   * Measured over both real exports, 159 punched rows: span − "Unpaid breaks"
+   * equals Homebase's own "Actual hours" on 159 of 159, where span − "Break
+   * length" matches on 153. So this is the authority for HOURS WORKED, and
+   * `breakMinutes` stays the authority for how long the recorded MEAL was —
+   * which is what the meal rule needs, and a figure the total can't give.
+   */
+  unpaidBreakMinutes: number | null;
   role: string | null;
   regularHours: number | null;
   overtimeHours: number | null;
@@ -74,6 +92,8 @@ export type ParsedShift = {
   clockOutMinutes: number | null;
   breakStartMinutes: number | null;
   breakMinutes: number | null;
+  /** Total unpaid break to deduct from the clock span. See HomebaseRow. */
+  unpaidBreakMinutes: number | null;
   role: string | null;
   source: HomebaseRow;
   /** True when this row was reassembled from two segments. */
@@ -265,6 +285,8 @@ export function planImport(text: string): ImportPlan {
     breakStart: at("Break start"),
     breakEnd: at("Break end"),
     breakLength: at("Break length"),
+    // NOT the same column as "Break length" — see `unpaidBreakMinutes`.
+    unpaidBreaks: at("Unpaid breaks"),
     payrollId: at("Payroll ID"),
     role: at("Role"),
     regular: at("Regular hours"),
@@ -308,6 +330,11 @@ export function planImport(text: string): ImportPlan {
       breakStart: cell(r[cols.breakStart]),
       breakEnd: cell(r[cols.breakEnd]),
       breakMinutes: breakLength(cell(r[cols.breakLength])),
+      // HOURS in the file — 1.00, 0.52 — where "Break length" is "30 min".
+      unpaidBreakMinutes: (() => {
+        const h = num(cell(r[cols.unpaidBreaks]));
+        return h === null ? null : Math.round(h * 60);
+      })(),
       role: cell(r[cols.role]),
       regularHours: num(cell(r[cols.regular])),
       overtimeHours: num(cell(r[cols.ot])),
@@ -367,6 +394,9 @@ export function planImport(text: string): ImportPlan {
       breakStartMinutes:
         breakStartMin === null ? null : (breakStartMin - inMin + 1440) % 1440,
       breakMinutes,
+      // Falls back to the recorded meal when the column is absent, which is
+      // what every export before this one effectively meant.
+      unpaidBreakMinutes: row.unpaidBreakMinutes ?? breakMinutes,
       role: row.role,
       source: row,
       stitched: false,
@@ -474,6 +504,12 @@ function stitchMidnightSplits(shifts: ParsedShift[]): {
         a.breakMinutes = b.breakMinutes;
         a.breakStartMinutes =
           b.breakStartMinutes === null ? null : b.breakStartMinutes + (1440 - a.clockInMinutes);
+      }
+      // The unpaid TOTAL adds, though — both halves were deducted, and the
+      // stitched shift has to carry the whole deduction or its hours come out
+      // long by whatever the other segment gave up.
+      if (a.unpaidBreakMinutes !== null || b.unpaidBreakMinutes !== null) {
+        a.unpaidBreakMinutes = (a.unpaidBreakMinutes ?? 0) + (b.unpaidBreakMinutes ?? 0);
       }
       merged.add(b);
       count += 1;

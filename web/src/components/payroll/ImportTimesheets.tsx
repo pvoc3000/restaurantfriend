@@ -313,7 +313,9 @@ export function ImportTimesheets({
             source_hours_overtime: s.source.overtimeHours,
             source_hours_double_ot: s.source.doubleOtHours,
             source_hours_paid: s.source.totalPaidHours,
-            source_break_minutes: s.breakMinutes,
+            // What the source SAID it deducted — the total, which is the figure
+            // that reconciles with Homebase's own Actual hours.
+            source_break_minutes: s.unpaidBreakMinutes,
             // The historical posture: take the source's word for it, and record
             // that nobody has re-checked. The overtime queue on /timesheets is
             // where that gets argued with.
@@ -321,7 +323,12 @@ export function ImportTimesheets({
             hours_overtime: s.source.overtimeHours,
             hours_double_ot: s.source.doubleOtHours,
             ot_decision: "source",
-            unpaid_break_minutes: s.breakMinutes,
+            // THE TOTAL UNPAID BREAK, not the length of the one recorded meal.
+            // `workedHours` subtracts this from the clock span, so reading the
+            // punch pair's 30 min on a shift Homebase deducted a full hour for
+            // made us 0.50h long — and the recompute then proposed half an hour
+            // of extra DOUBLE time (Mark, 2026-08-05, on Gaspar López 07-23).
+            unpaid_break_minutes: s.unpaidBreakMinutes,
             scheduled_hours: s.source.scheduledHours,
             // "01 Overnight Baker" → "Overnight Baker". The FMP export no longer
             // carries FileMaker's numbering; the Homebase Role column still does.

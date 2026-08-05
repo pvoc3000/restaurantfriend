@@ -26,6 +26,7 @@ import "./tableSort.fixtures";
 import "./tipPool.fixtures";
 import "./timeZone.fixtures";
 import "./timesheets.fixtures";
+import "./unpaidBreaks.fixtures";
 import { runAll } from "./harness";
 
 runAll();

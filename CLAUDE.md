@@ -1330,6 +1330,28 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    of those after it, including 3,135 of 3,371 in the 5h00–5h30 band. Thirteen
    years of FileMaker enforce exactly 5h00. Every message now says "within 5
    hours" and never "the fifth hour".
+   **A HOMEBASE ROW CARRIES TWO BREAK FIGURES AND WE DEDUCTED THE WRONG ONE**
+   (Mark, 2026-08-05, reading Gaspar López's 07-23 shift). The export has
+   `Break start` · `Break end` · `Break length` — the ONE recorded meal punch —
+   and, twelve columns later, **`Unpaid breaks`**, the TOTAL deducted, in HOURS.
+   The importer wrote `Break length` to `unpaid_break_minutes`, which
+   `workedHours` subtracts from the clock span. On most shifts the two agree and
+   nothing showed; on a long overnight they don't, because a second meal is taken
+   and deducted while Homebase's single punch pair still shows only the first.
+   Gaspar punched 6:01pm → 8:10am with `Break length` 30 min and `Unpaid breaks`
+   1.00, so we came out 0.50h long and the overtime recompute proposed half an
+   hour of extra DOUBLE time on it. Measured over both real exports, 159 punched
+   rows: **span − `Unpaid breaks` equals Homebase's own `Actual hours` on 159 of
+   159**, where `Break length` matches on 153. So `Unpaid breaks` is the
+   authority for HOURS WORKED and `breakMinutes` stays the authority for how long
+   the recorded MEAL was — which is what the meal rule needs and what the total
+   cannot give. The stitcher ADDS the two segments' totals where it merges. 6
+   fixtures, one of them Gaspar's verbatim line; reverting turns 3 red and
+   reproduces 13.65 against 13.15.
+   **Consequence for data already imported:** the fix is in the parser, so rows
+   written before it keep the wrong figure until the file is imported again —
+   which corrects them in place, the upsert being on `source_row_key`. Measured
+   on the 07/20–08/02 fortnight: 6 rows, all Gaspar's, 3.03 hours over-counted.
    **Audit scripts must `.order()` before paginating.** A `.range()` sweep with
    no ORDER BY returns rows in whatever order Postgres likes, so pages overlap:
    measured, 44,661 rows fetched held only 27,795 distinct ids. That fabricated
