@@ -1,5 +1,3 @@
-import Link from "next/link";
-
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canRunPayroll } from "@/lib/roles";
@@ -179,25 +177,16 @@ export default async function TimeSheetsPage({
 
   return (
     <div className="space-y-6">
-      {/* A COMMAND, not a sentence with a link in it (Mark, 2026-08-05: "No
-          'Import Timesheets' button on Timesheets"). Importing is the main way
-          rows get here, and it was reachable only by reading a paragraph. */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Timesheets
-          </h1>
-          <p className="max-w-[72ch] text-sm text-muted">
-            Every shift in one pay period. What the source said is kept beside
-            what we decided — open a row to see both, and why they differ.
-          </p>
-        </div>
-        <Link
-          href="/timesheets/import"
-          className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
-        >
-          Import timesheets
-        </Link>
+      {/* Importing is reached from inside the New timesheet dialog now (Mark,
+          2026-08-05) — one door, not one per screen. */}
+      <div className="space-y-1">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          Timesheets
+        </h1>
+        <p className="max-w-[72ch] text-sm text-muted">
+          Every shift in one pay period. What the source said is kept beside
+          what we decided — open a row to see both, and why they differ.
+        </p>
       </div>
 
       <TimesheetsList
