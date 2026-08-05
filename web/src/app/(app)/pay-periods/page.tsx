@@ -85,6 +85,7 @@ export default async function PayPeriodsPage() {
         canWrite={canRunPayroll(session.membership.role)}
         today={today}
         settings={session.orgSettings.payroll}
+        orgId={session.membership.org_id}
       />
     </div>
   );

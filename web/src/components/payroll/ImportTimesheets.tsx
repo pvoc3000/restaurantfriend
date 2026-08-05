@@ -208,7 +208,11 @@ export function ImportTimesheets({
     startTransition(async () => {
       const { data, error: e } = await supabase
         .from("pay_periods")
-        .insert({ ...proposedPeriod, status: "open" })
+        // `org_id` is not optional here: 027's insert policy is
+        // `with check (user_has_role(org_id, …))`, and a WITH CHECK runs BEFORE
+        // the NOT NULL constraint — so omitting it fails as an RLS violation
+        // naming the policy rather than the column. See NewPayPeriod.
+        .insert({ ...proposedPeriod, org_id: orgId, status: "open" })
         .select("id");
       setOpeningPeriod(false);
       if (e || !data || data.length === 0) {

@@ -45,11 +45,14 @@ export function NewPayPeriod({
   rows,
   today,
   settings: rawSettings,
+  orgId,
 }: {
   /** Every period, for the cadence and the overlap check. */
   rows: PayPeriodRow[];
   today: string;
   settings?: unknown;
+  /** Required by 027's insert policy — see the note on the insert itself. */
+  orgId: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -132,6 +135,19 @@ export function NewPayPeriod({
       const { data, error } = await supabase
         .from("pay_periods")
         .insert({
+          // WITHOUT THIS THE INSERT IS REFUSED AS AN RLS VIOLATION, and the
+          // message names the policy rather than the missing column, which is
+          // what made this hard to read (Mark, 2026-08-05). 027's
+          // `pay_periods_insert` is `with check (user_has_role(org_id, …))`, and
+          // a WITH CHECK is evaluated BEFORE the NOT NULL constraint — so an
+          // omitted org_id reaches the policy as null, `user_has_role(null, …)`
+          // is not true, and Postgres reports the policy it actually failed.
+          //
+          // Nothing had ever caught it because all 177 existing periods came
+          // from the service_role loader, which bypasses RLS entirely. Every
+          // other insert in the app passes org_id explicitly; this was the one
+          // that didn't.
+          org_id: orgId,
           start_date: range.start_date,
           end_date: range.end_date,
           // A new period is always open. The ladder only ever moves forward

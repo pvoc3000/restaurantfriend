@@ -56,12 +56,15 @@ export function PayPeriodsList({
   canWrite,
   today,
   settings,
+  orgId,
 }: {
   rows: PayPeriodRow[];
   canWrite: boolean;
   today: string;
-  /** `orgs.settings.payroll` — the fortnight, per design rule 2. */
+  /** `orgs.settings.payroll` — the pay period shape, per design rule 2. */
   settings?: unknown;
+  /** Passed straight through to the insert — 027's policy reads it. */
+  orgId: string;
 }) {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("current");
@@ -247,7 +250,7 @@ export function PayPeriodsList({
           // Right-aligned in the filter row — the template `NewEmployee` set for
           // the app's first create, and the one every list follows.
           <div className="ml-auto">
-            <NewPayPeriod rows={rows} today={today} settings={settings} />
+            <NewPayPeriod rows={rows} today={today} settings={settings} orgId={orgId} />
           </div>
         )}
       </div>

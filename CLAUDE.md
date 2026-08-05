@@ -1573,6 +1573,20 @@ weekday column, and 003 then silently made it per-vendor-item.
    RLS (org-scoped policies exist). Never bypass RLS from the web app; the
    `service_role` key is for local migration scripts only and must never appear
    in `web/` or in git.
+   **EVERY INSERT MUST PASS `org_id` EXPLICITLY, and forgetting it does NOT say
+   so** (Mark, 2026-08-05, on `pay_periods`). No table has a default or a
+   trigger for it, and an insert policy is `with check (user_has_role(org_id,
+   …))` — a WITH CHECK is evaluated BEFORE the NOT NULL constraint, so an
+   omitted `org_id` arrives as null, `user_has_role(null, …)` is not true, and
+   Postgres reports **"new row violates row-level security policy"**. The
+   message names the policy, which sends you to look at roles and grants when
+   the actual fault is a missing column. `NewPayPeriod` had shipped this way and
+   nothing caught it, because all 177 existing periods came from the
+   service_role loader, which bypasses RLS entirely — so the app's only path to
+   creating one had never once been exercised. Swept 2026-08-05: every other
+   insert in `web/src` passes it (two look like they don't and do — one via a
+   spread, one via a copied-columns list). **A create that a loader also
+   performs is a create nobody has tested.**
 2. **Zero business hardcoding**: business names, billing entity, PO number
    format, email templates, terminology live in `orgs.settings` /
    `locations.settings` jsonb — never in code. (The old system hardcoded
