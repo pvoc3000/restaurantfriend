@@ -10,6 +10,13 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { StatusChip } from "@/components/payroll/PayPeriodsList";
 import { PayPeriodActions } from "@/components/payroll/PayPeriodActions";
+import { PayrollWorksheet } from "@/components/payroll/PayrollWorksheet";
+import {
+  buildEmployeeRollup,
+  buildFindings,
+  buildPools,
+  type WorksheetShift,
+} from "@/lib/payrollWorksheet";
 import {
   daysBetween,
   formatPeriodRange,
@@ -45,11 +52,14 @@ function stamp(value: string | null, timeZone: string): string {
 /**
  * One fortnight.
  *
- * Phase 1 of the payroll module, so this screen is the CALENDAR record and not
- * yet the payroll worksheet. The per-employee roll-up, the break-premium
- * decisions, the tip pools and the export all land here in later phases — the
- * placeholder at the bottom says so rather than leaving a page that looks
- * finished and does nothing.
+ * The calendar record AND the payroll worksheet: per-employee hours, the
+ * meal-break findings awaiting a decision, and each shop-day's tip pool with
+ * its rate and residual.
+ *
+ * Everything in the worksheet is DERIVED on each load and nothing in it is
+ * stored until a human records a decision — which is decisions 3 and 10 made
+ * operable. The Gusto export is deliberately absent; see the note at the foot
+ * of the page.
  */
 export async function PayPeriodDetail({
   id,
@@ -105,6 +115,118 @@ export async function PayPeriodDetail({
   // them. Decision 8 is the module's single read-only rule, and a note is part
   // of the record it describes.
   const editable = canWrite && isPayPeriodEditable(period.status);
+
+  // ---- the worksheet's inputs -------------------------------------------
+  // Four queries in one round trip. Below owner/admin the timesheet SELECT
+  // returns nothing (028's policy), which is correct and not worth a second
+  // code path: the worksheet renders empty and the screen above it already
+  // explains the gate.
+  const [
+    { data: shiftRows },
+    { data: employeeRows },
+    { data: premiumRows, error: premiumError },
+    { data: poolRows, error: poolError },
+    { data: waiverRows },
+  ] = await Promise.all([
+    supabase
+      .from("timesheets")
+      .select(
+        `id, employee_id, location_id, workday, business_date, clock_in, clock_out,
+         unpaid_break_minutes, hours_regular, hours_overtime, hours_double_ot,
+         sick_hours, exclude_tips, source_payload`
+      )
+      .eq("pay_period_id", id),
+    supabase.from("employees").select("id, first_name, last_name, excludes_tips"),
+    supabase
+      .from("break_premiums")
+      .select("employee_id, workday, kind, decision, hours")
+      .gte("workday", period.start_date)
+      .lte("workday", period.end_date),
+    supabase
+      .from("tip_pools")
+      .select("id, location_id, business_date, reported_cents, corrected_cents")
+      .gte("business_date", period.start_date)
+      .lte("business_date", period.end_date),
+    // The 51 signed waivers change the ANSWER, not the presentation — a waived
+    // meal on a six-hour day owes nothing at all. NOTE: this returns zero rows
+    // today, because FMP keeps its waivers in the Events table and that has
+    // never been migrated. Measured consequence: the rule reports ~6,374 more
+    // no-meal days across the history than FileMaker did, nearly all of them
+    // six hours or less. A data gap, not a rule bug.
+    supabase.from("employee_documents").select("employee_id").eq("kind", "meal_break_waiver"),
+  ]);
+
+  const num = (v: unknown): number | null => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const shifts: WorksheetShift[] = (shiftRows ?? []).map((t) => ({
+    id: t.id as string,
+    employee_id: t.employee_id as string,
+    location_id: (t.location_id ?? null) as string | null,
+    workday: t.workday as string,
+    business_date: t.business_date as string,
+    clock_in: (t.clock_in ?? null) as string | null,
+    clock_out: (t.clock_out ?? null) as string | null,
+    unpaid_break_minutes: num(t.unpaid_break_minutes),
+    hours_regular: num(t.hours_regular),
+    hours_overtime: num(t.hours_overtime),
+    hours_double_ot: num(t.hours_double_ot),
+    sick_hours: num(t.sick_hours),
+    exclude_tips: (t.exclude_tips ?? null) as boolean | null,
+    source_payload: (t.source_payload ?? null) as Record<string, unknown> | null,
+  }));
+
+  const employeeMap = new Map(
+    (employeeRows ?? []).map((e) => [
+      e.id as string,
+      {
+        name: `${e.last_name}, ${e.first_name}`,
+        excludes_tips: (e.excludes_tips ?? false) as boolean,
+      },
+    ])
+  );
+  const waiverIds = new Set((waiverRows ?? []).map((w) => w.employee_id as string));
+
+  const decidedByKey = new Map(
+    (premiumRows ?? []).map((p) => [
+      `${p.employee_id}|${p.workday}|${p.kind}`,
+      { decision: p.decision as string },
+    ])
+  );
+  const premiumHours = new Map<string, number>();
+  for (const p of premiumRows ?? []) {
+    const k = p.employee_id as string;
+    premiumHours.set(k, (premiumHours.get(k) ?? 0) + (num(p.hours) ?? 0));
+  }
+
+  const poolMap = new Map(
+    (poolRows ?? []).map((p) => [
+      `${p.location_id}|${p.business_date}`,
+      {
+        id: p.id as string,
+        reported_cents: num(p.reported_cents),
+        corrected_cents: num(p.corrected_cents),
+      },
+    ])
+  );
+  // The FULL location list, not activeLocations — DF03 is closed and people
+  // were paid for shifts there. Design rule 3: a LOOK-UP, not an enumeration.
+  const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
+
+  // BEFORE 029 IS APPLIED these two are "Could not find the table", and the
+  // worksheet must SAY so. Swallowing them renders a tips view reading "no
+  // figure entered" for every day and a breaks view where nothing is ever
+  // decided — both of which look like real answers. Same reason PO detail
+  // replaces its Paperwork card with the Postgres error rather than showing an
+  // empty card. The hours view needs neither table and still works.
+  const worksheetError = premiumError ?? poolError;
+
+  const findings = buildFindings(shifts, employeeMap, waiverIds, decidedByKey);
+  const rollup = buildEmployeeRollup(shifts, employeeMap, findings, premiumHours);
+  const pools = buildPools(shifts, employeeMap, codeById, poolMap);
 
   return (
     <div className="space-y-16">
@@ -218,17 +340,33 @@ export async function PayPeriodDetail({
         </dl>
       </section>
 
-      {/* ---- what isn't built yet -------------------------------------- */}
-      <section className="space-y-4">
-        <SectionHeading>Payroll worksheet</SectionHeading>
-        <p className="max-w-[72ch] border border-hairline px-4 py-3 text-sm text-muted">
-          The per-employee hours roll-up, the break-premium decisions, the tip
-          pools with their rate and residual, and the Gusto export all live here.
-          None of it is built yet — timesheets arrive with migration 028, and the
-          export is deliberately last, because it is irreversible and must not
-          run until every input is trustworthy.
-        </p>
-      </section>
+      {/* ---- the worksheet ---------------------------------------------- */}
+      {worksheetError ? (
+        <section className="space-y-4">
+          <SectionHeading>Payroll worksheet</SectionHeading>
+          <p className="max-w-[72ch] border border-accent px-4 py-3 text-sm text-accent">
+            The break-premium and tip-pool tables are missing:{" "}
+            {worksheetError.message}. Migration 029 has not been applied yet.
+          </p>
+        </section>
+      ) : (
+      <PayrollWorksheet
+        employees={rollup}
+        findings={findings}
+        pools={pools}
+        editable={editable}
+        orgId={session.membership.org_id}
+      />
+      )}
+
+      <p className="max-w-[72ch] border border-hairline px-4 py-3 text-sm text-muted">
+        The Gusto export is deliberately last: it is irreversible, and it must
+        not run until every input above is trustworthy. It also needs one
+        decision from Mark — whether a meal premium exports as HOURS on Gusto&rsquo;s
+        native <code>missed_break_hours</code> column or as dollars on
+        <code> custom_earning_premium</code>, which is what the FileMaker export
+        does today.
+      </p>
     </div>
   );
 }

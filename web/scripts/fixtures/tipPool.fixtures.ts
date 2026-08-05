@@ -4,7 +4,7 @@
 // one assertion asked a different way, because a cent lost each day is a cent
 // the shop pays out of its own pocket, forever.
 
-import { test, eq, ok, no } from "./harness";
+import { test, eq, ok } from "./harness";
 import {
   allocateTips,
   formatCents,
