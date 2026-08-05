@@ -44,6 +44,7 @@ export function NewTimesheet({
   orgId,
   timeZone,
   period,
+  disabled = false,
 }: {
   employees: { id: string; name: string }[];
   locations: { id: string; code: string }[];
@@ -51,6 +52,23 @@ export function NewTimesheet({
   timeZone: string;
   /** The period being viewed — the dates are held inside it. */
   period: { id: string; start_date: string; end_date: string; status: PayPeriodStatus } | null;
+  /**
+   * Rendered but unusable, rather than absent (Mark, 2026-08-05: "instead of
+   * hiding the button we should disable it then").
+   *
+   * A control that vanishes teaches nothing — you cannot tell a screen that has
+   * no such feature from one where the feature is currently shut, and the row it
+   * sits in changes width as you page between periods. Greyed, it says the
+   * feature exists and this period isn't taking it.
+   *
+   * The usual objection to a disabled control is that it explains itself only on
+   * hover, and the iPad has none — which is what made the receiving screen's
+   * greyed Match buttons a complaint. It doesn't apply here: the sentence
+   * directly beneath already says "This period is closed, so these shifts are
+   * read-only", so the reason is on screen, in words, whether or not anything
+   * is hovered. The `title` is belt and braces for the desk.
+   */
+  disabled?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -231,7 +249,13 @@ export function NewTimesheet({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
+        disabled={disabled}
+        title={
+          disabled
+            ? "This pay period is no longer open, so nothing can be added to it."
+            : undefined
+        }
+        className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:cursor-not-allowed disabled:border-hairline disabled:bg-white disabled:text-faint disabled:hover:bg-white disabled:hover:text-faint"
       >
         New timesheet
       </button>

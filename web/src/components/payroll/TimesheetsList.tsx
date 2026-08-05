@@ -618,20 +618,21 @@ export function TimesheetsList({
         </div>
 
         {/* Right-aligned in the filter row — the NewEmployee template, which is
-            how every create in this app is reached. Only while the period is
-            editable: below that the insert is one 028 refuses, and a control
-            that cannot work is worse than an absent one. */}
-        {editable && (
-          <div className="ml-auto">
-            <NewTimesheet
-              employees={employees}
-              locations={locations}
-              orgId={orgId}
-              timeZone={timeZone}
-              period={period}
-            />
-          </div>
-        )}
+            how every create in this app is reached. ALWAYS RENDERED, disabled
+            when the period is closed rather than hidden (Mark, 2026-08-05): a
+            control that vanishes can't be told from a feature that doesn't
+            exist, and the filter row shouldn't change width as you page between
+            periods. The reason is already in words directly below. */}
+        <div className="ml-auto">
+          <NewTimesheet
+            employees={employees}
+            locations={locations}
+            orgId={orgId}
+            timeZone={timeZone}
+            period={period}
+            disabled={!editable}
+          />
+        </div>
       </div>
 
       {/* The pay period in one line. Overtime is stated separately from regular

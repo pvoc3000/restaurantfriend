@@ -1238,6 +1238,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    writes no overtime split and never touches `source_*`: there was no source,
    and the list's recompute argues with it out loud instead. A reason is
    required, like every other decision in this module.
+   Its button is **always rendered and DISABLED on a closed period, never
+   hidden** (Mark, 2026-08-05: "instead of hiding the button we should disable it
+   then") — a control that vanishes can't be told from a feature that doesn't
+   exist, and the filter row shouldn't change width as you page between periods.
+   The usual objection, that a greyed control explains itself only on hover and
+   the iPad has none, doesn't bite here: the sentence directly beneath already
+   reads "This period is closed, so these shifts are read-only", so the reason is
+   on screen in words. **Known consequence, accepted:** the Import link lives in
+   that dialog, so from a closed period there is no visible route to the import
+   screen — switch to the open period, or go to `/timesheets/import` directly,
+   which is no loss because a closed period refuses an import anyway.
    Its button was pulled from the list and PUT BACK the same day (Mark,
    2026-08-05) — "remove the add timesheet button on pay period sheet" meant a
    different screen than the one it was on. It reads **New timesheet** now, per
