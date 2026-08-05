@@ -1589,6 +1589,13 @@ LOADED: 445 rows, 26 active / 2 new hire / 417 inactive, matching the transform
 report, with Mark's row linked to his auth account. 022 verified 2026-08-02 by
 inserting an `orientation` document and removing it again — the constraint
 accepts the value, so the widened check is live.
+**032 is APPLIED** (Mark, 2026-08-05) — `break_premiums.reason` is nullable and
+the requirement now rides the decision, so a waiver or a not-owed may be
+recorded bare while an owed hour still has to argue its case. Probe with
+`select is_nullable from information_schema.columns where table_name =
+'break_premiums' and column_name = 'reason'` (YES) and
+`select conname from pg_constraint where conrelid = 'public.break_premiums'::regclass`
+(expect `break_premiums_reason_when_owed`, and NO `break_premiums_reason_check`).
 **031 is NOT applied yet** — until it is, the pay-period record replaces its
 worksheet and export with "column timesheets.wage_type does not exist", which
 is the intended behaviour rather than an empty screen. Probe with
