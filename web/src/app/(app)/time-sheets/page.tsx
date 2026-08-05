@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canRunPayroll } from "@/lib/roles";
@@ -178,7 +180,14 @@ export default async function TimeSheetsPage({
         </h1>
         <p className="max-w-[72ch] text-sm text-muted">
           Every shift in one pay period. What the source said is kept beside what
-          we decided — open a row to see both, and why they differ.
+          we decided — open a row to see both, and why they differ.{" "}
+          <Link
+            href="/time-sheets/import"
+            className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+          >
+            Import a Homebase export
+          </Link>
+          .
         </p>
       </div>
 
