@@ -893,9 +893,14 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    FMP keeps writing until their own modules are built. See
    `migration/field-map.md` for the per-field reasons and the traps in each
    child file.
-4d. 📋 **Timesheets / payroll prep** — SPECCED 2026-08-04, NOT built (next
-   migration is 025). Full brief: **`docs/timesheets-brief.md`** — read it before
-   touching anything here. The three things worth knowing without opening it:
+4d. 🚧 **Timesheets / payroll prep** — phases 1 and 2 SHIPPED 2026-08-04
+   (migrations **027 + 028**, both APPLIED). Full brief:
+   **`docs/timesheets-brief.md`** — read it before touching anything here, but
+   read the CORRECTIONS below first: the brief was written against the
+   2015–2019 partial export, and Mark's 2026-08-04 re-exports contradict it in
+   several places. **The brief numbers its migrations 025–028; Invoices took
+   025/026 the same day, so this module is 027–030 — add two.**
+   The three things worth knowing without opening it:
    **the module exports HOURS and TIP DOLLARS and nothing else** (Mark: "leave
    rates out. They're already set in two places: Homebase and Gusto"), so no wage
    rate is ever stored and no paycheck is ever computed — a meal premium exports
@@ -909,24 +914,120 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Gusto owns money and tax; and **sick hours are a reconciliation column that is
    DELIBERATELY OMITTED from the export file**, because Gusto already pays them
    and including them double-pays.
-   The reason the module exists at all is that **Homebase splits a shift at
-   midnight, which systematically UNDER-counts California daily overtime** (a
-   6pm–4am shift is 10h and owes 2h; split into 6h+4h it owes none). Measured in
-   the FMP export: 4,308 of 23,673 shifts cross midnight (18.2%), 1,071 carrying
-   OT — and `ts_Date_End` was declared and used on ZERO rows, because FileMaker
-   stored a crossing shift as one row dated by its start day. So the importer
-   reassembles them, `clock_in`/`clock_out` are `timestamptz` (DST-correct
-   duration for free — 10pm→6am is 7h on spring-forward, 9h on fall-back), and
-   `workday` / `business_date` are two fields rather than one.
-   **Blocked on three files from Mark** (brief's last section): one real Homebase
-   CSV — whether Homebase emits a stable shift id decides the idempotency key,
-   and the FMP natural key is provably NOT unique (23,220 distinct over 23,673
-   rows, so keying on it silently drops 64 byte-identical rows) — plus full
-   re-exports of `Timesheets.mer` **with a record id** and `PayPeriods.mer`
-   **with its key**. Both files on disk are inadequate: Timesheets is a partial
-   found set (2015-09-28 → 2019-03-23, no Homebase era at all) and PayPeriods is
-   a LAYOUT export with ten columns. That's the `hr-export-is-a-layout-export`
-   trap for the second time.
+   **CORRECTIONS TO THE BRIEF, measured on the 2026-08-04 re-exports.** Every
+   one is in our favour, and the first is the big one.
+   **The brief's central premise is FALSE for the current data.** It says
+   Homebase splits a shift at midnight and so under-counts CA daily overtime.
+   The real Homebase CSVs (DF01 + DF02, the 07/20–08/02 fortnight) have
+   separate `Clock in date` and `Clock out date` columns and keep an overnight
+   shift WHOLE — zero adjacent-at-local-midnight pairs across both shops — and
+   Homebase's own overtime is correct on them: Gaspar López 6:01pm→8:10am =
+   13.15h billed as **8.00 regular + 4.00 OT + 1.15 double** (textbook CA), and
+   a 6.03h shift billed 0 regular + 2.88 OT + 3.15 double shows the seventh-day
+   rule being applied too. FileMaker likewise fills `ts_Date_End` in this era
+   (1,148 of 1,148 crossing rows dated start+1), where the brief measured ZERO
+   — that figure came from the 2015–2019 ShiftPlanning/Deputy export. **So the
+   stitcher is a safety net, not the centrepiece**, the historical load needed
+   no stitching at all, and decision 2 (import and VERIFY) is where the module's
+   value actually lives. `isLocalMidnight` is built and fixture-tested anyway;
+   nothing depends on it yet.
+   Also corrected: `ts_Position` is clean (30 values, no FileMaker numbering) —
+   **but the Homebase CSV's `Role` still carries it** ("01 Overnight Baker"), so
+   the prefix-strip trap moved rather than vanished. `ts_Location` has six
+   spellings but only **6 stray rows** (DF1/DF2/df01), not two shops under six
+   names. `ts_BreakType` and the break PUNCHES are populated on ~27,500 rows,
+   where the brief thought them empty. **`cTimeSheetError` is populated on
+   10,143 rows** with real Late/Missed/Short Break findings — so phase 5's
+   `breakRules.ts` HAS a reference implementation to diff against, which the
+   brief said didn't exist. It rides in `source_payload` rather than becoming a
+   column, since decision 3 says a violation is derived and never stored.
+   And the idempotency key is far safer than feared: the natural tuple gives
+   44,765 distinct over 44,767 rows (the brief measured 23,220/23,673 on the old
+   file). **Still no record id in either source** — not in Timesheets.mer's 117
+   columns, not in the Homebase CSV — so `source_row_key` is the natural tuple
+   plus an occurrence ordinal, stored READABLE rather than hashed so a duplicate
+   explains itself.
+   **Shipped, phase 1 — migration 027 `pay_periods` + `/pay-periods`.** The
+   ladder `open → review → exported → closed`, the reopen stamps with a required
+   reason, and a **btree_gist exclusion constraint so periods cannot overlap**,
+   which is what makes "which period owns this workday" a TOTAL function so 028
+   can fill `pay_period_id` by trigger. Read is membership-only (a period is two
+   dates and a status, and a supervisor reporting Saturday's tips must know
+   which fortnight is open); write is owner/admin; no delete policy. The
+   fortnight lives in `orgs.settings.payroll` per design rule 2 — 024's lesson
+   that a statement true of finished data is still wrong as a constraint.
+   Loaded the real calendar: **178 periods, 2019-10-07 → 2026-08-02**, every one
+   14 days from a Monday, zero gaps, zero overlaps, re-derived from the file by
+   the transform rather than taken from the brief. All land `closed`, so history
+   is read-only by construction. The loader deliberately does NOT open the
+   current period — that arithmetic lives once, in `nextPeriodAfter`, or it is
+   016's `nextDeliveryDate` trap. **So after the load there is no open period
+   and `/pay-periods` opens on an empty `Current` filter; that is expected, and
+   the empty state says so and routes you to New pay period.**
+   **`isPayPeriodEditable` covers `open` AND `review`** — review is where
+   corrections are MADE, and gating it would force a reviewer to step the period
+   backwards to fix what they found. 028's write policies name the same pair;
+   **they must change together.**
+   **Shipped, phase 2 — migration 028 `timesheets` + `/time-sheets`.** The punch
+   as real INSTANTS, what the SOURCE said beside what we DECIDED, and the two
+   derived dates. Plus `employees.homebase_id` / `gusto_id` / `excludes_tips` —
+   there was no external-id column anywhere in this schema, and an import that
+   matches on a NAME pays the wrong Sanchez.
+   RLS is **owner/admin on every verb including SELECT** (020's reasoning: what
+   a named person was paid for is the same class of fact as their home address),
+   and writes additionally require the period to be open or in review.
+   **Verified in the harness as a real authenticated admin, which is the only
+   way to test a policy** — and it confirmed the footgun rather than assuming
+   it: an update against a CLOSED period **changed zero rows and returned NO
+   error**, delete likewise zero, insert refused outright, while the same update
+   on an open period changed 1 row. A supervisor sees 0 timesheets and 2 pay
+   periods. `anon` is refused `timesheet_period_editable`, `authenticated` is
+   granted it (002 and 018's lessons, both live). Hence the app covers it BOTH
+   ways: every write `.select()`s its own result, **and** the cell renders
+   `READ_ONLY_VALUE` rather than offering an edit the database will silently
+   swallow.
+   **`lib/timeZone.ts` is the module everything rests on**, and it has one
+   non-obvious property. The obvious two-pass offset lookup — look it up at the
+   guess, correct, look it up again — **CONVERGES**, so on a fall-back night it
+   finds one instant and confidently reports no ambiguity. Two fixtures caught
+   that. It probes the offset a DAY EITHER SIDE instead, generating a candidate
+   from each, and verifies both by formatting back: two survive = ambiguous, one
+   = ordinary, none = the wall time does not exist. It REPORTS which rather than
+   guessing, because both cases are an hour of somebody's overtime. 22:00→06:00
+   is 7h across spring-forward and 9h across fall-back; a wall-clock subtraction
+   says 8 for both.
+   **Loaded the history: 44,721 rows** (44,766 transformed, 45 skipped and each
+   named — five employee ids match nobody, including a `387B` and two
+   phone-number-shaped ones; one row refused for an unparsable `"21"` clock-in).
+   **Every row landed in a pay period, and FileMaker's own `cPayPeriod` agrees
+   with the trigger's answer from the workday on all 44,721** — two independent
+   answers, zero disagreements. 10 rows carry a fall-back AMBIGUOUS punch,
+   resolved to the earlier instant and flagged in
+   `source_payload.local_time_ambiguity`; **FileMaker took the LATER one**,
+   which is where 37 of the 133 hour-level disagreements with FMP come from.
+   `transform-timesheets.mjs` **imports the app's COMPILED `timeZone` module**
+   out of `web/.fixtures-build` rather than keeping a second copy of the DST
+   arithmetic, and refuses to run if `npm run fixtures` hasn't been run. It is a
+   field ALLOW-LIST, so the 53 wage rates sitting in the file are never read
+   (decision 1). Its first crossing-midnight rule trusted `ts_Date_End` and
+   produced a **30.58-hour shift**; the TIMES decide now (`minOut < minIn`) and
+   `ts_Date_End` is corroboration only.
+   `/time-sheets` is scoped to ONE pay period (44,721 rows exist) and opens on
+   the most recent period that HAS shifts, not the newest — which after the load
+   is an empty current fortnight. **No `/time-sheets/[id]` route**: a shift is a
+   row, not a record, and what a detail screen would show lives in the row's
+   expansion. The Worked column is DECIMAL, not a `5:13` clock reading, because
+   Regular + OT + Double must visibly sum to it.
+   **Still blocked**: phase 6's Gusto export. The template arrived and settles
+   decision 1 — Gusto has a native **`missed_break_hours`** column, so a premium
+   CAN export as hours — but Donut Friend's current FMP export puts premiums in
+   **`custom_earning_premium` as DOLLARS** (values 16–26, matching
+   `ts_Premium_Pay`), so which one to write is Mark's call. The template also
+   shows the export is **one row per (employee, WAGE TYPE)**, not per employee —
+   tips and premiums ride the `(Primary)` row while hours split across rate
+   cards — which `gustoExport.ts` has to model. Not built.
+   Next: phase 3 (the importer, now unblocked — but see the premise correction
+   above), phase 4 (`overtime.ts`), phase 5 (break rules + tip pooling).
 4d. 🚧 **Invoices** — the third module, and the one that finishes the purchasing
    loop (Mark, 2026-08-04, after using the receiving screen: "this reconcile PO
    workflow is new to me and I love it… Every time we upload an invoice to a
@@ -1119,6 +1220,11 @@ LOADED: 445 rows, 26 active / 2 new hire / 417 inactive, matching the transform
 report, with Mark's row linked to his auth account. 022 verified 2026-08-02 by
 inserting an `orientation` document and removing it again — the constraint
 accepts the value, so the widened check is live.
+**027 and 028 are APPLIED** (Mark, 2026-08-04) and both loads have run — 178
+pay periods and 44,721 timesheets. Probe with `select count(*) from
+pay_periods` (178) and `select count(*) from timesheets` (44,721); for 028's
+period gate, `select public.timesheet_period_editable(id), status from
+pay_periods order by start_date desc limit 3` — false on every closed one.
 **025 and 026 are APPLIED** (Mark, 2026-08-04) and `extract-invoice` is
 redeployed. Verified the same day by probe and then end to end against the live
 database: both tables and `purchase_order_attachments.invoice_id` /
