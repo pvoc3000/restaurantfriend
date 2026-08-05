@@ -23,6 +23,7 @@
     "../../src/lib/purchaseOrders.ts",
     "../../src/lib/payPeriods.ts",
     "../../src/lib/timeZone.ts",
-    "../../src/lib/timesheets.ts"
+    "../../src/lib/timesheets.ts",
+    "../../src/lib/overtime.ts"
   ]
 }

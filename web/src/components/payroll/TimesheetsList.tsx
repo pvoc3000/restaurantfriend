@@ -10,6 +10,8 @@ import { PickList } from "@/components/ui/PickList";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { formatPeriodRange, type PayPeriodStatus } from "@/lib/payPeriods";
 import { PAY_PERIOD_STATUS_LABEL } from "@/lib/payPeriods";
+import { proposeOvertime, type ShiftProposal, type Split } from "@/lib/overtime";
+import { AdjudicateOvertime } from "./AdjudicateOvertime";
 import {
   OT_DECISION_LABEL,
   effectiveExclusion,
@@ -61,8 +63,33 @@ export type PeriodOption = {
   status: PayPeriodStatus;
 };
 
+/**
+ * Does the recompute differ from what the row currently SAYS?
+ *
+ * Note this compares against `hours_*` (the DECISION), not `source_hours_*`.
+ * Those are two different questions and the screen asks both: the source-vs-
+ * decided pair is history ("someone changed this"), while this one is the live
+ * queue ("someone should look at this"). A row already adjudicated to disagree
+ * with its source must not keep appearing here.
+ *
+ * Same one-cent tolerance as `compareToSource`, and for the same measured
+ * reason — see lib/overtime's EPSILON.
+ */
+const REVIEW_EPSILON = 0.015;
+function differsFromDecided(
+  p: ShiftProposal,
+  r: { hours_regular: number | null; hours_overtime: number | null; hours_double_ot: number | null }
+): boolean {
+  return (
+    Math.abs(p.regular - (r.hours_regular ?? 0)) >= REVIEW_EPSILON ||
+    Math.abs(p.overtime - (r.hours_overtime ?? 0)) >= REVIEW_EPSILON ||
+    Math.abs(p.double_ot - (r.hours_double_ot ?? 0)) >= REVIEW_EPSILON
+  );
+}
+
 type SortKey = "employee" | "workday" | "in" | "worked" | "regular" | "ot" | "location";
 type Grouping = "none" | "employee" | "workday";
+type Review = "all" | "needs_review";
 
 /**
  * A fortnight of shifts.
@@ -94,6 +121,7 @@ export function TimesheetsList({
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [grouping, setGrouping] = useState<Grouping>("employee");
+  const [review, setReview] = useState<Review>("all");
   const [sort, setSort] = useState<{ key: SortKey; dir: "asc" | "desc" }>({
     key: "employee",
     dir: "asc",
@@ -111,15 +139,56 @@ export function TimesheetsList({
   const editable =
     canWrite && period !== null && (period.status === "open" || period.status === "review");
 
+  /**
+   * The recompute, over the WHOLE fortnight — never over the filtered set.
+   * Overtime is a property of an employee's workweek, so hiding half a week
+   * behind a search box would change the answer for the half still showing.
+   * Measured at 63ms for all 44,721 rows, so a fortnight is free.
+   */
+  const proposals = useMemo(
+    () =>
+      proposeOvertime(
+        rows
+          .map((r) => {
+            const hours = workedHours(r);
+            return hours === null
+              ? null
+              : {
+                  id: r.id,
+                  employee_id: r.employee_id,
+                  workday: r.workday,
+                  workweek_start: r.workweek_start,
+                  hours,
+                };
+          })
+          // An unfinished shift has no hours to classify. Feeding it 0 would
+          // quietly tell the seventh-day rule that a day was worked.
+          .filter((x): x is NonNullable<typeof x> => x !== null)
+      ),
+    [rows]
+  );
+
+  /** Where the recompute differs from what the row currently SAYS. */
+  const needsReview = useMemo(() => {
+    const out = new Set<string>();
+    for (const r of rows) {
+      const p = proposals.get(r.id);
+      if (!p) continue;
+      if (differsFromDecided(p, r)) out.add(r.id);
+    }
+    return out;
+  }, [rows, proposals]);
+
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return rows;
-    return rows.filter((r) =>
+    const base = review === "needs_review" ? rows.filter((r) => needsReview.has(r.id)) : rows;
+    if (!q) return base;
+    return base.filter((r) =>
       `${r.employee_name} ${r.workday} ${r.location_code ?? ""} ${r.position ?? ""}`
         .toLowerCase()
         .includes(q)
     );
-  }, [rows, search]);
+  }, [rows, search, review, needsReview]);
 
   const sorted = useMemo(() => {
     const value = (r: TimesheetRow): string | number => {
@@ -333,6 +402,24 @@ export function TimesheetsList({
 
         <div className="space-y-1.5">
           <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
+            Overtime
+          </span>
+          <TabPicker
+            ariaLabel="Overtime review"
+            value={review}
+            onChange={setReview}
+            options={[
+              { key: "all", label: "All", count: rows.length },
+              // Always shown, count and all — "Needs review 0" is the answer you
+              // came for, where an absent tab only says the screen forgot to
+              // offer it. The PO list's roll-up convention.
+              { key: "needs_review", label: "Needs review", count: needsReview.size },
+            ]}
+          />
+        </div>
+
+        <div className="space-y-1.5">
+          <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
             Group by
           </span>
           <TabPicker
@@ -400,11 +487,18 @@ export function TimesheetsList({
             const d = otDisagreements(r);
             if (d.length) marks.push(`${d.length} differ${d.length === 1 ? "s" : ""} from source`);
             if (r.stitched) marks.push("stitched");
+            if (needsReview.has(r.id)) marks.push("overtime differs from ours");
             if (r.source_payload?.local_time_ambiguity) marks.push("ambiguous clock time");
             if (r.employee_note || r.manager_note) marks.push("note");
             return marks.length ? <span className="text-mark">{marks.join(" · ")}</span> : null;
           },
-          render: (r) => <ShiftDetail row={r} editable={editable} />,
+          render: (r) => (
+            <ShiftDetail
+              row={r}
+              editable={editable}
+              proposal={needsReview.has(r.id) ? (proposals.get(r.id) ?? null) : null}
+            />
+          ),
         }}
         empty={
           <p className="text-sm text-muted">
@@ -493,7 +587,16 @@ function TipsCell({ row, editable }: { row: TimesheetRow; editable: boolean }) {
  * What a `/time-sheets/[id]` route would have shown: the raw source row, the
  * stitch provenance, and the OT disagreement in full.
  */
-function ShiftDetail({ row, editable }: { row: TimesheetRow; editable: boolean }) {
+function ShiftDetail({
+  row,
+  editable,
+  proposal,
+}: {
+  row: TimesheetRow;
+  editable: boolean;
+  /** Non-null only when the recompute disagrees with the stored decision. */
+  proposal: ShiftProposal | null;
+}) {
   const disagreements = otDisagreements(row);
   const payload = row.source_payload ?? {};
   const raw = (k: string) => {
@@ -569,6 +672,19 @@ function ShiftDetail({ row, editable }: { row: TimesheetRow; editable: boolean }
           </div>
         )}
         {row.ot_reason && <p className="text-sm">{row.ot_reason}</p>}
+        {proposal && (
+          <AdjudicateOvertime
+            timesheetId={row.id}
+            decided={{
+              regular: row.hours_regular ?? 0,
+              overtime: row.hours_overtime ?? 0,
+              double_ot: row.hours_double_ot ?? 0,
+            } as Split}
+            proposal={proposal}
+            editable={editable}
+            currentDecision={OT_DECISION_LABEL[row.ot_decision].toLowerCase()}
+          />
+        )}
         <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
           <dt className="text-subtle">Workweek</dt>
           <dd className="tabular-nums">{row.workweek_start}</dd>
