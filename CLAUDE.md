@@ -1256,8 +1256,16 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    "New timesheet" on the button, "Worked shift" in its kind picker, and "163
    shifts" in the list's totals — that last one counts periods worked and is
    right as it stands.
-   Also: **Import time sheets** is a button on both screens (it had been a link
-   inside a paragraph); the importer OFFERS to open the period a file needs,
+   Also: **importing has exactly ONE door, and it is inside the New timesheet
+   dialog** (Mark, 2026-08-05: "It adds a click, but is a clear work flow New
+   Timesheet → Import"). It began as a link buried in a paragraph, became a
+   button on the timesheets list AND the pay-period list, and ended as a single
+   control in that dialog's footer — which is the right place, because "I need a
+   timesheet that isn't here" is the question the form and the import both
+   answer. It sits at the far LEFT of the `justify-end` footer (`mr-auto`), away
+   from the commit: it navigates away rather than completing the form, so it must
+   not read as a second commit. White, being no panel's own commit, and a `Link`
+   so it stays a soft navigation; the importer OFFERS to open the period a file needs,
    continuing the cadence from `nextPeriodAfter` rather than wrapping the file's
    dates, where it used to state that none covered them and stop; the import screen ends with
    a **black `Done`** at the lower right, OUTSIDE the `plan &&` block so it is
