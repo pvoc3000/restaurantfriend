@@ -1135,7 +1135,44 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    fallback is `custom_earning_premium` in dollars — and because the export is a
    DESCRIBED format in `orgs.settings.payroll_export` (design rule 2), that
    switch is configuration rather than a rewrite.
-   Then phase 7's parallel run, which `docs/master-plan.md` already requires.
+   **Shipped 2026-08-04, phase 6 — migration 031 + `lib/gustoExport.ts` + the
+   export block on the pay-period record. NEEDS 031 APPLIED.**
+   031 adds `timesheets.wage_type` and `employees.primary_wage_type`, and the
+   export cannot be right without them. `timesheets.position` is NOT the wage
+   type — it holds Homebase's `Role` and FMP's `ts_Position`, while
+   `employees.position` holds a THIRD vocabulary of abbreviations ("DF",
+   "Sr. DF") matching shift positions on only 8 of 22 people in the last real
+   fortnight.
+   **THE `(Primary)` SUFFIX IS NEVER STORED.** Both columns hold the bare title
+   and the export appends it by comparing them, which makes the file's central
+   invariant STRUCTURAL: one `primary_wage_type` per person → exactly one
+   primary row → exactly one place for the earnings. Storing it per shift would
+   let a fortnight produce two primary rows, or none. The backfill reads FMP's
+   `ts_Wage_Type` out of `source_payload`; 198 employees have one in history,
+   134 have exactly one ever and **64 CHANGED** (promotions), so **latest
+   wins** — verified with a seeded promotion resolving to Manager, and zero
+   suffixes stored on either table.
+   **The most important assertion in this repo** is that SICK HOURS DO NOT
+   APPEAR IN THE FILE, made against the produced **CSV header string** and not
+   an object shape (a rename would slip the column back in). Decision 7 — Gusto
+   already pays sick time, so including it pays the person twice. Checked by
+   putting the column back exactly as an "improvement" would.
+   Download and Finalize are TWO ACTS. Download changes nothing and may be taken
+   repeatedly; Finalize calls `freeze_pay_period`, which snapshots every
+   allocation and flips the status in ONE transaction. Verified in the harness
+   as a real authenticated admin: a partial payload is refused BY NAME
+   ("Allocations cover 1 of 4 timesheets"), a complete one freezes and stamps
+   `exported_at`/`exported_by`, re-freezing is refused, and the period is then
+   read-only to timesheet writes. `exportReadiness` follows `closeReadiness` —
+   names what's unresolved, lets you through anyway.
+   **`getAppSession` now embeds `orgs(name, settings)`**, not settings alone, so
+   the export names its file without a second query. `session.orgName` is new.
+   Then phase 7's parallel run, which `docs/master-plan.md` already requires —
+   one full fortnight through both FMP and this module, diffed per employee,
+   before anyone trusts the export. **The one thing still unverified is what
+   rate Gusto actually pays `missed_break_hours` at**; if it ever disagrees with
+   the base rate, the fallback is `custom_earning_premium` in dollars, and
+   because this is a described format that switch is configuration.
 4d. 🚧 **Invoices** — the third module, and the one that finishes the purchasing
    loop (Mark, 2026-08-04, after using the receiving screen: "this reconcile PO
    workflow is new to me and I love it… Every time we upload an invoice to a
@@ -1328,6 +1365,13 @@ LOADED: 445 rows, 26 active / 2 new hire / 417 inactive, matching the transform
 report, with Mark's row linked to his auth account. 022 verified 2026-08-02 by
 inserting an `orientation` document and removing it again — the constraint
 accepts the value, so the widened check is live.
+**031 is NOT applied yet** — until it is, the pay-period record replaces its
+worksheet and export with "column timesheets.wage_type does not exist", which
+is the intended behaviour rather than an empty screen. Probe with
+`select count(*) from timesheets where wage_type is not null` (~44,700) and
+`select count(*) from employees where primary_wage_type is not null` (198), and
+confirm `select count(*) from timesheets where wage_type like '%(Primary)%'` is
+ZERO — the suffix must never be stored.
 **027, 028, 029 and 030 are ALL APPLIED** (Mark, 2026-08-04) and both loads
 have run — 178 pay periods and 44,721 timesheets. For 029/030 probe
 `select count(*) from break_premiums`, `from tip_pools`, `from
