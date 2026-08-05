@@ -18,10 +18,9 @@
 // ---------------------------------------------------------------------------
 // WHAT THIS DELIBERATELY DOES NOT DO
 //
-// It does not invent the CURRENT pay period. The export ends at the last
-// CLOSED fortnight (2026-08-02), so after this load there is no open period —
-// which is correct: this script loads HISTORY, and every row it writes is
-// `closed` and therefore read-only by construction (decision 8).
+// It does not invent the CURRENT pay period — only the ones the file names. The
+// last of those is left OPEN (see the status block below); every earlier one is
+// closed and therefore read-only by construction (decision 8).
 //
 // Opening the next fortnight is the app's job, through `nextPeriodAfter` in
 // web/src/lib/payPeriods.ts. Putting that arithmetic here as well would be
@@ -144,16 +143,35 @@ for (const row of rows) {
     legacy_id,
     start_date,
     end_date,
-    // Every row in this file is a fortnight that has already been paid.
-    // Decision 8: historical loads land in already-closed periods and are
-    // read-only by construction, so 028's write policies refuse them without
-    // needing a flag of their own.
-    status: 'closed',
+    // Status is decided AFTER the sort — see below. It cannot be decided here,
+    // because it depends on which period is the last one in the file.
+    status: null,
     notes: get(row, 'notes') || null,
   });
 }
 
 periods.sort((a, b) => asDate(a.start_date) - asDate(b.start_date));
+
+// ---------------------------------------------------------------------------
+// Status: everything but the LAST period is closed
+// ---------------------------------------------------------------------------
+// The file has no status column, so this is an inference, and the first version
+// got it wrong: it marked every period `closed` on the reasoning that
+// "historical loads land in already-closed periods" (decision 8). True of 177 of
+// Donut Friend's 178 and false of the last one — a fortnight that has ENDED is
+// not a fortnight that has been PAID, and Mark was still importing that one's
+// timesheets into FileMaker on the day the export was taken.
+//
+// The consequence was not cosmetic: 028's write policies refuse every insert
+// and update against a closed period, and PostgREST reports no error when they
+// do. So the app silently could not receive the very fortnight it was next
+// going to be asked to run.
+//
+// `open` rather than `review` for the last one: both are editable, and `open`
+// is where a period starts. Move it along from the screen.
+for (let i = 0; i < periods.length; i++) {
+  periods[i].status = i === periods.length - 1 ? 'open' : 'closed';
+}
 
 // ---------------------------------------------------------------------------
 // Re-check the brief's claim about the calendar
@@ -197,7 +215,12 @@ console.log(`  gaps             ${gaps.length}`);
 console.log(`  overlaps         ${overlaps.length}`);
 console.log(`  duplicate ids    ${dupIds.length}`);
 console.log(`  with a note      ${periods.filter((p) => p.notes).length}`);
-console.log(`  status           closed ×${periods.length}  (history; the app opens the next one)`);
+{
+  const tally = periods.reduce((m, p) => ({ ...m, [p.status]: (m[p.status] ?? 0) + 1 }), {});
+  console.log(`  status           ${Object.entries(tally).map(([k, v]) => `${k} ×${v}`).join(', ')}`);
+  console.log(`                   (the last period is left OPEN — the file cannot say whether`);
+  console.log(`                    payroll has run for it, and a closed period refuses writes)`);
+}
 
 if (gaps.length) {
   console.log('\n  GAPS — not fatal (the schema forbids overlap, not gaps), but each is a');
