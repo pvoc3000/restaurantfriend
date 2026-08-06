@@ -5,12 +5,13 @@ import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import {
   EMPLOYEES_CRUMB,
   employeeName,
-  foodHandlerState,
   SCHEDULE_OPTIONS,
   STATUS_OPTIONS,
   type Employee,
 } from "@/lib/employees";
 import {
+  expiryState,
+  foodHandlerExpiry,
   EMPLOYEE_DOCS_BUCKET,
   SIGNED_URL_TTL_SECONDS,
   type EmployeeDocument,
@@ -20,7 +21,7 @@ import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
-import { InlineValue } from "@/components/catalog/InlineValue";
+import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { EmployeeDocuments } from "@/components/hr/EmployeeDocuments";
 import { AppAccess } from "@/components/hr/AppAccess";
@@ -66,7 +67,7 @@ export async function EmployeeDetail({
 
   const [
     { data: employee, error },
-    { data: documentRows },
+    { data: documentRows, error: documentError },
     { data: benefitRows, error: benefitError },
     { data: entitlementRows },
     { data: wageTypeRows },
@@ -80,7 +81,9 @@ export async function EmployeeDetail({
       .maybeSingle(),
     supabase
       .from("employee_documents")
-      .select("id, employee_id, storage_path, kind, file_name, content_type, byte_size, created_at")
+      .select(
+        "id, employee_id, storage_path, kind, file_name, content_type, byte_size, expires_on, created_at"
+      )
       .eq("employee_id", id)
       .order("created_at"),
     // 033. Errors are NOT folded into the page's own — a missing benefits table
@@ -200,7 +203,9 @@ export async function EmployeeDetail({
 
   const trail = parseTrail(rawParams, EMPLOYEES_CRUMB);
   const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
-  const fhc = foodHandlerState(person.food_handler_expires, today);
+  // The card on file wins over the column; see `foodHandlerExpiry`.
+  const foodCard = foodHandlerExpiry(documents, person.food_handler_expires);
+  const fhc = expiryState(foodCard.on, today);
 
   // No role gate on the editors: this whole screen is already owner/admin, and
   // that is exactly what migration 020's write policies allow.
@@ -412,25 +417,48 @@ export async function EmployeeDetail({
             />
           </dd>
           <dt className="py-0.5 text-subtle">Food card</dt>
-          <dd className="flex items-baseline gap-2">
-            <InlineValue
-              table={table}
-              id={person.id}
-              column="food_handler_expires"
-              value={person.food_handler_expires}
-              kind="date"
-              placeholder="none on file"
-            />
-            {person.status !== "inactive" && fhc === "expired" && (
-              <span className="text-[11px] uppercase tracking-[0.12em] text-accent">
-                expired
-              </span>
-            )}
-            {person.status !== "inactive" && fhc === "soon" && (
-              <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--rf-yellow-600)]">
-                expiring
-              </span>
-            )}
+          <dd className="space-y-0.5">
+            <div className="flex items-baseline gap-2">
+              {foodCard.source === "document" ? (
+                /* The card ITSELF is on file, so its own expiry is the record
+                   and this row only reports it. Editing it here as well would
+                   be two boxes for one date, and the one on the chip is the one
+                   sitting next to the photograph of the card. */
+                <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+                  {foodCard.on ?? <span className="text-faint">no expiry on the card</span>}
+                </span>
+              ) : (
+                <InlineValue
+                  table={table}
+                  id={person.id}
+                  column="food_handler_expires"
+                  value={person.food_handler_expires}
+                  kind="date"
+                  placeholder="none on file"
+                />
+              )}
+              {person.status !== "inactive" && fhc === "expired" && (
+                <span className="text-[11px] uppercase tracking-[0.12em] text-accent">
+                  expired
+                </span>
+              )}
+              {person.status !== "inactive" && fhc === "soon" && (
+                <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--rf-yellow-600)]">
+                  expiring
+                </span>
+              )}
+            </div>
+            {/* Which of the two places this came from, and where it is going.
+                Migration 034 put the expiry on the document; this column is
+                what answers for the 16 current staff whose card has a date on
+                the record and no photograph behind it. It is retired by a
+                follow-up migration once every one of those cards is filed —
+                034 names the probe. */}
+            <p className="text-[11px] text-faint">
+              {foodCard.source === "document"
+                ? "From the card on file — edit it under Paperwork."
+                : "From this record. File the card under Paperwork and its own date takes over."}
+            </p>
           </dd>
         </dl>
       </section>
@@ -495,12 +523,24 @@ export async function EmployeeDetail({
       {/* ---- paperwork ------------------------------------------------- */}
       <section className="space-y-2">
         <Heading>Paperwork</Heading>
-        <EmployeeDocuments
-          employeeId={person.id}
-          orgId={person.org_id}
-          documents={documents}
-          canEdit
-        />
+        {documentError ? (
+          /* 018's pattern: say what happened rather than render an empty card,
+             which reads as "nothing filed yet" — the one thing this block must
+             never claim by accident. Before migration 034 this is what a
+             missing `expires_on` column looks like. */
+          <p className="border border-ink px-4 py-3 text-sm text-accent">
+            Could not read this personnel file: {documentError.message}
+          </p>
+        ) : (
+          <EmployeeDocuments
+            employeeId={person.id}
+            orgId={person.org_id}
+            documents={documents}
+            legacyFoodHandlerExpires={person.food_handler_expires}
+            today={today}
+            canEdit
+          />
+        )}
       </section>
 
       {/* ---- access ---------------------------------------------------- */}

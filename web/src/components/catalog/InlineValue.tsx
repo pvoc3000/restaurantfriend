@@ -96,6 +96,7 @@ export function InlineValue({
   jsonDocument,
   match,
   scale,
+  collapseWhenEmpty = false,
 }: {
   table: string;
   /** The row's uuid — the identity of every table in the catalog. Omit it only
@@ -165,6 +166,9 @@ export function InlineValue({
    * cell has no unit.
    */
   scale?: { toShown: (stored: number) => number; toStored: (shown: number) => number };
+  /** kind="date" only — see `DateField`. For a date cell in a narrow box, where
+   *  reserving a field's width for an empty value strands the calendar glyph. */
+  collapseWhenEmpty?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -299,6 +303,7 @@ export function InlineValue({
           required={!nullable}
           ariaLabel={column}
           className={className}
+          collapseWhenEmpty={collapseWhenEmpty}
           onChange={(next) => {
             if (next === null && !nullable) {
               setError("required");

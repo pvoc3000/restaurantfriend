@@ -198,22 +198,8 @@ export function isSelf(
   return employee.user_id !== null && employee.user_id === currentUserId;
 }
 
-/**
- * How close a food handler card is to lapsing, for the mark colour on the
- * detail screen and the list.
- *
- * California cards run three years and a lapsed one is a health-inspection
- * finding, so "soon" is generous: 60 days is time to book the course.
- */
-export type ExpiryState = "none" | "expired" | "soon" | "ok";
-
-export function foodHandlerState(
-  expires: string | null,
-  today: string
-): ExpiryState {
-  if (!expires) return "none";
-  if (expires < today) return "expired";
-  const soon = new Date(`${today}T00:00:00`);
-  soon.setDate(soon.getDate() + 60);
-  return expires <= soon.toISOString().slice(0, 10) ? "soon" : "ok";
-}
+// `foodHandlerState` used to live here, when a food handler card was the only
+// thing in the app that could lapse and it lapsed on a column of THIS table.
+// Migration 034 put an expiry on every document, so the rule moved to
+// `lib/employeeDocuments` as `expiryState` — one window, one comparison, asked
+// of a card, a certificate or anything else somebody has to renew.

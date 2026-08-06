@@ -4,6 +4,7 @@ import { canReadHr, type Role } from "@/lib/roles";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { EmployeesList, type EmployeeRow } from "@/components/hr/EmployeesList";
 import type { EmployeeSchedule, EmployeeStatus } from "@/lib/employees";
+import { expiryRoll, type DocumentKind } from "@/lib/employeeDocuments";
 
 /**
  * The roster — everyone who has ever worked here, and who among them can sign
@@ -36,18 +37,31 @@ export default async function EmployeesPage() {
 
   const supabase = await createClient();
 
-  const [{ data, error }, { data: members }] = await Promise.all([
-    supabase
-      .from("employees")
-      .select(
-        "id, status, last_name, first_name, nickname, phone, email, position, schedule, start_date, food_handler_expires, main_location_id, user_id"
-      )
-      .order("last_name"),
-    // Who has access, and as what. Separate from the employee row because the
-    // link is deliberately one-directional: org_members is the access record
-    // and knows nothing about HR.
-    supabase.from("org_members").select("user_id, role"),
-  ]);
+  const [{ data, error }, { data: members }, { data: docRows, error: docError }] =
+    await Promise.all([
+      supabase
+        .from("employees")
+        .select(
+          "id, status, last_name, first_name, nickname, phone, email, position, schedule, start_date, food_handler_expires, main_location_id, user_id"
+        )
+        .order("last_name"),
+      // Who has access, and as what. Separate from the employee row because the
+      // link is deliberately one-directional: org_members is the access record
+      // and knows nothing about HR.
+      supabase.from("org_members").select("user_id, role"),
+      // What's on file that can lapse (migration 034). EVERY document, not only
+      // the ones carrying a date: `expiryRoll` also has to know whether a food
+      // handler CARD exists at all, since that is what decides whether the
+      // employee row's legacy date still speaks. 42 rows today.
+      //
+      // Its error is NOT folded into the page's own — the benefits block's
+      // reasoning on the employee record, one level up: a missing column must
+      // not blank a roster that is otherwise perfectly readable. But it can't
+      // be swallowed either, because an empty Expires column asserts that
+      // nothing is lapsing, which is the one claim this screen exists to make.
+      // So the column says what happened instead.
+      supabase.from("employee_documents").select("employee_id, kind, expires_on"),
+    ]);
 
   if (error) {
     return <p className="text-sm text-accent">Could not load employees: {error.message}</p>;
@@ -60,6 +74,21 @@ export default async function EmployeesPage() {
   // closed, and their row should still say DF03 rather than an em dash.
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
 
+  const docsByEmployee = new Map<
+    string,
+    { kind: DocumentKind; expires_on: string | null }[]
+  >();
+  for (const d of docRows ?? []) {
+    const key = d.employee_id as string;
+    const doc = {
+      kind: d.kind as DocumentKind,
+      expires_on: (d.expires_on ?? null) as string | null,
+    };
+    const list = docsByEmployee.get(key);
+    if (list) list.push(doc);
+    else docsByEmployee.set(key, [doc]);
+  }
+
   const rows: EmployeeRow[] = (data ?? []).map((e) => ({
     id: e.id as string,
     status: e.status as EmployeeStatus,
@@ -71,7 +100,13 @@ export default async function EmployeesPage() {
     position: (e.position ?? null) as string | null,
     schedule: (e.schedule ?? null) as EmployeeSchedule | null,
     start_date: (e.start_date ?? null) as string | null,
-    food_handler_expires: (e.food_handler_expires ?? null) as string | null,
+    // Derived on the SERVER, where the documents already are — the row carries
+    // one answer rather than a list the table has to reduce on every render.
+    next_expiry:
+      expiryRoll(
+        docsByEmployee.get(e.id as string) ?? [],
+        (e.food_handler_expires ?? null) as string | null
+      )[0] ?? null,
     location_code: e.main_location_id
       ? (codeById.get(e.main_location_id as string) ?? null)
       : null,
@@ -114,6 +149,7 @@ export default async function EmployeesPage() {
         locationOptions={locationOptions}
         positions={positions}
         today={today}
+        expiryError={docError?.message ?? null}
         orgId={session.membership.org_id}
       />
     </div>

@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   documentPath,
-  missingPaperwork,
+  expiryState,
+  paperworkStatus,
   DOCUMENT_KIND_LABEL,
   DOCUMENT_KIND_OPTIONS,
   EMPLOYEE_DOCS_BUCKET,
@@ -15,6 +16,75 @@ import {
 import { fileSize, isImage } from "@/lib/attachments";
 import { PickList } from "@/components/ui/PickList";
 import { ProgressBand } from "@/components/ui/ProgressBand";
+import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+
+/**
+ * One document's expiry, on the chip.
+ *
+ * A label line over the control, because a 176px chip has room for one or the
+ * other and not both — and the label is where the meaning of an EMPTY box
+ * lives. Null is the default and means "this does not lapse", which is right
+ * for a W-4 and a handbook receipt; a blank box with no label reads instead as
+ * something nobody has got round to filling in.
+ *
+ * The state mark is the app's usual pair: red for wrong (this has lapsed),
+ * yellow for worth your eye (it is about to). Never green — a card that is
+ * simply in date needs no colour.
+ */
+function ExpiryLine({
+  document: d,
+  today,
+  canEdit,
+  busy,
+}: {
+  document: SignedEmployeeDocument;
+  today: string;
+  canEdit: boolean;
+  busy: boolean;
+}) {
+  const state = expiryState(d.expires_on, today);
+
+  return (
+    /* ONE wrapping row, and the wrap is what does the layout. With no date the
+       control collapses to its glyph, so "NEVER EXPIRES 📅" sits on one line;
+       with a date the label and the date can't share 160px, so it breaks in two
+       by itself. Two hand-placed lines would have left the empty case with a
+       calendar floating in the middle of the chip. */
+    <div className="flex flex-wrap items-center gap-x-1 pt-0.5">
+      <span className="text-[11px] uppercase tracking-[0.12em]">
+        {d.expires_on === null ? (
+          <span className="text-subtle">Never expires</span>
+        ) : (
+          <>
+            <span className="text-subtle">Expires</span>
+            {state === "expired" && <span className="text-accent"> · expired</span>}
+            {state === "soon" && (
+              <span className="text-[var(--rf-yellow-600)]"> · soon</span>
+            )}
+          </>
+        )}
+      </span>
+      {canEdit ? (
+        /* -ml-1 cancels the resting cell's own px-1, so a wrapped date starts on
+           the same left edge as the label above it. */
+        <span className={`-ml-1 text-xs ${busy ? "pointer-events-none opacity-35" : ""}`}>
+          <InlineValue
+            table="employee_documents"
+            id={d.id}
+            column="expires_on"
+            value={d.expires_on}
+            kind="date"
+            collapseWhenEmpty
+          />
+        </span>
+      ) : (
+        <span className={`text-xs tabular-nums text-muted ${READ_ONLY_VALUE}`}>
+          {d.expires_on}
+        </span>
+      )}
+    </div>
+  );
+}
 
 /**
  * The personnel file.
@@ -47,12 +117,22 @@ export function EmployeeDocuments({
   employeeId,
   orgId,
   documents,
+  legacyFoodHandlerExpires,
+  today,
   canEdit,
 }: {
   employeeId: string;
   orgId: string;
   /** Signed by the server at render — see EmployeeDetail. */
   documents: SignedEmployeeDocument[];
+  /**
+   * `employees.food_handler_expires` — the column migration 034 is retiring.
+   * It counts toward the lapse line only while no food handler card is on
+   * file; the moment one is, the card's own date is the record.
+   */
+  legacyFoodHandlerExpires: string | null;
+  /** The org's today (orgs.settings.timezone), from the server. */
+  today: string;
   canEdit: boolean;
 }) {
   const router = useRouter();
@@ -62,7 +142,7 @@ export function EmployeeDocuments({
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const missing = missingPaperwork(documents.map((d) => d.kind));
+  const status = paperworkStatus(documents, legacyFoodHandlerExpires, today);
 
   async function upload(files: FileList) {
     setError(null);
@@ -179,21 +259,48 @@ export function EmployeeDocuments({
       </div>
 
       {/* The derived completeness line — what FMP's eight checkboxes were for,
-          except this one cannot be true without the documents. */}
-      <p className="text-sm">
-        {missing.length === 0 ? (
-          <span className="text-[var(--rf-green-600)]">
+          except this one cannot be true without the documents.
+
+          MISSING AND EXPIRED ARE SAID SEPARATELY. A lapsed food handler card is
+          not a missing one: it's on file, you can look at it, and what it needs
+          is a renewal rather than a first upload. Rolling them into one count
+          would tell you the wrong thing to do about it. */}
+      <div className="space-y-0.5 text-sm">
+        {status.complete ? (
+          <p className="text-[var(--rf-green-600)]">
             Onboarding paperwork complete.
-          </span>
+          </p>
         ) : (
-          <>
-            <span className="text-subtle">Missing: </span>
-            <span className="text-ink">
-              {missing.map((k) => DOCUMENT_KIND_LABEL[k]).join(", ")}
-            </span>
-          </>
+          status.missing.length > 0 && (
+            <p>
+              <span className="text-subtle">Missing: </span>
+              <span className="text-ink">
+                {status.missing.map((k) => DOCUMENT_KIND_LABEL[k]).join(", ")}
+              </span>
+            </p>
+          )
         )}
-      </p>
+        {status.expired.length > 0 && (
+          <p>
+            <span className="text-subtle">Expired: </span>
+            <span className="text-accent">
+              {status.expired
+                .map((e) => `${DOCUMENT_KIND_LABEL[e.kind]} (${e.on})`)
+                .join(", ")}
+            </span>
+          </p>
+        )}
+        {status.expiring.length > 0 && (
+          <p>
+            <span className="text-subtle">Expiring soon: </span>
+            <span className="text-[var(--rf-yellow-600)]">
+              {status.expiring
+                .map((e) => `${DOCUMENT_KIND_LABEL[e.kind]} (${e.on})`)
+                .join(", ")}
+            </span>
+          </p>
+        )}
+      </div>
 
       {busyLabel && <ProgressBand label={busyLabel} />}
       {error && <p className="text-sm text-accent">{error}</p>}
@@ -232,6 +339,27 @@ export function EmployeeDocuments({
                   {DOCUMENT_KIND_LABEL[d.kind]}
                   {d.byte_size !== null && ` · ${fileSize(d.byte_size)}`}
                 </p>
+
+                {/* The lapse date, on the chip and editable there (Mark,
+                    2026-08-05). Two lines rather than one: a 176px chip cannot
+                    hold a label and a date box side by side, and the box is the
+                    house `DateField` (through InlineValue) because a bare
+                    `<input type="date">` is the one control this app never
+                    writes — Safari paints today's date into an empty one.
+
+                    The LABEL carries the meaning of an empty box. A blank date
+                    means "never expires", which is true and silent; saying it
+                    is what stops the blank reading as "nobody has filled this
+                    in yet". */}
+                {(canEdit || d.expires_on) && (
+                  <ExpiryLine
+                    document={d}
+                    today={today}
+                    canEdit={canEdit}
+                    busy={busyLabel !== null}
+                  />
+                )}
+
                 {canEdit && (
                   <button
                     type="button"

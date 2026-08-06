@@ -887,6 +887,50 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    by. Ordered by `sort_order` — walk order is how you think about shelves.
    "No section" is a real option with an empty value, not the absence of one;
    without it there is no way to take an item OFF a shelf.
+   **Shipped 2026-08-05 — PAPERWORK CAN LAPSE (migration 034, NEEDS APPLYING).**
+   021 made onboarding completeness DERIVED, which fixed "a checkbox is a claim
+   about paper in a drawer". This is the other half of the same problem: a food
+   handler card that expired in 2023 is on file, so the derived flags said
+   complete, and the thing a health inspector would actually ask about was
+   invisible. ONE nullable column, `employee_documents.expires_on`, and **null
+   means it does not lapse** — the default, and the honest reading for a W-4 or
+   a handbook receipt, so no existing row needed touching.
+   **There is deliberately no per-kind allow-list.** Which documents expire is a
+   fact about the piece of paper in your hand, not about the vocabulary: a card
+   issued with no printed expiry says so by staying null, and the next kind that
+   turns out to lapse needs no migration.
+   `lib/employeeDocuments` gained the whole rule — `expiryState` (60 days is
+   "soon", moved here from `lib/employees`' `foodHandlerState`, which is gone),
+   `expiryRoll` (soonest first, so its head is both the next thing to deal with
+   and the worst thing outstanding), `soonestExpiry`, and `paperworkStatus`.
+   **MISSING AND EXPIRED ARE COUNTED SEPARATELY and never merged**: a lapsed
+   card is ON FILE, and reporting it as missing sends someone to upload a first
+   copy of a document they are looking at. `complete` is stricter than "nothing
+   missing" — expired breaks it, expiring soon does not.
+   UI: the expiry is on the CHIP and editable there (Mark's placement), as a
+   label line over an `InlineValue kind="date"` — two lines because a 176px chip
+   cannot hold both side by side, and **the label carries the meaning of an
+   empty box** ("Never expires"), or a blank reads as something nobody has got
+   round to filling in. The Paperwork block's derived line gained Expired and
+   Expiring-soon rows beside Missing. The roster's **Food card column became
+   `Expires`** — the soonest date, red if lapsed, yellow if near, with the KIND
+   on a second line because "expired" without it sends you to the record to find
+   out what.
+   **`employees.food_handler_expires` is NOT dropped, and that is the one thing
+   here that isn't finished.** Mark's note says this "would negate the need" for
+   it and it will, but not on the day it ships. Measured against the live DB:
+   124 employees carry that date (16 current staff) and **zero food handler CARDS
+   are on file** — 42 documents exist, all handbooks and meal-break waivers. So
+   dropping it destroys 124 real dates and moves none, and there is nowhere to
+   move them to (a document row requires a file). Until then the app reads the
+   two in priority order — `foodHandlerExpiry`, the same shape as receiving
+   preferring the FILED invoice over the last raw reading: **a card on file wins
+   even when it carries no expiry**, because at that point the card IS the
+   record and a date on the employee row is a claim about a different piece of
+   paper. `expiryRoll` folds the legacy column in only while no card is filed, so
+   the roster loses nobody it used to flag. The detail screen's Food card row
+   states which of the two it is showing. 034 names the probe whose answer must
+   be 0 before the follow-up migration drops the column.
    **NOT migrated:** SSN (never exported — it's in FMP and Gusto, and a
    web-reachable database is the wrong home for it), pay rates and everything
    payroll-adjacent, and the Events/Ratings/Reviews/Timesheets tables, which
@@ -1722,6 +1766,29 @@ Then the whole stack was run against the LIVE database — 159 shifts, 19
 entitlements, 36 accruals — and the produced CSV matches Mark's real Gusto file
 person for person, **$432.00 against $432.00**, with the sick-hours header
 assertion and the 18-cell width both holding on the real file.
+**034 is APPLIED** (Mark, 2026-08-06) — verified the same day: both screens'
+selects return rows, and **0 of the 42 existing documents carry an expiry**,
+which is the migration working (null means never, so nothing changed under
+anyone). Probe with `select count(*) from employee_documents where expires_on
+is not null` and check `employee_documents_expires_idx` exists.
+Then the real components were rendered in Node over the LIVE rows (the
+`PoPdf` idiom — esbuild-less tsc slice, service_role read, `renderToStaticMarkup`,
+inspected in the browser with the dev server's own stylesheet). What that
+measured is the argument for the whole feature: **15 of the 16 current staff
+with a food handler date are already LAPSED** — Campos 2021-07-27, Altamirano
+2022-12-28, five in 2023 — and only Kimberly Ramirez (2026-10-18) is in date.
+Every one of them read as "onboarding paperwork complete" the day before,
+because completeness asked whether a document existed and never whether it was
+still good. All 15 now show a red date over "Food handler card" on the roster.
+Note none is `filed: true` yet — they are all the legacy column speaking,
+exactly as designed until the cards are photographed.
+Pre-apply behaviour, verified before it was applied and worth keeping because
+the next schema change will meet it: the roster's document query is deliberately
+NOT folded into the page's own error — a missing column must not blank a
+readable roster — but it isn't swallowed either, because an empty Expires column
+asserts that nothing is lapsing, which is the one claim that screen exists to
+make. It reads "unreadable" instead, and the employee RECORD replaces its
+Paperwork card with the Postgres error, 018's pattern.
 **031 is NOT applied yet** — until it is, the pay-period record replaces its
 worksheet and export with "column timesheets.wage_type does not exist", which
 is the intended behaviour rather than an empty screen. Probe with
@@ -2275,6 +2342,17 @@ weekday column, and 003 then silently made it per-vendor-item.
   what opens the picker.
     **Verify any date-field change in BOTH engines** — this class of bug is
   invisible in one of them.
+  **`collapseWhenEmpty` is for a date in a NARROW box** (added 2026-08-06 for
+  the paperwork chip, forwarded through `InlineValue`). By default an empty
+  field still reserves its full 112px, which is right in a detail `dl` — the
+  rows line up and the glyph doesn't move when a date lands — and wrong in a
+  176px chip, where the invisible input renders as a calendar glyph floating
+  alone 112px from the label it belongs to, reading as decoration rather than
+  as a control. Caught by looking at it, not by review. Collapsed, the input
+  is still RENDERED and focusable over its own 16px (`showPicker()` throws on
+  an element that isn't rendered — that distinction is the whole of the care),
+  so the chip's expiry becomes one wrapping row that the browser lays out:
+  "NEVER EXPIRES 📅" on one line, a date and its glyph breaking to a second.
 - **A read-only value in a detail `dl` wears the editable one's padding.**
   `InlineValue`'s resting button is `px-1 py-0.5`, so a plain string rendered
   beside it starts 4px to its left and the whole column looks broken — Mark

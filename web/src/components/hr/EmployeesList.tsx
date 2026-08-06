@@ -10,12 +10,16 @@ import { PickList } from "@/components/ui/PickList";
 import {
   employeeDetailHref,
   employeeName,
-  foodHandlerState,
   SCHEDULE_LABEL,
   STATUS_LABEL,
   type EmployeeSchedule,
   type EmployeeStatus,
 } from "@/lib/employees";
+import {
+  expiryState,
+  DOCUMENT_KIND_LABEL,
+  type ExpiryEntry,
+} from "@/lib/employeeDocuments";
 import { ROLE_LABEL, type Role } from "@/lib/roles";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { makeComparator, type SortDir, type SortValue } from "@/lib/tableSort";
@@ -34,7 +38,15 @@ export type EmployeeRow = {
   position: string | null;
   schedule: EmployeeSchedule | null;
   start_date: string | null;
-  food_handler_expires: string | null;
+  /**
+   * The soonest thing on this person's file to lapse (migration 034), computed
+   * by the page. Null when nothing they have filed carries a date.
+   *
+   * This replaced a bare `food_handler_expires`, which could only ever flag one
+   * kind of document. `expiryRoll` still folds that legacy column in while no
+   * food handler card is on file, so the column loses nobody it used to show.
+   */
+  next_expiry: ExpiryEntry | null;
   /** Resolved by the page from `session.locations` — the FULL list, so a
    *  closed shop shows its code rather than an em dash. */
   location_code: string | null;
@@ -52,7 +64,7 @@ type SortKey =
   | "schedule"
   | "phone"
   | "start"
-  | "fhc"
+  | "expiry"
   | "access";
 
 /**
@@ -73,6 +85,7 @@ export function EmployeesList({
   locationOptions,
   positions,
   today,
+  expiryError,
   orgId,
 }: {
   rows: EmployeeRow[];
@@ -89,6 +102,12 @@ export function EmployeesList({
   positions: string[];
   /** The org's today, from the server (orgs.settings.timezone). */
   today: string;
+  /**
+   * Why the expiries couldn't be read, if they couldn't. Passed rather than
+   * swallowed because an empty Expires column asserts that nothing is lapsing,
+   * and that is the one claim this screen exists to make.
+   */
+  expiryError: string | null;
   orgId: string;
 }) {
   const [search, setSearch] = useState("");
@@ -116,8 +135,10 @@ export function EmployeesList({
         return row.phone;
       case "start":
         return row.start_date;
-      case "fhc":
-        return row.food_handler_expires;
+      case "expiry":
+        // Ascending puts the expired ones at the top, which is the reason to
+        // sort by this column at all.
+        return row.next_expiry?.on ?? null;
       case "access":
         // No access sinks below every role rather than sorting as an empty
         // string, so "who can sign in" is one click on this column.
@@ -264,22 +285,44 @@ export function EmployeesList({
       render: (r) => <span className="text-muted">{r.start_date ?? "—"}</span>,
     },
     {
-      key: "fhc",
-      label: "Food card",
-      width: 140,
+      key: "expiry",
+      label: "Expires",
+      width: 150,
       hideWhenCompact: true,
-      sortValue: (r) => sortValue(r, "fhc"),
+      sortValue: (r) => sortValue(r, "expiry"),
       render: (r) => {
+        // Until migration 034 is applied this column can't be read at all, and
+        // an em dash would say "nothing lapsing" for all 445 people.
+        if (expiryError) {
+          return (
+            <span className="text-accent" title={expiryError}>
+              unreadable
+            </span>
+          );
+        }
+        const next = r.next_expiry;
+        if (!next) return <span className="text-subtle">—</span>;
         // Only for people who still work here — a lapsed card on someone who
         // left in 2016 is not a finding, it's noise.
-        const state =
-          r.status === "inactive"
-            ? "ok"
-            : foodHandlerState(r.food_handler_expires, today);
-        if (!r.food_handler_expires) return <span className="text-subtle">—</span>;
+        const state = r.status === "inactive" ? "ok" : expiryState(next.on, today);
         return (
-          <span className={state === "expired" ? "text-accent" : "text-muted"}>
-            {r.food_handler_expires}
+          <span className="block leading-tight">
+            <span
+              className={
+                state === "expired"
+                  ? "text-accent"
+                  : state === "soon"
+                    ? "text-[var(--rf-yellow-600)]"
+                    : "text-muted"
+              }
+            >
+              {next.on}
+            </span>
+            {/* WHICH document, because "expired" without it sends you to the
+                record to find out. Two lines fit a 56px row. */}
+            <span className="block truncate text-[11px] text-subtle">
+              {DOCUMENT_KIND_LABEL[next.kind]}
+            </span>
           </span>
         );
       },

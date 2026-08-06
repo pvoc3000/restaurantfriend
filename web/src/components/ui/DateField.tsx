@@ -60,6 +60,7 @@ export function DateField({
   required = false,
   ariaLabel,
   className = "",
+  collapseWhenEmpty = false,
 }: {
   /** An ISO yyyy-mm-dd, or null for no date. */
   value: string | null;
@@ -71,6 +72,21 @@ export function DateField({
   required?: boolean;
   ariaLabel: string;
   className?: string;
+  /**
+   * Don't reserve the field's width while there is no date.
+   *
+   * The default reserves it, which is right in a detail screen's `dl`: the rows
+   * line up with each other and the glyph doesn't move when a date lands. It is
+   * wrong in a NARROW container, because an empty input is invisible (see
+   * above) — so a full-width reservation renders as a calendar glyph floating
+   * on its own 112px from anything it belongs to, which reads as decoration
+   * rather than as the control it is.
+   *
+   * The input is still rendered and still focusable when collapsed; only the
+   * blank it is laid over shrinks. `showPicker()` throws on an element that
+   * isn't rendered, so that distinction is the whole of the care here.
+   */
+  collapseWhenEmpty?: boolean;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const empty = value === null || value === "";
@@ -95,8 +111,14 @@ export function DateField({
        edit. */
     <span className="inline-flex items-center gap-1 px-1 py-0.5 hover:bg-neutral-100">
       {/* One fixed width in both states, so the glyph doesn't move when a date
-          lands and the two rows of a dl line up with each other. */}
-      <span className="relative inline-flex h-6 w-28 items-center">
+          lands and the two rows of a dl line up with each other — unless the
+          caller has asked to collapse, which trades that for not stranding the
+          glyph in a narrow box. */}
+      <span
+        className={`relative inline-flex h-6 items-center ${
+          empty && collapseWhenEmpty ? "w-4" : "w-28"
+        }`}
+      >
         <input
           ref={ref}
           type="date"
@@ -112,8 +134,12 @@ export function DateField({
           // do this is hidden (Chrome) or absent (Safari).
           onClick={empty ? openPicker : undefined}
           onChange={(e) => onChange(e.target.value || null)}
-          className={`rf-date h-6 w-28 bg-transparent tabular-nums outline-none disabled:opacity-35 ${
-            empty ? "absolute inset-0 cursor-pointer opacity-0" : ""
+          // `inset-0` sizes the empty input to the blank above, so the collapsed
+          // case narrows the target without ever removing it — it stays laid
+          // over its own 16px, which showPicker needs and which is a small hit
+          // area beside the glyph rather than nothing at all.
+          className={`rf-date h-6 bg-transparent tabular-nums outline-none disabled:opacity-35 ${
+            empty ? "absolute inset-0 cursor-pointer opacity-0" : "w-28"
           } ${className}`}
         />
       </span>
