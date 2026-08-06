@@ -245,7 +245,7 @@ export function ExportPayroll({
           <table className="w-full text-[13px]">
             <thead>
               <tr className="border-b border-ink text-left">
-                {["Name", "Title", "Gusto id", "Reg", "OT", "Dbl", "Premium hrs", "Tips"].map((h) => (
+                {["Name", "Title", "Payroll ID", "Reg", "OT", "Dbl", "Premium hrs", "Tips"].map((h) => (
                   <th key={h} className="px-3 py-2 font-semibold uppercase tracking-[0.06em]">
                     {h}
                   </th>
