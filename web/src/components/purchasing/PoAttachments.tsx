@@ -6,7 +6,6 @@ import { withFrom } from "@/lib/breadcrumbs";
 import {
   attachmentRejection,
   fileSize,
-  isImage,
   ATTACHMENT_ACCEPT,
   ATTACHMENT_ACCEPT_ATTR,
   ATTACHMENT_KIND_LABEL,
@@ -17,6 +16,7 @@ import {
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { PickList } from "@/components/ui/PickList";
 import { ProgressBand } from "@/components/ui/ProgressBand";
+import { DocumentChip } from "@/components/ui/DocumentChip";
 import { useAttachmentActions } from "./useAttachmentActions";
 import type { InvoiceCreationOrder } from "@/lib/invoiceFromExtraction";
 
@@ -165,35 +165,17 @@ export function PoAttachments({
       {attachments.length > 0 && (
         <ul className="flex flex-wrap gap-3">
           {attachments.map((a) => (
-            <li key={a.id} className="w-44 border border-hairline">
-              <a
-                href={a.url ?? undefined}
-                target="_blank"
-                rel="noreferrer"
-                className="block no-underline"
-              >
-                {isImage(a) && a.url ? (
-                  /* A plain <img>, not next/image: this is a signed, short-lived
-                     URL into a PRIVATE bucket. next/image would need the Supabase
-                     host whitelisted as a remote pattern and would then cache a
-                     URL that is built to expire. */
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={a.url}
-                    alt={a.file_name ?? "Attachment"}
-                    className="h-28 w-full bg-neutral-100 object-cover"
-                  />
-                ) : (
-                  <span className="flex h-28 w-full items-center justify-center bg-neutral-100 text-[12px] uppercase tracking-[0.12em] text-subtle">
-                    {a.url ? "PDF" : "Unavailable"}
-                  </span>
-                )}
-              </a>
-              <div className="space-y-0.5 px-2 py-2">
+            <DocumentChip
+              key={a.id}
+              url={a.url}
+              fileName={a.file_name}
+              contentType={a.content_type}
+            >
+              <>
                 <p className="truncate text-xs text-ink" title={a.file_name ?? ""}>
                   {a.file_name ?? "Untitled"}
                 </p>
-                <p className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+                <p className="truncate text-[11px] uppercase tracking-[0.12em] text-subtle">
                   {ATTACHMENT_KIND_LABEL[a.kind]}
                   {a.byte_size !== null && ` · ${fileSize(a.byte_size)}`}
                 </p>
@@ -250,8 +232,8 @@ export function PoAttachments({
                     </button>
                   </p>
                 )}
-              </div>
-            </li>
+              </>
+            </DocumentChip>
           ))}
         </ul>
       )}

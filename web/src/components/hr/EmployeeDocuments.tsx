@@ -13,9 +13,10 @@ import {
   type DocumentKind,
   type SignedEmployeeDocument,
 } from "@/lib/employeeDocuments";
-import { fileSize, isImage } from "@/lib/attachments";
+import { fileSize } from "@/lib/attachments";
 import { PickList } from "@/components/ui/PickList";
 import { ProgressBand } from "@/components/ui/ProgressBand";
+import { DocumentChip } from "@/components/ui/DocumentChip";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 
 /**
@@ -308,34 +309,17 @@ export function EmployeeDocuments({
       {documents.length > 0 && (
         <ul className="flex flex-wrap gap-3">
           {documents.map((d) => (
-            <li key={d.id} className="w-44 border border-hairline">
-              <a
-                href={d.url ?? undefined}
-                target="_blank"
-                rel="noreferrer"
-                className="block no-underline"
-              >
-                {isImage(d) && d.url ? (
-                  /* A plain <img>, not next/image: a signed, short-lived URL
-                     into a PRIVATE bucket. next/image would cache a URL that is
-                     built to expire. */
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={d.url}
-                    alt={d.file_name ?? "Document"}
-                    className="h-28 w-full bg-neutral-100 object-cover"
-                  />
-                ) : (
-                  <span className="flex h-28 w-full items-center justify-center bg-neutral-100 text-[12px] uppercase tracking-[0.12em] text-subtle">
-                    {d.url ? "PDF" : "Unavailable"}
-                  </span>
-                )}
-              </a>
-              <div className="space-y-0.5 px-2 py-2">
+            <DocumentChip
+              key={d.id}
+              url={d.url}
+              fileName={d.file_name}
+              contentType={d.content_type}
+            >
+              <>
                 <p className="truncate text-xs text-ink" title={d.file_name ?? ""}>
                   {d.file_name ?? "Untitled"}
                 </p>
-                <p className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+                <p className="truncate text-[11px] uppercase tracking-[0.12em] text-subtle">
                   {DOCUMENT_KIND_LABEL[d.kind]}
                   {d.byte_size !== null && ` · ${fileSize(d.byte_size)}`}
                 </p>
@@ -370,8 +354,8 @@ export function EmployeeDocuments({
                     Remove
                   </button>
                 )}
-              </div>
-            </li>
+              </>
+            </DocumentChip>
           ))}
         </ul>
       )}
