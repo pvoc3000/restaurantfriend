@@ -449,17 +449,19 @@ export async function EmployeeDetail({
                 </span>
               )}
             </div>
-            {/* Which of the two places this came from, and where it is going.
-                Migration 034 put the expiry on the document; this column is
-                what answers for the 16 current staff whose card has a date on
-                the record and no photograph behind it. It is retired by a
-                follow-up migration once every one of those cards is filed —
-                034 names the probe. */}
-            <p className="text-[11px] text-faint">
-              {foodCard.source === "document"
-                ? "From the card on file — edit it under Paperwork."
-                : "From this record. File the card under Paperwork and its own date takes over."}
-            </p>
+            {/* Said ONLY when the date comes from a filed card, because then it
+                is not editable here and the reader needs sending somewhere.
+                The other case — the legacy `employees.food_handler_expires`
+                column, which is what the 16 current staff with no photographed
+                card still read from — says nothing (Mark, 2026-08-06): the box
+                beside it is editable, which is the whole answer. That column is
+                retired by a follow-up migration once every card is filed; 034
+                names the probe. */}
+            {foodCard.source === "document" && (
+              <p className="text-[11px] text-faint">
+                From the card on file — edit it under Paperwork.
+              </p>
+            )}
           </dd>
         </dl>
       </section>
