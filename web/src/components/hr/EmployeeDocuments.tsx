@@ -218,11 +218,12 @@ export function EmployeeDocuments({
   }
 
   return (
-    /* The panel WRAPS the card — see PoAttachments for why — and opens DOWN,
-       since this one sits in the page's flow rather than at the window's foot.
-       The drop zone is the card, so it is the target open or closed. */
+    /* The panel WRAPS the card — see PoAttachments for why — and opens UP,
+       because this card is pinned to the foot of the window too (Mark,
+       2026-08-06). The drop zone is the card, so it is the target open or
+       closed. */
     <RevealPanel
-      direction="down"
+      direction="up"
       label="the filed documents"
       header={(toggle) => (
         <FileDropZone

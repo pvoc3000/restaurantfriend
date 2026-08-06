@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -24,6 +24,7 @@ import {
 import { withFrom } from "@/lib/breadcrumbs";
 import type { SignedAttachment } from "@/lib/attachments";
 import { PoAttachments } from "./PoAttachments";
+import { StickyFooter } from "@/components/ui/StickyFooter";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -32,73 +33,6 @@ import { AddPoLines } from "./AddPoLines";
 import { OrderBar } from "./OrderBar";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 import { nextDeliveryDate } from "@/lib/poProcessing";
-
-/**
- * Reserve, in the page's flow, exactly the height of a `position: fixed` footer.
- *
- * The Paperwork band is pinned to the bottom of the window, so it takes no
- * space — and two things then need to know how much space it WOULD have taken:
- * the last of the page's content, which must not slide under it, and
- * `useFillViewportHeight`, which sizes the line pane from "everything below me"
- * and would otherwise run the table under the band.
- *
- * Measured, not a constant, for the reason every other measurement on this
- * screen is: the card is 62px with nothing attached and taller with files in
- * it, and a wrong guess is invisible until someone files an invoice. Written
- * straight to the node — no state, so a resize doesn't re-render the line
- * table, and the `set-state-in-effect` lint has nothing to object to. The >1px
- * guard stops the observer reacting to its own write.
- *
- * IT RESERVES THE FOOTER MINUS WHAT ALREADY FOLLOWS IT. The spacer's own bottom
- * margin and the app layout's `py-8` sit under it and are already covered by
- * the band, so reserving the full height on top of them left 56px of white
- * between the last row and the card (Mark, 2026-08-02: "reduce the whitespace
- * between the datatable and the paperwork area"). Both are read straight off
- * computed style rather than measured from the layout, which keeps this free of
- * the feedback loop it would otherwise have with `useFillViewportHeight` —
- * that hook sizes the pane from this spacer, so a spacer that measured the
- * page would be measuring its own effect.
- */
-/** White left between the line table and the card. The page's own block rhythm
- *  (space-y-6), so the gap above the card matches every other gap on it. */
-const FOOTER_GAP = 16;
-
-function useStickyFooterClearance(
-  footerRef: React.RefObject<HTMLElement | null>,
-  spacerRef: React.RefObject<HTMLElement | null>
-) {
-  useLayoutEffect(() => {
-    const footer = footerRef.current;
-    const spacer = spacerRef.current;
-    if (!footer || !spacer) return;
-
-    const measure = () => {
-      const below =
-        (parseFloat(getComputedStyle(spacer).marginBottom) || 0) +
-        (parseFloat(getComputedStyle(spacer.closest("main")!).paddingBottom) || 0);
-      const target = Math.max(
-        0,
-        footer.getBoundingClientRect().height + FOOTER_GAP - below
-      );
-      if (Math.abs(parseFloat(spacer.style.height || "0") - target) > 1) {
-        spacer.style.height = `${target}px`;
-        // Tell the pane its floor moved. `useFillViewportHeight` re-measures on
-        // window resize and on `document.body` resizing — and body is
-        // `min-h-full`, so when this spacer SHRINKS (a file removed from the
-        // card) the body's box doesn't change at all and the pane never
-        // reclaims the space. Measured: the card going 188px -> 86px left the
-        // pane at 263px with 118px of white under it. A resize event is exactly
-        // the signal "the amount of page below you changed".
-        window.dispatchEvent(new Event("resize"));
-      }
-    };
-
-    measure();
-    const observer = new ResizeObserver(measure);
-    observer.observe(footer);
-    return () => observer.disconnect();
-  }, [footerRef, spacerRef]);
-}
 
 /**
  * PO detail: what was ordered, what arrived, and the gap between them.
@@ -155,9 +89,6 @@ export function PurchaseOrderDetail({
   const supabase = createClient();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const footerRef = useRef<HTMLDivElement>(null);
-  const footerSpacerRef = useRef<HTMLDivElement>(null);
-  useStickyFooterClearance(footerRef, footerSpacerRef);
   const [checkedLines, setCheckedLines] = useState<Set<string>>(new Set());
 
   // Line selection (and deletion) is purchaser+ work — `processing` is
@@ -950,20 +881,6 @@ export function PurchaseOrderDetail({
         empty={<p className="text-sm text-muted">This order has no lines.</p>}
       />
 
-      {/* Clearance for the pinned band below. Its height is MEASURED and
-          written here (see useStickyFooterClearance) rather than guessed: the
-          card is 62px empty and taller with files in it, and this number is
-          also what useFillViewportHeight reads as "everything below the pane",
-          so a guess would show up as the line list running under the band.
-
-          `-mt-6` cancels the page's own space-y-6 above it (Mark, 2026-08-02:
-          "you can tighten the white space at the bottom"). A spacer is a
-          measurement, not a block of content, so the rhythm that separates the
-          real blocks shouldn't apply to it — and the gap it was adding sat
-          on top of the band's own padding, which is where the breathing room
-          belongs. */}
-      <div ref={footerSpacerRef} className="-mt-6" aria-hidden />
-
       {/* PINNED to the bottom of the window (Mark, 2026-08-02), and last in the
           order of the screen (Mark, earlier the same day — declutter). It used
           to sit with Process, on the reasoning that sending the order and
@@ -972,14 +889,8 @@ export function PurchaseOrderDetail({
           delivery, then never again — between the Process card and the order
           itself, so every visit paid for it.
 
-          It keeps its BOUNDING BOX (Mark, 2026-08-02, on seeing it as a
-          full-bleed band with a top rule: he "preferred the paperwork section
-          in a bounding box and the datatable without a bottom border" — the
-          band's rule ran the full width directly under the line table, so it
-          read as a border the table had grown). So the card draws its own frame
-          as it always did, and the fixed wrapper contributes only position and
-          an opaque white backdrop — which it still needs, because once the pane
-          hits its floor the rows scroll UNDER this.
+          `ui/StickyFooter` owns the position and the measured clearance; the
+          CARD draws its own frame, which is why the band has none.
 
           Receiving is where this card is actually WORKED anyway: that screen has
           its own document pane, and auto-read-on-attach lives in the shared
@@ -989,17 +900,7 @@ export function PurchaseOrderDetail({
           Visible to everyone — the invoice is the answer to "what did we
           actually pay" — but only purchaser+ can add or remove, matching
           migration 018's storage policies. */}
-      <div
-        ref={footerRef}
-        // Full-bleed and opaque, but with NO border of its own — it carries the
-        // page's own gutters as padding so the card lines up with the table
-        // above it, and the white is what stops rows showing through when the
-        // page scrolls behind it.
-        //
-        // z-30 is the ActionBar's rung: above the table and its sticky column
-        // labels (20), below the masthead (50) and anchored panels (70).
-        className="fixed inset-x-0 bottom-0 z-30 bg-white px-4 pb-4 pt-2 xl:px-12"
-      >
+      <StickyFooter spacerClassName="-mt-6">
         {attachmentError ? (
           <p className="border border-accent px-4 py-3 text-sm text-accent">
             Could not load this order&rsquo;s paperwork: {attachmentError}
@@ -1020,7 +921,7 @@ export function PurchaseOrderDetail({
             }}
           />
         )}
-      </div>
+      </StickyFooter>
     </div>
   );
 }

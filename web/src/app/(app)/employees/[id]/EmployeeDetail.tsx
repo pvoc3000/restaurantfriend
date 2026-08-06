@@ -27,6 +27,7 @@ import { EmployeeDocuments } from "@/components/hr/EmployeeDocuments";
 import { AppAccess } from "@/components/hr/AppAccess";
 import { EmployeeActions } from "@/components/hr/EmployeeActions";
 import { EmployeePayroll } from "@/components/hr/EmployeePayroll";
+import { StickyFooter } from "@/components/ui/StickyFooter";
 import {
   EmployeeBenefits,
   type EmployeeBenefitRow,
@@ -516,29 +517,6 @@ export async function EmployeeDetail({
         </div>
       </section>
 
-      {/* ---- paperwork ------------------------------------------------- */}
-      <section className="space-y-2">
-        <Heading>Paperwork</Heading>
-        {documentError ? (
-          /* 018's pattern: say what happened rather than render an empty card,
-             which reads as "nothing filed yet" — the one thing this block must
-             never claim by accident. Before migration 034 this is what a
-             missing `expires_on` column looks like. */
-          <p className="border border-ink px-4 py-3 text-sm text-accent">
-            Could not read this personnel file: {documentError.message}
-          </p>
-        ) : (
-          <EmployeeDocuments
-            employeeId={person.id}
-            orgId={person.org_id}
-            documents={documents}
-            legacyFoodHandlerExpires={person.food_handler_expires}
-            today={today}
-            canEdit
-          />
-        )}
-      </section>
-
       {/* ---- access ---------------------------------------------------- */}
       <section className="space-y-2">
         <Heading>App access</Heading>
@@ -582,6 +560,37 @@ export async function EmployeeDetail({
           afterDelete={{ href: "/employees" }}
         />
       </div>
+
+      {/* ---- paperwork, pinned to the foot of the window ---------------- */}
+      {/* PO detail's treatment, asked for here by name (Mark, 2026-08-06). The
+          same argument applies: a grid of documents you consult occasionally
+          was spending a third of the record on itself, and `ui/RevealPanel`
+          opens it UP and OVER the record rather than reflowing it.
+
+          LAST on the screen and out of the flow, so the reading order of the
+          record — who they are, what they're paid, how to reach them — is not
+          interrupted by a filing cabinet. Delete stays the last thing IN the
+          flow, which is still where a destructive action belongs. */}
+      <StickyFooter spacerClassName="-mt-8">
+        {documentError ? (
+          /* 018's pattern: say what happened rather than render an empty card,
+             which reads as "nothing filed yet" — the one thing this block must
+             never claim by accident. Before migration 034 this is what a
+             missing `expires_on` column looks like. */
+          <p className="border border-ink bg-white px-4 py-3 text-sm text-accent">
+            Could not read this personnel file: {documentError.message}
+          </p>
+        ) : (
+          <EmployeeDocuments
+            employeeId={person.id}
+            orgId={person.org_id}
+            documents={documents}
+            legacyFoodHandlerExpires={person.food_handler_expires}
+            today={today}
+            canEdit
+          />
+        )}
+      </StickyFooter>
     </div>
   );
 }
