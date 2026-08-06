@@ -87,6 +87,16 @@ export type ExportRow = {
   double_overtime_hours: number;
   missed_break_hours: number;
   paycheck_tips: number | null;
+  /**
+   * Non-hours money, keyed by the Gusto column it belongs in — flat payroll
+   * benefits, from `lib/payrollBenefits`. Empty on every non-primary row.
+   *
+   * A plain object rather than a `Map` ON PURPOSE: the fixture harness compares
+   * with `JSON.stringify`, and a `Map` stringifies to `{}`, so every assertion
+   * about these figures would pass unconditionally. An assertion that cannot
+   * fail is worse than no assertion.
+   */
+  earnings: Record<string, number>;
   /** Only ever true on one row per person. */
   isPrimary: boolean;
   employee_id: string;
@@ -119,6 +129,36 @@ export const GUSTO_COLUMNS = [
   "personal_note",
 ] as const;
 
+/**
+ * The columns a payroll BENEFIT may be pointed at — non-hours money only.
+ *
+ * `paycheck_tips` is deliberately absent even though it is money: it has its own
+ * typed field and its own allocator, and letting a benefit target it would add
+ * silently to a figure `lib/tipPool` already owns to the cent.
+ *
+ * The hours columns are absent because a benefit is DOLLARS. Pointing one at
+ * `regular_hours` would put $12 where 12 hours belongs and corrupt a payroll
+ * file in a way nothing downstream would question — which is the whole reason
+ * this list exists rather than letting `payroll_benefits.gusto_column` be free
+ * text all the way to the CSV.
+ */
+export const EARNING_COLUMNS = [
+  "bonus",
+  "commission",
+  "cash_tips",
+  "correction_payment",
+  "custom_earning_commuter_benefit",
+  "custom_earning_distributed_service_charges",
+  "custom_earning_premium",
+  "reimbursement",
+] as const;
+
+export type GustoEarningColumn = (typeof EARNING_COLUMNS)[number];
+
+export function isEarningColumn(column: string): column is GustoEarningColumn {
+  return (EARNING_COLUMNS as readonly string[]).includes(column);
+}
+
 function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
@@ -133,7 +173,13 @@ function round2(n: number): number {
 export function buildExportRows(
   shifts: readonly ExportShift[],
   employees: readonly ExportEmployee[],
-  premiums: PremiumHours
+  premiums: PremiumHours,
+  /**
+   * employee id → Gusto column → dollars, from
+   * `payrollBenefits.earningsByEmployee`. Optional so every existing caller and
+   * fixture is untouched by this arriving.
+   */
+  earnings: ReadonlyMap<string, Readonly<Record<string, number>>> = new Map()
 ): ExportRow[] {
   const byId = new Map(employees.map((e) => [e.id, e]));
 
@@ -171,13 +217,15 @@ export function buildExportRows(
     }
   }
 
-  // Everybody who appears at all: worked hours, earned tips, or is owed a
-  // premium. The last is easy to forget and would silently drop a premium for
-  // someone whose only shift that fortnight was on another payroll.
+  // Everybody who appears at all: worked hours, earned tips, is owed a premium,
+  // or earned a benefit. Each of the last three is easy to forget and would
+  // silently drop somebody's money — a person whose only shift that fortnight
+  // was on another payroll still has to get their row.
   const touched = new Set<string>([
     ...[...cells.values()].map((c) => c.employee_id),
     ...tips.keys(),
     ...premiums.keys(),
+    ...earnings.keys(),
   ]);
 
   const rows: ExportRow[] = [];
@@ -209,6 +257,9 @@ export function buildExportRows(
         // Premiums are HOURS and ride the primary row with every other earning.
         missed_break_hours: isPrimary ? round2(premiums.get(employeeId) ?? 0) : 0,
         paycheck_tips: isPrimary ? round2(tips.get(employeeId) ?? 0) || null : null,
+        // Same rule as the two above, and measured the same way: zero
+        // violations in the real template.
+        earnings: isPrimary ? { ...(earnings.get(employeeId) ?? {}) } : {},
         isPrimary,
       });
     }
@@ -243,28 +294,38 @@ export function csvCell(value: string | number | null): string {
 
 export function toCsv(rows: readonly ExportRow[]): string {
   const header = GUSTO_COLUMNS.join(",");
-  const body = rows.map((r) =>
-    [
-      csvCell(r.last_name),
-      csvCell(r.first_name),
-      csvCell(r.title),
-      csvCell(r.gusto_employee_id),
-      r.regular_hours.toFixed(2),
-      r.overtime_hours.toFixed(2),
-      r.double_overtime_hours.toFixed(2),
-      r.missed_break_hours.toFixed(2),
-      "", // bonus
-      "", // commission
-      r.paycheck_tips === null ? "" : r.paycheck_tips.toFixed(2),
-      "", // cash_tips — Square card tips only, so there is no cash split
-      "", // correction_payment
-      "", // custom_earning_commuter_benefit
-      "", // custom_earning_distributed_service_charges
-      "", // custom_earning_premium — premiums go out as HOURS, above
-      "", // reimbursement
-      "", // personal_note
-    ].join(",")
-  );
+  const body = rows.map((r) => {
+    // The columns this module types itself. Everything not named here is a
+    // benefit column, filled from `earnings` — including `cash_tips` (Square
+    // card tips only, so there is no cash split) and `custom_earning_premium`
+    // (premiums go out as HOURS in `missed_break_hours`), both of which are
+    // simply empty until somebody points a benefit at them.
+    const typed: Record<string, string> = {
+      last_name: csvCell(r.last_name),
+      first_name: csvCell(r.first_name),
+      title: csvCell(r.title),
+      gusto_employee_id: csvCell(r.gusto_employee_id),
+      regular_hours: r.regular_hours.toFixed(2),
+      overtime_hours: r.overtime_hours.toFixed(2),
+      double_overtime_hours: r.double_overtime_hours.toFixed(2),
+      missed_break_hours: r.missed_break_hours.toFixed(2),
+      paycheck_tips: r.paycheck_tips === null ? "" : r.paycheck_tips.toFixed(2),
+      personal_note: "",
+    };
+
+    // THE COLUMN SET IS STILL THE CONSTANT. This walks GUSTO_COLUMNS and looks
+    // values UP; it never walks `earnings`. So no data can add a column to this
+    // file, however a benefit is configured — which is what keeps the
+    // sick-hours assertion load-bearing after the eight hardcoded blanks that
+    // used to sit here went away.
+    return GUSTO_COLUMNS.map((column) => {
+      const value = typed[column];
+      if (value !== undefined) return value;
+      const dollars = r.earnings[column] ?? 0;
+      // Blank rather than "0.00", which is the real template's shape.
+      return dollars ? dollars.toFixed(2) : "";
+    }).join(",");
+  });
   // CRLF, which is what the real template uses and what a spreadsheet expects.
   return [header, ...body].join("\r\n") + "\r\n";
 }
@@ -290,6 +351,12 @@ export function exportReadiness(input: {
   undecidedBreakFindings: number;
   poolsWithoutFigure: number;
   overtimeNeedingReview: number;
+  /**
+   * Benefits pointed at a column this file does not have, with what they came
+   * to. The UI picks from `EARNING_COLUMNS` so this cannot happen from a
+   * screen — it is the safety net for a value written in the SQL editor.
+   */
+  unknownEarningColumns?: readonly { name: string; column: string; dollars: number }[];
 }): ExportCaveat[] {
   const out: ExportCaveat[] = [];
   const byId = new Map(input.employees.map((e) => [e.id, e]));
@@ -337,7 +404,20 @@ export function exportReadiness(input: {
     });
   }
 
+  for (const bad of input.unknownEarningColumns ?? []) {
+    out.push({
+      code: "unknown_earning_column",
+      // NAME THE MONEY IT DROPPED. A caveat that says only "misconfigured" is
+      // one you skim; a caveat that says $432 is one you fix.
+      detail: `${bad.name} writes to “${bad.column}”, which is not a column in this file, so its ${formatDollars(bad.dollars)} is not in it.`,
+    });
+  }
+
   return out;
+}
+
+function formatDollars(n: number): string {
+  return `$${n.toFixed(2)}`;
 }
 
 /** `donut-friend-2026-07-20.csv` — the period, so two files never collide. */

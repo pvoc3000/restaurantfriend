@@ -317,3 +317,130 @@ test("the file is named for the period, so two never collide", () => {
   eq(exportFileName("Donut Friend", "2026-07-20"), "donut-friend-2026-07-20.csv");
   eq(exportFileName("", "2026-07-20"), "payroll-2026-07-20.csv");
 });
+
+/* -- payroll benefits: the non-hours earning columns ------------------------ */
+//
+// Added when `custom_earning_commuter_benefit` stopped being a hardcoded empty
+// string. The real fortnight these numbers come from is 07/20–08/02/2026, where
+// five people earned $432 of commuter benefit between them.
+
+const COMMUTER = "custom_earning_commuter_benefit";
+const cell = (csv: string, line: number, column: string) =>
+  csv.split("\r\n")[line].split(",")[GUSTO_COLUMNS.indexOf(column as never)];
+
+test("a benefit lands in its own column, and no other earning column moves", () => {
+  const csv = toCsv(
+    buildExportRows(
+      [shift({ employee_id: "e1", wage_type: "Sr. Donut Friend", hours_regular: 30 })],
+      [alice],
+      new Map(),
+      new Map([["e1", { [COMMUTER]: 96 }]])
+    )
+  );
+  eq(cell(csv, 1, COMMUTER), "96.00", "the commuter cell");
+  for (const c of ["bonus", "commission", "cash_tips", "correction_payment", "reimbursement"]) {
+    eq(cell(csv, 1, c), "", `${c} must stay empty`);
+  }
+});
+
+test("a benefit rides the (Primary) row and ONLY that row", () => {
+  const rows = buildExportRows(
+    [
+      shift({ employee_id: "e1", wage_type: "Sr. Donut Friend", hours_regular: 20 }),
+      shift({ employee_id: "e1", wage_type: "Baker", hours_regular: 10 }),
+    ],
+    [alice],
+    new Map(),
+    new Map([["e1", { [COMMUTER]: 96 }]])
+  );
+  eq(rows.length, 2, "two jobs, two rows");
+  const primary = rows.find((r) => r.isPrimary);
+  const other = rows.find((r) => !r.isPrimary);
+  eq(primary?.earnings, { [COMMUTER]: 96 }, "on the primary row");
+  eq(other?.earnings, {}, "and nowhere else");
+});
+
+test("someone owed ONLY a benefit — no hours, no tips — still gets a row", () => {
+  // The `touched` widening. Without it their money silently vanishes.
+  const rows = buildExportRows([], [alice], new Map(), new Map([["e1", { [COMMUTER]: 12 }]]));
+  eq(rows.length, 1, "a row exists");
+  ok(rows[0].isPrimary, "and it is the primary one");
+  eq(rows[0].regular_hours, 0, "with no hours");
+  eq(rows[0].earnings[COMMUTER], 12);
+});
+
+test("two benefits reach two different columns on the one row", () => {
+  const csv = toCsv(
+    buildExportRows(
+      [shift({ employee_id: "e1", wage_type: "Sr. Donut Friend", hours_regular: 30 })],
+      [alice],
+      new Map(),
+      new Map([["e1", { [COMMUTER]: 96, reimbursement: 40.5 }]])
+    )
+  );
+  eq(cell(csv, 1, COMMUTER), "96.00");
+  eq(cell(csv, 1, "reimbursement"), "40.50");
+});
+
+test("an absent or zero earning renders empty, never 0.00", () => {
+  const csv = toCsv(
+    buildExportRows(
+      [shift({ employee_id: "e1", wage_type: "Sr. Donut Friend", hours_regular: 30 })],
+      [alice],
+      new Map(),
+      new Map([["e1", { [COMMUTER]: 0 }]])
+    )
+  );
+  eq(cell(csv, 1, COMMUTER), "", "the real template leaves these blank");
+});
+
+test("NO DATA CAN ADD A COLUMN — a bogus earning key changes neither header nor width", () => {
+  // toCsv walks GUSTO_COLUMNS and looks values up; it must never walk the
+  // earnings object. This is what keeps the sick-hours assertion meaningful now
+  // that the eight hardcoded blanks are gone: put `sick_hours` in the map and
+  // the file must be byte-identical.
+  const clean = toCsv(
+    buildExportRows(
+      [shift({ employee_id: "e1", wage_type: "Sr. Donut Friend", hours_regular: 30 })],
+      [alice],
+      new Map()
+    )
+  );
+  const dirty = toCsv(
+    buildExportRows(
+      [shift({ employee_id: "e1", wage_type: "Sr. Donut Friend", hours_regular: 30 })],
+      [alice],
+      new Map(),
+      new Map([["e1", { sick_hours: 8, not_a_column: 999 }]])
+    )
+  );
+  eq(dirty, clean, "byte-identical");
+  no(/sick/i.test(dirty), "and still no mention of sick");
+});
+
+test("exportReadiness names an unknown earning column AND the dollars it dropped", () => {
+  const caveats = exportReadiness({
+    rows: [],
+    employees: [],
+    shiftsWithoutClockOut: 0,
+    undecidedBreakFindings: 0,
+    poolsWithoutFigure: 0,
+    overtimeNeedingReview: 0,
+    unknownEarningColumns: [
+      { name: "Commuter benefit", column: "custom_earning_commutter_benefit", dollars: 432 },
+    ],
+  });
+  eq(caveats.length, 1);
+  eq(caveats[0].code, "unknown_earning_column");
+  ok(caveats[0].detail.includes("$432.00"), `must name the money: ${caveats[0].detail}`);
+});
+
+test("the earnings map is untouched by an existing three-argument caller", () => {
+  // Every call site that predates benefits must keep compiling and behaving.
+  const rows = buildExportRows(
+    [shift({ employee_id: "e1", wage_type: "Sr. Donut Friend", hours_regular: 30 })],
+    [alice],
+    new Map()
+  );
+  eq(rows[0].earnings, {});
+});

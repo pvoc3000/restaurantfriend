@@ -95,8 +95,9 @@ function HoursBlock({ employees }: { employees: WorksheetEmployee[] }) {
       double_ot: t.double_ot + e.double_ot,
       sick: t.sick + e.sick,
       premium: t.premium + e.premiumHours,
+      benefits: t.benefits + e.benefitDollars,
     }),
-    { regular: 0, overtime: 0, double_ot: 0, sick: 0, premium: 0 }
+    { regular: 0, overtime: 0, double_ot: 0, sick: 0, premium: 0, benefits: 0 }
   );
 
   const num = (n: number) => <span className="tabular-nums">{n.toFixed(2)}</span>;
@@ -122,6 +123,22 @@ function HoursBlock({ employees }: { employees: WorksheetEmployee[] }) {
       // HOURS, never dollars (decision 1). Gusto multiplies by the regular rate
       // of compensation, which is arithmetic this system deliberately doesn't own.
       render: (e) => (e.premiumHours > 0 ? <span className="bg-mark-fill px-1 tabular-nums">{e.premiumHours.toFixed(2)}</span> : <span className="text-faint">—</span>),
+    },
+    {
+      key: "benefits",
+      label: "Benefits",
+      width: 100,
+      sortValue: (e) => e.benefitDollars,
+      // DOLLARS here, where Premium beside it is HOURS, and the two are not
+      // inconsistent: a premium is an hour of pay at a rate this system refuses
+      // to know, while a flat benefit is money that was never derived from a
+      // rate at all. The $ is what stops the columns being read as one kind.
+      render: (e) =>
+        e.benefitDollars > 0 ? (
+          <span className="tabular-nums">${e.benefitDollars.toFixed(2)}</span>
+        ) : (
+          <span className="text-faint">—</span>
+        ),
     },
     {
       key: "sick",
@@ -153,6 +170,9 @@ function HoursBlock({ employees }: { employees: WorksheetEmployee[] }) {
         <span>OT <strong className="tabular-nums">{totals.overtime.toFixed(2)}</strong></span>
         <span>Double <strong className="tabular-nums">{totals.double_ot.toFixed(2)}</strong></span>
         <span>Premium <strong className="tabular-nums">{totals.premium.toFixed(2)}</strong> hrs</span>
+        {totals.benefits > 0 && (
+          <span>Benefits <strong className="tabular-nums">${totals.benefits.toFixed(2)}</strong></span>
+        )}
         {totals.sick > 0 && (
           <span className="text-muted">
             Sick <strong className="tabular-nums">{totals.sick.toFixed(2)}</strong>
@@ -167,7 +187,7 @@ function HoursBlock({ employees }: { employees: WorksheetEmployee[] }) {
         rows={employees}
         columns={columns}
         rowKey={(e) => e.employee_id}
-        storageKey="rf.worksheet.hours.v1"
+        storageKey="rf.worksheet.hours.v2"
         columnChooser
         compactBelow={1280}
         empty={<p className="text-sm text-muted">No shifts in this pay period.</p>}

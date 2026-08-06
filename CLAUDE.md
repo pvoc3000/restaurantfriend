@@ -1397,6 +1397,119 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    exactly like a catastrophic data-integrity problem. The data is clean —
    44,661 rows, 44,661 distinct `source_row_key`. Check `ids.size === rows.length`
    before believing any whole-table audit.
+   **Shipped 2026-08-05 — PAYROLL BENEFITS (migration 033, NEEDS APPLYING).**
+   Flat money somebody earns for working a shift: the commuter allowance, and a
+   shape general enough for the overnight differential and reimbursements Mark
+   has already named. It fills `custom_earning_commuter_benefit`, which
+   `lib/gustoExport` had been emitting as a hardcoded empty string — so the
+   export as it stood was **$432 a fortnight short across five people**.
+   Three measurements out of the real FileMaker export decided the design, and
+   each one killed a piece of the FMP model:
+   **(a) `locations` is not touched at all.** FMP had a boolean + amount +
+   period on Location AND an amount + unit + repeating location list on the
+   employee. The employee's list classifies every stamped shift on its own:
+   Angelica Castellanos (configured DF02) 0 of 359 DF01 shifts, 4 of 4 DF02;
+   Erick Mejia 0 of 615 DF01, 32 of 34 DF02. DF01's flag is on with **no
+   amount**, so the location row isn't even the source of the money — it carries
+   one redundant bit, and a second place to state one fact is 016's
+   `nextDeliveryDate` trap. The amount cascades entitlement → benefit default,
+   design rule 6's shape.
+   **(b) Nothing is stamped onto a timesheet.** FMP's script wrote a dollar
+   figure at import and **the stamp has holes** — Casildo Herrera worked seven
+   consecutive DF02 overnights in July 2024 unstamped, and two configured people
+   (one active) were never stamped at all. Nothing surfaced it, because a
+   stamped number cannot explain itself: a $0 and a person who was never
+   entitled look identical. So an accrual is DERIVED (decision 3's posture) and
+   FROZEN at export (decision 10's), which is exactly how tips already work.
+   **(c) It paid per SHIFT** — 32 employee-days carry two $12 stamps, 16 of them
+   in 2026 — while both FMP unit fields literally read `Day`. Mark's reading is
+   per shift and the money agrees with him; seeded `per_shift`, one tap to
+   change on the new screen.
+   Schema: `payroll_benefits` (the catalog: code, name, `gusto_column`, unit,
+   `default_amount`, **`is_active`** — that spelling, because
+   `catalog/ActiveToggle` hardcodes `.update({ is_active })`), `employee_benefits`
+   (the entitlement, **`location_id` NOT NULL**, one row per shop), and
+   `timesheet_benefits` (the frozen snapshot, **SELECT-only policy and no
+   insert/update/delete at all** — the sole writer is `freeze_pay_period`, which
+   is definer and bypasses RLS, so the snapshot is structurally unwritable from
+   the app).
+   **The entitlement's constraint is an EXCLUSION, not a unique index** (027's
+   btree_gist idiom, second outing): `(org, employee, benefit, location)` plus
+   `daterange(starts_on, ends_on, '[]')`. A plain unique index would make the two
+   date columns decoration — "$12 through June, $15 from July" would be
+   inexpressible — and this makes "which entitlement pays this shift" a TOTAL
+   function, which is what lets `lib/payrollBenefits` be deterministic. Its one
+   cost is real: no `on conflict` target, so the backfill selects-then-updates
+   rather than upserting.
+   **Entitlement writes are deliberately NOT gated on period editability**,
+   unlike `break_premiums` and `tip_pools`. An entitlement is a standing fact
+   about a PERSON (the class of `employees.excludes_tips`, which 028 left
+   ungated for the same reason); `period_editable_on` takes ONE day while an
+   entitlement carries an unbounded range spanning closed periods; and what
+   decision 8 protects is money already PAID, which the freeze protects instead.
+   **The snapshot is what earns this table its ungated write** — which is also
+   why `mergeFrozen` makes the frozen figure WIN, backwards from `ExportPayroll`
+   preferring its tip recompute. That asymmetry is commented at both ends; a
+   tidy-up would restate July's dollars from a September correction.
+   **`freeze_pay_period` gained a 4th argument and 033 DROPS IT FIRST.**
+   `create or replace` cannot change an argument list — it would create an
+   OVERLOAD and leave 029's three-arg version live, so a stale tab would keep
+   freezing fortnights with no benefits in them and no error. With the drop a
+   stale tab gets PostgREST's `PGRST202`, which is loud. The benefit payload is
+   **sparse by construction** (most shifts accrue nothing), so it checks that
+   every row it was GIVEN landed rather than that every timesheet is covered —
+   the opposite of the allocations guard beside it — and it DELETES the period's
+   accruals before inserting, or a reopened period keeps an orphan for a shift
+   that stopped qualifying.
+   `lib/gustoExport` is now **data-driven for non-hours earnings**: a new
+   `EARNING_COLUMNS` allow-list, `ExportRow.earnings` (a plain **object, not a
+   `Map`** — the fixture harness compares with `JSON.stringify` and two different
+   Maps both stringify to `{}`, so every assertion would pass unconditionally;
+   verified), an optional 4th argument to `buildExportRows` so no existing caller
+   moved, and `toCsv`'s eight positional `""` literals replaced by a lookup.
+   **It still walks `GUSTO_COLUMNS` and never the earnings map**, so no data can
+   add a column — which is what keeps the sick-hours assertion load-bearing, and
+   is itself pinned by a fixture that puts `sick_hours` in the map and demands a
+   byte-identical file. `touched` widened with `earnings.keys()` or a
+   benefit-only person is dropped.
+   UI: a read-only **Benefits** block in the timesheet row expansion — the two
+   above it are decisions and carry editors, this one explains itself instead,
+   naming *"Earned at DF02, and this shift was at DF01"*, which is Angelica's 359
+   rows in one sentence and the thing FMP's stamp could never say. A **Benefits**
+   column on the worksheet's Hours block (dollars, beside Premium's hours) and a
+   per-benefit total on the export summary bar. **`/payroll-benefits`**, a list
+   with no detail route (`/shop-sections`' shape) where `gusto_column` is a
+   `PickList` over `EARNING_COLUMNS` so a typo is *unenterable*. And a **Payroll
+   block on the employee record** carrying the entitlements plus the four columns
+   that had **no UI writer anywhere in the app** — `gusto_id`, `homebase_id`,
+   `primary_wage_type`, `excludes_tips` — while `exportReadiness` had been
+   reporting "N people have no Gusto id" with no way to act on it.
+   `migration/backfill-employee-benefits.mjs` (dry run by default) recovers the
+   13 people × 19 rows and **diffs its own answer against FileMaker's 4,663
+   stamps**, which is what actually proves the rule. It sets
+   **`starts_on = 2022-06-27`**, and that is a measurement rather than a guess:
+   zero stamps exist before that date in seven years and the first day is a solid
+   block of people. Without it Gaspar López Alarcon alone picks up 343 days in
+   2020–21 that nobody was ever paid for.
+   **The diff's verdict: ZERO days where a currently active person was paid and
+   we would not**, and 56 days FileMaker's script missed (Casildo's seven among
+   them). All 531 "only FileMaker" days belong to eight **inactive** people whose
+   FMP config was cleared when they left, or to a **punchless bare-stamp row** —
+   FMP sometimes carried the $12 on a third row with no position, no punches and
+   no hours, which the punch-based rule correctly refuses.
+   Verified end to end: all 33 migrations apply on the Docker harness, the
+   exclusion constraint refused an overlap and accepted an abutting range, the
+   freeze refused bogus ids BY NAME and replaced rather than duplicated on
+   re-freeze, 479 fixtures pass (29 new, each rule checked by breaking it), and
+   **the real export rendered through the real components over the real
+   07/20–08/02 fortnight matches Mark's actual Gusto file person for person —
+   $432.00 vs $432.00.**
+   **Qualification is PUNCH-BASED, not hours-based**, and that is the choice a
+   rewrite would most likely flip: a flat allowance pays for showing up, so a
+   quarter-hour shift earns it in full and a nine-hour PTO adjustment earns
+   nothing. There is **no per-hour or percentage unit and there must never be
+   one** — a percentage would be a percentage of wages, which needs a rate, which
+   decision 1 forbids storing.
 4d. 🚧 **Invoices** — the third module, and the one that finishes the purchasing
    loop (Mark, 2026-08-04, after using the receiving screen: "this reconcile PO
    workflow is new to me and I love it… Every time we upload an invoice to a
@@ -1596,6 +1709,16 @@ recorded bare while an owed hour still has to argue its case. Probe with
 'break_premiums' and column_name = 'reason'` (YES) and
 `select conname from pg_constraint where conrelid = 'public.break_premiums'::regclass`
 (expect `break_premiums_reason_when_owed`, and NO `break_premiums_reason_check`).
+**033 is NOT applied yet** — until it is, `/payroll-benefits`, the employee
+record's Benefits sub-block and the pay-period worksheet each say so in words
+rather than rendering empty (which would read as "nothing configured"). Probe
+with `select count(*) from payroll_benefits` (1, code `commuter`), and confirm
+`select proname, pg_get_function_arguments(oid) from pg_proc where proname =
+'freeze_pay_period'` returns EXACTLY ONE row taking four arguments — two rows
+means the drop didn't happen and a stale tab can still freeze a period with no
+benefits in it. After applying, run
+`node --env-file=.env backfill-employee-benefits.mjs` (dry run) and read its
+verdict before `--apply`.
 **031 is NOT applied yet** — until it is, the pay-period record replaces its
 worksheet and export with "column timesheets.wage_type does not exist", which
 is the intended behaviour rather than an empty screen. Probe with

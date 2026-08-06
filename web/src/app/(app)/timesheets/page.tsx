@@ -6,8 +6,16 @@ import {
   type PeriodOption,
   type TimesheetRow,
 } from "@/components/payroll/TimesheetsList";
+import type { ShiftBenefitLine } from "@/components/payroll/ShiftDecisions";
 import type { PayPeriodStatus } from "@/lib/payPeriods";
 import type { OtDecision } from "@/lib/timesheets";
+import {
+  computeAccruals,
+  explainShift,
+  mergeFrozen,
+  type BenefitEntitlement,
+  type PayrollBenefit,
+} from "@/lib/payrollBenefits";
 
 /**
  * A fortnight of shifts.
@@ -108,6 +116,8 @@ export default async function TimeSheetsPage({
     { data: waiverRows },
     { data: premiumRows },
     { data: poolRows },
+    { data: benefitRows },
+    { data: entitlementRows },
   ] = await Promise.all([
     supabase
       .from("timesheets")
@@ -118,7 +128,8 @@ export default async function TimeSheetsPage({
          source_hours_paid, source_break_minutes,
          hours_regular, hours_overtime, hours_double_ot,
          ot_decision, ot_reason, unpaid_break_minutes, sick_hours, exclude_tips,
-         stitched, kind, position, employee_note, manager_note, source, source_payload`
+         stitched, kind, position, employee_note, manager_note, source, source_payload,
+         timesheet_benefits(benefit_id, amount)`
       )
       .eq("pay_period_id", periodId)
       .order("workday"),
@@ -146,6 +157,15 @@ export default async function TimeSheetsPage({
       .select("location_id, business_date, reported_cents, corrected_cents")
       .gte("business_date", periodStart)
       .lte("business_date", periodEnd),
+    // 033. Both small enough not to filter — an entitlement's own date range is
+    // what decides which days it covers.
+    supabase
+      .from("payroll_benefits")
+      .select("id, code, name, gusto_column, unit, default_amount, is_active")
+      .eq("is_active", true),
+    supabase
+      .from("employee_benefits")
+      .select("id, employee_id, benefit_id, location_id, amount, starts_on, ends_on"),
   ]);
 
   if (error) {
@@ -216,6 +236,67 @@ export default async function TimeSheetsPage({
     };
   }
 
+  // ---- benefits ----------------------------------------------------------
+  // Derived, then the frozen snapshot laid over the top — the same order the
+  // pay-period screen uses, so a shift reads the same figure on both.
+  const benefits: PayrollBenefit[] = (benefitRows ?? []).map((b) => ({
+    id: b.id as string,
+    code: b.code as string,
+    name: b.name as string,
+    gusto_column: b.gusto_column as string,
+    unit: b.unit as PayrollBenefit["unit"],
+    default_amount: numOrNull(b.default_amount),
+    is_active: (b.is_active ?? true) as boolean,
+  }));
+  const entitlements: BenefitEntitlement[] = (entitlementRows ?? []).map((e) => ({
+    id: e.id as string,
+    employee_id: e.employee_id as string,
+    benefit_id: e.benefit_id as string,
+    location_id: e.location_id as string,
+    amount: numOrNull(e.amount),
+    starts_on: (e.starts_on ?? null) as string | null,
+    ends_on: (e.ends_on ?? null) as string | null,
+  }));
+
+  const benefitShifts = (sheets ?? []).map((t) => ({
+    id: t.id as string,
+    employee_id: t.employee_id as string,
+    location_id: (t.location_id ?? null) as string | null,
+    workday: t.workday as string,
+    clock_in: (t.clock_in ?? null) as string | null,
+    clock_out: (t.clock_out ?? null) as string | null,
+  }));
+  const accruals = mergeFrozen(
+    computeAccruals(benefitShifts, benefits, entitlements),
+    (sheets ?? []).flatMap((t) =>
+      ((t.timesheet_benefits ?? []) as Array<Record<string, unknown>>).map((b) => ({
+        timesheet_id: t.id as string,
+        benefit_id: b.benefit_id as string,
+        amount: numOrNull(b.amount) ?? 0,
+      }))
+    ),
+    new Map(benefitShifts.map((s) => [s.id, { employee_id: s.employee_id, workday: s.workday }]))
+  );
+
+  // One note per shift, computed on the SERVER: `explainShift` needs every
+  // entitlement and every accrual, and shipping both to the browser to answer a
+  // question per row would send the whole benefit configuration down the wire.
+  const benefitNotes: Record<string, ShiftBenefitLine[]> = {};
+  for (const s of benefitShifts) {
+    const notes = explainShift(s, accruals, benefits, entitlements);
+    if (notes.length === 0) continue;
+    benefitNotes[s.id] = notes.map((n) => ({
+      state: n.state,
+      benefitName: n.benefit.name,
+      unit: n.benefit.unit,
+      amount: n.state === "accrued" ? n.amount : null,
+      locationCodes:
+        n.state === "not_entitled_here"
+          ? n.locationIds.map((id) => codeById.get(id) ?? "—")
+          : [],
+    }));
+  }
+
   const pools: Record<string, { reported_cents: number | null; corrected_cents: number | null }> = {};
   for (const p of poolRows ?? []) {
     pools[`${p.location_id}|${p.business_date}`] = {
@@ -256,6 +337,7 @@ export default async function TimeSheetsPage({
         orgId={session.membership.org_id}
         premiums={premiums}
         pools={pools}
+        benefitNotes={benefitNotes}
       />
     </div>
   );

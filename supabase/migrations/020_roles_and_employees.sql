@@ -93,9 +93,17 @@ alter table org_members add column invited_at timestamptz;
 --                  per employee AND a rate on every timesheet row; both come
 --                  across when Time & Payroll is built.
 --   earns tips     payroll-adjacent, same reasoning.
---   COVID vax, CalSavers, commuter benefit, POS PIN, payroll name overrides
+--   COVID vax, CalSavers, POS PIN, payroll name overrides
 --                  vestigial or never populated. They stay in the export file,
 --                  recoverable if a module ever wants them.
+--   commuter benefit
+--                  LISTED HERE AS VESTIGIAL AND IT IS NOT — corrected
+--                  2026-08-05, when migration 033 built the module. 17 people
+--                  are configured, 4,663 shifts were stamped, and $432 of it
+--                  sits in the Gusto file for the current fortnight. It was
+--                  lumped in with COVID vaccination status and dropped on that
+--                  basis. `commuterReimbAmount/Unit/Locations` are recovered by
+--                  migration/backfill-employee-benefits.mjs.
 --
 -- Kept from the same tab: the food handler card expiry, which is legally
 -- relevant and genuinely maintained (dates run to 2028).

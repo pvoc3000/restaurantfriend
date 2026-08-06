@@ -25,6 +25,15 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { EmployeeDocuments } from "@/components/hr/EmployeeDocuments";
 import { AppAccess } from "@/components/hr/AppAccess";
 import { EmployeeActions } from "@/components/hr/EmployeeActions";
+import { EmployeePayroll } from "@/components/hr/EmployeePayroll";
+import {
+  EmployeeBenefits,
+  type EmployeeBenefitRow,
+} from "@/components/hr/EmployeeBenefits";
+import {
+  AddEmployeeBenefit,
+  type BenefitOption,
+} from "@/components/hr/AddEmployeeBenefit";
 
 const Heading = SectionHeading;
 
@@ -55,11 +64,17 @@ export async function EmployeeDetail({
 
   const supabase = await createClient();
 
-  const [{ data: employee, error }, { data: documentRows }] = await Promise.all([
+  const [
+    { data: employee, error },
+    { data: documentRows },
+    { data: benefitRows, error: benefitError },
+    { data: entitlementRows },
+    { data: wageTypeRows },
+  ] = await Promise.all([
     supabase
       .from("employees")
       .select(
-        "id, org_id, user_id, legacy_id, status, last_name, first_name, nickname, phone, email, address, date_of_birth, main_location_id, schedule, employment_type, start_date, end_date, position, notes, food_handler_expires"
+        "id, org_id, user_id, legacy_id, status, last_name, first_name, nickname, phone, email, address, date_of_birth, main_location_id, schedule, employment_type, start_date, end_date, position, notes, food_handler_expires, gusto_id, homebase_id, primary_wage_type, excludes_tips"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -68,6 +83,23 @@ export async function EmployeeDetail({
       .select("id, employee_id, storage_path, kind, file_name, content_type, byte_size, created_at")
       .eq("employee_id", id)
       .order("created_at"),
+    // 033. Errors are NOT folded into the page's own — a missing benefits table
+    // must not blank an employee record that is otherwise perfectly readable.
+    // The block below says so in its own words instead.
+    supabase
+      .from("payroll_benefits")
+      .select("id, name, unit, default_amount")
+      .eq("is_active", true)
+      .order("sort_order")
+      .order("name"),
+    supabase
+      .from("employee_benefits")
+      .select("id, benefit_id, location_id, amount, starts_on, ends_on, notes")
+      .eq("employee_id", id),
+    // Every job title already in use, so Primary job OFFERS rather than asks
+    // someone to remember the exact spelling. Same move as the item category
+    // picker.
+    supabase.from("employees").select("primary_wage_type").not("primary_wage_type", "is", null),
   ]);
 
   if (error) {
@@ -78,6 +110,40 @@ export async function EmployeeDetail({
   }
 
   const person = employee as unknown as Employee;
+
+  // ---- payroll ------------------------------------------------------------
+  const benefitOptions: BenefitOption[] = (benefitRows ?? []).map((b) => ({
+    id: b.id as string,
+    name: b.name as string,
+    unit: b.unit as BenefitOption["unit"],
+    default_amount: b.default_amount === null ? null : Number(b.default_amount),
+  }));
+  const benefitById = new Map(benefitOptions.map((b) => [b.id, b]));
+  // The FULL location list, not activeLocations — an entitlement at a shop that
+  // has since closed still has to render its code rather than an em dash.
+  // Design rule 3: a LOOK-UP, not an enumeration.
+  const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
+
+  const benefitRowsForTable: EmployeeBenefitRow[] = (entitlementRows ?? []).map((e) => {
+    const b = benefitById.get(e.benefit_id as string);
+    return {
+      id: e.id as string,
+      benefit_id: e.benefit_id as string,
+      benefitName: b?.name ?? "(retired benefit)",
+      benefitUnit: b?.unit ?? "per_shift",
+      benefitDefault: b?.default_amount ?? null,
+      location_id: e.location_id as string,
+      locationCode: codeById.get(e.location_id as string) ?? "—",
+      amount: e.amount === null ? null : Number(e.amount),
+      starts_on: (e.starts_on ?? null) as string | null,
+      ends_on: (e.ends_on ?? null) as string | null,
+      notes: (e.notes ?? null) as string | null,
+    };
+  });
+
+  const wageTypes = [
+    ...new Set((wageTypeRows ?? []).map((r) => r.primary_wage_type as string).filter(Boolean)),
+  ].sort();
 
   // The access record, if they have one. A second query rather than an embed:
   // org_members has no FK from employees (the link points the other way), and
@@ -367,6 +433,49 @@ export async function EmployeeDetail({
             )}
           </dd>
         </dl>
+      </section>
+
+      {/* ---- payroll ---------------------------------------------------- */}
+      <section className="space-y-2">
+        <Heading>Payroll</Heading>
+        <EmployeePayroll
+          employeeId={person.id}
+          gustoId={person.gusto_id}
+          homebaseId={person.homebase_id}
+          primaryWageType={person.primary_wage_type}
+          excludesTips={person.excludes_tips}
+          wageTypes={wageTypes}
+          editable
+        />
+
+        <div className="space-y-2 pt-4">
+          <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">Benefits</h3>
+          {benefitError ? (
+            <p className="max-w-[72ch] border border-accent px-4 py-3 text-sm text-accent">
+              {benefitError.message}
+              {/payroll_benefits|employee_benefits/.test(benefitError.message)
+                ? " — migration 033 has not been applied yet."
+                : ""}
+            </p>
+          ) : (
+            <>
+              <EmployeeBenefits rows={benefitRowsForTable} editable />
+              <div className="flex flex-wrap items-center gap-4 pt-2">
+                <AddEmployeeBenefit
+                  employeeId={person.id}
+                  orgId={person.org_id}
+                  benefits={benefitOptions}
+                  locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
+                />
+                <span className="max-w-[52ch] text-sm text-muted">
+                  Flat amounts earned per shift, per shop. What they come to is
+                  worked out when payroll is read and frozen when the period is
+                  finalized.
+                </span>
+              </div>
+            </>
+          )}
+        </div>
       </section>
 
       {/* ---- notes ----------------------------------------------------- */}

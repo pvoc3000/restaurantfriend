@@ -143,14 +143,22 @@ function splitDay(hours: number, isSeventhDay: boolean): { split: Split; reasons
   return { split: { regular, overtime, double_ot }, reasons };
 }
 
+/** The least a row must carry to be ordered in time. */
+export type Startable = { id: string; starts_at?: string | number | null };
+
 /**
  * Earliest first; a shift with no start time sinks; `id` breaks the tie so the
  * result never depends on the order rows arrived in.
  *
  * The empty-sinks-last rule is `lib/tableSort`'s, and for the same reason: a
  * missing value is not a small one.
+ *
+ * EXPORTED and structurally typed, because `lib/payrollBenefits` needs the same
+ * ordering for the same reason: a `per_workday` benefit lands on the day's first
+ * shift, and "first" decided by uuid is the 2026-08-05 pour-over bug wearing a
+ * different hat. One comparator, so the two answers cannot drift apart.
  */
-function compareByStart(a: ShiftHours, b: ShiftHours): number {
+export function compareByStart(a: Startable, b: Startable): number {
   const av = a.starts_at ?? null;
   const bv = b.starts_at ?? null;
   if (av === null && bv !== null) return 1;

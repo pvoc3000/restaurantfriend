@@ -49,6 +49,8 @@ export type WorksheetEmployee = {
   /** Days with a meal finding and no decision on file yet. */
   openFindings: number;
   premiumHours: number;
+  /** Flat payroll benefits, in DOLLARS — `lib/payrollBenefits`. */
+  benefitDollars: number;
 };
 
 export type WorkdayFinding = {
@@ -173,7 +175,8 @@ export function buildEmployeeRollup(
   shifts: readonly WorksheetShift[],
   employees: ReadonlyMap<string, { name: string; excludes_tips: boolean }>,
   findings: readonly WorkdayFinding[],
-  premiumHoursByEmployee: ReadonlyMap<string, number>
+  premiumHoursByEmployee: ReadonlyMap<string, number>,
+  benefitDollarsByEmployee: ReadonlyMap<string, number> = new Map()
 ): WorksheetEmployee[] {
   const byEmployee = new Map<string, WorksheetEmployee>();
 
@@ -186,7 +189,7 @@ export function buildEmployeeRollup(
         name: emp?.name ?? "(unknown)",
         excludes_tips: emp?.excludes_tips ?? false,
         regular: 0, overtime: 0, double_ot: 0, sick: 0, worked: 0,
-        shifts: 0, openFindings: 0, premiumHours: 0,
+        shifts: 0, openFindings: 0, premiumHours: 0, benefitDollars: 0,
       };
       byEmployee.set(s.employee_id, row);
     }
@@ -211,6 +214,7 @@ export function buildEmployeeRollup(
     row.sick = round2(row.sick);
     row.worked = round2(row.worked);
     row.premiumHours = round2(premiumHoursByEmployee.get(row.employee_id) ?? 0);
+    row.benefitDollars = round2(benefitDollarsByEmployee.get(row.employee_id) ?? 0);
   }
 
   return [...byEmployee.values()].sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0));

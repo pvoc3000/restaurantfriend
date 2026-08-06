@@ -20,6 +20,7 @@ import "./overtime.fixtures";
 import "./overtimeOrder.fixtures";
 import "./packLabel.fixtures";
 import "./payPeriods.fixtures";
+import "./payrollBenefits.fixtures";
 import "./poFilters.fixtures";
 import "./receiving.fixtures";
 import "./tableSort.fixtures";

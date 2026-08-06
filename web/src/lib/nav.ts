@@ -115,6 +115,18 @@ export const SECTIONS: NavSection[] = [
         // it would never open for.
         roles: ["owner", "admin"],
       },
+      {
+        slug: "payroll-benefits",
+        // "Payroll Benefits", not "Benefits": the bare word in an HR menu reads
+        // as health insurance, which this is emphatically not.
+        label: "Payroll Benefits",
+        href: "/payroll-benefits",
+        built: true,
+        // 033 makes payroll_benefits readable by any member — it names no
+        // person. The tab is still gated, because the screen is only useful to
+        // whoever also maintains the entitlements, which IS owner/admin.
+        roles: ["owner", "admin"],
+      },
     ],
   },
   {

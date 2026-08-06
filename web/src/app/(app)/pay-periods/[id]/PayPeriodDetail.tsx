@@ -14,6 +14,16 @@ import { PayrollWorksheet } from "@/components/payroll/PayrollWorksheet";
 import { ExportPayroll } from "@/components/payroll/ExportPayroll";
 import { proposeOvertime } from "@/lib/overtime";
 import { workedHours } from "@/lib/timesheets";
+import { isEarningColumn } from "@/lib/gustoExport";
+import {
+  computeAccruals,
+  earningsByEmployee,
+  mergeFrozen,
+  totalByBenefit,
+  totalByEmployee,
+  type BenefitEntitlement,
+  type PayrollBenefit,
+} from "@/lib/payrollBenefits";
 import {
   buildEmployeeRollup,
   buildFindings,
@@ -130,6 +140,8 @@ export async function PayPeriodDetail({
     { data: premiumRows, error: premiumError },
     { data: poolRows, error: poolError },
     { data: waiverRows },
+    { data: benefitRows, error: benefitError },
+    { data: entitlementRows, error: entitlementError },
   ] = await Promise.all([
     supabase
       .from("timesheets")
@@ -137,7 +149,8 @@ export async function PayPeriodDetail({
         `id, employee_id, location_id, workday, business_date, clock_in, clock_out,
          unpaid_break_minutes, hours_regular, hours_overtime, hours_double_ot,
          sick_hours, exclude_tips, source_payload, wage_type, workweek_start,
-         tip_hours, tip_allocation`
+         tip_hours, tip_allocation,
+         timesheet_benefits(benefit_id, amount)`
       )
       .eq("pay_period_id", id),
     supabase.from("employees").select("id, first_name, last_name, excludes_tips, primary_wage_type, gusto_id"),
@@ -158,6 +171,16 @@ export async function PayPeriodDetail({
     // no-meal days across the history than FileMaker did, nearly all of them
     // six hours or less. A data gap, not a rule bug.
     supabase.from("employee_documents").select("employee_id").eq("kind", "meal_break_waiver"),
+    // 033. Both are small — one row per benefit, a few dozen entitlements — so
+    // neither is filtered by date; an entitlement's range is what decides which
+    // days it covers, and that is `lib/payrollBenefits`'s job.
+    supabase
+      .from("payroll_benefits")
+      .select("id, code, name, gusto_column, unit, default_amount, is_active")
+      .eq("is_active", true),
+    supabase
+      .from("employee_benefits")
+      .select("id, employee_id, benefit_id, location_id, amount, starts_on, ends_on"),
   ]);
 
   const num = (v: unknown): number | null => {
@@ -231,11 +254,69 @@ export async function PayPeriodDetail({
   // those selects fail, and an unchecked failure would render a worksheet with
   // no people and an export with no rows — two plausible-looking answers to
   // questions nobody asked. Same lesson as the 029 case below it.
-  const worksheetError = shiftError ?? employeeError ?? premiumError ?? poolError;
+  //
+  // 033's two are here for a SHARPER version of the same reason. A missing 029
+  // renders a tips view that is visibly empty; a swallowed 033 renders an export
+  // that looks entirely correct and is $432 short, because a benefit that
+  // accrues nothing and a benefit table that isn't there produce the same blank
+  // column. Note the timesheet select also carries 033's embed, so `shiftError`
+  // covers that third failure.
+  const worksheetError =
+    shiftError ?? employeeError ?? premiumError ?? poolError ?? benefitError ?? entitlementError;
 
   const findings = buildFindings(shifts, employeeMap, waiverIds, decidedByKey);
-  const rollup = buildEmployeeRollup(shifts, employeeMap, findings, premiumHours);
   const pools = buildPools(shifts, employeeMap, codeById, poolMap);
+
+  // ---- benefits ----------------------------------------------------------
+  const benefits: PayrollBenefit[] = (benefitRows ?? []).map((b) => ({
+    id: b.id as string,
+    code: b.code as string,
+    name: b.name as string,
+    gusto_column: b.gusto_column as string,
+    unit: b.unit as PayrollBenefit["unit"],
+    default_amount: num(b.default_amount),
+    is_active: (b.is_active ?? true) as boolean,
+  }));
+  const entitlements: BenefitEntitlement[] = (entitlementRows ?? []).map((e) => ({
+    id: e.id as string,
+    employee_id: e.employee_id as string,
+    benefit_id: e.benefit_id as string,
+    location_id: e.location_id as string,
+    amount: num(e.amount),
+    starts_on: (e.starts_on ?? null) as string | null,
+    ends_on: (e.ends_on ?? null) as string | null,
+  }));
+
+  const derivedAccruals = computeAccruals(shifts, benefits, entitlements);
+
+  // THE FROZEN FIGURE WINS, which is backwards from how tips are handled ten
+  // lines below — and deliberately. Every input to the tip allocator is gated on
+  // the period being editable, so recomputing reproduces the snapshot exactly.
+  // An ENTITLEMENT carries no such gate (033 argues why), so its inputs really
+  // can move under a closed period, and only the snapshot knows what was paid.
+  const accrualContext = new Map(
+    shifts.map((s) => [s.id, { employee_id: s.employee_id, workday: s.workday }])
+  );
+  const frozenAccruals = (shiftRows ?? []).flatMap((t) =>
+    ((t.timesheet_benefits ?? []) as Array<Record<string, unknown>>).map((b) => ({
+      timesheet_id: t.id as string,
+      benefit_id: b.benefit_id as string,
+      amount: num(b.amount) ?? 0,
+    }))
+  );
+  const accruals = mergeFrozen(derivedAccruals, frozenAccruals, accrualContext);
+  const benefitDollars = totalByEmployee(accruals);
+  const earnings = earningsByEmployee(accruals, benefits);
+
+  const rollup = buildEmployeeRollup(shifts, employeeMap, findings, premiumHours, benefitDollars);
+
+  // A benefit aimed at a column this file does not have. The picker on
+  // /payroll-benefits makes that unenterable, so this is the net for a value
+  // written in the SQL editor — and it names the money rather than the mistake.
+  const benefitTotals = totalByBenefit(accruals);
+  const unknownEarningColumns = benefits
+    .filter((b) => !isEarningColumn(b.gusto_column) && (benefitTotals.get(b.id) ?? 0) > 0)
+    .map((b) => ({ name: b.name, column: b.gusto_column, dollars: benefitTotals.get(b.id) ?? 0 }));
 
   // ---- the export's inputs ----------------------------------------------
   // The raw rows again, because the export needs two columns the worksheet has
@@ -432,9 +513,11 @@ export async function PayPeriodDetail({
           <SectionHeading>Payroll worksheet</SectionHeading>
           <p className="max-w-[72ch] border border-accent px-4 py-3 text-sm text-accent">
             {worksheetError.message}
-            {/^column/i.test(worksheetError.message)
-              ? " — migration 031 has not been applied yet."
-              : " — migration 029 has not been applied yet."}
+            {/payroll_benefits|employee_benefits|timesheet_benefits/.test(worksheetError.message)
+              ? " — migration 033 has not been applied yet."
+              : /^column/i.test(worksheetError.message)
+                ? " — migration 031 has not been applied yet."
+                : " — migration 029 has not been applied yet."}
           </p>
         </section>
       ) : (
@@ -457,11 +540,15 @@ export async function PayPeriodDetail({
           employees={exportEmployees}
           premiumHours={[...owedHours.entries()]}
           pools={pools}
+          benefits={benefits}
+          accruals={accruals}
+          earnings={[...earnings.entries()]}
           caveatInputs={{
             shiftsWithoutClockOut: shifts.filter((s) => !s.clock_out).length,
             undecidedBreakFindings: findings.filter((f) => !f.decided).length,
             poolsWithoutFigure: pools.filter((p) => p.effectiveCents === null).length,
             overtimeNeedingReview,
+            unknownEarningColumns,
           }}
           canWrite={canWrite}
           closeHref="/pay-periods"

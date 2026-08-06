@@ -103,7 +103,8 @@ Table names here reflect **migration 005** (2026-07-22 renames: `item_locations`
 | `Location_Name` | `name` | |
 | `Address_Shipping_*` / `Address_Billing_*` | `address` jsonb | |
 | `Location_OpenDays`, `OperatingHours_Open/Close_time`, `Email_Billing`, `LaborRate_n` | `settings` jsonb | kept for later modules |
-| `smtp_*`, `Path_PO_Dir`, `ShiftReportPages_*`, `commuterBenefit_*`, etc. | **dropped** | dead infra / other modules will re-model |
+| `smtp_*`, `Path_PO_Dir`, `ShiftReportPages_*`, etc. | **dropped** | dead infra / other modules will re-model |
+| `commuterBenefit_paysCommuterBenefit_b` / `_amount_n` / `_period_t` | **dropped, and deliberately not restored** | migration 033 puts the entitlement on the (employee, location) pair instead. Measured: the employee's own `commuterReimbLocations` classifies every stamped shift identically, and DF01's flag is on with no amount — the location row carries one redundant bit |
 
 ## Employee (DF-Employees) → `employees`
 
@@ -136,7 +137,8 @@ can't find and stops.
 | USER LEVEL (ADMIN tab) | *(roster only)* | kept in the JSON as `_fmp_user_level` to seed the invite list; never loaded into a column |
 | — | `user_id` | **derived**: null for everyone at load except Mark, whose row is linked to his existing auth account. Access is granted afterwards, per person, by invitation |
 | **SSN** | **dropped** | never exported. It is in FMP and in Gusto, which needs it for W-2s; nothing this app does requires it, and a web-reachable database is the wrong home for it |
-| pay rates, rate card, EARNS TIPS, CalSavers, commuter benefit, POS PIN, payroll name overrides | **dropped** | the payroll module's business — rates are also on every timesheet row |
+| pay rates, rate card, EARNS TIPS, CalSavers, POS PIN, payroll name overrides | **dropped** | the payroll module's business — rates are also on every timesheet row |
+| `commuterReimbAmount` / `commuterReimbUnit` / `commuterReimbLocations` | **RESTORED 2026-08-05** | dropped with the line above and that was wrong — the benefit is live, not vestigial (17 configured, 4,663 shifts stamped, $432 in the current Gusto file). `backfill-employee-benefits.mjs` reads the `.mer` directly into `employee_benefits` (migration 033), one row per (person, shop). `transform-hr.mjs` is untouched: it feeds a load that has already run |
 | USERNAME / PASSWORD (ADMIN tab) | **dropped** | stored in plain text in FMP. Replaced entirely by the invite flow; no credential is ever stored here |
 | DEFAULT LOCATION / ACCESS LOCATIONS | **dropped** | per-location access is deliberately not built yet (Mark wants to revisit it) |
 | COVID19 vaccination status, `hasHealthCare_b` | **dropped** | 2021 artifact; the healthcare flag only ever stored `1`, so an unchecked box is indistinguishable from an unanswered one |

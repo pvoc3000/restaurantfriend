@@ -16,6 +16,7 @@ import {
   type ExportShift,
 } from "@/lib/gustoExport";
 import { formatCents, formatRate } from "@/lib/tipPool";
+import { totalByBenefit, type BenefitAccrual, type PayrollBenefit } from "@/lib/payrollBenefits";
 import type { DayPool } from "@/lib/payrollWorksheet";
 
 /**
@@ -52,6 +53,9 @@ export function ExportPayroll({
   employees,
   premiumHours,
   pools,
+  benefits,
+  accruals,
+  earnings,
   caveatInputs,
   canWrite,
   closeHref,
@@ -65,11 +69,19 @@ export function ExportPayroll({
   /** Employee id → premium HOURS owed (decision = 'owed'). */
   premiumHours: [string, number][];
   pools: DayPool[];
+  /** The active benefit catalog, for the summary line's names. */
+  benefits: PayrollBenefit[];
+  /** Every accrual in the period — what the freeze snapshots. */
+  accruals: BenefitAccrual[];
+  /** Employee id → Gusto column → dollars. Entries, not a Map: this crosses the
+   *  server→client boundary, same as `premiumHours`. */
+  earnings: [string, Record<string, number>][];
   caveatInputs: {
     shiftsWithoutClockOut: number;
     undecidedBreakFindings: number;
     poolsWithoutFigure: number;
     overtimeNeedingReview: number;
+    unknownEarningColumns: { name: string; column: string; dollars: number }[];
   };
   canWrite: boolean;
   closeHref: string;
@@ -81,6 +93,7 @@ export function ExportPayroll({
   const [failed, setFailed] = useState<string | null>(null);
 
   const premiums = useMemo(() => new Map(premiumHours), [premiumHours]);
+  const earningsMap = useMemo(() => new Map(earnings), [earnings]);
 
   /**
    * The tip allocations, computed from the pools — the same `allocateTips` the
@@ -101,9 +114,10 @@ export function ExportPayroll({
       buildExportRows(
         shifts.map((s) => ({ ...s, tip_allocation: allocationById.get(s.id) ?? s.tip_allocation })),
         employees,
-        premiums
+        premiums,
+        earningsMap
       ),
-    [shifts, employees, premiums, allocationById]
+    [shifts, employees, premiums, earningsMap, allocationById]
   );
 
   const caveats = useMemo(
@@ -115,6 +129,15 @@ export function ExportPayroll({
   const people = new Set(rows.map((r) => r.employee_id)).size;
   const totalTips = rows.reduce((n, r) => n + (r.paycheck_tips ?? 0), 0);
   const totalPremium = rows.reduce((n, r) => n + r.missed_break_hours, 0);
+
+  /** Per benefit, but only the ones that came to anything — a nil benefit on the
+   *  summary line is a figure you have to read to learn it says nothing. */
+  const benefitTotals = useMemo(() => {
+    const totals = totalByBenefit(accruals);
+    return benefits
+      .map((b) => ({ name: b.name, dollars: totals.get(b.id) ?? 0 }))
+      .filter((b) => b.dollars > 0);
+  }, [benefits, accruals]);
 
   function download() {
     // A blob and an anchor, not a route: the file is already built in the
@@ -152,6 +175,14 @@ export function ExportPayroll({
         p_period_id: periodId,
         p_allocations: allocations,
         p_pools: poolPayload,
+        // SPARSE by construction — most shifts accrue nothing — which is why
+        // the function checks that every row it was given landed rather than
+        // that every timesheet is covered, the way the allocations are.
+        p_benefits: accruals.map((a) => ({
+          timesheet_id: a.timesheet_id,
+          benefit_id: a.benefit_id,
+          amount: a.amount,
+        })),
       });
 
       if (error) {
@@ -184,6 +215,14 @@ export function ExportPayroll({
         <span>
           Premium <strong className="tabular-nums">{totalPremium.toFixed(2)}</strong> hrs
         </span>
+        {/* One per benefit that came to something. This is the figure that has
+            to match the Gusto file's own column, on the last screen before the
+            file leaves — which is the only place anyone would catch it. */}
+        {benefitTotals.map((b) => (
+          <span key={b.name}>
+            {b.name} <strong className="tabular-nums">${b.dollars.toFixed(2)}</strong>
+          </span>
+        ))}
         {/* Said here because this is the last screen before the file leaves. */}
         <span className="text-[12px] text-muted">
           Sick hours are not in this file — Gusto already pays them.
@@ -192,9 +231,9 @@ export function ExportPayroll({
 
       {frozen && (
         <p className="max-w-[72ch] border border-ink bg-go px-4 py-3 text-sm text-ink">
-          This period is {status}. Its tip allocations are frozen onto each
-          timesheet, so the numbers below are the ones the file was built from —
-          not a fresh derivation that might have drifted.
+          This period is {status}. Its tip allocations and benefit accruals are
+          frozen, so the numbers below are the ones the file was built from — not
+          a fresh derivation that might have drifted.
         </p>
       )}
 
@@ -274,7 +313,8 @@ export function ExportPayroll({
         )}
         <span className="max-w-[52ch] text-sm text-muted">
           Downloading changes nothing — take it as often as you like. Finalizing
-          snapshots the tip allocations and marks the period exported.
+          snapshots the tip allocations and benefit accruals, and marks the
+          period exported.
         </span>
       </div>
 
@@ -304,11 +344,12 @@ export function ExportPayroll({
         >
           <div className="space-y-5">
             <p className="max-w-[60ch] text-sm">
-              This snapshots every tip allocation onto its timesheet and marks
-              the period <strong>exported</strong>. After it, editing a punch no
-              longer moves anybody&rsquo;s tips — which is the point: a
-              correction next month must not silently re-divide money that has
-              already been paid out.
+              This snapshots every tip allocation and every benefit accrual, and
+              marks the period <strong>exported</strong>. After it, editing a
+              punch no longer moves anybody&rsquo;s tips and correcting
+              somebody&rsquo;s shops next month cannot move their benefit — which
+              is the point: a correction later must not silently re-divide money
+              that has already been paid out.
             </p>
 
             {caveats.length > 0 ? (

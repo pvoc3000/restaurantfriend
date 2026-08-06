@@ -20,7 +20,13 @@ import {
 import { MEAL_CODE_LABEL, assessWorkday, type BreakFinding } from "@/lib/breakRules";
 import { toBreakShift } from "@/lib/payrollWorksheet";
 import { allocateTips, type PoolResult } from "@/lib/tipPool";
-import { ShiftPremium, ShiftTips, type PremiumRow } from "./ShiftDecisions";
+import {
+  ShiftBenefits,
+  ShiftPremium,
+  ShiftTips,
+  type PremiumRow,
+  type ShiftBenefitLine,
+} from "./ShiftDecisions";
 import { AdjudicateOvertime } from "./AdjudicateOvertime";
 import { NewTimesheet } from "./NewTimesheet";
 import {
@@ -151,6 +157,7 @@ export function TimesheetsList({
   orgId,
   premiums,
   pools,
+  benefitNotes,
 }: {
   rows: TimesheetRow[];
   periods: PeriodOption[];
@@ -170,6 +177,8 @@ export function TimesheetsList({
   premiums: Record<string, PremiumRow>;
   /** Each shop-day's reported and corrected figure, keyed `location|date`. */
   pools: Record<string, { reported_cents: number | null; corrected_cents: number | null }>;
+  /** Timesheet id → one line per benefit, already worded by the server. */
+  benefitNotes: Record<string, ShiftBenefitLine[]>;
 }) {
   const router = useRouter();
   const [search, setSearch] = useState("");
@@ -779,6 +788,7 @@ export function TimesheetsList({
               premium={premiums[`${r.employee_id}|${r.workday}|meal`] ?? null}
               pool={r.location_id ? (dayPools.get(`${r.location_id}|${r.business_date}`) ?? null) : null}
               orgId={orgId}
+              benefitLines={benefitNotes[r.id] ?? []}
             />
           ),
         }}
@@ -1001,6 +1011,7 @@ function ShiftDetail({
   premium,
   pool,
   orgId,
+  benefitLines,
 }: {
   row: TimesheetRow;
   editable: boolean;
@@ -1015,6 +1026,9 @@ function ShiftDetail({
   /** This shop-day's pool and its division. */
   pool: { result: PoolResult | null; reported: number | null; corrected: number | null } | null;
   orgId: string;
+  /** What each benefit did with this shift, INCLUDING the ones that paid
+   *  nothing. Computed on the server — see `payrollBenefits.explainShift`. */
+  benefitLines: ShiftBenefitLine[];
 }) {
   const disagreements = otDisagreements(row);
   const payload = row.source_payload ?? {};
@@ -1200,6 +1214,10 @@ function ShiftDetail({
         excluded={effectiveExclusion(row.exclude_tips, row.employee_excludes_tips)}
         editable={editable}
       />
+
+      {/* Read-only, and last: the two above are decisions to make, this is an
+          answer to read. */}
+      <ShiftBenefits lines={benefitLines} locationCode={row.location_code} />
     </div>
   );
 }

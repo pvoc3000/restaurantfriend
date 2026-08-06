@@ -71,6 +71,18 @@ export type Employee = {
   position: string | null;
   notes: string | null;
   food_handler_expires: string | null;
+  /**
+   * The payroll settings (028 and 031). Declared late because until the Payroll
+   * block shipped, NONE of these four had a UI writer anywhere in the app —
+   * `gusto_id` and `primary_wage_type` came only from 031's backfill,
+   * `homebase_id` only from the timesheet importer's link action, and
+   * `excludes_tips` only from SQL.
+   */
+  gusto_id: string | null;
+  homebase_id: string | null;
+  /** The bare job title. The export appends `(Primary)`; it is never stored. */
+  primary_wage_type: string | null;
+  excludes_tips: boolean;
 };
 
 /** "Prentice, Ada" — the sort order and the way a roster reads. */

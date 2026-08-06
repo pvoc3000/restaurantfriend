@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
@@ -353,6 +353,90 @@ export function ShiftTips({
       )}
 
       {failed && <p className="border border-accent px-3 py-2 text-[13px] text-accent">{failed}</p>}
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/* Flat payroll benefits — READ ONLY                                           */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * One line per benefit this person is entitled to somewhere, computed on the
+ * server by `payrollBenefits.explainShift`.
+ *
+ * The two blocks above it are DECISIONS and carry editors. This one carries
+ * none, deliberately: an accrual is arithmetic, not an adjudication — nobody
+ * decides whether somebody drove to work. What it must do instead is EXPLAIN
+ * ITSELF, which is the thing FileMaker's stamped dollar figure could never do.
+ * A stamped $0 and a person who was never entitled look identical, and that is
+ * why nobody noticed Casildo Herrera's seven consecutive unstamped DF02
+ * overnights in July 2024, or that two configured people were never paid at all.
+ *
+ * To change what a shift earns you change the ENTITLEMENT, on the employee's
+ * record. That is the only writer, and it is one place rather than one per
+ * shift.
+ */
+export type ShiftBenefitLine = {
+  state: "accrued" | "covered_elsewhere" | "not_entitled_here" | "not_worked";
+  benefitName: string;
+  unit: "per_shift" | "per_workday" | "per_period";
+  /** Dollars, on an `accrued` line only. */
+  amount: number | null;
+  /** The shops they DO earn it at — `not_entitled_here` only. */
+  locationCodes: string[];
+};
+
+export function ShiftBenefits({
+  lines,
+  locationCode,
+}: {
+  lines: ShiftBenefitLine[];
+  locationCode: string | null;
+}) {
+  if (lines.length === 0) return null;
+
+  return (
+    <div className="space-y-2">
+      <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">Benefits</h3>
+
+      <dl className="grid grid-cols-[9rem_1fr] gap-x-4 gap-y-1 text-sm">
+        {lines.map((line) => (
+          <Fragment key={line.benefitName}>
+            <dt className="text-subtle">{line.benefitName}</dt>
+            <dd>
+              {line.state === "accrued" ? (
+                <>
+                  <span className="tabular-nums">${(line.amount ?? 0).toFixed(2)}</span>
+                  <span className="ml-2 text-muted">
+                    {line.unit === "per_shift"
+                      ? "per shift"
+                      : line.unit === "per_workday"
+                        ? "per day"
+                        : "per pay period"}
+                    {locationCode ? ` · ${locationCode}` : ""}
+                  </span>
+                </>
+              ) : line.state === "not_entitled_here" ? (
+                // Angelica Castellanos's 359 DF01 shifts, in one sentence.
+                <span className="text-muted">
+                  Earned at {line.locationCodes.join(", ") || "no shop"}
+                  {locationCode ? `, and this shift was at ${locationCode}` : ""}.
+                </span>
+              ) : line.state === "covered_elsewhere" ? (
+                <span className="text-muted">
+                  Already earned on {line.unit === "per_workday" ? "this workday" : "this pay period"}
+                  &rsquo;s earlier shift.
+                </span>
+              ) : (
+                <span className="text-muted">
+                  This row has no punches, so nothing accrues.
+                </span>
+              )}
+            </dd>
+          </Fragment>
+        ))}
+      </dl>
     </div>
   );
 }

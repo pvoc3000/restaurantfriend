@@ -250,8 +250,10 @@ phase 5 starts.
    production schedules; a supervisor who orders is given `purchaser`
    individually.
 3. **What's on the FMP employee record** — SSN and pay rates are there, and
-   neither migrates. The vestigial set (COVID vaccination, CalSavers, commuter
-   benefit, POS PIN, payroll name overrides) is left in the export too. The one
+   neither migrates. The vestigial set (COVID vaccination, CalSavers, POS PIN,
+   payroll name overrides) is left in the export too. **The commuter benefit was
+   on that list and should not have been** — see migration 033; it is live, and
+   its three fields are recovered by `backfill-employee-benefits.mjs`. The one
    surprise worth recording: the ADMIN tab stored the password **in plain text
    and displayed it on the layout**, beside the SSN on the INFO tab of the same
    record — so anyone who could open an employee could read both.
