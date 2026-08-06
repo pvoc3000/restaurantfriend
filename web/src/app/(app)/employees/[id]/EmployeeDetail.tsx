@@ -468,6 +468,7 @@ export async function EmployeeDetail({
         <Heading>Payroll</Heading>
         <EmployeePayroll
           employeeId={person.id}
+          legacyId={person.legacy_id}
           gustoId={person.gusto_id}
           homebaseId={person.homebase_id}
           primaryWageType={person.primary_wage_type}
