@@ -13,7 +13,7 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
  * the organization's own employee number — was queried and never shown. `gusto_id` and
  * `primary_wage_type` arrived only in 031's backfill, `homebase_id` only when
  * the importer links an unmatched name, and `excludes_tips` only from SQL —
- * while `exportReadiness` has been reporting "N people have no Gusto id" and "N
+ * while `exportReadiness` has been reporting "N people have no payroll id" and "N
  * rows have no job title" on the export screen the whole time. A caveat you
  * cannot act on is how a caveat stops being read, which is the argument for
  * this block existing at all.

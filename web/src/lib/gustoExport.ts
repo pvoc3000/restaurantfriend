@@ -366,8 +366,11 @@ export function exportReadiness(input: {
   );
   if (noGustoId.length) {
     out.push({
+      // The CODE keeps the column's own name, like the column does. Only the
+      // sentence is vendor-neutral — it names the field the way the employee
+      // record labels it, so the two screens are talking about one thing.
       code: "no_gusto_id",
-      detail: `${noGustoId.length} ${noGustoId.length === 1 ? "person has" : "people have"} no Gusto id. Their rows will import against a name, which Gusto may reject.`,
+      detail: `${noGustoId.length} ${noGustoId.length === 1 ? "person has" : "people have"} no payroll id. Their rows will import against a name, which Gusto may reject.`,
     });
   }
 
