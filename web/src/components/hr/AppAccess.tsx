@@ -142,7 +142,7 @@ export function AppAccess({
       {state === "none" && (
         <div className="flex flex-wrap items-center gap-4">
           <p className="text-sm text-muted">
-            No access to the app.
+            No access.
             {!employeeEmail && " There's no email address on this record yet."}
           </p>
           <button
@@ -156,7 +156,7 @@ export function AppAccess({
               setOpen(true);
             }}
           >
-            Invite to app&hellip;
+            Invite&hellip;
           </button>
         </div>
       )}
