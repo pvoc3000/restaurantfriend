@@ -17,7 +17,7 @@ export type BenefitOption = {
 };
 
 /**
- * Give somebody a benefit at a shop.
+ * Add a benefit to somebody, at a shop.
  *
  * `AddShopSection`'s template, and it STAYS OPEN after each add, clearing only
  * the shop — because the shape of this task is FileMaker's own: six of the
@@ -33,7 +33,7 @@ export function AddEmployeeBenefit({
   employeeId: string;
   orgId: string;
   benefits: BenefitOption[];
-  /** ACTIVE shops only — this enumerates somewhere to give a benefit, and a
+  /** ACTIVE shops only — this enumerates somewhere to add a benefit, and a
    *  closed shop is not one (design rule 3). */
   locations: { id: string; code: string }[];
 }) {
@@ -116,12 +116,12 @@ export function AddEmployeeBenefit({
         onClick={() => setOpen(true)}
         className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
       >
-        Give a benefit
+        Add benefit
       </button>
 
       {open && (
         <Dialog
-          title="Give a payroll benefit"
+          title="Add a payroll benefit"
           onClose={close}
           busy={pending}
           width="max-w-2xl"
@@ -136,7 +136,7 @@ export function AddEmployeeBenefit({
                 disabled={!ready || pending}
                 className={DIALOG_COMMIT_CLASS}
               >
-                {pending ? "Adding…" : "Give it"}
+                {pending ? "Adding…" : "Add benefit"}
               </button>
             </>
           }

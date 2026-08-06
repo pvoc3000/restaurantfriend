@@ -58,11 +58,6 @@ export function EmployeePayroll({
         ) : (
           <span className={READ_ONLY_VALUE}>{primaryWageType ?? "—"}</span>
         )}
-        <p className="mt-0.5 text-[12px] text-muted">
-          The row this person&rsquo;s tips, premiums and benefits ride in the
-          export. The <code>(Primary)</code> suffix is added to the file and
-          stored nowhere, so exactly one row can ever carry it.
-        </p>
       </dd>
 
       <dt className="py-0.5 text-subtle">Gusto id</dt>
@@ -93,10 +88,6 @@ export function EmployeePayroll({
         ) : (
           <span className={READ_ONLY_VALUE}>{homebaseId ?? "—"}</span>
         )}
-        <p className="mt-0.5 text-[12px] text-muted">
-          What the timesheet import matches on. Without it an import falls back
-          to the name, which pays the wrong Sanchez.
-        </p>
       </dd>
 
       <dt className="py-0.5 text-subtle">Tips</dt>
@@ -160,11 +151,6 @@ function ExcludesTips({
           {on ? "Excluded from the tip pool" : "In the tip pool"}
         </span>
       )}
-      <p className="text-[12px] text-muted">
-        A durable fact about the person, which a single shift can still override.
-        It CHANGES on promotion — and an old pay period keeps its own answer,
-        because its allocations were frozen when it was exported.
-      </p>
       {failed && <p className="text-[12px] text-accent">{failed}</p>}
     </div>
   );

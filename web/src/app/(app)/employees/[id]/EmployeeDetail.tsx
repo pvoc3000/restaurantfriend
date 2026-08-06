@@ -488,18 +488,13 @@ export async function EmployeeDetail({
           ) : (
             <>
               <EmployeeBenefits rows={benefitRowsForTable} editable />
-              <div className="flex flex-wrap items-center gap-4 pt-2">
+              <div className="pt-2">
                 <AddEmployeeBenefit
                   employeeId={person.id}
                   orgId={person.org_id}
                   benefits={benefitOptions}
                   locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
                 />
-                <span className="max-w-[52ch] text-sm text-muted">
-                  Flat amounts earned per shift, per shop. What they come to is
-                  worked out when payroll is read and frozen when the period is
-                  finalized.
-                </span>
               </div>
             </>
           )}
