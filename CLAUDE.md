@@ -1709,16 +1709,19 @@ recorded bare while an owed hour still has to argue its case. Probe with
 'break_premiums' and column_name = 'reason'` (YES) and
 `select conname from pg_constraint where conrelid = 'public.break_premiums'::regclass`
 (expect `break_premiums_reason_when_owed`, and NO `break_premiums_reason_check`).
-**033 is NOT applied yet** — until it is, `/payroll-benefits`, the employee
-record's Benefits sub-block and the pay-period worksheet each say so in words
-rather than rendering empty (which would read as "nothing configured"). Probe
-with `select count(*) from payroll_benefits` (1, code `commuter`), and confirm
-`select proname, pg_get_function_arguments(oid) from pg_proc where proname =
-'freeze_pay_period'` returns EXACTLY ONE row taking four arguments — two rows
-means the drop didn't happen and a stale tab can still freeze a period with no
-benefits in it. After applying, run
-`node --env-file=.env backfill-employee-benefits.mjs` (dry run) and read its
-verdict before `--apply`.
+**033 is APPLIED** (Mark, 2026-08-05) and the backfill has run: 19 entitlement
+rows over 13 people, `starts_on` 2022-06-27, every amount left NULL so they
+inherit the benefit's $12. Verified the same day — the three tables select, the
+commuter benefit is seeded, and the OLD three-argument `freeze_pay_period` is
+GONE (a call to it returns PostgREST's `PGRST202`) while the four-argument one
+raises "No such pay period" from inside its own body. That pair of probes is the
+one that matters: two live overloads would let a stale tab freeze a fortnight
+with no benefits in it and no error. A second `--apply` wrote 0 new and updated
+19, so the select-then-update idempotency holds without an `on conflict` target.
+Then the whole stack was run against the LIVE database — 159 shifts, 19
+entitlements, 36 accruals — and the produced CSV matches Mark's real Gusto file
+person for person, **$432.00 against $432.00**, with the sick-hours header
+assertion and the 18-cell width both holding on the real file.
 **031 is NOT applied yet** — until it is, the pay-period record replaces its
 worksheet and export with "column timesheets.wage_type does not exist", which
 is the intended behaviour rather than an empty screen. Probe with
