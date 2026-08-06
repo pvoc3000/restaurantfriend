@@ -13,10 +13,17 @@ import {
   type DocumentKind,
   type SignedEmployeeDocument,
 } from "@/lib/employeeDocuments";
-import { fileSize } from "@/lib/attachments";
+import {
+  ATTACHMENT_ACCEPT,
+  ATTACHMENT_ACCEPT_ATTR,
+  attachmentRejection,
+  fileSize,
+} from "@/lib/attachments";
 import { PickList } from "@/components/ui/PickList";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { DocumentChip } from "@/components/ui/DocumentChip";
+import { FileDropZone } from "@/components/ui/FileDropZone";
+import { RevealPanel } from "@/components/ui/RevealPanel";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 
 /**
@@ -145,7 +152,7 @@ export function EmployeeDocuments({
 
   const status = paperworkStatus(documents, legacyFoodHandlerExpires, today);
 
-  async function upload(files: FileList) {
+  async function upload(files: FileList | File[]) {
     setError(null);
     for (const file of Array.from(files)) {
       setBusyLabel(`Uploading ${file.name}…`);
@@ -211,8 +218,26 @@ export function EmployeeDocuments({
   }
 
   return (
-    <div className="space-y-3 border border-ink px-4 py-3">
+    /* The panel WRAPS the card — see PoAttachments for why — and opens DOWN,
+       since this one sits in the page's flow rather than at the window's foot.
+       The drop zone is the card, so it is the target open or closed. */
+    <RevealPanel
+      direction="down"
+      label="the filed documents"
+      header={(toggle) => (
+        <FileDropZone
+          disabled={!canEdit || busyLabel !== null}
+          accept={ATTACHMENT_ACCEPT}
+          label={`Drop to file as ${DOCUMENT_KIND_LABEL[kind].toLowerCase()}`}
+          onFiles={(files) => void upload(files)}
+          // The zone knows a type didn't match; only this screen knows what to
+          // suggest instead, and `accept` governs the PICKER only — a drag never
+          // consults it, which is why the HEIC guard has to be re-stated here.
+          onReject={(rejected) => setError(attachmentRejection(rejected))}
+          className="space-y-3 border border-ink bg-white px-4 py-3"
+        >
       <div className="flex flex-wrap items-center gap-4">
+        {documents.length > 0 && toggle}
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Paperwork
         </h2>
@@ -249,7 +274,7 @@ export function EmployeeDocuments({
               ref={fileRef}
               type="file"
               multiple
-              accept="image/jpeg,image/png,image/webp,application/pdf"
+              accept={ATTACHMENT_ACCEPT_ATTR}
               className="hidden"
               onChange={(e) => {
                 if (e.target.files?.length) void upload(e.target.files);
@@ -303,9 +328,13 @@ export function EmployeeDocuments({
         )}
       </div>
 
+      {/* Progress and errors stay in the HEADER, not the body: a failed upload
+          you can only see by hovering is one nobody sees. */}
       {busyLabel && <ProgressBand label={busyLabel} />}
       {error && <p className="text-sm text-accent">{error}</p>}
-
+        </FileDropZone>
+      )}
+    >
       {documents.length > 0 && (
         <ul className="flex flex-wrap gap-3">
           {documents.map((d) => (
@@ -359,6 +388,6 @@ export function EmployeeDocuments({
           ))}
         </ul>
       )}
-    </div>
+    </RevealPanel>
   );
 }

@@ -17,6 +17,7 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 import { PickList } from "@/components/ui/PickList";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { DocumentChip } from "@/components/ui/DocumentChip";
+import { RevealPanel } from "@/components/ui/RevealPanel";
 import { useAttachmentActions } from "./useAttachmentActions";
 import type { InvoiceCreationOrder } from "@/lib/invoiceFromExtraction";
 
@@ -89,15 +90,30 @@ export function PoAttachments({
   } = useAttachmentActions({ poId, orgId, order });
 
   return (
-    <FileDropZone
-      disabled={!canEdit || busy}
-      accept={ATTACHMENT_ACCEPT}
-      label={`Drop to attach as ${ATTACHMENT_KIND_LABEL[kind].toLowerCase()}`}
-      onFiles={(files) => void upload(files, kind)}
-      onReject={(rejected) => reportError(attachmentRejection(rejected))}
-      className="space-y-3 border border-ink bg-white px-4 py-3"
-    >
+    /* UP, because this card is pinned to the bottom of the window — see
+       RevealPanel: the body is out of flow, so `useStickyFooterClearance` keeps
+       reserving the COLLAPSED height and the line table above never resizes as
+       the pointer passes over.
+
+       The panel WRAPS the card rather than sitting inside it. `bottom-full`
+       measures from the panel's own root, so a root inside the card's padding
+       would open the body from the header ROW and let the card's top border cut
+       across it. The drop zone stays on the card, which is the target whether
+       the panel is open or not. */
+    <RevealPanel
+      direction="up"
+      label="the filed paperwork"
+      header={(toggle) => (
+        <FileDropZone
+          disabled={!canEdit || busy}
+          accept={ATTACHMENT_ACCEPT}
+          label={`Drop to attach as ${ATTACHMENT_KIND_LABEL[kind].toLowerCase()}`}
+          onFiles={(files) => void upload(files, kind)}
+          onReject={(rejected) => reportError(attachmentRejection(rejected))}
+          className="space-y-3 border border-ink bg-white px-4 py-3"
+        >
       <div className="flex flex-wrap items-center gap-4">
+        {attachments.length > 0 && toggle}
         <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
           Paperwork
         </h2>
@@ -161,7 +177,9 @@ export function PoAttachments({
       )}
 
       {error && <p className="text-sm text-accent">{error}</p>}
-
+        </FileDropZone>
+      )}
+    >
       {attachments.length > 0 && (
         <ul className="flex flex-wrap gap-3">
           {attachments.map((a) => (
@@ -237,6 +255,6 @@ export function PoAttachments({
           ))}
         </ul>
       )}
-    </FileDropZone>
+    </RevealPanel>
   );
 }
