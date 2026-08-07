@@ -131,13 +131,25 @@ export function AppNav({
           >
             {sections.map((section) => {
               const active = section.slug === sectionSlug;
+              // THE WORKING LOCATION IS ALWAYS YELLOW, selected or not (Mark,
+              // 2026-08-06). It is the one tab that isn't a place you go: it
+              // names the shop every other screen is about, so "which shop am I
+              // ordering for" has to be answerable from any section without
+              // hunting. Selection is white, matching the second tier, which had
+              // marked active in white all along — so the two bands now agree
+              // and the yellow means one thing instead of two.
+              const isLocation = section.slug === "location";
               return (
                 <Link
                   key={section.slug}
                   href={sectionHref(section, memory, locationId, sectionSlug ?? null)}
                   aria-current={active ? "page" : undefined}
                   className={`${TAB} ${
-                    active ? "text-mark" : "text-white/60 hover:text-white"
+                    isLocation
+                      ? "text-mark"
+                      : active
+                        ? "text-white"
+                        : "text-white/60 hover:text-white"
                   }`}
                 >
                   {sectionLabel(section, locationCode)}
