@@ -345,19 +345,29 @@ new plans and schedules").** The migration scope is the CATALOG and its
 CONFIG, nothing else. Consequences, accepted: the Item screen's two-week
 history starts empty and fills from launch, and there is no historical
 baseline for the efficiency analysis until the app has run for a while.
-Batch numbering starts fresh unless Mark says to continue FMP's sequence.
+**Batch numbering seeds at 30,000** — FMP's sequence stood at 19,541 on
+2026-08-07, so the two systems can never collide during the transition.
+(Mark wrote "3000"; read as 30,000 since anything below 19,541 would collide
+— flagged for confirmation.)
 
-Still to export — seven small tables (record counts as of the 2026-07-19 DDR):
+**The seven config exports are DONE (2026-08-07, underscore-prefixed in
+`FMP Export/Production/`) and VERIFIED: all nine FK joins against the catalog
+exports resolve with ZERO orphans** — dependencies → items and elements,
+donutpars → items, elementpars/yields/production → elements, prices → items,
+and all 8,175 recipe lines → recipes (lines with an `_ItemKey`, 5,200, all
+resolve to Recipe_Items; the rest are procedure steps and separators).
+`_recipelements` has 34 more rows than the 2026-07-19 DDR counted — three
+weeks of recipe edits, expected.
 
-| Table (file) | Records | What it is |
+| Export | Records | What it is |
 | --- | --- | --- |
-| RecipeElements (Recipes) | 8,141 | **The recipe lines** — ingredients AND procedure steps (`Recipes_RecipeIngredients` / `Recipes_RecipeProcedures`). Content, not history |
-| PRODUCTION (Premade-Production) | 1,201 | Element schedule rows (the element detail's Schedule tab: location, day, par, sort, exclude). Current config, not history |
-| DEPENDENCIES (") | 408 | The Item → Element BOM (the Dependencies portal) |
-| DONUT_PARS (") | 316 | Item pars |
-| ELEMENT_PARS (") | 60 | Element pars |
-| DONUT_YIELDS (") | 22 | Likely the batch-size denominators — see open question 1 |
-| PRICES (") | 17 | Per-item price overrides (the Price Overrides portal) |
+| `_recipelements.mer` | 8,175 | **The recipe lines** — ingredients AND procedure steps. Content, not history |
+| `_production.mer` | 1,201 | Element schedule rows — note they carry a **kitchen** (DF01 485 / DF02 631 / DF03 55) and no selling location, which squares with kitchen-on-plan |
+| `_dependencies.mer` | 408 | The Item → Element BOM |
+| `_donutpars.mer` | 316 | Item pars per (item, location), 7-slot repeating array packed with `\x1d`. **Locations include `WHOLESALE` (3 rows) and `EVENT` (37)** — WHOLESALE is a pseudo-location; ask Mark what its pars drive before mapping it |
+| `_elementpars.mer` | 60 | Element pars (with yields) |
+| `_yields.mer` | 22 | **Confirmed: the batch-size table** — per (type, subtype, size): `portionOfBatch` (Raised/Promise Ring/Regular = 0.002857 ≈ 1/350 of a batch) and `sizeFactor` (Mini = 0.4 of a Regular). Exact rounding vs the printed "BATCH SIZE: 0.60" still to confirm — open question 1 |
+| `_prices.mer` | 17 | Per-item-per-location price overrides |
 
 Loaded from the existing exports: Production_Elements, Production_Recipes,
 Recipe_Items, Production_Items, Production_Item_Prices.

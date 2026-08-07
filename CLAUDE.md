@@ -1799,9 +1799,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    class×tier grid with sparse location overrides (measured: DF01/02/03
    byte-identical, only EVENT differs). **NO HISTORY MIGRATES** (Mark,
    2026-08-07: fresh plans and schedules) — the migration is catalog + config
-   only: 7 small child tables still to export (recipe lines, element schedule
-   rows, BOM, pars, yields, price overrides — the brief's census names them,
-   largest 8,141 rows) plus the 5 catalog exports already taken. The 376k
+   only, and **its inputs are COMPLETE**: the 7 config exports landed the
+   same day (underscore-prefixed in `FMP Export/Production/`) and all nine FK
+   joins against the 5 catalog exports resolve with zero orphans. Batch
+   numbering seeds at 30,000 (FMP's sequence was at 19,541). The 376k
    rows of schedule-line actuals, the 29k tray day slots, and the
    plans/schedules/batch-log exports deliberately never load. The DDR in
    `DF Operations FMP Database Design/` is how to enumerate any FMP file's
