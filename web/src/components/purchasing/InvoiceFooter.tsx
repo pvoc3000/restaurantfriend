@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { ATTACHMENT_BUCKET } from "@/lib/attachments";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { InvoiceStatus } from "@/lib/invoices";
+import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 
 /**
  * The invoice's own footer — Close · Void · Approve, right-aligned, in the
@@ -215,7 +216,7 @@ export function InvoiceFooter({
             type="button"
             disabled={busy !== null}
             onClick={() => void setStatus("void")}
-            className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
+            className={DANGER_BUTTON_CLASS}
           >
             {busy === "void" ? "Voiding…" : "Void"}
           </button>
@@ -238,7 +239,7 @@ export function InvoiceFooter({
             type="button"
             disabled={busy !== null}
             onClick={() => void destroy()}
-            className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
+            className={DANGER_BUTTON_CLASS}
           >
             {busy === "delete" ? "Deleting…" : "Delete"}
           </button>

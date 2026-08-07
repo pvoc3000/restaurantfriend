@@ -128,9 +128,16 @@ export function EmployeeDocuments({
   legacyFoodHandlerExpires,
   today,
   canEdit,
+  variant = "panel",
 }: {
   employeeId: string;
   orgId: string;
+  /**
+   * `panel` is the pinned footer that opens on hover — right when this shares a
+   * screen with the whole record. `page` is the same card with its body open in
+   * flow, for the Documents tab, where the crowding it was hiding from is gone.
+   */
+  variant?: "panel" | "page";
   /** Signed by the server at render — see EmployeeDetail. */
   documents: SignedEmployeeDocument[];
   /**
@@ -225,6 +232,7 @@ export function EmployeeDocuments({
     <RevealPanel
       direction="up"
       label="the filed documents"
+      alwaysOpen={variant === "page"}
       header={(toggle) => (
         <FileDropZone
           disabled={!canEdit || busyLabel !== null}

@@ -51,10 +51,22 @@ export function RevealPanel({
   direction = "down",
   label,
   header,
+  alwaysOpen = false,
   children,
 }: {
   /** Which way the body opens. `up` for a footer pinned to the window bottom. */
   direction?: "up" | "down";
+  /**
+   * Skip the revealing entirely: the body is open, IN FLOW, and there is no
+   * toggle. For when the panel has a screen to itself and the reason it hides —
+   * that a grid of documents was spending a third of a record on itself — has
+   * gone away (Mark, 2026-08-06, moving paperwork onto its own tab).
+   *
+   * A prop rather than a second component: the header, the drop zone, the
+   * progress band and the error line are all the same, and only where the body
+   * sits changes. Two components would drift, which is the `ui/Dialog` story.
+   */
+  alwaysOpen?: boolean;
   /** What the toggle is for, e.g. "paperwork" — read by screen readers. */
   label: string;
   /**
@@ -74,7 +86,7 @@ export function RevealPanel({
   // this, pointing at the header of a person with no documents would open an
   // empty bordered box, which reads as a panel that failed to load.
   const hasBody = children !== null && children !== undefined && children !== false;
-  const open = hasBody && (pinned || pointerIn || focusIn);
+  const open = hasBody && (alwaysOpen || pinned || pointerIn || focusIn);
 
   const toggle = (
     <button
@@ -95,7 +107,7 @@ export function RevealPanel({
 
   return (
     <div
-      className="relative"
+      className={alwaysOpen ? undefined : "relative"}
       onMouseEnter={() => setPointerIn(true)}
       onMouseLeave={() => setPointerIn(false)}
       // React's onFocus/onBlur bubble, unlike the native events, so these catch
@@ -103,7 +115,9 @@ export function RevealPanel({
       onFocus={() => setFocusIn(true)}
       onBlur={() => setFocusIn(false)}
     >
-      {header(hasBody ? toggle : null)}
+      {/* No toggle when there is nothing to reveal, and none when it is already
+          open for good — a control that cannot change anything is noise. */}
+      {header(hasBody && !alwaysOpen ? toggle : null)}
 
       {hasBody && (
       <div
@@ -111,9 +125,18 @@ export function RevealPanel({
         // hairline, so an open panel reads as the section having grown rather
         // than as a menu floating near it. No gap, deliberately: an 8px gap is
         // 8px of "not hovering" between the header and the thing it opened.
-        className={`absolute inset-x-0 z-20 max-h-[60vh] overflow-y-auto border border-ink bg-white px-4 py-3 transition-opacity duration-100 ${
-          direction === "up" ? "bottom-full -mb-px" : "top-full -mt-px"
-        } ${open ? "visible opacity-100" : "invisible opacity-0"}`}
+        //
+        // In flow when it is always open: absolute positioning exists so the
+        // reveal doesn't reflow the page, and a body that never hides has
+        // nothing to avoid. It also drops the 60vh cap, which on a screen of
+        // its own would scroll the documents inside a box inside the page.
+        className={
+          alwaysOpen
+            ? "border border-ink bg-white px-4 py-3 -mt-px"
+            : `absolute inset-x-0 z-20 max-h-[60vh] overflow-y-auto border border-ink bg-white px-4 py-3 transition-opacity duration-100 ${
+                direction === "up" ? "bottom-full -mb-px" : "top-full -mt-px"
+              } ${open ? "visible opacity-100" : "invisible opacity-0"}`
+        }
       >
         {children}
       </div>

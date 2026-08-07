@@ -18,6 +18,7 @@ import {
   type Employee,
 } from "@/lib/employees";
 import { ROLE_LABEL, type Role } from "@/lib/roles";
+import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 
 /** The documents on file, read fresh when the dialog opens — the count AND the
  *  storage paths, which have to be captured before the row that holds them is
@@ -209,15 +210,24 @@ export function EmployeeActions({
           Status field on this very screen has always done — so the menu was
           hiding one command behind a glyph in order to present a choice that
           didn't need one.
-          Bordered rather than filled, and NOT in the accent colour: this button
-          only opens a confirm, and in this design system colour means record
-          state. The red belongs on the commit inside the dialog, which is the
-          keystroke that actually destroys something. */}
+          RED, like every other destructive trigger in the app (Mark,
+          2026-08-06). This used to be an ordinary black-outlined button on the
+          argument that it only OPENS a confirm and the red belongs on the
+          commit inside the dialog. That argument lost to five precedents that
+          all do the opposite and are all only openers too: PO detail's Delete,
+          the PO list's batch Delete, an invoice's Void and Delete, and
+          Inventory's "Deactivate everywhere". A reader cannot tell "this opens a
+          confirm" from "this destroys" by looking, so the colour has to warn at
+          the point you reach for it.
+          Bordered rather than filled: a filled cell would read as the primary
+          action of the screen, which deleting somebody is emphatically not. */}
       <button
         type="button"
         onClick={() => void openConfirm()}
         disabled={busy !== null}
-        className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink hover:bg-ink hover:text-white disabled:opacity-35"
+        // The extras are POSITIONAL and stay here — the shared class carries the
+        // weight, not the layout of the row it happens to sit in.
+        className={`${DANGER_BUTTON_CLASS} inline-flex shrink-0 items-center whitespace-nowrap`}
       >
         Delete employee
       </button>

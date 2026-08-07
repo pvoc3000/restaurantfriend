@@ -2160,8 +2160,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/Pane` + `PaneHeader` | a bordered div with a header band you style yourself | a framed column standing beside another (receiving's document + lines): one FIXED-height band so the two rules line up, and `overflow-hidden` so nothing paints over the frame |
   | `ui/DocumentChip` | a bordered div with a thumbnail strip | a filed document in a list — PO attachments, employee paperwork. Full-bleed preview (image, or PDF via `<object>`) with the text semi-opaque over it; the plugin is `pointer-events-none` and a transparent anchor takes the click |
   | `ui/StickyFooter` | a hand-placed `fixed bottom-0` div plus a guessed spacer | a band pinned to the foot of the window — PO paperwork, employee paperwork. MEASURES its own height into a spacer so the page's last block doesn't slide under it, minus what already follows (the layout's `py-8`), and fires a `resize` so `useFillViewportHeight` reclaims space when it SHRINKS |
-  | `ui/RevealPanel` | a section that is always fully open, or a hand-rolled hover-expand | a block whose body costs more screen than it earns — both paperwork areas. Header always visible (title, count, Add as, Attach, progress, errors); the body opens on hover, on focus, or from a pinning toggle, and is ABSOLUTELY POSITIONED so it never reflows the page |
+  | `ui/RevealPanel` | a section that is always fully open, or a hand-rolled hover-expand | a block whose body costs more screen than it earns — both paperwork areas. Header always visible (title, count, Add as, Attach, progress, errors); the body opens on hover, on focus, or from a pinning toggle, and is ABSOLUTELY POSITIONED so it never reflows the page. **`alwaysOpen`** drops the toggle and puts the body IN FLOW, for when the panel gets a screen of its own and the crowding it was hiding from is gone |
+  | `ui/buttons` `DANGER_BUTTON_CLASS` | re-typing the red class string | any destructive command out on a screen — Delete, Void, "Deactivate everywhere". Red EVEN THOUGH most only open a confirm: a reader can't tell "opens a confirm" from "destroys" by looking. Bordered, never filled. NOT the same as `DIALOG_DANGER_CLASS` (`px-5`, a dialog footer's commit) — don't merge them. Positional classes stay at the call site |
   | `ui/FileDropZone` | `onDrop` on a div | dropping files onto a region. Its OVERLAY takes the drop (a PDF `<object>` is a plugin and swallows drag events — confirmed working over a live PDF, Mark 2026-08-04), it arms off WINDOW drag events so it's up before the pointer arrives, it vets types itself (`accept` governs only the picker), and it stops a stray drop navigating the page away |
+  | `ui/SectionNav` | a second sidebar, underline tabs, or a `TabPicker` turned sideways | **the sections of one detail record** — the employee screen's Info · Employment · Events · Documents · Admin. Plain text links, no box: active bold black, inactive `text-muted`. `orientation="horizontal"` is the narrow-screen form. See "A detail screen that outgrows one page" below — REUSE THIS, don't re-derive it |
   | `ui/RecordNav` + `lib/recordSet` | going back to the list for the next record | FMP's book on a detail screen: the LIST publishes its found set, the detail walks it |
   | `DataTable columnChooser` | a bespoke checklist, or placing `ColumnsMenu` yourself | show/hide columns on a list — the table puts it above its own last column header; pair it with `DataColumn.pinned` on the column that IS the row |
   | `ui/BackToTop` | — | long lists; already on the guide |
@@ -3199,6 +3201,73 @@ weekday column, and 003 then silently made it per-vendor-item.
   trip. Filters and sort still survive (URL / the guide's session cookie), and
   scroll is bought back for every screen — see scroll restoration below. New
   detail screens are just pages.
+- **A detail screen that outgrows one page becomes TABS, and the employee record
+  is the pattern** (Mark, 2026-08-06: "the employee detail page is getting a
+  little unwieldy", with Gusto's employee sidebar as the reference; then, having
+  seen it, "if we need tabs in any detail view in the future, this is the way to
+  do it, and we should reuse the code here so it doesn't drift" — **specifically
+  `ui/SectionNav`**). Copy the shape; do not re-derive it.
+  **The nav is `ui/SectionNav`, NOT a `ui/TabPicker`.** The convention says every
+  one-of-N choice is a TabPicker with a black selected cell, and that rule is
+  about CHOOSING — a filter, a scope, a view mode, things that change what a
+  screen shows you. Sections NAVIGATE: each is a real address, back walks them,
+  they open in a new tab. `AppNav`'s two tiers are navigation too and mark active
+  with weight and colour rather than a filled cell, so this reads like those. A
+  bordered box beside a bordered table beside a bordered filter row was three
+  boxes deep before anybody had read a word. TabPicker was tried vertically first
+  and reverted to byte-identical.
+  **The tab lives in the URL** — view state, the same rule as filters and sort —
+  through three pure helpers in the record's own lib module, fixture-tested:
+  `EmployeeTab` + `EMPLOYEE_TABS` + `EMPLOYEE_TAB_LABEL`, `parseEmployeeTab`
+  (anything unrecognised falls back to the first tab: a stale bookmark should
+  show you the record, not an error), and `employeeTabHref`, which carries the
+  CURRENT params through — `from`/`fromLabel` above all, or moving between tabs
+  strips the breadcrumb trail and the record book loses its found set. **The
+  default tab writes no parameter at all**, so the record keeps one canonical
+  address and every link already stored still points at it.
+  **The real win is that each tab fetches only itself.** Measured on the employee
+  record: Info runs **1 query where the whole page ran 13**, and only the
+  Documents tab signs a Storage URL. A `SKIP = { data: null, error: null, count:
+  null }` stands in for an unwanted query so the `Promise.all` destructuring
+  keeps its shape.
+  **The identity block sits ABOVE the split and is INDENTED to the content
+  column** — `lg:ml-48` is exactly the sidebar's `lg:w-40` plus the row's
+  `lg:gap-8`. THOSE THREE VALUES ARE COUPLED; change one and the heading drifts
+  off the content it belongs to. The name stays put while the sections change
+  under it, with a `status · position · shop` line beneath it carrying the facts
+  you'd otherwise change tabs to check.
+  **Below `lg` it stacks**, `orientation="horizontal"` above the content: five
+  vertical cells cost 180px before anything is read, which an iPad can't spare.
+  The two orientations are **wrapped in their own visibility divs** rather than
+  switched with a responsive `display` utility on the control — Tailwind resolves
+  competing utilities by STYLESHEET order, not class-string order, so a `hidden`
+  passed in `className` would not reliably beat the component's own `flex` (the
+  trap that put the ⋯ menu's hints beside their labels).
+  **A table's command shares the SECTION HEADING's line, in a full-width row
+  above the strip** — `flex items-center justify-between`, heading left, command
+  right. Four placements were tried on New event and the three failures are the
+  whole argument:
+  · *under the table* — past the fold on any record with more than a screen of rows;
+  · *stacked above the columns eye* (a `DataTable action` prop, since REVERTED —
+    the table is byte-identical to before) — the right-hand cell became 76px
+    against the filters' 36px, and `items-end` bottom-aligned the tiers to the
+    eye, leaving ~40px of nothing under the heading (Mark: "a large gap between
+    the section header and the filter buttons");
+  · *on the heading's line but INSIDE `leading`* — `leading` is a `min-w-0
+    flex-1` box with the eye's cell beside it, so anything right-aligned in there
+    stops ~48px short of the table's edge (the gap plus the eye).
+  This is the one case where a heading does NOT go in `leading`, and the reason
+  the usual rule doesn't bite: that rule exists because an otherwise EMPTY 32px
+  band opened a 44px hole under the heading, and a strip carrying filters has no
+  empty band to close. `items-center`, not `items-end` — a 16px heading and a
+  36px button share a centre line, not a baseline.
+  One more thing the move earned: a block that was hiding from crowding can stop
+  (`RevealPanel alwaysOpen` — paperwork got its own tab, so the reveal had
+  nothing left to avoid).
+  Known gaps, neither fixed: `RecordNav` doesn't carry the tab, so walking to the
+  next record lands on the first one; and `ScrollMemory` keys on pathname without
+  the query, so all five tabs share one scroll position — `useScrollMemoryKey` is
+  how the order guide solves exactly that.
 - **Safari:** a table cell under `border-collapse` is NOT a containing block in
   WebKit — anchor absolutely-positioned children to an inner `<div>`. And see
   web/README.md on Safari caching a stale dev stylesheet.

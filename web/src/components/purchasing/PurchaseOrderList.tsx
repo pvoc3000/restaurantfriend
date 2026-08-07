@@ -38,6 +38,7 @@ import { usePublishRecordSet } from "@/lib/recordSet";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
 import type { PoListRow } from "@/app/(app)/purchase-orders/page";
+import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 
 // Widths and hidden columns share this key — one table, one identity.
 const PO_WIDTHS_KEY = "rf.purchaseOrders.columnWidths.v2";
@@ -767,7 +768,7 @@ export function PurchaseOrderList({
             <button
               disabled={batchBusy !== null}
               onClick={batchDelete}
-              className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
+              className={DANGER_BUTTON_CLASS}
             >
               {batchBusy === "delete" ? "Deleting…" : "Delete"}
             </button>

@@ -22,6 +22,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { PickList } from "@/components/ui/PickList";
 import type { ItemRow } from "@/app/(app)/items/page";
+import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 
 const ACTIVE_TABS: { key: ActiveFilter; label: string }[] = [
   { key: "active", label: "Active" },
@@ -408,7 +409,7 @@ export function ItemsList({
           <button
             disabled={busy}
             onClick={() => deactivate("everywhere")}
-            className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
+            className={DANGER_BUTTON_CLASS}
           >
             Deactivate everywhere
           </button>

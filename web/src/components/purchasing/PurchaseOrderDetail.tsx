@@ -33,6 +33,7 @@ import { AddPoLines } from "./AddPoLines";
 import { OrderBar } from "./OrderBar";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 import { nextDeliveryDate } from "@/lib/poProcessing";
+import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 
 /**
  * PO detail: what was ordered, what arrived, and the gap between them.
@@ -820,7 +821,7 @@ export function PurchaseOrderDetail({
           <button
             disabled={busy}
             onClick={deleteLines}
-            className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
+            className={DANGER_BUTTON_CLASS}
           >
             {busy ? "Deleting…" : "Delete"}
           </button>

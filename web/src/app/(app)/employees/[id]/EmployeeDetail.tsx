@@ -4,10 +4,16 @@ import { canReadHr, type Role } from "@/lib/roles";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import {
   EMPLOYEES_CRUMB,
+  EMPLOYEE_TABS,
+  EMPLOYEE_TAB_LABEL,
   employeeName,
+  employeeTabHref,
+  parseEmployeeTab,
   SCHEDULE_OPTIONS,
+  STATUS_LABEL,
   STATUS_OPTIONS,
   type Employee,
+  type EmployeeStatus,
 } from "@/lib/employees";
 import {
   expiryState,
@@ -23,11 +29,11 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { SectionNav } from "@/components/ui/SectionNav";
 import { EmployeeDocuments } from "@/components/hr/EmployeeDocuments";
 import { AppAccess } from "@/components/hr/AppAccess";
 import { EmployeeActions } from "@/components/hr/EmployeeActions";
 import { EmployeePayroll } from "@/components/hr/EmployeePayroll";
-import { StickyFooter } from "@/components/ui/StickyFooter";
 import {
   EmployeeBenefits,
   type EmployeeBenefitRow,
@@ -81,6 +87,22 @@ export async function EmployeeDetail({
 
   const supabase = await createClient();
 
+  // WHICH TAB, and therefore WHAT TO FETCH. Splitting the record into five
+  // screens is what makes this worth doing twice over: it is not only shorter to
+  // read, it stops every visit paying for the parts you aren't looking at — the
+  // Info tab now runs one query where the whole record ran eleven, and only the
+  // Documents tab signs a Storage URL.
+  //
+  // `SKIP` stands in for a query that isn't wanted, so the destructuring below
+  // keeps its shape. Promise.all takes plain values happily.
+  const tab = parseEmployeeTab(rawParams.tab);
+  const SKIP = { data: null, error: null, count: null };
+  const wantsEmployment = tab === "employment";
+  const wantsEvents = tab === "events";
+  // The Employment tab reads the documents to work out the food handler card's
+  // state; only the Documents tab needs them SIGNED, which is the expensive half.
+  const wantsDocumentRows = tab === "documents" || tab === "employment";
+
   const [
     { data: employee, error },
     { data: documentRows, error: documentError },
@@ -97,30 +119,38 @@ export async function EmployeeDetail({
       )
       .eq("id", id)
       .maybeSingle(),
-    supabase
-      .from("employee_documents")
-      .select(
-        "id, employee_id, storage_path, kind, file_name, content_type, byte_size, expires_on, created_at"
-      )
-      .eq("employee_id", id)
-      .order("created_at"),
+    wantsDocumentRows
+      ? supabase
+          .from("employee_documents")
+          .select(
+            "id, employee_id, storage_path, kind, file_name, content_type, byte_size, expires_on, created_at"
+          )
+          .eq("employee_id", id)
+          .order("created_at")
+      : SKIP,
     // 033. Errors are NOT folded into the page's own — a missing benefits table
     // must not blank an employee record that is otherwise perfectly readable.
     // The block below says so in its own words instead.
-    supabase
-      .from("payroll_benefits")
-      .select("id, name, unit, default_amount")
-      .eq("is_active", true)
-      .order("sort_order")
-      .order("name"),
-    supabase
-      .from("employee_benefits")
-      .select("id, benefit_id, location_id, amount, starts_on, ends_on, notes")
-      .eq("employee_id", id),
+    wantsEmployment
+      ? supabase
+          .from("payroll_benefits")
+          .select("id, name, unit, default_amount")
+          .eq("is_active", true)
+          .order("sort_order")
+          .order("name")
+      : SKIP,
+    wantsEmployment
+      ? supabase
+          .from("employee_benefits")
+          .select("id, benefit_id, location_id, amount, starts_on, ends_on, notes")
+          .eq("employee_id", id)
+      : SKIP,
     // Every job title already in use, so Primary job OFFERS rather than asks
     // someone to remember the exact spelling. Same move as the item category
     // picker.
-    supabase.from("employees").select("primary_wage_type").not("primary_wage_type", "is", null),
+    wantsEmployment
+      ? supabase.from("employees").select("primary_wage_type").not("primary_wage_type", "is", null)
+      : SKIP,
     // 035. Like the benefits above, this error is NOT folded into the page's
     // own — a missing events table must not blank a readable employee record.
     //
@@ -133,25 +163,29 @@ export async function EmployeeDetail({
     //
     // So the narrative kinds are fetched WHOLE (they are rare — 2,635 across all
     // 445 people) and only the shift ratings are capped.
-    supabase
-      .from("employee_events")
-      .select(EVENT_COLUMNS)
-      .eq("employee_id", id)
-      .neq("kind", "shift")
-      .order("occurred_on", { ascending: false })
-      .order("id"),
+    wantsEvents
+      ? supabase
+          .from("employee_events")
+          .select(EVENT_COLUMNS)
+          .eq("employee_id", id)
+          .neq("kind", "shift")
+          .order("occurred_on", { ascending: false })
+          .order("id")
+      : SKIP,
     // The second `.order("id")` is load-bearing rather than tidy — `occurred_on`
     // is a DATE and ties are everywhere, and a ranged sweep on a non-unique sort
     // key returns overlapping pages, which is what fabricated 112,338
     // double-time hours in the 2026-08-05 audit.
-    supabase
-      .from("employee_events")
-      .select(EVENT_COLUMNS, { count: "exact" })
-      .eq("employee_id", id)
-      .eq("kind", "shift")
-      .order("occurred_on", { ascending: false })
-      .order("id")
-      .range(0, EVENT_PAGE - 1),
+    wantsEvents
+      ? supabase
+          .from("employee_events")
+          .select(EVENT_COLUMNS, { count: "exact" })
+          .eq("employee_id", id)
+          .eq("kind", "shift")
+          .order("occurred_on", { ascending: false })
+          .order("id")
+          .range(0, EVENT_PAGE - 1)
+      : SKIP,
   ]);
 
   const eventRows = [...(narrativeRows ?? []), ...(shiftRows ?? [])];
@@ -203,7 +237,9 @@ export async function EmployeeDetail({
   // The access record, if they have one. A second query rather than an embed:
   // org_members has no FK from employees (the link points the other way), and
   // most people have no row here at all.
-  const { data: membership } = person.user_id
+  // The Admin tab needs it for the access block; every other tab needs it for
+  // nothing at all.
+  const { data: membership } = person.user_id && tab === "admin"
     ? await supabase
         .from("org_members")
         .select("role, display_name, invited_at")
@@ -214,7 +250,7 @@ export async function EmployeeDetail({
   // Sign every document in ONE batch on the server — not a round trip per card,
   // and a URL built to expire doesn't outlive the page.
   const docs = (documentRows ?? []) as unknown as EmployeeDocument[];
-  const { data: signed } = docs.length
+  const { data: signed } = docs.length && tab === "documents"
     ? await supabase.storage
         .from(EMPLOYEE_DOCS_BUCKET)
         .createSignedUrls(
@@ -229,10 +265,9 @@ export async function EmployeeDetail({
 
   // Every position already in use — the vocabulary to pick from, the same
   // derive-then-allowNew shape as the inventory category picker.
-  const { data: positionRows } = await supabase
-    .from("employees")
-    .select("position")
-    .not("position", "is", null);
+  const { data: positionRows } = wantsEmployment
+    ? await supabase.from("employees").select("position").not("position", "is", null)
+    : { data: null };
   const positions = [
     ...new Set(
       (positionRows ?? [])
@@ -250,7 +285,7 @@ export async function EmployeeDetail({
   // who has no employee record any more.
   const authorIds = [
     ...new Set(
-      (eventRows ?? []).map((e) => e.author_employee_id as string | null).filter((v): v is string => !!v)
+      eventRows.map((e) => e.author_employee_id as string | null).filter((v): v is string => !!v)
     ),
   ];
   const { data: authorRows } = authorIds.length
@@ -260,7 +295,7 @@ export async function EmployeeDetail({
     (authorRows ?? []).map((a) => [a.id as string, employeeName(a as Pick<Employee, "first_name" | "last_name">)])
   );
 
-  const events: EmployeeEventRow[] = (eventRows ?? []).map((e) => ({
+  const events: EmployeeEventRow[] = eventRows.map((e) => ({
     id: e.id as string,
     occurred_on: e.occurred_on as string,
     kind: e.kind as EmployeeEventRow["kind"],
@@ -283,16 +318,13 @@ export async function EmployeeDetail({
 
   // The signed-in person's own employee row, so a new event records who wrote
   // it without the dialog having to query for itself.
-  const { data: selfRow } = await supabase
-    .from("employees")
-    .select("id")
-    .eq("user_id", session.userId)
-    .maybeSingle();
+  const { data: selfRow } = wantsEvents
+    ? await supabase.from("employees").select("id").eq("user_id", session.userId).maybeSingle()
+    : { data: null };
 
-  const { data: typeRows } = await supabase
-    .from("employees")
-    .select("employment_type")
-    .not("employment_type", "is", null);
+  const { data: typeRows } = wantsEmployment
+    ? await supabase.from("employees").select("employment_type").not("employment_type", "is", null)
+    : { data: null };
   const employmentTypes = [
     ...new Set(
       (typeRows ?? [])
@@ -311,6 +343,13 @@ export async function EmployeeDetail({
   // that is exactly what migration 020's write policies allow.
   const table = "employees";
 
+  // Built once and rendered twice — see the two navs below.
+  const tabOptions = EMPLOYEE_TABS.map((t) => ({
+    key: t,
+    label: EMPLOYEE_TAB_LABEL[t],
+    href: employeeTabHref(id, t, rawParams),
+  }));
+
   return (
     <div className="space-y-8">
       {/* The record book sits at the FAR right of the crumb row (Mark,
@@ -322,9 +361,19 @@ export async function EmployeeDetail({
         <RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />
       </div>
 
-      {/* ---- who this is ---------------------------------------------- */}
-      <div className="space-y-3">
-        {/* The name is READ-ONLY here and editable in the rows below. Two
+      {/* ---- who this is, ABOVE the split ------------------------------ */}
+      {/* Gusto's shape, and the right one: the name is the record's identity, so
+          it stays put while the sections change under it. The line beneath is
+          the three facts you would otherwise change tabs to check.
+
+          INDENTED TO THE CONTENT COLUMN (Mark, 2026-08-06), not to the page
+          margin: `lg:ml-48` is exactly the sidebar's `lg:w-40` plus the row's
+          `lg:gap-8` (10rem + 2rem), so the name starts on the same left edge as
+          everything under it. THOSE THREE VALUES ARE COUPLED — change the
+          sidebar's width and this has to move with it, or the heading drifts off
+          the content it belongs to. Below `lg` there is no sidebar to clear. */}
+      <div className="space-y-1 lg:ml-48">
+        {/* The name is READ-ONLY here and editable on the Info tab. Two
             InlineValues side by side don't work: the trigger is `w-full` of
             its parent, so first and last each claim a line and the heading
             wraps. Editing a name is rare enough that it belongs with the other
@@ -332,7 +381,50 @@ export async function EmployeeDetail({
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           {employeeName(person)}
         </h1>
+        <p className="text-sm text-muted">
+          {[
+            STATUS_LABEL[person.status as EmployeeStatus],
+            person.position,
+            person.main_location_id ? codeById.get(person.main_location_id) : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        </p>
+      </div>
 
+      {/* ---- the record's five sections -------------------------------- */}
+      {/* Below `lg` it STACKS, bar above content: a 192px column beside a table
+          at iPad-portrait width leaves neither enough room, and a horizontal bar
+          is what this control is anyway. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+        {/* TWO renderings of one control, wrapped rather than switched with a
+            responsive `display` utility on the control itself: Tailwind resolves
+            competing utilities by STYLESHEET order, not class-string order, so a
+            `hidden` passed in `className` would not reliably beat the component's
+            own `flex` (the trap that put the ⋯ menu's hints beside their labels).
+            A wrapper div has no such argument to lose. */}
+        <div
+          className="hidden lg:sticky lg:block lg:w-40 lg:shrink-0"
+          // Under the masthead, which MEASURES itself — it wraps to two or three
+          // rows at iPad widths, so any constant here would be wrong at some width.
+          style={{ top: "calc(var(--rf-header-h) + 1.5rem)" }}
+        >
+          <SectionNav ariaLabel="Which part of this record" value={tab} items={tabOptions} />
+        </div>
+        <div className="lg:hidden">
+          <SectionNav
+            orientation="horizontal"
+            ariaLabel="Which part of this record"
+            value={tab}
+            items={tabOptions}
+          />
+        </div>
+
+        <div className="min-w-0 flex-1 space-y-8">
+
+      {tab === "info" && (
+        <>
+      <div className="space-y-3">
         <dl className="grid max-w-md grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
           <dt className="py-0.5 text-subtle">First name</dt>
           <dd>
@@ -429,6 +521,24 @@ export async function EmployeeDetail({
         </dl>
       </section>
 
+      {/* ---- notes ----------------------------------------------------- */}
+      <section className="space-y-2">
+        <Heading>Notes</Heading>
+        <div className="max-w-2xl text-sm">
+          <InlineValue
+            table={table}
+            id={person.id}
+            column="notes"
+            value={person.notes}
+            placeholder="none"
+          />
+        </div>
+      </section>
+        </>
+      )}
+
+      {tab === "employment" && (
+        <>
       {/* ---- the job --------------------------------------------------- */}
       <section className="space-y-2">
         <Heading>Employment</Heading>
@@ -604,23 +714,39 @@ export async function EmployeeDetail({
         </div>
       </section>
 
-      {/* ---- notes ----------------------------------------------------- */}
-      <section className="space-y-2">
-        <Heading>Notes</Heading>
-        <div className="max-w-2xl text-sm">
-          <InlineValue
-            table={table}
-            id={person.id}
-            column="notes"
-            value={person.notes}
-            placeholder="none"
-          />
-        </div>
-      </section>
+        </>
+      )}
 
-      {/* ---- events (035) ---------------------------------------------- */}
+      {tab === "events" && (
+      /* ---- events (035) ---------------------------------------------- */
       <section className="space-y-2">
-        <Heading count={(shiftTotal ?? 0) + (narrativeRows ?? []).length}>Events</Heading>
+        {/* The heading and the command share a line, and the row spans the
+            table's FULL width so the button lands flush with its right edge
+            (Mark, 2026-08-06). That is why this sits above the strip rather than
+            inside `leading`: `leading` is a `min-w-0 flex-1` box with the eye's
+            cell beside it, so anything right-aligned in there stops ~48px short —
+            the gap plus the eye. The usual "a heading over a DataTable goes in
+            `leading`" rule is about an otherwise EMPTY 32px band opening a 44px
+            hole under the heading; this strip carries the tier filters, so there
+            is no empty band to close.
+            `items-center`: a 16px heading and a 36px button share a centre line,
+            not a baseline. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <Heading count={eventError ? undefined : (shiftTotal ?? 0) + (narrativeRows ?? []).length}>
+            Events
+          </Heading>
+          {!eventError && (
+            <NewEmployeeEvent
+              employeeId={person.id}
+              orgId={person.org_id}
+              userId={session.userId}
+              authorEmployeeId={(selfRow?.id ?? null) as string | null}
+              locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
+              today={today}
+              outcomes={outcomes}
+            />
+          )}
+        </div>
         {eventError ? (
           <p className="max-w-[72ch] border border-accent px-4 py-3 text-sm text-accent">
             {eventError.message}
@@ -629,23 +755,13 @@ export async function EmployeeDetail({
               : ""}
           </p>
         ) : (
-          <>
-            <EmployeeEvents rows={events} shiftTotal={shiftTotal ?? 0} editable />
-            <div className="pt-2">
-              <NewEmployeeEvent
-                employeeId={person.id}
-                orgId={person.org_id}
-                userId={session.userId}
-                authorEmployeeId={(selfRow?.id ?? null) as string | null}
-                locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
-                today={today}
-                outcomes={outcomes}
-              />
-            </div>
-          </>
+          <EmployeeEvents rows={events} shiftTotal={shiftTotal ?? 0} editable />
         )}
       </section>
+      )}
 
+      {tab === "admin" && (
+        <>
       {/* ---- access ---------------------------------------------------- */}
       <section className="space-y-2">
         <Heading>App access</Heading>
@@ -664,13 +780,10 @@ export async function EmployeeDetail({
       {/* ---- the end of the record ------------------------------------- */}
       {/* Bottom LEFT, after everything (Mark, 2026-08-02, having tried it
           beside the name, then under the record book, then bottom right).
-          The end of the record is the right place for it — you pass the
-          paperwork on file and whether they can sign in before you reach the
-          one control that destroys the thing, which is where a destructive
-          action belongs in any document. Left is where it lines up: every
-          other block on this screen starts at the left margin, so the button
-          sits under the content it acts on instead of floating off in a corner
-          of its own.
+          Still the end — now the end of the LAST tab, which is the same
+          argument one level up: you pass whether they can sign in before you
+          reach the one control that destroys the thing. Left is where it lines
+          up with every other block.
           A plain button rather than a `ui/ActionBar`: the bar is a fixed black
           band that would follow you up the whole record for the sake of one
           command used a few times a year, and it costs every screen carrying
@@ -690,36 +803,43 @@ export async function EmployeeDetail({
         />
       </div>
 
-      {/* ---- paperwork, pinned to the foot of the window ---------------- */}
-      {/* PO detail's treatment, asked for here by name (Mark, 2026-08-06). The
-          same argument applies: a grid of documents you consult occasionally
-          was spending a third of the record on itself, and `ui/RevealPanel`
-          opens it UP and OVER the record rather than reflowing it.
+        </>
+      )}
 
-          LAST on the screen and out of the flow, so the reading order of the
-          record — who they are, what they're paid, how to reach them — is not
-          interrupted by a filing cabinet. Delete stays the last thing IN the
-          flow, which is still where a destructive action belongs. */}
-      <StickyFooter spacerClassName="-mt-8">
-        {documentError ? (
-          /* 018's pattern: say what happened rather than render an empty card,
-             which reads as "nothing filed yet" — the one thing this block must
-             never claim by accident. Before migration 034 this is what a
-             missing `expires_on` column looks like. */
-          <p className="border border-ink bg-white px-4 py-3 text-sm text-accent">
-            Could not read this personnel file: {documentError.message}
-          </p>
-        ) : (
-          <EmployeeDocuments
-            employeeId={person.id}
-            orgId={person.org_id}
-            documents={documents}
-            legacyFoodHandlerExpires={person.food_handler_expires}
-            today={today}
-            canEdit
-          />
-        )}
-      </StickyFooter>
+      {tab === "documents" && (
+        /* ---- paperwork, on a screen of its own ------------------------ */
+        /* It used to be pinned to the foot of the window and revealed on hover
+           (PO detail's treatment, Mark 2026-08-06), because a grid of documents
+           you consult occasionally was spending a third of the record on itself.
+           A tab of its own settles that better than hiding did: the reason to
+           hide was crowding, and there is no crowding here. So `variant="page"`
+           — the same card, the same drop zone, body open and in flow. */
+        <section className="space-y-2">
+          <Heading count={documents.length}>Paperwork</Heading>
+          {documentError ? (
+            /* 018's pattern: say what happened rather than render an empty card,
+               which reads as "nothing filed yet" — the one thing this block must
+               never claim by accident. Before migration 034 this is what a
+               missing `expires_on` column looks like. */
+            <p className="border border-ink bg-white px-4 py-3 text-sm text-accent">
+              Could not read this personnel file: {documentError.message}
+            </p>
+          ) : (
+            <EmployeeDocuments
+              employeeId={person.id}
+              orgId={person.org_id}
+              documents={documents}
+              legacyFoodHandlerExpires={person.food_handler_expires}
+              today={today}
+              canEdit
+              variant="page"
+            />
+          )}
+        </section>
+      )}
+
+        </div>
+      </div>
     </div>
   );
 }

@@ -8,6 +8,10 @@
 // ones where an over-eager matcher would cry wolf on two unrelated people.
 
 import {
+  EMPLOYEE_TABS,
+  EMPLOYEE_TAB_LABEL,
+  employeeTabHref,
+  parseEmployeeTab,
   deleteWarnings,
   findPossibleRehires,
   isSelf,
@@ -168,6 +172,55 @@ test("the event count defaults to zero, so an unmigrated caller still works", ()
   const w = deleteWarnings(clean, 0);
   eq(w.events, 0);
   no(w.any, "any");
+});
+
+// ------------------------------------------------------------ record tabs
+
+test("an unrecognised tab falls back to the record itself", () => {
+  // A stale bookmark or a typo should show you the person, not an error and not
+  // an empty shell.
+  eq(parseEmployeeTab("events"), "events", "a real tab");
+  eq(parseEmployeeTab(undefined), "info", "no parameter at all");
+  eq(parseEmployeeTab(""), "info", "empty");
+  eq(parseEmployeeTab("payroll"), "info", "a tab that never existed");
+  eq(parseEmployeeTab("Events"), "info", "case matters — the URL is the vocabulary");
+  eq(parseEmployeeTab(["documents", "admin"]), "documents", "a repeated parameter takes the first");
+});
+
+test("every tab in the list parses back to itself", () => {
+  // The list, the labels and the parser have to agree or a sidebar cell links
+  // somewhere that renders as `info`.
+  for (const t of EMPLOYEE_TABS) {
+    eq(parseEmployeeTab(t), t, t);
+    ok(EMPLOYEE_TAB_LABEL[t], `${t} is labelled`);
+  }
+});
+
+test("the default tab writes no parameter, so the record keeps one address", () => {
+  // Otherwise every link already stored — the roster's rows, the found set, a
+  // pasted URL — would point at something that isn't canonical.
+  eq(employeeTabHref("e-1", "info"), "/employees/e-1");
+  eq(employeeTabHref("e-1", "events"), "/employees/e-1?tab=events");
+});
+
+test("switching tabs carries the breadcrumb trail through", () => {
+  // Drop `from` here and moving between tabs silently strips the trail that led
+  // to the record, which also costs the record book its found set.
+  eq(
+    employeeTabHref("e-1", "admin", { from: "/employees", fromLabel: "Employees" }),
+    "/employees/e-1?from=%2Femployees&fromLabel=Employees&tab=admin",
+    "params kept, tab appended",
+  );
+  eq(
+    employeeTabHref("e-1", "info", { from: "/employees", fromLabel: "Employees" }),
+    "/employees/e-1?from=%2Femployees&fromLabel=Employees",
+    "and no tab= on the default",
+  );
+});
+
+test("the old tab is replaced, never appended twice", () => {
+  eq(employeeTabHref("e-1", "documents", { tab: "events" }), "/employees/e-1?tab=documents");
+  eq(employeeTabHref("e-1", "info", { tab: "events" }), "/employees/e-1", "back to the default drops it");
 });
 
 // ------------------------------------------------------------ self-delete

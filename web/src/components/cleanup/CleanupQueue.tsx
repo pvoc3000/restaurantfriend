@@ -14,6 +14,7 @@ import type { QueueItem } from "@/app/(app)/cleanup/page";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { FixDrawer } from "./FixDrawer";
+import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 
 type ProblemTab = ProblemKind | "all";
 type StaleTab = StaleBucket | "any";
@@ -232,7 +233,7 @@ export function CleanupQueue({
           <button
             disabled={bulkBusy}
             onClick={deactivateSelected}
-            className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
+            className={DANGER_BUTTON_CLASS}
           >
             Deactivate selected here
           </button>
@@ -366,7 +367,7 @@ export function CleanupQueue({
               <button
                 disabled={bulkBusy}
                 onClick={deactivateItemsEverywhere}
-                className="h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35"
+                className={DANGER_BUTTON_CLASS}
               >
                 Deactivate {followUp.length === 1 ? "item" : "all"}
               </button>

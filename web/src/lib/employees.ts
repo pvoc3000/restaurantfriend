@@ -14,6 +14,81 @@ export function employeeDetailHref(id: string): string {
   return withFrom(`/employees/${id}`, EMPLOYEES_CRUMB);
 }
 
+/* -- the record's own sections --------------------------------------------- */
+
+/**
+ * The employee record is five screens, not one long page (Mark, 2026-08-06:
+ * "the employee detail page is getting a little unwieldy", with Gusto's
+ * employee sidebar as the reference).
+ *
+ * IN THE URL, not in client state, because a tab is VIEW STATE — the same rule
+ * that puts filters and sort in the query string. It makes a tab linkable, it
+ * makes the back button work through them, and it is what lets the page fetch
+ * only the tab being looked at instead of all of it every time.
+ *
+ * `admin` is last and holds both the access record and the destructive
+ * actions: revoking a sign-in and deleting the record are the same job, and
+ * keeping Delete at the end of the LAST tab preserves where it sat before —
+ * past everything else, which is where a destructive action belongs.
+ */
+export type EmployeeTab = "info" | "employment" | "events" | "documents" | "admin";
+
+export const EMPLOYEE_TABS: EmployeeTab[] = [
+  "info",
+  "employment",
+  "events",
+  "documents",
+  "admin",
+];
+
+export const EMPLOYEE_TAB_LABEL: Record<EmployeeTab, string> = {
+  info: "Info",
+  employment: "Employment",
+  events: "Events",
+  documents: "Documents",
+  admin: "Admin",
+};
+
+/**
+ * The tab a request is asking for. Anything unrecognised — a stale bookmark, a
+ * typo, a missing parameter — falls back to `info` rather than throwing or
+ * rendering an empty shell: a bad tab should show you the record, not an error.
+ */
+export function parseEmployeeTab(raw: string | string[] | undefined): EmployeeTab {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return (EMPLOYEE_TABS as string[]).includes(value ?? "")
+    ? (value as EmployeeTab)
+    : "info";
+}
+
+/**
+ * A link to one tab of the record you are already on.
+ *
+ * It carries the CURRENT params through — `from` and `fromLabel` above all, or
+ * moving between tabs would quietly strip the breadcrumb trail that led here and
+ * the record book would lose its found set.
+ *
+ * `info` writes no parameter at all, so the default tab's URL is the plain
+ * record address. That keeps every link already stored elsewhere — the roster's
+ * rows, the found set, a pasted URL — pointing at something canonical instead of
+ * at `?tab=info`.
+ */
+export function employeeTabHref(
+  id: string,
+  tab: EmployeeTab,
+  params: Record<string, string | string[] | undefined> = {}
+): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (key === "tab") continue;
+    const single = Array.isArray(value) ? value[0] : value;
+    if (single) search.set(key, single);
+  }
+  if (tab !== "info") search.set("tab", tab);
+  const query = search.toString();
+  return `/employees/${id}${query ? `?${query}` : ""}`;
+}
+
 /** Migration 020's check constraint. FMP: Active 26 · New Hire 2 · Inactive 417. */
 export type EmployeeStatus = "active" | "new_hire" | "inactive";
 
