@@ -131,13 +131,18 @@ export function AppNav({
           >
             {sections.map((section) => {
               const active = section.slug === sectionSlug;
-              // THE WORKING LOCATION IS ALWAYS YELLOW, selected or not (Mark,
+              // The location tab is yellow WHEREVER ELSE YOU ARE (Mark,
               // 2026-08-06). It is the one tab that isn't a place you go: it
               // names the shop every other screen is about, so "which shop am I
               // ordering for" has to be answerable from any section without
-              // hunting. Selection is white, matching the second tier, which had
-              // marked active in white all along — so the two bands now agree
-              // and the yellow means one thing instead of two.
+              // hunting for it.
+              //
+              // But SELECTION WINS when you are actually on it (Mark, same day).
+              // Otherwise the location is the one tab whose active state can't be
+              // seen, which trades a rare question for a constant one. White also
+              // matches the second tier, which had marked active in white all
+              // along — so the bands agree, and each colour means exactly one
+              // thing: white "you are here", yellow "this is the shop".
               const isLocation = section.slug === "location";
               return (
                 <Link
@@ -145,10 +150,10 @@ export function AppNav({
                   href={sectionHref(section, memory, locationId, sectionSlug ?? null)}
                   aria-current={active ? "page" : undefined}
                   className={`${TAB} ${
-                    isLocation
-                      ? "text-mark"
-                      : active
-                        ? "text-white"
+                    active
+                      ? "text-white"
+                      : isLocation
+                        ? "text-mark"
                         : "text-white/60 hover:text-white"
                   }`}
                 >

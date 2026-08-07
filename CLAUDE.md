@@ -706,10 +706,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    56px apart, so they aren't read as one segmented control the way a
    TabPicker's abutting cells are, and alone a filled box with a label is a
    button. Yellow is already this app's mark for WHICH SHOP YOU ARE AT:
-   `AppNav`'s location tab is `text-mark` permanently, and no button anywhere is
-   filled yellow. (When this was written the nav marked its active SECTION
-   yellow; since 2026-08-06 selection is white in both bands and the yellow
-   belongs to the location alone — which if anything sharpens the parallel.) The 130×30 optical compensation went with the black — a pale fill is
+   `AppNav`'s location tab is `text-mark` from every other section, and no button
+   anywhere is filled yellow. (When this was written the nav marked its active
+   SECTION yellow; since 2026-08-06 selection is white in both bands and the
+   yellow belongs to the location alone — which if anything sharpens the
+   parallel.) The 130×30 optical compensation went with the black — a pale fill is
    a light area like the outlined box beside it), a `Work here` button
    on any other ACTIVE one, and **nothing at all on an inactive one**. Chip and
    button are ONE box — same width, height and border, only the fill differs —
@@ -2254,12 +2255,15 @@ weekday column, and 003 then silently made it per-vendor-item.
   sub-sections under it, both bands black, **both marking active in WHITE**
   (told apart by 12px vs 11px, white/60 vs white/50, and a `white/15` hairline).
   Six sections — the first is labelled with the ACTIVE LOCATION CODE, not
-  "Location" — and **that one tab is always YELLOW, selected or not** (Mark,
-  2026-08-06). It is the only tab that isn't a place you go: it names the shop
-  every other screen is about, so "which shop am I ordering for" has to be
-  answerable from any section without hunting for it. Tier 1 used to mark its
-  active section yellow while tier 2 already used white — that split is gone,
-  the two bands agree, and the yellow now means one thing rather than two. Only Purchasing is built (Vendors · Inventory · Order Guide ·
+  "Location" — and **that one tab is YELLOW wherever else you are, WHITE when
+  you are on it** (Mark, 2026-08-06). It is the only tab that isn't a place you
+  go: it names the shop every other screen is about, so "which shop am I
+  ordering for" has to be answerable from any section without hunting for it.
+  Selection still wins on it, though — yellow-always made the location the one
+  tab whose active state couldn't be seen, trading a rare question for a
+  constant one. Tier 1 used to mark its active section yellow while tier 2
+  already used white; that split is gone, the two bands agree, and each colour
+  means exactly one thing: white "you are here", yellow "this is the shop". Only Purchasing is built (Vendors · Inventory · Order Guide ·
   Purchase Orders · Cleanup, Mark's order); everything else lands on
   `/soon/<section>/<sub>`, one shared placeholder. **The menu is
   `web/src/lib/nav.ts`** — a screen ships by getting a real `href` there and
