@@ -104,7 +104,7 @@ export function AddEmployeeBenefit({
     return (
       <p className="text-sm text-muted">
         No active payroll benefits are configured yet — set one up under HR →
-        Payroll Benefits first.
+        Benefits first.
       </p>
     );
   }

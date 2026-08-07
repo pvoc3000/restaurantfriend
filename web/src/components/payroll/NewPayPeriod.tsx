@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { DateField } from "@/components/ui/DateField";
 import { TextInput } from "@/components/ui/TextInput";
-import { payPeriodDetailHref } from "@/lib/payPeriodRoutes";
 import {
   daysBetween,
   formatPeriodRange,
@@ -17,16 +16,18 @@ import {
   payrollSettings,
   periodContaining,
   type PayrollSettings,
+  type PeriodRange,
 } from "@/lib/payPeriods";
-import type { PayPeriodRow } from "./PayPeriodsList";
 
 const WEEKDAY = ["", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
 /**
  * Open the next fortnight.
  *
- * The `NewEmployee` template: a command right-aligned in the list's filter row →
- * `ui/Dialog` → insert → land on the new record.
+ * The `NewEmployee` template: a command right-aligned in the filter row →
+ * `ui/Dialog` → insert → land on the new record. Since 2026-08-06 the "record"
+ * is the Timesheets screen scoped to the new period — the pay-period record
+ * screen is gone, and this is the only thing that ever pushed to it.
  *
  * It PROPOSES rather than dictates. The proposal continues the cadence from the
  * last period that exists — the day after it ends, for `period_days` — which is
@@ -47,8 +48,10 @@ export function NewPayPeriod({
   settings: rawSettings,
   orgId,
 }: {
-  /** Every period, for the cadence and the overlap check. */
-  rows: PayPeriodRow[];
+  /** Every period, for the cadence and the overlap check. Only the two dates are
+   *  read, so this asks for the narrowest thing that satisfies it — it used to
+   *  take the deleted pay-period list's own row type. */
+  rows: readonly PeriodRange[];
   today: string;
   settings?: unknown;
   /** Required by 027's insert policy — see the note on the insert itself. */
@@ -63,7 +66,7 @@ export function NewPayPeriod({
   // whatever order the list happens to be in.
   const last = useMemo(
     () =>
-      rows.reduce<PayPeriodRow | null>(
+      rows.reduce<PeriodRange | null>(
         (best, r) => (best === null || r.end_date > best.end_date ? r : best),
         null
       ),
@@ -164,7 +167,7 @@ export function NewPayPeriod({
         return;
       }
       router.refresh();
-      router.push(payPeriodDetailHref(data.id as string));
+      router.push(`/timesheets?period=${data.id as string}`);
     });
   }
 

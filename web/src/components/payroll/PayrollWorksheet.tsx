@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -23,13 +22,10 @@ export function PayrollWorksheet({
   employees,
   findings,
   pools,
-  timesheetsHref,
 }: {
   employees: WorksheetEmployee[];
   findings: WorkdayFinding[];
   pools: DayPool[];
-  /** Where the work is actually done — see the note on this component. */
-  timesheetsHref: string;
 }) {
   const [view, setView] = useState<"hours" | "breaks" | "tips">("hours");
 
@@ -61,19 +57,17 @@ export function PayrollWorksheet({
 
           So Breaks and Tips kept their totals and lost their editors. A finding
           here is a name, a date and a sentence; everything you would need to
-          judge it is on the shift, one click away, which is where the controls
-          now live. What this screen is still for is the view before you export:
-          how many decisions are outstanding, and what the totals come to. */}
+          judge it is on the shift, which is where the controls now live. What
+          this is still for is the view before you export: how many decisions are
+          outstanding, and what the totals come to.
+
+          The sentence below used to carry a LINK to this period's timesheets.
+          It's gone because the shifts are now directly behind this panel (Mark,
+          2026-08-06) — a link to the screen you are already on is worse than no
+          link, since following it reads as broken. */}
       <p className="max-w-[80ch] text-sm text-muted">
         A summary, before the file is produced. Premiums and tips are recorded on
-        the shift itself, where the punches are —{" "}
-        <Link
-          href={timesheetsHref}
-          className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-        >
-          open this period&rsquo;s timesheets
-        </Link>
-        .
+        the shift itself, where the punches are — close this panel to reach them.
       </p>
 
       {view === "hours" && <HoursBlock employees={employees} />}

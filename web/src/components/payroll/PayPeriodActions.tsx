@@ -26,10 +26,16 @@ const BUTTON =
  * exception — the black commit inside the reopen dialog IS that exception,
  * because a panel exists to produce one outcome.
  *
- * Producing the export file is deliberately absent: that is phase 6, and until
- * it exists `exported` is reachable only by someone who has actually produced a
- * file some other way. Marking it by hand would let the status claim something
- * no file backs.
+ * `exported` IS NOT OFFERED HERE (Mark, 2026-08-06). Phase 6 shipped, so the
+ * export exists, and Finalize in the panel around these buttons is the only
+ * thing that should reach that status — because it is the only thing that also
+ * FREEZES. When the ladder and the export lived on separate parts of a long
+ * screen, a bare "Mark exported" beside them was merely redundant; side by side
+ * in one panel it is a trap, since pressing it leaves a period reading as
+ * exported with no tip allocation, premium or accrual snapshotted and no file
+ * anywhere. `nextStatuses` still returns it — the ladder in `lib/payPeriods` is
+ * unchanged, and a reopen still has to clear `exported_at` — this only declines
+ * to offer it a button.
  */
 export function PayPeriodActions({
   id,
@@ -87,12 +93,14 @@ export function PayPeriodActions({
     });
   }
 
-  const forward = nextStatuses(status);
+  // Everything the ladder allows EXCEPT `exported`, which only Finalize may
+  // reach — see the note at the top of this file.
+  const forward = nextStatuses(status).filter((next) => next !== "exported");
 
-  /** The stamps each transition owns. Cleared on the way back out. */
+  /** The stamps each transition owns. Cleared on the way back out. `exported`
+   *  isn't here because it isn't offered — Finalize stamps it. */
   function patchFor(next: PayPeriodStatus): Record<string, unknown> {
     if (next === "closed") return { closed_at: new Date().toISOString() };
-    if (next === "exported") return { exported_at: new Date().toISOString() };
     // Stepping review → open isn't a reopen and discards nothing, so it stamps
     // nothing either.
     return {};
@@ -101,7 +109,6 @@ export function PayPeriodActions({
   const LABEL: Partial<Record<PayPeriodStatus, string>> = {
     review: "Start review",
     open: "Back to open",
-    exported: "Mark exported",
     closed: "Close period",
   };
 

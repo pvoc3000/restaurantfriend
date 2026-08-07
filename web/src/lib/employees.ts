@@ -149,14 +149,17 @@ export function findPossibleRehires<
  * on the dialog. Three signals, each a different kind of loss:
  *
  * - `migrated` — `legacy_id` is FileMaker's employee id, and `field-map.md`
- *   calls it "the join key every child table uses". Events, ratings, reviews
- *   and timesheets ALL reference it and NONE of them are migrated yet, so
- *   deleting today breaks records that don't exist in this database to protest.
+ *   calls it "the join key every child table uses". Reviews and timesheets
+ *   still reference it, so deleting can break records elsewhere.
  * - `hasAccess` — deleting revokes their sign-in. Worth saying out loud.
  * - `documents` — the I-9s and food handler cards go with the row (021
  *   cascades), and those are the records you're required to keep.
+ * - `events` — migration 035 cascades too, and this is the number that grows
+ *   without anyone noticing: a long-serving person carries ~1,000 shift ratings
+ *   and a decade of warnings and incident reports. A cascade nobody is warned
+ *   about is the actual danger, not the cascade.
  *
- * None of the three is a veto; `EmployeeActions` shows them and lets you
+ * None of the four is a veto; `EmployeeActions` shows them and lets you
  * through, defaulting to Deactivate. The `closeReadiness` posture: a confirm
  * that names something you can't act on teaches you to stop reading confirms.
  */
@@ -164,13 +167,15 @@ export type DeleteWarnings = {
   migrated: number | null;
   hasAccess: boolean;
   documents: number;
-  /** True when any of the three fired — i.e. this is more than a typo. */
+  events: number;
+  /** True when any of them fired — i.e. this is more than a typo. */
   any: boolean;
 };
 
 export function deleteWarnings(
   employee: Pick<Employee, "legacy_id" | "user_id">,
-  documentCount: number
+  documentCount: number,
+  eventCount = 0
 ): DeleteWarnings {
   const migrated = employee.legacy_id ?? null;
   const hasAccess = employee.user_id !== null;
@@ -178,7 +183,8 @@ export function deleteWarnings(
     migrated,
     hasAccess,
     documents: documentCount,
-    any: migrated !== null || hasAccess || documentCount > 0,
+    events: eventCount,
+    any: migrated !== null || hasAccess || documentCount > 0 || eventCount > 0,
   };
 }
 

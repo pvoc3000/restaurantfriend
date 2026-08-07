@@ -1,15 +1,12 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
-import { PickList } from "@/components/ui/PickList";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { formatPeriodRange, type PayPeriodStatus } from "@/lib/payPeriods";
-import { PAY_PERIOD_STATUS_LABEL } from "@/lib/payPeriods";
+import { PAY_PERIOD_STATUS_LABEL, type PayPeriodStatus } from "@/lib/payPeriods";
 import {
   REASON_LABEL,
   proposeOvertime,
@@ -147,8 +144,7 @@ const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: TimesheetRow) => string
  */
 export function TimesheetsList({
   rows,
-  periods,
-  periodId,
+  period,
   canWrite,
   timeZone,
   waiverEmployeeIds,
@@ -160,8 +156,8 @@ export function TimesheetsList({
   benefitNotes,
 }: {
   rows: TimesheetRow[];
-  periods: PeriodOption[];
-  periodId: string | null;
+  /** The fortnight these rows are from, chosen on the bar above. */
+  period: PeriodOption | null;
   canWrite: boolean;
   /** The org's zone. Punches are instants; reading one back needs a zone, and
    *  the SERVER's is not it — a host in UTC would show every shift shifted. */
@@ -180,7 +176,6 @@ export function TimesheetsList({
   /** Timesheet id → one line per benefit, already worded by the server. */
   benefitNotes: Record<string, ShiftBenefitLine[]>;
 }) {
-  const router = useRouter();
   const [search, setSearch] = useState("");
   const [grouping, setGrouping] = useState<Grouping>("employee");
   const [review, setReview] = useState<Review>("all");
@@ -189,7 +184,10 @@ export function TimesheetsList({
     dir: "asc",
   });
 
-  const period = periods.find((p) => p.id === periodId) ?? null;
+  // The picker that chose it lives on `PeriodBar` above this list (Mark,
+  // 2026-08-06) — these filters act on the shifts, that bar acts on the period.
+  // What's still needed here is which period it IS, for the read-only rule and
+  // for the shift a `NewTimesheet` would land in.
 
   /**
    * THE rule (decision 8), and it must agree with `isPayPeriodEditable` and
@@ -631,24 +629,6 @@ export function TimesheetsList({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-4">
-        <label className="space-y-1.5">
-          <span className="block text-[11px] uppercase tracking-[0.12em] text-muted">
-            Pay period
-          </span>
-          <PickList
-            variant="field"
-            ariaLabel="Pay period"
-            value={periodId ?? ""}
-            onPick={(id) => router.push(`/timesheets?period=${id}`)}
-            options={periods.map((p) => ({
-              value: p.id,
-              label: formatPeriodRange(p),
-              hint: PAY_PERIOD_STATUS_LABEL[p.status],
-            }))}
-            className="w-64"
-          />
-        </label>
-
         <TextInput
           value={search}
           onValueChange={setSearch}

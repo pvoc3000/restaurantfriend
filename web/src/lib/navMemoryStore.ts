@@ -15,7 +15,14 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-import { EMPTY_NAV_MEMORY, NAV_COOKIE, serializeNavMemory, type NavMemory } from "@/lib/navMemory";
+import type { NavPosition } from "./nav";
+import {
+  EMPTY_NAV_MEMORY,
+  NAV_COOKIE,
+  rememberIn,
+  serializeNavMemory,
+  type NavMemory,
+} from "./navMemory";
 
 const listeners = new Set<() => void>();
 
@@ -31,17 +38,24 @@ function subscribe(onChange: () => void) {
 }
 
 /**
- * Record where you are. Called on every navigation; a no-op when nothing
- * changed, which is the common case (re-renders that aren't navigations).
+ * Record where you are — which sub-section, and the url of the actual screen.
+ * Called on every navigation; a no-op when nothing changed, which is the common
+ * case (re-renders that aren't navigations).
  */
-export function remember(sectionSlug: string, subSlug: string) {
+export function remember(position: NavPosition, locationId: string | null, url: string) {
   const current = memory ?? EMPTY_NAV_MEMORY;
-  if (current[sectionSlug] === subSlug) return;
+  const next = rememberIn(current, position, locationId, url);
+  if (next === current) return;
 
-  memory = { ...current, [sectionSlug]: subSlug };
+  memory = next;
+  // Only when the SUB moved. The urls never go in the cookie (see
+  // lib/navMemory), so opening one record after another must not churn it.
+  //
   // Session cookie — no max-age, so it dies with the browser session, and
   // signOut() deletes it so the next person starts from the defaults.
-  document.cookie = `${NAV_COOKIE}=${serializeNavMemory(memory)}; path=/; SameSite=Lax`;
+  if (next.subs !== current.subs) {
+    document.cookie = `${NAV_COOKIE}=${serializeNavMemory(next)}; path=/; SameSite=Lax`;
+  }
   for (const listener of listeners) listener();
 }
 

@@ -1,24 +1,42 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canRunPayroll } from "@/lib/roles";
+import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import {
   TimesheetsList,
   type PeriodOption,
   type TimesheetRow,
 } from "@/components/payroll/TimesheetsList";
+import { PeriodBar } from "@/components/payroll/PeriodBar";
+import { NewPayPeriod } from "@/components/payroll/NewPayPeriod";
+import {
+  ExportTimesheets,
+  type PayPeriodRecord,
+} from "@/components/payroll/ExportTimesheets";
 import type { ShiftBenefitLine } from "@/components/payroll/ShiftDecisions";
-import type { PayPeriodStatus } from "@/lib/payPeriods";
-import type { OtDecision } from "@/lib/timesheets";
+import { payrollSettings, workweekStart, type PayPeriodStatus } from "@/lib/payPeriods";
+import { proposeOvertime } from "@/lib/overtime";
+import { workedHours, type OtDecision } from "@/lib/timesheets";
+import { isEarningColumn } from "@/lib/gustoExport";
+import {
+  buildEmployeeRollup,
+  buildFindings,
+  buildPools,
+  type WorksheetShift,
+} from "@/lib/payrollWorksheet";
 import {
   computeAccruals,
+  earningsByEmployee,
   explainShift,
   mergeFrozen,
+  totalByBenefit,
+  totalByEmployee,
   type BenefitEntitlement,
   type PayrollBenefit,
 } from "@/lib/payrollBenefits";
 
 /**
- * A fortnight of shifts.
+ * A fortnight of shifts, and everything payroll does with them.
  *
  * ORG-scoped, so exempt from the inactive-location gate for the reason
  * `/employees` is: payroll belongs to the company, not to a shop. A shift at
@@ -30,8 +48,18 @@ import {
  * with no parameter it opens the most recent period that HAS shifts, which
  * after the historical load is the last paid fortnight rather than an empty
  * current one.
+ *
+ * THE PAY-PERIOD SCREENS FOLDED IN HERE (Mark, 2026-08-06). There used to be a
+ * list of 178 fortnights and a record screen for each; the list's whole job was
+ * choosing one, which the picker on `PeriodBar` does, and the record's contents
+ * decide nothing — the 2026-08-05 rework had already moved every decision onto
+ * the shift row. So the record became a ROUTINE you open over the shifts,
+ * `ExportTimesheets`, and this page computes its inputs alongside its own.
+ *
+ * Which is why the derivations below the queries are in two halves: the ROWS the
+ * table shows, and the ROLL-UP the panel shows. They read the same shifts.
  */
-export default async function TimeSheetsPage({
+export default async function TimesheetsPage({
   searchParams,
 }: {
   searchParams: Promise<{ period?: string }>;
@@ -58,10 +86,18 @@ export default async function TimeSheetsPage({
 
   const supabase = await createClient();
   const { period: requested } = await searchParams;
+  const timeZone = session.orgSettings.timezone ?? "UTC";
+  const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
+  const settings = payrollSettings(session.orgSettings.payroll);
 
+  // Every period, for the picker — and wide enough to BE the chosen period's
+  // record, since the export panel needs its note and its stamps. 178 rows of
+  // six more columns is cheaper than a second round trip for one of them.
   const { data: periodRows, error: periodError } = await supabase
     .from("pay_periods")
-    .select("id, start_date, end_date, status")
+    .select(
+      "id, legacy_id, start_date, end_date, status, notes, exported_at, closed_at, reopened_at, reopen_reason"
+    )
     .order("start_date", { ascending: false });
 
   if (periodError) {
@@ -77,14 +113,22 @@ export default async function TimeSheetsPage({
 
   if (periods.length === 0) {
     return (
-      <div className="max-w-2xl space-y-2">
+      <div className="max-w-2xl space-y-4">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           Timesheets
         </h1>
         <p className="text-sm text-muted">
           There are no pay periods yet, so there is nowhere to record hours. Open
-          one on the Pay Periods screen first.
+          the first one and this screen fills in.
         </p>
+        {/* This used to send you to the Pay Periods screen, which no longer
+            exists — a dead end for the one state that most needed a way out. */}
+        <NewPayPeriod
+          rows={periods}
+          today={today}
+          settings={session.orgSettings.payroll}
+          orgId={session.membership.org_id}
+        />
       </div>
     );
   }
@@ -109,16 +153,22 @@ export default async function TimeSheetsPage({
   const chosen = periods.find((p) => p.id === periodId) ?? periods[0];
   const periodStart = chosen.start_date;
   const periodEnd = chosen.end_date;
+  const record = ((periodRows ?? []).find((p) => p.id === chosen.id) ??
+    null) as unknown as PayPeriodRecord | null;
 
   const [
     { data: sheets, error },
-    { data: employees },
+    { data: employees, error: employeeError },
     { data: waiverRows },
-    { data: premiumRows },
-    { data: poolRows },
-    { data: benefitRows },
-    { data: entitlementRows },
+    { data: premiumRows, error: premiumError },
+    { data: poolRows, error: poolError },
+    { data: benefitRows, error: benefitError },
+    { data: entitlementRows, error: entitlementError },
   ] = await Promise.all([
+    // ONE select for both halves of the screen. It is all-or-nothing on the
+    // payroll migrations — the `timesheet_benefits` embed already made it so
+    // before 031's three columns joined it — which is why a failure here returns
+    // the Postgres text rather than an empty table.
     supabase
       .from("timesheets")
       .select(
@@ -129,14 +179,17 @@ export default async function TimeSheetsPage({
          hours_regular, hours_overtime, hours_double_ot,
          ot_decision, ot_reason, unpaid_break_minutes, sick_hours, exclude_tips,
          stitched, kind, position, employee_note, manager_note, source, source_payload,
+         wage_type, tip_hours, tip_allocation,
          timesheet_benefits(benefit_id, amount)`
       )
       .eq("pay_period_id", periodId)
       .order("workday"),
-    // Names and the durable tip-exclusion flag. A separate query rather than an
-    // embed: the same employee appears on ~20 shifts a fortnight, and embedding
-    // would send their row twenty times.
-    supabase.from("employees").select("id, first_name, last_name, excludes_tips"),
+    // Names and the durable tip-exclusion flag, plus the two the FILE needs
+    // (031). A separate query rather than an embed: the same employee appears on
+    // ~20 shifts a fortnight, and embedding would send their row twenty times.
+    supabase
+      .from("employees")
+      .select("id, first_name, last_name, excludes_tips, primary_wage_type, gusto_id"),
     // The signed meal-break waivers. They change the ANSWER the break rules
     // give, not just how it's presented — a waived meal on a six-hour day owes
     // nothing at all. Returns zero rows today: FMP keeps its 51 waivers in the
@@ -152,9 +205,11 @@ export default async function TimeSheetsPage({
       .select("id, employee_id, workday, kind, decision, hours, reason")
       .gte("workday", periodStart)
       .lte("workday", periodEnd),
+    // `id` is here for the FREEZE: `freeze_pay_period`'s pool payload names each
+    // tip_pool row, so the panel cannot snapshot a rate without it.
     supabase
       .from("tip_pools")
-      .select("location_id, business_date, reported_cents, corrected_cents")
+      .select("id, location_id, business_date, reported_cents, corrected_cents")
       .gte("business_date", periodStart)
       .lte("business_date", periodEnd),
     // 033. Both small enough not to filter — an entitlement's own date range is
@@ -237,8 +292,8 @@ export default async function TimeSheetsPage({
   }
 
   // ---- benefits ----------------------------------------------------------
-  // Derived, then the frozen snapshot laid over the top — the same order the
-  // pay-period screen uses, so a shift reads the same figure on both.
+  // Derived, then the frozen snapshot laid over the top — the order the export
+  // uses too, so a shift reads the same figure in the row and in the file.
   const benefits: PayrollBenefit[] = (benefitRows ?? []).map((b) => ({
     id: b.id as string,
     code: b.code as string,
@@ -266,6 +321,12 @@ export default async function TimeSheetsPage({
     clock_in: (t.clock_in ?? null) as string | null,
     clock_out: (t.clock_out ?? null) as string | null,
   }));
+  // THE FROZEN FIGURE WINS, which is backwards from how tips are handled in the
+  // export panel — and deliberately. Every input to the tip allocator is gated
+  // on the period being editable, so recomputing reproduces the snapshot
+  // exactly. An ENTITLEMENT carries no such gate (033 argues why), so its inputs
+  // really can move under a closed period, and only the snapshot knows what was
+  // paid.
   const accruals = mergeFrozen(
     computeAccruals(benefitShifts, benefits, entitlements),
     (sheets ?? []).flatMap((t) =>
@@ -305,28 +366,227 @@ export default async function TimeSheetsPage({
     };
   }
 
+  /* ---- the export panel's inputs ----------------------------------------
+     Everything from here down was `/pay-periods/[id]`'s. It reads the same
+     `sheets` the table above does, which is the merge's one measurable win:
+     the two screens ran the same seven queries over the same seven tables. */
+
+  const shifts: WorksheetShift[] = (sheets ?? []).map((t) => ({
+    id: t.id as string,
+    employee_id: t.employee_id as string,
+    location_id: (t.location_id ?? null) as string | null,
+    workday: t.workday as string,
+    business_date: t.business_date as string,
+    clock_in: (t.clock_in ?? null) as string | null,
+    clock_out: (t.clock_out ?? null) as string | null,
+    unpaid_break_minutes: numOrNull(t.unpaid_break_minutes),
+    hours_regular: numOrNull(t.hours_regular),
+    hours_overtime: numOrNull(t.hours_overtime),
+    hours_double_ot: numOrNull(t.hours_double_ot),
+    sick_hours: numOrNull(t.sick_hours),
+    exclude_tips: (t.exclude_tips ?? null) as boolean | null,
+    source_payload: (t.source_payload ?? null) as Record<string, unknown> | null,
+  }));
+
+  const waiverIds = new Set((waiverRows ?? []).map((w) => w.employee_id as string));
+
+  const decidedByKey = new Map(
+    (premiumRows ?? []).map((p) => [
+      `${p.employee_id}|${p.workday}|${p.kind}`,
+      { decision: p.decision as string },
+    ])
+  );
+  // Every premium's hours, for the roll-up; and only the ones DECIDED as owed,
+  // for the file. A finding with no decision is not a premium — decision 3's
+  // whole point, and `exportReadiness` names how many are still outstanding.
+  const premiumHours = new Map<string, number>();
+  const owedHours = new Map<string, number>();
+  for (const p of premiumRows ?? []) {
+    const k = p.employee_id as string;
+    const hours = numOrNull(p.hours) ?? 0;
+    premiumHours.set(k, (premiumHours.get(k) ?? 0) + hours);
+    if (p.decision === "owed") owedHours.set(k, (owedHours.get(k) ?? 0) + hours);
+  }
+
+  const poolMap = new Map(
+    (poolRows ?? []).map((p) => [
+      `${p.location_id}|${p.business_date}`,
+      {
+        id: p.id as string,
+        reported_cents: numOrNull(p.reported_cents),
+        corrected_cents: numOrNull(p.corrected_cents),
+      },
+    ])
+  );
+
+  // BEFORE 029 IS APPLIED these are "Could not find the table", and the panel
+  // must SAY so. Swallowing them renders a tips view reading "no figure entered"
+  // for every day and a breaks view where nothing is ever decided — both of
+  // which look like real answers. Same reason PO detail replaces its Paperwork
+  // card with the Postgres error rather than showing an empty card.
+  //
+  // 033's two are here for a SHARPER version of the same reason. A missing 029
+  // renders a tips view that is visibly empty; a swallowed 033 renders an export
+  // that looks entirely correct and is $432 short, because a benefit that
+  // accrues nothing and a benefit table that isn't there produce the same blank
+  // column. The shift and employee selects are NOT in here — they gate the whole
+  // screen above, and `error` has already returned by this point.
+  const problem = employeeError ?? premiumError ?? poolError ?? benefitError ?? entitlementError;
+  const worksheetError = problem
+    ? problem.message +
+      (/payroll_benefits|employee_benefits|timesheet_benefits/.test(problem.message)
+        ? " — migration 033 has not been applied yet."
+        : /^column/i.test(problem.message)
+          ? " — migration 031 has not been applied yet."
+          : " — migration 029 has not been applied yet.")
+    : null;
+
+  const findings = buildFindings(shifts, employeeById, waiverIds, decidedByKey);
+  const worksheetPools = buildPools(shifts, employeeById, codeById, poolMap);
+  const benefitDollars = totalByEmployee(accruals);
+  const earnings = earningsByEmployee(accruals, benefits);
+  const rollup = buildEmployeeRollup(shifts, employeeById, findings, premiumHours, benefitDollars);
+
+  // A benefit aimed at a column `lib/gustoExport` does not have. The picker on
+  // /payroll-benefits makes that unenterable, so this is the net for a value
+  // written in the SQL editor — and it names the money rather than the mistake.
+  const benefitTotals = totalByBenefit(accruals);
+  const unknownEarningColumns = benefits
+    .filter((b) => !isEarningColumn(b.gusto_column) && (benefitTotals.get(b.id) ?? 0) > 0)
+    .map((b) => ({ name: b.name, column: b.gusto_column, dollars: benefitTotals.get(b.id) ?? 0 }));
+
+  const rawById = new Map((sheets ?? []).map((t) => [t.id as string, t]));
+
+  // Overtime still disagreeing with our recompute, for the readiness list. Same
+  // one-cent tolerance and the same comparison against the DECISION that the
+  // list's own needs-review queue uses — see lib/overtime's EPSILON. It is
+  // computed TWICE, here and in the browser, and the two must not drift.
+  const proposals = proposeOvertime(
+    shifts
+      .map((s) => {
+        const hours = workedHours(s);
+        const wk = rawById.get(s.id)?.workweek_start as string | undefined;
+        return hours === null || !wk
+          ? null
+          : {
+              id: s.id,
+              employee_id: s.employee_id,
+              workday: s.workday,
+              workweek_start: wk,
+              hours,
+              // Which shift carries the day's overtime depends on this. See
+              // `ShiftHours.starts_at`.
+              starts_at: s.clock_in,
+            };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null)
+  );
+  let overtimeNeedingReview = 0;
+  for (const s of shifts) {
+    const p = proposals.get(s.id);
+    if (!p) continue;
+    if (
+      Math.abs(p.regular - (s.hours_regular ?? 0)) >= 0.015 ||
+      Math.abs(p.overtime - (s.hours_overtime ?? 0)) >= 0.015 ||
+      Math.abs(p.double_ot - (s.hours_double_ot ?? 0)) >= 0.015
+    ) {
+      overtimeNeedingReview += 1;
+    }
+  }
+
+  const exportShifts = shifts.map((s) => {
+    const r = rawById.get(s.id);
+    return {
+      id: s.id,
+      employee_id: s.employee_id,
+      wage_type: (r?.wage_type ?? null) as string | null,
+      hours_regular: s.hours_regular,
+      hours_overtime: s.hours_overtime,
+      hours_double_ot: s.hours_double_ot,
+      sick_hours: s.sick_hours,
+      // The FROZEN allocation where there is one. On an unfrozen period the
+      // panel recomputes from the pools instead, so the file and the worksheet
+      // can never disagree.
+      tip_allocation: numOrNull(r?.tip_allocation),
+      tip_hours: numOrNull(r?.tip_hours),
+    };
+  });
+
+  const exportEmployees = (employees ?? []).map((e) => ({
+    id: e.id as string,
+    first_name: e.first_name as string,
+    last_name: e.last_name as string,
+    primary_wage_type: (e.primary_wage_type ?? null) as string | null,
+    gusto_id: (e.gusto_id ?? null) as string | null,
+  }));
+
+  // A fortnight holds TWO workweeks, and California weekly overtime and the
+  // seventh-day rule are per workweek. Stating them in the panel is how it stops
+  // anyone reading the period as the unit overtime is computed over.
+  const weeks: string[] = [];
+  {
+    let w = workweekStart(periodStart, settings);
+    const guard = 60; // a period can't sanely hold more weeks than this
+    for (let i = 0; i < guard && w <= periodEnd; i++) {
+      weeks.push(w);
+      const next = new Date(`${w}T00:00:00Z`);
+      next.setUTCDate(next.getUTCDate() + 7);
+      w = next.toISOString().slice(0, 10);
+    }
+  }
+
+  const canWrite = canRunPayroll(session.membership.role);
+
   return (
     <div className="space-y-6">
-      {/* Importing is reached from inside the New timesheet dialog now (Mark,
-          2026-08-05) — one door, not one per screen. */}
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Timesheets
-        </h1>
-        <p className="max-w-[72ch] text-sm text-muted">
-          Every shift in one pay period. What the source said is kept beside
-          what we decided — open a row to see both, and why they differ.
-        </p>
-      </div>
+      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+        Timesheets
+      </h1>
+
+      {/* Which fortnight and what state it's in, then the two commands that act
+          on the PERIOD. The filters below act on the shifts. */}
+      <PeriodBar periods={periods} periodId={periodId} status={chosen.status}>
+        <NewPayPeriod
+          rows={periods}
+          today={today}
+          settings={session.orgSettings.payroll}
+          orgId={session.membership.org_id}
+        />
+        {record && (
+          <ExportTimesheets
+            period={record}
+            canWrite={canWrite}
+            timeZone={timeZone}
+            weeks={weeks}
+            orgName={session.orgName}
+            worksheetError={worksheetError}
+            rollup={rollup}
+            findings={findings}
+            pools={worksheetPools}
+            shifts={exportShifts}
+            employees={exportEmployees}
+            premiumHours={[...owedHours.entries()]}
+            benefits={benefits}
+            accruals={accruals}
+            earnings={[...earnings.entries()]}
+            caveatInputs={{
+              shiftsWithoutClockOut: shifts.filter((s) => !s.clock_out).length,
+              undecidedBreakFindings: findings.filter((f) => !f.decided).length,
+              poolsWithoutFigure: worksheetPools.filter((p) => p.effectiveCents === null).length,
+              overtimeNeedingReview,
+              unknownEarningColumns,
+            }}
+          />
+        )}
+      </PeriodBar>
 
       <TimesheetsList
         rows={rows}
-        periods={periods}
-        periodId={periodId}
-        canWrite={canRunPayroll(session.membership.role)}
+        period={chosen}
+        canWrite={canWrite}
         // The org's zone, not the server's: a punch is an instant, and reading
         // one back on a UTC host would show every shift seven hours out.
-        timeZone={session.orgSettings.timezone ?? "UTC"}
+        timeZone={timeZone}
         waiverEmployeeIds={(waiverRows ?? []).map((w) => w.employee_id as string)}
         employees={[...employeeById.entries()]
           .map(([id, e]) => ({ id, name: e.name }))

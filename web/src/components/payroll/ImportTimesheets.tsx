@@ -516,8 +516,8 @@ export function ImportTimesheets({
                   <p className="max-w-[72ch] text-sm text-muted">
                     These dates don&rsquo;t sit on the next period in the
                     sequence, so opening one here would leave a gap or an
-                    overlap. Open it on the Pay Periods screen, where both dates
-                    are editable.
+                    overlap. Open it with New pay period on the timesheets
+                    screen, where both dates are editable.
                   </p>
                 )}
               </div>

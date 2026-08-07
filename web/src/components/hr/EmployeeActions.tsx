@@ -70,25 +70,35 @@ export function EmployeeActions({
   const supabase = createClient();
   const [confirming, setConfirming] = useState(false);
   const [docs, setDocs] = useState<Docs | null>(null);
+  const [eventCount, setEventCount] = useState<number | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const self = isSelf(employee, currentUserId);
   const warnings: DeleteWarnings | null =
-    docs === null ? null : deleteWarnings(employee, docs.paths.length);
+    docs === null ? null : deleteWarnings(employee, docs.paths.length, eventCount ?? 0);
 
   async function openConfirm() {
     setConfirming(true);
     setDocs(null);
+    setEventCount(null);
     setError(null);
-    const { data } = await supabase
-      .from("employee_documents")
-      .select("storage_path, kind")
-      .eq("employee_id", employee.id);
+    const [{ data }, { count }] = await Promise.all([
+      supabase.from("employee_documents").select("storage_path, kind").eq("employee_id", employee.id),
+      // 035 cascades, and this is the count that grows without anyone noticing —
+      // a decade of warnings under a thousand shift ratings. HEAD count is fine
+      // here: a missing table leaves it null, which reads as "none" and simply
+      // doesn't warn, rather than blocking a delete that is otherwise fine.
+      supabase
+        .from("employee_events")
+        .select("*", { count: "exact", head: true })
+        .eq("employee_id", employee.id),
+    ]);
     setDocs({
       paths: (data ?? []).map((d) => d.storage_path as string),
       kinds: (data ?? []).map((d) => d.kind as string),
     });
+    setEventCount(count ?? 0);
   }
 
   async function deactivate() {
@@ -298,6 +308,17 @@ export function EmployeeActions({
                       you&rsquo;re required to keep.
                     </p>
                   )}
+                  {warnings.events > 0 && (
+                    <p>
+                      <span className="font-semibold">
+                        {warnings.events.toLocaleString()}{" "}
+                        {warnings.events === 1 ? "event" : "events"} on the record
+                      </span>
+                      . Shift ratings, notes, and any warnings or incident reports
+                      — all of it goes with them, and a write-up is the record you
+                      would most want to still have.
+                    </p>
+                  )}
                   <p>
                     Deactivating keeps the record and everything hanging off it,
                     and takes them off the roster&rsquo;s active list — which is
@@ -307,7 +328,7 @@ export function EmployeeActions({
               ) : (
                 <p className="text-muted">
                   Nothing hangs off this record — no FileMaker history, no app
-                  access, no documents on file. Deleting it removes one row and
+                  access, no documents on file, nothing on the record. Deleting it removes one row and
                   loses nothing.
                 </p>
               )}

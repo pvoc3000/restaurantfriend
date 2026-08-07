@@ -133,15 +133,9 @@ export default async function EmployeesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Employees
-        </h1>
-        <p className="max-w-[72ch] text-sm text-muted">
-          Everyone who has worked here. Open a record to edit it, file their
-          paperwork, or give them access to the app.
-        </p>
-      </div>
+      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+        Employees
+      </h1>
 
       <EmployeesList
         rows={rows}

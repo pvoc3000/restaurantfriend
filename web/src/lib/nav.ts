@@ -92,22 +92,24 @@ export const SECTIONS: NavSection[] = [
       stub("hr", "team-events", "Team Events"),
       stub("hr", "team-ratings", "Team Ratings"),
       stub("hr", "team-reviews", "Team Reviews"),
-      {
-        slug: "pay-periods",
-        label: "Pay Periods",
-        href: "/pay-periods",
-        built: true,
-        // NOT role-gated, unlike Employees. Migration 027 makes pay_periods
-        // readable by any member on purpose — a period is two dates and a
-        // status, and a supervisor reporting Saturday's tips has to know which
-        // fortnight is open. Writing one is owner/admin, which the screen
-        // itself gates.
-      },
+      // Pay Periods used to sit here, and it went on 2026-08-06 (Mark: "since
+      // pay periods are now on the timesheet screen, there's no need for a pay
+      // period menu item"). Both its screens folded into Timesheets — the list's
+      // only job was choosing a fortnight, which that screen's picker does, and
+      // the record became its "Export timesheets…" panel. `/pay-periods*` still
+      // resolves, as redirect shims, which is what the `also` below is for.
+      //
+      // Known consequence: 027 makes pay_periods readable by ANY member, and
+      // that list was the whole of what the permission bought a supervisor.
+      // Nothing they could act on is lost — the tip writer `report_pooled_tips`
+      // has never had a surface they can reach — but that missing screen is now
+      // the obvious next one.
       {
         slug: "timesheets",
         label: "Timesheets",
         href: "/timesheets",
         built: true,
+        also: ["/pay-periods"],
         // Migration 028 gates timesheets at owner/admin on every verb, select
         // included — what a named person was paid for is the same class of fact
         // as their home address. The screen says so itself for anyone who
@@ -117,9 +119,13 @@ export const SECTIONS: NavSection[] = [
       },
       {
         slug: "payroll-benefits",
-        // "Payroll Benefits", not "Benefits": the bare word in an HR menu reads
-        // as health insurance, which this is emphatically not.
-        label: "Payroll Benefits",
+        // "Benefits" (Mark, 2026-08-06). This read "Payroll Benefits" on the
+        // grounds that the bare word in an HR menu reads as health insurance,
+        // which this is emphatically not — that argument was OVERRULED, not
+        // forgotten, and it assumed a sibling would lend the context that
+        // Timesheets keeping its own name means there isn't one. If anyone ever
+        // does take this for medical cover, that is the note to reread.
+        label: "Benefits",
         href: "/payroll-benefits",
         built: true,
         // 033 makes payroll_benefits readable by any member — it names no
@@ -269,13 +275,76 @@ export function resolveRoute(pathname: string): NavPosition | null {
 }
 
 /**
- * Where a section tab goes: the sub you last used there, or its first sub the
- * first time you visit. `memory` comes from the rf.nav cookie — see
- * lib/navMemory.ts for why it's threaded through the client rather than read
- * from the cookie on every render.
+ * What the menu remembers. Declared HERE rather than imported from
+ * lib/navMemory, because that module imports THIS one — the dependency has to
+ * keep running one way, which is also why `sectionHref` has always taken its
+ * memory structurally.
  */
-export function sectionHref(section: NavSection, memory: Record<string, string>): string {
-  const remembered = memory[section.slug];
+export type NavMemoryLike = {
+  /** section slug → sub slug. The whole content of the rf.nav cookie. */
+  subs: Record<string, string>;
+  /** navPathKey() → the last url seen there. In memory only. */
+  paths: Record<string, string>;
+};
+
+/**
+ * Where the last url for a sub-section is filed.
+ *
+ * Per SUB, because tier 2 needs its own answer and tier 1 reaches its answer
+ * through the sub it remembers. Per LOCATION, because a remembered purchase
+ * order or shop section is a location-scoped row — the problem
+ * `clearScrollMemory()` exists for, solved by keying instead of clearing, so
+ * coming back to DF01 finds DF01's record again. The cost is that switching
+ * shops also forgets the org-level records (an employee), which is conservative
+ * and never wrong.
+ */
+export function navPathKey(
+  locationId: string | null,
+  sectionSlug: string,
+  subSlug: string
+): string {
+  return `${locationId ?? "anywhere"}|${sectionSlug}/${subSlug}`;
+}
+
+function rememberedHref(
+  section: NavSection,
+  sub: NavSub,
+  memory: NavMemoryLike,
+  locationId: string | null
+): string | undefined {
+  return memory.paths[navPathKey(locationId, section.slug, sub.slug)];
+}
+
+/**
+ * Where a section tab goes: the last SCREEN you had open there — list or record
+ * — or the sub you last used, or its first sub the first time you visit.
+ *
+ * The tab for the section you are ALREADY in goes to the list instead (Mark,
+ * 2026-08-06). That's the escape hatch: a tab whose only destination was the
+ * record you're standing on would be a no-op, and "back to the top of this
+ * area" is what pressing your own tab has always meant.
+ */
+export function sectionHref(
+  section: NavSection,
+  memory: NavMemoryLike,
+  locationId: string | null,
+  activeSectionSlug: string | null
+): string {
+  const remembered = memory.subs[section.slug];
   const sub = (remembered ? findSub(section, remembered) : undefined) ?? section.subs[0];
-  return sub.href;
+  if (section.slug === activeSectionSlug) return sub.href;
+  return rememberedHref(section, sub, memory, locationId) ?? sub.href;
+}
+
+/** The same rule one tier down, so Employees → Timesheets → Employees comes back
+ *  to the employee you were reading. */
+export function subHref(
+  section: NavSection,
+  sub: NavSub,
+  memory: NavMemoryLike,
+  locationId: string | null,
+  activeSubSlug: string | null
+): string {
+  if (sub.slug === activeSubSlug) return sub.href;
+  return rememberedHref(section, sub, memory, locationId) ?? sub.href;
 }

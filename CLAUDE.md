@@ -1005,9 +1005,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the transform rather than taken from the brief. All land `closed`, so history
    is read-only by construction. The loader deliberately does NOT open the
    current period — that arithmetic lives once, in `nextPeriodAfter`, or it is
-   016's `nextDeliveryDate` trap. **So after the load there is no open period
-   and `/pay-periods` opens on an empty `Current` filter; that is expected, and
-   the empty state says so and routes you to New pay period.**
+   016's `nextDeliveryDate` trap. **So after the load there is no open period**;
+   that is expected, and New pay period is how you open one. (Until 2026-08-06
+   this read as `/pay-periods` opening on an empty `Current` filter — that screen
+   is gone, and the button now sits on the timesheets screen's period bar.)
    **`isPayPeriodEditable` covers `open` AND `review`** — review is where
    corrections are MADE, and gating it would force a reviewer to step the period
    backwards to fix what they found. 028's write policies name the same pair;
@@ -1118,9 +1119,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    (all on days under 5h that need no meal at all), only us 7,691 — 82.6%
    agreement. **The excess is a DATA GAP, not a rule bug: 6,374 of the 6,562
    excess no-meal days are six hours or less, exactly what a signed waiver
-   covers, and ZERO waivers are loaded** because FMP keeps them in its Events
-   table, which was never migrated. Loading them is the fix; nothing in this
-   module pays anybody meanwhile.
+   covers, and ZERO waivers are loaded**.
+   **CORRECTED 2026-08-06 — the waivers were never in FMP's Events table.** This
+   note said twice that they were, and the fresh Events export has no waiver
+   among its thirteen `EventType` values; `migration/field-map.md:146` has
+   `MEALBREAK WAIVER` as an onboarding CHECKBOX on the employee record, dropped
+   at the 020 load with the other paperwork ticks. Both halves of the gap have
+   since closed by other routes: **Mark filed 21 real waiver PDFs on 2026-08-05**
+   (`employee_documents`, kind `meal_break_waiver`), which `assessWorkday`
+   already reads; and `migration/backfill-break-premiums.mjs` wrote **10,453
+   `not_owed` decisions** from the break reasons FileMaker kept in its RATINGS
+   table, resolving 3,138 of the excess findings. See build step 4e.
    **Phase 3, migration 030 + `lib/homebaseImport.ts` + `/timesheets/import`.**
    Drop → plan → commit, with NOTHING WRITTEN BEFORE COMMIT, and a commit into a
    closed period BLOCKED rather than left to fail silently. The parser is pinned
@@ -1336,9 +1345,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the real failures; and **"fortnight" is "pay period"** in every visible
    string.
    Known and NOT a bug: 90 meal findings on that fortnight's 163 shifts reads as
-   a lot, and 28 of the 31 no-meal days would be covered by a signed waiver. Zero
-   waivers are loaded — FMP keeps them in its Events table, never migrated —
-   which is the same data gap already recorded under phase 5.
+   a lot, and 28 of the 31 no-meal days would be covered by a signed waiver.
+   (This said "zero waivers are loaded — FMP keeps them in its Events table";
+   both clauses were wrong by 2026-08-06. 21 waiver PDFs are on file and the
+   waivers were never in Events — see the correction under phase 5.)
    **A DAY'S OVERTIME WAS POURED OVER ITS SHIFTS IN UUID ORDER** (found by Mark
    reading one row, 2026-08-05). `pourOverShifts` fills regular hours first and
    then overtime, so the order it walks decides which shift CARRIES the premium
@@ -1405,8 +1415,56 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    own expansion (`ShiftDecisions.tsx`), beside the punches, the recorded meal
    and the day's hours. The worksheet KEPT its three totals and lost both
    editors; it is now the view before you export — how many decisions are
-   outstanding and what they come to — with a link to the period's timesheets.
-   The export stays there regardless: `freeze_pay_period` is period-scoped.
+   outstanding and what they come to.
+   **Shipped 2026-08-06: THE PAY-PERIOD SCREENS ARE GONE, and the export is a
+   PANEL** (Mark: "since pay periods are now on the timesheet screen, there's no
+   need for a pay period menu item"; the record "can be rolled into an 'Export
+   Timesheets…' routine that opens the pay periods detail screen like a panel").
+   That finished the sentence the 2026-08-05 rework started. Once every DECISION
+   had moved onto the shift row, what was left on `/pay-periods/[id]` decided
+   nothing — it stated the period, stepped it along the ladder, rolled the shifts
+   up and produced the file — and the 178-row LIST beside it existed only to
+   choose a fortnight, which `/timesheets`' own `PickList` already did.
+   So: `components/payroll/ExportTimesheets.tsx` is the old record, opened as a
+   `ui/Dialog` at `h-[88vh]` from a command on the new `PeriodBar` (period picker
+   · `StatusChip` · New pay period · Export timesheets…) above the shift filters.
+   **The screen keeps its name** — "Payroll" was considered and dropped — and the
+   routes did not move, so breadcrumbs, `loading.tsx`, scroll keys and nav-memory
+   keys were all untouched. `/pay-periods` and `/pay-periods/[id]` are redirect
+   shims (`/location`'s pattern, no `loading.tsx` — a redirect thrown during
+   render never paints), and the Timesheets sub carries `also: ["/pay-periods"]`
+   so a shim lights the right tab on the way through. `PayPeriodsList`,
+   `PayPeriodDetail`, `ExportPayroll` and `lib/payPeriodRoutes` are deleted;
+   `StatusChip` got its own file, having outlived the list it lived in.
+   Three things worth knowing.
+   **`Mark exported` is no longer offered on the ladder.** `nextStatuses` still
+   returns it — `lib/payPeriods` is untouched and a reopen still clears
+   `exported_at` — but `PayPeriodActions` filters it out, because Finalize is the
+   only route to that status that also FREEZES. Four rem apart on a long screen
+   it was merely redundant; side by side in one panel it is a trap that leaves a
+   period reading exported with nothing snapshotted and no file anywhere.
+   **Finalize is BLACK here** where it was white on the screen, and that is the
+   rule applying rather than bending: a panel produces one outcome, so its footer
+   is a two-weight decision (`DIALOG_COMMIT_CLASS` beside a text Close and a
+   white Download). It also LEAVES on success by closing the panel rather than
+   navigating — the receiving screen's lesson, same gesture in a panel's terms.
+   The confirm is a SECOND `Dialog` rendered as a SIBLING, not nested inside the
+   first: both are `z-[60]`, so the later portal paints on top and the panel stays
+   up behind it.
+   **The commit row had to move to the `footer` prop**, which is what forced the
+   old `ExportPayroll` to be absorbed rather than composed — its buttons were the
+   last row of a body that now scrolls, and a commit that scrolls away is the
+   exact thing that bullet exists to prevent.
+   Measured win: the two screens ran the same seven queries over the same seven
+   tables, so the merge is ONE wave — 8 queries where the pair needed ~15. The
+   export panel's inputs are derived on the server beside the table's own rows,
+   from the same `sheets`; nothing in the panel renders until it is opened.
+   Known cost, accepted: the cross-period view goes — status bands over 178 rows,
+   the notes column, the "days ≠ 14" flag, filtering to everything exported. Every
+   period is still reachable by range and status in the picker, which grows a find
+   box past eight options.
+   The export stays with the period regardless: `freeze_pay_period` is
+   period-scoped.
    **BOTH CONTROLS ARE COARSER THAN THE ROW THEY SIT IN, and each says so.** A
    row is one SHIFT; a meal premium is per employee-WORKDAY (§226.7 pays one
    hour per workday per CATEGORY — *UPS v. Superior Court* (2011) allows a meal
@@ -1640,6 +1698,85 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Known pane artefact, not an app bug: `router.refresh()` after a write can
    take several seconds, so a probe run 1.5s after a click reads as "nothing
    happened" — wait longer or re-navigate before concluding anything.
+4e. ✅ **EMPLOYEE EVENTS — migration 035, APPLIED and LOADED 2026-08-06.**
+   FMP's two HR child tables merged into ONE (Mark: "In retrospect, these should
+   really be all in one table: Events. What were 'ratings' are really just shift
+   events… Events already had different types, what's one more."). `Events`
+   (2,398 rows, ~200/yr, narrative) and `Ratings` (44,251 rows, ~5,000/yr, one
+   per person per shift, **written daily and still in use**) are now
+   `employee_events`, 46,553 rows, 2014-06-11 → 2026-08-06.
+   **THE BATCH SHIFT-LOG SCREEN IS DEFERRED TO THE PRODUCTION MODULE**, and that
+   is the load-bearing scoping decision (Mark, 2026-08-06). Supervisors write
+   ratings 2–3 at a time at end of shift, alongside sales, tips and donut
+   production counts — `Operations/ShiftReports.mer` carries all of it. A
+   ratings-only batch screen would be built twice. So the write surface is the
+   employee's own record and RLS is owner/admin on all four verbs, verified in
+   the harness as a real authenticated **supervisor: 0 rows visible, insert
+   refused by RLS** — the assertion that proves the deferral is real and not
+   merely unwired in the UI.
+   **`ShiftReports.mer` is READ but never loaded**, and it is what made the
+   migration good: `_log_id` is a real unique id (13,059 of 13,059) and
+   `Ratings.log_id` joins it at **100.0%**, supplying the four things Ratings has
+   no column for — the LOCATION (DF01 25,592 · DF02 15,578 · DF03 2,946 · EVENT
+   134), the SUPERVISOR (44,237 rows, all 46 ids resolving to real employees),
+   the SHIFT as a label (`Off-site` 481, which the 1/2/3 sort field cannot
+   express), and a DATE for the 329 ratings whose own is blank. An earlier plan
+   recovered location by joining to the TIMESHEET, which works from 2020 and not
+   at all before; that inference is gone, along with any need to read the 85 MB
+   Timesheets.mer. The `log_id` rides in `source_payload` for the day Production
+   builds a real `shift_logs` table — a column now would reference nothing.
+   **The five category scores collapse to ONE and we keep a BETTER figure than
+   FMP had.** 89% of 40,793 scored ratings are a 5, so the categories never
+   discriminated; the note is the payload. FMP stored `round(mean)`, which agrees
+   with the true mean on only 33,545 rows, so the transform computes the mean to
+   2dp — `[4,5,5,4,5]` was filed as "5" and is now 4.60. The five survive in
+   `source_payload`, so the collapse is reversible without a re-export.
+   Two measurements decided the schema and both would be easy to get backwards:
+   **`n/a` is EXCLUDED from the mean** (the mean over the rest matches FMP's
+   total on 15,427 rows, differs on 1) and **`0` is INCLUDED, because a zero is a
+   supervisor writing the shift off** — of 132 rows carrying one the total says
+   counted on 107, excluded on 10, and the 65 all-zero rows read "NO CALL/NO
+   SHOW". Hence `check (score between 0 and 5)`; at 1–5 it would refuse 72 rows
+   of real history mid-batch.
+   Eleven kinds, folding FMP's three drifted merge pairs. `document_note` is
+   HISTORICAL ONLY — **field-map.md was wrong** to say the 81 `Document` rows go
+   to `employee_documents`: 021 declares `storage_path not null` and these are
+   metadata with no files, and a metadata-only row would let `missingPaperwork()`
+   report a W-4 as filed that nobody can produce, which is the exact failure 021
+   exists to prevent. 253 ratings whose POSITION read some spelling of "call out"
+   became `call_out` events (a narrow `/^call out$/` would have missed "CALLED
+   OUT", "DF- CALL OUT" and "Call out/cover").
+   **NO `timesheet_id`, NO `log_id` column, NO period gate** — each argued in the
+   migration header. The period gate especially: `period_editable_on` returns
+   TRUE for a day outside the 178-period calendar, so half of Events would be
+   freely editable while 2020 was frozen.
+   **THE UI'S CAP WAS A BUG UNTIL REAL DATA FOUND IT.** The block opens on a
+   "Notes & warnings" tier because a long-serving person's warnings would
+   otherwise be buried under a thousand shift ratings. The first cut capped ONE
+   query at 500 and let the client filter — measured on Ruby Mares (1,590 events,
+   84 narrative), that would have hidden **69 of her 84**, including 4 written
+   and 6 verbal warnings, while the tab's own count said everything was fine. So
+   it is TWO queries: narrative kinds fetched WHOLE (rare — 2,635 across all 445
+   people), only shifts capped, and the "showing N of M" line names shift ratings
+   specifically and never appears on the tier that is complete.
+   Kind renders as plain text, never a coloured chip — colour means record STATE
+   and a warning is a record TYPE. `deleteWarnings` gained an event count, since
+   035 cascades and 023 lets an owner delete a record carrying a decade of
+   write-ups.
+   **`backfill-break-premiums.mjs` closed the phase-5 data gap** (see the
+   correction under 4d): 10,453 `not_owed` decisions written from the break
+   reasons FMP kept in its Ratings table, resolving **3,138** of the excess
+   findings. **`hours: 0` explicitly** — 029 defaults it to 1.00 and
+   `timesheets/page.tsx` sums EVERY premium's hours for the worksheet regardless
+   of decision, so the default would have put ten thousand phantom premium hours
+   on screen; verified after the write, total premium hours = 1, identical to the
+   owed total. It **skips the 451 findings our rule argues with** rather than
+   recording decisions nobody made: the dominant code among them is `short_meal`
+   (208), and a waiver covers SKIPPING a meal on a short shift, not taking a
+   ten-minute one — several read "no break needed" at 5.1h, the same 5h-vs-6h
+   misreading recorded above, and three are junk ("test" twice, "fgdfg").
+   `--include-contested` overrides it. Never upserts: one human decision already
+   on file was left untouched, and a second `--apply` wrote 0.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -1766,6 +1903,18 @@ Then the whole stack was run against the LIVE database — 159 shifts, 19
 entitlements, 36 accruals — and the produced CSV matches Mark's real Gusto file
 person for person, **$432.00 against $432.00**, with the sick-hours header
 assertion and the 18-cell width both holding on the real file.
+**035 is APPLIED and LOADED** (Mark, 2026-08-06) — 46,553 employee events,
+verified the same day by probe: `select count(*) from employee_events` (46,553),
+`… where source='filemaker' and legacy_id is null` (0), `… where score < 0 or
+score > 5` (0), `… where kind='shift' and location_id is null` (1), and
+`select kind, count(*) … group by 1` (shift 43,918 · attendance 867 · call_out
+435 · negative 409 · incident 339 · verbal_warning 194 · positive 158 ·
+written_warning 100 · document_note 81 · note 38 · check_in 14). Mean shift score
+4.825 against FMP's own stored 4.854 — lower on purpose, because we keep the true
+mean where FileMaker rounded up. 33 rows skipped and named (employee ids `387B`
+and `001` match nobody). All 35 migrations apply on the Docker harness, and the
+whole 46,553-row file was replayed through the real constraints there before it
+went near production. See build step 4e.
 **034 is APPLIED** (Mark, 2026-08-06) — verified the same day: both screens'
 selects return rows, and **0 of the 42 existing documents carry an expiry**,
 which is the migration working (null means never, so nothing changed under
@@ -1789,13 +1938,17 @@ readable roster — but it isn't swallowed either, because an empty Expires colu
 asserts that nothing is lapsing, which is the one claim that screen exists to
 make. It reads "unreadable" instead, and the employee RECORD replaces its
 Paperwork card with the Postgres error, 018's pattern.
-**031 is NOT applied yet** — until it is, the pay-period record replaces its
-worksheet and export with "column timesheets.wage_type does not exist", which
-is the intended behaviour rather than an empty screen. Probe with
-`select count(*) from timesheets where wage_type is not null` (~44,700) and
-`select count(*) from employees where primary_wage_type is not null` (198), and
-confirm `select count(*) from timesheets where wage_type like '%(Primary)%'` is
-ZERO — the suffix must never be stored.
+**031 IS APPLIED** — measured 2026-08-06 by service_role probe, after this line
+had said "NOT applied yet" for two days: `timesheets.wage_type`, `tip_hours` and
+`tip_allocation` and `employees.primary_wage_type` and `gusto_id` all select, and
+**44,516 timesheets carry a wage_type**. That mattered, not as bookkeeping — the
+timesheets screen's ONE select now carries those columns, so had they been
+missing the whole screen would have gone down rather than just the export panel.
+**Probe, don't read this file**; it has now been wrong in both directions for
+four different migrations. `select count(*) from timesheets where wage_type is
+not null` (~44,500) and `select count(*) from employees where primary_wage_type
+is not null` (198), and confirm `select count(*) from timesheets where wage_type
+like '%(Primary)%'` is ZERO — the suffix must never be stored.
 **027, 028, 029 and 030 are ALL APPLIED** (Mark, 2026-08-04) and both loads
 have run — 178 pay periods and 44,721 timesheets. For 029/030 probe
 `select count(*) from break_premiums`, `from tip_pools`, `from
@@ -2108,6 +2261,34 @@ weekday column, and 003 then silently made it per-vendor-item.
   then owned by the client** (`lib/navMemoryStore.ts`): a server layout does not
   re-render on soft navigation, so a client-written cookie can never be read
   back mid-session and the tab hrefs would freeze. `signOut` deletes it.
+  **A tab comes back to the SCREEN, not just the sub-section** (Mark,
+  2026-08-06: "if we were looking at a list, we return to that. If it was a
+  detail view, we return to that"). So `NavMemory` is two maps —
+  `subs` (section → sub, the cookie's whole content) and **`paths`**
+  (`navPathKey` → the last url, **in memory only**, the call `scrollMemory` and
+  `recordSet` already made: the clicking this exists for is all one page load,
+  while a hard load has nothing worth restoring, and being dropped tomorrow onto
+  a record somebody read yesterday is the thing to avoid). `sectionHref` and the
+  new `subHref` read them; tier 2 reads the memory now, which is what makes
+  Employees → Timesheets → Employees return to the employee.
+  Three rules a rewrite would break quietly:
+  **the tab you are ALREADY on goes to its list** — that's the escape hatch,
+  since a tab whose only destination is the record under your feet is a no-op;
+  **the key carries the LOCATION** (`${locationId}|${section}/${sub}`), because a
+  remembered PO is a location-scoped row — keying rather than clearing, so
+  returning to DF01 finds DF01's record, at the accepted cost of forgetting the
+  org-level ones (an employee) on a switch; and **the remembered url keeps its
+  QUERY**, which on a record is the breadcrumb (`?from=…`), so coming back finds
+  the same crumbs and the same record book. On a list the query is filters
+  written with `history.replaceState` AFTER arrival, so what's remembered is the
+  query you ARRIVED with — none for a tab click, i.e. exactly the old behaviour.
+  `rememberIn` is the pure reducer (fixture-tested, 18 cases) and returns the
+  SAME OBJECT when nothing moved: `getSnapshot` needs referential stability, and
+  each map is preserved individually so the store can tell from identity alone
+  whether the cookie needs rewriting — otherwise every record you opened would
+  rewrite an identical cookie. Known edge, not fixed: a remembered record that
+  gets deleted leaves a tab pointing at a dead id until you visit that area
+  again (narrow — every delete flow navigates to the list, which overwrites it).
 - **A days-old `next dev` will start reload-looping** (Mark, 2026-07-26 — the
   order guide stuck on its loading bar, restarting, page reloading by itself,
   cured for a few minutes by navigating away and back). Not an app bug: the dev

@@ -36,8 +36,23 @@ import {
   AddEmployeeBenefit,
   type BenefitOption,
 } from "@/components/hr/AddEmployeeBenefit";
+import {
+  EmployeeEvents,
+  type EmployeeEventRow,
+} from "@/components/hr/EmployeeEvents";
+import { NewEmployeeEvent } from "@/components/hr/NewEmployeeEvent";
 
 const Heading = SectionHeading;
+
+/**
+ * How many events one record fetches. A long-serving person carries ~1,000 shift
+ * ratings, and the block states the total beside what it shows rather than
+ * pretending the cap is the whole history.
+ */
+const EVENT_PAGE = 500;
+
+const EVENT_COLUMNS =
+  "id, occurred_on, kind, score, shift, position, headline, detail, outcome, author_employee_id, author_name, location_id";
 
 /**
  * One person's record.
@@ -72,6 +87,8 @@ export async function EmployeeDetail({
     { data: benefitRows, error: benefitError },
     { data: entitlementRows },
     { data: wageTypeRows },
+    { data: narrativeRows, error: narrativeError },
+    { data: shiftRows, error: shiftError, count: shiftTotal },
   ] = await Promise.all([
     supabase
       .from("employees")
@@ -104,7 +121,41 @@ export async function EmployeeDetail({
     // someone to remember the exact spelling. Same move as the item category
     // picker.
     supabase.from("employees").select("primary_wage_type").not("primary_wage_type", "is", null),
+    // 035. Like the benefits above, this error is NOT folded into the page's
+    // own — a missing events table must not blank a readable employee record.
+    //
+    // TWO QUERIES, AND THE SPLIT IS THE POINT. Measured on real data
+    // (2026-08-06): Ruby Mares has 1,590 events, of which 84 are notes and
+    // warnings. Capping the whole set at 500 and letting the client filter would
+    // have shown 500 recent SHIFTS and silently cut off every warning older than
+    // them — hiding exactly what the default tier exists to surface, while the
+    // tab's own count said everything was fine.
+    //
+    // So the narrative kinds are fetched WHOLE (they are rare — 2,635 across all
+    // 445 people) and only the shift ratings are capped.
+    supabase
+      .from("employee_events")
+      .select(EVENT_COLUMNS)
+      .eq("employee_id", id)
+      .neq("kind", "shift")
+      .order("occurred_on", { ascending: false })
+      .order("id"),
+    // The second `.order("id")` is load-bearing rather than tidy — `occurred_on`
+    // is a DATE and ties are everywhere, and a ranged sweep on a non-unique sort
+    // key returns overlapping pages, which is what fabricated 112,338
+    // double-time hours in the 2026-08-05 audit.
+    supabase
+      .from("employee_events")
+      .select(EVENT_COLUMNS, { count: "exact" })
+      .eq("employee_id", id)
+      .eq("kind", "shift")
+      .order("occurred_on", { ascending: false })
+      .order("id")
+      .range(0, EVENT_PAGE - 1),
   ]);
+
+  const eventRows = [...(narrativeRows ?? []), ...(shiftRows ?? [])];
+  const eventError = narrativeError ?? shiftError;
 
   if (error) {
     return <p className="text-sm text-accent">Could not load this employee: {error.message}</p>;
@@ -189,6 +240,54 @@ export async function EmployeeDetail({
         .filter((p): p is string => !!p)
     ),
   ].sort();
+
+  // ---- events (035) -------------------------------------------------------
+  // Who wrote each one. A second query rather than a PostgREST embed: there are
+  // TWO foreign keys from employee_events to employees (the subject and the
+  // author), so an embed has to be disambiguated by constraint name, and one
+  // author writes hundreds of these — the embed would send their row hundreds
+  // of times. FMP's own `author_name` string is the fallback for a supervisor
+  // who has no employee record any more.
+  const authorIds = [
+    ...new Set(
+      (eventRows ?? []).map((e) => e.author_employee_id as string | null).filter((v): v is string => !!v)
+    ),
+  ];
+  const { data: authorRows } = authorIds.length
+    ? await supabase.from("employees").select("id, first_name, last_name").in("id", authorIds)
+    : { data: null };
+  const authorById = new Map(
+    (authorRows ?? []).map((a) => [a.id as string, employeeName(a as Pick<Employee, "first_name" | "last_name">)])
+  );
+
+  const events: EmployeeEventRow[] = (eventRows ?? []).map((e) => ({
+    id: e.id as string,
+    occurred_on: e.occurred_on as string,
+    kind: e.kind as EmployeeEventRow["kind"],
+    score: e.score === null ? null : Number(e.score),
+    shift: (e.shift ?? null) as EmployeeEventRow["shift"],
+    position: (e.position ?? null) as string | null,
+    headline: (e.headline ?? null) as string | null,
+    detail: (e.detail ?? null) as string | null,
+    outcome: (e.outcome ?? null) as string | null,
+    author:
+      authorById.get((e.author_employee_id ?? "") as string) ?? ((e.author_name ?? null) as string | null),
+    locationCode: codeById.get((e.location_id ?? "") as string) ?? null,
+  }));
+
+  // The outcomes already in use, so "Action taken" offers rather than asking
+  // anyone to remember how they phrased it last time.
+  const outcomes = [...new Set(events.map((e) => e.outcome).filter((o): o is string => !!o))]
+    .sort()
+    .slice(0, 40);
+
+  // The signed-in person's own employee row, so a new event records who wrote
+  // it without the dialog having to query for itself.
+  const { data: selfRow } = await supabase
+    .from("employees")
+    .select("id")
+    .eq("user_id", session.userId)
+    .maybeSingle();
 
   const { data: typeRows } = await supabase
     .from("employees")
@@ -517,6 +616,34 @@ export async function EmployeeDetail({
             placeholder="none"
           />
         </div>
+      </section>
+
+      {/* ---- events (035) ---------------------------------------------- */}
+      <section className="space-y-2">
+        <Heading count={(shiftTotal ?? 0) + (narrativeRows ?? []).length}>Events</Heading>
+        {eventError ? (
+          <p className="max-w-[72ch] border border-accent px-4 py-3 text-sm text-accent">
+            {eventError.message}
+            {/employee_events/.test(eventError.message)
+              ? " — migration 035 has not been applied yet."
+              : ""}
+          </p>
+        ) : (
+          <>
+            <EmployeeEvents rows={events} shiftTotal={shiftTotal ?? 0} editable />
+            <div className="pt-2">
+              <NewEmployeeEvent
+                employeeId={person.id}
+                orgId={person.org_id}
+                userId={session.userId}
+                authorEmployeeId={(selfRow?.id ?? null) as string | null}
+                locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
+                today={today}
+                outcomes={outcomes}
+              />
+            </div>
+          </>
+        )}
       </section>
 
       {/* ---- access ---------------------------------------------------- */}

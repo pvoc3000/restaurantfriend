@@ -8,6 +8,7 @@ import {
   resolveRoute,
   sectionHref,
   sectionLabel,
+  subHref,
   type NavSection,
 } from "@/lib/nav";
 import type { NavMemory } from "@/lib/navMemory";
@@ -52,6 +53,7 @@ export function AppNav({
   sections,
   initialMemory,
   locationCode,
+  locationId,
   controls,
   identity,
 }: {
@@ -60,6 +62,9 @@ export function AppNav({
   sections: NavSection[];
   initialMemory: NavMemory;
   locationCode: string | null;
+  /** Which shop the remembered screens belong to — see `navPathKey`. Not the
+   *  code: codes are for reading, and a record is keyed by the row's own id. */
+  locationId: string | null;
   /** Row 1 of the right-hand column: things that change what you're looking at
    *  — home, settings and the chrome collapse. Composed on the server so the
    *  signOut form action doesn't have to cross into this client component. */
@@ -71,13 +76,27 @@ export function AppNav({
   const here = resolveRoute(pathname);
   const memory = useNavMemory(initialMemory);
 
-  // Remember where we are so this section's tab comes back here later. An
-  // external-store write, not a setState — see lib/navMemoryStore.ts.
+  // Remember where we are so this area's tab comes back HERE later — the screen,
+  // not just the sub-section. An external-store write, not a setState — see
+  // lib/navMemoryStore.ts.
   const sectionSlug = here?.sectionSlug;
   const subSlug = here?.subSlug;
   useEffect(() => {
-    if (sectionSlug && subSlug) remember(sectionSlug, subSlug);
-  }, [sectionSlug, subSlug]);
+    if (!sectionSlug || !subSlug) return;
+    // The query matters on a RECORD, where it carries the breadcrumb trail
+    // (?from=…): remembering it means coming back finds the same crumbs and the
+    // same record book rather than a screen that has forgotten how you got
+    // there. Read off `window` rather than useSearchParams, because a list
+    // rewrites its filters with history.replaceState AFTER arrival and the query
+    // we want is the one we arrived with — which for a tab click is none, i.e.
+    // exactly what happened before this existed.
+    //
+    // The guard is scrollMemory's, for scrollMemory's reason: the router can
+    // already have moved the window on, and stapling the next screen's query
+    // onto this one's path would produce a url that was never visited.
+    const search = window.location.pathname === pathname ? window.location.search : "";
+    remember({ sectionSlug, subSlug }, locationId, `${pathname}${search}`);
+  }, [pathname, sectionSlug, subSlug, locationId]);
 
   // From the FILTERED list, not the full one: a section this role can't see
   // must not render its sub-tier either.
@@ -115,7 +134,7 @@ export function AppNav({
               return (
                 <Link
                   key={section.slug}
-                  href={sectionHref(section, memory)}
+                  href={sectionHref(section, memory, locationId, sectionSlug ?? null)}
                   aria-current={active ? "page" : undefined}
                   className={`${TAB} ${
                     active ? "text-mark" : "text-white/60 hover:text-white"
@@ -140,7 +159,7 @@ export function AppNav({
                 return (
                   <Link
                     key={sub.slug}
-                    href={sub.href}
+                    href={subHref(currentSection, sub, memory, locationId, subSlug ?? null)}
                     aria-current={active ? "page" : undefined}
                     className={`${TAB} ${
                       active ? "text-white" : "text-white/50 hover:text-white"

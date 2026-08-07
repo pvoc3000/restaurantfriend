@@ -23,6 +23,10 @@ export async function AppHeader({ session }: { session: AppSession }) {
         sections={sectionsForRole(session.membership.role)}
         initialMemory={initialMemory}
         locationCode={session.activeLocation?.code ?? null}
+        // Which shop's remembered screens the tabs should offer. A remembered
+        // purchase order belongs to one location; `navPathKey` files them apart
+        // so switching shops can't send you to another one's record.
+        locationId={session.activeLocation?.id ?? null}
         // Row 1: where to go. The location SWITCHER used to sit here; the
         // Locations list replaced it (Mark, 2026-08-01), and the code you're
         // working at is still on screen at all times — the tier-1 tab wears it

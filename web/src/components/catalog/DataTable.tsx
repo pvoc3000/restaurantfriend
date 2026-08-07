@@ -252,11 +252,12 @@ export function DataTable<T>({
   // overhangs by 6px, which makes it a scroll container, which pushes the sticky
   // labels 64px DOWN — under the rows they label.
   //
-  // Found on /pay-periods, whose default filter is legitimately empty until
-  // someone opens a fortnight: land on it, click All, and the header paints over
-  // the first row. No existing list defaults to an empty filter, which is the
-  // only reason this had never shown. Flipping `enabled` false → true when the
-  // first row appears is what re-runs the measurement.
+  // Found on the pay-period list (since folded into Timesheets), whose default
+  // filter was legitimately empty until someone opened a fortnight: land on it,
+  // click All, and the header paints over the first row. No list defaults to an
+  // empty filter today, which is the only reason this had never shown before and
+  // is why the guard has to stay rather than being "no longer needed". Flipping
+  // `enabled` false → true when the first row appears re-runs the measurement.
   useOverflowOnlyWhenNeeded(paneRef, !scroll && rows.length > 0);
   // A pane ends where the window does, unless the caller named a height. Same
   // hazard, same guard: a paned table that starts empty would otherwise keep

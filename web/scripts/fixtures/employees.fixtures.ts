@@ -142,9 +142,32 @@ test("documents alone fire the warning", () => {
   eq(w.documents, 3);
 });
 
-test("all three at once, each reported separately", () => {
-  const w = deleteWarnings({ legacy_id: 214, user_id: "u-1" }, 2);
-  eq(w, { migrated: 214, hasAccess: true, documents: 2, any: true });
+test("events alone fire the warning", () => {
+  // 035 cascades, and this is the count that grows without anyone noticing — a
+  // decade of warnings buried under a thousand shift ratings. Drop `events` out
+  // of the `any` expression and this goes red.
+  const w = deleteWarnings(clean, 0, 1214);
+  ok(w.any, "any");
+  eq(w.events, 1214);
+});
+
+test("all four at once, each reported separately", () => {
+  const w = deleteWarnings({ legacy_id: 214, user_id: "u-1" }, 2, 903);
+  eq(w, { migrated: 214, hasAccess: true, documents: 2, events: 903, any: true });
+});
+
+test("a record with nothing hanging off it stays a clean delete", () => {
+  // The other half of the rule: the events count must not make EVERY record
+  // look dangerous, or the warning stops meaning anything.
+  const w = deleteWarnings(clean, 0, 0);
+  no(w.any, "any");
+  eq(w.events, 0);
+});
+
+test("the event count defaults to zero, so an unmigrated caller still works", () => {
+  const w = deleteWarnings(clean, 0);
+  eq(w.events, 0);
+  no(w.any, "any");
 });
 
 // ------------------------------------------------------------ self-delete

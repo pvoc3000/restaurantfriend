@@ -152,17 +152,42 @@ can't find and stops.
 until each module is built, so they're re-exported at that module's cutover
 rather than loaded twice. Notes for when that happens:
 
-- **Events** key on `EmployeeID`; `Name_Full_c` there is the AUTHOR, not the
-  subject. Its `EventType` vocabulary drifted over twelve years and has three
-  merge pairs (`Negative`/`Negative Event`, `Positive`/`Positive Event`,
-  `Incident`/`Incident Report`). The 81 rows typed **`Document`** (2024+, 73 of
-  them flagged as having a paper original) are the filing-cabinet use that
-  `employee_documents` now covers — those migrate there, not into an events
-  table.
-- **Ratings** has **two columns literally named `Name_Full_c`** (subject and
-  rater); a header-to-dict parser silently drops one. `break_confirmed_b` is
-  corrupt in 59% of rows (`0\x0b1`, two values flattened together), and
-  `Document_Category_txt` is entirely empty.
+- ~~**Events**~~ and ~~**Ratings**~~ — **MIGRATED 2026-08-06** into ONE table,
+  `employee_events` (migration 035), via `transform-events.mjs` →
+  `load-events.mjs`. A rating is `kind = 'shift'`. The three merge pairs
+  (`Negative`/`Negative Event`, `Positive`/`Positive Event`,
+  `Incident`/`Incident Report`) fold in `lib/employeeEvents.ts`, which the
+  transform imports so the vocabulary is one list rather than three.
+  Three notes here were WRONG and are corrected rather than deleted, because
+  each one would have sent the next reader the wrong way:
+  - The 81 rows typed **`Document`** do **not** migrate to `employee_documents`.
+    021 declares `storage_path text not null` and these are metadata with no
+    files; a metadata-only row would let `missingPaperwork()` report a W-4 as
+    filed that nobody can produce, which is the exact failure 021 exists to
+    prevent. They load as `kind = 'document_note'`.
+  - The fresh Ratings export has **one** `full_name` column, not two named
+    `Name_Full_c` — checked, no duplicate headers in either file. The rater is
+    not in Ratings at all; it comes from the shift report (below). The transform
+    still refuses to run on a repeated header, since the warning cost nothing to
+    keep.
+  - `Events` carries the author as `SupervisorID` + `Supervisor` (1,889 of 2,398
+    rows), not as a second `Name_Full_c`.
+  Still true: `break_confirmed_b` is corrupt in 59% of rows (`0\x0b1`, a
+  repeating field flattened) and `Document_Category_txt` is empty. Both ride in
+  `source_payload` and neither is read.
+- **`Operations/ShiftReports.mer`** is FMP's shift log and is READ by the events
+  transform without being loaded — it is the unbuilt Production module's table
+  (sales, tips, production batches and yields, waste, leftovers, a task
+  checklist). `_log_id` is a real unique id (13,059 of 13,059) and
+  `Ratings.log_id` joins it at **100.0%**, which is where a rating gets its
+  LOCATION (Ratings has no location column), its SUPERVISOR, its SHIFT label
+  (`Off-site` is a real value the 1/2/3 sort field cannot express), and a DATE
+  for the 329 ratings whose own is blank. When Production builds a real
+  `shift_logs` table, the value to key it from is in
+  `employee_events.source_payload.log_id`.
+- **The meal-break waivers are NOT in Events.** `MEALBREAK WAIVER` is an
+  onboarding checkbox on the employee record (see the dropped-fields row above),
+  and CLAUDE.md asserted the Events thing twice; both passages are corrected.
 - **Reviews**' category labels (`PA_Cat01`–`PA_Cat10`) are NOT in the export —
   they were layout text — so the scores are meaningless until the rubric is
   recovered.

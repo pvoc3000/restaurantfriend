@@ -264,8 +264,9 @@ function startable(q: Qualifying) {
 /**
  * Fold the frozen accruals over the derived ones, FROZEN WINNING.
  *
- * This is backwards from how tips are handled, and deliberately. `ExportPayroll`
- * prefers its recompute over `timesheets.tip_allocation`, which is harmless
+ * This is backwards from how tips are handled, and deliberately.
+ * `ExportTimesheets` prefers its recompute over `timesheets.tip_allocation`,
+ * which is harmless
  * because every input to the tip allocator is gated on the period being
  * editable — the recompute reproduces the snapshot exactly. Entitlements carry
  * NO such gate (033 argues why), so a benefit's inputs really can move under a

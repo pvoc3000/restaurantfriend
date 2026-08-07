@@ -32,6 +32,10 @@ export default async function PayrollBenefitsPage() {
     return (
       <p className="max-w-[72ch] text-sm text-muted">
         Payroll benefits are visible to managers and owners.
+        {/* "Payroll benefits" in the sentence where the heading says "Benefits"
+            (Mark, 2026-08-06): the menu word is short because it sits under HR
+            with Timesheets, and a lone sentence has no such neighbours to say
+            which kind of benefit it means. */}
       </p>
     );
   }
@@ -80,29 +84,15 @@ export default async function PayrollBenefitsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Payroll benefits
-        </h1>
-        <p className="max-w-[72ch] text-sm text-muted">
-          Flat amounts somebody earns for working a shift — a parking allowance,
-          an overnight differential. They are worked out from each person&rsquo;s
-          entitlements every time payroll is read, and frozen when a pay period
-          is finalized, so a correction later cannot move money already paid.
-        </p>
-      </div>
+      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+        Benefits
+      </h1>
 
       <PayrollBenefitsList rows={rows} editable={canReadHr(session.membership.role)} />
 
       <section className="space-y-2">
         <SectionHeading>Adding one</SectionHeading>
-        <div className="flex flex-wrap items-center gap-4">
-          <AddPayrollBenefit orgId={session.membership.org_id} />
-          <span className="max-w-[52ch] text-sm text-muted">
-            A new benefit earns nobody anything until somebody is given it, on
-            their own record under Payroll.
-          </span>
-        </div>
+        <AddPayrollBenefit orgId={session.membership.org_id} />
       </section>
     </div>
   );
