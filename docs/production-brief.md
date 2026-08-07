@@ -338,26 +338,38 @@ The authoritative census is the Database Design Report at
 `DF Operations/DF Operations FMP Database Design/` (its Tables section lists
 every base table with field and record counts — the way to be sure no related
 table is missed, now and for every future module). Per that census,
-**DF-Premade-Production has 23 base tables (8 exported) and DF-Recipes has 3
-(2 exported)**. Still needed, with record counts as of the 2026-07-19 DDR:
+**DF-Premade-Production has 23 base tables and DF-Recipes has 3**.
+
+**NO HISTORICAL DATA MIGRATES (Mark, 2026-08-07: "We're starting fresh with
+new plans and schedules").** The migration scope is the CATALOG and its
+CONFIG, nothing else. Consequences, accepted: the Item screen's two-week
+history starts empty and fills from launch, and there is no historical
+baseline for the efficiency analysis until the app has run for a while.
+Batch numbering starts fresh unless Mark says to continue FMP's sequence.
+
+Still to export — seven small tables (record counts as of the 2026-07-19 DDR):
 
 | Table (file) | Records | What it is |
 | --- | --- | --- |
-| ITEMS (Premade-Production) | 29,083 | The tray day slots (`Trays_Items_Day1…Day7`) — the plan matrix content |
+| RecipeElements (Recipes) | 8,141 | **The recipe lines** — ingredients AND procedure steps (`Recipes_RecipeIngredients` / `Recipes_RecipeProcedures`). Content, not history |
+| PRODUCTION (Premade-Production) | 1,201 | Element schedule rows (the element detail's Schedule tab: location, day, par, sort, exclude). Current config, not history |
 | DEPENDENCIES (") | 408 | The Item → Element BOM (the Dependencies portal) |
 | DONUT_PARS (") | 316 | Item pars |
 | ELEMENT_PARS (") | 60 | Element pars |
-| PRODUCTION (") | 1,201 | Element schedule rows (the element detail's Schedule tab) |
-| LOG_PREMADE_ITEMS (") | 199,258 | Premade schedule lines — **seven years of made/leftover/sold actuals**, and the Item screen's two-week history |
-| LOG_DONUTPROD_ITEMS (") | 61,778 | Donut schedule lines |
-| LOG_WEEKLYPROD_ITEMS (") | 27,970 | Weekly schedule lines |
-| LOG_ABPROD_ITEMS (") | 87,351 | AB schedule lines |
-| PRICES (") | 17 | Per-item price overrides (the Price Overrides portal) |
 | DONUT_YIELDS (") | 22 | Likely the batch-size denominators — see open question 1 |
-| RecipeElements (Recipes) | 8,141 | **The recipe lines** — ingredients AND procedure steps (`Recipes_RecipeIngredients` / `Recipes_RecipeProcedures`) |
+| PRICES (") | 17 | Per-item price overrides (the Price Overrides portal) |
 
-Unclassified, ask Mark whether they matter: SALES (32 fields, 198 records) and
-DisplaySigns (25 fields, 86 records) in the Premade-Production file.
+Loaded from the existing exports: Production_Elements, Production_Recipes,
+Recipe_Items, Production_Items, Production_Item_Prices.
+
+**Deliberately NOT exported/loaded** (history, superseded by the fresh
+start): ITEMS (29,083 tray day slots — new plans get built in the new app's
+editor), LOG_PREMADE_ITEMS (199,258), LOG_DONUTPROD_ITEMS (61,778),
+LOG_ABPROD_ITEMS (87,351), LOG_WEEKLYPROD_ITEMS (27,970) — the schedule-line
+actuals — and, of the files already exported, Production_Plans.mer,
+Production_Schedules.mer and Production_Logs stay on disk as reference but
+never load. SALES (198) and DisplaySigns (86) presumed out of scope;
+unclassified, confirm with Mark if they ever come up.
 
 Export procedure for a table with no layout of its own: New Layout on that
 table occurrence (blank, no fields needed) → Records > **Show All Records** (a
@@ -383,8 +395,6 @@ probably not worth it.
   them. The Recipe_Items vendor mappings (160 rows with `_VendorItemKey`)
   become purchased elements' inventory-item links by resolving through
   `vendor_items.legacy_id` → its inventory item.
-- **Operators**: `__OperatorID` in the batch log joins `employees.legacy_id`
-  (the Events migration already proved this join).
 - Element pars stored as free text ("6x 1.5 GAL", "10 BAGS") parse to
   count × size × unit; refuse and report what doesn't parse.
 - The EVENT location is real in this data (plans, prices) — it exists in
@@ -413,13 +423,12 @@ kitchen-on-plan. Retire from the Location record UI when this ships.
    guides + element sheets as PDFs).
 5. **Actuals** — made/leftover entry on schedule lines (the shift-report
    surface, joint with 4e's deferred batch screen), batch logs with photos,
-   the two-week history on the Item screen.
-6. **History load** — once the re-exports exist: plans, schedule actuals
-   history, batch logs. Interleave with phases as exports arrive; nothing in
-   phases 1–5 depends on history being loaded first.
+   the two-week history on the Item screen (forward-filled from launch — no
+   history migrates, see the migration section).
 
 Each phase is separately shippable; 1–2 deliver value (costed recipes) before
-any scheduling exists.
+any scheduling exists. There is no history-load phase: the fresh-start
+decision removed it.
 
 ---
 
