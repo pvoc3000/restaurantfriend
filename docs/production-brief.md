@@ -324,29 +324,48 @@ snapshot — the guide → PO split exactly.
 
 ## Migration notes
 
-### Export status (measured 2026-08-07)
+### Export status (measured 2026-08-07; corrected same day against the DDR)
 
-Substantially complete: `Production_Plans.mer` (150), `Production_Elements.mer`
-(249), `Production_Recipes.mer` (493), `Production_Logs` (14,103),
-`Production_Item_Prices.mer` (125), `Production_Schedules.mer` headers
-(17,843), `Production_Items.mer` (307, headers only).
+The eight exports taken so far are **full table exports, verified**: their
+column counts match the DDR's field counts exactly, minus container fields,
+which .mer cannot carry (TRAYS 25=25, DONUTS 48=48, ELEMENTS 39=39, LOGS
+37=37, Recipes 55 vs 54 = the Picture container, BatchLog 40 vs 39 likewise).
+An earlier draft of this brief called four of them layout exports — **wrong**;
+what's missing is not fields but *entire child tables that were never on the
+export list*.
 
-**Four exports are layout exports missing their payload** (the HR lesson —
-read the header before trusting a .mer) and need re-exporting as full tables
-or child-table exports before migration:
+The authoritative census is the Database Design Report at
+`DF Operations/DF Operations FMP Database Design/` (its Tables section lists
+every base table with field and record counts — the way to be sure no related
+table is missed, now and for every future module). Per that census,
+**DF-Premade-Production has 23 base tables (8 exported) and DF-Recipes has 3
+(2 exported)**. Still needed, with record counts as of the 2026-07-19 DDR:
 
-1. **Plan_Items** — has tray identity but *no day-slot fields*: which item on
-   which tray on which day is absent.
-2. **Production_Items** — no dependencies (the BOM portal) and pars only as a
-   concatenated calc; the real per-day par fields and the dependency child
-   table are needed.
-3. **Recipe lines** — `Recipe_Items.mer` is the ingredient *catalog* (212
-   rows), not the lines; the table behind the recipe screen's ingredient rows
-   (qty/unit per scale column, sort, notes) was not exported.
-4. **Production_Schedule lines** — 17,843 headers only; the lines carry
-   par/made/leftover/sold, i.e. **seven years of supervisor-entered actuals**,
-   and are the two-week history on the Item screen. Without them the history
-   the module is supposed to learn from doesn't migrate.
+| Table (file) | Records | What it is |
+| --- | --- | --- |
+| ITEMS (Premade-Production) | 29,083 | The tray day slots (`Trays_Items_Day1…Day7`) — the plan matrix content |
+| DEPENDENCIES (") | 408 | The Item → Element BOM (the Dependencies portal) |
+| DONUT_PARS (") | 316 | Item pars |
+| ELEMENT_PARS (") | 60 | Element pars |
+| PRODUCTION (") | 1,201 | Element schedule rows (the element detail's Schedule tab) |
+| LOG_PREMADE_ITEMS (") | 199,258 | Premade schedule lines — **seven years of made/leftover/sold actuals**, and the Item screen's two-week history |
+| LOG_DONUTPROD_ITEMS (") | 61,778 | Donut schedule lines |
+| LOG_WEEKLYPROD_ITEMS (") | 27,970 | Weekly schedule lines |
+| LOG_ABPROD_ITEMS (") | 87,351 | AB schedule lines |
+| PRICES (") | 17 | Per-item price overrides (the Price Overrides portal) |
+| DONUT_YIELDS (") | 22 | Likely the batch-size denominators — see open question 1 |
+| RecipeElements (Recipes) | 8,141 | **The recipe lines** — ingredients AND procedure steps (`Recipes_RecipeIngredients` / `Recipes_RecipeProcedures`) |
+
+Unclassified, ask Mark whether they matter: SALES (32 fields, 198 records) and
+DisplaySigns (25 fields, 86 records) in the Premade-Production file.
+
+Export procedure for a table with no layout of its own: New Layout on that
+table occurrence (blank, no fields needed) → Records > **Show All Records** (a
+stale found set silently truncates the export) → File > Export Records >
+Merge → in the field picker switch from "Current Layout" to the table itself →
+Move All. Container fields (batch photos) never export via .mer; recovering
+them would take a FileMaker script writing container contents to files, and is
+probably not worth it.
 
 ### Transform traps already identified
 
@@ -424,8 +443,11 @@ any scheduling exists.
 
 1. **Batch-size semantics.** The guides print e.g. "VANILLA TOTAL: 54 /
    BATCH SIZE: 1.05" and "RAISED TOTAL: 300 / BATCH SIZE: 0.60". Confirm the
-   exact formula (presumably day's total ÷ master recipe yield at ×1, rounded
-   how?) and which recipe/version it reads, before building the roll-up.
+   exact formula (presumably day's total ÷ yield, rounded how?) and which
+   yield it reads — the DDR shows a **DONUT_YIELDS table (22 rows,
+   `Logs_PremadeItems_Yields`)**, so the denominators are likely per-type
+   yield rows there rather than recipe yields. Export it and check before
+   building the roll-up.
 2. **Tray tally boxes.** The printed schedule renders pars as runs of 6s/24s
    across numbered boxes (trays of 6 for premade, 24s for the baker guide).
    Confirm the box-size rule (per type? per size?) so the PDFs reproduce

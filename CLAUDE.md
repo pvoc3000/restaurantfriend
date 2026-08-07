@@ -1797,9 +1797,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    screen), element actuals in batch logs; costs derive LIVE through
    purchasing (no stored recipe/item costs); prices are an org-level
    class×tier grid with sparse location overrides (measured: DF01/02/03
-   byte-identical, only EVENT differs). Four FMP exports are layout exports
-   needing re-export before migration (plan day slots, item BOM+pars, recipe
-   lines, schedule lines = 7 years of actuals). Ships vestigial:
+   byte-identical, only EVENT differs). Mark's 8 exports are full-table
+   (verified against the DDR field counts) — but 12 CHILD TABLES were never
+   exported and are needed before migration (plan day slots, item BOM+pars,
+   recipe lines, schedule lines = 7 years of actuals; the brief's census
+   table names them all, from the DDR in `DF Operations FMP Database
+   Design/`, which is the way to enumerate any FMP file's real tables).
+   Ships vestigial:
    `locations.kitchen_by_weekday` / `shops_for` retire when kitchen-on-plan
    lands.
 5. SwiftUI floor app (only after 4 is proven in real use)
