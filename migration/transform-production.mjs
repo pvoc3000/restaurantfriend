@@ -628,6 +628,19 @@ for (const r of L.rows) {
   }
 
   // An ingredient. First: is it one of the magic metadata rows?
+  //
+  // These fill the version's own columns AND STAY AS LINES (2026-08-08). 036
+  // lifted them out and dropped the row, which is half right: they are metadata
+  // about the recipe, and they are also PER BATCH COLUMN. Measured over this
+  // export the columns differ on 196 of 198 mixer sizes, 349 of 376 yields and
+  // 57 of 94 prep times — Banana Cake Donut v10 mixes in 4/10/10/20 QT, which
+  // is not proportional to anything, so no scaling recovers it from one number.
+  // FileMaker's own printed sheet lists all three as rows under a rule.
+  //
+  // The columns are not a duplicate: they come from the recipe record's own
+  // `Yield` / `PrepTime_text` fields (FileMaker prints those in the header
+  // block), and `??=` only reaches for the row when the record left them empty.
+  // `yield_amount` is load-bearing besides — costing divides a batch by it.
   const magic = label ? MAGIC.get(norm(label)) : null;
   if (magic) {
     const base = num(amounts[0]);
@@ -636,7 +649,7 @@ for (const r of L.rows) {
     else if (magic === 'yield') { version.yield_amount ??= base; version.yield_unit ??= unit; }
     else if (magic === 'prep_time') version.prep_time ??= base === null ? null : `${base}${unit ? ' ' + unit : ''}`;
     counts.magic++;
-    continue;
+    // falls through — the row is kept
   }
 
   // FMP's literal separator rows, which are presentation stored as data —
@@ -918,11 +931,14 @@ console.log(`\n── RECIPE LINES ──`);
 console.log(`  ${L.rows.length} source rows accounted for:`);
 console.log(`    ${counts.ingredient} ingredient lines`);
 console.log(`    ${counts.procedure} procedure steps`);
-console.log(`    ${counts.magic} metadata rows lifted onto the version (mixer size / yield / prep time)`);
+console.log(`      of which ${counts.magic} are metadata rows (mixer size / yield / prep time),`);
+console.log(`      kept as lines AND read into the version's own columns where those were empty`);
 console.log(`    ${counts.separator} separators dropped`);
 console.log(`    ${counts.empty} empty rows dropped`);
 console.log(`    ${counts.orphan} orphans`);
-const accounted = counts.ingredient + counts.procedure + counts.magic + counts.separator + counts.empty + counts.orphan;
+// `magic` is a SUBSET of `ingredient` since 2026-08-08 — those rows are kept —
+// so it must not be added again here or every run reports 668 phantom rows.
+const accounted = counts.ingredient + counts.procedure + counts.separator + counts.empty + counts.orphan;
 if (accounted !== L.rows.length) fatal.push(`recipe lines: ${accounted} accounted for, ${L.rows.length} in the file`);
 console.log(`  ${lines.filter((l) => !l.element_legacy_id).length} lines have no element (a note-shaped line: "pinch of salt")`);
 

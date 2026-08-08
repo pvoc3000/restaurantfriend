@@ -17,12 +17,12 @@ import { PrintRecipe } from "./PrintRecipe";
  */
 export function RecipeVersions({
   recipeName,
-  elementName,
+  orgName,
   versions,
   editable,
 }: {
   recipeName: string;
-  elementName: string | null;
+  orgName: string;
   versions: SheetVersion[];
   editable: boolean;
 }) {
@@ -76,11 +76,7 @@ export function RecipeVersions({
             }))}
           />
         )}
-        <PrintRecipe
-          recipeName={recipeName}
-          elementName={elementName}
-          version={current}
-        />
+        <PrintRecipe recipeName={recipeName} orgName={orgName} version={current} />
       </div>
 
       {!current.is_master ? (

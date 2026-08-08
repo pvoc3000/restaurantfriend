@@ -63,6 +63,9 @@ export type SheetVersion = {
   tools: string | null;
   scale_labels: string[] | null;
   scale_multipliers: number[] | null;
+  /** The printed sheet's header block states both, the way FileMaker's does. */
+  created_at: string | null;
+  updated_at: string | null;
   lines: SheetLine[];
   steps: SheetStep[];
   batchCost: Cost;
@@ -698,13 +701,18 @@ function ItemCell({ line, editable }: { line: SheetLine; editable: boolean }) {
         {line.elementName ?? line.label}
       </Link>
       {editable ? (
+        // FMP's `columnName_t`. NOT what prints — the element's own name is,
+        // here and on the sheet, because this override goes stale when a
+        // version is copied (Banana Cake Donut v10 still calls its bananas
+        // "Coffee"). It is kept and editable because it is real stored data and
+        // somebody may have meant it; it just doesn't get to name the line.
         <span className="w-full text-[12px] text-subtle">
           <InlineValue
             table="production_recipe_lines"
             id={line.id}
             column="label"
             value={line.label}
-            placeholder="print as…"
+            placeholder="also called…"
           />
         </span>
       ) : line.label && line.label !== line.elementName ? (

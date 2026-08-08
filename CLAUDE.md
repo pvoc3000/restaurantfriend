@@ -2169,6 +2169,60 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    sheet's own metadata rows say 34 (340 at ×1) and 2.75 hr. 036 lifted those
    rows into columns and preferred the recipe record's fields where both
    existed. Worth Mark's eye; not a code fix.
+   **The PRINTED SHEET was rebuilt 2026-08-08 to FileMaker's own**, which Mark
+   supplied as a reference (Banana Cake Donut v10). Its brief is one sentence —
+   *it has to be easy to follow by kitchen staff* — and three things come off it
+   on his instruction: **no money** (no unit cost, no line cost, no batch total),
+   **no notes**, and **no percentages** (FMP's sheet has no % column; the screen
+   keeps it). Black banner, FileMaker's bordered header block, ingredients LEFT
+   and the batch columns right (Mark's preference over FMP, which reverses them),
+   each amount split into a number and its unit.
+   **MIXER SIZE, EXPECTED YIELD AND PREP TIME ARE ROWS AGAIN**, one figure per
+   batch column, and that is the correction that mattered (Mark: "the recipe
+   contains multiple batches and the mixer and prep time are included with the
+   batch size"). 036 lifted them into columns on the version and DROPPED the
+   rows, which is half right: they are metadata AND they are per column.
+   Measured over the export, the columns differ on **196 of 198** mixer sizes,
+   **349 of 376** yields and **57 of 94** prep times — Banana Cake Donut v10
+   mixes in 4 / 10 / 10 / 20 QT, which is proportional to nothing, so no scaling
+   recovers it from one number. `migration/backfill-recipe-metadata-rows.mjs`
+   restored **668 lines** (idempotent — they carry their FMP key as `legacy_id`
+   and the table is unique on `(org_id, legacy_id)`), and the transform now
+   keeps them instead of `continue`-ing past. **`counts.magic` became a SUBSET of
+   `counts.ingredient` when it did**, so it must not be added to the accounting
+   total again or every run reports 668 phantom rows.
+   The version COLUMNS stay and are not a duplicate: they come from the recipe
+   record's own `Yield` / `PrepTime_text`, which FileMaker also keeps and also
+   prints in the header. `yield_amount` is load-bearing besides — costing
+   divides a made element's batch by it. **Known and NOT fixed:** the screen's
+   Facts block still states yield/mixer/prep beside the rows that now say it per
+   column, and on Raisied Donut v11 the two disagree (30 ea vs 34→340 ea). Ask
+   Mark before removing either.
+   **THE ELEMENT'S NAME LEADS; `label` is only a fallback**, on the sheet and in
+   the PDF. FMP's `columnName_t` is an override that goes STALE when a version
+   is copied: Banana Cake Donut v10 still carries "Coffee" and "Amoretti
+   Espresso Artisan Flavor" over its bananas, left by the coffee donut it was
+   cloned from — and FileMaker prints "Bananas, Mashed", because it reads the
+   item. The transform still PREFERS the override when filling `label`, so the
+   stale text is in the data; only the readers changed.
+   **Ingredient groups are the HOLES in the sort numbers.** FMP grouped with
+   separator rows (827 of them, presentation stored as data, dropped at the 036
+   load) and what it could not drop is the gap they left: v10 runs 1, 2, (3), 4,
+   5, 6, 7, (98, 99), 100, 101, 102. `opensGroup` opens a blank line wherever two
+   consecutive PRINTED rows jump — computed after the hidden rows come off, so
+   Total Liquid at 99 leaves its gap behind rather than absorbing one.
+   **CREATED is FileMaker's date and MODIFIED is not printed at all.**
+   `created_at` defaulted to `now()`, so after the load every recipe claimed to
+   have been written the day the migration ran — harmless in a database and a
+   lie on a page that states it. `migration/backfill-recipe-created.mjs` dated
+   all **493 versions** from `_CreationTimestamp` (span 2022-01-25 → 2026-07-21)
+   and parked `_ModificationTimestamp` in `source_payload.fmp_modified_at`.
+   MODIFIED stays off the sheet because `updated_at` is trigger-maintained and
+   says when the ROW changed — the load, for everything migrated — while FMP's
+   says when the RECIPE changed. Two different facts, one label, no column yet.
+   Verified by rendering the real v10 through the real component in Node over
+   live rows (the `PoPdf` idiom) and comparing against Mark's own printout: every
+   amount, every unit, every group break and all three metadata rows match.
    **Phase 5 is NOT built**: batches + actuals (was 041, now 042). `made`/`leftover` ship as
    columns and render read-only, because a supervisor writing them needs
    COLUMN-scoped access this table's RLS deliberately doesn't give — that is

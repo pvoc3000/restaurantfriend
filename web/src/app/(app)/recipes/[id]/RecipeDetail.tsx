@@ -42,6 +42,7 @@ export async function RecipeDetail({
            id, org_id, version_label, version_sort, is_master, is_active, author, description,
            note, testing_notes, yield_amount, yield_unit, mixer_size, prep_time,
            shelf_life, storage, tools, scale_labels, scale_multipliers,
+           created_at, updated_at,
            production_recipe_lines (
              id, label, qty, unit, note, sort, element_id,
              scale_auto, scale_amounts, scale_units, hide_on_print
@@ -93,6 +94,8 @@ export async function RecipeDetail({
     tools: string | null;
     scale_labels: string[] | null;
     scale_multipliers: number[] | null;
+    created_at: string | null;
+    updated_at: string | null;
     production_recipe_lines: {
       id: string;
       label: string | null;
@@ -198,6 +201,8 @@ export async function RecipeDetail({
         tools: v.tools,
         scale_labels: v.scale_labels,
         scale_multipliers: v.scale_multipliers?.map(Number) ?? null,
+        created_at: v.created_at,
+        updated_at: v.updated_at,
         lines,
         steps: (v.production_recipe_steps ?? [])
           .slice()
@@ -269,7 +274,7 @@ export async function RecipeDetail({
 
       <RecipeVersions
         recipeName={recipe.name as string}
-        elementName={(element?.name ?? null) as string | null}
+        orgName={session.orgName}
         versions={versions}
         editable={editable}
       />

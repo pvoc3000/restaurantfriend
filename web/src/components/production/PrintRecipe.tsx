@@ -16,11 +16,12 @@ import type { SheetVersion } from "./RecipeVersionSheet";
  */
 export function PrintRecipe({
   recipeName,
-  elementName,
+  orgName,
   version,
 }: {
   recipeName: string;
-  elementName: string | null;
+  /** Printed at the foot of every page, where FileMaker sets the wordmark. */
+  orgName: string;
   version: SheetVersion;
 }) {
   const [pending, start] = useTransition();
@@ -40,44 +41,37 @@ export function PrintRecipe({
         const blob = await pdf(
           <RecipePdf
             data={{
-              orgName: "",
+              orgName,
               recipeName,
-              elementName,
               versionLabel: version.version_label,
-              isMaster: version.is_master,
+              createdAt: formatStamp(version.created_at),
               author: version.author,
-              description: version.description,
-              yieldAmount: version.yield_amount,
-              yieldUnit: version.yield_unit,
-              mixerSize: version.mixer_size,
+              info: version.description,
               prepTime: version.prep_time,
               shelfLife: version.shelf_life,
               storage: version.storage,
               tools: version.tools,
-              note: version.note,
-              testingNotes: version.testing_notes,
               scaleLabels: version.scale_labels,
               scaleMultipliers: version.scale_multipliers,
               lines: version.lines.map((l) => ({
-                // The LABEL leads where there is one: FMP's `columnName_t` is
-                // an override written for the printed page ("Speedy Glaze"),
-                // and the element's catalog name is what it is filed under.
-                name: l.label ?? l.elementName ?? "—",
+                // THE ELEMENT'S NAME LEADS, and the label is only a fallback.
+                // FileMaker's own printed sheet does the same, and its data is
+                // why: `columnName_t` is an override that goes stale when a
+                // version is copied. Banana Cake Donut v10 still carries
+                // "Coffee" and "Amoretti Espresso Artisan Flavor" over its
+                // bananas, left behind by the coffee donut it was cloned from —
+                // and FMP prints "Bananas, Mashed", because it reads the item.
+                name: l.elementName ?? l.label ?? "—",
                 qty: l.qty,
                 unit: l.unit,
-                note: l.note,
                 scaleAuto: l.scaleAuto,
                 scaleAmounts: l.scaleAmounts,
                 scaleUnits: l.scaleUnits,
                 hidden: l.hideOnPrint,
-                cost: l.cost.cost,
+                sort: l.sort,
               })),
               steps: version.steps.map((s) => ({ body: s.body, imageUrl: s.imageUrl })),
-              batchCost: version.batchCost.cost,
-              unpricedCount: new Set(version.batchCost.unresolved.map((u) => u.name)).size,
-              // The date belongs to the PRINT, not to the recipe: a sheet
-              // carries live costs frozen at the moment it was made.
-              printedOn: new Date().toISOString().slice(0, 10),
+              printedOn: new Date().toLocaleDateString(),
             }}
           />
         ).toBlob();
@@ -103,4 +97,15 @@ export function PrintRecipe({
       </button>
     </div>
   );
+}
+
+/**
+ * A timestamp as FileMaker's header block sets it — the local date and time,
+ * not an ISO string. This is the one page in the app read by somebody who has
+ * never seen a database.
+ */
+function formatStamp(value: string | null): string | null {
+  if (!value) return null;
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d.toLocaleString();
 }
