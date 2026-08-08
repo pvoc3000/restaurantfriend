@@ -3,14 +3,22 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Switch } from "@/components/ui/Switch";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { freezeScales, type ScalableLine, type ScaleColumn } from "@/lib/production";
 
 /**
- * The AUTO switch — FileMaker's `AutoUpdate_bool`, one per ingredient row,
- * sitting between the base column and the first scaled one because that is
- * exactly what it governs.
+ * The AUTO box — FileMaker's `AutoUpdate_bool`, one per ingredient row, sitting
+ * between the base column and the first scaled one because that is exactly what
+ * it governs.
+ *
+ * A CHECKBOX AND NOT A SWITCH (Mark, 2026-08-08: "we have both toggle switches
+ * and check boxes in the ingredient list. Pick one"). Both were doing the same
+ * job on the same row — this and HIDE — and two shapes for one kind of answer is
+ * just something else to read. The box wins on the two grounds that decide it:
+ * FileMaker uses one here, and at 18px square it costs a third of the width a
+ * 36×20 switch does on a grid that is already 1,300px wide. `ui/Switch` stays
+ * what it is — a control for a RECORD's state, which is what `ActiveToggle` and
+ * the versions list use it for.
  *
  * ON: the columns to its right are the base times the multiplier above them.
  * OFF: they are whatever somebody typed, and nothing overwrites them.
@@ -23,7 +31,7 @@ import { freezeScales, type ScalableLine, type ScaleColumn } from "@/lib/product
  * nothing, it stops a mis-tap being destructive, and the next switch-off
  * re-freezes over it anyway.
  */
-export function ScaleAutoSwitch({
+export function ScaleAutoBox({
   line,
   columns,
   base,
@@ -83,16 +91,16 @@ export function ScaleAutoSwitch({
 
   return (
     <span className="inline-flex items-center gap-1">
-      <Switch
-        size="sm"
-        on={on}
+      <Checkbox
+        checked={on}
         disabled={pending}
-        onToggle={toggle}
-        ariaLabel={
+        size={18}
+        label={
           on
-            ? "Scaled from the multipliers — switch off to type these columns"
-            : "Typed — switch on to scale these columns from the multipliers"
+            ? "Scaled from the multipliers — clear to type these columns"
+            : "Typed — tick to scale these columns from the multipliers"
         }
+        onChange={toggle}
       />
       {failed && <span className="text-[11px] uppercase text-accent">retry</span>}
     </span>

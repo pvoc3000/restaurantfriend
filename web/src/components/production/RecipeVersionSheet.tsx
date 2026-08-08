@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import { useRef } from "react";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { useExactViewportHeight } from "@/lib/tableHead";
+import { useWideLayout } from "@/lib/useWideLayout";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import {
   scaleColumns,
@@ -12,7 +15,7 @@ import {
 import { convert } from "@/lib/units";
 import { unresolvedSummary, type Cost } from "@/lib/productionCost";
 import { RecipeScaleCell } from "./RecipeScaleCell";
-import { ScaleAutoSwitch, HideOnPrint, DeleteRecipeRow } from "./RecipeRowControls";
+import { ScaleAutoBox, HideOnPrint, DeleteRecipeRow } from "./RecipeRowControls";
 import { RecipeStepImage } from "./RecipeStepImage";
 import { AddRecipeRow } from "./AddRecipeRow";
 
@@ -162,15 +165,31 @@ export function RecipeVersionSheet({
     null
   );
 
+  // BOTH LISTS ON SCREEN AT ONCE (Mark, 2026-08-08). A recipe is read as two
+  // documents together — what goes in, and what you do with it — and a
+  // seventy-row ingredient grid pushed the procedure a page and a half down.
+  // So they split the window and scroll their own rows, the Info tab's
+  // arrangement applied to the tab it was really needed on.
+  //
+  // Ingredients take the larger share: they are the list you look back at
+  // between steps, and they are the one with a horizontal axis to spare.
+  const frame = useRef<HTMLDivElement>(null);
+  const wide = useWideLayout();
+  useExactViewportHeight(frame, wide, 520);
+
   return (
-    <div className="space-y-10">
+    <div ref={frame} className="flex flex-col gap-8 overflow-hidden">
       {/* ------------------------------------------------------------------ */}
       {/* Ingredients                                                         */}
       {/* ------------------------------------------------------------------ */}
-      <section className="space-y-3">
+      <section className="flex min-h-0 basis-0 grow-[1.35] flex-col gap-3">
         <SectionHeading count={version.lines.length}>Ingredients</SectionHeading>
 
-        <div className="overflow-x-auto">
+        {/* One scroller for BOTH axes, which is what the sticky header needs:
+            `position: sticky` resolves against the nearest scroll container, so
+            a separate horizontal wrapper would pin the labels to a box that
+            never scrolls vertically. */}
+        <div className="min-h-0 flex-1 overflow-auto">
           <table
             className="w-full table-fixed border-collapse text-[14px]"
             style={{ minWidth: tableWidth }}
@@ -193,13 +212,17 @@ export function RecipeVersionSheet({
               {/* The multiplier strip. Nothing over the base column — it is what
                   the others are a multiple OF — and nothing over `%`, which is
                   a share rather than a scale. */}
-              <tr>
+              <tr className="[&>th]:sticky [&>th]:top-0 [&>th]:z-20 [&>th]:bg-white">
                 <th />
                 <th />
-                <th className="px-2 pb-1 text-right text-[10px] uppercase tracking-[0.12em] text-subtle">
-                  Multiplier
-                </th>
                 <th />
+                {/* The multiplier sign sits over the AUTO column (Mark,
+                    2026-08-08), which is the column it belongs to: the boxes
+                    beneath it are what decide whether the numbers to its right
+                    are the base times these figures. Left where it was, over the
+                    base amount, it labelled the one column no multiplier
+                    applies to. */}
+                <th className="px-2 pb-1 text-center text-[12px] font-semibold text-subtle">×</th>
                 {headerSlots.slice(1).map((column, i) => (
                   <th key={`m${i}`} className="px-2 pb-1">
                     {column && !column.isPercent && editable ? (
@@ -231,10 +254,13 @@ export function RecipeVersionSheet({
 
               {/* The batch names — what each column MAKES, and the reason the
                   labels are content rather than a fixed ×½/×¾/×1 ladder. */}
-              <tr>
-                <th className="px-2 pb-1 text-left text-[10px] uppercase tracking-[0.12em] text-subtle">
-                  Batch
-                </th>
+              {/* STACKED STICKY OFFSETS. The three header rows scroll as one, so
+                  each is pinned below the last: 26px is the multiplier row's own
+                  height (12px text over `pb-1`) and 62 is that plus the batch
+                  names'. Measured, not guessed — and stable, because both rows
+                  are fixed type at fixed padding. */}
+              <tr className="[&>th]:sticky [&>th]:top-[26px] [&>th]:z-20 [&>th]:bg-white">
+                <th />
                 <th />
                 {/* The base column, then the AUTO column's own empty cell, then
                     the rest — the switch sits BETWEEN the first two amount
@@ -262,7 +288,7 @@ export function RecipeVersionSheet({
                 <th colSpan={5} />
               </tr>
 
-              <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em] text-ink">
+              <tr className="text-[11px] uppercase tracking-[0.12em] text-ink [&>th]:sticky [&>th]:top-[62px] [&>th]:z-20 [&>th]:border-b-2 [&>th]:border-ink [&>th]:bg-white">
                 <th className="px-2 py-2 text-left">Sort</th>
                 <th className="px-3 py-2 text-left">Item</th>
                 <th />
@@ -324,7 +350,7 @@ export function RecipeVersionSheet({
                   )}
 
                   <td className="px-2 py-2 text-center">
-                    <ScaleAutoSwitch
+                    <ScaleAutoBox
                       line={line}
                       columns={columns}
                       base={base}
@@ -403,7 +429,7 @@ export function RecipeVersionSheet({
         </div>
 
         {version.lines.length === 0 ? (
-          <p className="text-[13px] text-muted">No ingredients on this version.</p>
+          <p className="shrink-0 text-[13px] text-muted">No ingredients on this version.</p>
         ) : null}
 
         {editable ? (
@@ -421,9 +447,10 @@ export function RecipeVersionSheet({
       {/* ------------------------------------------------------------------ */}
       {/* Procedure                                                           */}
       {/* ------------------------------------------------------------------ */}
-      <section className="space-y-3">
+      <section className="flex min-h-0 basis-0 grow flex-col gap-3">
         <SectionHeading count={version.steps.length}>Procedure</SectionHeading>
 
+        <div className="min-h-0 flex-1 overflow-auto">
         <table className="w-full table-fixed border-collapse text-[14px]">
           <colgroup>
             <col style={{ width: W_SORT }} />
@@ -432,7 +459,7 @@ export function RecipeVersionSheet({
             <col style={{ width: W_TRASH }} />
           </colgroup>
           <thead>
-            <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em] text-ink">
+            <tr className="text-[11px] uppercase tracking-[0.12em] text-ink [&>th]:sticky [&>th]:top-0 [&>th]:z-20 [&>th]:border-b-2 [&>th]:border-ink [&>th]:bg-white">
               <th className="px-2 py-2 text-left">Sort</th>
               <th className="px-3 py-2 text-left">Step</th>
               <th className="px-3 py-2 text-left">Picture</th>
@@ -500,9 +527,10 @@ export function RecipeVersionSheet({
             ))}
           </tbody>
         </table>
+        </div>
 
         {version.steps.length === 0 ? (
-          <p className="text-[13px] text-muted">No procedure on this version.</p>
+          <p className="shrink-0 text-[13px] text-muted">No procedure on this version.</p>
         ) : null}
 
         {editable ? (

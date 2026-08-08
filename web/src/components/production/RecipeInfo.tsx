@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useRef, useState, useSyncExternalStore, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Switch } from "@/components/ui/Switch";
-import { useFillViewportHeight } from "@/lib/tableHead";
+import { useExactViewportHeight } from "@/lib/tableHead";
+import { useWideLayout } from "@/lib/useWideLayout";
 import { unresolvedSummary } from "@/lib/productionCost";
 import { recipeHref } from "@/lib/recipes";
 import { scaleColumns } from "@/lib/production";
@@ -52,10 +53,14 @@ export function RecipeInfo({
   editable: boolean;
   params: Record<string, string | string[] | undefined>;
 }) {
-  const frame = useRef<HTMLDivElement>(null);
-  // Only the wide layout is capped. Stacked, the page is meant to scroll.
-  const wide = useWide();
-  useFillViewportHeight(frame, wide, 420);
+  // THE CAP IS ON THE ROW, not on the whole tab. Capping the frame made the
+  // three cells whatever was left after the fields block — 250px on a laptop,
+  // which is not a pane, it is a letterbox (Mark, 2026-08-08: "much taller").
+  // Measuring the row itself lets it take the window down to its own floor, and
+  // past that the page scrolls rather than the cells shrinking further.
+  const row = useRef<HTMLDivElement>(null);
+  const wide = useWideLayout();
+  useExactViewportHeight(row, wide, 560);
 
   // THE CHOSEN COLUMN LIVES HERE, not inside the costs block, because two
   // things read it: the matrix, and the Batch cost fact at the top of the
@@ -76,30 +81,38 @@ export function RecipeInfo({
   const at = defaultColumn(matrix);
 
   return (
-    <div ref={frame} className="flex flex-col gap-8 overflow-hidden">
+    <div className="flex flex-col gap-6">
+      {/* ONE THIRD / TWO THIRDS, the same split as the row beneath it, so the
+          boundary runs straight down the page (Mark, 2026-08-08). Two `dl`s
+          rather than one four-track grid: a single grid ties the two sides to
+          the same row heights, so a long description would push Storage's value
+          down to meet it. */}
       <section className="shrink-0 space-y-3">
         <SectionHeading>Version {version.version_label}</SectionHeading>
-        <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-6 gap-y-2 text-[14px] lg:grid-cols-[minmax(7rem,auto)_1fr_minmax(7rem,auto)_1fr]">
+        <div className="grid gap-x-8 gap-y-2 lg:grid-cols-[1fr_2fr]">
+        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-6 gap-y-2 text-[14px]">
           <Fact label="Description">
             <Editable id={version.id} column="description" value={version.description} editable={editable} />
-          </Fact>
-          <Fact label="Storage">
-            <Editable id={version.id} column="storage" value={version.storage} editable={editable} />
           </Fact>
           <Fact label="Author">
             <Editable id={version.id} column="author" value={version.author} editable={editable} />
           </Fact>
-          <Fact label="Shelf life">
-            <Editable id={version.id} column="shelf_life" value={version.shelf_life} editable={editable} />
-          </Fact>
           <Fact label="Created">
             <span className={READ_ONLY_VALUE}>{stamp(version.created_at) ?? "—"}</span>
           </Fact>
-          <Fact label="Tools">
-            <Editable id={version.id} column="tools" value={version.tools} editable={editable} multiline />
-          </Fact>
           <Fact label="Modified">
             <span className={READ_ONLY_VALUE}>{stamp(modifiedAt(version)) ?? "—"}</span>
+          </Fact>
+        </dl>
+        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-6 gap-y-2 text-[14px] lg:grid-cols-[minmax(6rem,auto)_1fr_minmax(6rem,auto)_1fr]">
+          <Fact label="Storage">
+            <Editable id={version.id} column="storage" value={version.storage} editable={editable} />
+          </Fact>
+          <Fact label="Shelf life">
+            <Editable id={version.id} column="shelf_life" value={version.shelf_life} editable={editable} />
+          </Fact>
+          <Fact label="Tools">
+            <Editable id={version.id} column="tools" value={version.tools} editable={editable} multiline />
           </Fact>
           <Fact label="Batch cost">
             {/* Follows the cost column. The gaps note goes on its OWN LINE,
@@ -123,14 +136,18 @@ export function RecipeInfo({
             </span>
           </Fact>
         </dl>
+        </div>
       </section>
 
-      <div className="flex min-h-0 flex-1 flex-col gap-8 xl:flex-row">
+      <div
+        ref={row}
+        className="flex min-h-0 flex-col gap-8 overflow-hidden xl:grid xl:grid-cols-[1fr_2fr] xl:gap-8"
+      >
         {/* `min-w-0` on BOTH columns, and not behind a breakpoint: a flex item's
             min-width defaults to min-content, so the costs matrix's own
             `minWidth` would make its column refuse to shrink and push the whole
             page sideways rather than scrolling inside its box. */}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-8">
+        <div className="flex min-h-0 min-w-0 flex-col gap-8">
           <Notes version={version} editable={editable} />
           <RecipeVersionList
             recipeId={recipeId}
@@ -140,14 +157,13 @@ export function RecipeInfo({
             params={params}
           />
         </div>
-        {/* Sized to the matrix rather than to a share of the row. The matrix is
-            the one thing here with a natural width — 140px of labels plus 92 per
-            batch size — and giving it a fraction instead left four columns
-            needing 508px in a 394px pane, scrolling sideways to read a block
-            whose whole point is the comparison across it. 32rem covers the four
-            and five columns nearly every version has; a wider strip scrolls
-            inside its own box, which is the honest failure. */}
-        <div className="min-h-0 min-w-0 shrink-0 overflow-y-auto xl:w-[32rem]">
+        {/* Two thirds, which is what the matrix wants anyway: 140px of labels
+            plus 92 per batch size is 508 at four columns, and a third of the row
+            left it at 394 — scrolling sideways to read the one block whose whole
+            point is the comparison across it. `min-w-0` is not optional here;
+            without it the table's own `minWidth` stops the track shrinking and
+            pushes the PAGE sideways. */}
+        <div className="min-h-0 min-w-0 overflow-y-auto">
           <RecipeCosts
             version={version}
             matrix={matrix}
@@ -441,32 +457,6 @@ function Editable({
     </span>
   );
 }
-
-/**
- * Whether the wide layout is on — the same `xl` the stacked/side-by-side switch
- * uses in CSS, read once in JS so the height cap agrees with it.
- *
- * `useSyncExternalStore` rather than an effect, which is what the
- * `set-state-in-effect` lint wants and what keeps the server render honest: the
- * server snapshot is `false`, so the first paint is the stacked layout and no
- * height is written until the client knows its own width.
- */
-function useWide(): boolean {
-  const subscribe = useCallback((notify: () => void) => {
-    const mq = window.matchMedia(WIDE);
-    mq.addEventListener("change", notify);
-    return () => mq.removeEventListener("change", notify);
-  }, []);
-  return useSyncExternalStore(
-    subscribe,
-    () => window.matchMedia(WIDE).matches,
-    () => false
-  );
-}
-
-/** Tailwind's `xl`. The CSS and the measurement must agree or the page caps
- *  itself at a width where the columns are still stacked. */
-const WIDE = "(min-width: 1280px)";
 
 function stamp(value: string | null): string | null {
   if (!value) return null;

@@ -265,3 +265,56 @@ export function useFillViewportHeight(
     };
   }, [ref, enabled, minHeight]);
 }
+
+/**
+ * The DEFINITE-HEIGHT sibling of `useFillViewportHeight`: it writes `height`
+ * rather than `max-height`, so the element ends where the window does AND its
+ * flex children have something to be a proportion OF.
+ *
+ * The difference is not a nicety. A `max-height` alone leaves the box
+ * content-sized, and a child with `basis-0 grow` has no content height to fall
+ * back on — so a column of proportional panes collapses to nothing at all,
+ * which is exactly what the recipe tabs did. Reach for the cap when a pane
+ * should be as tall as its rows and no taller; reach for this when several
+ * panes have to SHARE a height.
+ *
+ * Everything else is the cap's: the top is measured, whatever follows the
+ * element is measured too (the layout's own padding sits under it), the write
+ * goes straight to the node so a resize doesn't re-render the rows, and a >1px
+ * guard stops the observer reacting to its own write.
+ */
+export function useExactViewportHeight(
+  ref: React.RefObject<HTMLElement | null>,
+  enabled = true,
+  minHeight = 320
+) {
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    if (!enabled) {
+      el.style.height = "";
+      return;
+    }
+
+    const measure = () => {
+      const previous = el.style.height;
+      el.style.height = "auto";
+      const rect = el.getBoundingClientRect();
+      const below = document.body.getBoundingClientRect().bottom - rect.bottom;
+      const target = Math.max(minHeight, window.innerHeight - rect.top - below);
+      el.style.height = previous;
+      if (Math.abs(parseFloat(previous || "0") - target) > 1) {
+        el.style.height = `${target}px`;
+      }
+    };
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
+    window.addEventListener("resize", measure);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [ref, enabled, minHeight]);
+}

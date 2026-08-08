@@ -2261,6 +2261,28 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Labour rate is fetched in the page's own `Promise.all` rather than folded
    into `getAppSession`: one column read by one screen, against a session every
    screen pays for.
+   **BOTH RECIPE TABS ARE ONE SCREEN OF PANES** (Mark, 2026-08-08). Info: the
+   fields, then Notes + Versions sharing a column beside Costs. Recipe:
+   Ingredients over Procedure, each scrolling its own rows. **Both areas split
+   ONE THIRD / TWO THIRDS** so the boundary runs straight down the page — the
+   fields as two `dl`s rather than one four-track grid, because a single grid
+   ties both sides to the same row heights and a long description would push
+   Storage's value down to meet it.
+   **`useExactViewportHeight` — the DEFINITE-height sibling of
+   `useFillViewportHeight`, and the difference is not a nicety.** A `max-height`
+   alone leaves the box content-sized, and a child with `basis-0 grow` has no
+   content height to fall back on, so a column of proportional panes collapses
+   to NOTHING. Both recipe tabs did exactly that before the switch. Reach for the
+   cap when a pane should be as tall as its rows and no taller; reach for the
+   exact one when several panes SHARE a height. `lib/useWideLayout` is the
+   matching `xl` probe, so the measurement and the CSS agree.
+   Other traps paid for here: **`min-w-0` on both columns and NOT behind a
+   breakpoint**, or the costs matrix's own `minWidth` stops its track shrinking
+   and pushes the PAGE sideways; the ingredient grid's **one scroller for both
+   axes**, since `position: sticky` resolves against the nearest scroll
+   container and a separate horizontal wrapper pins the labels to a box that
+   never scrolls vertically; and its **three header rows stack their sticky
+   offsets** (0 / 26 / 62px, measured).
    **THE INFO TAB IS ONE SCREEN** (Mark, 2026-08-08: "ideally everything should
    display on a single screen. Notes and versions should scroll"). The fields sit
    at their natural height; below them a row takes whatever is left, with NOTES
@@ -2278,7 +2300,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **Batch cost at the top follows the chosen column**, so the state lives in
    `RecipeInfo` and the matrix is computed once and passed down — a figure quoted
    twice from two different columns is the duplication this tab spent the day
-   removing. **Item is the ingredient grid's SECOND column**, after Sort.
+   removing. **Item is the ingredient grid's SECOND column**, after Sort, the
+   multiplier row is a single `×` centred over the AUTO column it governs, and
+   **AUTO is a CHECKBOX** — Mark, 2026-08-08: "we have both toggle switches and
+   check boxes in the ingredient list. Pick one." Two shapes for one kind of
+   answer on one row is just something else to read; the box matches FileMaker,
+   matches HIDE beside it, and costs a third of a switch's width. `ui/Switch`
+   stays what it is, a control for a RECORD's state.
    **MODIFIED is FileMaker's stamp where we have one** (`fmp_modified_at`, parked
    in `source_payload` by `backfill-recipe-created.mjs`), and `updated_at` where
    we don't. That order is right today — for every migrated recipe `updated_at`
