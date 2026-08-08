@@ -89,6 +89,7 @@ export type Unresolved = {
     | "no vendor price"        // mapped, but nothing carries a price
     | "no package content"     // priced, but we can't get to a per-unit cost
     | "no recipe"              // made, but no master version
+    | "no ingredients"         // made, and the master version is an empty document
     | "no yield"               // made, but the version doesn't say how much it makes
     | "no quantity"            // a line with no amount
     | "incompatible units"     // the line's unit can't reach the element's
@@ -246,6 +247,15 @@ export function versionBatchCost(
     priced += 1;
     unresolved.push(...result.unresolved);
   }
+
+  // A version with no lines at all costs nothing AND had nothing to report,
+  // so it used to come back as an unexplained null — an element reading "—"
+  // with no reason beside it, which is the one thing this module's whole
+  // unresolved-list exists to prevent. Measured against the live catalog: one
+  // element (Toasted Coconut) is exactly this.
+  if (!version.lines.length) {
+    unresolved.push({ elementId: null, name: "this recipe", reason: "no ingredients" });
+  }
   return { cost: priced ? total : null, unit: null, unresolved };
 }
 
@@ -289,10 +299,20 @@ export function lineCost(
   return { cost: qtyInElementUnit * per.cost, unit: null, unresolved: per.unresolved };
 }
 
-/** "$4.12", "≥ $4.12" when something in the tree could not be priced. */
+/**
+ * "$4.12", or "≥ $4.12" when something in the tree could not be priced.
+ *
+ * A SUB-CENT COST KEEPS FOUR DECIMALS, and that is not a nicety. Half this
+ * catalog is priced per GRAM — Chocolate Glaze is $7.68 a batch over a 3,272 g
+ * yield, which is $0.0024/g — and two decimals renders every one of them as
+ * "$0.00", i.e. free. That reads as the costing being broken rather than as
+ * rounding, and it is why FileMaker kept a CostPerGram column to sixteen
+ * places. Found on the element screen with real data.
+ */
 export function formatCost(cost: Cost, currency = "$"): string {
   if (cost.cost === null) return "—";
-  const money = `${currency}${cost.cost.toFixed(2)}`;
+  const places = cost.cost !== 0 && Math.abs(cost.cost) < 0.01 ? 4 : 2;
+  const money = `${currency}${cost.cost.toFixed(places)}`;
   return cost.unresolved.length ? `≥ ${money}` : money;
 }
 

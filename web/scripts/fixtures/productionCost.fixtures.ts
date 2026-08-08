@@ -247,6 +247,21 @@ test("a note-shaped line with no element costs nothing and reports nothing", () 
   eq(c.unresolved.length, 0, "not an error — simply not a priced ingredient");
 });
 
+test("a recipe with NO ingredients says so instead of returning an unexplained null", () => {
+  // Found against the live catalog: one element came back uncosted with an
+  // EMPTY unresolved list, so the screen showed a dash with nothing beside it.
+  // An unexplained null is the one outcome this module exists to prevent.
+  const el: CostElement = {
+    id: "e", name: "Toasted Coconut", kind: "made",
+    manual_cost: null, manual_cost_unit: null,
+    master: { id: "v", yield_amount: 4, yield_unit: "qt", lines: [] },
+  };
+  const c = elementCost(el, graph(el), DF01);
+  eq(c.cost, null);
+  ok(c.unresolved.length > 0, "a reason is always given");
+  eq(c.unresolved[0].reason, "no ingredients");
+});
+
 test("a made element with no master version says 'no recipe'", () => {
   const el: CostElement = {
     id: "e", name: "Bear Claw Filling", kind: "made",
@@ -281,4 +296,16 @@ test("a line whose quantity is missing is named, not skipped", () => {
 test("formatCost renders an empty cost as an em dash, never $0.00", () => {
   eq(formatCost({ cost: null, unit: null, unresolved: [] }), "—");
   no(formatCost({ cost: null, unit: null, unresolved: [] }).includes("0.00"));
+});
+
+test("a SUB-CENT cost keeps four decimals instead of rounding to free", () => {
+  // Chocolate Glaze: $7.68 a batch over a 3,272 g yield. At two decimals every
+  // gram-priced element in the catalog renders "$0.00", which reads as the
+  // costing being broken rather than as rounding.
+  eq(formatCost({ cost: 7.68 / 3272, unit: "g", unresolved: [] }), "$0.0023");
+  eq(formatCost({ cost: 0.0099, unit: "g", unresolved: [] }), "$0.0099");
+  eq(formatCost({ cost: 0.01, unit: "g", unresolved: [] }), "$0.01", "a whole cent stays at two");
+  eq(formatCost({ cost: 4.125, unit: "lbs", unresolved: [] }), "$4.13");
+  // A real zero is a real zero — "Water, Room Temp" is priced at $0.
+  eq(formatCost({ cost: 0, unit: "g", unresolved: [] }), "$0.00");
 });

@@ -128,13 +128,20 @@ export function RecipeVersionSheet({
           <Editable id={version.id} column="author" value={version.author} editable={editable} />
         </Fact>
         <Fact label="Batch cost">
-          <span
-            className={`${READ_ONLY_VALUE} tabular-nums`}
-            title={unresolvedSummary(version.batchCost) ?? undefined}
-          >
-            {formatCost(version.batchCost)}
+          {/* The gaps note goes on its OWN LINE, never beside the figure. Set
+              inline it read "≥ $7.385 not priced" — the count's first digit
+              runs straight onto the cents, and a reader sees $7.385.
+              A WRAPPER, not `block` on the spans: READ_ONLY_VALUE carries
+              `inline-block`, and Tailwind resolves competing display utilities
+              by STYLESHEET order rather than class-string order, so appending
+              `block` silently loses. That is the same trap MENU_ITEM_CLASS
+              carries no display for. */}
+          <span className="flex flex-col items-start">
+            <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+              {formatCost(version.batchCost)}
+            </span>
             {unresolvedSummary(version.batchCost) ? (
-              <span className="ml-2 text-[13px] text-mark">
+              <span className={`${READ_ONLY_VALUE} text-[13px] text-mark`}>
                 {unresolvedSummary(version.batchCost)}
               </span>
             ) : null}

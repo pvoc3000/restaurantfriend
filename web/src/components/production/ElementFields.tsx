@@ -143,10 +143,16 @@ export function ElementFields({
       ) : null}
 
       <Row label="Cost today">
-        <span className={`${READ_ONLY_VALUE} tabular-nums`} title={gaps ?? undefined}>
-          {formatCost(cost)}
-          {cost.unit ? <span className="text-subtle"> / {cost.unit}</span> : null}
-          {gaps ? <span className="ml-2 text-[13px] text-mark">{gaps}</span> : null}
+        {/* The gaps note takes its own line — see RecipeVersionSheet for why,
+            including why this is a wrapper rather than `block` on the spans. */}
+        <span className="flex flex-col items-start">
+          <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+            {formatCost(cost)}
+            {cost.unit ? <span className="text-subtle"> / {cost.unit}</span> : null}
+          </span>
+          {gaps ? (
+            <span className={`${READ_ONLY_VALUE} text-[13px] text-mark`}>{gaps}</span>
+          ) : null}
         </span>
       </Row>
 

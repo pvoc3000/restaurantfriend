@@ -23,29 +23,66 @@ export type ProductionGraph = {
   sourceByElement: Map<string, string>;
 };
 
+/**
+ * POSTGREST RETURNS AT MOST 1,000 ROWS AND SAYS NOTHING ABOUT IT.
+ *
+ * Supabase caps every REST select at `db-max-rows` (1,000 by default), so a
+ * table with more rows comes back silently truncated — no error, no flag, just
+ * a short array. `production_recipe_lines` has 3,765 rows, and the first cut of
+ * this module fetched them in one call: two-thirds of every recipe's
+ * ingredients were invisible to costing, so 299 elements read as uncosted where
+ * the real figure is 209. It looked exactly like a catalog with more holes in
+ * it than expected, which is why it survived a first read of the screen.
+ *
+ * Note the `.order()` — a `.range()` sweep with no ORDER BY returns rows in
+ * whatever order Postgres likes, so pages overlap and rows go missing. That is
+ * the timesheets audit lesson (44,661 rows fetched holding 27,795 distinct
+ * ids), and it applies to any paginated read.
+ */
+async function fetchAll(
+  supabase: SupabaseClient,
+  table: string,
+  select: string
+): Promise<{ data: Record<string, unknown>[]; error: { message: string } | null }> {
+  const PAGE = 1000;
+  const out: Record<string, unknown>[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from(table)
+      .select(select)
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) return { data: [], error };
+    out.push(...(data as unknown as Record<string, unknown>[]));
+    if (!data || data.length < PAGE) break;
+  }
+  return { data: out, error: null };
+}
+
 export async function loadProductionGraph(
   supabase: SupabaseClient
 ): Promise<{ graph: ProductionGraph | null; error: string | null }> {
   const [elements, recipes, versions, lines] = await Promise.all([
-    supabase
-      .from("production_elements")
-      .select(
-        `id, name, kind, manual_cost, manual_cost_unit, inventory_item_id,
-         inventory_items ( id, name, base_unit,
-           vendor_items ( id, price, package_content, is_active,
-             vendor_item_location_prices ( location_id, price ) ) )`
-      ),
-    supabase.from("production_recipes").select("id, element_id, name"),
+    fetchAll(
+      supabase,
+      "production_elements",
+      `id, name, kind, manual_cost, manual_cost_unit, inventory_item_id,
+       inventory_items ( id, name, base_unit,
+         vendor_items ( id, price, package_content, is_active,
+           vendor_item_location_prices ( location_id, price ) ) )`
+    ),
+    fetchAll(supabase, "production_recipes", "id, element_id, name"),
+    // Master versions only — a non-master is a document you read on its own
+    // screen, never what an element costs. ~128 rows, one page.
     supabase
       .from("production_recipe_versions")
       .select("id, recipe_id, yield_amount, yield_unit, is_master")
-      .eq("is_master", true),
+      .eq("is_master", true)
+      .order("id"),
     // Only the master versions' lines are needed for costing, but filtering
     // them here would need the version ids first — a fifth round trip to save
     // a few thousand rows we are already holding. Fetched flat and filtered.
-    supabase
-      .from("production_recipe_lines")
-      .select("id, version_id, element_id, label, qty, unit"),
+    fetchAll(supabase, "production_recipe_lines", "id, version_id, element_id, label, qty, unit"),
   ]);
 
   const failed = [elements, recipes, versions, lines].find((r) => r.error);
