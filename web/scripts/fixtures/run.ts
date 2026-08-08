@@ -26,6 +26,7 @@ import "./payrollBenefits.fixtures";
 import "./poFilters.fixtures";
 import "./productionCost.fixtures";
 import "./productionItems.fixtures";
+import "./productionPlans.fixtures";
 import "./productionScale.fixtures";
 import "./receiving.fixtures";
 import "./tableSort.fixtures";

@@ -30,6 +30,7 @@
     "../../src/lib/tipPool.ts",
     "../../src/lib/homebaseImport.ts",
     "../../src/lib/gustoExport.ts",
-    "../../src/lib/productionPrice.ts"
+    "../../src/lib/productionPrice.ts",
+    "../../src/lib/productionPlans.ts"
   ]
 }

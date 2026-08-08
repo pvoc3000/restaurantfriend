@@ -161,7 +161,7 @@ export const SECTIONS: NavSection[] = [
     // exists to kill. Recipe Items is gone entirely — decision 2 merges it into
     // Elements, so a menu item for it would name a table that no longer exists.
     subs: [
-      stub("production", "plans", "Plans"),
+      { slug: "plans", label: "Plans", href: "/plans", built: true },
       stub("production", "schedules", "Schedules"),
       { slug: "items", label: "Items", href: "/production-items", built: true },
       { slug: "elements", label: "Elements", href: "/elements", built: true },
