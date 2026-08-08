@@ -1780,10 +1780,102 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    misreading recorded above, and three are junk ("test" twice, "fgdfg").
    `--include-contested` overrides it. Never upserts: one human decision already
    on file was left untouched, and a second `--apply` wrote 0.
-4f. 🚧 **Production** — SPECCED 2026-08-07, nothing built. Read
-   **`docs/production-brief.md`** before designing or touching anything here —
-   the whole design was settled in conversation with Mark that day and the
-   brief carries the decisions, the migration traps, and the open questions.
+4f. 🚧 **Production** — specced 2026-08-07; **PHASE 1 BUILT the same day
+   (migration 036, NEEDS APPLYING)**. Read **`docs/production-brief.md`** before
+   designing or touching anything here — the whole design was settled in
+   conversation with Mark and the brief carries the decisions, the migration
+   traps, and what the exports actually say.
+   **Mark's six open questions are ANSWERED** and recorded in the brief: batch
+   numbering seeds at **30,000**; the batch-size rule is his (a regular donut is
+   **1/340** of a batch, mini ⅓ of a regular, giant 2×) which DISAGREES with the
+   stale `_yields.mer` export and so ships as **editable data, never a
+   constant**; a generated schedule line DOES snapshot its cost; wholesale stays
+   informational; the WHOLESALE pseudo-location's pars are skipped with a
+   report; and **the shift-report surface is deferred ENTIRELY** — phase 5's
+   item actuals go on the schedule's own screen and element actuals on a
+   standalone batch-log screen, so Production no longer waits on 4e either.
+   Still unanswered and gating only phase 4's printed packet: the **tray tally
+   box rule**.
+   **Shipped, phase 1 — `/elements` + `/recipes`, both with detail screens, and
+   the recipe sheet as a client-rendered PDF.** Migration 036 is six tables
+   (elements · element-locations · recipes · versions · lines · steps) with
+   **no cost column anywhere in them** — decision 11, and the cure for FMP's
+   `Recipe_Items` still carrying its 1/30/2022 prices in 2026. RLS is
+   membership READ (production is operational, not HR-sensitive: anyone rostered
+   to make a thing needs its recipe) and purchaser+ writes; verified on the
+   harness as a real authenticated user, where staff read but an update changes
+   0 rows, a delete removes 0, and an insert is refused outright.
+   **THE SCALE COLUMNS ARE COMPUTED, AND THAT WAS A MEASUREMENT, NOT A TASTE.**
+   It is the decision a rewrite is most likely to flip. FileMaker STORED an
+   amount per variation column — four hand-maintained numbers per line — and it
+   looks like four independent quantities. It isn't: **96.4% of testable
+   ingredient lines are within 2% of a strict multiple of the base column**,
+   once two things are accounted for that make a naive check report 65%
+   failure — **the unit changes as the number grows** (170 g → 510 g → 850 g →
+   **1.7 kg** is ×1/×3/×5/×10 exactly) and **a blank multiplier in slot 0 means
+   ×1** (all 493 versions put the base there). So a line stores ONE amount plus
+   the version's (label, multiplier) strip, and the rest is rendered. Verified
+   AFTER building, over all 493 versions: **98.64% of computed cells match what
+   FMP stored** (7,619 of 7,724).
+   Reaching that figure is what found the four kinds of line that are NOT
+   ingredients — `Expected Labor` (159 lines, a constant per batch like mixer
+   size, and already duplicated by the version's `prep_time`), `Total Liquid`
+   and `Total Base` (283 computed subtotals), and 41 temperatures carrying unit
+   `C`. **None is lifted automatically**: three are already covered by a real
+   column and the fourth is derivable, so more name-matching would be guessing
+   where the brief says report. They load as labelled lines with no element,
+   cost nothing, and are visible to delete.
+   The 105 cells still disagreeing are **29 versions whose columns are
+   FORMULATION VARIANTS rather than scales** (Vanilla Cake Donut labels its
+   "A"/"B"/"C", Chocolate Chip Cookie v6–v16 likewise). No multiplier can
+   express those — **the one place this model loses something FileMaker had** —
+   and the raw strip survives in each line's `source_payload`. Ask Mark; a
+   variant probably wants to be its own VERSION, which is what the family is for.
+   **Costing is `lib/productionCost`, and AN UNKNOWN COST IS NEVER ZERO.**
+   155 of the 470 migrated elements resolve to nothing (FMP never mapped them;
+   24 are cleaning duties with no cost at all), so a resolver treating those as
+   free would report a confident, always-too-low figure for every recipe
+   containing one with nothing on screen saying so. A cost is therefore the
+   money we could account for PLUS the elements we could not, rendered `≥ $4.12`
+   with the gaps named. There is a **cycle guard** too, since 036 lets a line
+   point at any element and nothing stops Glaze A being made from Glaze B and
+   back; FileMaker needed none because its costs were snapshots, so a cycle just
+   froze. The graph loads in **FOUR queries however deep the BOM goes** — ~470
+   elements and ~4,000 lines are small enough to hold whole, so it is fetched
+   flat and walked in memory rather than recursed over the network.
+   The element list's **Uncosted tier is the catalog cleanup made into a place
+   you can go**, rather than a footnote under each recipe.
+   **Two bugs the PRINTED SHEET found**, neither visible in code review: the
+   lower-bound `≥` printed as a stray "e", because @react-pdf's built-in
+   Helvetica is WinAnsi and lacks the glyph — so a total read "e$12.10", not
+   merely losing the claim but replacing it with a typo (the PDF says
+   **AT LEAST** in words now; the screen keeps the symbol, where browser fonts
+   have it); and scaled amounts printed "30.625 g", which no kitchen scale can
+   show. Precision now falls as the quantity grows.
+   Nav's Production section drops FMP's vocabulary for this module's own —
+   **Recipe Items is gone entirely** (decision 2 merged it away, so a menu item
+   would name a table that no longer exists) and "Item Schedules" becomes Plans.
+   **576 fixtures pass**, 35 new, each rule checked by breaking it: zeroing an
+   unresolved line fails 2 cases, ignoring the location override fails 2, and
+   removing the cycle guard produces the literal stack overflow it prevents.
+   **Migration/transform traps, all found by replaying the REAL 8,175-row export
+   through the REAL schema on the harness rather than by reading:**
+   **Six rows in FMP's ingredient CATALOG are not ingredients** — "Mixer Size",
+   "Expected Yield", "Prep Time", "Total Liquid" and two separators, every one
+   typed "Vendor Item" with no vendor key. They must not become elements, and
+   they cannot merely be dropped either, because 827 recipe lines carry their
+   name ONLY through that link. They lend the line its label instead.
+   **Merging duplicate elements CREATES a par collision that is not in the
+   source**: FMP's two "Candied Peanuts" rows each carry a DF01 par, and once
+   the elements are one so are their pars — the insert failed on row 471 of 530.
+   **34 recipe families have no element at all** (the 13 "Knotted – …" creams,
+   several "(old)" glazes), so `element_id` NOT NULL means the transform CREATES
+   one for each, inactive and named in the report.
+   Everything else joins clean: 8,175/8,175 lines, 5,200/5,200 item keys,
+   97/97 name links. `cost_basis_t` needed reading rather than guessing —
+   **"Internal" means made in-house** (45 of 68 name a recipe), not manual.
+   **Phases 2–5 are NOT built**: Items + the price grid (037), Plans (038),
+   Schedules + generation + the packet (039), Batches + actuals (040).
    The one-paragraph version: Recipe_Items merges into Production_Elements
    (made | purchased | manual, one component vocabulary for both BOM layers);
    Recipes stay separate and VERSIONED, element→recipe a real FK, never a
@@ -1947,6 +2039,18 @@ mean where FileMaker rounded up. 33 rows skipped and named (employee ids `387B`
 and `001` match nobody). All 35 migrations apply on the Docker harness, and the
 whole 46,553-row file was replayed through the real constraints there before it
 went near production. See build step 4e.
+**036 is NOT applied yet** (written 2026-08-07). It verifies on the Docker
+harness — all 36 migrations replay clean, RLS behaves as designed under a real
+authenticated purchaser and a real staff member, and the whole real export
+loads through it — but Mark applies migrations himself. Until he does, both new
+screens say so out loud: "Could not find the table 'public.production_elements'
+… migration 036 has not been applied yet", which is 018's pattern and confirmed
+in the browser. **Probe, don't read this line** — it has been wrong in both
+directions for four different migrations. `select count(*) from
+production_elements` (0 before the load, ~470 after), and check
+`production_recipe_versions_one_master` exists. After applying it, run
+`node transform-production.mjs --write` then
+`node --env-file=.env load-production.mjs`.
 **034 is APPLIED** (Mark, 2026-08-06) — verified the same day: both screens'
 selects return rows, and **0 of the 42 existing documents carry an expiry**,
 which is the migration working (null means never, so nothing changed under
