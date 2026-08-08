@@ -1,95 +1,86 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { PickList } from "@/components/ui/PickList";
-import { RecipeVersionSheet, type SheetVersion } from "./RecipeVersionSheet";
+import { recipeHref, type RecipeTab } from "@/lib/recipes";
 import { PrintRecipe } from "./PrintRecipe";
+import type { SheetVersion } from "./RecipeVersionSheet";
 
 /**
- * The version picker and the sheet under it.
+ * The version picker and Print sheet, above the record's sections.
  *
- * Opens on the MASTER, which is what costing reads and what the kitchen makes;
- * older versions are a click away and are the reason the family exists as a
- * record at all (decision 3). The picker is a `TabPicker` because it chooses a
- * VIEW — one of N, the app's own rule — and the master carries a mark so you
- * can tell which one is in force without reading the fields.
+ * It sits ABOVE the split rather than inside a tab, because the version is what
+ * both tabs are about: Info describes this version and Recipe is how to make it,
+ * and a control that changed under you when you moved between them would be the
+ * `key`-a-client-component trap in a new costume.
+ *
+ * WHICH VERSION IS IN THE URL (`?v=11`), not in state. That is the app's rule
+ * for view state, and here it is also what makes the two tabs agree — client
+ * state would be discarded on the soft navigation between them, silently
+ * dropping you back to the master half way through reading v24.
  */
 export function RecipeVersions({
+  recipeId,
   recipeName,
   orgName,
   versions,
-  editable,
+  current,
+  tab,
+  params,
 }: {
+  recipeId: string;
   recipeName: string;
   orgName: string;
   versions: SheetVersion[];
-  editable: boolean;
+  current: SheetVersion;
+  tab: RecipeTab;
+  params: Record<string, string | string[] | undefined>;
 }) {
-  const master = versions.find((v) => v.is_master) ?? versions[0] ?? null;
-  const [id, setId] = useState(master?.id ?? "");
-  const current = versions.find((v) => v.id === id) ?? master;
-
-  if (!current) {
-    return (
-      <p className="text-[13px] text-muted">
-        This recipe has no versions yet.
-      </p>
-    );
-  }
+  const router = useRouter();
+  const href = (v: SheetVersion) =>
+    recipeHref(recipeId, { tab, version: v.version_label }, params);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        {/* A SEGMENTED BAR UNTIL THERE ARE TOO MANY VERSIONS, THEN A LIST.
-            Chocolate Glaze has 38 and Chocolate Chip Cookie 23: a TabPicker of
-            those is 2,381px wide in a 1,425px window, so the whole PAGE
-            scrolled sideways — which the app's layout rules forbid outright.
-            Eight is PickList's own threshold for growing a find box, and a
-            reader hunting for v43 among 38 wants to type it anyway. Below
-            that a bar is still right: three versions read at a glance and
-            cost one tap. */}
-        {versions.length > 8 ? (
-          <PickList
-            variant="field"
-            ariaLabel="Version"
-            value={current.id}
-            onPick={setId}
-            options={versions.map((v) => ({
-              value: v.id,
-              label: `v${v.version_label}`,
-              hint: v.is_master ? "master" : undefined,
-            }))}
-            className="w-48"
-          />
-        ) : (
-          <TabPicker
-            ariaLabel="Version"
-            value={current.id}
-            onChange={setId}
-            options={versions.map((v) => ({
-              key: v.id,
-              // The master is marked in the label rather than by colour: this
-              // is a TabPicker, whose black cell already means "selected", and
-              // a second colour in the same control would be two things to read.
-              label: v.is_master ? `v${v.version_label} ★` : `v${v.version_label}`,
-            }))}
-          />
-        )}
-        <PrintRecipe recipeName={recipeName} orgName={orgName} version={current} />
-      </div>
-
-      {!current.is_master ? (
-        <p className="text-[13px] text-mark">
-          This is not the master version — it is kept for reference and is not
-          what the element costs.
-        </p>
-      ) : null}
-
-      {/* Keyed by version: every field below seeds `useState` from props, so
-          without this switching versions would show the old one's values in
-          the new one's cells. The order guide's own lesson, 2026-07-26. */}
-      <RecipeVersionSheet key={current.id} version={current} editable={editable} />
+    <div className="flex flex-wrap items-end justify-between gap-3">
+      {/* A SEGMENTED BAR UNTIL THERE ARE TOO MANY VERSIONS, THEN A LIST.
+          Chocolate Glaze has 38 and Chocolate Chip Cookie 23: a TabPicker of
+          those is 2,381px wide in a 1,425px window, so the whole PAGE scrolled
+          sideways — which the app's layout rules forbid outright. Eight is
+          PickList's own threshold for growing a find box, and a reader hunting
+          for v43 among 38 wants to type it anyway. Below that a bar is still
+          right: three versions read at a glance and cost one tap. */}
+      {versions.length > 8 ? (
+        <PickList
+          variant="field"
+          ariaLabel="Version"
+          value={current.version_label}
+          onPick={(label) => {
+            const next = versions.find((v) => v.version_label === label);
+            if (next) router.push(href(next));
+          }}
+          options={versions.map((v) => ({
+            value: v.version_label,
+            label: `v${v.version_label}`,
+            hint: v.is_master ? "master" : undefined,
+          }))}
+          className="w-48"
+        />
+      ) : (
+        <TabPicker
+          ariaLabel="Version"
+          value={current.version_label}
+          options={versions.map((v) => ({
+            key: v.version_label,
+            // The master is marked in the label rather than by colour: this is a
+            // TabPicker, whose black cell already means "selected", and a second
+            // colour in the same control would be two things to read.
+            label: v.is_master ? `v${v.version_label} ★` : `v${v.version_label}`,
+            href: href(v),
+          }))}
+        />
+      )}
+      <PrintRecipe recipeName={recipeName} orgName={orgName} version={current} />
     </div>
   );
 }

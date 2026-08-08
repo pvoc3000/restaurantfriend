@@ -29,6 +29,7 @@ import "./productionItems.fixtures";
 import "./productionPlans.fixtures";
 import "./productionScale.fixtures";
 import "./productionSchedule.fixtures";
+import "./recipeCosts.fixtures";
 import "./receiving.fixtures";
 import "./tableSort.fixtures";
 import "./tipPool.fixtures";

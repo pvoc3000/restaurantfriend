@@ -10,7 +10,17 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { RecipeVersions } from "@/components/production/RecipeVersions";
+import { RecipeVersionSheet } from "@/components/production/RecipeVersionSheet";
+import { RecipeInfo } from "@/components/production/RecipeInfo";
+import { SectionNav } from "@/components/ui/SectionNav";
 import { RECIPE_IMAGE_BUCKET, RECIPE_IMAGE_TTL_SECONDS } from "@/lib/recipeImages";
+import {
+  RECIPE_TABS,
+  RECIPE_TAB_LABEL,
+  parseRecipeTab,
+  parseRecipeVersion,
+  recipeHref,
+} from "@/lib/recipes";
 import type { SheetLine, SheetVersion } from "@/components/production/RecipeVersionSheet";
 
 /**
@@ -32,7 +42,8 @@ export async function RecipeDetail({
   const editable = canWriteCatalog(session.membership.role);
   const locationId = session.activeLocation?.id ?? null;
 
-  const [{ data: recipe, error }, { graph, error: graphError }] = await Promise.all([
+  const [{ data: recipe, error }, { graph, error: graphError }, { data: shop }] =
+    await Promise.all([
     supabase
       .from("production_recipes")
       .select(
@@ -42,7 +53,7 @@ export async function RecipeDetail({
            id, org_id, version_label, version_sort, is_master, is_active, author, description,
            note, testing_notes, yield_amount, yield_unit, mixer_size, prep_time,
            shelf_life, storage, tools, scale_labels, scale_multipliers,
-           created_at, updated_at,
+           created_at, updated_at, cost_column,
            production_recipe_lines (
              id, label, qty, unit, note, sort, element_id,
              scale_auto, scale_amounts, scale_units, hide_on_print
@@ -52,15 +63,23 @@ export async function RecipeDetail({
       )
       .eq("id", id)
       .maybeSingle(),
-    loadProductionGraph(supabase),
-  ]);
+      loadProductionGraph(supabase),
+      // The shop's hourly rate, for the costs block. NOT folded into
+      // `getAppSession` — it is one column read by one screen, and the session
+      // is paid for by every screen there is.
+      locationId
+        ? supabase.from("locations").select("labor_rate").eq("id", locationId).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
 
   if (error || graphError) {
     const message = error?.message ?? graphError ?? "";
     return (
       <p className="text-sm text-accent">
         Could not load this recipe: {message}
-        {/scale_auto|hide_on_print|image_path/.test(message)
+        {/cost_column/.test(message)
+          ? " — migration 042 has not been applied yet."
+          : /scale_auto|hide_on_print|image_path/.test(message)
           ? " — migration 041 has not been applied yet."
           : /production_/.test(message)
             ? " — migration 036 has not been applied yet."
@@ -96,6 +115,7 @@ export async function RecipeDetail({
     scale_multipliers: number[] | null;
     created_at: string | null;
     updated_at: string | null;
+    cost_column: number | null;
     production_recipe_lines: {
       id: string;
       label: string | null;
@@ -203,6 +223,7 @@ export async function RecipeDetail({
         scale_multipliers: v.scale_multipliers?.map(Number) ?? null,
         created_at: v.created_at,
         updated_at: v.updated_at,
+        cost_column: v.cost_column === null ? null : Number(v.cost_column),
         lines,
         steps: (v.production_recipe_steps ?? [])
           .slice()
@@ -234,7 +255,29 @@ export async function RecipeDetail({
       };
     });
 
+  // Labour is charged at the WORKING shop's rate, which is a fact about who is
+  // doing the making rather than about the recipe — so the same recipe read at
+  // DF01 and at EVENT legitimately costs different amounts to produce. Taken
+  // from the session's own list rather than a query: `session.locations` holds
+  // every location, closed ones included, which is what a lookup wants.
+  const laborRate = shop?.labor_rate === undefined || shop?.labor_rate === null
+    ? null
+    : Number(shop.labor_rate);
+
   const trail = parseTrail(rawParams, { href: "/recipes", label: "Recipes" });
+
+  // The section and the version both come off the URL — view state, this app's
+  // rule, and here also what keeps the two tabs agreeing about which version
+  // you are reading. A `?v=` naming nothing falls through to the master rather
+  // than to an empty screen, so a link shared before a version was retired
+  // still lands on the recipe.
+  const tab = parseRecipeTab(rawParams.tab);
+  const wanted = parseRecipeVersion(rawParams.v);
+  const current =
+    versions.find((v) => v.version_label === wanted) ??
+    versions.find((v) => v.is_master) ??
+    versions[0] ??
+    null;
 
   return (
     <div className="space-y-8">
@@ -244,40 +287,104 @@ export async function RecipeDetail({
         trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
       />
 
-      <div className="space-y-2">
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            {recipe.name as string}
-          </h1>
-          {!recipe.is_active ? (
-            <span className="text-[12px] uppercase tracking-[0.12em] text-muted">Inactive</span>
-          ) : null}
+      {/* The identity block sits ABOVE the split and is INDENTED to the content
+          column: `lg:ml-48` is the sidebar's `lg:w-40` plus the row's `lg:gap-8`.
+          THOSE THREE VALUES ARE COUPLED — change one and the heading drifts off
+          the content it belongs to. The employee record is the worked example. */}
+      <div className="space-y-3 lg:ml-48">
+        <div className="space-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+            <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+              {recipe.name as string}
+            </h1>
+            {!recipe.is_active ? (
+              <span className="text-[12px] uppercase tracking-[0.12em] text-muted">Inactive</span>
+            ) : null}
+          </div>
+          <p className="text-[13px] text-muted">
+            Makes{" "}
+            {element ? (
+              <Link
+                href={withFrom(`/elements/${element.id as string}`, {
+                  href: `/recipes/${id}`,
+                  label: recipe.name as string,
+                })}
+                className="font-medium text-ink hover:underline"
+              >
+                {element.name as string}
+              </Link>
+            ) : (
+              "—"
+            )}
+            {recipe.recipe_type ? ` · ${recipe.recipe_type as string}` : ""}
+          </p>
         </div>
-        <p className="text-[13px] text-muted">
-          Makes{" "}
-          {element ? (
-            <Link
-              href={withFrom(`/elements/${element.id as string}`, {
-                href: `/recipes/${id}`,
-                label: recipe.name as string,
-              })}
-              className="font-medium text-ink hover:underline"
-            >
-              {element.name as string}
-            </Link>
-          ) : (
-            "—"
-          )}
-          {recipe.recipe_type ? ` · ${recipe.recipe_type as string}` : ""}
-        </p>
+
+        {current ? (
+          <RecipeVersions
+            recipeId={id}
+            recipeName={recipe.name as string}
+            orgName={session.orgName}
+            versions={versions}
+            current={current}
+            tab={tab}
+            params={rawParams}
+          />
+        ) : null}
       </div>
 
-      <RecipeVersions
-        recipeName={recipe.name as string}
-        orgName={session.orgName}
-        versions={versions}
-        editable={editable}
-      />
+      {!current ? (
+        <p className="text-[13px] text-muted">This recipe has no versions yet.</p>
+      ) : (
+        <div className="flex flex-col gap-6 lg:flex-row lg:gap-8">
+          {/* Two orientations in their own visibility wrappers rather than a
+              responsive utility on the control: Tailwind resolves competing
+              utilities by STYLESHEET order, so a `hidden` passed in className
+              would not reliably beat the component's own `flex`. */}
+          <div className="lg:hidden">
+            <SectionNav
+              orientation="horizontal"
+              ariaLabel="Recipe sections"
+              value={tab}
+              items={RECIPE_TABS.map((key) => ({
+                key,
+                label: RECIPE_TAB_LABEL[key],
+                href: recipeHref(id, { tab: key, version: wanted }, rawParams),
+              }))}
+            />
+          </div>
+          <div className="hidden shrink-0 lg:block lg:w-40">
+            <SectionNav
+              ariaLabel="Recipe sections"
+              value={tab}
+              items={RECIPE_TABS.map((key) => ({
+                key,
+                label: RECIPE_TAB_LABEL[key],
+                href: recipeHref(id, { tab: key, version: wanted }, rawParams),
+              }))}
+            />
+          </div>
+
+          {/* Keyed by version: every editor below seeds `useState` from props,
+              so without this switching versions would show the old one's values
+              in the new one's cells. The order guide's lesson, 2026-07-26. */}
+          <div className="min-w-0 flex-1" key={current.id}>
+            {tab === "info" ? (
+              <RecipeInfo
+                recipeId={id}
+                version={current}
+                versions={versions}
+                laborRate={laborRate}
+                locationCode={session.activeLocation?.code ?? null}
+                editable={editable}
+                params={rawParams}
+              />
+            ) : (
+              <RecipeVersionSheet version={current} editable={editable} />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -10,7 +10,7 @@ import {
   type ScaleColumn,
 } from "@/lib/production";
 import { convert } from "@/lib/units";
-import { formatCost, unresolvedSummary, type Cost } from "@/lib/productionCost";
+import { unresolvedSummary, type Cost } from "@/lib/productionCost";
 import { RecipeScaleCell } from "./RecipeScaleCell";
 import { ScaleAutoSwitch, HideOnPrint, DeleteRecipeRow } from "./RecipeRowControls";
 import { RecipeStepImage } from "./RecipeStepImage";
@@ -66,6 +66,8 @@ export type SheetVersion = {
   /** The printed sheet's header block states both, the way FileMaker's does. */
   created_at: string | null;
   updated_at: string | null;
+  /** Migration 042 — which batch size this recipe is costed at. Null = base. */
+  cost_column: number | null;
   lines: SheetLine[];
   steps: SheetStep[];
   batchCost: Cost;
@@ -157,84 +159,6 @@ export function RecipeVersionSheet({
 
   return (
     <div className="space-y-10">
-      <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-6 gap-y-2 text-[14px] sm:grid-cols-[minmax(7rem,auto)_1fr_minmax(7rem,auto)_1fr]">
-        <Fact label="Yield">
-          {editable ? (
-            <span className="flex items-baseline gap-1">
-              <InlineValue
-                table="production_recipe_versions"
-                id={version.id}
-                column="yield_amount"
-                kind="number"
-                value={version.yield_amount}
-              />
-              <InlineValue
-                table="production_recipe_versions"
-                id={version.id}
-                column="yield_unit"
-                value={version.yield_unit}
-              />
-            </span>
-          ) : (
-            <span className={READ_ONLY_VALUE}>
-              {version.yield_amount === null
-                ? "—"
-                : `${version.yield_amount} ${version.yield_unit ?? ""}`.trim()}
-            </span>
-          )}
-        </Fact>
-        <Fact label="Mixer">
-          <Editable id={version.id} column="mixer_size" value={version.mixer_size} editable={editable} />
-        </Fact>
-        <Fact label="Prep time">
-          <Editable id={version.id} column="prep_time" value={version.prep_time} editable={editable} />
-        </Fact>
-        <Fact label="Shelf life">
-          <Editable id={version.id} column="shelf_life" value={version.shelf_life} editable={editable} />
-        </Fact>
-        <Fact label="Storage">
-          <Editable id={version.id} column="storage" value={version.storage} editable={editable} />
-        </Fact>
-        <Fact label="Tools">
-          <Editable id={version.id} column="tools" value={version.tools} editable={editable} />
-        </Fact>
-        <Fact label="Author">
-          <Editable id={version.id} column="author" value={version.author} editable={editable} />
-        </Fact>
-        <Fact label="Batch cost">
-          {/* The gaps note goes on its OWN LINE, never beside the figure. Set
-              inline it read "≥ $7.385 not priced" — the count's first digit
-              runs straight onto the cents, and a reader sees $7.385.
-              A WRAPPER, not `block` on the spans: READ_ONLY_VALUE carries
-              `inline-block`, and Tailwind resolves competing display utilities
-              by STYLESHEET order rather than class-string order, so appending
-              `block` silently loses. That is the same trap MENU_ITEM_CLASS
-              carries no display for. */}
-          <span className="flex flex-col items-start">
-            <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-              {formatCost(version.batchCost)}
-            </span>
-            {unresolvedSummary(version.batchCost) ? (
-              <span className={`${READ_ONLY_VALUE} text-[13px] text-mark`}>
-                {unresolvedSummary(version.batchCost)}
-              </span>
-            ) : null}
-          </span>
-        </Fact>
-      </dl>
-
-      {version.description || editable ? (
-        <div className="max-w-[80ch] text-[14px] text-muted">
-          <Editable
-            id={version.id}
-            column="description"
-            value={version.description}
-            editable={editable}
-            multiline
-          />
-        </div>
-      ) : null}
-
       {/* ------------------------------------------------------------------ */}
       {/* Ingredients                                                         */}
       {/* ------------------------------------------------------------------ */}
@@ -586,29 +510,6 @@ export function RecipeVersionSheet({
         ) : null}
       </section>
 
-      {version.testing_notes || version.note || editable ? (
-        <section className="space-y-2">
-          <SectionHeading>Notes</SectionHeading>
-          <div className="max-w-[80ch] text-[14px]">
-            <Editable
-              id={version.id}
-              column="note"
-              value={version.note}
-              editable={editable}
-              multiline
-            />
-          </div>
-          <div className="max-w-[80ch] text-[14px] text-muted">
-            <Editable
-              id={version.id}
-              column="testing_notes"
-              value={version.testing_notes}
-              editable={editable}
-              multiline
-            />
-          </div>
-        </section>
-      ) : null}
     </div>
   );
 }
@@ -718,45 +619,6 @@ function ItemCell({ line, editable }: { line: SheetLine; editable: boolean }) {
       ) : line.label && line.label !== line.elementName ? (
         <span className={`${READ_ONLY_VALUE} text-[12px] text-subtle`}>{line.label}</span>
       ) : null}
-    </span>
-  );
-}
-
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <>
-      <dt className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-        {label}
-      </dt>
-      <dd className="min-w-0">{children}</dd>
-    </>
-  );
-}
-
-function Editable({
-  id,
-  column,
-  value,
-  editable,
-  multiline = false,
-}: {
-  id: string;
-  column: string;
-  value: string | null;
-  editable: boolean;
-  multiline?: boolean;
-}) {
-  return editable ? (
-    <InlineValue
-      table="production_recipe_versions"
-      id={id}
-      column={column}
-      value={value}
-      multiline={multiline}
-    />
-  ) : (
-    <span className={`${READ_ONLY_VALUE} ${multiline ? "whitespace-pre-wrap" : ""}`}>
-      {value ?? "—"}
     </span>
   );
 }

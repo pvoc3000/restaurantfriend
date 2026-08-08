@@ -2223,6 +2223,45 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Verified by rendering the real v10 through the real component in Node over
    live rows (the `PoPdf` idiom) and comparing against Mark's own printout: every
    amount, every unit, every group break and all three metadata rows match.
+   **The recipe record became TWO TABS 2026-08-08 (migration 042, NEEDS
+   APPLYING)**, with FileMaker's RECIPES > INFO tab beside it. `ui/SectionNav` —
+   Info · Recipe — the employee record's pattern reused rather than re-derived,
+   which is what Mark asked for when that shipped. Ingredients and procedure
+   moved to Recipe; Info carries the version's fields, the VERSIONS list and the
+   COSTS matrix, neither of which existed here at all.
+   **BOTH THE TAB AND THE VERSION LIVE IN THE URL** (`?tab=recipe&v=11`), and
+   the version had to move there with it: it was client state, which a soft
+   navigation between tabs discards, so reading v24 and switching tabs would
+   have dropped you silently back to the master. `lib/recipes.ts` holds the
+   three pure helpers (`parseRecipeTab`, `parseRecipeVersion`, `recipeHref`),
+   fixture-tested; the defaults write NO parameter, so the record keeps one
+   canonical address. The version LABEL and not the id — `?v=11` is a URL a
+   person can check, and a label matching nothing falls through to the master.
+   **The COSTS matrix is a matrix, not a `DataTable`** (`/price-grid`'s call): a
+   row is a kind of figure and a column is a batch size. **INGREDIENTS SCALE AND
+   LABOUR DOES NOT**, which is the whole reason FileMaker prints five columns
+   instead of one figure — labour is the prep-time ROW (041's typed strip)
+   times the WORKING SHOP's `locations.labor_rate`, so cost per unit falls
+   sharply as the batch grows. Verified against FMP's own block on Raisied Donut
+   v11: labour **$96.25 / $105.00 / $113.75 / $122.50** and yield
+   **34 / 170 / 255 / 340** match to the cent, and our ingredient figures are
+   lower by exactly the one element the catalog cannot price (Seed Dough) —
+   which is the 209-element backlog showing through, not an arithmetic error.
+   **042's `cost_column` is a SLOT NUMBER, not a label**, for the same reason
+   `ScaleColumn` carries its slot: labels are editable content, and renaming a
+   batch would otherwise move which one the recipe is costed at. Null means the
+   base column. It drives the block only — **it deliberately does NOT change
+   what `lib/productionCost` charges for an element**, because cost per unit is
+   (batch ÷ yield) and both scale together, so the answer differs only where the
+   yield row is one AUTO was turned off for. Wiring the two together is a real
+   follow-up and a costing change; make it deliberately, with fixtures.
+   Also new on Info: **Make master**, which is TWO STATEMENTS and the order is
+   load-bearing — 036 enforces one master per family with a PARTIAL UNIQUE
+   INDEX, so the old flag must be cleared BEFORE the new one is set or the write
+   trips the index. Both `.select()` their own result.
+   Labour rate is fetched in the page's own `Promise.all` rather than folded
+   into `getAppSession`: one column read by one screen, against a session every
+   screen pays for.
    **Phase 5 is NOT built**: batches + actuals (was 041, now 042). `made`/`leftover` ship as
    columns and render read-only, because a supervisor writing them needs
    COLUMN-scoped access this table's RLS deliberately doesn't give — that is

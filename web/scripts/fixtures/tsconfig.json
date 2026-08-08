@@ -31,6 +31,9 @@
     "../../src/lib/homebaseImport.ts",
     "../../src/lib/gustoExport.ts",
     "../../src/lib/productionPrice.ts",
-    "../../src/lib/productionPlans.ts"
+    "../../src/lib/productionPlans.ts",
+    "../../src/lib/production.ts",
+    "../../src/lib/recipeCosts.ts",
+    "../../src/lib/recipes.ts"
   ]
 }
