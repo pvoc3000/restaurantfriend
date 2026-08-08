@@ -1964,9 +1964,45 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    where a par is changed in anger. **That is the obvious next thing to build.**
    Nav: Operations > Prices was an existing named stub and now points at the
    grid; if staff look for it under Production instead, it is one line.
-   **Phases 3–5 are NOT built**: Plans (039), Schedules + generation + the
-   packet (040), Batches + actuals (041). Note the brief's numbering is now off
-   by one, since 038 was spent on the name constraint.
+   **Shipped, phase 3 — migration 039, APPLIED 2026-08-07.** `/plans` and
+   `/plans/[id]`, the tray × weekday matrix. **No transform and no loader**: the
+   fresh-start decision means FMP's 150 plans and 29,083 tray-day slots stay on
+   disk, so the screen is the ONLY write path — which is why it was exercised
+   end to end rather than probed (design rule 1's "a create that a loader also
+   performs is a create nobody has tested", with no loader at all here).
+   **THE KITCHEN LIVES ON THE PLAN** (decision 9) — the thing FileMaker could
+   not express, because it put where-a-thing-is-MADE on `locations` and a column
+   there has room for one answer while DF01 makes DF02's raised donuts and DF02
+   makes its own cake. A plan is (selling location, kitchen, date range, trays),
+   several may be active at once, and their UNION is that shop's menu.
+   **OVERLAP IS DELIBERATELY NOT A CONSTRAINT.** 027 taught the btree_gist
+   exclusion idiom and this is exactly where NOT to reach for it: overlapping
+   ranges are the feature, and even "the same item on two of one shop's plans"
+   is legitimate. What it means is that pars SUM, so it is a yellow line on the
+   list and a sentence on the record — the under-minimum-vendor pattern.
+   **The matrix is not a `DataTable`**: the columns are DAYS rather than fields,
+   every cell is a SET of items rather than a value, and there is nothing to
+   sort by. It writes immediately, one item at a time, because there is no draft
+   of a menu to save.
+   **ISO 1 = MONDAY, and off by one silently shifts a whole shop's menu by a
+   day** — `lib/productionPlans` is fixture-tested on exactly that (breaking the
+   index turns 3 red), and dates compare as STRINGS rather than through `Date`,
+   since `new Date("2026-08-07")` is UTC midnight and would move a plan's first
+   day for everyone west of Greenwich.
+   Verified on the live database by building a real plan through the UI — DF02
+   selling, DF01 kitchen, tray 01, Bananaversary on Saturday, stored as
+   `weekday=6` and rendered in the Saturday column — then DELETED, leaving 0
+   plans, 0 trays, 0 slots.
+   **`locations.kitchen_by_weekday` / `shops_for` are now VESTIGIAL** and should
+   be retired from the Location record; that is not done yet.
+   **Phases 4–5 are NOT built**: Schedules + generation + the packet (040),
+   Batches + actuals (041). Note the brief's numbering is off by one, since 038
+   was spent on the name constraint.
+   **A HEAD COUNT PROBE CANNOT TELL "EMPTY" FROM "MISSING"** — probing 039 with
+   `.select("*", { count: "exact", head: true })` returned `null` and NO error
+   for a table that did not exist. A HEAD response has no body to carry the
+   message, which is the same trap `load-events.mjs` already warns about for
+   emptiness checks. Probe a table's existence with `.select("col").limit(1)`.
    The one-paragraph version: Recipe_Items merges into Production_Elements
    (made | purchased | manual, one component vocabulary for both BOM layers);
    Recipes stay separate and VERSIONED, element→recipe a real FK, never a
