@@ -29,6 +29,7 @@
     "../../src/lib/breakRules.ts",
     "../../src/lib/tipPool.ts",
     "../../src/lib/homebaseImport.ts",
-    "../../src/lib/gustoExport.ts"
+    "../../src/lib/gustoExport.ts",
+    "../../src/lib/productionPrice.ts"
   ]
 }

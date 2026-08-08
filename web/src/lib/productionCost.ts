@@ -91,6 +91,7 @@ export type Unresolved = {
     | "no recipe"              // made, but no master version
     | "no ingredients"         // made, and the master version is an empty document
     | "no yield"               // made, but the version doesn't say how much it makes
+    | "no batch yield"         // an ITEM whose (type, subtype, size) has no dough rule
     | "no quantity"            // a line with no amount
     | "incompatible units"     // the line's unit can't reach the element's
     | "cycle";                 // the BOM refers to itself
@@ -323,4 +324,120 @@ export function unresolvedSummary(cost: Cost): string | null {
   const head = names.slice(0, 3).join(", ");
   const rest = names.length > 3 ? ` and ${names.length - 3} more` : "";
   return `${names.length} not priced: ${head}${rest}`;
+}
+
+/* ========================================================================== */
+/* Items — the finished good                                                   */
+/* ========================================================================== */
+
+/**
+ * What one ITEM costs to make: its dough plus everything on it.
+ *
+ * The dough is the part that is not like a recipe line. An item does not store
+ * how much dough it uses — FileMaker never did either, which is why 176 of its
+ * BOM edges carry no quantity — because the amount is a property of the KIND
+ * of donut, not of the individual one. Mark's rule:
+ *
+ *   "each regular donut (promise rings, bismarks, bullseyes, letters) is 1/340
+ *    of a batch, mini donuts are 1/3 the size of a regular donut, giant donuts
+ *    are 2x a regular donut"
+ *
+ * So the dough contributes `batch cost x portion_of_batch x size_factor`, and
+ * the rule lives in `production_batch_yields` as editable data rather than as a
+ * constant here — Mark asked for "a better way to do it" and the better way
+ * starts with being able to change it without a migration.
+ */
+export type ItemBom = {
+  id: string;
+  name: string;
+  item_type: string | null;
+  subtype: string | null;
+  size: string | null;
+  base_element_id: string | null;
+  /** The components besides the dough. */
+  elements: CostLine[];
+};
+
+export type BatchYield = {
+  item_type: string;
+  subtype: string | null;
+  size: string | null;
+  portion_of_batch: number | null;
+  size_factor: number | null;
+};
+
+/**
+ * The rule for this item, MOST SPECIFIC FIRST.
+ *
+ * A rule may be stated at (type, subtype, size), at (type, subtype), at
+ * (type, size) or at (type) alone, and the narrowest match wins — which is
+ * what lets "all Raised is 1/340" coexist with "Cake Banana is 1/30" without
+ * enumerating every cut. Null in a stored rule means "any".
+ */
+export function matchYield(
+  item: { item_type: string | null; subtype: string | null; size: string | null },
+  yields: BatchYield[]
+): BatchYield | null {
+  const eq = (a: string | null, b: string | null) =>
+    (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+  const candidates = yields.filter(
+    (y) =>
+      eq(y.item_type, item.item_type) &&
+      (y.subtype === null || eq(y.subtype, item.subtype)) &&
+      (y.size === null || eq(y.size, item.size))
+  );
+  if (!candidates.length) return null;
+  // Specificity = how many of the two optional columns the rule pins down.
+  const score = (y: BatchYield) => (y.subtype === null ? 0 : 1) + (y.size === null ? 0 : 1);
+  return candidates.slice().sort((a, b) => score(b) - score(a))[0];
+}
+
+export function itemCost(
+  item: ItemBom,
+  byId: Map<string, CostElement>,
+  yields: BatchYield[],
+  locationId: string | null
+): Cost {
+  let total = 0;
+  let priced = 0;
+  const unresolved: Unresolved[] = [];
+
+  // The dough.
+  if (item.base_element_id) {
+    const base = byId.get(item.base_element_id);
+    if (!base) {
+      unresolved.push({ elementId: item.base_element_id, name: "the dough", reason: "no recipe" });
+    } else {
+      const rule = matchYield(item, yields);
+      if (!rule || rule.portion_of_batch === null) {
+        // A size nobody has measured yet costs nothing AND says so, rather
+        // than defaulting to a confident wrong number.
+        unresolved.push({ elementId: base.id, name: base.name, reason: "no batch yield" });
+      } else {
+        // The BATCH cost, not the per-unit cost: portion_of_batch is a
+        // fraction OF A BATCH, so dividing by the yield first and multiplying
+        // by the portion would be the same number twice.
+        const batch = base.master
+          ? versionBatchCost(base.master, byId, locationId, new Set([base.id]))
+          : elementCost(base, byId, locationId);
+        if (batch.cost === null) unresolved.push(...batch.unresolved);
+        else {
+          total += batch.cost * Number(rule.portion_of_batch) * Number(rule.size_factor ?? 1);
+          priced += 1;
+          unresolved.push(...batch.unresolved);
+        }
+      }
+    }
+  }
+
+  // Everything on it.
+  for (const line of item.elements) {
+    const result = lineCost(line, byId, locationId);
+    if (result.cost === null) { unresolved.push(...result.unresolved); continue; }
+    total += result.cost;
+    priced += 1;
+    unresolved.push(...result.unresolved);
+  }
+
+  return { cost: priced ? total : null, unit: "each", unresolved };
 }
