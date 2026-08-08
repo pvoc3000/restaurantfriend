@@ -151,13 +151,17 @@ export const SECTIONS: NavSection[] = [
   {
     slug: "production",
     label: "Production",
+    // FMP's seven, reworked to this module's own vocabulary (production brief,
+    // Terminology): "Item Schedules" was its name for PLANS and "Prod
+    // Schedules" for the committed day, which is the ambiguity decision 1
+    // exists to kill. Recipe Items is gone entirely — decision 2 merges it into
+    // Elements, so a menu item for it would name a table that no longer exists.
     subs: [
-      stub("production", "item-schedules", "Item Schedules"),
+      stub("production", "plans", "Plans"),
+      stub("production", "schedules", "Schedules"),
       stub("production", "items", "Items"),
-      stub("production", "elements", "Elements"),
-      stub("production", "production-schedules", "Production Schedules"),
-      stub("production", "recipes", "Recipes"),
-      stub("production", "recipe-items", "Recipe Items"),
+      { slug: "elements", label: "Elements", href: "/elements", built: true },
+      { slug: "recipes", label: "Recipes", href: "/recipes", built: true },
       stub("production", "batch-logs", "Batch Logs"),
     ],
   },

@@ -419,6 +419,37 @@ render, not stored" is confirmed**: store ONE amount + unit per line plus the
 version's column definitions, and report the dozen tweaks the transform is
 about to round off rather than dropping them silently.
 
+**Verified after building it, against all 493 versions: 98.64% of ingredient
+cells the app COMPUTES match what FileMaker STORED** (7,619 of 7,724), which is
+decision 3 checked end to end rather than argued for. Getting to that figure
+took excluding four kinds of line that are not ingredients, and finding them is
+most of what the check was worth:
+
+- **`Expected Labor`** (159 lines, unit `hr`) — FMP stores a CONSTANT across
+  every column, and rightly: scaling to a bigger vessel does not multiply the
+  labor. It is mixer size wearing a different unit, and it duplicates the
+  version's own `prep_time`.
+- **`Total Liquid` / `Total Base`** (283 lines) — computed subtotals of the
+  recipe's own lines, stored as lines.
+- **temperatures** (41 lines carrying unit `C`).
+
+None of these is lifted automatically, deliberately: three of the four are
+already covered by a real column on the version, and the fourth is derivable.
+Adding more name-matching heuristics to the transform to hide them would be
+guessing where the brief says report. They load as ordinary lines with a label
+and no element, cost nothing, and are visible for Mark to delete or reclassify.
+
+**The 105 cells that still disagree are 29 versions whose columns are FORMULATION
+VARIANTS, not scales** — Vanilla Cake Donut v12 labels its columns "A", "B",
+"C" and v100 has "100b"; Chocolate Chip Cookie v6–v16 do the same. Those are
+genuinely different recipes side by side, so no multiplier can express them and
+computing from the base is wrong for those columns. **This is the one place the
+model loses information FileMaker had**, it is confined to 29 of 493 versions,
+and the raw strip survives in each line's `source_payload`, so recovering it
+needs no re-export. Ask Mark before doing anything about it — a "variant"
+column probably wants to be a separate VERSION, which is what the family
+structure is for.
+
 **The variation columns are LABELLED, and the labels are content.** Not a fixed
 TEST/×½/×¾/×1/% ladder: 48 versions say "1/2 Pan | 1 Pan | 2 Pans | 3 Pans | %",
 39 say "2 QT | 7.5 QT | 12 QT | 22 QT | %", others "x1 | x2 | x4 | x8",
