@@ -10,6 +10,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { RecipeVersions } from "@/components/production/RecipeVersions";
+import { RECIPE_IMAGE_BUCKET, RECIPE_IMAGE_TTL_SECONDS } from "@/lib/recipeImages";
 import type { SheetLine, SheetVersion } from "@/components/production/RecipeVersionSheet";
 
 /**
@@ -38,11 +39,14 @@ export async function RecipeDetail({
         `id, name, recipe_type, is_active, element_id,
          production_elements ( id, name ),
          production_recipe_versions (
-           id, version_label, version_sort, is_master, is_active, author, description,
+           id, org_id, version_label, version_sort, is_master, is_active, author, description,
            note, testing_notes, yield_amount, yield_unit, mixer_size, prep_time,
            shelf_life, storage, tools, scale_labels, scale_multipliers,
-           production_recipe_lines ( id, label, qty, unit, note, sort, element_id ),
-           production_recipe_steps ( id, sort, body )
+           production_recipe_lines (
+             id, label, qty, unit, note, sort, element_id,
+             scale_auto, scale_amounts, scale_units, hide_on_print
+           ),
+           production_recipe_steps ( id, sort, body, image_path, image_name )
          )`
       )
       .eq("id", id)
@@ -55,7 +59,11 @@ export async function RecipeDetail({
     return (
       <p className="text-sm text-accent">
         Could not load this recipe: {message}
-        {/production_/.test(message) ? " — migration 036 has not been applied yet." : ""}
+        {/scale_auto|hide_on_print|image_path/.test(message)
+          ? " — migration 041 has not been applied yet."
+          : /production_/.test(message)
+            ? " — migration 036 has not been applied yet."
+            : ""}
       </p>
     );
   }
@@ -67,6 +75,7 @@ export async function RecipeDetail({
 
   type RawVersion = {
     id: string;
+    org_id: string;
     version_label: string;
     version_sort: number | null;
     is_master: boolean;
@@ -92,11 +101,39 @@ export async function RecipeDetail({
       note: string | null;
       sort: number | null;
       element_id: string | null;
+      scale_auto: boolean | null;
+      scale_amounts: (number | string | null)[] | null;
+      scale_units: (string | null)[] | null;
+      hide_on_print: boolean | null;
     }[];
-    production_recipe_steps: { id: string; sort: number | null; body: string }[];
+    production_recipe_steps: {
+      id: string;
+      sort: number | null;
+      body: string;
+      image_path: string | null;
+      image_name: string | null;
+    }[];
   };
 
   const raw = (recipe.production_recipe_versions ?? []) as RawVersion[];
+
+  // SIGNED SERVER-SIDE, in ONE batch across every version's steps — a URL built
+  // to expire shouldn't outlive the page, and one round trip beats one per
+  // picture. `createSignedUrls` answers in the order it was asked, but it also
+  // reports per-item errors, so the answers are keyed by path rather than
+  // zipped by position.
+  const imagePaths = raw.flatMap((v) =>
+    (v.production_recipe_steps ?? []).map((s) => s.image_path).filter((p): p is string => !!p)
+  );
+  const signed = new Map<string, string>();
+  if (imagePaths.length) {
+    const { data } = await supabase.storage
+      .from(RECIPE_IMAGE_BUCKET)
+      .createSignedUrls(imagePaths, RECIPE_IMAGE_TTL_SECONDS);
+    for (const row of data ?? []) {
+      if (row.signedUrl && row.path) signed.set(row.path, row.signedUrl);
+    }
+  }
 
   const versions: SheetVersion[] = raw
     // Newest first — a baker opening a recipe wants what they make today, and
@@ -118,6 +155,16 @@ export async function RecipeDetail({
             sort: l.sort,
             elementId: l.element_id,
             elementName: node?.name ?? null,
+            // `numeric[]` arrives as strings, the way every other numeric
+            // column here does — an unconverted strip silently sorts and
+            // compares as text.
+            scaleAuto: l.scale_auto !== false,
+            scaleAmounts:
+              l.scale_amounts?.map((n) =>
+                n === null || n === "" ? null : Number(n)
+              ) ?? null,
+            scaleUnits: l.scale_units ?? null,
+            hideOnPrint: l.hide_on_print === true,
             cost: lineCost(
               {
                 id: l.id,
@@ -134,6 +181,7 @@ export async function RecipeDetail({
 
       return {
         id: v.id,
+        org_id: v.org_id,
         version_label: v.version_label,
         is_master: v.is_master,
         is_active: v.is_active,
@@ -153,7 +201,15 @@ export async function RecipeDetail({
         lines,
         steps: (v.production_recipe_steps ?? [])
           .slice()
-          .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0)),
+          .sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+          .map((s) => ({
+            id: s.id,
+            sort: s.sort,
+            body: s.body,
+            imagePath: s.image_path,
+            imageName: s.image_name,
+            imageUrl: s.image_path ? (signed.get(s.image_path) ?? null) : null,
+          })),
         batchCost: versionBatchCost(
           {
             id: v.id,

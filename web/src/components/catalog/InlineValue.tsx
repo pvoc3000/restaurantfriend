@@ -65,6 +65,27 @@ function setJsonPath(
 }
 
 /**
+ * A copy of `strip` with slot `index` set to `next`, padded out to `width`.
+ *
+ * The array counterpart of `setJsonPath`, and it exists for the same reason:
+ * PostgREST can't write one element, so the whole column is rewritten. Padding
+ * rather than assuming the array is already long enough matters because a row
+ * that predates a column being added has no array at all, and the first slot
+ * somebody edits is as likely to be the fourth as the first.
+ */
+function setArraySlot(
+  strip: readonly (string | number | null)[] | null | undefined,
+  index: number,
+  next: string | number | null,
+  width: number
+): (string | number | null)[] {
+  const out: (string | number | null)[] = [];
+  for (let i = 0; i < Math.max(width, index + 1); i++) out.push(strip?.[i] ?? null);
+  out[index] = next;
+  return out;
+}
+
+/**
  * A value that ISN'T editable, wearing the padding `InlineValue`'s resting
  * button wears. Every editable value starts 4px in; a plain string started at 0
  * and broke the column (Mark, 2026-08-02, on an emailed order: "'email' isn't
@@ -94,8 +115,13 @@ export function InlineValue({
   jsonColumn,
   jsonPath,
   jsonDocument,
+  arrayColumn,
+  arrayIndex,
+  arrayStrip,
+  arrayWidth,
   match,
   scale,
+  multiline = false,
   collapseWhenEmpty = false,
 }: {
   table: string;
@@ -129,7 +155,7 @@ export function InlineValue({
    */
   alsoUpdate?: (
     next: string | number | null
-  ) => Record<string, string | number | null> | null;
+  ) => Record<string, string | number | null | (string | number | null)[]> | null;
   /** Required by kind="pick": the vocabulary this column may hold. */
   options?: PickOption[];
   /** kind="pick" only — let a value off the list be typed in (categories). */
@@ -140,6 +166,26 @@ export function InlineValue({
   jsonPath?: string[];
   /** That column's CURRENT value — the object the new one is derived from. */
   jsonDocument?: Record<string, unknown> | null;
+  /**
+   * The array column to write, when this cell edits ONE SLOT of one.
+   *
+   * The same shape as the jsonb trio above, for the same reason: a Postgres
+   * array is a single value to PostgREST, so the slot is set in the browser and
+   * the whole column is rewritten. Built for the recipe sheet, whose scale
+   * columns are `numeric[]` + `text[]` aligned with the version's own strip —
+   * the `par_by_weekday` idiom, which until now had no editor at all.
+   *
+   * A column whose length is CONSTRAINED against a sibling array (041's scale
+   * strip) must write both in one statement; that is what `alsoUpdate` is for.
+   */
+  arrayColumn?: string;
+  /** Which slot, 0-based. */
+  arrayIndex?: number;
+  /** That column's CURRENT value — the array the new one is derived from. */
+  arrayStrip?: readonly (string | number | null)[] | null;
+  /** How many slots the written array should have. Defaults to the strip's own
+   *  length, which is wrong the moment a version grows a scale column. */
+  arrayWidth?: number;
   /**
    * How to find the row, when its identity ISN'T a column called `id`.
    *
@@ -166,6 +212,15 @@ export function InlineValue({
    * cell has no unit.
    */
   scale?: { toShown: (stored: number) => number; toStored: (shown: number) => number };
+  /**
+   * A field whose value is PROSE — a recipe step, a storage note.
+   *
+   * It edits in a textarea, so Enter makes a paragraph instead of saving, and
+   * it rests with `whitespace-pre-wrap` so the line breaks somebody typed are
+   * still there when they come back. ⌘/Ctrl+Enter and blur both save, since
+   * with Enter spoken for there has to be a keyboard way out.
+   */
+  multiline?: boolean;
   /** kind="date" only — see `DateField`. For a date cell in a narrow box, where
    *  reserving a field's width for an empty value strands the calendar glyph. */
   collapseWhenEmpty?: boolean;
@@ -244,7 +299,17 @@ export function InlineValue({
       .update(
         jsonColumn && jsonPath
           ? { [jsonColumn]: setJsonPath(jsonDocument, jsonPath, next) }
-          : { [column]: next, ...(alsoUpdate?.(next) ?? {}) }
+          : arrayColumn && arrayIndex !== undefined
+            ? {
+                [arrayColumn]: setArraySlot(
+                  arrayStrip,
+                  arrayIndex,
+                  next,
+                  arrayWidth ?? arrayStrip?.length ?? 0
+                ),
+                ...(alsoUpdate?.(next) ?? {}),
+              }
+            : { [column]: next, ...(alsoUpdate?.(next) ?? {}) }
       )
       .match(where);
     setSaving(false);
@@ -319,6 +384,34 @@ export function InlineValue({
     );
   }
 
+  if (editing && multiline) {
+    return (
+      <span className="flex flex-col">
+        <textarea
+          autoFocus
+          rows={4}
+          value={draft}
+          disabled={saving}
+          autoComplete="off"
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={save}
+          onKeyDown={(e) => {
+            // Enter is a paragraph break here, so the commit moves to the
+            // modifier — a field you can only leave by clicking elsewhere is
+            // one you can't fill in from a keyboard.
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
+            if (e.key === "Escape") {
+              setError(null);
+              setEditing(false);
+            }
+          }}
+          className="w-full resize-y border-2 border-ink px-2 py-1 outline-none"
+        />
+        {error && <span className="text-xs text-accent">{error}</span>}
+      </span>
+    );
+  }
+
   if (editing) {
     return (
       <span className="inline-flex flex-col">
@@ -363,7 +456,9 @@ export function InlineValue({
       // Dotted underline at rest — the quietest possible "this is editable".
       className={`w-full px-1 py-0.5 underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 ${
         align === "right" ? "text-right tabular-nums" : "text-left"
-      } ${shown === null || shown === "" ? "text-faint" : ""} ${className}`}
+      } ${multiline ? "whitespace-pre-wrap" : ""} ${
+        shown === null || shown === "" ? "text-faint" : ""
+      } ${className}`}
     >
       {shown === null || shown === ""
         ? placeholder

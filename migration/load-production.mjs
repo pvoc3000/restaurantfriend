@@ -256,6 +256,14 @@ const lineRows = data.recipes.flatMap((r) => r.versions.flatMap((v) =>
     sort: l.sort,
     section: l.section,
     note: l.note,
+    // Migration 041. A reload carries FileMaker's own AUTO flag and the typed
+    // strip it guards, so `backfill-recipe-scales.mjs` is only ever needed on
+    // data that was already loaded — it must not become the second place this
+    // is decided.
+    scale_auto: l.scale_auto !== false,
+    scale_amounts: l.scale_amounts ?? null,
+    scale_units: l.scale_units ?? null,
+    hide_on_print: l.hide_on_print === true,
     legacy_id: l.legacy_id,
     source_payload: l.source_payload ?? null,
   }))));

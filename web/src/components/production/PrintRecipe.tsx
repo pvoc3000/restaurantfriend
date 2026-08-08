@@ -59,13 +59,20 @@ export function PrintRecipe({
               scaleLabels: version.scale_labels,
               scaleMultipliers: version.scale_multipliers,
               lines: version.lines.map((l) => ({
-                name: l.elementName ?? l.label ?? "—",
+                // The LABEL leads where there is one: FMP's `columnName_t` is
+                // an override written for the printed page ("Speedy Glaze"),
+                // and the element's catalog name is what it is filed under.
+                name: l.label ?? l.elementName ?? "—",
                 qty: l.qty,
                 unit: l.unit,
                 note: l.note,
+                scaleAuto: l.scaleAuto,
+                scaleAmounts: l.scaleAmounts,
+                scaleUnits: l.scaleUnits,
+                hidden: l.hideOnPrint,
                 cost: l.cost.cost,
               })),
-              steps: version.steps.map((s) => s.body),
+              steps: version.steps.map((s) => ({ body: s.body, imageUrl: s.imageUrl })),
               batchCost: version.batchCost.cost,
               unpricedCount: new Set(version.batchCost.unresolved.map((u) => u.name)).size,
               // The date belongs to the PRINT, not to the recipe: a sheet

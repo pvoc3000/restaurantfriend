@@ -11,8 +11,14 @@
 // document never leaves the building. That is the same split PoPdf and
 // ShoppingListPdf already draw.
 
-import { Document, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
-import { scaleColumns, scaledAmount, percentOfBatch, type ScaleColumn } from "@/lib/production";
+import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
+import {
+  scaleColumns,
+  columnCell,
+  formatCell,
+  bakersPercent,
+  type ScaleColumn,
+} from "@/lib/production";
 import { convert } from "@/lib/units";
 
 export type RecipePdfLine = {
@@ -20,8 +26,23 @@ export type RecipePdfLine = {
   qty: number | null;
   unit: string | null;
   note: string | null;
+  /** Migration 041 — a row FileMaker's AUTO switch left alone prints what
+   *  somebody typed, not a multiple of the base. */
+  scaleAuto: boolean;
+  scaleAmounts: (number | null)[] | null;
+  scaleUnits: (string | null)[] | null;
+  /** FMP's HIDE box — in the recipe, off the printed page. */
+  hidden: boolean;
   /** Null when the ingredient could not be priced — printed as a dash. */
   cost: number | null;
+};
+
+export type RecipePdfStep = {
+  body: string;
+  /** A short-lived signed URL. `@react-pdf` fetches it while rendering, so it
+   *  has to still be valid at the moment Print is pressed — which it is, since
+   *  the page that minted it is the page you pressed it on. */
+  imageUrl: string | null;
 };
 
 export type RecipePdfData = {
@@ -44,7 +65,7 @@ export type RecipePdfData = {
   scaleLabels: string[] | null;
   scaleMultipliers: number[] | null;
   lines: RecipePdfLine[];
-  steps: string[];
+  steps: RecipePdfStep[];
   batchCost: number | null;
   /** How many ingredients could not be priced — what the ≥ is hiding. */
   unpricedCount: number;
@@ -113,6 +134,7 @@ const styles = StyleSheet.create({
   step: { flexDirection: "row", marginBottom: 4 },
   stepNumber: { width: 16, fontSize: 9, color: "#666" },
   stepBody: { flexGrow: 1, flexBasis: 0, fontSize: 9 },
+  stepImage: { marginTop: 4, marginBottom: 2, maxWidth: 200, objectFit: "contain" },
 
   notes: { fontSize: 8, color: "#666", marginTop: 4 },
   footer: {
@@ -132,11 +154,18 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
   // The % column is derived per line, so it never earns an amount column of
   // its own — it has its own narrow column at the right of the ingredients.
   const amountColumns = columns.filter((c) => !c.isPercent);
+  const baseIndex = columns[0]?.index ?? 0;
   const base = columns[0]?.multiplier ?? 1;
-  const percents = percentOfBatch(
+  // The percentage is a share of the whole recipe, so it is computed BEFORE the
+  // hidden rows come off — a working note left off the binder page must not
+  // move the numbers on it.
+  const allPercents = bakersPercent(
     data.lines.map((l) => ({ qty: l.qty, unit: l.unit })),
     convert
   );
+  const printed = data.lines
+    .map((line, i) => ({ line, percent: allPercents[i] }))
+    .filter(({ line }) => !line.hidden);
 
   return (
     <Document title={`${data.recipeName} v${data.versionLabel}`}>
@@ -188,7 +217,7 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
           <Text style={[styles.headCell, styles.colCost]}>Cost</Text>
         </View>
 
-        {data.lines.map((line, i) => (
+        {printed.map(({ line, percent }, i) => (
           <View key={`${line.name}-${i}`} style={styles.row} wrap={false}>
             <View style={styles.colName}>
               <Text style={styles.cell}>{line.name}</Text>
@@ -196,11 +225,24 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
             </View>
             {amountColumns.map((c) => (
               <Text key={c.label} style={[styles.cell, styles.colAmount]}>
-                {scaledAmount(line.qty, line.unit, c, base)}
+                {formatCell(
+                  columnCell(
+                    {
+                      qty: line.qty,
+                      unit: line.unit,
+                      scaleAuto: line.scaleAuto,
+                      scaleAmounts: line.scaleAmounts,
+                      scaleUnits: line.scaleUnits,
+                    },
+                    c,
+                    base,
+                    baseIndex
+                  )
+                )}
               </Text>
             ))}
             <Text style={[styles.cellMuted, styles.colPercent]}>
-              {percents[i] === null ? "" : `${percents[i]!.toFixed(1)}%`}
+              {percent === null ? "" : `${percent.toFixed(1)}%`}
             </Text>
             <Text style={[styles.cell, styles.colCost]}>
               {line.cost === null ? "—" : `$${line.cost.toFixed(2)}`}
@@ -238,7 +280,16 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
             {data.steps.map((s, i) => (
               <View key={i} style={styles.step} wrap={false}>
                 <Text style={styles.stepNumber}>{i + 1}.</Text>
-                <Text style={styles.stepBody}>{s}</Text>
+                <View style={styles.stepBody}>
+                  <Text>{s.body}</Text>
+                  {/* The picture goes UNDER its step rather than beside it: a
+                      procedure is read as prose and a photo in the margin would
+                      squeeze every step's text to make room for the one step
+                      that has one. */}
+                  {/* eslint-disable-next-line jsx-a11y/alt-text -- @react-pdf's
+                      Image is a PDF primitive, not an <img>; it takes no alt. */}
+                  {s.imageUrl ? <Image src={s.imageUrl} style={styles.stepImage} /> : null}
+                </View>
               </View>
             ))}
           </>

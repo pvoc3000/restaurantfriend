@@ -563,6 +563,12 @@ const L = table(resolve(PROD, '_recipelements.mer'), '_recipelements.mer', {
   sort: { names: ['Sort_num'] },
   step: { names: ['Step_text'] },
   hide: { names: ['shouldHide_bool'] },
+  // Migration 041. FileMaker's own answer to "does this row scale?" — set on
+  // 3,350 of 5,260 ingredient lines and clear on 1,910, which is exactly the
+  // mixer sizes, the prep times and the 29 versions whose columns are
+  // formulation variants. 036 computed every column and had nowhere to put the
+  // rows this flag marks; it does now.
+  auto: { names: ['AutoUpdate_bool'] },
 });
 
 const versionByFmpKey = new Map();
@@ -667,6 +673,24 @@ for (const r of L.rows) {
     }
   }
 
+  // Migration 041. Auto rows store one amount and compute the rest (decision 3);
+  // a row FileMaker marked NOT auto keeps its typed strip, EXCEPT slot 0 —
+  // the base is `qty`/`unit` and a second copy of it is how the two disagree.
+  const auto = String(L.g(r, 'auto') ?? '').split(VT).some((x) => x.trim() === '1');
+  let strip = { amounts: null, units: null };
+  if (!auto) {
+    let width = 0;
+    for (let i = 0; i < Math.max(amounts.length, units.length); i++) {
+      if (num(amounts[i]) !== null || blank(units[i]) !== null) width = i + 1;
+    }
+    if (width > 1) {
+      strip = {
+        amounts: amounts.slice(0, width).map((a, i) => (i === 0 ? null : num(a))),
+        units: units.slice(0, width).map((u, i) => (i === 0 ? null : blank(u))),
+      };
+    }
+  }
+
   version.lines.push({
     legacy_id: `RL:${L.g(r, 'key')}`,
     element_legacy_id: item ? item.legacy_id : null,
@@ -676,6 +700,10 @@ for (const r of L.rows) {
     sort: sort === null ? null : Math.round(sort),
     section: null,
     note: text(L.g(r, 'note')),
+    scale_auto: auto,
+    scale_amounts: strip.amounts,
+    scale_units: strip.units,
+    hide_on_print: L.g(r, 'hide') === '1',
     source_payload: {
       columns: amounts.some(Boolean) ? { amounts, units } : undefined,
       item_key: L.g(r, 'item_key') || undefined,

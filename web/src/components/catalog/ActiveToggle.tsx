@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Switch } from "@/components/ui/Switch";
 
 /**
  * Table-agnostic active/inactive switch (inventory_items,
@@ -49,28 +50,18 @@ export function ActiveToggle({
 
   return (
     <span className="inline-flex items-center gap-2">
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        aria-label={
+      {/* The box itself is `ui/Switch` — black when on, not green, since green
+          is spoken for by the order box, and off is the exact inverse. This was
+          the app's only switch until the recipe sheet needed one; the markup
+          moved rather than being copied. */}
+      <Switch
+        on={on}
+        disabled={pending}
+        onToggle={toggle}
+        ariaLabel={
           label ?? (on ? "Active — click to deactivate" : "Inactive — click to activate")
         }
-        disabled={pending}
-        onClick={toggle}
-        // Black when on, not green: green is spoken for by the order box.
-        className={`relative inline-flex h-[26px] w-[46px] shrink-0 items-center rounded-full border-[1.5px] border-ink transition-colors disabled:opacity-35 ${
-          on ? "bg-ink" : "bg-white"
-        }`}
-      >
-        {/* Off is the exact inverse of on (Mark, 2026-07-25): black track /
-            white knob ↔ white track / black knob. */}
-        <span
-          className={`inline-block h-[18px] w-[18px] transform rounded-full transition-transform ${
-            on ? "translate-x-[22px] bg-white" : "translate-x-[2px] bg-ink"
-          }`}
-        />
-      </button>
+      />
       {failed && (
         <span className="text-[12px] uppercase tracking-[0.12em] text-accent">
           retry

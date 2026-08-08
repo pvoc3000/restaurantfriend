@@ -2088,13 +2088,75 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    prints 0.60 in FMP where Mark's own 1/340 gives 0.88. The export is stale by
    his account and his rule is what phase 2 seeded, editable, precisely so this
    is a data edit. Show him the first real packet.
-   **Phase 5 is NOT built**: batches + actuals (041). `made`/`leftover` ship as
+   **Reworked 2026-08-08 from Mark's first pass over the recipe screen, with
+   FileMaker's RECIPES > RECIPE tab beside it (migration 041, NEEDS APPLYING).**
+   The sheet phase 1 shipped was READ-ONLY, showed one scale column at a time,
+   and had dropped four things the old layout had. Every field on a version, a
+   line and a step is now inline-editable, rows can be added and deleted, and
+   the grid is FMP's: sort · base amount · AUTO · every other batch size · item ·
+   note · cost · hide.
+   **THE AUTO SWITCH IS THE ONE THAT MATTERS, and it is decision 3 gaining an
+   escape hatch rather than losing an argument.** Phase 1 computed every scale
+   column from one stored amount, on the measurement that 96.4% of FMP's stored
+   columns are a strict multiple of the base — that is still the default and
+   still right. What it could not express was the other 3.6%, and phase 1's own
+   note names the cost: "29 versions whose columns are FORMULATION VARIANTS
+   rather than scales … the one place this model loses something FileMaker had".
+   **FileMaker had an answer and no transform had ever read it**:
+   `_recipelements.mer` carries **`AutoUpdate_bool`**, one flag per line, set on
+   3,350 of the 5,260 ingredient rows and clear on 1,910 — a mixer size does not
+   scale, and a variant is not a multiple of anything. So 041 gives the line
+   `scale_auto` plus a typed `scale_amounts` / `scale_units` strip, ON with the
+   multipliers is the default, and OFF is stored. **Turning it off FREEZES what
+   is on screen in the same statement** — the computed values live nowhere but
+   the render, so a bare `scale_auto = false` would blank four cells the instant
+   you claimed them, which reads as having destroyed the row.
+   **SLOT 0 OF THE STRIP IS NEVER READ.** The base column is `qty`/`unit` and
+   041 keeps no second copy of it: costing, the percentage and every computed
+   column read that one, and two answers to one question is how they drift.
+   **`ScaleColumn` carries the SLOT it came from, not its position on screen.**
+   `scaleColumns` drops an unlabelled slot, so a version with a gap renders its
+   third column second — and every write (the multiplier, the label, each
+   amount) has to use `column.index` or it silently stores column 3's amount in
+   column 2's slot, on exactly the versions with a gap.
+   Also new: `sort` is a column on both lists again; the batch NAMES and the
+   MULTIPLIER row above them are editable (036 loaded that strip and no screen
+   could touch it), with a narrow trailing slot to add one; a portion size is
+   two fields, a number and a unit `PickList` (`allowNew`, since a recipe counts
+   in hr and C and %); FMP's HIDE box, which keeps a working note in the record
+   and off the binder page — and the PDF now honours it, computing the
+   percentages BEFORE the hidden rows come off; and a picture on a procedure
+   step, one per step, in the new private `recipe-images` bucket. **No drop zone
+   on the step picture**, deliberately: `ui/FileDropZone` arms off WINDOW drag
+   events and suppresses the page's own drop handling, so one per step would
+   light fifteen overlays at once.
+   **THE `%` COLUMN WAS MEASURABLY WRONG AND IS NOW BAKER'S PERCENTAGE.** 036
+   read FMP's stored `%` as each line's share of the batch TOTAL and said so in
+   the schema notes. Measured over 2,478 export lines carrying both a weighable
+   amount and a stored %: share-of-the-first-ingredient matches on **1,758**,
+   share-of-total on **178**. Mark's own Raised Donut v11 settles it by
+   inspection — mix 5 lbs at 100%, water 2.8 lbs at 56%, and 2.8/5 is 56 where
+   2.8/8.875 is 32. `percentOfBatch` is now `bakersPercent`; the fixtures
+   reproduce all four of that version's printed percentages.
+   Verified: all 41 migrations apply on the Docker harness, the shape constraint
+   refuses a mismatched or over-wide strip, and as real authenticated roles a
+   staffer reads the lines while an update changes **0 rows and returns NO
+   error**, a purchaser's changes 1, a purchaser may write an object under their
+   own org's folder and not another's, a junk path is refused by the POLICY
+   rather than raising a cast error, and `anon` is refused outright. 647
+   fixtures pass, and the six new rules were each checked by breaking them.
+   **Still to do, in order:** apply 041, run
+   `migration/backfill-recipe-scales.mjs` (dry run by default) to bring FMP's
+   AUTO flag and typed strips onto the 3,765 loaded lines, then look at a real
+   recipe. `hide_on_print` is backfilled by the migration itself, because the
+   transform had already carried `shouldHide_bool` into `source_payload`.
+   **Phase 5 is NOT built**: batches + actuals (was 041, now 042). `made`/`leftover` ship as
    columns and render read-only, because a supervisor writing them needs
    COLUMN-scoped access this table's RLS deliberately doesn't give — that is
    029's `report_pooled_tips` shape, a definer function naming exactly those
    columns, and it belongs in phase 5 rather than in a loosened policy here.
-   Note the brief's numbering is off by one, since 038 was spent on the name
-   constraint.
+   Note the brief's numbering is off by TWO now — 038 was spent on the name
+   constraint and 041 on the recipe sheet.
    **A HEAD COUNT PROBE CANNOT TELL "EMPTY" FROM "MISSING"** — probing 039 with
    `.select("*", { count: "exact", head: true })` returned `null` and NO error
    for a table that did not exist. A HEAD response has no body to carry the
@@ -2501,12 +2563,13 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary — a VALUE or a filter's VIEW; `variant="inline"` in a cell, `variant="field"` as a standalone box. Opens below the field, portals so panes can't clip it |
   | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons |
   | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands; shares `lib/anchoredPanel` with PickList, so it escapes scroll panes the same way |
-  | `catalog/InlineValue` | a hand-wired edit-in-place, or a bare `<input type="date">` | any editable cell — `kind` text / number / date / **pick**; `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column |
+  | `catalog/InlineValue` | a hand-wired edit-in-place, or a bare `<input type="date">` | any editable cell — `kind` text / number / date / **pick**; `multiline` for prose (textarea, ⌘↵ saves); `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column; `arrayColumn` + `arrayIndex` + `arrayStrip` + `arrayWidth` to edit ONE SLOT of a Postgres array (the `par_by_weekday` idiom, which had no editor until the recipe sheet). An array column CONSTRAINED against a sibling array must write both in one statement — that is what `alsoUpdate` is for |
   | `ui/SectionHeading` | a hand-styled `<h2>` | the heading over a block on a detail screen (16px bold black, optional `count`) |
   | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style. Selected cell is ALWAYS black; `count` and `href` are the only options |
   | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
   | `ui/DateField` | `<input type="date">` | EVERY date box. Carries the Safari empty-date apparatus (see the date bullet); `InlineValue kind="date"` wraps it, and a create form uses it directly |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
+  | `ui/Switch` | a rounded div you style yourself | every switch. Black on, and off is the EXACT inverse; `size="sm"` for a dense grid row. Presentational only — the write, the optimism and the error state belong to the caller, because `ActiveToggle` and the recipe sheet's AUTO switch disagree about all three |
   | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory |
   | `catalog/ActiveToggle` | a bespoke switch | the Active column, which leads every catalog table |
   | `catalog/WeekdayPicker` | seven buttons | any day-set; its column must be `WEEKDAY_PICKER_WIDTH` |
