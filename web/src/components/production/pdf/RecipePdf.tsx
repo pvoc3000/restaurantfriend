@@ -219,10 +219,16 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
             <Text key={c.label} style={[styles.cell, styles.colAmount]} />
           ))}
           <Text style={[styles.cell, styles.colPercent]} />
+          {/* "AT LEAST", not "≥". @react-pdf's built-in Helvetica is
+              WinAnsi-encoded and has no ≥ glyph — it rendered as a stray "e",
+              so the total read "e$12.10" and the lower-bound claim was not
+              merely lost but replaced with a typo. Found by rendering a real
+              recipe and reading the paper. The screen keeps the ≥, where the
+              browser's own fonts have it. */}
           <Text style={[styles.headCell, styles.colCost]}>
             {data.batchCost === null
               ? "—"
-              : `${data.unpricedCount ? "≥ " : ""}$${data.batchCost.toFixed(2)}`}
+              : `${data.unpricedCount ? "AT LEAST " : ""}$${data.batchCost.toFixed(2)}`}
           </Text>
         </View>
 

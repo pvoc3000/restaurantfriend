@@ -100,9 +100,19 @@ export function scaledAmount(
   return unit ? `${trim(scaled)} ${unit}` : trim(scaled);
 }
 
-/** 2.50 → "2.5", 1700 → "1700" — a baker's number, not a float. */
+/**
+ * A baker's number, not a float.
+ *
+ * Precision falls as the quantity grows, because that is how a scale works and
+ * how a person reads one: 175 g is weighed to the gram, 2.5 g of agar to a
+ * tenth. Rounding everything to three decimals — which this did at first —
+ * turned a 17.5 g line scaled by 1.75 into "30.625 g", a number no kitchen
+ * scale can show and nobody would try to hit. Caught by rendering a real
+ * recipe rather than by reading the code.
+ */
 function trim(n: number): string {
-  const r = Math.round(n * 1000) / 1000;
+  const places = n >= 100 ? 0 : n >= 10 ? 1 : n >= 1 ? 2 : 3;
+  const r = Number(n.toFixed(places));
   return String(r);
 }
 

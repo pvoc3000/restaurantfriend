@@ -82,6 +82,27 @@ test("a line with no quantity renders nothing rather than a zero", () => {
   eq(scaledAmount(null, "g", x2, 1), "");
 });
 
+/* -- precision ------------------------------------------------------------- */
+
+test("precision falls as the quantity grows, the way a scale reads", () => {
+  // Found by rendering a real recipe: 17.5 g of lemon juice at ×1.75 is
+  // 30.625 g, which no kitchen scale can show and nobody would try to hit.
+  const columns = scaleColumns(["1/2 Pan", "1 Pan"], [1, 1.75]);
+  eq(scaledAmount(17.5, "g", columns[1], 1), "30.6 g", "10–100 keeps one place");
+  eq(scaledAmount(2.5, "g", columns[1], 1), "4.38 g", "1–10 keeps two");
+  eq(scaledAmount(100, "g", columns[1], 1), "175 g", "over 100 is whole grams");
+  // Only below a gram is three places worth printing — a pinch of something
+  // potent is the one case where the third decimal is real.
+  eq(scaledAmount(0.4, "g", columns[1], 1), "0.7 g");
+  eq(scaledAmount(0.002, "g", columns[1], 1), "0.004 g");
+});
+
+test("a whole number never grows a decimal point", () => {
+  const x2 = scaleColumns(["x1", "x2"], [1, 2])[1];
+  eq(scaledAmount(50, "g", x2, 1), "100 g");
+  eq(scaledAmount(1.5, "kg", x2, 1), "3 kg");
+});
+
 /* -- the % column ---------------------------------------------------------- */
 
 test("percent is each line's share of the batch by weight", () => {
