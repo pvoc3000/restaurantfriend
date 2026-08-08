@@ -286,7 +286,9 @@ by business concept.
   sort, note, section. **`production_recipe_steps`** — version FK, sort, text.
   Scale columns are computed at render, not stored.
 - **`production_items`** — name, taxonomy (type / subtype / finish / size),
-  price class, price tier, active.
+  price class, price tier, active, and **`tally_box_size` (not null, default 6)**
+  — how many this item trays in, which the printed schedule's counting strip
+  reads. Per item on Mark's instruction; see answered question 3.
   **`production_item_locations`** — per-location config: `par_by_weekday`
   (the 009 seven-slot array idiom), active, price override.
   **`production_item_elements`** — the BOM edge: item FK, element FK, qty, unit.
@@ -608,8 +610,38 @@ decision removed it.
    size factor — and NEVER as a constant in code. Getting to the better way
    later then costs an edit, not a migration.
 
-3. **Tray tally boxes** — still unanswered, and it only gates phase 4's printed
-   packet. Ask before building the schedule PDFs.
+3. **Tray tally boxes — ANSWERED, and it grows a feature.** Mark, 2026-08-07:
+
+   > It's always 6, but that is something that would make it better — to have
+   > the ability to set the chunk size for each item
+
+   So the printed schedule's tally strip gets its box size **from the ITEM**,
+   not from a constant and not from the (type, size) yield table. Migration 037
+   adds `production_items.tally_box_size integer not null default 6` — a default
+   rather than a nullable column, because 6 is the honest answer for every one
+   of the 307 items today, which also means the load needs no backfill and the
+   printed sheet is unchanged on day one.
+
+   **PER ITEM, not per size.** It would be tempting to hang this off the
+   (type, subtype, size) row that carries the batch-size factors, since a mini
+   plausibly trays differently from a regular — but Mark asked for per item, the
+   data has exactly one value today, and a cascade nobody needs is 016's
+   `nextDeliveryDate` trap in miniature. If "every mini is 12" ever becomes
+   true, it is a bulk edit on the list, not a second place to state one fact.
+
+   What the rest of the strip does is settled by MEASUREMENT, from the real
+   DF02 packet of 2026-08-07 (`DF Operations Screenshots/desktop/Production/`):
+
+   - **The strip is a fixed 24 boxes, independent of par** — Bananaversary
+     (par 15) and Angry Samoa (par 18) get the same 24. Exactly 888 boxes over
+     37 item rows. It is a counting grid you tick off, not a tally sized to the
+     order, so the PDF draws 24 cells and prints the box size in each.
+   - **Every one of those 888 boxes reads 6** on that packet, which is what
+     makes `default 6` the right migration.
+   - **The baker and fryer guides are NOT this control.** Their `1 2 3 … 25`
+     strip is a ruler of TRAY NUMBERS with the day's total printed underneath —
+     a different artifact that happens to look similar, and reproducing one
+     from the other's rule would be wrong.
 
 4. **A generated schedule line DOES snapshot its cost** (my call, Mark:
    "do what you think is best"). It is decision 11's own carve-out — costing is

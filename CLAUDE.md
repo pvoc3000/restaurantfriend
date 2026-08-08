@@ -1794,8 +1794,20 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    report; and **the shift-report surface is deferred ENTIRELY** — phase 5's
    item actuals go on the schedule's own screen and element actuals on a
    standalone batch-log screen, so Production no longer waits on 4e either.
-   Still unanswered and gating only phase 4's printed packet: the **tray tally
-   box rule**.
+   **The tray tally box rule is answered too, and it grew a feature** (Mark,
+   2026-08-07: "It's always 6, but that is something that would make it better —
+   to have the ability to set the chunk size for each item"). So 037 gives
+   `production_items` a **`tally_box_size` (not null, default 6)** — per ITEM,
+   not per size, because that is what he asked for and the data has exactly one
+   value today; a cascade nobody needs would be 016's `nextDeliveryDate` trap in
+   miniature. The rest of the strip was settled by MEASURING the real 8/7 DF02
+   packet rather than asking: it is a **fixed 24 boxes independent of par** (888
+   boxes over 37 rows; par 15 and par 18 both get 24), so it is a counting grid
+   you tick off rather than a tally sized to the order. **The baker and fryer
+   guides are NOT this control** — their `1 2 3 … 25` strip is a ruler of tray
+   numbers with the day's total printed beneath, and reproducing one from the
+   other's rule would be wrong.
+   **NOTHING IS NOW BLOCKED**: every question that gated phases 2–5 is answered.
    **Shipped, phase 1 — `/elements` + `/recipes`, both with detail screens, and
    the recipe sheet as a client-rendered PDF.** Migration 036 is six tables
    (elements · element-locations · recipes · versions · lines · steps) with
