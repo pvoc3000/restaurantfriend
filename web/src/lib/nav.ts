@@ -145,7 +145,11 @@ export const SECTIONS: NavSection[] = [
       stub("operations", "check-lists", "Check Lists"),
       stub("operations", "master-check-lists", "Master Check Lists"),
       stub("operations", "tags", "Tags"),
-      stub("operations", "prices", "Prices"),
+      // The production price grid (decision 10). It lives under Operations
+      // because that is the slot FileMaker's own price screen occupied, and
+      // because the grid prices the MENU rather than describing one item — if
+      // it turns out staff look for it under Production, move this line.
+      { slug: "prices", label: "Prices", href: "/price-grid", built: true },
     ],
   },
   {

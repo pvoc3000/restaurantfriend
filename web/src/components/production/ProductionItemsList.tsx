@@ -6,6 +6,7 @@ import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { usePublishRecordSet } from "@/lib/recordSet";
 import { formatCost, unresolvedSummary, type Cost } from "@/lib/productionCost";
 import { formatMargin, type PriceSource } from "@/lib/productionPrice";
 
@@ -75,6 +76,13 @@ export function ProductionItemsList({
       );
     });
   }, [rows, search, tier]);
+
+  // The list publishes what it is showing, so a detail screen walks the found
+  // set rather than sending you back here for the next one.
+  usePublishRecordSet(
+    "/production-items",
+    visible.map((r) => ({ id: r.id, href: `/production-items/${r.id}` }))
+  );
 
   const columns: DataColumn<ProductionItemRow>[] = [
     {
