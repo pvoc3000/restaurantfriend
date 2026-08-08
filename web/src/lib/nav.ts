@@ -162,7 +162,17 @@ export const SECTIONS: NavSection[] = [
     // Elements, so a menu item for it would name a table that no longer exists.
     subs: [
       { slug: "plans", label: "Plans", href: "/plans", built: true },
-      stub("production", "schedules", "Schedules"),
+      // `resolveRoute` prefix-matches, so /schedules/[id] lights this without
+      // an `also`. The derived day is a sibling screen rather than a sub of its
+      // own: it is what generation is ABOUT to write, so it belongs to the same
+      // tab as the record it becomes.
+      {
+        slug: "schedules",
+        label: "Schedules",
+        href: "/schedules",
+        built: true,
+        also: ["/production-day"],
+      },
       { slug: "items", label: "Items", href: "/production-items", built: true },
       { slug: "elements", label: "Elements", href: "/elements", built: true },
       { slug: "recipes", label: "Recipes", href: "/recipes", built: true },

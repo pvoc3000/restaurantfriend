@@ -1995,9 +1995,106 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    plans, 0 trays, 0 slots.
    **`locations.kitchen_by_weekday` / `shops_for` are now VESTIGIAL** and should
    be retired from the Location record; that is not done yet.
-   **Phases 4–5 are NOT built**: Schedules + generation + the packet (040),
-   Batches + actuals (041). Note the brief's numbering is off by one, since 038
-   was spent on the name constraint.
+   **Shipped, phase 4 — migration 040, NEEDS APPLYING.** `/schedules` +
+   `/schedules/[id]` + `/production-day`, the generation function, and the
+   printed packet. A PLAN is a proposal; a SCHEDULE is the committed day.
+   **THE DERIVED DAY IS A FUNCTION, and that is the decision a rewrite is most
+   likely to get wrong in either direction.** Not a table (design rule 4), and
+   not a plain view either: `v_order_guide` fabricates a weekday axis with
+   `cross join generate_series(1,7)` because its par lives in a seven-slot
+   ARRAY with no weekday row to join to, while `production_plan_tray_items`
+   already IS a row per weekday — copying the idiom past the point its reason
+   applies would manufacture an axis only to filter it back down. And a
+   schedule is bound to a DATE: plan membership is a RANGE predicate no
+   subscript can fake, and a date axis has no natural bound, so a caller who
+   forgets the `where` gets a silent cartesian. Hence
+   **`production_day(location, date)`** — exposed to PostgREST for the screen
+   AND called internally by the generator. 013's precedent: one implementation,
+   two callers, so a stale tab can't post last week's arithmetic into a
+   committed document.
+   **SQL WRITES THE PARS; TYPESCRIPT WRITES THE MONEY.** `productionCost`
+   already resolves the whole graph with `lib/units`' conversion, a cycle
+   guard and an `unresolved[]` list, and `matchYield` already ranks
+   `production_batch_yields`. A SQL twin would be decision 2's disease in a new
+   form, so generation leaves the four cost columns NULL and the caller patches
+   them from the graph it is already holding (the **Recost** command does it
+   again later). A null `costed_at` is a legible state; a zero is a wrong
+   number that looks right. Element demand is TypeScript for a DIFFERENT
+   reason, and the asymmetry is principled: pars are RECORDS, so the generator
+   must own them; element demand is a RENDERING (decision 5), so nothing writes
+   it and there is no second writer to drift from.
+   **`generate_production_schedules` NEVER SILENTLY REPLACES** (decision 6), in
+   three levels each costing an explicit act: default SKIPS an existing day and
+   reports it, so a 14-day run overlapping three still writes the other eleven;
+   `p_replace` replaces lines IN PLACE keeping the id and `printed_at`;
+   `p_allow_actuals` is required on top when any line carries made/leftover, or
+   it RAISES. Replacement is an UPSERT on `(schedule_id, item_id)`, not a
+   delete-and-insert, which is what carries a supervisor's typing forward for
+   free — and a line a human ADDED (`par_source = 'manual'`) survives too.
+   **A schedule is a WORKING DOCUMENT** (Mark, 2026-08-07, applying the
+   2026-07-28 PO call): par, note, added and struck lines are editable in
+   place, and an edited par writes `par_source = 'manual'` in the SAME update,
+   so the schedule and the plan may disagree but never silently. That does NOT
+   make overrides redundant — an override is intent BEFORE generation, editing
+   is correction AFTER.
+   **`production_par_overrides.par` is NOT NULL and ZERO MEANS "don't make it"**
+   — the ROW is the touch, so a nullable par would be a second way to say
+   nothing, and to a kitchen the two sentences are the same. A suppressed item
+   still SHOWS on the derived day (a printed sheet with a zero row invites
+   someone to make it anyway). Bump vs ADDITION is one record type: the derived
+   day's `full outer join` answers it, so there is no `is_addition` flag.
+   **THE PACKET IS SEVEN DOCUMENTS FROM ONE DATASET.** Only the premade
+   schedule is a record; the three tray guides are ONE renderer at three grains
+   (subtype = cut, +finish = prep, +item = decorate) and the element sheets are
+   derivation. They sum every schedule live in that KITCHEN that night, which
+   is what makes "including special orders" true by construction rather than by
+   a flag. **`TALLY_BOXES` is a fixed 24 and fills by FLOOR** — measured, 888
+   boxes over 37 rows, and par 15 shades two not three — while the guides' `1…25`
+   strip is a ruler of TRAY numbers. Reproducing one from the other's rule
+   would be wrong (answered question 3 says so outright).
+   **TRAY CAPACITY IS A COLUMN, and only rendering the real packet found it.**
+   Every filled cell holds 24 — vanilla 54 reads 24 · 24 · 6 — EXCEPT fritters,
+   which FileMaker trays 16 · 4 rather than as a single 20. A constant would
+   have printed a tray the kitchen never fills, while looking plausible. 040
+   adds `production_items.tray_capacity` default 24, snapshotted on the line
+   beside `tally_box_size`; a run takes the SMALLEST among its lines.
+   **`_production.mer` IS THE ONE CONFIG EXPORT NO TRANSFORM HAD EVER READ** —
+   1,201 rows, and the AB/Weekly sheets have nothing to print without it. Two
+   things a reading of its column list gets wrong: **a row is one BATCH**
+   (Raised Dough at DF01 on a Monday morning is four rows), and
+   **`batchOrder_n` is NOT a number** — its values include "Blueberry",
+   "Caramel", "x2", so an integer column takes the numeric ones and drops the
+   rest without a word. It has **no primary key at all**, so identity is the
+   natural tuple plus an `occurrence` ordinal (028's `source_row_key` lesson):
+   element 1126 has six unlabelled Tuesday batches at DF01 carrying amounts 8,
+   4 and 2, and merging on the tuple alone discards five real batches.
+   `WeeklyPar` is constant per (element, kitchen) — 197 groups, zero varying —
+   so it lands on `production_element_locations`' stock columns, which 036
+   created and left empty. 1,105 of 1,201 load; 30 have no kitchen and 66 no
+   weekday, each reported.
+   Verified: all 40 migrations apply on the Docker harness; the real 1,105 rows
+   replay through the real constraints with the flavour batches intact;
+   generation, the skip guard, the actuals refusal, actuals carried forward,
+   ahead-of-time, overlap summing, additions, suppression and the kitchen-split
+   override all exercised as a real authenticated owner, with staff reading and
+   every write changing **0 rows and returning NO error**, and `anon` refused
+   both functions. **637 fixtures pass**, each rule checked by breaking it. And
+   the real 2026-08-07 DF02 night was rendered through the real components and
+   compared page for page against FileMaker's own packet: every type total,
+   every subtype subtotal, every tally strip and every tray ruler matches.
+   **Expected discrepancy, NOT a bug:** the printed BATCH SIZE figures don't all
+   reproduce. Cake reconciles exactly (Banana 15 × 1/30 = 0.50, Old Fashioned
+   33 × 1/60 = 0.55, Fritter 20 × 1/16 = 1.25) but raised does not — 300 raised
+   prints 0.60 in FMP where Mark's own 1/340 gives 0.88. The export is stale by
+   his account and his rule is what phase 2 seeded, editable, precisely so this
+   is a data edit. Show him the first real packet.
+   **Phase 5 is NOT built**: batches + actuals (041). `made`/`leftover` ship as
+   columns and render read-only, because a supervisor writing them needs
+   COLUMN-scoped access this table's RLS deliberately doesn't give — that is
+   029's `report_pooled_tips` shape, a definer function naming exactly those
+   columns, and it belongs in phase 5 rather than in a loosened policy here.
+   Note the brief's numbering is off by one, since 038 was spent on the name
+   constraint.
    **A HEAD COUNT PROBE CANNOT TELL "EMPTY" FROM "MISSING"** — probing 039 with
    `.select("*", { count: "exact", head: true })` returned `null` and NO error
    for a table that did not exist. A HEAD response has no body to carry the
