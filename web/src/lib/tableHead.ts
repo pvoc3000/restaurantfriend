@@ -267,6 +267,59 @@ export function useFillViewportHeight(
 }
 
 /**
+ * How much page there really is BELOW an element, in its own flow.
+ *
+ * NOT `body.bottom - rect.bottom`, which is what both of these hooks used to
+ * ask and which is a LIE on any page shorter than the window. `body` is
+ * `min-h-full`, so its bottom edge sits at the foot of the VIEWPORT and every
+ * pixel of slack under the content gets counted as content. `below` then
+ * absorbs the slack and `innerHeight - top - below` comes back as EXACTLY the
+ * height the element already has, whatever that is — the measurement is a fixed
+ * point and the element can never grow. `useFillViewportHeight` escapes it by
+ * dropping its cap before measuring, which makes the page overflow again so the
+ * body tells the truth; the definite-height hook below cannot do that (see its
+ * own note), so it had no defence at all and simply sat at its floor: measured
+ * 2026-08-08, the recipe tab's frame was 360px in a 720px window with 71px of
+ * white underneath it.
+ *
+ * So don't ask the body. Walk the ancestors and add up what actually follows:
+ * at each level the gap between our bottom and the bottom-most later sibling,
+ * plus that level's own bottom padding and border. Every one of those distances
+ * is INDEPENDENT of our height — a later sibling moves down as we grow — which
+ * is what makes the answer stable enough to write a height from and what stops
+ * the ResizeObserver chasing its own tail.
+ *
+ * Out-of-flow siblings are skipped: a `fixed` bar takes no flow space, and the
+ * one we have (`ui/StickyFooter`) already measures itself into an in-flow
+ * spacer, which this counts by the ordinary route.
+ */
+export function spaceBelow(el: HTMLElement): number {
+  let total = 0;
+  let node: HTMLElement = el;
+  while (node !== document.body && node.parentElement) {
+    const parent = node.parentElement;
+    const bottom = node.getBoundingClientRect().bottom;
+    let last = bottom;
+    for (let s = node.nextElementSibling; s; s = s.nextElementSibling) {
+      const style = getComputedStyle(s);
+      if (style.position === "fixed" || style.position === "absolute") continue;
+      const rect = s.getBoundingClientRect();
+      // A zero box is a renders-nothing component (ScrollMemory) or a portal's
+      // anchor, not layout.
+      if (rect.height || rect.width) last = Math.max(last, rect.bottom);
+    }
+    const style = getComputedStyle(parent);
+    total +=
+      last -
+      bottom +
+      (parseFloat(style.paddingBottom) || 0) +
+      (parseFloat(style.borderBottomWidth) || 0);
+    node = parent;
+  }
+  return total;
+}
+
+/**
  * The DEFINITE-HEIGHT sibling of `useFillViewportHeight`: it writes `height`
  * rather than `max-height`, so the element ends where the window does AND its
  * flex children have something to be a proportion OF.
@@ -312,11 +365,17 @@ export function useExactViewportHeight(
      * the element and is unaffected by its height, and `below` — what sits under
      * it — is stable once the height is applied, so the second pass computes the
      * same target as the first and the >1px guard stops the loop.
+     *
+     * WHICH IS WHY `below` CANNOT COME FROM THE BODY'S BOTTOM EDGE. Refusing the
+     * probe means refusing the cap's own cure for the fixed point `min-h-full`
+     * creates, so this one has to measure what follows it honestly — see
+     * `spaceBelow`. Without it the height is self-fulfilling: the frame opened
+     * at its floor, because a column of `basis-0 grow` panes has no content
+     * height before a definite height is written, and stayed there for ever.
      */
     const measure = () => {
       const rect = el.getBoundingClientRect();
-      const below = document.body.getBoundingClientRect().bottom - rect.bottom;
-      const target = Math.max(minHeight, window.innerHeight - rect.top - below);
+      const target = Math.max(minHeight, window.innerHeight - rect.top - spaceBelow(el));
       if (Math.abs(parseFloat(el.style.height || "0") - target) > 1) {
         el.style.height = `${target}px`;
       }

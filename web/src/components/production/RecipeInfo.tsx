@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState, useTransition } from "react";
+import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Switch } from "@/components/ui/Switch";
-import { useExactViewportHeight } from "@/lib/tableHead";
+import { spaceBelow, useViewportAtLeast } from "@/lib/tableHead";
 import { unresolvedSummary } from "@/lib/productionCost";
 import { recipeHref } from "@/lib/recipes";
 import { scaleColumns } from "@/lib/production";
@@ -22,15 +22,14 @@ import type { SheetVersion } from "./RecipeVersionSheet";
  * IT IS ONE SCREEN, and that is the layout's whole brief (Mark, 2026-08-08:
  * "ideally everything should display on a single screen. Notes and versions
  * should scroll"). The fields sit at their natural height; below them a frame
- * takes whatever is left, holding NOTES across the top and then VERSIONS beside
- * COSTS (Mark's arrangement). Each of the three scrolls its own contents, so a
- * recipe with 38 versions and a page of testing notes fills the same frame as
- * one with two lines of each.
+ * takes whatever is left, holding NOTES down the left and VERSIONS over COSTS
+ * down the right (Mark's arrangement, 2026-08-08). Notes and Versions each
+ * scroll their own contents, so a recipe with 38 versions and a page of testing
+ * notes fills the same frame as one with two lines of each.
  *
  * THE COLUMN BOUNDARY IS THE SAME HALF-AND-HALF as the fields above it, which is
- * the point of putting Versions and Costs side by side rather than stacking
- * them: one rule runs straight down the page instead of three blocks each
- * finding their own edge.
+ * the point of the two columns rather than three stacked blocks: one rule runs
+ * straight down the page instead of each block finding its own edge.
  *
  * The height is MEASURED, never a CSS constant — `useExactViewportHeight`, the
  * same reason the receiving screen measures its own: what sits above varies with
@@ -56,18 +55,90 @@ export function RecipeInfo({
   editable: boolean;
   params: Record<string, string | string[] | undefined>;
 }) {
-  // THE CAP IS ON THE ROW, not on the whole tab. Capping the frame made the
-  // three cells whatever was left after the fields block — 250px on a laptop,
-  // which is not a pane, it is a letterbox (Mark, 2026-08-08: "much taller").
-  // Measuring the row itself lets it take the window down to its own floor, and
-  // past that the page scrolls rather than the cells shrinking further.
-  // NOT GATED ON WIDTH. It was, on `xl`, and that is what left the page with
-  // most of its height unused on any window narrower than 1280 — no height was
-  // written at all and every pane fell back to its natural size. Height is the
-  // only thing this measurement is about, so a short window is handled by the
-  // FLOOR: below it the page scrolls, which is the honest failure.
-  const row = useRef<HTMLDivElement>(null);
-  useExactViewportHeight(row, true, 420);
+  // THE ROW IS SIZED BY THE RIGHT COLUMN, NOT BY THE WINDOW (Mark, 2026-08-08:
+  // "versions doesn't need to be so tall. It could probably be the same height
+  // as Costs, and then Notes can be tall enough so its bottom is aligned with
+  // the bottom of costs"). Filling the viewport meant SOMETHING had to absorb
+  // the leftover, and the only block in the column that could give was the
+  // versions list — so a family with 38 versions got a 505px pane of 44px rows
+  // and the two columns ended level with the foot of the SCREEN rather than
+  // with the last line of the matrix.
+  //
+  // Two measurements, both one-directional, which is what keeps this from
+  // oscillating the way a self-referential height does:
+  //   1. VERSIONS IS CAPPED TO THE HEIGHT OF COSTS. Measured, not written down:
+  //      the matrix is a fixed six rows, but its heading wraps when a recipe has
+  //      unpriced elements to name, so it is 324px on one recipe and 340 on the
+  //      next and a constant would be visibly wrong on one of them.
+  //   2. NOTES IS GIVEN THE RIGHT COLUMN'S HEIGHT, so the two columns end level.
+  // Costs never reads the list above it and the right column never reads Notes,
+  // so the arrows only point one way. `xl:items-start` is load-bearing for that:
+  // it stops the grid stretching the right column to the row, which would make
+  // its height depend on the very thing we derive from it.
+  //
+  // Written straight to the nodes, the `lib/tableHead` idiom — no state, so a
+  // re-measure doesn't re-render 38 rows.
+  //
+  // A CONSEQUENCE, ACCEPTED: the tab is no longer clamped to one screen. The row
+  // is at most `costs + gap + costs` ≈ 700px, so on a window under ~1200 the
+  // page scrolls a little. That is inherent in the ask — bottoms aligned on the
+  // matrix's last line is a content-driven height, not a viewport-driven one.
+  const wide = useViewportAtLeast(1280);
+  const notesColumn = useRef<HTMLDivElement>(null);
+  const rightColumn = useRef<HTMLDivElement>(null);
+  const versionsBox = useRef<HTMLDivElement>(null);
+  const costsBox = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const notes = notesColumn.current;
+    const right = rightColumn.current;
+    const box = versionsBox.current;
+    const costs = costsBox.current;
+    if (!notes || !right || !box || !costs) return;
+    if (!wide) {
+      // Stacked, both are as tall as they are and the page scrolls.
+      box.style.maxHeight = "";
+      notes.style.height = "";
+      return;
+    }
+    const apply = () => {
+      const costsHeight = Math.round(costs.getBoundingClientRect().height);
+      if (costsHeight) {
+        // The matrix's height is what the list WANTS. What it can have is also
+        // bounded by the window, so the tab still opens as one screen wherever
+        // it can: at 1100px the pair would come to 672 in 552 of room, and the
+        // list gives up the 120 rather than the page scrolling. Both terms of
+        // `room` are independent of this box's own height — the grid's top is
+        // decided by what sits above it and `spaceBelow` counts real siblings
+        // and padding, never slack — so this can't become the fixed point that
+        // `lib/tableHead` documents.
+        const grid = right.parentElement;
+        const gap = Math.round(costs.getBoundingClientRect().top - box.getBoundingClientRect().bottom);
+        const room = grid
+          ? Math.round(
+              window.innerHeight - grid.getBoundingClientRect().top - spaceBelow(grid)
+            ) - gap - costsHeight
+          : costsHeight;
+        // Never below three rows: past that the list stops being a list, and a
+        // page that scrolls is the better failure.
+        const cap = `${Math.max(132, Math.min(costsHeight, room))}px`;
+        if (box.style.maxHeight !== cap) box.style.maxHeight = cap;
+      }
+      const rightHeight = Math.round(right.getBoundingClientRect().height);
+      if (rightHeight) {
+        const height = `${rightHeight}px`;
+        if (notes.style.height !== height) notes.style.height = height;
+      }
+    };
+    apply();
+    const observer = new ResizeObserver(apply);
+    observer.observe(costs);
+    observer.observe(right);
+    window.addEventListener("resize", apply);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", apply);
+    };
+  }, [wide]);
 
   // THE CHOSEN COLUMN LIVES HERE, not inside the costs block, because two
   // things read it: the matrix, and the Batch cost fact at the top of the
@@ -146,23 +217,28 @@ export function RecipeInfo({
         </div>
       </section>
 
-      <div ref={row} className="flex min-h-0 flex-col gap-6 overflow-hidden">
-        {/* Notes sits at its NATURAL height under a cap rather than taking a
-            share of the frame (Mark, 2026-08-08: the lists "should start about
-            half way down the page"). Given a share it stretched to a quarter of
-            the window for two lines of prose and pushed the lists into the
-            bottom third; capped, a short note costs what it is worth and a long
-            one scrolls. */}
-        <Notes version={version} editable={editable} />
+      {/* NOTES on the left; VERSIONS over COSTS on the right (Mark, 2026-08-08
+          — "move the versions section across from Notes and above Costs"). The
+          boundary is the same half-and-half as the fields above it, so one rule
+          runs straight down the page.
+          `min-w-0` on BOTH tracks, and not behind a breakpoint: a grid item's
+          min-width defaults to min-content, so the matrix's own `minWidth`
+          would stop its track shrinking and push the whole PAGE sideways rather
+          than scrolling inside its box. */}
+      <div className="flex flex-col gap-6 xl:grid xl:grid-cols-2 xl:items-start xl:gap-10">
+        {/* Its HEIGHT is written by the effect above — the right column's, so the
+            two end level. `min-h-0` so the notes inside can give way to it. */}
+        <div ref={notesColumn} className="flex min-h-0 min-w-0 flex-col">
+          <Notes version={version} editable={editable} />
+        </div>
 
-        {/* Versions and Costs side by side (Mark, 2026-08-08), on the same
-            half-and-half boundary as the fields above.
-            `min-w-0` on BOTH tracks, and not behind a breakpoint: a grid item's
-            min-width defaults to min-content, so the matrix's own `minWidth`
-            would stop its track shrinking and push the whole PAGE sideways
-            rather than scrolling inside its box. */}
-        <div className="flex min-h-0 flex-1 flex-col gap-6 xl:grid xl:grid-cols-2 xl:gap-10">
-          <div className="flex min-h-0 min-w-0 flex-col">
+        {/* SHRINK, NEVER GROW, on the versions list — sized to its own rows and
+            capped at the matrix's height by the effect above. Costs is
+            `shrink-0`: it is a fixed grid of figures with one right height, and
+            it is what the cap above it and the column across from it are both
+            measured FROM, so it must not move. */}
+        <div ref={rightColumn} className="flex min-w-0 flex-col gap-12">
+          <div ref={versionsBox} className="flex min-h-0 flex-col">
             <RecipeVersionList
               recipeId={recipeId}
               current={version}
@@ -171,7 +247,7 @@ export function RecipeInfo({
               params={params}
             />
           </div>
-          <div className="min-h-0 min-w-0 overflow-y-auto">
+          <div ref={costsBox} className="min-h-0 shrink-0 overflow-y-auto">
             <RecipeCosts
               version={version}
               matrix={matrix}
@@ -188,34 +264,44 @@ export function RecipeInfo({
 }
 
 /**
- * The version's prose, across the top of the frame so a page of testing notes
- * can't push everything else off the screen.
+ * The version's prose, down the left of the frame.
  *
- * `basis-0 grow` rather than `flex-1`: the proportion has to be of the WHOLE
- * frame, not of whatever is left after the content has had its say, or a long
- * note takes the row beneath it and the ratio means nothing.
+ * THE VERSION NOTE IS ITS OWN ELEMENT and sits OUTSIDE the scroller (Mark,
+ * 2026-08-08). The two are not the same kind of writing: the version note is a
+ * line naming what this version IS — "v09 scaled to 2000g" — which is the first
+ * thing you read and should always be on screen, where testing notes accumulate
+ * over years and are what the scrolling is for. Sharing one box meant a long
+ * testing note could push the version's own name for itself out of sight, and
+ * scrolling back up to a heading is a strange way to find a single line.
  */
 function Notes({ version, editable }: { version: SheetVersion; editable: boolean }) {
   return (
-    <section className="flex shrink-0 flex-col gap-3">
+    // `flex-initial` below `xl`, `flex-1` at it. Only the two-column frame has
+    // a definite height to be a share OF; stacked, the frame is content-sized,
+    // and `flex-1` is `flex: 1 1 0%` — a basis of 0 in an auto-height column
+    // means the whole block collapses to its heading.
+    <section className="flex min-h-0 flex-initial flex-col gap-3 xl:flex-1">
       <SectionHeading>Notes</SectionHeading>
-      {/* A CAP, not a share of the frame. Given a share it stretched to a
-          quarter of the window for two lines of prose and pushed the two lists
-          into the bottom third (Mark, 2026-08-08). Capped, a short note costs
-          what it is worth, a long one scrolls, and the lists get everything
-          else — which is what "start about half way down" asks for on any
-          window tall enough to have a half. */}
-      <div className="max-h-32 space-y-3 overflow-y-auto pr-1 text-[14px]">
-        <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-            Version note
-          </p>
-          <Editable id={version.id} column="note" value={version.note} editable={editable} multiline />
-        </div>
-        <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-            Testing notes
-          </p>
+
+      <div className="shrink-0 text-[14px]">
+        <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+          Version note
+        </p>
+        <Editable id={version.id} column="note" value={version.note} editable={editable} multiline />
+      </div>
+
+      {/* Only the testing notes scroll, and they get the rest of the column —
+          at `xl`. Stacked they are as long as they are and the page scrolls;
+          see the note on the section.
+          `mt-9` on top of the section's own `gap-3` — 48px, the same break the
+          right column puts between Versions and Costs, because it is the same
+          kind of break: two distinct blocks stacked in one column, not a label
+          and the words under it. */}
+      <div className="mt-9 flex min-h-0 flex-initial flex-col text-[14px] xl:flex-1">
+        <p className="mb-1 shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+          Testing notes
+        </p>
+        <div className="min-h-0 flex-initial overflow-y-auto pr-1 xl:flex-1">
           <span className="text-muted">
             <Editable
               id={version.id}
@@ -294,9 +380,16 @@ function RecipeVersionList({
   }
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col gap-3">
+    // `flex-initial` — see the note at the call site: it shrinks and scrolls
+    // when the family is long, and never grows past its own rows when it isn't.
+    <section className="flex min-h-0 flex-initial flex-col gap-3">
       <SectionHeading count={versions.length}>Versions</SectionHeading>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* `flex-initial` again, and for a reason worth stating: `flex-1` is
+          `flex: 1 1 0%`, and a basis of 0 inside a section that is now sized by
+          its CONTENT means the section has no content — the list would collapse
+          to its heading. Basis `auto` lets the rows decide, and `min-h-0` still
+          lets them give way when the column can't hold them. */}
+      <div className="min-h-0 flex-initial overflow-y-auto">
         <table className="w-full table-fixed border-collapse text-[14px]">
           {/* Tight, because this list shares its column with the Notes cell and
               the costs matrix takes the width it needs. Everything fixed adds to

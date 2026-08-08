@@ -2262,12 +2262,53 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    into `getAppSession`: one column read by one screen, against a session every
    screen pays for.
    **BOTH RECIPE TABS ARE ONE SCREEN OF PANES** (Mark, 2026-08-08). Info: the
-   fields, then Notes across the top with Versions beside Costs. Recipe:
-   Ingredients over Procedure, each scrolling its own rows. **Both areas split
-   HALF AND HALF** so the boundary runs straight down the page — the
-   fields as two `dl`s rather than one four-track grid, because a single grid
-   ties both sides to the same row heights and a long description would push
+   fields, then NOTES down the left with VERSIONS over COSTS down the right
+   (Mark's second pass the same day — "move the versions section across from
+   Notes and above Costs"; it had been Notes across the top with Versions beside
+   Costs). Recipe: Ingredients over Procedure, each scrolling its own rows.
+   **Both areas split HALF AND HALF** so the boundary runs straight down the page
+   — the fields as two `dl`s rather than one four-track grid, because a single
+   grid ties both sides to the same row heights and a long description would push
    Storage's value down to meet it.
+   **THE VERSION NOTE IS ITS OWN ELEMENT, OUTSIDE THE SCROLLER** (Mark, same
+   pass). It shared one `overflow-y-auto` box with the testing notes and they are
+   not the same kind of writing: the version note is one line naming what this
+   version IS ("v09 scaled to 2000g"), the first thing you read and always worth
+   having on screen, where testing notes accumulate over years — Chocolate Glaze
+   v50 carries 844px of them — and are what the scrolling is for. Sharing a box
+   let the note be scrolled out of sight by prose about a version it names.
+   **VERSIONS SHRINKS AND NEVER GROWS** (`flex-initial`, not `flex-1`). Given a
+   share of the column it stretched to the frame's full height for a recipe with
+   ONE version and left Costs stranded 600px below — which is not "above Costs".
+   Sized to its content it sits directly on the matrix, and `min-h-0` is what
+   lets a 38-version family give the room back and scroll instead. Its inner
+   scroller is `flex-initial` for the mirror reason: `flex-1` is `flex: 1 1 0%`,
+   and a basis of 0 inside a section now sized by its CONTENT means the section
+   has no content, so the list collapses to its heading.
+   **THE ROW IS SIZED BY THE RIGHT COLUMN, NOT BY THE WINDOW** (Mark, third pass
+   the same day: "versions doesn't need to be so tall. It could probably be the
+   same height as Costs, and then Notes can be tall enough so its bottom is
+   aligned with the bottom of costs"). Filling the viewport meant SOMETHING had
+   to absorb the leftover, and the only block that could give was the versions
+   list — so a 38-version family got a 505px pane of 44px rows and the two
+   columns ended level with the foot of the SCREEN rather than with the last line
+   of the matrix. Two measurements do it, and **both arrows point one way, which
+   is what stops it becoming another fixed point**: Versions is capped to the
+   MEASURED height of Costs, and Notes is given the MEASURED height of the right
+   column. Costs never reads the list above it and the right column never reads
+   Notes. **`xl:items-start` is load-bearing** — without it the grid stretches
+   the right column to the row, making its height depend on the very thing
+   derived from it.
+   The cap is measured rather than written down because the matrix's heading
+   WRAPS when a recipe has unpriced elements to name: 324px on Chocolate Glaze,
+   340 on Banana Cake Donut. It is also bounded by the window, so the tab still
+   opens as one screen where it can — at 1100px the pair would want 672 in 552 of
+   room, and the list gives up the 120 rather than the page scrolling (floor 132,
+   three rows, past which the page scrolls instead). Verified: 1500px window →
+   both blocks 324 and Notes 680, bottoms level to 1px; 1100px → versions 197,
+   page exactly one viewport; one-version recipe → versions 112, Notes 484,
+   bottoms level to 0px. Below `xl` both overrides are CLEARED and the page
+   scrolls.
    **`useExactViewportHeight` — the DEFINITE-height sibling of
    `useFillViewportHeight`, and TWO things separate them, both paid for by a
    blank screen.** First: a `max-height` alone leaves the box content-sized, and
@@ -2284,12 +2325,43 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    so the second pass computes the same target and the >1px guard ends it.
    Reach for the cap when a pane should be as tall as its rows and no taller;
    reach for the exact one when several panes SHARE a height.
-   **The fill is NOT gated on width.** It was, on `xl`, and that is what left the
-   page with most of its height unused on any window narrower than 1280 — no
-   height was written at all and every pane fell back to its natural size (Mark,
-   2026-08-08: "so much height unused"). Height is the only thing the
-   measurement is about, so a short window is handled by the FLOOR (760px on both
-   tabs): below it the page scrolls, which is the honest failure.
+   **BUT REFUSING THE PROBE MEANT REFUSING THE CAP'S OWN CURE, and that shipped
+   a frame stuck at its floor** (Mark, 2026-08-08: "why is there so little height
+   on the Ingredient and procedure section?"). Both hooks asked
+   `body.bottom - rect.bottom` for what sits below, and `body` is `min-h-full`,
+   so on a page shorter than the window its bottom edge is the foot of the
+   VIEWPORT and every pixel of slack counts as content. `below` absorbs the
+   slack, `innerHeight - top - below` returns EXACTLY the height the element
+   already has, and the measurement is a FIXED POINT at whatever it started
+   at — which for a column of `basis-0 grow` panes is ZERO, because they have no
+   content height before a definite one is written, so the floor is where it
+   stops. The cap escapes by dropping `max-height` first, which makes the page
+   overflow again so the body tells the truth; the exact hook cannot, and had no
+   defence at all. Measured: the Recipe tab's frame sat at its 360px floor in a
+   720px window with 71px of white underneath, showing three sticky header rows
+   and not one ingredient.
+   So `spaceBelow` in `lib/tableHead` walks the ancestors instead and adds up
+   what really follows — at each level the gap from our bottom to the bottom-most
+   later sibling, plus that level's own bottom padding and border, skipping
+   out-of-flow siblings. Every one of those distances is INDEPENDENT of our
+   height, which is what keeps the answer stable. Verified: 1000px window →
+   679.5px frame (1000 − 288.5 top − 32 layout padding), two 320px halves, page
+   exactly one viewport; 1400px window → 1079.5 and two 520s. **The cap still
+   asks the body**, masked by its probe — a latent version of the same bug, worth
+   remembering if a `useFillViewportHeight` pane is ever mysteriously short.
+   **The viewport measurement IS gated on width — at `xl`, where the two columns
+   exist.** Below it the blocks stack in ONE column and a height there either
+   clips them or hands an iPad three ~250px panes inside a scrolling page.
+   Stacked, the page scrolls, and the stretch classes go with it
+   (`flex-initial xl:flex-1`, or a basis of 0 in an auto-height column collapses
+   the block). This is NOT the gate removed earlier the same day for leaving
+   height unused (Mark: "so much height unused") — that symptom was the fixed
+   point above, which left the frame at its floor at EVERY width; ungating it
+   only made a narrow window wrong a second way. The RECIPE tab stays ungated
+   and keeps `useExactViewportHeight`: it is two lists sharing a column at any
+   width, and there the even split IS the answer. Short windows are handled by a
+   FLOOR — 360 on the Recipe frame, 132 on the Info tab's versions cap — past
+   which the page scrolls, which is the honest failure.
    Other traps paid for here: **`min-w-0` on both columns and NOT behind a
    breakpoint**, or the costs matrix's own `minWidth` stops its track shrinking
    and pushes the PAGE sideways; the ingredient grid's **one scroller for both
@@ -2299,12 +2371,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    offsets** (0 / 26 / 62px, measured).
    **THE INFO TAB IS ONE SCREEN** (Mark, 2026-08-08: "ideally everything should
    display on a single screen. Notes and versions should scroll"). The fields sit
-   at their natural height; below them a row takes whatever is left, with NOTES
-   and VERSIONS sharing the left column `basis-0 grow` / `grow-[1.5]` and
-   scrolling their own contents, and COSTS beside them. `basis-0`, not `flex-1`:
-   the proportion has to be of the WHOLE cell, or a page of testing notes takes
-   the versions list's room and the ratio means nothing. Height is MEASURED
-   (`useFillViewportHeight`) and only above `xl`; stacked, the page scrolls.
+   at their natural height; below them a row takes whatever is left, holding
+   NOTES down the left and VERSIONS over COSTS down the right — see the
+   arrangement note above, which supersedes the `basis-0 grow` / `grow-[1.5]`
+   left column this line originally described. Height is MEASURED
+   (`useExactViewportHeight`) and only above `xl`; stacked, the page scrolls.
    **`min-w-0` ON BOTH COLUMNS, not behind a breakpoint** — a flex item's
    min-width defaults to min-content, so the matrix's own `minWidth` made its
    column refuse to shrink and pushed the whole PAGE sideways. And the costs pane
