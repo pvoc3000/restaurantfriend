@@ -2262,7 +2262,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    into `getAppSession`: one column read by one screen, against a session every
    screen pays for.
    **BOTH RECIPE TABS ARE ONE SCREEN OF PANES** (Mark, 2026-08-08). Info: the
-   fields, then Notes + Versions sharing a column beside Costs. Recipe:
+   fields, then Notes across the top with Versions beside Costs. Recipe:
    Ingredients over Procedure, each scrolling its own rows. **Both areas split
    HALF AND HALF** so the boundary runs straight down the page — the
    fields as two `dl`s rather than one four-track grid, because a single grid

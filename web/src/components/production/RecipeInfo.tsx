@@ -21,19 +21,23 @@ import type { SheetVersion } from "./RecipeVersionSheet";
  *
  * IT IS ONE SCREEN, and that is the layout's whole brief (Mark, 2026-08-08:
  * "ideally everything should display on a single screen. Notes and versions
- * should scroll"). So the four blocks are laid out rather than stacked: the
- * fields at their natural height, then a row that takes whatever is left, with
- * NOTES and VERSIONS sharing the left column in proportion and scrolling their
- * own contents, and COSTS beside them. A recipe with 38 versions and a page of
- * testing notes fills the same frame as one with two lines of each.
+ * should scroll"). The fields sit at their natural height; below them a frame
+ * takes whatever is left, holding NOTES across the top and then VERSIONS beside
+ * COSTS (Mark's arrangement). Each of the three scrolls its own contents, so a
+ * recipe with 38 versions and a page of testing notes fills the same frame as
+ * one with two lines of each.
  *
- * The height is MEASURED, never a CSS constant — `useFillViewportHeight`, the
- * same reason the receiving screen measures its own: what sits above this row
- * varies with the masthead's wrapping and with how long the description runs,
- * and every constant is wrong at some width.
+ * THE COLUMN BOUNDARY IS THE SAME HALF-AND-HALF as the fields above it, which is
+ * the point of putting Versions and Costs side by side rather than stacking
+ * them: one rule runs straight down the page instead of three blocks each
+ * finding their own edge.
  *
- * Below `xl` it STACKS at natural height and the page scrolls, which is the
- * receiving screen's rule too: nothing hidden, no panes too short to read.
+ * The height is MEASURED, never a CSS constant — `useExactViewportHeight`, the
+ * same reason the receiving screen measures its own: what sits above varies with
+ * the masthead's wrapping and with how long the description runs, so every
+ * constant is wrong at some width. Below `xl` the two columns stack and the
+ * floor takes over, which is the receiving screen's rule too: nothing hidden, no
+ * panes too short to read.
  */
 export function RecipeInfo({
   recipeId,
@@ -142,36 +146,35 @@ export function RecipeInfo({
         </div>
       </section>
 
-      <div
-        ref={row}
-        className="flex min-h-0 flex-col gap-10 overflow-hidden xl:grid xl:grid-cols-2 xl:gap-10"
-      >
-        {/* `min-w-0` on BOTH columns, and not behind a breakpoint: a flex item's
-            min-width defaults to min-content, so the costs matrix's own
-            `minWidth` would make its column refuse to shrink and push the whole
-            page sideways rather than scrolling inside its box. */}
-        <div className="flex min-h-0 min-w-0 flex-col gap-10">
-          <Notes version={version} editable={editable} />
-          <RecipeVersionList
-            recipeId={recipeId}
-            current={version}
-            versions={versions}
-            editable={editable}
-            params={params}
-          />
-        </div>
-        {/* `min-w-0` is not optional here: without it the matrix's own
-            `minWidth` stops this track shrinking and pushes the PAGE sideways
-            instead of scrolling inside the box. */}
-        <div className="min-h-0 min-w-0 overflow-y-auto">
-          <RecipeCosts
-            version={version}
-            matrix={matrix}
-            laborRate={laborRate}
-            locationCode={locationCode}
-            editable={editable}
-            onChoose={setChosen}
-          />
+      <div ref={row} className="flex min-h-0 flex-col gap-10 overflow-hidden">
+        <Notes version={version} editable={editable} />
+
+        {/* Versions and Costs side by side (Mark, 2026-08-08), on the same
+            half-and-half boundary as the fields above.
+            `min-w-0` on BOTH tracks, and not behind a breakpoint: a grid item's
+            min-width defaults to min-content, so the matrix's own `minWidth`
+            would stop its track shrinking and push the whole PAGE sideways
+            rather than scrolling inside its box. */}
+        <div className="flex min-h-0 basis-0 grow-[3] flex-col gap-10 xl:grid xl:grid-cols-2 xl:gap-10">
+          <div className="flex min-h-0 min-w-0 flex-col">
+            <RecipeVersionList
+              recipeId={recipeId}
+              current={version}
+              versions={versions}
+              editable={editable}
+              params={params}
+            />
+          </div>
+          <div className="min-h-0 min-w-0 overflow-y-auto">
+            <RecipeCosts
+              version={version}
+              matrix={matrix}
+              laborRate={laborRate}
+              locationCode={locationCode}
+              editable={editable}
+              onChoose={setChosen}
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -179,12 +182,12 @@ export function RecipeInfo({
 }
 
 /**
- * The version's prose, in its own cell so a page of testing notes can't push
- * everything else off the screen.
+ * The version's prose, across the top of the frame so a page of testing notes
+ * can't push everything else off the screen.
  *
  * `basis-0 grow` rather than `flex-1`: the proportion has to be of the WHOLE
- * cell, not of whatever is left after the content has had its say, or a long
- * note takes the versions list's room and the ratio means nothing.
+ * frame, not of whatever is left after the content has had its say, or a long
+ * note takes the row beneath it and the ratio means nothing.
  */
 function Notes({ version, editable }: { version: SheetVersion; editable: boolean }) {
   return (
@@ -279,7 +282,7 @@ function RecipeVersionList({
   }
 
   return (
-    <section className="flex min-h-0 basis-0 grow-[2] flex-col gap-3">
+    <section className="flex min-h-0 flex-1 flex-col gap-3">
       <SectionHeading count={versions.length}>Versions</SectionHeading>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <table className="w-full table-fixed border-collapse text-[14px]">
