@@ -389,10 +389,110 @@ Move All. Container fields (batch photos) never export via .mer; recovering
 them would take a FileMaker script writing container contents to files, and is
 probably not worth it.
 
+### What the exports actually say (measured 2026-08-07, before writing 036)
+
+Every figure below was taken off the real files. Three of them corrected an
+assumption in the sections above, so read these first.
+
+**The scale columns ARE computed, and the data proves it.** This was the one
+decision that could have gone either way: `_recipelements.columnAmount_n` is a
+repeating field holding an amount PER VARIATION COLUMN ("170⑳510⑳850⑳1.7"),
+which looks like four independent hand-entered numbers. It isn't. Of the 3,111
+ingredient lines where proportionality is testable, **2,999 (96.4%) are within
+2% of a strict multiple of the base column**, once you account for two things
+that make a naive check report 65% failure:
+
+- **the unit changes as the number grows** — 170 g → 510 g → 850 g → **1.7 kg**
+  is ×1/×3/×5/×10 exactly, and a comparison that doesn't normalise g↔kg sees a
+  wild deviation at the last column;
+- **`Multiplier_number` slot 0 is BLANK meaning ×1** (all 493 versions put the
+  base in slot 0), so a reader that requires a number there discards the
+  majority of lines.
+
+The 86 lines still >25% off are explicable and none of them is an independent
+quantity: `Mixer Size` (sort 100, metadata — a 3× batch uses a 20 qt bowl, not
+a 30 qt one), Chocolate Glaze v24 whose 4th column is a different unit basis
+altogether, and Sugar Cookie stating one ingredient twice ("1.5 cup" and
+"225 g"). Genuine hand-tweaks amount to about a dozen rows — Strawberry Jam's
+17.3 kg where ×3 says 16.5. **So decision 3's "scale columns are computed at
+render, not stored" is confirmed**: store ONE amount + unit per line plus the
+version's column definitions, and report the dozen tweaks the transform is
+about to round off rather than dropping them silently.
+
+**The variation columns are LABELLED, and the labels are content.** Not a fixed
+TEST/×½/×¾/×1/% ladder: 48 versions say "1/2 Pan | 1 Pan | 2 Pans | 3 Pans | %",
+39 say "2 QT | 7.5 QT | 12 QT | 22 QT | %", others "x1 | x2 | x4 | x8",
+"4x 1.5G | 5x 1.5G | 3x 1.5G", "TEST | x1 | x1.5 | x2 | %". So a version owns an
+ordered list of (label, multiplier) — up to 8 — and the `%` column is derived
+(measured: a line's % is its share of the batch's total weight, not of flour).
+
+**Every join resolves.** 8,175 of 8,175 recipe lines join their version row;
+5,200 of 5,200 `_ItemKey`s resolve to a Recipe_Item; `recipeName_t` matches a
+recipe name **97 of 97** and `_recipeKey_t` 11 of 11. The brief's "resolve by
+name, report every miss" stands as written, and there are no misses to report.
+
+**Recipes group into 128 families, and 34 of them have no element.** The
+grouping key is `_ElementID` where any version carries one (301 of 493 rows, 2
+orphans both "Royal Icing" → a deleted element 1166), falling back to the name.
+Four elements carry two spellings across versions — element 1002 is
+"Scratch Cake Donut" at v01 and "Vanilla Cake Donut" at v11, element 1000 is
+"Raisied Donut"/"Scratch Raised Donut" — and these are ONE family renamed
+mid-life, not two. Combining both link directions (the recipe's `_ElementID`, a
+sibling version's, the element's `recipeName_t`, and an exact name equality)
+links 94 families; **the remaining 34 (39 version rows) have no element in FMP
+at all** — the 13 "Knotted – …" creams and custards, several "(old)" glazes,
+Peanut Butter Cookie, Sugar Cookie, Maple Glaze.
+
+Since decision 3 makes `production_recipes.element_id` NOT NULL, **the transform
+CREATES an element for each of those 34**, `kind = 'made'` and INACTIVE, and
+names every one in its report. That is the only reading consistent with the
+decision's own reasoning — a recipe is a document describing how to make an
+element, so a recipe with no element means the element was never written down —
+and it is trivially reversible, since Mark can delete any he doesn't want.
+
+**Masters need a rule.** Of the 128 families, 103 have exactly one
+`isMaster_bool` row, 6 have several (Passion Fruit Glaze marks both v22 and
+v23) and 64 have none — so the partial unique index below cannot simply trust
+the flag. Rule: one master → it; several → the highest version number; none →
+the highest version among the active rows, else the highest version. Report
+every family where the flag didn't decide.
+
+**Duplicate names, as promised.** Elements: "Candied Peanuts", "Fryer",
+"X-Ray Speculoos Scoop Cup" (3 pairs over 249 rows, all with distinct
+`_id_element_t`). Recipe_Items: "Blueberries, Frozen", "Simple Syrup" (2 pairs
+over 212). Merge with a report; never load both.
+
+**Element kinds come from Recipe_Items' own vocabulary**: `VendorItemOrRecipe_text`
+is "Vendor Item" 199 · "Manual" 8 · "Recipe" 5, and 75% carry a
+`_VendorItemKey` to resolve through. The elements table separately carries
+`cost_basis_t` (Internal 68 · Recipes 35 · Inventory 25, empty 121) — a second,
+drifted answer to the same question, which is exactly the "four vocabularies for
+a thing with a cost" disease. `kind` is derived from both, preferring the
+explicit link that actually resolves.
+
+**`type_forprint_c` already holds the stripped type**, so FMP itself agrees the
+numbered prefix is presentation: "05 Topping" → "Topping". 15 distinct types
+over 249 elements (Topping 61 · Glaze 35 · Cleaning 25 · Ice Cream 24 · Cream
+23 · Donut 20 · …), one row with none. The prefix number IS the sort order.
+
+**Element pars are PER LOCATION**, which the model sketch above doesn't say:
+`_elementpars.mer` is keyed (element, location) — DF01 49 rows, DF02 11 — with
+a 7-slot packed par AND a 7-slot yield. The element's own `par` field is nearly
+empty (a stray free-text value in slot 0 on a handful of rows) and
+`currentPar_c` is a calculation showing the current location's. So the stock-up
+par belongs on a `production_element_locations` table in the
+`inventory_item_locations` mould, not on the element — same shape, same 7-slot
+`par_by_weekday` idiom as 009.
+
+Free-text par forms to parse: "10 BAGS", "6x 1.5 GAL", "8 ea.", "1x 22# tub",
+"2x 5.5 QT", "1 CAN / 4 QT", and one literal "?". Count × size × unit as the
+brief says; refuse and name the rest.
+
 ### Transform traps already identified
 
 - **Element → recipe links are by name** (39% name, 4% key). Resolve by name
-  match at transform, report every miss by name; do not guess.
+  match at transform, report every miss by name; do not guess. (Measured: every
+  filled link resolves — see above.)
 - **Packed fields**: element pars `"12#12#12#15#21#18#"` (slot n = weekday n),
   multipliers `"13510"`, yields `"2 QT6 QT10 QT20 QT%"` — all repeating-field
   concatenations to unpack.
@@ -458,26 +558,47 @@ decision removed it.
 - **Special Orders is its own future module** — only the `source` seam ships
   now (decision 12).
 
-## Open questions (pinned — ask Mark, don't guess)
+## Open questions — ANSWERED 2026-08-07 (Mark)
 
-1. **Batch-size semantics.** The guides print e.g. "VANILLA TOTAL: 54 /
-   BATCH SIZE: 1.05" and "RAISED TOTAL: 300 / BATCH SIZE: 0.60". Confirm the
-   exact formula (presumably day's total ÷ yield, rounded how?) and which
-   yield it reads — the DDR shows a **DONUT_YIELDS table (22 rows,
-   `Logs_PremadeItems_Yields`)**, so the denominators are likely per-type
-   yield rows there rather than recipe yields. Export it and check before
-   building the roll-up.
-2. **Tray tally boxes.** The printed schedule renders pars as runs of 6s/24s
-   across numbered boxes (trays of 6 for premade, 24s for the baker guide).
-   Confirm the box-size rule (per type? per size?) so the PDFs reproduce
-   faithfully.
-3. **Does a generated schedule line snapshot its cost?** The FMP premade
-   schedule shows a day cost and wholesale total. Cheap to stamp at
-   generation; decide whether it's wanted or noise.
-4. **Wholesale flow.** Items carry wholesale pricing and the FMP schedule
-   totals a wholesale figure. Is anything operational hanging off it today
-   (standing wholesale orders?), or is it informational until Special Orders?
-5. **Shift-report surface ownership.** Phase 5 here and build step 4e's
-   deferred batch screen are one surface. When production counts move into
-   this app, do ratings entry and tips entry ride along in v1 of that screen,
-   or does it start production-only?
+1. **Batch numbering seeds at 30,000** — confirmed, not 3,000. Anything below
+   FMP's 19,541 would collide during the transition.
+
+2. **Batch-size semantics — Mark's rule, superseding `_yields.mer`.**
+
+   > each regular donut (promise rings, bismarks, bullseyes, letters) is 1/340
+   > of a batch, mini donuts are 1/3 the size of a regular donut, giant donuts
+   > are 2x a regular donut
+
+   Note this DISAGREES with the exported table, which says 1/350
+   (`portionOfBatch` 0.002857) and mini = 0.4. Mark's numbers are the current
+   truth; the export is stale. He also said "we need to come up with a better
+   way to do it", so the rule ships as **editable data seeded from those
+   figures** — a per-(type, subtype, size) row carrying portion-of-batch and a
+   size factor — and NEVER as a constant in code. Getting to the better way
+   later then costs an edit, not a migration.
+
+3. **Tray tally boxes** — still unanswered, and it only gates phase 4's printed
+   packet. Ask before building the schedule PDFs.
+
+4. **A generated schedule line DOES snapshot its cost** (my call, Mark:
+   "do what you think is best"). It is decision 11's own carve-out — costing is
+   derived live, snapshots happen exactly where a document needs them — and a
+   schedule is a document about a day that has now passed. Without it, last
+   month's day cost silently re-prices itself every time an ingredient does,
+   which is the 2022-price disease pointing the other way.
+
+5. **Wholesale is informational** until Special Orders. Nothing operational
+   hangs off it; totals are display only.
+
+6. **The shift-report surface is DEFERRED ENTIRELY.** Mark, 2026-08-07:
+   "different screens have different things that need to be entered. we are
+   ignoring the shift report for now. we can implement once everything else is
+   in place." So phase 5's item actuals land on the SCHEDULE's own screen and
+   element actuals on a standalone batch-log screen; the composite surface that
+   also carries ratings, sales and tips — build step 4e's deferred batch screen
+   — comes after this module is otherwise complete. 4e's deferral note still
+   stands; what changes is that Production no longer waits for it either.
+
+**Also skipped, with a report rather than a guess:** the WHOLESALE pseudo-
+location in `_donutpars.mer` (3 rows). Mark, 2026-08-07: "honestly can't
+remember, can skip for now."
