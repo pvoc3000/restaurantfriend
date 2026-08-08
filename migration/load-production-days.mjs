@@ -59,21 +59,50 @@ const { data: locations, error: locErr } = await db.from('locations').select('id
 if (locErr) die('locations', locErr);
 const locationByCode = new Map(locations.map((l) => [l.code, l.id]));
 
+/**
+ * The element index, and it has to be built two ways because phase 1 did two
+ * things to these ids.
+ *
+ * FIRST, IT PREFIXED THEM. `transform-production.mjs` writes `E:1000`, not
+ * `1000`, and `_production.mer` names the bare FileMaker id. Matching on the
+ * raw value resolves NOTHING — the first run of this loader skipped all 1,105
+ * batches and said so 1,237 times, which is the allow-list design working, but
+ * it is still a join to get right rather than to report.
+ *
+ * SECOND, IT MERGED DUPLICATES. "Candied Peanuts", "Fryer" and "X-Ray Speculoos
+ * Scoop Cup" were each two element rows in FMP with distinct ids, folded into
+ * one and the losing ids kept in `source_payload.merged_legacy_ids`. A batch
+ * naming a merged-away id has to land on the survivor, or it disappears with no
+ * error at all — which is the worse failure, because the count would look
+ * plausible.
+ */
 const elementByLegacy = new Map();
+let elementCount = 0;
 for (let from = 0; ; from += 1000) {
   const { data: rows, error } = await db
     .from('production_elements')
-    .select('id, legacy_id, name')
+    .select('id, legacy_id, name, source_payload')
     .eq('org_id', ORG)
     .not('legacy_id', 'is', null)
     .order('legacy_id')                 // an unordered .range() sweep overlaps pages
     .range(from, from + 999);
   if (error) die('production_elements', error);
-  for (const r of rows) elementByLegacy.set(String(r.legacy_id), r);
+  for (const r of rows) {
+    elementCount += 1;
+    const ids = [r.legacy_id, ...(r.source_payload?.merged_legacy_ids ?? [])];
+    for (const id of ids) {
+      const key = String(id);
+      elementByLegacy.set(key, r);
+      // The bare FMP id too, so this transform's output never has to know
+      // phase 1's prefix convention.
+      const bare = key.includes(':') ? key.slice(key.indexOf(':') + 1) : key;
+      if (!elementByLegacy.has(bare)) elementByLegacy.set(bare, r);
+    }
+  }
   if (rows.length < 1000) break;
 }
-console.log(`Resolved ${elementByLegacy.size} elements`);
-if (elementByLegacy.size === 0) {
+console.log(`Resolved ${elementCount} elements (${elementByLegacy.size} keys, counting merged ids and bare FileMaker ids)`);
+if (elementCount === 0) {
   console.error('\nNo elements. Run `load-production.mjs` first — a batch has nothing to point at.');
   process.exit(1);
 }
@@ -107,11 +136,31 @@ if (WIPE) {
 
 const skipped = [];
 const rows = [];
+// THE OCCURRENCE ORDINAL IS RECOMPUTED HERE, NOT TAKEN FROM THE TRANSFORM.
+//
+// The transform numbered occurrences against the RAW FileMaker element id,
+// which is the only id it has. Phase 1 merged duplicate elements, so two raw
+// ids can resolve to one element — and then two batches that were distinct in
+// FileMaker collide on 040's unique key. That is a collision THAT DOES NOT
+// EXIST IN THE SOURCE, and it is the same trap phase 1 hit with element pars:
+// its insert failed on row 471 of 530 because FMP's two "Candied Peanuts" rows
+// each carried their own DF01 par.
+//
+// `legacy_id` still records where the row came from, so nothing is lost;
+// `occurrence` is only the tiebreak that keeps the resolved key unique.
+const seen = new Map();
+let renumbered = 0;
+
 for (const d of data.element_days) {
   const element = elementByLegacy.get(d.element_legacy_id);
   if (!element) { skipped.push(`element ${d.element_legacy_id} is not in the catalog`); continue; }
   const locationId = locationByCode.get(d.location_code);
   if (!locationId) { skipped.push(`kitchen ${d.location_code} is not a location`); continue; }
+
+  const key = `${element.id}|${locationId}|${d.weekday}|${d.shift ?? ''}|${d.batch_label ?? ''}`;
+  const occurrence = (seen.get(key) ?? 0) + 1;
+  seen.set(key, occurrence);
+  if (occurrence !== d.occurrence) renumbered += 1;
 
   rows.push({
     org_id: ORG,
@@ -121,7 +170,7 @@ for (const d of data.element_days) {
     shift: d.shift,
     batch_label: d.batch_label,
     sort: d.sort,
-    occurrence: d.occurrence,
+    occurrence,
     batch_amount: d.batch_amount,
     batch_unit: d.batch_unit,
     is_excluded: d.is_excluded,
@@ -130,6 +179,9 @@ for (const d of data.element_days) {
     source: 'filemaker',
     source_payload: d.source_payload,
   });
+}
+if (renumbered) {
+  console.log(`${renumbered} batch(es) renumbered because a merged element brought two FileMaker rows onto one key.`);
 }
 
 for (let i = 0; i < rows.length; i += BATCH) {
@@ -159,12 +211,26 @@ if (elErr) die('reading production_element_locations', elErr);
 const noteByPair = new Map(existingLocs.map((r) => [`${r.element_id}|${r.location_id}`, r.notes]));
 
 const parRows = [];
-let unparsed = 0, keptNote = 0;
+const parByPair = new Map();
+let unparsed = 0, keptNote = 0, parMerged = 0;
 for (const p of data.element_locations) {
   const element = elementByLegacy.get(p.element_legacy_id);
   if (!element) { skipped.push(`stock-up par names element ${p.element_legacy_id}, not in the catalog`); continue; }
   const locationId = locationByCode.get(p.location_code);
   if (!locationId) { skipped.push(`stock-up par names kitchen ${p.location_code}, not a location`); continue; }
+
+  // The merge can bring two FileMaker elements onto one (element, location),
+  // which 036 makes unique. An upsert would just let the last one win silently;
+  // the first is kept and the clash is reported.
+  const pair = `${element.id}|${locationId}`;
+  if (parByPair.has(pair)) {
+    parMerged += 1;
+    skipped.push(
+      `two stock-up pars now share ${element.name} at ${p.location_code} ` +
+      `("${parByPair.get(pair)}" and "${p.stock_raw}") — kept the first`);
+    continue;
+  }
+  parByPair.set(pair, p.stock_raw);
 
   const row = {
     org_id: ORG,
@@ -189,7 +255,8 @@ for (let i = 0; i < parRows.length; i += BATCH) {
     .upsert(parRows.slice(i, i + BATCH), { onConflict: 'element_id,location_id' });
   if (error) die(`upserting stock-up pars ${i}–${i + BATCH}`, error);
 }
-console.log(`Upserted ${parRows.length} stock-up pars (${unparsed} unparsed, written to notes; ${keptNote} left an existing note alone).`);
+console.log(`Upserted ${parRows.length} stock-up pars (${unparsed} unparsed, written to notes; ${keptNote} left an existing note alone` +
+  `${parMerged ? `; ${parMerged} dropped as a post-merge duplicate` : ''}).`);
 
 /* -------------------------------------------------------------------------- */
 /* 5. Verify, don't assume                                                     */
