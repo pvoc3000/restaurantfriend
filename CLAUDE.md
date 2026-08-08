@@ -2089,7 +2089,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    his account and his rule is what phase 2 seeded, editable, precisely so this
    is a data edit. Show him the first real packet.
    **Reworked 2026-08-08 from Mark's first pass over the recipe screen, with
-   FileMaker's RECIPES > RECIPE tab beside it (migration 041, NEEDS APPLYING).**
+   FileMaker's RECIPES > RECIPE tab beside it (migration 041, APPLIED and
+   BACKFILLED 2026-08-08).**
    The sheet phase 1 shipped was READ-ONLY, showed one scale column at a time,
    and had dropped four things the old layout had. Every field on a version, a
    line and a step is now inline-editable, rows can be added and deleted, and
@@ -2145,11 +2146,29 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    own org's folder and not another's, a junk path is refused by the POLICY
    rather than raising a cast error, and `anon` is refused outright. 647
    fixtures pass, and the six new rules were each checked by breaking them.
-   **Still to do, in order:** apply 041, run
-   `migration/backfill-recipe-scales.mjs` (dry run by default) to bring FMP's
-   AUTO flag and typed strips onto the 3,765 loaded lines, then look at a real
-   recipe. `hide_on_print` is backfilled by the migration itself, because the
-   transform had already carried `shouldHide_bool` into `source_payload`.
+   **041 IS APPLIED and `backfill-recipe-scales.mjs` HAS RUN** (2026-08-08):
+   746 lines marked typed, 579 of them carrying a strip, 202 hidden from print
+   (that last one by the migration itself, since the transform had already
+   carried `shouldHide_bool` into `source_payload`). A second run wrote 0.
+   **Probe, don't read this line** — the counts are
+   `select count(*) from production_recipe_lines where not scale_auto` (746),
+   `… where scale_auto and scale_amounts is not null` (0 — an auto row must
+   never carry a strip), and `… where hide_on_print` (202). The 746 is smaller
+   than the export's 1,910 because the 036 load keeps 3,765 of 5,260 ingredient
+   rows; the rest are separators and the three magic rows.
+   **Exercised through the real UI against the live database and left as
+   found**: the AUTO switch on Raisied Donut v11's Seed Dough line froze its
+   strip to exactly the computed values (`[null,5,7.5,10,20]` /
+   `[null,lbs,lbs,lbs,%]`, the `%` slot taking the derived 20.0), the x3/4 cell
+   then edited 7.5 → 8.25 writing ONE slot with `scale_units` rewritten beside
+   it in the same statement, and both rows were restored afterwards.
+   The screen reproduces FileMaker's printed sheet for that version line for
+   line — 5 lbs → 25 / 37.5 / 50, and 100.0 / 56.0 / 1.5 / 20.0 per cent.
+   **Two disagreements in FMP's OWN data, surfaced rather than introduced:**
+   v11's version record says yield 30 ea and prep time 3.5 hours while the
+   sheet's own metadata rows say 34 (340 at ×1) and 2.75 hr. 036 lifted those
+   rows into columns and preferred the recipe record's fields where both
+   existed. Worth Mark's eye; not a code fix.
    **Phase 5 is NOT built**: batches + actuals (was 041, now 042). `made`/`leftover` ship as
    columns and render read-only, because a supervisor writing them needs
    COLUMN-scoped access this table's RLS deliberately doesn't give — that is

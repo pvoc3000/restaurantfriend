@@ -93,7 +93,10 @@ export function RecipeScaleCell({
           <InlineValue
             table="production_recipe_lines"
             id={line.id}
-            column="scale_amounts"
+            // The READABLE name, not the target: `arrayColumn` below is what
+            // gets written, and `column` is only the accessible name and the
+            // word an error is worded around. "scale_amounts" is neither.
+            column="amount"
             kind="number"
             value={cell.qty}
             align="right"
@@ -124,7 +127,7 @@ export function RecipeScaleCell({
           <InlineValue
             table="production_recipe_lines"
             id={line.id}
-            column="scale_units"
+            column="unit"
             kind="pick"
             allowNew
             options={UNIT_PICK_OPTIONS}
