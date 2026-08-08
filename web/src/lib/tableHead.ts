@@ -296,14 +296,28 @@ export function useExactViewportHeight(
       return;
     }
 
+    /**
+     * IT NEVER SETS `height: auto` TO MEASURE, which is the one thing that
+     * separates this from the cap above and the reason the first version left
+     * every pane blank.
+     *
+     * The cap can probe with `max-height: none` safely: on a box shorter than
+     * its cap that changes no layout, so the ResizeObserver settles. A definite
+     * height cannot. Setting it to `auto` genuinely resizes the page, which
+     * fires the observer, which probes again — and the element spends as much
+     * time at `auto` as at its target, so what you see is whichever the browser
+     * painted. With `basis-0 grow` children, `auto` means zero.
+     *
+     * Nothing needs the probe anyway. `rect.top` is decided by what sits ABOVE
+     * the element and is unaffected by its height, and `below` — what sits under
+     * it — is stable once the height is applied, so the second pass computes the
+     * same target as the first and the >1px guard stops the loop.
+     */
     const measure = () => {
-      const previous = el.style.height;
-      el.style.height = "auto";
       const rect = el.getBoundingClientRect();
       const below = document.body.getBoundingClientRect().bottom - rect.bottom;
       const target = Math.max(minHeight, window.innerHeight - rect.top - below);
-      el.style.height = previous;
-      if (Math.abs(parseFloat(previous || "0") - target) > 1) {
+      if (Math.abs(parseFloat(el.style.height || "0") - target) > 1) {
         el.style.height = `${target}px`;
       }
     };

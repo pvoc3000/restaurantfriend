@@ -8,7 +8,6 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Switch } from "@/components/ui/Switch";
 import { useExactViewportHeight } from "@/lib/tableHead";
-import { useWideLayout } from "@/lib/useWideLayout";
 import { unresolvedSummary } from "@/lib/productionCost";
 import { recipeHref } from "@/lib/recipes";
 import { scaleColumns } from "@/lib/production";
@@ -58,9 +57,13 @@ export function RecipeInfo({
   // which is not a pane, it is a letterbox (Mark, 2026-08-08: "much taller").
   // Measuring the row itself lets it take the window down to its own floor, and
   // past that the page scrolls rather than the cells shrinking further.
+  // NOT GATED ON WIDTH. It was, on `xl`, and that is what left the page with
+  // most of its height unused on any window narrower than 1280 — no height was
+  // written at all and every pane fell back to its natural size. Height is the
+  // only thing this measurement is about, so a short window is handled by the
+  // FLOOR: below it the page scrolls, which is the honest failure.
   const row = useRef<HTMLDivElement>(null);
-  const wide = useWideLayout();
-  useExactViewportHeight(row, wide, 560);
+  useExactViewportHeight(row, true, 760);
 
   // THE CHOSEN COLUMN LIVES HERE, not inside the costs block, because two
   // things read it: the matrix, and the Batch cost fact at the top of the
@@ -82,14 +85,14 @@ export function RecipeInfo({
 
   return (
     <div className="flex flex-col gap-6">
-      {/* ONE THIRD / TWO THIRDS, the same split as the row beneath it, so the
-          boundary runs straight down the page (Mark, 2026-08-08). Two `dl`s
-          rather than one four-track grid: a single grid ties the two sides to
-          the same row heights, so a long description would push Storage's value
-          down to meet it. */}
-      <section className="shrink-0 space-y-3">
+      {/* HALF AND HALF, the same split as the row beneath it, so the boundary
+          runs straight down the page (Mark, 2026-08-08). Two `dl`s rather than
+          one four-track grid: a single grid ties the two sides to the same row
+          heights, so a long description would push Storage's value down to meet
+          it. */}
+      <section className="shrink-0 space-y-4">
         <SectionHeading>Version {version.version_label}</SectionHeading>
-        <div className="grid gap-x-8 gap-y-2 lg:grid-cols-[1fr_2fr]">
+        <div className="grid gap-x-10 gap-y-3 lg:grid-cols-2">
         <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-6 gap-y-2 text-[14px]">
           <Fact label="Description">
             <Editable id={version.id} column="description" value={version.description} editable={editable} />
@@ -141,13 +144,13 @@ export function RecipeInfo({
 
       <div
         ref={row}
-        className="flex min-h-0 flex-col gap-8 overflow-hidden xl:grid xl:grid-cols-[1fr_2fr] xl:gap-8"
+        className="flex min-h-0 flex-col gap-10 overflow-hidden xl:grid xl:grid-cols-2 xl:gap-10"
       >
         {/* `min-w-0` on BOTH columns, and not behind a breakpoint: a flex item's
             min-width defaults to min-content, so the costs matrix's own
             `minWidth` would make its column refuse to shrink and push the whole
             page sideways rather than scrolling inside its box. */}
-        <div className="flex min-h-0 min-w-0 flex-col gap-8">
+        <div className="flex min-h-0 min-w-0 flex-col gap-10">
           <Notes version={version} editable={editable} />
           <RecipeVersionList
             recipeId={recipeId}
@@ -157,12 +160,9 @@ export function RecipeInfo({
             params={params}
           />
         </div>
-        {/* Two thirds, which is what the matrix wants anyway: 140px of labels
-            plus 92 per batch size is 508 at four columns, and a third of the row
-            left it at 394 — scrolling sideways to read the one block whose whole
-            point is the comparison across it. `min-w-0` is not optional here;
-            without it the table's own `minWidth` stops the track shrinking and
-            pushes the PAGE sideways. */}
+        {/* `min-w-0` is not optional here: without it the matrix's own
+            `minWidth` stops this track shrinking and pushes the PAGE sideways
+            instead of scrolling inside the box. */}
         <div className="min-h-0 min-w-0 overflow-y-auto">
           <RecipeCosts
             version={version}
@@ -279,7 +279,7 @@ function RecipeVersionList({
   }
 
   return (
-    <section className="flex min-h-0 basis-0 grow-[1.5] flex-col gap-3">
+    <section className="flex min-h-0 basis-0 grow-[2] flex-col gap-3">
       <SectionHeading count={versions.length}>Versions</SectionHeading>
       <div className="min-h-0 flex-1 overflow-y-auto">
         <table className="w-full table-fixed border-collapse text-[14px]">
@@ -292,7 +292,7 @@ function RecipeVersionList({
             <col style={{ width: 58 }} />
             <col style={{ width: 88 }} />
             <col />
-            <col style={{ width: 96 }} />
+            <col style={{ width: 116 }} />
           </colgroup>
           <thead>
             {/* Sticky, because the pane scrolls under it — `lib/tableHead`'s
@@ -350,7 +350,7 @@ function RecipeVersionList({
                       onClick={() => makeMaster(v)}
                       className="whitespace-nowrap border border-hairline px-2 py-0.5 text-[10px] uppercase tracking-[0.04em] text-muted hover:border-ink hover:text-ink disabled:opacity-35"
                     >
-                      Master
+                      Make master
                     </button>
                   ) : null}
                 </td>

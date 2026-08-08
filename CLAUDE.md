@@ -2264,18 +2264,32 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **BOTH RECIPE TABS ARE ONE SCREEN OF PANES** (Mark, 2026-08-08). Info: the
    fields, then Notes + Versions sharing a column beside Costs. Recipe:
    Ingredients over Procedure, each scrolling its own rows. **Both areas split
-   ONE THIRD / TWO THIRDS** so the boundary runs straight down the page — the
+   HALF AND HALF** so the boundary runs straight down the page — the
    fields as two `dl`s rather than one four-track grid, because a single grid
    ties both sides to the same row heights and a long description would push
    Storage's value down to meet it.
    **`useExactViewportHeight` — the DEFINITE-height sibling of
-   `useFillViewportHeight`, and the difference is not a nicety.** A `max-height`
-   alone leaves the box content-sized, and a child with `basis-0 grow` has no
-   content height to fall back on, so a column of proportional panes collapses
-   to NOTHING. Both recipe tabs did exactly that before the switch. Reach for the
-   cap when a pane should be as tall as its rows and no taller; reach for the
-   exact one when several panes SHARE a height. `lib/useWideLayout` is the
-   matching `xl` probe, so the measurement and the CSS agree.
+   `useFillViewportHeight`, and TWO things separate them, both paid for by a
+   blank screen.** First: a `max-height` alone leaves the box content-sized, and
+   a child with `basis-0 grow` has no content height to fall back on, so a column
+   of proportional panes collapses to NOTHING. Second, and subtler: **it must
+   never probe with `height: auto`.** The cap can measure that way safely,
+   because on a box shorter than its cap `max-height: none` changes no layout and
+   the ResizeObserver settles. A definite height cannot — setting it to `auto`
+   genuinely resizes the page, which fires the observer, which probes again, and
+   the element spends as much time at `auto` as at its target. With `basis-0
+   grow` children, `auto` means zero, so what you see is whichever frame the
+   browser painted. Nothing needs the probe: `rect.top` is decided by what sits
+   ABOVE the element, and what sits BELOW is stable once the height is applied,
+   so the second pass computes the same target and the >1px guard ends it.
+   Reach for the cap when a pane should be as tall as its rows and no taller;
+   reach for the exact one when several panes SHARE a height.
+   **The fill is NOT gated on width.** It was, on `xl`, and that is what left the
+   page with most of its height unused on any window narrower than 1280 — no
+   height was written at all and every pane fell back to its natural size (Mark,
+   2026-08-08: "so much height unused"). Height is the only thing the
+   measurement is about, so a short window is handled by the FLOOR (760px on both
+   tabs): below it the page scrolls, which is the honest failure.
    Other traps paid for here: **`min-w-0` on both columns and NOT behind a
    breakpoint**, or the costs matrix's own `minWidth` stops its track shrinking
    and pushes the PAGE sideways; the ingredient grid's **one scroller for both
