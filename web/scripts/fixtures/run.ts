@@ -24,6 +24,7 @@ import "./packLabel.fixtures";
 import "./payPeriods.fixtures";
 import "./payrollBenefits.fixtures";
 import "./poFilters.fixtures";
+import "./productionCost.fixtures";
 import "./receiving.fixtures";
 import "./tableSort.fixtures";
 import "./tipPool.fixtures";
