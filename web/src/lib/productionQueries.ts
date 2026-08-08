@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { CostElement } from "./productionCost";
+import type { BatchYield, CostElement, ItemBom } from "./productionCost";
+import type { PriceGridCell, PriceGridOverride } from "./productionPrice";
 
 /**
  * Load the whole costing graph in FOUR queries, regardless of how deep the BOM
@@ -42,7 +43,15 @@ export type ProductionGraph = {
 async function fetchAll(
   supabase: SupabaseClient,
   table: string,
-  select: string
+  select: string,
+  /**
+   * What to order the sweep by. Defaults to `id`, which every table here has
+   * EXCEPT `production_price_grid_locations` — 037 gives it none on purpose,
+   * the `vendor_item_location_prices` idiom, because the pair IS the key. A
+   * hardcoded "id" here asked Postgres for a column that does not exist and
+   * took the whole menu screen down with it.
+   */
+  orderBy = "id"
 ): Promise<{ data: Record<string, unknown>[]; error: { message: string } | null }> {
   const PAGE = 1000;
   const out: Record<string, unknown>[] = [];
@@ -50,7 +59,7 @@ async function fetchAll(
     const { data, error } = await supabase
       .from(table)
       .select(select)
-      .order("id")
+      .order(orderBy)
       .range(from, from + PAGE - 1);
     if (error) return { data: [], error };
     out.push(...(data as unknown as Record<string, unknown>[]));
@@ -193,4 +202,124 @@ export async function loadProductionGraph(
   }
 
   return { graph: { byId, recipeCountByElement, sourceByElement }, error: null };
+}
+
+/* ========================================================================== */
+/* Items                                                                       */
+/* ========================================================================== */
+
+
+export type ItemGraph = {
+  items: (ItemBom & {
+    finish: string | null;
+    price_class: string | null;
+    price_tier: string | null;
+    tally_box_size: number;
+    is_active: boolean;
+    baseName: string | null;
+  })[];
+  yields: BatchYield[];
+  grid: PriceGridCell[];
+  gridOverrides: PriceGridOverride[];
+  /** Per-item price overrides, keyed by item id. */
+  overridesByItem: Map<string, { location_id: string; price_override: number | null }[]>;
+};
+
+/**
+ * The item layer, in five paginated queries.
+ *
+ * Paginated for the reason `fetchAll` exists: 325 item-locations and 324 edges
+ * are under the 1,000 cap today and a menu grows. A silent truncation here
+ * would drop toppings off items and read as a costing gap rather than a
+ * missing row.
+ */
+export async function loadItemGraph(
+  supabase: SupabaseClient,
+  elementNames: Map<string, string>
+): Promise<{ graph: ItemGraph | null; error: string | null }> {
+  const [items, edges, locations, grid, overrides, yields] = await Promise.all([
+    fetchAll(
+      supabase,
+      "production_items",
+      `id, name, item_type, subtype, finish, size, base_element_id,
+       price_class, price_tier, tally_box_size, is_active`
+    ),
+    fetchAll(supabase, "production_item_elements", "id, item_id, element_id, qty, unit, sort"),
+    fetchAll(supabase, "production_item_locations", "id, item_id, location_id, price_override"),
+    fetchAll(supabase, "production_price_grid",
+      "id, price_class, price_tier, price, class_sort, tier_sort"),
+    fetchAll(supabase, "production_price_grid_locations", "grid_id, location_id, price", "grid_id"),
+    fetchAll(supabase, "production_batch_yields",
+      "item_type, subtype, size, portion_of_batch, size_factor"),
+  ]);
+
+  const failed = [items, edges, locations, grid, overrides, yields].find((r) => r.error);
+  if (failed?.error) return { graph: null, error: failed.error.message };
+
+  const edgesByItem = new Map<string, ItemBom["elements"]>();
+  for (const e of edges.data) {
+    const key = e.item_id as string;
+    const list = edgesByItem.get(key) ?? [];
+    list.push({
+      id: e.id as string,
+      label: null,
+      qty: e.qty === null ? null : Number(e.qty),
+      unit: (e.unit ?? null) as string | null,
+      element_id: (e.element_id ?? null) as string | null,
+    });
+    edgesByItem.set(key, list);
+  }
+
+  const overridesByItem = new Map<string, { location_id: string; price_override: number | null }[]>();
+  for (const l of locations.data) {
+    const key = l.item_id as string;
+    const list = overridesByItem.get(key) ?? [];
+    list.push({
+      location_id: l.location_id as string,
+      price_override: l.price_override === null ? null : Number(l.price_override),
+    });
+    overridesByItem.set(key, list);
+  }
+
+  return {
+    graph: {
+      items: items.data.map((i) => ({
+        id: i.id as string,
+        name: i.name as string,
+        item_type: (i.item_type ?? null) as string | null,
+        subtype: (i.subtype ?? null) as string | null,
+        finish: (i.finish ?? null) as string | null,
+        size: (i.size ?? null) as string | null,
+        base_element_id: (i.base_element_id ?? null) as string | null,
+        baseName: i.base_element_id ? elementNames.get(i.base_element_id as string) ?? null : null,
+        price_class: (i.price_class ?? null) as string | null,
+        price_tier: (i.price_tier ?? null) as string | null,
+        tally_box_size: Number(i.tally_box_size ?? 6),
+        is_active: (i.is_active ?? true) as boolean,
+        elements: edgesByItem.get(i.id as string) ?? [],
+      })),
+      yields: yields.data.map((y) => ({
+        item_type: y.item_type as string,
+        subtype: (y.subtype ?? null) as string | null,
+        size: (y.size ?? null) as string | null,
+        portion_of_batch: y.portion_of_batch === null ? null : Number(y.portion_of_batch),
+        size_factor: y.size_factor === null ? null : Number(y.size_factor),
+      })),
+      grid: grid.data.map((g) => ({
+        id: g.id as string,
+        price_class: g.price_class as string,
+        price_tier: g.price_tier as string,
+        price: g.price === null ? null : Number(g.price),
+        class_sort: g.class_sort === null ? null : Number(g.class_sort),
+        tier_sort: g.tier_sort === null ? null : Number(g.tier_sort),
+      })),
+      gridOverrides: overrides.data.map((o) => ({
+        grid_id: o.grid_id as string,
+        location_id: o.location_id as string,
+        price: o.price === null ? null : Number(o.price),
+      })),
+      overridesByItem,
+    },
+    error: null,
+  };
 }

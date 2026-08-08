@@ -159,7 +159,7 @@ export const SECTIONS: NavSection[] = [
     subs: [
       stub("production", "plans", "Plans"),
       stub("production", "schedules", "Schedules"),
-      stub("production", "items", "Items"),
+      { slug: "items", label: "Items", href: "/production-items", built: true },
       { slug: "elements", label: "Elements", href: "/elements", built: true },
       { slug: "recipes", label: "Recipes", href: "/recipes", built: true },
       stub("production", "batch-logs", "Batch Logs"),
