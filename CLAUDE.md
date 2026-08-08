@@ -2039,18 +2039,17 @@ mean where FileMaker rounded up. 33 rows skipped and named (employee ids `387B`
 and `001` match nobody). All 35 migrations apply on the Docker harness, and the
 whole 46,553-row file was replayed through the real constraints there before it
 went near production. See build step 4e.
-**036 is NOT applied yet** (written 2026-08-07). It verifies on the Docker
-harness — all 36 migrations replay clean, RLS behaves as designed under a real
-authenticated purchaser and a real staff member, and the whole real export
-loads through it — but Mark applies migrations himself. Until he does, both new
-screens say so out loud: "Could not find the table 'public.production_elements'
-… migration 036 has not been applied yet", which is 018's pattern and confirmed
-in the browser. **Probe, don't read this line** — it has been wrong in both
-directions for four different migrations. `select count(*) from
-production_elements` (0 before the load, ~470 after), and check
-`production_recipe_versions_one_master` exists. After applying it, run
-`node transform-production.mjs --write` then
-`node --env-file=.env load-production.mjs`.
+**036 is APPLIED and LOADED** (Mark, 2026-08-07) — 470 elements · 59
+element-locations · 128 recipes · 493 versions · 3,765 lines · 2,914 steps, with
+**128 masters for 128 families**, verified by the loader's own sanity counts and
+then by using the screens against live data. 154 of the 159 vendor keys resolved
+to an inventory item. **Probe, don't read this line** — it has been wrong in
+both directions for four different migrations: `select count(*) from
+production_elements` (470), and confirm exactly one master per family with
+`select count(*) from production_recipes r where (select count(*) from
+production_recipe_versions v where v.recipe_id = r.id and v.is_master) <> 1`
+(0). To reload: `node transform-production.mjs --write` then
+`node --env-file=.env load-production.mjs --wipe`.
 **034 is APPLIED** (Mark, 2026-08-06) — verified the same day: both screens'
 selects return rows, and **0 of the 42 existing documents carry an expiry**,
 which is the migration working (null means never, so nothing changed under
@@ -2586,6 +2585,25 @@ weekday column, and 003 then silently made it per-vendor-item.
   place the design system's "no spinners, no skeletons" is relaxed — an
   indeterminate bar, not a skeleton, because a static label during a 3.5s wait
   still reads as stuck. The keyframes live in `globals.css`.
+- **POSTGREST RETURNS AT MOST 1,000 ROWS AND SAYS NOTHING ABOUT IT.** Supabase
+  caps every REST select at `db-max-rows` (1,000 by default), so a table with
+  more rows comes back **silently truncated — no error, no flag, just a short
+  array**. `loadProductionGraph` fetched 3,765 recipe lines in one call and got
+  1,000, so two-thirds of every recipe's ingredients were invisible to costing
+  and 299 elements read as uncosted where the real figure is 209. It did not
+  look like a bug; it looked like a catalog with more holes than expected,
+  which is why it survived a first read of the screen. Found by counting the
+  same thing two ways — a service_role script that DID paginate disagreed with
+  the page.
+  Any screen that selects a table which could exceed 1,000 rows must paginate
+  (`productionQueries.fetchAll` is the idiom), **and the sweep must `.order()`**
+  or pages overlap and rows go missing — the timesheets-audit lesson, which
+  measured 44,661 rows fetched holding only 27,795 distinct ids. Today's
+  candidates over that line: `purchase_order_items` (104k),
+  `inventory_item_locations`, `vendor_items` (2,888), `employee_events` (46k),
+  `timesheets` (44k), `production_recipe_lines` (3,765) and
+  `production_recipe_steps` (2,914). A screen that filters to one parent row is
+  usually safe; one that loads a whole table is not.
 - **Page speed: round trips and payload, in that order** (measured 2026-07-26,
   dev server, hosted Supabase). `getAppSession` is wrapped in React `cache()` —
   the (app) layout AND the page both call it, which was a duplicate ~220-450ms
