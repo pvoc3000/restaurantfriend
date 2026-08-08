@@ -53,7 +53,7 @@ export async function RecipeDetail({
            id, org_id, version_label, version_sort, is_master, is_active, author, description,
            note, testing_notes, yield_amount, yield_unit,
            shelf_life, storage, tools, scale_labels, scale_multipliers,
-           created_at, updated_at, cost_column,
+           created_at, updated_at, cost_column, source_payload,
            production_recipe_lines (
              id, label, qty, unit, note, sort, element_id,
              scale_auto, scale_amounts, scale_units, hide_on_print
@@ -114,6 +114,7 @@ export async function RecipeDetail({
     created_at: string | null;
     updated_at: string | null;
     cost_column: number | null;
+    source_payload: { fmp_modified_at?: string | null } | null;
     production_recipe_lines: {
       id: string;
       label: string | null;
@@ -219,6 +220,7 @@ export async function RecipeDetail({
         scale_multipliers: v.scale_multipliers?.map(Number) ?? null,
         created_at: v.created_at,
         updated_at: v.updated_at,
+        fmp_modified_at: v.source_payload?.fmp_modified_at ?? null,
         cost_column: v.cost_column === null ? null : Number(v.cost_column),
         lines,
         steps: (v.production_recipe_steps ?? [])

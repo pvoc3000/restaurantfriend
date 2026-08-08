@@ -1,14 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useCallback, useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Switch } from "@/components/ui/Switch";
-import { formatCost, unresolvedSummary } from "@/lib/productionCost";
+import { useFillViewportHeight } from "@/lib/tableHead";
+import { unresolvedSummary } from "@/lib/productionCost";
 import { recipeHref } from "@/lib/recipes";
+import { scaleColumns } from "@/lib/production";
+import { recipeCostMatrix, defaultColumn, type CostLine } from "@/lib/recipeCosts";
 import { RecipeCosts } from "./RecipeCosts";
 import type { SheetVersion } from "./RecipeVersionSheet";
 
@@ -16,11 +19,21 @@ import type { SheetVersion } from "./RecipeVersionSheet";
  * The recipe's Info tab — everything about this version that isn't the making
  * of it, which is FileMaker's own split between its INFO and RECIPE tabs.
  *
- * Three blocks: the version's own fields, the family's other versions, and the
- * costs. The middle one is the piece the app had been missing outright — a
- * recipe with 38 versions was a picker with 38 cells in it and no way to see
- * when each was written or why, which is the only thing that makes an old
- * version worth keeping.
+ * IT IS ONE SCREEN, and that is the layout's whole brief (Mark, 2026-08-08:
+ * "ideally everything should display on a single screen. Notes and versions
+ * should scroll"). So the four blocks are laid out rather than stacked: the
+ * fields at their natural height, then a row that takes whatever is left, with
+ * NOTES and VERSIONS sharing the left column in proportion and scrolling their
+ * own contents, and COSTS beside them. A recipe with 38 versions and a page of
+ * testing notes fills the same frame as one with two lines of each.
+ *
+ * The height is MEASURED, never a CSS constant — `useFillViewportHeight`, the
+ * same reason the receiving screen measures its own: what sits above this row
+ * varies with the masthead's wrapping and with how long the description runs,
+ * and every constant is wrong at some width.
+ *
+ * Below `xl` it STACKS at natural height and the page scrolls, which is the
+ * receiving screen's rule too: nothing hidden, no panes too short to read.
  */
 export function RecipeInfo({
   recipeId,
@@ -39,9 +52,32 @@ export function RecipeInfo({
   editable: boolean;
   params: Record<string, string | string[] | undefined>;
 }) {
+  const frame = useRef<HTMLDivElement>(null);
+  // Only the wide layout is capped. Stacked, the page is meant to scroll.
+  const wide = useWide();
+  useFillViewportHeight(frame, wide, 420);
+
+  // THE CHOSEN COLUMN LIVES HERE, not inside the costs block, because two
+  // things read it: the matrix, and the Batch cost fact at the top of the
+  // screen (Mark, 2026-08-08 — "batch cost in the top header should change
+  // depending on what is selected in the cost area"). A figure quoted in two
+  // places from two different columns is the duplication this tab has spent
+  // the day removing.
+  const [chosen, setChosen] = useState<number | null>(version.cost_column);
+
+  const columns = scaleColumns(version.scale_labels, version.scale_multipliers);
+  const matrix = recipeCostMatrix({
+    columns,
+    lines: version.lines as CostLine[],
+    baseIngredientCost: version.batchCost.cost,
+    laborRate,
+    costColumn: chosen,
+  });
+  const at = defaultColumn(matrix);
+
   return (
-    <div className="space-y-16">
-      <section className="space-y-3">
+    <div ref={frame} className="flex flex-col gap-8 overflow-hidden">
+      <section className="shrink-0 space-y-3">
         <SectionHeading>Version {version.version_label}</SectionHeading>
         <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-6 gap-y-2 text-[14px] lg:grid-cols-[minmax(7rem,auto)_1fr_minmax(7rem,auto)_1fr]">
           <Fact label="Description">
@@ -50,36 +86,35 @@ export function RecipeInfo({
           <Fact label="Storage">
             <Editable id={version.id} column="storage" value={version.storage} editable={editable} />
           </Fact>
-          <Fact label="Note">
-            <Editable id={version.id} column="note" value={version.note} editable={editable} multiline />
+          <Fact label="Author">
+            <Editable id={version.id} column="author" value={version.author} editable={editable} />
           </Fact>
           <Fact label="Shelf life">
             <Editable id={version.id} column="shelf_life" value={version.shelf_life} editable={editable} />
           </Fact>
-          <Fact label="Author">
-            <Editable id={version.id} column="author" value={version.author} editable={editable} />
+          <Fact label="Created">
+            <span className={READ_ONLY_VALUE}>{stamp(version.created_at) ?? "—"}</span>
           </Fact>
           <Fact label="Tools">
             <Editable id={version.id} column="tools" value={version.tools} editable={editable} multiline />
           </Fact>
-          {/* NO MIXER, YIELD OR PREP TIME HERE (Mark, 2026-08-08). All three are
-              per BATCH SIZE and are rows on the Recipe tab, one figure per
-              column; a single value beside them was the same fact stated twice
-              and, on Raisied Donut v11, stated differently — 30 ea against a row
-              reading 34 → 340. The yield the app COSTS with is a different
-              question and has moved to the Costs block, which is the only place
-              that number means anything. */}
-          <Fact label="Created">
-            <span className={READ_ONLY_VALUE}>{formatStamp(version.created_at) ?? "—"}</span>
+          <Fact label="Modified">
+            <span className={READ_ONLY_VALUE}>{stamp(modifiedAt(version)) ?? "—"}</span>
           </Fact>
           <Fact label="Batch cost">
-            {/* The gaps note goes on its OWN LINE, never beside the figure. Set
-                inline it read "≥ $7.385 not priced" — the count's first digit
-                runs straight onto the cents. A WRAPPER, not `block` on the
-                spans: READ_ONLY_VALUE carries `inline-block`, and Tailwind
-                resolves competing display utilities by stylesheet order. */}
+            {/* Follows the cost column. The gaps note goes on its OWN LINE,
+                never beside the figure — set inline it read "≥ $7.385 not
+                priced", the count's first digit running onto the cents. A
+                WRAPPER, not `block` on the spans: READ_ONLY_VALUE carries
+                `inline-block`, and Tailwind resolves competing display
+                utilities by stylesheet order rather than class-string order. */}
             <span className="flex flex-col items-start">
-              <span className={`${READ_ONLY_VALUE} tabular-nums`}>{formatCost(version.batchCost)}</span>
+              <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+                {at?.ingredients === null || at === null
+                  ? "—"
+                  : `${version.batchCost.unresolved.length ? "≥ " : ""}$${at.ingredients.toFixed(2)}`}
+                <span className="ml-2 text-[12px] font-normal text-muted">at {at?.column.label}</span>
+              </span>
               {unresolvedSummary(version.batchCost) ? (
                 <span className={`${READ_ONLY_VALUE} text-[13px] text-mark`}>
                   {unresolvedSummary(version.batchCost)}
@@ -87,7 +122,70 @@ export function RecipeInfo({
               ) : null}
             </span>
           </Fact>
-          <Fact label="Testing notes">
+        </dl>
+      </section>
+
+      <div className="flex min-h-0 flex-1 flex-col gap-8 xl:flex-row">
+        {/* `min-w-0` on BOTH columns, and not behind a breakpoint: a flex item's
+            min-width defaults to min-content, so the costs matrix's own
+            `minWidth` would make its column refuse to shrink and push the whole
+            page sideways rather than scrolling inside its box. */}
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-8">
+          <Notes version={version} editable={editable} />
+          <RecipeVersionList
+            recipeId={recipeId}
+            current={version}
+            versions={versions}
+            editable={editable}
+            params={params}
+          />
+        </div>
+        {/* Sized to the matrix rather than to a share of the row. The matrix is
+            the one thing here with a natural width — 140px of labels plus 92 per
+            batch size — and giving it a fraction instead left four columns
+            needing 508px in a 394px pane, scrolling sideways to read a block
+            whose whole point is the comparison across it. 32rem covers the four
+            and five columns nearly every version has; a wider strip scrolls
+            inside its own box, which is the honest failure. */}
+        <div className="min-h-0 min-w-0 shrink-0 overflow-y-auto xl:w-[32rem]">
+          <RecipeCosts
+            version={version}
+            matrix={matrix}
+            laborRate={laborRate}
+            locationCode={locationCode}
+            editable={editable}
+            onChoose={setChosen}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The version's prose, in its own cell so a page of testing notes can't push
+ * everything else off the screen.
+ *
+ * `basis-0 grow` rather than `flex-1`: the proportion has to be of the WHOLE
+ * cell, not of whatever is left after the content has had its say, or a long
+ * note takes the versions list's room and the ratio means nothing.
+ */
+function Notes({ version, editable }: { version: SheetVersion; editable: boolean }) {
+  return (
+    <section className="flex min-h-0 basis-0 grow flex-col gap-3">
+      <SectionHeading>Notes</SectionHeading>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 text-[14px]">
+        <div>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Version note
+          </p>
+          <Editable id={version.id} column="note" value={version.note} editable={editable} multiline />
+        </div>
+        <div>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Testing notes
+          </p>
+          <span className="text-muted">
             <Editable
               id={version.id}
               column="testing_notes"
@@ -95,36 +193,21 @@ export function RecipeInfo({
               editable={editable}
               multiline
             />
-          </Fact>
-        </dl>
-      </section>
-
-      <RecipeVersionList
-        recipeId={recipeId}
-        current={version}
-        versions={versions}
-        editable={editable}
-        params={params}
-      />
-
-      <RecipeCosts
-        version={version}
-        laborRate={laborRate}
-        locationCode={locationCode}
-        editable={editable}
-      />
-    </div>
+          </span>
+        </div>
+      </div>
+    </section>
   );
 }
 
 /**
  * Every version of this recipe, and which one is in force.
  *
- * NOT a `DataTable`: it is short, it has no sort worth offering and no columns
- * worth hiding, and its rows are the family's own history in version order —
- * which is the one order it should ever be in. What it does have is the two
- * things the picker could never show, the date and the note, and those are the
- * whole reason a shop keeps v24 around.
+ * NOT a `DataTable`: it has no sort worth offering and no columns worth hiding,
+ * and its rows are the family's own history in version order — which is the one
+ * order it should ever be in. What it does have is the two things the picker
+ * could never show, the date and the note, and those are the whole reason a
+ * shop keeps v24 around.
  *
  * MAKING A VERSION MASTER IS TWO STATEMENTS AND THE ORDER IS LOAD-BEARING.
  * 036 enforces one master per family with a PARTIAL UNIQUE INDEX, so the old
@@ -180,79 +263,96 @@ function RecipeVersionList({
   }
 
   return (
-    <section className="space-y-3">
+    <section className="flex min-h-0 basis-0 grow-[1.5] flex-col gap-3">
       <SectionHeading count={versions.length}>Versions</SectionHeading>
-      <table className="w-full table-fixed border-collapse text-[14px]">
-        <colgroup>
-          <col style={{ width: 90 }} />
-          <col style={{ width: 92 }} />
-          <col style={{ width: 130 }} />
-          <col />
-          <col style={{ width: 130 }} />
-        </colgroup>
-        <thead>
-          <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em] text-ink">
-            <th className="px-3 py-2 text-left">Version</th>
-            <th className="px-3 py-2 text-left">Active</th>
-            <th className="px-3 py-2 text-left">Created</th>
-            <th className="px-3 py-2 text-left">Note</th>
-            <th className="px-3 py-2 text-left">Master</th>
-          </tr>
-        </thead>
-        <tbody>
-          {versions.map((v) => (
-            <tr
-              key={v.id}
-              className={`align-baseline hover:bg-neutral-50 ${
-                v.id === current.id ? "font-bold" : ""
-              }`}
-            >
-              <td className="px-3 py-2">
-                <Link
-                  href={recipeHref(recipeId, { tab: "info", version: v.version_label }, params)}
-                  className="hover:underline"
-                >
-                  v{v.version_label}
-                </Link>
-              </td>
-              <td className="px-3 py-2">
-                {editable ? (
-                  <ActiveVersion id={v.id} active={v.is_active} />
-                ) : (
-                  <span className={`${READ_ONLY_VALUE} text-[13px] text-muted`}>
-                    {v.is_active ? "Active" : "Inactive"}
-                  </span>
-                )}
-              </td>
-              <td className="px-3 py-2 text-[13px] text-muted">{formatDate(v.created_at)}</td>
-              <td className="px-3 py-2 text-[13px] text-muted">{v.note ?? ""}</td>
-              <td className="px-3 py-2">
-                {v.is_master ? (
-                  <span className="inline-flex items-center gap-1 text-[12px] font-semibold uppercase tracking-[0.06em]">
-                    ★ Master
-                  </span>
-                ) : editable ? (
-                  <button
-                    type="button"
-                    disabled={pending}
-                    onClick={() => makeMaster(v)}
-                    className="border border-hairline px-2 py-0.5 text-[11px] uppercase tracking-[0.06em] text-muted hover:border-ink hover:text-ink disabled:opacity-35"
-                  >
-                    Make master
-                  </button>
-                ) : null}
-              </td>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <table className="w-full table-fixed border-collapse text-[14px]">
+          {/* Tight, because this list shares its column with the Notes cell and
+              the costs matrix takes the width it needs. Everything fixed adds to
+              308, so the Note gets whatever is left — which is the column worth
+              giving it to. */}
+          <colgroup>
+            <col style={{ width: 72 }} />
+            <col style={{ width: 58 }} />
+            <col style={{ width: 88 }} />
+            <col />
+            <col style={{ width: 96 }} />
+          </colgroup>
+          <thead>
+            {/* Sticky, because the pane scrolls under it — `lib/tableHead`'s
+                rule, and on the `th` rather than the row: WebKit doesn't honour
+                sticky on a `tr` under `border-collapse`, and an iPad is what
+                this is read on. */}
+            {/* `0.06em`, not the app's usual 0.12: these columns are narrow
+                enough that the wider tracking pushed "VERSION" and "ACTIVE" past
+                their own cells, and a clipped column label reads as a rendering
+                fault. */}
+            <tr className="text-[11px] uppercase tracking-[0.06em] text-ink">
+              <Th>Version</Th>
+              <Th>Active</Th>
+              <Th>Modified</Th>
+              <Th>Note</Th>
+              <Th>Master</Th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-      {error ? <p className="text-[13px] text-accent">{error}</p> : null}
-      <p className="max-w-[70ch] text-[12px] text-muted">
-        The master is what the element costs and what the recipe sheet prints by
-        default. Exactly one version may be master; the others are kept for
-        reference.
-      </p>
+          </thead>
+          <tbody>
+            {versions.map((v) => (
+              <tr
+                key={v.id}
+                className={`align-baseline hover:bg-neutral-50 ${
+                  v.id === current.id ? "font-bold" : ""
+                }`}
+              >
+                <td className="px-2 py-2">
+                  <Link
+                    href={recipeHref(recipeId, { tab: "info", version: v.version_label }, params)}
+                    className="hover:underline"
+                  >
+                    v{v.version_label}
+                  </Link>
+                </td>
+                <td className="px-2 py-2">
+                  {editable ? (
+                    <ActiveVersion id={v.id} active={v.is_active} />
+                  ) : (
+                    <span className={`${READ_ONLY_VALUE} text-[13px] text-muted`}>
+                      {v.is_active ? "Active" : "Inactive"}
+                    </span>
+                  )}
+                </td>
+                <td className="px-2 py-2 text-[13px] text-muted">{date(modifiedAt(v))}</td>
+                <td className="px-2 py-2 text-[13px] text-muted">{v.note ?? ""}</td>
+                <td className="px-2 py-2">
+                  {v.is_master ? (
+                    <span className="inline-flex items-center gap-1 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.04em]">
+                      ★ Master
+                    </span>
+                  ) : editable ? (
+                    <button
+                      type="button"
+                      disabled={pending}
+                      onClick={() => makeMaster(v)}
+                      className="whitespace-nowrap border border-hairline px-2 py-0.5 text-[10px] uppercase tracking-[0.04em] text-muted hover:border-ink hover:text-ink disabled:opacity-35"
+                    >
+                      Master
+                    </button>
+                  ) : null}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {error ? <p className="shrink-0 text-[13px] text-accent">{error}</p> : null}
     </section>
+  );
+}
+
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th className="sticky top-0 z-10 border-b-2 border-ink bg-white px-2 py-2 text-left">
+      {children}
+    </th>
   );
 }
 
@@ -286,6 +386,21 @@ function ActiveVersion({ id, active }: { id: string; active: boolean }) {
       }}
     />
   );
+}
+
+/**
+ * When this version last changed.
+ *
+ * FileMaker's own stamp where we have one, and the row's `updated_at` where we
+ * don't. That order is right today and will need revisiting: for every migrated
+ * recipe `updated_at` is the moment the migration ran, so ours says 2026 about a
+ * recipe FileMaker last touched in 2024 — and the 2024 answer is the true one.
+ * The cost is the mirror image, and it is real: editing a migrated version here
+ * will not move this date, because nothing clears the stored stamp. Giving
+ * `_ModificationTimestamp` its own column is the fix and it is a migration.
+ */
+function modifiedAt(version: SheetVersion): string | null {
+  return version.fmp_modified_at ?? version.updated_at;
 }
 
 function Fact({ label, children }: { label: string; children: React.ReactNode }) {
@@ -327,13 +442,39 @@ function Editable({
   );
 }
 
-function formatStamp(value: string | null): string | null {
+/**
+ * Whether the wide layout is on — the same `xl` the stacked/side-by-side switch
+ * uses in CSS, read once in JS so the height cap agrees with it.
+ *
+ * `useSyncExternalStore` rather than an effect, which is what the
+ * `set-state-in-effect` lint wants and what keeps the server render honest: the
+ * server snapshot is `false`, so the first paint is the stacked layout and no
+ * height is written until the client knows its own width.
+ */
+function useWide(): boolean {
+  const subscribe = useCallback((notify: () => void) => {
+    const mq = window.matchMedia(WIDE);
+    mq.addEventListener("change", notify);
+    return () => mq.removeEventListener("change", notify);
+  }, []);
+  return useSyncExternalStore(
+    subscribe,
+    () => window.matchMedia(WIDE).matches,
+    () => false
+  );
+}
+
+/** Tailwind's `xl`. The CSS and the measurement must agree or the page caps
+ *  itself at a width where the columns are still stacked. */
+const WIDE = "(min-width: 1280px)";
+
+function stamp(value: string | null): string | null {
   if (!value) return null;
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? null : d.toLocaleString();
 }
 
-function formatDate(value: string | null): string {
+function date(value: string | null): string {
   if (!value) return "";
   const d = new Date(value);
   return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString();

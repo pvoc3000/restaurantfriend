@@ -2261,6 +2261,31 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Labour rate is fetched in the page's own `Promise.all` rather than folded
    into `getAppSession`: one column read by one screen, against a session every
    screen pays for.
+   **THE INFO TAB IS ONE SCREEN** (Mark, 2026-08-08: "ideally everything should
+   display on a single screen. Notes and versions should scroll"). The fields sit
+   at their natural height; below them a row takes whatever is left, with NOTES
+   and VERSIONS sharing the left column `basis-0 grow` / `grow-[1.5]` and
+   scrolling their own contents, and COSTS beside them. `basis-0`, not `flex-1`:
+   the proportion has to be of the WHOLE cell, or a page of testing notes takes
+   the versions list's room and the ratio means nothing. Height is MEASURED
+   (`useFillViewportHeight`) and only above `xl`; stacked, the page scrolls.
+   **`min-w-0` ON BOTH COLUMNS, not behind a breakpoint** — a flex item's
+   min-width defaults to min-content, so the matrix's own `minWidth` made its
+   column refuse to shrink and pushed the whole PAGE sideways. And the costs pane
+   is sized to the matrix (`xl:w-[32rem]`) rather than to a share of the row:
+   given a fraction it came out 394px for a 508px matrix, so the one block whose
+   point is the comparison across it had to be scrolled to be read.
+   **Batch cost at the top follows the chosen column**, so the state lives in
+   `RecipeInfo` and the matrix is computed once and passed down — a figure quoted
+   twice from two different columns is the duplication this tab spent the day
+   removing. **Item is the ingredient grid's SECOND column**, after Sort.
+   **MODIFIED is FileMaker's stamp where we have one** (`fmp_modified_at`, parked
+   in `source_payload` by `backfill-recipe-created.mjs`), and `updated_at` where
+   we don't. That order is right today — for every migrated recipe `updated_at`
+   is the moment the migration ran — and it has a known cost: editing a migrated
+   version here will NOT move the date, because nothing clears the stored stamp.
+   Giving `_ModificationTimestamp` its own column is the fix and it is a
+   migration.
    **MIXER, YIELD AND PREP TIME ARE GONE FROM THE INFO BLOCK** (Mark,
    2026-08-08) — and from the printed sheet's header, which is the same
    instruction applied twice. All three are per BATCH SIZE and are rows on the

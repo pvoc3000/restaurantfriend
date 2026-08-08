@@ -64,9 +64,13 @@ export type SheetVersion = {
   tools: string | null;
   scale_labels: string[] | null;
   scale_multipliers: number[] | null;
-  /** The printed sheet's header block states both, the way FileMaker's does. */
   created_at: string | null;
   updated_at: string | null;
+  /** FileMaker's own `_ModificationTimestamp`, parked in `source_payload` by
+   *  `backfill-recipe-created.mjs`. For a migrated version it is the only true
+   *  answer to "when did this recipe last change" — `updated_at` is when the
+   *  migration ran. */
+  fmp_modified_at: string | null;
   /** Migration 042 — which batch size this recipe is costed at. Null = base. */
   cost_column: number | null;
   lines: SheetLine[];
@@ -173,12 +177,12 @@ export function RecipeVersionSheet({
           >
             <colgroup>
               <col style={{ width: W_SORT }} />
+              <col style={{ width: W_ITEM }} />
               <col style={{ width: W_SCALE }} />
               <col style={{ width: W_AUTO }} />
               {headerSlots.slice(1).map((column, i) => (
                 <col key={i} style={{ width: column ? W_SCALE : W_SPARE }} />
               ))}
-              <col style={{ width: W_ITEM }} />
               <col style={{ width: W_NOTE }} />
               <col style={{ width: W_COST }} />
               <col style={{ width: W_HIDE }} />
@@ -190,6 +194,7 @@ export function RecipeVersionSheet({
                   the others are a multiple OF — and nothing over `%`, which is
                   a share rather than a scale. */}
               <tr>
+                <th />
                 <th />
                 <th className="px-2 pb-1 text-right text-[10px] uppercase tracking-[0.12em] text-subtle">
                   Multiplier
@@ -230,6 +235,7 @@ export function RecipeVersionSheet({
                 <th className="px-2 pb-1 text-left text-[10px] uppercase tracking-[0.12em] text-subtle">
                   Batch
                 </th>
+                <th />
                 {/* The base column, then the AUTO column's own empty cell, then
                     the rest — the switch sits BETWEEN the first two amount
                     columns, which is what it governs, so every header row has
@@ -258,12 +264,12 @@ export function RecipeVersionSheet({
 
               <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em] text-ink">
                 <th className="px-2 py-2 text-left">Sort</th>
+                <th className="px-3 py-2 text-left">Item</th>
                 <th />
                 <th className="px-2 py-2 text-center">Auto</th>
                 {headerSlots.slice(1).map((_, i) => (
                   <th key={`h${i}`} />
                 ))}
-                <th className="px-3 py-2 text-left">Item</th>
                 <th className="px-3 py-2 text-left">Note</th>
                 <th className="px-3 py-2 text-right">Cost</th>
                 <th className="px-2 py-2 text-center">Hide</th>
@@ -295,6 +301,10 @@ export function RecipeVersionSheet({
                         {line.sort ?? ""}
                       </span>
                     )}
+                  </td>
+
+                  <td className="px-3 py-2">
+                    <ItemCell line={line} editable={editable} />
                   </td>
 
                   {baseColumn ? (
@@ -341,10 +351,6 @@ export function RecipeVersionSheet({
                       <td key={`spare${c}`} />
                     )
                   )}
-
-                  <td className="px-3 py-2">
-                    <ItemCell line={line} editable={editable} />
-                  </td>
 
                   <td className="px-3 py-2 text-[13px] text-muted">
                     {editable ? (

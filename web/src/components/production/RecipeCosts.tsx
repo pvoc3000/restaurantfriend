@@ -5,8 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { recipeCostMatrix, defaultColumn, type CostLine } from "@/lib/recipeCosts";
-import { scaleColumns } from "@/lib/production";
+import { defaultColumn, type CostColumnFigures } from "@/lib/recipeCosts";
 import type { SheetVersion } from "./RecipeVersionSheet";
 
 /**
@@ -26,30 +25,28 @@ import type { SheetVersion } from "./RecipeVersionSheet";
  */
 export function RecipeCosts({
   version,
+  matrix,
   laborRate,
   locationCode,
   editable,
+  onChoose,
 }: {
   version: SheetVersion;
+  /** Computed by the caller, which also owns the chosen column — the Batch cost
+   *  fact at the top of the screen reads the same figure, and a second matrix
+   *  computed here would be a second answer waiting to disagree. */
+  matrix: CostColumnFigures[];
   /** The working shop's hourly rate — labour is a fact about who is making it. */
   laborRate: number | null;
   locationCode: string | null;
   editable: boolean;
+  onChoose: (index: number | null) => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [chosen, setChosen] = useState<number | null>(version.cost_column);
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const columns = scaleColumns(version.scale_labels, version.scale_multipliers);
-  const matrix = recipeCostMatrix({
-    columns,
-    lines: version.lines as CostLine[],
-    baseIngredientCost: version.batchCost.cost,
-    laborRate,
-    costColumn: chosen,
-  });
   const headline = defaultColumn(matrix);
 
   if (matrix.length === 0) {
@@ -64,20 +61,21 @@ export function RecipeCosts({
   }
 
   function choose(index: number) {
-    const previous = chosen;
-    setChosen(index);
+    const previous = version.cost_column;
+    // The BASE column stores null rather than 0 — "nobody has chosen" and
+    // "somebody chose the first one" are the same answer here, and null is the
+    // one a fresh version already has.
+    const next = index === matrix[0].column.index ? null : index;
+    onChoose(next);
     setError(null);
     start(async () => {
       const { data, error: e } = await supabase
         .from("production_recipe_versions")
-        // The BASE column stores null rather than 0 — "nobody has chosen" and
-        // "somebody chose the first one" are the same answer here, and null is
-        // the one a fresh version already has.
-        .update({ cost_column: index === matrix[0].column.index ? null : index })
+        .update({ cost_column: next })
         .eq("id", version.id)
         .select("id");
       if (e || !data?.length) {
-        setChosen(previous);
+        onChoose(previous);
         setError(e?.message ?? "not allowed");
         return;
       }
@@ -87,9 +85,9 @@ export function RecipeCosts({
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
         <SectionHeading>Costs</SectionHeading>
-        <span className="text-[14px] font-bold tabular-nums">
+        <span className="min-w-0 text-[14px] font-bold tabular-nums">
           {headline?.costPer === null || headline === null
             ? "—"
             : `${money(headline.costPer)} per ${headline.yieldUnit ?? "unit"}`}
@@ -101,11 +99,18 @@ export function RecipeCosts({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full table-fixed border-collapse text-[14px]" style={{ minWidth: 520 }}>
+        {/* Narrow enough that four batch sizes fit beside the notes and versions
+            column at 1280 — which is the width this screen is read at — and set
+            to scroll inside its own box past that rather than pushing the page
+            sideways. */}
+        <table
+          className="w-full table-fixed border-collapse text-[13px]"
+          style={{ minWidth: 140 + matrix.length * 92 }}
+        >
           <colgroup>
-            <col style={{ width: 190 }} />
+            <col style={{ width: 140 }} />
             {matrix.map((c) => (
-              <col key={c.column.index} style={{ width: 110 }} />
+              <col key={c.column.index} style={{ width: 92 }} />
             ))}
           </colgroup>
           <thead>
@@ -113,11 +118,11 @@ export function RecipeCosts({
                 below it is arithmetic — so it sits at the top where FileMaker
                 puts it, above the names of the things it is choosing between. */}
             <tr>
-              <th className="px-3 pb-1 text-right text-[10px] uppercase tracking-[0.12em] text-subtle">
+              <th className="px-2 pb-1 text-right text-[10px] uppercase tracking-[0.12em] text-subtle">
                 Cost at
               </th>
               {matrix.map((c) => (
-                <th key={c.column.index} className="px-3 pb-1 text-center">
+                <th key={c.column.index} className="px-2 pb-1 text-center">
                   <button
                     type="button"
                     role="radio"
@@ -141,7 +146,7 @@ export function RecipeCosts({
               {matrix.map((c) => (
                 <th
                   key={c.column.index}
-                  className={`px-3 py-2 text-right ${c.isDefault ? "font-bold" : ""}`}
+                  className={`px-2 py-2 text-right ${c.isDefault ? "font-bold" : ""}`}
                 >
                   {c.column.label}
                 </th>
@@ -215,23 +220,9 @@ export function RecipeCosts({
                 : `${version.yield_amount} ${version.yield_unit ?? ""}`.trim()}
             </span>
           )}
-          <span className="text-[12px] text-muted">
-            — what the rest of the app divides this batch by
-          </span>
         </dd>
       </dl>
 
-      {/* What the block is NOT saying, stated rather than left to be discovered.
-          Both caveats are real and both would otherwise be found by someone
-          comparing this to a figure elsewhere in the app and assuming one of
-          them is broken. */}
-      <p className="max-w-[70ch] text-[12px] text-muted">
-        Ingredients are live from purchasing. Labour is the shop&rsquo;s hourly rate
-        against this recipe&rsquo;s prep time
-        {laborRate === null ? " — and this shop has no rate set, so it is left blank" : ""}.
-        What an element costs elsewhere in the app is ingredients only, divided by
-        the costed yield rather than by the yield row above.
-      </p>
     </section>
   );
 }
@@ -245,19 +236,19 @@ function Row({
   spaced = false,
 }: {
   label: string;
-  matrix: ReturnType<typeof recipeCostMatrix>;
-  value: (c: ReturnType<typeof recipeCostMatrix>[number]) => string;
-  hint?: (c: ReturnType<typeof recipeCostMatrix>[number]) => string | null;
+  matrix: CostColumnFigures[];
+  value: (c: CostColumnFigures) => string;
+  hint?: (c: CostColumnFigures) => string | null;
   strong?: boolean;
   spaced?: boolean;
 }) {
   return (
     <tr className={spaced ? "border-t border-hairline" : ""}>
-      <td className={`px-3 py-2 text-[13px] ${strong ? "font-semibold" : "text-muted"}`}>{label}</td>
+      <td className={`px-2 py-2 text-[13px] ${strong ? "font-semibold" : "text-muted"}`}>{label}</td>
       {matrix.map((c) => (
         <td
           key={c.column.index}
-          className={`px-3 py-2 text-right tabular-nums ${c.isDefault ? "bg-neutral-100" : ""} ${
+          className={`px-2 py-2 text-right tabular-nums ${c.isDefault ? "bg-neutral-100" : ""} ${
             strong ? "font-semibold" : ""
           }`}
         >
