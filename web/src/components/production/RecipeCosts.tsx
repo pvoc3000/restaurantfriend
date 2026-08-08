@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { recipeCostMatrix, defaultColumn, type CostLine } from "@/lib/recipeCosts";
 import { scaleColumns } from "@/lib/production";
 import type { SheetVersion } from "./RecipeVersionSheet";
@@ -173,6 +173,54 @@ export function RecipeCosts({
 
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
 
+      {/* THE COSTED YIELD LIVES HERE AND NOWHERE ELSE (Mark, 2026-08-08, having
+          the Info block state it beside a Recipe row that said something else).
+          `production_recipe_versions.yield_amount` is what `lib/productionCost`
+          divides a made element's batch by, so it is the number behind every
+          figure the app quotes for this thing — and it is NOT the Expected
+          Yield row above, which is per batch column and is what this matrix
+          reads. On Raisied Donut v11 the two disagree, 30 against 34.
+          Measured over all 493 versions: 284 agree, 71 differ and 137 have no
+          row at all, and 19 of the 128 masters would move — some by 4×, one by
+          14× — if costing were switched to the row. So they stay two numbers,
+          and this is the one place the costing one is worth reading, which is
+          why its editor moved here rather than being deleted with the others. */}
+      <dl className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[13px]">
+        <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+          Costed yield
+        </dt>
+        <dd className="flex items-baseline gap-1">
+          {editable ? (
+            <>
+              <InlineValue
+                table="production_recipe_versions"
+                id={version.id}
+                column="yield_amount"
+                kind="number"
+                value={version.yield_amount}
+                className="w-16"
+              />
+              <InlineValue
+                table="production_recipe_versions"
+                id={version.id}
+                column="yield_unit"
+                value={version.yield_unit}
+                className="w-16"
+              />
+            </>
+          ) : (
+            <span className={READ_ONLY_VALUE}>
+              {version.yield_amount === null
+                ? "—"
+                : `${version.yield_amount} ${version.yield_unit ?? ""}`.trim()}
+            </span>
+          )}
+          <span className="text-[12px] text-muted">
+            — what the rest of the app divides this batch by
+          </span>
+        </dd>
+      </dl>
+
       {/* What the block is NOT saying, stated rather than left to be discovered.
           Both caveats are real and both would otherwise be found by someone
           comparing this to a figure elsewhere in the app and assuming one of
@@ -181,7 +229,8 @@ export function RecipeCosts({
         Ingredients are live from purchasing. Labour is the shop&rsquo;s hourly rate
         against this recipe&rsquo;s prep time
         {laborRate === null ? " — and this shop has no rate set, so it is left blank" : ""}.
-        What an element costs elsewhere in the app is ingredients only.
+        What an element costs elsewhere in the app is ingredients only, divided by
+        the costed yield rather than by the yield row above.
       </p>
     </section>
   );

@@ -24,9 +24,12 @@
 // ROWS, one figure per batch column, because that is what they are (Mark:
 // "the recipe contains multiple batches and the mixer and prep time are
 // included with the batch size"). They come from real lines restored by
-// `migration/backfill-recipe-metadata-rows.mjs`; the version-level PREP TIME in
-// the header block is the recipe record's own field, which FileMaker prints
-// there too.
+// `migration/backfill-recipe-metadata-rows.mjs`.
+//
+// FileMaker ALSO prints a version-level PREP TIME in the header block and this
+// does not, which is that same instruction applied twice: the recipe record's
+// single figure sat above a row saying 0.5 / 0.5 / 0.6 / 0.7 hr, and where the
+// two disagree only the row can say which batch it means.
 
 import React from "react";
 import { Document, Image, Page, StyleSheet, Text, View } from "@react-pdf/renderer";
@@ -66,7 +69,10 @@ export type RecipePdfData = {
   /** Who wrote it — FileMaker fills this on 91% of versions. */
   author: string | null;
   info: string | null;
-  prepTime: string | null;
+  /* NO PREP TIME HERE. FileMaker prints one in this block AND a Prep Time row
+     per batch column below, which is the same fact twice and, where the recipe
+     record and the row disagree, twice differently. The row wins: it is the one
+     that says which batch it is talking about. */
   shelfLife: string | null;
   storage: string | null;
   tools: string | null;
@@ -184,7 +190,6 @@ export function RecipePdf({ data }: { data: RecipePdfData }) {
             {data.info ? <Fact label="Info">{data.info}</Fact> : null}
           </View>
           <View style={[styles.panel, styles.panelDivider]}>
-            <Fact label="Prep time">{data.prepTime ?? "—"}</Fact>
             <Fact label="Shelf life">{data.shelfLife ?? "—"}</Fact>
             <Fact label="Storage">{data.storage ?? "—"}</Fact>
             {data.tools ? <Fact label="Tools">{data.tools}</Fact> : null}

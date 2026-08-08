@@ -2223,8 +2223,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Verified by rendering the real v10 through the real component in Node over
    live rows (the `PoPdf` idiom) and comparing against Mark's own printout: every
    amount, every unit, every group break and all three metadata rows match.
-   **The recipe record became TWO TABS 2026-08-08 (migration 042, NEEDS
-   APPLYING)**, with FileMaker's RECIPES > INFO tab beside it. `ui/SectionNav` —
+   **The recipe record became TWO TABS 2026-08-08 (migration 042, APPLIED)**, with FileMaker's RECIPES > INFO tab beside it. `ui/SectionNav` —
    Info · Recipe — the employee record's pattern reused rather than re-derived,
    which is what Mark asked for when that shipped. Ingredients and procedure
    moved to Recipe; Info carries the version's fields, the VERSIONS list and the
@@ -2262,6 +2261,25 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Labour rate is fetched in the page's own `Promise.all` rather than folded
    into `getAppSession`: one column read by one screen, against a session every
    screen pays for.
+   **MIXER, YIELD AND PREP TIME ARE GONE FROM THE INFO BLOCK** (Mark,
+   2026-08-08) — and from the printed sheet's header, which is the same
+   instruction applied twice. All three are per BATCH SIZE and are rows on the
+   Recipe tab; a single value beside them was the same fact stated twice and, on
+   Raisied Donut v11, stated differently (30 ea against a row reading 34 → 340).
+   `mixer_size` and `prep_time` now have NO reader in `web/src` at all — the
+   columns keep FileMaker's single value and the transform still fills them.
+   **The costed yield moved to the COSTS block rather than going with them**,
+   which is the one part of this that isn't a deletion. `yield_amount` is what
+   `lib/productionCost` divides a made element's batch by, so it is the number
+   behind every figure the app quotes — deleting its only editor would have left
+   that invisible and unfixable. It is NOT the Expected Yield row: measured over
+   all 493 versions, 284 agree, 71 differ, 137 have no row at all, and **19 of
+   the 128 masters would move if costing were switched to the row — some by 4×,
+   one by 14×**. So they stay two numbers with two homes, and the follow-up
+   remains a deliberate costing change rather than a tidy-up.
+   Exercised against the live database and left as found: the radio wrote
+   `cost_column = 2`, the mark moved, the headline re-quoted at x3/4, and it was
+   set back to null (0 versions carry one).
    **Phase 5 is NOT built**: batches + actuals (was 041, now 042). `made`/`leftover` ship as
    columns and render read-only, because a supervisor writing them needs
    COLUMN-scoped access this table's RLS deliberately doesn't give — that is

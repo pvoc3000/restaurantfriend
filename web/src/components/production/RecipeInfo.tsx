@@ -53,46 +53,22 @@ export function RecipeInfo({
           <Fact label="Note">
             <Editable id={version.id} column="note" value={version.note} editable={editable} multiline />
           </Fact>
-          <Fact label="Prep time">
-            <Editable id={version.id} column="prep_time" value={version.prep_time} editable={editable} />
+          <Fact label="Shelf life">
+            <Editable id={version.id} column="shelf_life" value={version.shelf_life} editable={editable} />
           </Fact>
           <Fact label="Author">
             <Editable id={version.id} column="author" value={version.author} editable={editable} />
           </Fact>
-          <Fact label="Shelf life">
-            <Editable id={version.id} column="shelf_life" value={version.shelf_life} editable={editable} />
-          </Fact>
-          <Fact label="Mixer">
-            <Editable id={version.id} column="mixer_size" value={version.mixer_size} editable={editable} />
-          </Fact>
           <Fact label="Tools">
             <Editable id={version.id} column="tools" value={version.tools} editable={editable} multiline />
           </Fact>
-          <Fact label="Yield">
-            {editable ? (
-              <span className="flex items-baseline gap-1">
-                <InlineValue
-                  table="production_recipe_versions"
-                  id={version.id}
-                  column="yield_amount"
-                  kind="number"
-                  value={version.yield_amount}
-                />
-                <InlineValue
-                  table="production_recipe_versions"
-                  id={version.id}
-                  column="yield_unit"
-                  value={version.yield_unit}
-                />
-              </span>
-            ) : (
-              <span className={READ_ONLY_VALUE}>
-                {version.yield_amount === null
-                  ? "—"
-                  : `${version.yield_amount} ${version.yield_unit ?? ""}`.trim()}
-              </span>
-            )}
-          </Fact>
+          {/* NO MIXER, YIELD OR PREP TIME HERE (Mark, 2026-08-08). All three are
+              per BATCH SIZE and are rows on the Recipe tab, one figure per
+              column; a single value beside them was the same fact stated twice
+              and, on Raisied Donut v11, stated differently — 30 ea against a row
+              reading 34 → 340. The yield the app COSTS with is a different
+              question and has moved to the Costs block, which is the only place
+              that number means anything. */}
           <Fact label="Created">
             <span className={READ_ONLY_VALUE}>{formatStamp(version.created_at) ?? "—"}</span>
           </Fact>

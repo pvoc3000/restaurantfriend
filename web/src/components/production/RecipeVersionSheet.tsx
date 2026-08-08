@@ -56,8 +56,9 @@ export type SheetVersion = {
   testing_notes: string | null;
   yield_amount: number | null;
   yield_unit: string | null;
-  mixer_size: string | null;
-  prep_time: string | null;
+  /* NO `mixer_size` / `prep_time`. Both are per BATCH SIZE and are rows on the
+     Recipe tab; the version columns still hold FileMaker's single value and
+     nothing reads them (Mark, 2026-08-08). */
   shelf_life: string | null;
   storage: string | null;
   tools: string | null;

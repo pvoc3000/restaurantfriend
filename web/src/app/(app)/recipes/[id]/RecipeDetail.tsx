@@ -51,7 +51,7 @@ export async function RecipeDetail({
          production_elements ( id, name ),
          production_recipe_versions (
            id, org_id, version_label, version_sort, is_master, is_active, author, description,
-           note, testing_notes, yield_amount, yield_unit, mixer_size, prep_time,
+           note, testing_notes, yield_amount, yield_unit,
            shelf_life, storage, tools, scale_labels, scale_multipliers,
            created_at, updated_at, cost_column,
            production_recipe_lines (
@@ -106,8 +106,6 @@ export async function RecipeDetail({
     testing_notes: string | null;
     yield_amount: number | null;
     yield_unit: string | null;
-    mixer_size: string | null;
-    prep_time: string | null;
     shelf_life: string | null;
     storage: string | null;
     tools: string | null;
@@ -214,8 +212,6 @@ export async function RecipeDetail({
         testing_notes: v.testing_notes,
         yield_amount: v.yield_amount === null ? null : Number(v.yield_amount),
         yield_unit: v.yield_unit,
-        mixer_size: v.mixer_size,
-        prep_time: v.prep_time,
         shelf_life: v.shelf_life,
         storage: v.storage,
         tools: v.tools,

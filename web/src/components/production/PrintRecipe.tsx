@@ -47,7 +47,6 @@ export function PrintRecipe({
               createdAt: formatStamp(version.created_at),
               author: version.author,
               info: version.description,
-              prepTime: version.prep_time,
               shelfLife: version.shelf_life,
               storage: version.storage,
               tools: version.tools,
