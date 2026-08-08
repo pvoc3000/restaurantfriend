@@ -67,7 +67,7 @@ export function RecipeInfo({
   // only thing this measurement is about, so a short window is handled by the
   // FLOOR: below it the page scrolls, which is the honest failure.
   const row = useRef<HTMLDivElement>(null);
-  useExactViewportHeight(row, true, 760);
+  useExactViewportHeight(row, true, 420);
 
   // THE CHOSEN COLUMN LIVES HERE, not inside the costs block, because two
   // things read it: the matrix, and the Batch cost fact at the top of the
@@ -88,7 +88,7 @@ export function RecipeInfo({
   const at = defaultColumn(matrix);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="flex flex-col gap-5">
       {/* HALF AND HALF, the same split as the row beneath it, so the boundary
           runs straight down the page (Mark, 2026-08-08). Two `dl`s rather than
           one four-track grid: a single grid ties the two sides to the same row
@@ -111,7 +111,7 @@ export function RecipeInfo({
             <span className={READ_ONLY_VALUE}>{stamp(modifiedAt(version)) ?? "—"}</span>
           </Fact>
         </dl>
-        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-6 gap-y-2 text-[14px] lg:grid-cols-[minmax(6rem,auto)_1fr_minmax(6rem,auto)_1fr]">
+        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-6 gap-y-2 text-[14px]">
           <Fact label="Storage">
             <Editable id={version.id} column="storage" value={version.storage} editable={editable} />
           </Fact>
@@ -146,7 +146,13 @@ export function RecipeInfo({
         </div>
       </section>
 
-      <div ref={row} className="flex min-h-0 flex-col gap-10 overflow-hidden">
+      <div ref={row} className="flex min-h-0 flex-col gap-6 overflow-hidden">
+        {/* Notes sits at its NATURAL height under a cap rather than taking a
+            share of the frame (Mark, 2026-08-08: the lists "should start about
+            half way down the page"). Given a share it stretched to a quarter of
+            the window for two lines of prose and pushed the lists into the
+            bottom third; capped, a short note costs what it is worth and a long
+            one scrolls. */}
         <Notes version={version} editable={editable} />
 
         {/* Versions and Costs side by side (Mark, 2026-08-08), on the same
@@ -155,7 +161,7 @@ export function RecipeInfo({
             min-width defaults to min-content, so the matrix's own `minWidth`
             would stop its track shrinking and push the whole PAGE sideways
             rather than scrolling inside its box. */}
-        <div className="flex min-h-0 basis-0 grow-[3] flex-col gap-10 xl:grid xl:grid-cols-2 xl:gap-10">
+        <div className="flex min-h-0 flex-1 flex-col gap-6 xl:grid xl:grid-cols-2 xl:gap-10">
           <div className="flex min-h-0 min-w-0 flex-col">
             <RecipeVersionList
               recipeId={recipeId}
@@ -191,9 +197,15 @@ export function RecipeInfo({
  */
 function Notes({ version, editable }: { version: SheetVersion; editable: boolean }) {
   return (
-    <section className="flex min-h-0 basis-0 grow flex-col gap-3">
+    <section className="flex shrink-0 flex-col gap-3">
       <SectionHeading>Notes</SectionHeading>
-      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1 text-[14px]">
+      {/* A CAP, not a share of the frame. Given a share it stretched to a
+          quarter of the window for two lines of prose and pushed the two lists
+          into the bottom third (Mark, 2026-08-08). Capped, a short note costs
+          what it is worth, a long one scrolls, and the lists get everything
+          else — which is what "start about half way down" asks for on any
+          window tall enough to have a half. */}
+      <div className="max-h-32 space-y-3 overflow-y-auto pr-1 text-[14px]">
         <div>
           <p className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
             Version note
@@ -369,7 +381,11 @@ function RecipeVersionList({
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th className="sticky top-0 z-10 border-b-2 border-ink bg-white px-2 py-2 text-left">
+    // `h-9` on BOTH tables' header cells (see `RecipeCosts`): the rules under
+    // them have to read as one band across the page, and a cell's height
+    // otherwise follows whatever it contains — a 14px radio in the costs header
+    // put its rule 4px lower than this one.
+    <th className="sticky top-0 z-10 h-9 border-b-2 border-ink bg-white px-2 py-0 text-left align-middle">
       {children}
     </th>
   );

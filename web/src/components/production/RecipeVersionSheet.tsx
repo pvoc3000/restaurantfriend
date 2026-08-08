@@ -170,20 +170,19 @@ export function RecipeVersionSheet({
   // So they split the window and scroll their own rows, the Info tab's
   // arrangement applied to the tab it was really needed on.
   //
-  // Ingredients take the larger share: they are the list you look back at
-  // between steps, and they are the one with a horizontal axis to spare.
-  // Not gated on width — see the note in `RecipeInfo`. The floor is generous
-  // because these two lists ARE the screen: a 260px ingredient pane is a
-  // letterbox, not a document.
+  // The frame fills the window exactly, and the two lists split it EVENLY
+  // (Mark, 2026-08-08). The floor is small on purpose: it is the fallback for a
+  // window too short to divide, not a target — a generous floor makes the page
+  // scroll on every laptop, which is the opposite of filling it.
   const frame = useRef<HTMLDivElement>(null);
-  useExactViewportHeight(frame, true, 760);
+  useExactViewportHeight(frame, true, 360);
 
   return (
     <div ref={frame} className="flex flex-col gap-10 overflow-hidden">
       {/* ------------------------------------------------------------------ */}
       {/* Ingredients                                                         */}
       {/* ------------------------------------------------------------------ */}
-      <section className="flex min-h-0 basis-0 grow-[1.35] flex-col gap-3">
+      <section className="flex min-h-0 basis-0 grow flex-col gap-3">
         <SectionHeading count={version.lines.length}>Ingredients</SectionHeading>
 
         {/* One scroller for BOTH axes, which is what the sticky header needs:

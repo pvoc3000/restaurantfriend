@@ -114,41 +114,38 @@ export function RecipeCosts({
             ))}
           </colgroup>
           <thead>
-            {/* The radio row. It is the only INPUT in the block — everything
-                below it is arithmetic — so it sits at the top where FileMaker
-                puts it, above the names of the things it is choosing between. */}
-            <tr>
-              <th className="px-2 pb-1 text-right text-[10px] uppercase tracking-[0.12em] text-subtle">
-                Cost at
-              </th>
-              {matrix.map((c) => (
-                <th key={c.column.index} className="px-2 pb-1 text-center">
-                  <button
-                    type="button"
-                    role="radio"
-                    aria-checked={c.isDefault}
-                    aria-label={`Cost this recipe at ${c.column.label}`}
-                    disabled={!editable || pending}
-                    onClick={() => choose(c.column.index)}
-                    className={`inline-flex h-[18px] w-[18px] items-center justify-center rounded-full border-[1.5px] border-ink transition-colors disabled:opacity-35 ${
-                      c.isDefault ? "bg-ink" : "bg-white"
-                    }`}
-                  >
-                    {c.isDefault ? (
-                      <span className="h-[6px] w-[6px] rounded-full bg-white" />
-                    ) : null}
-                  </button>
-                </th>
-              ))}
-            </tr>
+            {/* ONE HEADER ROW, and the radios live in it. They had a row of
+                their own above the batch names, which put this table's black
+                rule 26px below the Versions list's beside it — two blocks that
+                should read as one band across the page, and didn't (Mark,
+                2026-08-08). Inline, the rule lines up and the control sits on
+                the name of the thing it selects, which is what you would aim
+                at anyway. */}
+            {/* `h-9` on every cell, matching the Versions list beside it: the
+                two black rules have to read as one band across the page, and a
+                14px radio in this row otherwise pushed this one 4px lower. */}
             <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em] text-ink">
-              <th className="px-3 py-2 text-left">Variation</th>
+              <th className="h-9 px-2 py-0 text-left align-middle">Variation</th>
               {matrix.map((c) => (
-                <th
-                  key={c.column.index}
-                  className={`px-2 py-2 text-right ${c.isDefault ? "font-bold" : ""}`}
-                >
-                  {c.column.label}
+                <th key={c.column.index} className="h-9 px-2 py-0 text-right align-middle">
+                  <span className="inline-flex items-center gap-1.5 leading-none">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={c.isDefault}
+                      aria-label={`Cost this recipe at ${c.column.label}`}
+                      disabled={!editable || pending}
+                      onClick={() => choose(c.column.index)}
+                      className={`inline-flex h-[14px] w-[14px] shrink-0 items-center justify-center rounded-full border-[1.5px] border-ink transition-colors disabled:opacity-35 ${
+                        c.isDefault ? "bg-ink" : "bg-white"
+                      }`}
+                    >
+                      {c.isDefault ? (
+                        <span className="h-[5px] w-[5px] rounded-full bg-white" />
+                      ) : null}
+                    </button>
+                    <span className={c.isDefault ? "font-bold" : ""}>{c.column.label}</span>
+                  </span>
                 </th>
               ))}
             </tr>
