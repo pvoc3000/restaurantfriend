@@ -1886,8 +1886,68 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Everything else joins clean: 8,175/8,175 lines, 5,200/5,200 item keys,
    97/97 name links. `cost_basis_t` needed reading rather than guessing —
    **"Internal" means made in-house** (45 of 68 name a recipe), not manual.
-   **Phases 2–5 are NOT built**: Items + the price grid (037), Plans (038),
-   Schedules + generation + the packet (039), Batches + actuals (040).
+   **Shipped, phase 2 — migrations 037 + 038, both APPLIED and LOADED
+   2026-08-07.** 307 items · 324 BOM edges · 325 item-locations · 40 price cells
+   + 5 overrides · 21 yield rules, plus `/production-items`.
+   **038 EXISTS BECAUSE 037 WAS WRONG, and the data said so in a minute.** 037
+   put `unique (org_id, name)` on `production_items`, copying 036's rule for
+   elements, and the first load collapsed **307 items to 173**. An item's name
+   is a LABEL: **"Angry Samoa" is four different donuts** — Regular Cake
+   Vanilla, Mini Raised Promise Ring, Regular Raised Letter, Giant Raised
+   Promise Ring — with four price classes. 038 **DROPS** the constraint rather
+   than widening it: `(name, size, type, subtype)` is exactly unique over all
+   307 rows and a composite index is therefore available and TEMPTING, but those
+   are four separate `InlineValue` cells and changing a Regular to a Mini when
+   that Mini exists would fail on the first edit with no order that works —
+   024's mistake exactly. Duplicates get `findPossibleRehires`' treatment
+   instead: warn, and let the person through.
+   **THE BOM IS TWO FACTS THAT OVERLAP.** FMP states what an item is made of in
+   `_idBase_t` (the dough) AND `_dependencies` (everything else), and they
+   overlap on 84 of 216 items — load both and the dough counts twice, load only
+   dependencies and 132 items lose it. So the base is a COLUMN, dependencies are
+   EDGES, and an edge naming the item's own base is dropped with a report. That
+   also explains why 176 edges carry no quantity: **the dough's amount is
+   DERIVED**, never stored.
+   **`production_batch_yields` is Mark's rule as editable DATA** — dough cost =
+   `batch cost × portion_of_batch × size_factor`. Seeded over FMP's structure
+   with every change named: 11 raised portions 1/350 → **1/340**, mini 0.4 →
+   **1/3**, giant 4 → **2**. He named only the RAISED cuts, so the export's cake
+   portions (Vanilla 1/40, Chocolate 1/35, Banana 1/30) load as they stand
+   rather than being invented.
+   **The dough must read its element's BATCH cost, not its per-unit cost** —
+   `elementCost` already divides a made element by its yield, so doing that AND
+   multiplying by `portion_of_batch` applies the yield TWICE, giving $0.01 where
+   $1.00 is right. A hundredfold error that still looks like a plausible
+   ingredient cost. Four fixtures exist for it and reproduce exactly 0.01 when
+   the guard is removed.
+   **Decision 10 confirmed by measurement**: 125 price rows are 40 (class, tier)
+   cells copied across four shops, DF01/DF02/DF03 agree on **all 40**, and only
+   EVENT differs — on exactly its five Regular-class cells. `lib/productionPrice`
+   resolves item-location override → location grid override → org grid. An item
+   missing a class or tier has NO price rather than a default one (19 of 307),
+   and **margin is a fraction of PRICE, not cost** ($1 at $4 is a 75% margin and
+   a 300% markup).
+   **WHAT PHASE 2 DOES NOT PROVE.** The plan was to validate item costs against
+   FileMaker's own frozen `costEach`, kept in `source_payload` for exactly that.
+   **The diff cannot run**: of the 61 items FMP costed, ZERO have a complete cost
+   of ours, because every one carries 4–11 unpriced components. The arithmetic is
+   fixture-verified; the DATA cannot corroborate it until the element catalog is
+   mapped — even Raised Donut's batch resolves to $6.22 with one of its four
+   lines unpriced. That is the 209-element backlog the Uncosted tier exists for,
+   and it is Mark's data work, not a code fix. **Re-run that diff after the
+   catalog is filled in** — it is the real validation and it is still owed.
+   Two traps this phase added to the pagination lesson: `fetchAll` must take its
+   ORDER COLUMN as a parameter, because `production_price_grid_locations`
+   deliberately has no `id` (the pair is the key, `vendor_item_location_prices`'
+   idiom) and a hardcoded `.order("id")` took the whole menu screen down; and
+   `_yields.mer` has a genuine duplicate `(Raised, Letter, Regular)` row, merged
+   with a report, which the harness caught and reading had not.
+   **NOT built in phase 2**: the item DETAIL screen and a price-grid editor —
+   the list is read-and-filter plus the Active toggle, so a class, tier or par
+   still has to be changed in SQL. Those are the first things to add.
+   **Phases 3–5 are NOT built**: Plans (039), Schedules + generation + the
+   packet (040), Batches + actuals (041). Note the brief's numbering is now off
+   by one, since 038 was spent on the name constraint.
    The one-paragraph version: Recipe_Items merges into Production_Elements
    (made | purchased | manual, one component vocabulary for both BOM layers);
    Recipes stay separate and VERSIONED, element→recipe a real FK, never a
