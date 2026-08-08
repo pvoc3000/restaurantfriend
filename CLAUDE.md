@@ -1942,9 +1942,28 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    idiom) and a hardcoded `.order("id")` took the whole menu screen down; and
    `_yields.mer` has a genuine duplicate `(Raised, Letter, Regular)` row, merged
    with a report, which the harness caught and reading had not.
-   **NOT built in phase 2**: the item DETAIL screen and a price-grid editor —
-   the list is read-and-filter plus the Active toggle, so a class, tier or par
-   still has to be changed in SQL. Those are the first things to add.
+   **Also shipped: `/production-items/[id]` and `/price-grid`.**
+   **The price grid is a MATRIX, not a `DataTable`** — the table component is
+   for a list of RECORDS, and this is one record with two axes. Reading it as 40
+   rows of (class, tier, price) would lose the point: a tier is a COLUMN, and
+   changing one cell reprices every item on it. A shop picker switches between
+   the org prices and any one shop's, where an overridden cell is a live value
+   and an inherited one is the org price in GREY with a "set" button — and that
+   button INSERTS the override row, because **a cell with no override has no row
+   to write to and so cannot be an `InlineValue` at all**. Verified against
+   EVENT: five live Regular-class values, 35 grey inherited ones.
+   **The item record shows WHY a cost is what it is** — FMP stored one frozen
+   `costEach`, so a wrong-looking figure told you nothing. Every contributor is
+   a row, the dough included, rendered as **"1/340 of a batch"** because that is
+   how a baker says it, and anything unpriced says so on its own line rather
+   than being dropped from the total.
+   **Per-location pars are READ-ONLY, deliberately**: `InlineValue` writes a
+   whole COLUMN and a par cell must write one SLOT of a Postgres array, so an
+   editor means a new component or widening `InlineValue`. Showing the seven
+   numbers is most of the value and none of the risk, and the order guide is
+   where a par is changed in anger. **That is the obvious next thing to build.**
+   Nav: Operations > Prices was an existing named stub and now points at the
+   grid; if staff look for it under Production instead, it is one line.
    **Phases 3–5 are NOT built**: Plans (039), Schedules + generation + the
    packet (040), Batches + actuals (041). Note the brief's numbering is now off
    by one, since 038 was spent on the name constraint.
