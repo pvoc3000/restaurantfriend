@@ -2679,7 +2679,53 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    order, which is not a thing to rely on. `duplicateTitle` names it "… copy",
    "… copy 2" — no unique constraint exists on the title, so this is for the
    READER picking a plan out of a list.
-   **The copy opens OFFERING the shop's defaults** — `?defaults=review`, which
+   **CHECKING THE PARS AGAINST A SHOP'S DEFAULTS IS ONE MODE WITH THREE DOORS**
+   (Mark, 2026-08-08, having moved a copied plan from DF01 to DF02 and wanted
+   its pars re-based). He offered three designs — always flag, an always-visible
+   reset, or a dialog on the location change — and they are the same question
+   asked at three moments, so they are one feature: a DUPLICATE arrives in
+   review mode, MOVING the plan to another shop turns it on by itself (state
+   adjusted during render when the `locationId` prop changes, React's own
+   documented pattern), and a **Check pars** control turns it on whenever.
+   **"Always flag" is the one option NOT taken**, and deliberately: a plan is
+   SUPPOSED to diverge from the defaults — that is what a seasonal menu is — so
+   a permanent mark would sit on exactly the slots somebody had thought hardest
+   about and teach the reader to stop seeing it.
+   The control states the count BEFORE you turn it on ("175 pars differ from
+   DF02's defaults"), because a number you can only see once you have already
+   entered the mode is no use for deciding whether to. That is why `defaultGap`
+   (the FACT) is split from `suggestionFor` (what the screen is offering).
+   Inside the mode, **Use all n** takes every offer at once, grouped by
+   resulting value like the tray stepper, `window.confirm` naming the count and
+   saying the current numbers are replaced.
+   **EVERY "use the default" HAS ITS REVERSE** (Mark, 2026-08-08) — the
+   receiving screen's two-stage price button in a plan's terms: take the app's
+   figure, or tell the app yours. Per slot, `↑ set default n` sits on its own
+   line under `→ use default n`, quieter, and in bulk **Set defaults from plan**
+   sits beside **Use all n** as text rather than a bordered cell. The asymmetry
+   is deliberate and is the whole point: taking a default changes THIS PLAN,
+   where setting one changes the SHOP'S CATALOG that every future plan seeds
+   from — so it is a separate act, worded to say so, and its confirm spells out
+   the blast radius.
+   Two things the write has to get right. It **UPSERTS** on
+   `(item_id, location_id)`, because most pairs have no row at all
+   (/price-grid's "set" problem) and an update would change nothing and report
+   success; only `par_by_weekday` is written, so `is_active` and
+   `price_override` survive — verified. And **`arrayWidth` is 7, not the strip's
+   own length**, since 037 checks `array_length = 7` and a null or short strip
+   would otherwise be refused on the first write. The bulk version groups by
+   ITEM, not slot: one item appears on several weekdays and they share one
+   seven-slot array, so writing them separately would have each overwrite the
+   last.
+   Round-tripped on the live DF02 catalog: `↑ set default 24` moved Angry
+   Samoa's Friday from 18 to 24 and touched no other slot, then the plan par was
+   stepped down, `↑ set default 18` put it back, and the par stepped up — the
+   array is `[18,18,18,18,18,18,18]` again.
+   Verified on Mark's real DF02 plan — 175 of 225 slots still carried DF01's
+   numbers, and the per-slot offers appeared on exactly those. The bulk write
+   was proved on a THROWAWAY duplicate rather than his live plan (175 → 0,
+   banner flipping to "Every par matches DF02's defaults"), then deleted.
+   **A duplicate opens OFFERING the shop's defaults** — `?defaults=review`, which
    turns the drag-copy's `→ use default n` on for EVERY slot whose par disagrees
    with its default rather than just the ones a drag landed on. `suggestionFor`
    is the one function both routes go through, which is why `dismissed` had to

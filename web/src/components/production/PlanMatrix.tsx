@@ -25,6 +25,7 @@ import {
   type ItemTaxonomy,
 } from "@/lib/productionPlans";
 import { useSlotDrag, type SlotDragSource, type SlotDropTarget } from "@/lib/planSlotDrag";
+import { withSlot } from "@/lib/production";
 
 export type MatrixTray = { id: string; tray_number: string; band: string | null; sort: number | null };
 export type MatrixSlot = {
@@ -85,6 +86,8 @@ export function PlanMatrix({
   slots,
   items,
   defaultPars,
+  locationId,
+  locationCode,
   bands,
   reviewDefaults = false,
   editable,
@@ -100,12 +103,15 @@ export function PlanMatrix({
    * `production_item_locations.par_by_weekday` is still for.
    */
   defaultPars: DefaultPars;
+  /** The shop this plan SELLS at — whose defaults `defaultPars` holds. */
+  locationId: string;
+  locationCode: string;
   /** The band vocabulary already in use across this org's plans. */
   bands: string[];
   /**
-   * Offer every shop default that disagrees with a par, not just the slots a
-   * drag just landed on — how a DUPLICATED plan opens, so the copy can be
-   * re-based on the new shop's own numbers one tap at a time.
+   * Open in review mode — every par that disagrees with its shop default
+   * offers it. How a DUPLICATED plan arrives; see `review` below for the other
+   * two ways in.
    */
   reviewDefaults?: boolean;
   editable: boolean;
@@ -122,6 +128,32 @@ export function PlanMatrix({
    * either way, and a plan is read in one sitting.
    */
   const [grouping, setGrouping] = useState<MatrixGrouping>("tray");
+  /**
+   * REVIEW MODE: every par that disagrees with this shop's default offers it.
+   *
+   * One mode with three doors, because they are the same question asked at
+   * three moments (Mark, 2026-08-08, having moved a copied plan from DF01 to
+   * DF02): a DUPLICATE arrives in it, MOVING the plan to another shop turns it
+   * on by itself, and the Check pars control turns it on whenever you like.
+   *
+   * A MODE rather than a permanent flag, which is the one option not taken. A
+   * plan is supposed to diverge from the defaults — that is what a seasonal
+   * menu IS — so flagging every difference forever would put a yellow mark on
+   * exactly the slots somebody had already thought hardest about, and teach the
+   * reader to stop seeing it.
+   */
+  const [review, setReview] = useState(reviewDefaults);
+  /**
+   * Moving the plan to another shop makes EVERY par suspect at once, so it
+   * turns review on by itself. Adjusting state during render when a prop
+   * changes is React's own documented pattern for this, and it is why the
+   * previous value is held rather than compared in an effect.
+   */
+  const [reviewedShop, setReviewedShop] = useState(locationId);
+  if (locationId !== reviewedShop) {
+    setReviewedShop(locationId);
+    setReview(true);
+  }
   /**
    * Slots a drag has landed on, each with the destination's own default par —
    * shown as a one-tap `→` beside that par when the two disagree.
@@ -172,7 +204,18 @@ export function PlanMatrix({
     if (dismissed[slot.rowId]) return null;
     const explicit = landed[slot.rowId];
     if (explicit !== undefined) return explicit === slot.par ? null : explicit;
-    if (!reviewDefaults) return null;
+    return review ? defaultGap(slot, weekday) : null;
+  }
+
+  /**
+   * This shop's default for the slot, when it disagrees with the par — the
+   * FACT, independent of whether the screen is currently offering it.
+   *
+   * Kept apart from `suggestionFor` so the Check pars control can say how many
+   * differ while review is OFF. A count that only worked once you had already
+   * turned the thing on would be no use for deciding whether to.
+   */
+  function defaultGap(slot: TraySlot, weekday: number): number | null {
     const seeded = defaultParFor(defaultPars, slot.itemId, weekday);
     return seeded !== null && seeded !== slot.par ? seeded : null;
   }
@@ -335,6 +378,144 @@ export function PlanMatrix({
     });
   }
 
+  /**
+   * Every slot this shop's defaults disagree with, ignoring the ones already
+   * answered. Computed from the matrix so it counts exactly what the screen is
+   * offering — a count that could drift from the offers would be worse than no
+   * count.
+   */
+  const differing = matrix.flatMap((row) =>
+    row.days.flatMap((day, i) =>
+      day.flatMap((slot) => {
+        const suggested = dismissed[slot.rowId] ? null : defaultGap(slot, WEEKDAYS[i].iso);
+        return suggested === null ? [] : [{ rowId: slot.rowId, suggested }];
+      })
+    )
+  );
+
+  /**
+   * Take every offer at once — the bulk answer to "re-base this plan on the new
+   * shop's numbers", which is a real thing to want after moving a plan and a
+   * tedious thing to do 225 times.
+   *
+   * Grouped by resulting value, like the tray stepper: a plan's differences
+   * usually land on a handful of distinct numbers, so this is a few statements
+   * rather than one per slot.
+   */
+  function takeAllSuggested() {
+    if (!differing.length) return;
+    if (
+      !window.confirm(
+        `Set ${differing.length} par${differing.length === 1 ? "" : "s"} to ${locationCode}'s defaults? The numbers currently on those slots are replaced.`
+      )
+    ) {
+      return;
+    }
+    const groups = new Map<number, string[]>();
+    for (const d of differing) {
+      groups.set(d.suggested, [...(groups.get(d.suggested) ?? []), d.rowId]);
+    }
+    run(async (supabase) => {
+      const results = await Promise.all(
+        [...groups].map(([par, ids]) =>
+          supabase.from("production_plan_tray_items").update({ par }).in("id", ids).select("id")
+        )
+      );
+      const bad = results.find((r) => r.error || !r.data?.length);
+      return bad ? bad.error?.message ?? "Those pars could not be changed." : null;
+    });
+  }
+
+  /**
+   * The REVERSE of taking the default: teach the shop this slot's number.
+   *
+   * The receiving screen's two-stage price button, in a plan's terms — take the
+   * app's figure, or tell the app yours — and a SEPARATE act for the same
+   * reason: fixing this plan is not consent to edit the shop's catalog, so it
+   * is a second button rather than something the first one also does.
+   *
+   * UPSERT, not update: most (item, location) pairs have no row at all
+   * (/price-grid's "set" problem), and an update would change nothing and
+   * report success. Only `par_by_weekday` is written, so a row's `is_active`
+   * and `price_override` survive.
+   *
+   * `arrayWidth` is 7 and not the strip's own length — 037 checks
+   * `array_length = 7`, so a null or short strip has to be padded or the first
+   * write on an item that never had defaults is refused.
+   */
+  function updateDefault(slot: TraySlot, weekday: number) {
+    if (slot.par === null) return;
+    const strip = withSlot(defaultPars[slot.itemId] ?? null, weekday - 1, slot.par, 7);
+    run(async (supabase) => {
+      const { data, error } = await supabase
+        .from("production_item_locations")
+        .upsert(
+          {
+            org_id: orgId,
+            item_id: slot.itemId,
+            location_id: locationId,
+            par_by_weekday: strip,
+          },
+          { onConflict: "item_id,location_id" }
+        )
+        .select("id");
+      return error || !data?.length
+        ? error?.message ?? "That default could not be changed."
+        : null;
+    });
+  }
+
+  /**
+   * The bulk reverse: make this plan's pars the shop's defaults.
+   *
+   * One row per ITEM rather than per slot — an item appears on several weekdays,
+   * and they share one seven-slot array, so writing them separately would have
+   * each overwrite the last.
+   */
+  function updateAllDefaults() {
+    if (!differing.length) return;
+    const byItem = new Map<string, (number | null)[]>();
+    for (const row of matrix) {
+      row.days.forEach((day, i) => {
+        for (const slot of day) {
+          if (slot.par === null || dismissed[slot.rowId]) continue;
+          if (defaultGap(slot, WEEKDAYS[i].iso) === null) continue;
+          byItem.set(
+            slot.itemId,
+            withSlot(byItem.get(slot.itemId) ?? defaultPars[slot.itemId] ?? null, i, slot.par, 7)
+          );
+        }
+      });
+    }
+    if (!byItem.size) return;
+    if (
+      !window.confirm(
+        `Set ${locationCode}'s DEFAULT pars from this plan — ${byItem.size} item${
+          byItem.size === 1 ? "" : "s"
+        }? This changes the shop's catalog, not just this plan, and every future plan seeds from it.`
+      )
+    ) {
+      return;
+    }
+    run(async (supabase) => {
+      const { data, error } = await supabase
+        .from("production_item_locations")
+        .upsert(
+          [...byItem].map(([item_id, par_by_weekday]) => ({
+            org_id: orgId,
+            item_id,
+            location_id: locationId,
+            par_by_weekday,
+          })),
+          { onConflict: "item_id,location_id" }
+        )
+        .select("id");
+      return error || data?.length !== byItem.size
+        ? error?.message ?? "Those defaults could not be changed."
+        : null;
+    });
+  }
+
   /** Take the destination's default for a slot a drag landed on. */
   function takeSuggested(rowId: string, par: number) {
     dismissLanded(rowId);
@@ -486,6 +667,61 @@ export function PlanMatrix({
       {/* A control that changes what the list SHOWS goes with the list, never
           in a command bar — and every one-of-N choice in this app is a
           TabPicker. */}
+      {/* The pars against this shop's own defaults. Always available, so the
+          question can be asked without a duplicate or a move to prompt it —
+          and it says the count BEFORE you turn it on, which is what you need
+          to decide whether to. */}
+      {editable && (differing.length > 0 || review) ? (
+        <div className="flex flex-wrap items-center gap-3 border-l-2 border-mark pl-3 text-[13px]">
+          <span className="text-muted">
+            {differing.length === 0 ? (
+              <>Every par matches {locationCode}&rsquo;s defaults.</>
+            ) : (
+              <>
+                <span className="font-medium text-ink">
+                  {differing.length} par{differing.length === 1 ? "" : "s"}
+                </span>{" "}
+                differ{differing.length === 1 ? "s" : ""} from {locationCode}&rsquo;s defaults.
+              </>
+            )}
+          </span>
+          {differing.length ? (
+            <button
+              type="button"
+              onClick={() => setReview((v) => !v)}
+              className="text-[12px] font-semibold uppercase tracking-[0.06em] text-subtle hover:text-ink"
+            >
+              {review ? "Stop checking" : "Check pars"}
+            </button>
+          ) : null}
+          {review && differing.length ? (
+            <>
+              <button
+                type="button"
+                onClick={takeAllSuggested}
+                disabled={pending}
+                title={`Replace those pars with ${locationCode}'s defaults`}
+                className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-40"
+              >
+                Use all {differing.length}
+              </button>
+              {/* The reverse, and the riskier direction: it writes the SHOP's
+                  catalog, which every future plan seeds from. Quieter than its
+                  opposite on purpose, and its confirm says so. */}
+              <button
+                type="button"
+                onClick={updateAllDefaults}
+                disabled={pending}
+                title={`Make this plan's pars ${locationCode}'s defaults — changes the shop's catalog`}
+                className="text-[12px] font-semibold uppercase tracking-[0.06em] text-subtle hover:text-ink disabled:opacity-40"
+              >
+                Set defaults from plan
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
       {trays.length > 1 ? (
         <div className="space-y-1.5">
           <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
@@ -724,6 +960,26 @@ export function PlanMatrix({
                                     ✕
                                   </button>
                                 </span>
+                              ) : null}
+
+                              {/* THE REVERSE, on its own line: teach the shop
+                                  this number instead of taking its one. Two
+                                  lines because the pair will not fit a 150px
+                                  chip, and quieter than the offer above it —
+                                  taking a default changes this plan, where
+                                  setting one changes the catalog every future
+                                  plan seeds from. */}
+                              {editable && suggestionFor(slot, weekday) !== null && slot.par !== null ? (
+                                <button
+                                  type="button"
+                                  onClick={() => updateDefault(slot, weekday)}
+                                  disabled={pending}
+                                  title={`Make ${slot.par} ${locationCode}'s default for ${slot.name} on ${WEEKDAYS[i].long} — changes the shop, not just this plan`}
+                                  aria-label={`Set ${locationCode}'s default for ${slot.name} on ${WEEKDAYS[i].long} to ${slot.par}`}
+                                  className="mt-0.5 self-start whitespace-nowrap text-[11px] tabular-nums text-subtle hover:text-ink"
+                                >
+                                  ↑ set default {slot.par}
+                                </button>
                               ) : null}
                             </span>
                           ))}

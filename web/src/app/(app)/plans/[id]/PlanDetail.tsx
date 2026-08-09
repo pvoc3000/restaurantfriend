@@ -312,6 +312,8 @@ export async function PlanDetail({
             finish: (i.finish ?? null) as string | null,
           }))}
           bands={bands}
+          locationId={plan.location_id as string}
+          locationCode={codeById.get(plan.location_id as string) ?? "this shop"}
           // Set by a duplicate: the new plan opens offering each shop's own
           // default beside every par that disagrees with it.
           reviewDefaults={rawParams[REVIEW_DEFAULTS_PARAM] === "review"}
