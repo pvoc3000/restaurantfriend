@@ -2695,9 +2695,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    DF02's defaults"), because a number you can only see once you have already
    entered the mode is no use for deciding whether to. That is why `defaultGap`
    (the FACT) is split from `suggestionFor` (what the screen is offering).
-   Inside the mode, **Use all n** takes every offer at once, grouped by
+   Inside the mode, **Use defaults** takes every offer at once, grouped by
    resulting value like the tray stepper, `window.confirm` naming the count and
    saying the current numbers are replaced.
+   All three of that band's controls — Check pars, Use defaults, Update defaults
+   — are the app's ONE button weight, outlined and white (Mark, 2026-08-08:
+   "make it look like a real button"). The count that used to ride in the label
+   ("Use all 175") moved out of it: the sentence beside them already says 175,
+   and a number in a button reads as part of the command.
+   The **Trays** section heading is GONE with them (Mark) — the pinned footer
+   already says "24 trays on this plan", and a heading that only restated a
+   count was pushing the band that matters down the page.
    **EVERY "use the default" HAS ITS REVERSE** (Mark, 2026-08-08) — the
    receiving screen's two-stage price button in a plan's terms: take the app's
    figure, or tell the app yours. Per slot, `↑ set default n` sits on its own

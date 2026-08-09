@@ -5,7 +5,6 @@ import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
-import { SectionHeading } from "@/components/ui/SectionHeading";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { PlanMatrix } from "@/components/production/PlanMatrix";
@@ -272,7 +271,6 @@ export async function PlanDetail({
       </div>
 
       <section className="space-y-3">
-        <SectionHeading count={(trays ?? []).length}>Trays</SectionHeading>
         <PlanMatrix
           planId={id}
           orgId={session.membership.org_id}

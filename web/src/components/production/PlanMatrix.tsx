@@ -689,7 +689,7 @@ export function PlanMatrix({
             <button
               type="button"
               onClick={() => setReview((v) => !v)}
-              className="text-[12px] font-semibold uppercase tracking-[0.06em] text-subtle hover:text-ink"
+              className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
             >
               {review ? "Stop checking" : "Check pars"}
             </button>
@@ -703,19 +703,21 @@ export function PlanMatrix({
                 title={`Replace those pars with ${locationCode}'s defaults`}
                 className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-40"
               >
-                Use all {differing.length}
+                Use defaults
               </button>
               {/* The reverse, and the riskier direction: it writes the SHOP's
-                  catalog, which every future plan seeds from. Quieter than its
-                  opposite on purpose, and its confirm says so. */}
+                  catalog, which every future plan seeds from. It reads as a peer
+                  of its opposite (Mark, 2026-08-08) — the app's one button
+                  weight, outlined and white — so the warning lives entirely in
+                  the confirm, which names the blast radius. */}
               <button
                 type="button"
                 onClick={updateAllDefaults}
                 disabled={pending}
                 title={`Make this plan's pars ${locationCode}'s defaults — changes the shop's catalog`}
-                className="text-[12px] font-semibold uppercase tracking-[0.06em] text-subtle hover:text-ink disabled:opacity-40"
+                className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-40"
               >
-                Set defaults from plan
+                Update defaults
               </button>
             </>
           ) : null}
