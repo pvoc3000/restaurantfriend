@@ -26,6 +26,11 @@ import { PickList } from "@/components/ui/PickList";
  * `status` defaults to COMPLETE here, where a generated row defaults to to-do,
  * and the asymmetry is the point: generation writes a job to be done, and this
  * writes down something that already happened.
+ *
+ * EVERY BATCH BELONGS TO A LOG (045), so this finds that day's log for the
+ * kitchen or makes one. There is no such thing as a loose batch — which is what
+ * gives the date one home and keeps "a way to associate batch logs together"
+ * true even for the ones nobody generated.
  */
 export function NewBatch({
   orgId,
@@ -93,15 +98,33 @@ export function NewBatch({
         return;
       }
 
+      // The day's log, found or made. `upsert` on the unique (location, date)
+      // rather than select-then-insert: two people logging a stray batch on the
+      // same day would otherwise race, and the loser would get a constraint
+      // violation instead of a batch.
+      const { data: log, error: logError } = await supabase
+        .from("production_batch_logs")
+        .upsert(
+          { org_id: orgId, location_id: locationId, log_date: date },
+          { onConflict: "location_id,log_date", ignoreDuplicates: false }
+        )
+        .select("id")
+        .single();
+      if (logError) {
+        setFailed(logError.message);
+        return;
+      }
+
       const { data, error } = await supabase
         .from("production_batches")
         .insert({
           org_id: orgId,
+          log_id: log.id,
           element_id: elementId,
           location_id: locationId,
-          batch_date: date,
           batch_number: number as string,
           batch_label: label?.trim() ? label.trim() : null,
+          is_generated: false,
           status: "complete",
         })
         .select("id")
@@ -158,10 +181,10 @@ export function NewBatch({
 
           <div className="space-y-4">
             <p className="text-sm text-muted">
-              For something the weekly schedule doesn&rsquo;t carry — an AB or
+              For something the weekly round doesn&rsquo;t carry — an AB or
               donut element, an extra batch, a test. It lands at {locationCode}{" "}
-              marked complete; the yield, who made it and the photo go on the
-              record.
+              marked complete, on that day&rsquo;s log; the yield, who made it
+              and the photo go on the record.
             </p>
 
             <label className="block space-y-1.5">

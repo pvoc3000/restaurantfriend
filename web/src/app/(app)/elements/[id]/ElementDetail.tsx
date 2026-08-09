@@ -64,10 +64,13 @@ export async function ElementDetail({
   const { data: recentBatches, error: batchError } = await supabase
     .from("production_batches")
     .select(
-      "id, batch_date, batch_number, batch_label, status, location_id, yield_count, yield_size, yield_unit"
+      `id, batch_number, batch_label, status, location_id,
+       yield_count, yield_size, yield_unit,
+       production_batch_logs!inner ( log_date )`
     )
     .eq("element_id", id)
-    .order("batch_date", { ascending: false })
+    // The date is the LOG's since 045 — an item has none of its own.
+    .order("log_date", { ascending: false, referencedTable: "production_batch_logs" })
     .limit(10);
 
   // Every location, not just the active ones — a batch made at a shop that has
@@ -212,7 +215,10 @@ export async function ElementDetail({
                   href={`/batch-logs/${b.id}`}
                   className="w-24 shrink-0 font-medium hover:underline"
                 >
-                  {batchDate(b.batch_date as string)}
+                  {batchDate(
+                    (b.production_batch_logs as unknown as { log_date: string } | null)
+                      ?.log_date ?? ""
+                  )}
                 </Link>
                 <span className="w-16 text-muted">
                   {codeById.get(b.location_id as string) ?? "—"}

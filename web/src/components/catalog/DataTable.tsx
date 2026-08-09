@@ -104,6 +104,21 @@ export type DataGroup<T> = {
   label: (row: T) => string;
   sortKey?: string;
   summary?: (rows: T[]) => Record<string, ReactNode>;
+  /**
+   * A SECOND heading INSIDE each band — FileMaker's own batch log, where a
+   * black 8/4/2026 rule is followed by an underlined "ICE CREAM" over that
+   * night's ice creams.
+   *
+   * Deliberately a lighter mark than the band: black text on white with a rule
+   * under it, not a second filled bar. A second black band would read as
+   * another break of the SAME weight, where this is a heading inside one — the
+   * distinction the plan matrix already draws between its type band and its
+   * cut heading.
+   *
+   * Like `label`, it can only band what the ORDER already groups, so the
+   * caller's comparator must sort by the sub-key within each run.
+   */
+  subLabel?: (row: T) => string;
 };
 
 /**
@@ -566,6 +581,17 @@ export function DataTable<T>({
                 label !== null &&
                 (index === sorted.length - 1 || banding!.label(sorted[index + 1]) !== label);
 
+              // The sub-heading opens on the first row of each run of like
+              // sub-labels, and also whenever the BAND above it changes — so a
+              // new day repeats the type heading rather than swallowing it,
+              // which is what the printed log does.
+              const subLabel = banding?.subLabel ? banding.subLabel(row) : null;
+              const startsSubGroup =
+                subLabel !== null &&
+                (startsGroup ||
+                  index === 0 ||
+                  banding!.subLabel!(sorted[index - 1]) !== subLabel);
+
               return (
                 <Fragment key={key}>
                   {/* BLACK, white text (Mark, 2026-08-02, with a screenshot of
@@ -586,6 +612,16 @@ export function DataTable<T>({
                         <span className="ml-2 font-normal tracking-normal text-white/55 normal-case">
                           {groupRows.get(label)?.length ?? 0}
                         </span>
+                      </td>
+                    </tr>
+                  )}
+                  {startsSubGroup && (
+                    <tr>
+                      <td
+                        colSpan={visibleColumns.length}
+                        className="border-b border-ink px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-[0.08em] text-ink"
+                      >
+                        {subLabel}
                       </td>
                     </tr>
                   )}

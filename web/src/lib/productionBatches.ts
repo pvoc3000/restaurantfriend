@@ -129,50 +129,26 @@ export function yieldAgainstPar(batch: {
   return made > par ? "over" : "under";
 }
 
-/* -- the week ------------------------------------------------------------- */
+/* -- dates --------------------------------------------------------------- */
 
 /**
- * The ISO week containing `iso` — Monday first, seven dates.
+ * THE WEEK IS GONE from this module, and that is the point.
  *
- * ISO 1 = MONDAY, and off by one silently shifts a whole kitchen's week by a
- * day — the trap `lib/productionPlans` already carries a fixture for. Dates are
- * compared and stepped as STRINGS through a UTC anchor, never `new Date(iso)`,
- * which is UTC midnight and so the previous day west of Greenwich.
+ * 044 generated a week and placed each batch on the weekday its element
+ * schedule named. 045 generates a DAY: a batch log is a collection of things to
+ * be made sometime soon, not on a specific day (Mark, 2026-08-09 — "our
+ * production staff has two days to get it done and they're free to do it on
+ * whatever day and in whatever order"). So `batchWeek`, `weekStart` and
+ * `weekLabel` went with the rule they served, along with their fixtures.
+ *
+ * What is left is date arithmetic done as STRINGS through a UTC anchor, never
+ * `new Date(iso)` — which is UTC midnight, and so the previous day everywhere
+ * west of Greenwich.
  */
-export function batchWeek(iso: string): string[] {
-  const monday = weekStart(iso);
-  const out: string[] = [];
-  for (let i = 0; i < 7; i++) out.push(addDays(monday, i));
-  return out;
-}
-
-/** The Monday of the week containing `iso`. */
-export function weekStart(iso: string): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  // getUTCDay is 0=Sunday; ISO wants 1=Monday…7=Sunday.
-  const isodow = d.getUTCDay() === 0 ? 7 : d.getUTCDay();
-  return addDays(iso, -(isodow - 1));
-}
-
 export function addDays(iso: string, days: number): string {
   const d = new Date(`${iso}T00:00:00Z`);
   d.setUTCDate(d.getUTCDate() + days);
   return d.toISOString().slice(0, 10);
-}
-
-/** "11 Aug – 17 Aug 2026", for a dialog that has to say which week. */
-export function weekLabel(iso: string): string {
-  const week = batchWeek(iso);
-  return `${short(week[0])} – ${short(week[6])} ${week[6].slice(0, 4)}`;
-}
-
-function short(iso: string): string {
-  const d = new Date(`${iso}T00:00:00Z`);
-  const month = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
-  ][d.getUTCMonth()];
-  return `${d.getUTCDate()} ${month}`;
 }
 
 /** "Mon 8/11" — the same voice the item history uses. */

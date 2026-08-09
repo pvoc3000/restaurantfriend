@@ -13,9 +13,6 @@ import {
   describeAmount,
   amountTotal,
   yieldAgainstPar,
-  batchWeek,
-  weekStart,
-  weekLabel,
   batchDate,
 } from "../../src/lib/productionBatches";
 
@@ -113,49 +110,6 @@ test("unit comparison ignores case and padding", () => {
   eq(yieldAgainstPar({ yield_count: 2, yield_size: 22, yield_unit: " QT ", ...par }), "at");
 });
 
-/* -- the week ------------------------------------------------------------- */
-
-test("ISO 1 = MONDAY: every day of one week resolves to the same Monday", () => {
-  // Off by one here shifts a kitchen's whole week by a day.
-  for (const d of [
-    "2026-08-10", "2026-08-11", "2026-08-12",
-    "2026-08-13", "2026-08-14", "2026-08-15", "2026-08-16",
-  ]) {
-    eq(weekStart(d), "2026-08-10", `week of ${d}`);
-  }
-});
-
-test("SUNDAY belongs to the week that STARTED, not the one about to", () => {
-  // The classic off-by-one: getUTCDay() is 0 for Sunday, so a naive
-  // `-(day - 1)` moves Sunday FORWARD a day instead of back six.
-  eq(weekStart("2026-08-16"), "2026-08-10");
-  eq(weekStart("2026-08-09"), "2026-08-03");
-});
-
-test("batchWeek is seven consecutive dates, Monday first", () => {
-  const w = batchWeek("2026-08-13");
-  eq(w.length, 7);
-  eq(w[0], "2026-08-10");
-  eq(w[6], "2026-08-16");
-});
-
-test("a week crossing a month and a year still runs seven days", () => {
-  eq(batchWeek("2026-12-31")[0], "2026-12-28");
-  eq(batchWeek("2026-12-31")[6], "2027-01-03");
-});
-
-test("the week does not shift west of Greenwich", () => {
-  const before = process.env.TZ;
-  process.env.TZ = "America/Los_Angeles";
-  eq(weekStart("2026-08-16"), "2026-08-10");
-  eq(batchDate("2026-08-10"), "Mon 8/10");
-  process.env.TZ = before;
-});
-
-test("weekLabel names both ends and the year once", () => {
-  eq(weekLabel("2026-08-13"), "10 Aug – 16 Aug 2026");
-});
-
 /* -- band ordering -------------------------------------------------------- */
 
 test("a week's day BANDS order chronologically, not alphabetically", () => {
@@ -181,4 +135,15 @@ test("the same trap across a month boundary", () => {
   const byLabel = [...days].sort((a, b) => (batchDate(a) < batchDate(b) ? -1 : 1));
   eq(byLabel, ["2026-09-11", "2026-09-02"], "the label order is wrong");
   eq([...days].sort(), ["2026-09-02", "2026-09-11"], "the ISO order is right");
+});
+
+test("batchDate does not shift west of Greenwich", () => {
+  // `new Date("2026-08-10")` is UTC midnight, which is the 9th in Los Angeles.
+  // The module anchors to UTC and formats from UTC parts so the answer cannot
+  // depend on where the server is.
+  const before = process.env.TZ;
+  process.env.TZ = "America/Los_Angeles";
+  eq(batchDate("2026-08-10"), "Mon 8/10");
+  eq(batchDate("2026-01-01"), "Thu 1/1");
+  process.env.TZ = before;
 });

@@ -3,57 +3,40 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { batchDate, weekLabel, weekStart } from "@/lib/productionBatches";
+import { batchDate } from "@/lib/productionBatches";
 import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 
 /**
- * "Generate the week" — the batch log's own generator, migration 044.
+ * "Generate a batch log" — migration 045.
  *
- * Mark, 2026-08-09: an employee generates the week's batch log for a kitchen
- * from the WEEKLY-class element schedule, then works the list down. So this
- * takes a KITCHEN and a WEEK, where `GenerateSchedules` takes a start date, a
- * number of days and a set of shops — the two are different acts and the
- * difference is real: a schedule is one shop's day, a batch log is one
- * kitchen's week.
+ * A KITCHEN and a DATE. Not a week and not a weekday, because the round has no
+ * days in it (Mark, 2026-08-09): a batch log is a collection of things to be
+ * made sometime soon, and the staff choose the order. So the log carries the
+ * date it was generated and the items carry no date at all.
  *
- * It shares that generator's guards exactly, so there is one rule to learn: an
- * existing batch is SKIPPED and named, replacing is a second explicit press,
- * and a batch already carrying a YIELD refuses to be replaced without a third.
+ * Generating the same day twice TOPS UP the same log rather than making a
+ * second — the unique index on (location, date) says so, and the receipt says
+ * which happened.
  *
- * There is deliberately no preview of what the week will produce. Computing it
- * here would be a TypeScript twin of the SQL rule — 016's `nextDeliveryDate`
- * trap, and here the rule decides what a kitchen is told to make. The receipt
- * reports what actually happened instead.
+ * There is deliberately no preview of what it will produce. Computing it here
+ * would be a TypeScript twin of the SQL rule — 016's `nextDeliveryDate` trap,
+ * and here the rule decides what a kitchen is told to make. The receipt reports
+ * what actually happened instead.
  */
 
-type Created = {
-  date: string;
-  element_name: string;
-  batch_label: string | null;
-  batch_number: string;
-  shift: string | null;
-};
-
-type Skipped = {
-  batch_id: string;
-  date: string;
-  element_name: string;
-  batch_label: string | null;
-  reason: string;
-};
-
-type Replaced = Omit<Skipped, "reason">;
-
+type Created = { element_name: string; batch_number: string };
+type Skipped = { batch_id: string; element_name: string; reason: string };
 type Warning = { kind: string; element_name: string };
 
 type Receipt = {
-  week_start: string;
+  log_id: string;
+  log_date: string;
+  new_log: boolean;
   location_code: string;
   created: Created[];
   skipped: Skipped[];
-  replaced: Replaced[];
   warnings: Warning[];
 };
 
@@ -76,7 +59,7 @@ export function GenerateBatches({
 
   const [open, setOpen] = useState(false);
   const [kitchen, setKitchen] = useState<string | null>(defaultLocationId);
-  const [week, setWeek] = useState<string | null>(today);
+  const [logDate, setLogDate] = useState<string | null>(today);
   const [running, setRunning] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -86,18 +69,17 @@ export function GenerateBatches({
     setReceipt(null);
     setError(null);
     setKitchen(defaultLocationId);
-    setWeek(today);
+    setLogDate(today);
   }
 
-  async function run(replace: boolean, allowYields: boolean) {
-    if (!kitchen || !week) return;
+  async function run(replace: boolean) {
+    if (!kitchen || !logDate) return;
     setRunning(true);
     setError(null);
     const { data, error } = await supabase.rpc("generate_production_batches", {
       p_location_id: kitchen,
-      p_week_start: week,
+      p_log_date: logDate,
       p_replace: replace,
-      p_allow_yields: allowYields,
     });
     setRunning(false);
     if (error) {
@@ -115,12 +97,12 @@ export function GenerateBatches({
         onClick={openDialog}
         className="border border-ink bg-white px-4 py-2 text-[13px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white"
       >
-        Generate the week…
+        Generate a log…
       </button>
 
       {open && (
         <Dialog
-          title={receipt ? "Batch log generated" : "Generate the week's batch log"}
+          title={receipt ? "Batch log generated" : "Generate a batch log"}
           onClose={() => setOpen(false)}
           busy={running}
           width="max-w-2xl"
@@ -131,11 +113,11 @@ export function GenerateBatches({
                 {receipt.skipped.length > 0 ? (
                   <button
                     type="button"
-                    onClick={() => run(true, true)}
+                    onClick={() => run(true)}
                     disabled={running}
                     className={DIALOG_CANCEL_CLASS}
                   >
-                    Refresh these {receipt.skipped.length} from the schedule
+                    Refresh these {receipt.skipped.length} from the round
                   </button>
                 ) : null}
                 <button
@@ -158,8 +140,8 @@ export function GenerateBatches({
                 </button>
                 <button
                   type="button"
-                  onClick={() => run(false, false)}
-                  disabled={running || !kitchen || !week}
+                  onClick={() => run(false)}
+                  disabled={running || !kitchen || !logDate}
                   className={DIALOG_COMMIT_CLASS}
                 >
                   {running ? "Generating…" : "Generate"}
@@ -173,7 +155,8 @@ export function GenerateBatches({
           {receipt ? (
             <div className="space-y-5 text-sm">
               <p className="text-muted">
-                {receipt.location_code} · week of {weekLabel(receipt.week_start)}
+                {receipt.location_code} · {batchDate(receipt.log_date)}
+                {receipt.new_log ? " · new log" : " · added to the existing log"}
               </p>
 
               <Block
@@ -191,11 +174,7 @@ export function GenerateBatches({
                         key={c.batch_number}
                         className="flex items-baseline gap-3 px-3 py-1.5"
                       >
-                        <span className="w-20 shrink-0 text-muted">{batchDate(c.date)}</span>
                         <span className="font-medium">{c.element_name}</span>
-                        {c.batch_label ? (
-                          <span className="text-muted">#{c.batch_label}</span>
-                        ) : null}
                         <span className="ml-auto tabular-nums text-subtle">
                           {c.batch_number}
                         </span>
@@ -209,17 +188,13 @@ export function GenerateBatches({
                 <Block title={`${receipt.skipped.length} already logged`}>
                   <p className="mb-2 text-muted">
                     Left exactly as they are. Refreshing them re-reads the
-                    schedule&rsquo;s amounts and recipe version and keeps every
+                    round&rsquo;s amounts and recipe version and keeps every
                     yield, status and note somebody entered.
                   </p>
                   <ul className="divide-y divide-hairline border border-hairline">
                     {receipt.skipped.slice(0, 12).map((s) => (
                       <li key={s.batch_id} className="flex items-baseline gap-3 px-3 py-1.5">
-                        <span className="w-20 shrink-0 text-muted">{batchDate(s.date)}</span>
                         <span>{s.element_name}</span>
-                        {s.batch_label ? (
-                          <span className="text-muted">#{s.batch_label}</span>
-                        ) : null}
                       </li>
                     ))}
                   </ul>
@@ -228,15 +203,6 @@ export function GenerateBatches({
                       and {receipt.skipped.length - 12} more
                     </p>
                   ) : null}
-                </Block>
-              ) : null}
-
-              {receipt.replaced.length > 0 ? (
-                <Block title={`${receipt.replaced.length} refreshed`}>
-                  <p className="text-muted">
-                    Their amounts and recipe versions now match the schedule.
-                    Yields, statuses and notes were left alone.
-                  </p>
                 </Block>
               ) : null}
 
@@ -262,10 +228,10 @@ export function GenerateBatches({
           ) : (
             <div className="space-y-5">
               <p className="text-sm text-muted">
-                One kitchen, one week. Every WEEKLY-class element on that
-                kitchen&rsquo;s schedule becomes a batch to do — including each
-                separate batch of a morning, so a dough made four times is four
-                rows. AB and donut elements are not generated; log those by hand.
+                One kitchen, one day. Every element on that kitchen&rsquo;s
+                weekly round becomes one batch to do — what needs making, in no
+                particular order. Anything off the round is logged by hand.
+                Generating the same day again tops up the same log.
               </p>
 
               <div className="grid gap-4 sm:grid-cols-2">
@@ -288,18 +254,15 @@ export function GenerateBatches({
 
                 <label className="space-y-1.5">
                   <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                    Week
+                    Date
                   </span>
                   <DateField
-                    value={week}
-                    onChange={(next) => setWeek(next)}
-                    ariaLabel="A day in the week to generate"
+                    value={logDate}
+                    onChange={(next) => setLogDate(next)}
+                    ariaLabel="The day this log is for"
                   />
                   <span className="block text-xs text-muted">
-                    {week ? weekLabel(week) : "Pick any day in the week"}
-                    {week && weekStart(week) !== week
-                      ? " — the week that day falls in"
-                      : ""}
+                    {logDate ? batchDate(logDate) : "Pick a day"}
                   </span>
                 </label>
               </div>

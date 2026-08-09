@@ -43,18 +43,18 @@ export default async function BatchLogsPage() {
         // One string literal, never a concatenation: Supabase types the result
         // from the select's literal type, and `"a" + "b"` widens to `string`.
         .select(
-          `id, batch_date, batch_number, element_id, location_id, element_day_id,
+          `id, log_id, batch_number, element_id, location_id, is_generated,
            batch_label, sort, status, operator_employee_id, created_by,
            recipe_version_label, batch_amount, batch_unit,
            par_count, par_size, par_unit,
            on_hand_count, on_hand_size, on_hand_unit,
            yield_count, yield_size, yield_unit, notes, photo_path,
-           production_elements ( name, element_type )`
+           production_elements ( name, element_type ),
+           production_batch_logs!inner ( log_date, status )`
         )
         .eq("location_id", active.id)
-        .gte("batch_date", from)
-        .lte("batch_date", to)
-        .order("batch_date"),
+        .gte("production_batch_logs.log_date", from)
+        .lte("production_batch_logs.log_date", to),
       // The roster, through 044's definer — `employees` READ is owner/admin only
       // (020), so a supervisor cannot select that table at all. Two columns.
       supabase.rpc("production_operators", { p_location_id: active.id }),
@@ -86,9 +86,16 @@ export default async function BatchLogsPage() {
     const element = b.production_elements as unknown as
       | { name: string; element_type: string | null }
       | null;
+    const log = b.production_batch_logs as unknown as
+      | { log_date: string; status: string }
+      | null;
     return {
       id: b.id as string,
-      batch_date: b.batch_date as string,
+      // THE DATE COMES FROM THE LOG. There is no date on an item any more —
+      // migration 045 moved it up, so "the date the batch log was generated" is
+      // structurally true rather than a convention (Mark, 2026-08-09).
+      logDate: log?.log_date ?? "",
+      logStatus: (log?.status ?? "open") as string,
       batch_number: b.batch_number as string,
       element_name: element?.name ?? "—",
       element_type: element?.element_type ?? null,
@@ -114,10 +121,10 @@ export default async function BatchLogsPage() {
       yield_count: num(b.yield_count),
       yield_size: num(b.yield_size),
       yield_unit: (b.yield_unit ?? null) as string | null,
-      // A row the weekly schedule produced, rather than one somebody logged by
-      // hand. The list marks the hand-logged ones so a number with no schedule
-      // behind it explains itself.
-      generated: b.element_day_id !== null,
+      // A row generation produced, rather than one somebody logged by hand.
+      // The list marks the hand-logged ones so a number with no round behind it
+      // explains itself.
+      generated: (b.is_generated ?? false) as boolean,
       notes: (b.notes ?? null) as string | null,
       hasPhoto: b.photo_path !== null,
     };
@@ -158,9 +165,9 @@ export default async function BatchLogsPage() {
       {rows.length === 0 ? (
         <p className="max-w-[80ch] text-sm text-muted">
           Nothing logged at {active.code} in the three weeks either side of{" "}
-          {today}. Generating the week turns that kitchen&rsquo;s weekly element
-          schedule into a batch to do for each one — including every separate
-          batch of a morning — and anything off the schedule is logged by hand.
+          {today}. Generating a day turns that kitchen&rsquo;s weekly round into
+          one batch to do per element — what needs making, in no particular
+          order — and anything off the round is logged by hand.
         </p>
       ) : (
         <BatchLogsList rows={rows} editable={editable} />

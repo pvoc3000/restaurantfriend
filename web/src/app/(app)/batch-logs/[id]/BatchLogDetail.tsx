@@ -52,15 +52,16 @@ export async function BatchLogDetail({
   const { data: batch, error } = await supabase
     .from("production_batches")
     .select(
-      `id, org_id, element_id, location_id, element_day_id, batch_date, batch_number,
-       batch_label, sort, shift, status, operator_employee_id, created_by,
+      `id, org_id, element_id, location_id, log_id, is_generated, batch_number,
+       batch_label, sort, status, operator_employee_id, created_by,
        recipe_version_id, recipe_version_label, scale_index, scale_label,
        batch_amount, batch_unit, par_count, par_size, par_unit,
        on_hand_count, on_hand_size, on_hand_unit,
        yield_count, yield_size, yield_unit,
        unit_cost, cost_unresolved, costed_at, notes,
        photo_path, photo_name, created_at,
-       production_elements ( id, name, element_type, kind )`
+       production_elements ( id, name, element_type, kind ),
+       production_batch_logs ( id, log_date, status )`
     )
     .eq("id", id)
     .maybeSingle();
@@ -80,6 +81,12 @@ export async function BatchLogDetail({
   const element = batch.production_elements as unknown as
     | { id: string; name: string; element_type: string | null; kind: string }
     | null;
+  // THE DATE LIVES ON THE LOG since 045 — an item has none of its own, which is
+  // what makes "the date the batch log was generated" true by construction.
+  const log = batch.production_batch_logs as unknown as
+    | { id: string; log_date: string; status: string }
+    | null;
+  const logDate = log?.log_date ?? "";
 
   const [{ data: operators }, { data: versions }, signed] = await Promise.all([
     // 044's definer — `employees` READ is owner/admin only (020), so this is
@@ -133,7 +140,7 @@ export async function BatchLogDetail({
     <div className="space-y-8">
       <Breadcrumbs
         trail={trail}
-        current={`${element?.name ?? "Batch"} · ${batchDate(batch.batch_date as string)}`}
+        current={`${element?.name ?? "Batch"} · ${batchDate(logDate)}`}
         trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
       />
 
@@ -145,11 +152,10 @@ export async function BatchLogDetail({
           ) : null}
         </h1>
         <p className="text-sm text-muted">
-          {batchDate(batch.batch_date as string)} · made at{" "}
-          <span className="font-medium text-ink">{kitchenCode}</span>
-          {batch.shift ? ` · ${batch.shift}` : ""} · batch{" "}
+          {batchDate(logDate)} · made at{" "}
+          <span className="font-medium text-ink">{kitchenCode}</span> · batch{" "}
           <span className="tabular-nums">{batch.batch_number as string}</span>
-          {batch.element_day_id === null ? " · logged by hand" : ""}
+          {batch.is_generated ? "" : " · logged by hand"}
           {element ? (
             <>
               {" · "}
@@ -192,15 +198,15 @@ export async function BatchLogDetail({
           )}
         </Field>
 
-        <Field label="Day">
-          {editable ? (
-            <InlineValue
-              table="production_batches" id={id} column="batch_date" kind="date"
-              nullable={false} value={batch.batch_date as string} ariaLabel="The day it was made"
-            />
-          ) : (
-            <span className={`${READ_ONLY_VALUE} text-muted`}>{batch.batch_date as string}</span>
-          )}
+        <Field label="Batch log">
+          {/* READ-ONLY, and deliberately: the date is the LOG's, so an editable
+              copy here would be a second answer to one question — 016's
+              `nextDeliveryDate` trap. Move the batch by moving it to another
+              log, not by retyping its date. */}
+          <span className={`${READ_ONLY_VALUE} text-muted`}>
+            {batchDate(logDate)}
+            {log?.status === "complete" ? " · complete" : ""}
+          </span>
         </Field>
 
         <Field label="Recipe version">

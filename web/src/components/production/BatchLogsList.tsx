@@ -19,11 +19,14 @@ import {
 
 export type BatchRow = {
   id: string;
-  batch_date: string;
+  /** The LOG's date. An item has no date of its own since 045 — see the page. */
+  logDate: string;
   batch_number: string;
   element_name: string;
   element_type: string | null;
   kitchenCode: string;
+  /** The LOG's status — open or complete. The batch's own status is separate. */
+  logStatus: string;
   batch_label: string | null;
   sort: number | null;
   status: string;
@@ -101,7 +104,7 @@ type Tier = "outstanding" | "today" | "done" | "all";
 type Grouping = "date" | "location" | "type" | "element" | "none";
 
 const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
-  date: (r) => batchDate(r.batch_date),
+  date: (r) => batchDate(r.logDate),
   location: (r) => r.kitchenCode,
   type: (r) => r.element_type ?? "No type",
   element: (r) => r.element_name,
@@ -117,7 +120,7 @@ const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = 
  * name, where the label IS the key.
  */
 const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
-  date: (r) => r.batch_date,
+  date: (r) => r.logDate,
   location: (r) => r.kitchenCode,
   type: (r) => r.element_type ?? "￿", // no type sinks last, lib/tableSort's rule
   element: (r) => r.element_name.toLowerCase(),
@@ -158,7 +161,7 @@ export function BatchLogsList({
   const counts = useMemo(
     () => ({
       outstanding: rows.filter((r) => isBatchOutstanding(r.status)).length,
-      today: rows.filter((r) => r.batch_date === today).length,
+      today: rows.filter((r) => r.logDate === today).length,
       done: rows.filter((r) => r.status === "complete").length,
       all: rows.length,
     }),
@@ -169,7 +172,7 @@ export function BatchLogsList({
     const q = term.trim().toLowerCase();
     return rows.filter((r) => {
       if (tier === "outstanding" && !isBatchOutstanding(r.status)) return false;
-      if (tier === "today" && r.batch_date !== today) return false;
+      if (tier === "today" && r.logDate !== today) return false;
       if (tier === "done" && r.status !== "complete") return false;
       if (!q) return true;
       return [
@@ -189,7 +192,7 @@ export function BatchLogsList({
   const visible = useMemo(() => {
     const value = (r: BatchRow): string | number => {
       switch (sort.key) {
-        case "date": return r.batch_date;
+        case "date": return r.logDate;
         case "element": return r.element_name;
         case "location": return r.kitchenCode;
         case "type": return r.element_type ?? "";
@@ -197,7 +200,7 @@ export function BatchLogsList({
         case "operator": return r.operatorName ?? "";
         case "number": return r.batch_number;
         case "kitchen": return r.kitchenCode;
-        default: return r.batch_date;
+        default: return r.logDate;
       }
     };
     const dir = sort.dir === "asc" ? 1 : -1;
@@ -206,6 +209,12 @@ export function BatchLogsList({
       if (groupOf) {
         const ag = groupOf(a), bg = groupOf(b);
         if (ag !== bg) return ag < bg ? -1 : 1;
+      }
+      // The SUB-band can only band what the order already groups, same rule as
+      // the band above it — so within a date run, type leads the chosen sort.
+      if (grouping === "date") {
+        const at = a.element_type ?? "\uFFFF", bt = b.element_type ?? "\uFFFF";
+        if (at !== bt) return at < bt ? -1 : 1;
       }
       const av = value(a), bv = value(b);
       if (av < bv) return -1 * dir;
@@ -237,8 +246,8 @@ export function BatchLogsList({
       label: "Date",
       width: 120,
       pinned: true,
-      sortValue: (r) => r.batch_date,
-      render: (r) => <span className="text-muted">{batchDate(r.batch_date)}</span>,
+      sortValue: (r) => r.logDate,
+      render: (r) => <span className="text-muted">{batchDate(r.logDate)}</span>,
     },
     {
       key: "location",
@@ -395,7 +404,7 @@ export function BatchLogsList({
             nullable={false}
             options={BATCH_STATUS_OPTIONS}
             value={r.status}
-            ariaLabel={`Status, ${r.element_name} ${batchDate(r.batch_date)}`}
+            ariaLabel={`Status, ${r.element_name} ${batchDate(r.logDate)}`}
           />
         ) : (
           <span className={READ_ONLY_VALUE}>
@@ -410,6 +419,11 @@ export function BatchLogsList({
       ? undefined
       : {
           label: GROUP_LABEL[grouping],
+          // FileMaker's own batch log: a black date rule, then an ITEM TYPE
+          // heading inside it. Only under the DATE grouping — banding a date
+          // inside a type run, or a type inside a type run, says nothing.
+          subLabel:
+            grouping === "date" ? (r) => r.element_type ?? "No type" : undefined,
         };
 
   return (
