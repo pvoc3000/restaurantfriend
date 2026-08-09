@@ -139,6 +139,7 @@ export function DataTable<T>({
   storageKey,
   defaultSort,
   rowClassName,
+  onRowClick,
   scroll = false,
   fill = false,
   maxHeightClass,
@@ -158,6 +159,19 @@ export function DataTable<T>({
   storageKey: string;
   defaultSort?: { key: string; dir?: SortDir };
   rowClassName?: (row: T) => string;
+  /**
+   * Clicking anywhere on a row.
+   *
+   * For a list paired with a DETAIL PANE, where picking a row is the whole
+   * gesture — the batch log. It does not replace the row's own link or
+   * controls: those still fire, and selecting the row you just started editing
+   * is the right outcome rather than a conflict.
+   *
+   * A row is not focusable, so anything reachable this way must ALSO be
+   * reachable from a control inside the row. The batch log makes its element
+   * cell a button for exactly that reason.
+   */
+  onRowClick?: (row: T) => void;
   scroll?: boolean;
   /**
    * With `scroll`: fill the parent instead of capping at a height.
@@ -628,7 +642,10 @@ export function DataTable<T>({
                   {/* No rule between rows (Mark, 2026-07-25) — the hover wash
                       carries the eye across the width instead. */}
                   <tr
-                    className={`hover:bg-neutral-50 ${rowClassName?.(row) ?? ""}`}
+                    onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    className={`hover:bg-neutral-50 ${onRowClick ? "cursor-pointer" : ""} ${
+                      rowClassName?.(row) ?? ""
+                    }`}
                   >
                     {visibleColumns.map((col, index) => {
                       const cell = col.render(row);

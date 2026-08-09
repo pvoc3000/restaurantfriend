@@ -8,7 +8,10 @@ import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { batchDate } from "@/lib/productionBatches";
-import { BatchItemsTable, type BatchRow } from "@/components/production/BatchItemsTable";
+import { type BatchRow } from "@/components/production/BatchItemsTable";
+import { BatchLogItems } from "@/components/production/BatchLogItems";
+import { type BatchFieldsRow } from "@/components/production/BatchFields";
+import { BATCH_PHOTO_BUCKET, BATCH_PHOTO_TTL_SECONDS } from "@/lib/batchPhotos";
 import { BatchLogActions } from "@/components/production/BatchLogActions";
 import { NewBatch } from "@/components/production/NewBatch";
 
@@ -60,12 +63,13 @@ export async function BatchLogRecord({
       supabase
         .from("production_batches")
         .select(
-          `id, log_id, element_id, is_generated,
+          `id, log_id, element_id, is_generated, batch_number,
            batch_label, sort, status, operator_employee_id,
-           recipe_version_label, batch_amount, batch_unit,
+           recipe_version_id, recipe_version_label, scale_label,
+           batch_amount, batch_unit,
            par_count, par_size, par_unit,
            on_hand_count, on_hand_size, on_hand_unit,
-           yield_count, yield_size, yield_unit, notes, photo_path,
+           yield_count, yield_size, yield_unit, notes, photo_path, photo_name,
            production_elements ( name, element_type )`
         )
         .eq("log_id", id),
@@ -81,9 +85,59 @@ export async function BatchLogRecord({
   const memberById = new Map(
     (members ?? []).map((m) => [m.user_id as string, (m.display_name ?? null) as string | null])
   );
+  const operatorOptions = ((employees ?? []) as { id: string; name: string }[]).map((o) => ({
+    value: o.id,
+    label: o.name,
+  }));
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
   const kitchenCode = codeById.get(log.location_id as string) ?? "—";
   const logDate = log.log_date as string;
+
+  // Every photo signed in ONE round trip, not one per batch — `createSignedUrls`
+  // is plural for exactly this, and a URL built to expire must not outlive the
+  // page (018's rule).
+  const photoPaths = (batches ?? [])
+    .map((b) => b.photo_path as string | null)
+    .filter((p): p is string => p !== null);
+  const signedByPath = new Map<string, string>();
+  if (photoPaths.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from(BATCH_PHOTO_BUCKET)
+      .createSignedUrls(photoPaths, BATCH_PHOTO_TTL_SECONDS);
+    for (const s of signed ?? []) {
+      if (s.path && s.signedUrl) signedByPath.set(s.path, s.signedUrl);
+    }
+  }
+
+  // The element's own recipe versions, for the pane's picker. One query for the
+  // whole log rather than one per batch.
+  const elementIds = [
+    ...new Set((batches ?? []).map((b) => b.element_id as string).filter(Boolean)),
+  ];
+  const { data: versionRows } = elementIds.length
+    ? await supabase
+        .from("production_recipe_versions")
+        .select("id, version_label, is_master, production_recipes!inner(element_id)")
+        .in("production_recipes.element_id", elementIds)
+        .order("version_sort", { nullsFirst: false })
+    : { data: [] };
+
+  const versionsByElement: Record<string, { value: string; label: string; hint?: string }[]> = {};
+  for (const v of (versionRows ?? []) as unknown as {
+    id: string;
+    version_label: string;
+    is_master: boolean;
+    production_recipes: { element_id: string };
+  }[]) {
+    const key = v.production_recipes.element_id;
+    (versionsByElement[key] ??= []).push({
+      value: v.id,
+      label: v.version_label,
+      hint: v.is_master ? "master" : undefined,
+    });
+  }
+
+  const fields: Record<string, BatchFieldsRow> = {};
 
   const rows: BatchRow[] = (batches ?? []).map((b) => {
     const element = b.production_elements as unknown as
@@ -117,6 +171,39 @@ export async function BatchLogRecord({
     };
   });
 
+  for (const b of batches ?? []) {
+    const element = b.production_elements as unknown as { name: string } | null;
+    const path = (b.photo_path ?? null) as string | null;
+    fields[b.id as string] = {
+      id: b.id as string,
+      batch_number: b.batch_number as string,
+      element_name: element?.name ?? "—",
+      element_id: (b.element_id ?? null) as string | null,
+      batch_label: (b.batch_label ?? null) as string | null,
+      status: (b.status ?? "to_do") as string,
+      operator_employee_id: (b.operator_employee_id ?? null) as string | null,
+      recipe_version_id: (b.recipe_version_id ?? null) as string | null,
+      recipe_version_label: (b.recipe_version_label ?? null) as string | null,
+      scale_label: (b.scale_label ?? null) as string | null,
+      batch_amount: num(b.batch_amount),
+      batch_unit: (b.batch_unit ?? null) as string | null,
+      par_count: num(b.par_count),
+      par_size: num(b.par_size),
+      par_unit: (b.par_unit ?? null) as string | null,
+      on_hand_count: num(b.on_hand_count),
+      on_hand_size: num(b.on_hand_size),
+      on_hand_unit: (b.on_hand_unit ?? null) as string | null,
+      yield_count: num(b.yield_count),
+      yield_size: num(b.yield_size),
+      yield_unit: (b.yield_unit ?? null) as string | null,
+      notes: (b.notes ?? null) as string | null,
+      photo_path: path,
+      photo_name: (b.photo_name ?? null) as string | null,
+      photoUrl: path ? signedByPath.get(path) ?? null : null,
+      generated: (b.is_generated ?? false) as boolean,
+    };
+  }
+
   const done = rows.filter((r) => r.status === "complete" || r.status === "skipped").length;
   const generatedByName = log.generated_by
     ? memberById.get(log.generated_by as string) ?? null
@@ -125,46 +212,45 @@ export async function BatchLogRecord({
   const trail = parseTrail(rawParams, { href: "/batch-logs", label: "Batch Logs" });
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-4">
       <Breadcrumbs
         trail={trail}
         current={`${batchDate(logDate)} · ${kitchenCode}`}
         trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
       />
 
-      <header className="space-y-3">
+      <header className="flex flex-wrap items-baseline gap-x-4">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           {kitchenCode} — {batchDate(logDate)}
         </h1>
         <p className="text-sm text-muted">
-          {rows.length === 0
-            ? "Nothing on this log yet"
-            : `${done} of ${rows.length} done`}
-          {generatedByName ? ` · generated by ${generatedByName}` : ""}
+          {rows.length === 0 ? "Nothing on this log yet" : `${done} of ${rows.length} done`}
         </p>
       </header>
 
-      <dl className="grid gap-x-10 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-        <Field label="Status">
-          <span className={READ_ONLY_VALUE}>
-            {log.status === "complete" ? "Complete" : "Open"}
+      {/* ONE STRIP, not a field grid plus an action row.
+          The pane below is pinned to the window, so every pixel above it comes
+          out of the table: the first cut spent 441px on chrome and left 279 for
+          the list and the detail together, which is under the frame's own floor
+          — so nothing pinned at all and the page scrolled. The log has four
+          facts and two commands; they fit on a line. */}
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-hairline py-2 text-sm">
+        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+          {log.status === "complete" ? "Complete" : "Open"}
+        </span>
+        <span className="text-muted">
+          Generated {log.generated_at ? String(log.generated_at).slice(0, 10) : "—"}
+          {generatedByName ? ` by ${generatedByName}` : ""}
+        </span>
+        {log.printed_at ? (
+          <span className="text-muted">Printed {String(log.printed_at).slice(0, 10)}</span>
+        ) : (
+          <span className="text-mark">not printed</span>
+        )}
+        <span className="flex min-w-0 items-baseline gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+            Note
           </span>
-        </Field>
-        <Field label="Generated">
-          <span className={`${READ_ONLY_VALUE} text-muted`}>
-            {log.generated_at ? String(log.generated_at).slice(0, 10) : "—"}
-          </span>
-        </Field>
-        <Field label="Printed">
-          {log.printed_at ? (
-            <span className={`${READ_ONLY_VALUE} text-muted`}>
-              {String(log.printed_at).slice(0, 10)}
-            </span>
-          ) : (
-            <span className={`${READ_ONLY_VALUE} text-mark`}>not printed</span>
-          )}
-        </Field>
-        <Field label="Note">
           {editable ? (
             <InlineValue
               table="production_batch_logs"
@@ -176,18 +262,20 @@ export async function BatchLogRecord({
           ) : (
             <span className={`${READ_ONLY_VALUE} text-muted`}>{log.note ?? "—"}</span>
           )}
-        </Field>
-      </dl>
+        </span>
 
-      <BatchLogActions
-        logId={id}
-        status={(log.status ?? "open") as string}
-        logDate={logDate}
-        kitchenCode={kitchenCode}
-        batches={rows.length}
-        outstanding={rows.length - done}
-        editable={editable}
-      />
+        <span className="ml-auto">
+          <BatchLogActions
+            logId={id}
+            status={(log.status ?? "open") as string}
+            logDate={logDate}
+            kitchenCode={kitchenCode}
+            batches={rows.length}
+            outstanding={rows.length - done}
+            editable={editable}
+          />
+        </span>
+      </div>
 
       {itemErr ? (
         // Not folded into the page's own error: a failed item read must not
@@ -197,8 +285,12 @@ export async function BatchLogRecord({
           The batches could not be read: {itemErr.message}
         </p>
       ) : (
-        <BatchItemsTable
+        <BatchLogItems
           rows={rows}
+          fields={fields}
+          orgId={session.membership.org_id}
+          operators={operatorOptions}
+          versionsByElement={versionsByElement}
           editable={editable}
           add={
             editable ? (
@@ -213,15 +305,6 @@ export async function BatchLogRecord({
           }
         />
       )}
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{label}</dt>
-      <dd className="mt-0.5">{children}</dd>
     </div>
   );
 }

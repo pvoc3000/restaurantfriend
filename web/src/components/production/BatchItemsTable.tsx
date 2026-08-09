@@ -43,54 +43,6 @@ export type BatchRow = {
   hasPhoto: boolean;
 };
 
-/**
- * A count × size unit trio, edited in place.
- *
- * Three cells rather than one box because that is what the amount IS — "3 ×
- * 1.5 gal", which is exactly how FileMaker's own detail lays it out (# CONTAINERS
- * × AMOUNT IN CONTAINER). Only the pair can be multiplied, and 036 parsed the
- * free text into three columns precisely so it could be.
- */
-function AmountCells({
-  row,
-  prefix,
-  editable,
-}: {
-  row: BatchRow;
-  prefix: "on_hand" | "yield";
-  editable: boolean;
-}) {
-  const count = prefix === "on_hand" ? row.on_hand_count : row.yield_count;
-  const size = prefix === "on_hand" ? row.on_hand_size : row.yield_size;
-  const unit = prefix === "on_hand" ? row.on_hand_unit : row.yield_unit;
-  const what = prefix === "on_hand" ? "On hand" : "Made";
-
-  if (!editable) {
-    return (
-      <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-        {describeAmount(count, size, unit)}
-      </span>
-    );
-  }
-  return (
-    <span className="flex flex-wrap items-baseline gap-1">
-      <InlineValue
-        table="production_batches" id={row.id} column={`${prefix}_count`} kind="number"
-        value={count} ariaLabel={`${what} count, ${row.element_name}`}
-      />
-      <span className="text-subtle">×</span>
-      <InlineValue
-        table="production_batches" id={row.id} column={`${prefix}_size`} kind="number"
-        value={size} ariaLabel={`${what} size, ${row.element_name}`}
-      />
-      <InlineValue
-        table="production_batches" id={row.id} column={`${prefix}_unit`}
-        value={unit} ariaLabel={`${what} unit, ${row.element_name}`}
-      />
-    </span>
-  );
-}
-
 type Tier = "outstanding" | "done" | "all";
 type Grouping = "type" | "element" | "none";
 
@@ -129,12 +81,20 @@ export function BatchItemsTable({
   rows,
   editable,
   add,
+  selectedId,
+  onSelect,
+  fill,
 }: {
   rows: BatchRow[];
   /** Supervisor and up — 044's `production_batches` write policies. */
   editable: boolean;
   /** The "New batch" command, which belongs to the LOG rather than the table. */
   add?: React.ReactNode;
+  /** Which row the detail pane is showing. */
+  selectedId?: string | null;
+  onSelect?: (id: string) => void;
+  /** Fill the parent rather than capping — the pinned-pane layout. */
+  fill?: boolean;
 }) {
   const [tier, setTier] = useState<Tier>("all");
   const [grouping, setGrouping] = useState<Grouping>("type");
@@ -255,18 +215,34 @@ export function BatchItemsTable({
       width: 260,
       pinned: true,
       sortValue: (r) => r.element_name,
-      render: (r) => (
-        <Link href={`/batches/${r.id}`} className="font-medium hover:underline">
-          {r.element_name}
-          {/* The marker moved here off the batch number, which the master now
-              carries: a row nobody generated still has to explain itself. */}
-          {r.generated ? null : (
-            <span className="ml-1.5 text-muted" title="Logged by hand">
-              *
-            </span>
-          )}
-        </Link>
-      ),
+      render: (r) =>
+        onSelect ? (
+          // A BUTTON, not a link: the destination is the pane below, and the
+          // pane's own header carries the way out to /batches/[id]. It is also
+          // the keyboard path to a selection the row click makes with a mouse —
+          // a `<tr>` cannot be focused.
+          <button
+            type="button"
+            onClick={() => onSelect(r.id)}
+            className="text-left font-medium hover:underline"
+          >
+            {r.element_name}
+            {r.generated ? null : (
+              <span className="ml-1.5 text-muted" title="Logged by hand">
+                *
+              </span>
+            )}
+          </button>
+        ) : (
+          <Link href={`/batches/${r.id}`} className="font-medium hover:underline">
+            {r.element_name}
+            {r.generated ? null : (
+              <span className="ml-1.5 text-muted" title="Logged by hand">
+                *
+              </span>
+            )}
+          </Link>
+        ),
     },
     {
       key: "type",
@@ -309,16 +285,28 @@ export function BatchItemsTable({
     {
       key: "onhand",
       label: "On hand",
-      width: 190,
+      width: 130,
       sortValue: (r) => amountTotal(r.on_hand_count, r.on_hand_size) ?? -1,
-      render: (r) => <AmountCells row={r} prefix="on_hand" editable={editable} />,
+      // LINEAR, and read-only (Mark, 2026-08-09). Three stacked editors made a
+      // 56px row three lines tall and put the same control in two places; the
+      // detail pane below owns the editing, so this states the amount and gets
+      // out of the way. Empty is ONE em dash, not "— × — —".
+      render: (r) => (
+        <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+          {describeAmount(r.on_hand_count, r.on_hand_size, r.on_hand_unit)}
+        </span>
+      ),
     },
     {
       key: "made",
       label: "Made",
-      width: 190,
+      width: 130,
       sortValue: (r) => amountTotal(r.yield_count, r.yield_size) ?? -1,
-      render: (r) => <AmountCells row={r} prefix="yield" editable={editable} />,
+      render: (r) => (
+        <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+          {describeAmount(r.yield_count, r.yield_size, r.yield_unit)}
+        </span>
+      ),
     },
     {
       key: "note",
@@ -380,6 +368,12 @@ export function BatchItemsTable({
       storageKey="production-batch-logs"
       compactBelow={1200}
       columnChooser
+      scroll={fill}
+      fill={fill}
+      onRowClick={onSelect ? (r) => onSelect(r.id) : undefined}
+      // The selected row is a light fill, never the black a band uses: black
+      // DELIMITS here and this row is still one of the list's own.
+      rowClassName={(r) => (r.id === selectedId ? "bg-mark-fill" : "")}
       group={group}
       sort={sort}
       onSortChange={setSort}

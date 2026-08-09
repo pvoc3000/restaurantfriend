@@ -7,7 +7,7 @@ import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { batchDate } from "@/lib/productionBatches";
 
 const COMMAND =
-  "inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+  "inline-flex h-8 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
 
 /**
  * The commands on one batch log: close it, reopen it, delete it.
@@ -104,7 +104,7 @@ export function BatchLogActions({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-wrap items-center gap-3">
       <div className="flex flex-wrap items-center gap-3">
         {status === "complete" ? (
           <button
@@ -129,7 +129,7 @@ export function BatchLogActions({
           type="button"
           onClick={remove}
           disabled={busy !== null}
-          className={`${DANGER_BUTTON_CLASS} ml-auto`}
+          className={DANGER_BUTTON_CLASS}
         >
           {busy === "delete" ? "Deleting…" : "Delete"}
         </button>

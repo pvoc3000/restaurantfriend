@@ -6,20 +6,11 @@ import { getAppSession } from "@/lib/session";
 import { canLogBatch, canWriteCatalog } from "@/lib/roles";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
-import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { SectionHeading } from "@/components/ui/SectionHeading";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
-import {
-  BATCH_STATUS_LABEL,
-  BATCH_STATUS_OPTIONS,
-  batchDate,
-  describeAmount,
-  yieldAgainstPar,
-} from "@/lib/productionBatches";
+import { batchDate, yieldAgainstPar } from "@/lib/productionBatches";
 import { BATCH_PHOTO_BUCKET, BATCH_PHOTO_TTL_SECONDS } from "@/lib/batchPhotos";
-import { BatchPhoto } from "@/components/production/BatchPhoto";
 import { BatchActions } from "@/components/production/BatchActions";
-import { BatchVersionCell } from "@/components/production/BatchVersionCell";
+import { BatchFields } from "@/components/production/BatchFields";
 
 /**
  * One batch — production brief decision 8, element actuals.
@@ -167,161 +158,61 @@ export async function BatchDetail({
         </p>
       </header>
 
-      <dl className="grid gap-x-10 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-        <Field label="Status">
-          {editable ? (
-            <InlineValue
-              table="production_batches" id={id} column="status" kind="pick"
-              nullable={false} options={BATCH_STATUS_OPTIONS}
-              value={batch.status as string} ariaLabel="Batch status"
-            />
-          ) : (
-            <span className={READ_ONLY_VALUE}>
-              {BATCH_STATUS_LABEL[batch.status as keyof typeof BATCH_STATUS_LABEL] ??
-                (batch.status as string)}
-            </span>
-          )}
-        </Field>
+      {/* THE SAME FIELDS the batch log's pinned pane renders. One component for
+          two homes: two field sets over one table drift, and the second never
+          behaves quite like the first. */}
+      <BatchFields
+        row={{
+          id,
+          batch_number: batch.batch_number as string,
+          element_name: element?.name ?? "—",
+          element_id: element?.id ?? null,
+          batch_label: (batch.batch_label ?? null) as string | null,
+          status: (batch.status ?? "to_do") as string,
+          operator_employee_id: (batch.operator_employee_id ?? null) as string | null,
+          recipe_version_id: (batch.recipe_version_id ?? null) as string | null,
+          recipe_version_label: (batch.recipe_version_label ?? null) as string | null,
+          scale_label: (batch.scale_label ?? null) as string | null,
+          batch_amount: num(batch.batch_amount),
+          batch_unit: (batch.batch_unit ?? null) as string | null,
+          par_count: amounts.par_count,
+          par_size: amounts.par_size,
+          par_unit: amounts.par_unit,
+          on_hand_count: num(batch.on_hand_count),
+          on_hand_size: num(batch.on_hand_size),
+          on_hand_unit: (batch.on_hand_unit ?? null) as string | null,
+          yield_count: amounts.yield_count,
+          yield_size: amounts.yield_size,
+          yield_unit: amounts.yield_unit,
+          notes: (batch.notes ?? null) as string | null,
+          photo_path: (batch.photo_path ?? null) as string | null,
+          photo_name: (batch.photo_name ?? null) as string | null,
+          photoUrl,
+          generated: (batch.is_generated ?? false) as boolean,
+        }}
+        orgId={batch.org_id as string}
+        operators={operatorOptions}
+        versions={versionOptions}
+        editable={editable}
+      />
 
-        <Field label="Made by">
-          {editable ? (
-            <InlineValue
-              table="production_batches" id={id} column="operator_employee_id" kind="pick"
-              options={operatorOptions}
-              value={(batch.operator_employee_id ?? null) as string | null}
-              ariaLabel="Who made this batch"
-            />
-          ) : (
-            <span className={`${READ_ONLY_VALUE} text-muted`}>
-              {operatorOptions.find((o) => o.value === batch.operator_employee_id)?.label ?? "—"}
-            </span>
-          )}
-        </Field>
-
-        <Field label="Batch log">
-          {/* READ-ONLY, and deliberately: the date is the LOG's, so an editable
-              copy here would be a second answer to one question — 016's
-              `nextDeliveryDate` trap. Move the batch by moving it to another
-              log, not by retyping its date. */}
-          <span className={`${READ_ONLY_VALUE} text-muted`}>
-            {batchDate(logDate)}
-            {log?.status === "complete" ? " · complete" : ""}
-          </span>
-        </Field>
-
-        <Field label="Recipe version">
-          {editable && versionOptions.length > 0 ? (
-            // Its own client component, because writing the label alongside the
-            // id needs `alsoUpdate` — a FUNCTION, which cannot cross a server
-            // component's boundary. See BatchVersionCell.
-            <BatchVersionCell
-              batchId={id}
-              value={(batch.recipe_version_id ?? null) as string | null}
-              options={versionOptions}
-            />
-          ) : (
-            <span className={`${READ_ONLY_VALUE} text-muted`}>
-              {(batch.recipe_version_label ?? "—") as string}
-            </span>
-          )}
-        </Field>
-
-        <Field label="Batch size run">
-          {editable ? (
-            <InlineValue
-              table="production_batches" id={id} column="scale_label"
-              value={(batch.scale_label ?? null) as string | null}
-              ariaLabel="Which batch size was run"
-            />
-          ) : (
-            <span className={`${READ_ONLY_VALUE} text-muted`}>
-              {(batch.scale_label ?? "—") as string}
-            </span>
-          )}
-        </Field>
-
-        <Field label="Cost">
-          {/* Decision 11's carve-out: costing derives live and a DOCUMENT
-              snapshots. A null `costed_at` is a legible state — the Cost
-              command beside the record writes it — where a zero would be a
-              wrong number that looks right. */}
-          <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
-            {batch.costed_at === null
-              ? "not costed"
-              : `${Number(batch.cost_unresolved) > 0 ? "at least " : ""}$${Number(
-                  batch.unit_cost ?? 0
-                ).toFixed(2)}`}
-          </span>
-        </Field>
-      </dl>
-
-      <section className="space-y-3">
-        <SectionHeading>The batch</SectionHeading>
-        <p className="max-w-[80ch] text-[13px] text-muted">
-          Four amounts, and they are four different facts. What the weekly
-          round asked for; what this kitchen keeps on hand; what was there
-          before you started; and what came out.
+      {verdict !== "unknown" ? (
+        <p className={`text-sm ${verdict === "at" ? "text-muted" : "text-mark"}`}>
+          {verdict === "at"
+            ? "This batch made its par."
+            : verdict === "over"
+              ? "This batch came out over par."
+              : "This batch came out under par."}
         </p>
+      ) : null}
 
-        <dl className="grid gap-x-10 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
-          <Field label="Asked for">
-            <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
-              {describeAmount(num(batch.batch_amount), null, batch.batch_unit as string | null)}
-            </span>
-          </Field>
-
-          <Field label="Par">
-            <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
-              {describeAmount(amounts.par_count, amounts.par_size, amounts.par_unit)}
-            </span>
-          </Field>
-
-          <Field label="On hand before">
-            <Triple id={id} prefix="on_hand" editable={editable} row={batch} />
-          </Field>
-
-          <Field label="Yield">
-            <div className="space-y-1">
-              <Triple id={id} prefix="yield" editable={editable} row={batch} />
-              {verdict !== "unknown" ? (
-                <span
-                  className={`block text-xs ${verdict === "at" ? "text-muted" : "text-mark"}`}
-                >
-                  {verdict === "at" ? "at par" : verdict === "over" ? "over par" : "under par"}
-                </span>
-              ) : null}
-            </div>
-          </Field>
-        </dl>
-      </section>
-
-      <div className="grid gap-8 lg:grid-cols-2">
-        <section className="space-y-3">
-          <SectionHeading>Notes</SectionHeading>
-          {editable ? (
-            <InlineValue
-              table="production_batches" id={id} column="notes" multiline
-              value={(batch.notes ?? null) as string | null} ariaLabel="Notes on this batch"
-            />
-          ) : (
-            <p className="whitespace-pre-wrap text-sm text-muted">
-              {(batch.notes ?? "—") as string}
-            </p>
-          )}
-        </section>
-
-        <section className="space-y-3">
-          <SectionHeading>Photo</SectionHeading>
-          <BatchPhoto
-            batchId={id}
-            orgId={batch.org_id as string}
-            url={photoUrl}
-            path={(batch.photo_path ?? null) as string | null}
-            name={(batch.photo_name ?? null) as string | null}
-            editable={editable}
-          />
-        </section>
-      </div>
+      <p className="text-sm text-muted">
+        {batch.costed_at === null
+          ? "Not costed."
+          : `Cost ${Number(batch.cost_unresolved) > 0 ? "at least " : ""}$${Number(
+              batch.unit_cost ?? 0
+            ).toFixed(2)}.`}
+      </p>
 
       <BatchActions
         batchId={id}
@@ -334,63 +225,6 @@ export async function BatchDetail({
         editable={editable}
         removable={removable}
       />
-    </div>
-  );
-}
-
-/** A count × size unit trio, the shape every amount on this record has. */
-function Triple({
-  id,
-  prefix,
-  editable,
-  row,
-}: {
-  id: string;
-  prefix: "on_hand" | "yield";
-  editable: boolean;
-  row: Record<string, unknown>;
-}) {
-  const count = num(row[`${prefix}_count`]);
-  const size = num(row[`${prefix}_size`]);
-  const unit = (row[`${prefix}_unit`] ?? null) as string | null;
-
-  if (!editable) {
-    return (
-      <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-        {describeAmount(count, size, unit)}
-      </span>
-    );
-  }
-  return (
-    <span className="flex flex-wrap items-baseline gap-1">
-      <InlineValue
-        table="production_batches" id={id} column={`${prefix}_count`} kind="number"
-        value={count} ariaLabel={`${prefix} count`}
-      />
-      <span className="text-subtle">×</span>
-      <InlineValue
-        table="production_batches" id={id} column={`${prefix}_size`} kind="number"
-        value={size} ariaLabel={`${prefix} size`}
-      />
-      <InlineValue
-        table="production_batches" id={id} column={`${prefix}_unit`}
-        value={unit} ariaLabel={`${prefix} unit`}
-      />
-    </span>
-  );
-}
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div>
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{label}</dt>
-      <dd className="mt-0.5">{children}</dd>
     </div>
   );
 }
