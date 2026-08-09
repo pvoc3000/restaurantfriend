@@ -12,6 +12,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ElementFields } from "@/components/production/ElementFields";
 import { ElementLocationRows } from "@/components/production/ElementLocationRows";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
+import { BATCH_STATUS_LABEL, batchDate, describeAmount } from "@/lib/productionBatches";
 import type { ElementKind } from "@/lib/production";
 
 /**
@@ -55,6 +56,23 @@ export async function ElementDetail({
         .eq("element_id", id),
       supabase.from("production_elements").select("element_type").not("element_type", "is", null),
     ]);
+
+  // The last ten times this was made — what `production_batches_element_idx`
+  // exists for. Fetched after the wave above rather than inside it: it needs
+  // nothing from the others, but folding it in would make a table that does not
+  // exist yet (044) able to take the whole record down with it.
+  const { data: recentBatches, error: batchError } = await supabase
+    .from("production_batches")
+    .select(
+      "id, batch_date, batch_number, batch_label, status, location_id, yield_count, yield_size, yield_unit"
+    )
+    .eq("element_id", id)
+    .order("batch_date", { ascending: false })
+    .limit(10);
+
+  // Every location, not just the active ones — a batch made at a shop that has
+  // since closed should still say which shop (design rule 3's look-up half).
+  const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
 
   if (error) {
     return (
@@ -170,6 +188,54 @@ export async function ElementDetail({
         orgId={session.membership.org_id}
         editable={editable}
       />
+
+      <section className="space-y-2">
+        <SectionHeading count={recentBatches?.length ?? 0}>Recent batches</SectionHeading>
+        {batchError ? (
+          // Not swallowed: an empty list asserts this has never been made.
+          <p className="text-[13px] text-accent">
+            The batch log could not be read: {batchError.message}
+            {/production_batches/.test(batchError.message)
+              ? " — migration 044 has not been applied yet."
+              : ""}
+          </p>
+        ) : (recentBatches ?? []).length === 0 ? (
+          <p className="text-[13px] text-muted">
+            Never logged. A batch appears here once somebody records making this
+            — generated from the weekly schedule, or logged by hand.
+          </p>
+        ) : (
+          <ul className="divide-y divide-hairline border border-hairline text-[13px]">
+            {(recentBatches ?? []).map((b) => (
+              <li key={b.id as string} className="flex flex-wrap items-baseline gap-3 px-3 py-2">
+                <Link
+                  href={`/batch-logs/${b.id}`}
+                  className="w-24 shrink-0 font-medium hover:underline"
+                >
+                  {batchDate(b.batch_date as string)}
+                </Link>
+                <span className="w-16 text-muted">
+                  {codeById.get(b.location_id as string) ?? "—"}
+                </span>
+                {b.batch_label ? (
+                  <span className="text-muted">#{b.batch_label as string}</span>
+                ) : null}
+                <span className="tabular-nums">
+                  {describeAmount(
+                    b.yield_count === null ? null : Number(b.yield_count),
+                    b.yield_size === null ? null : Number(b.yield_size),
+                    (b.yield_unit ?? null) as string | null
+                  )}
+                </span>
+                <span className="ml-auto text-muted">
+                  {BATCH_STATUS_LABEL[b.status as keyof typeof BATCH_STATUS_LABEL] ??
+                    (b.status as string)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </div>
   );
 }

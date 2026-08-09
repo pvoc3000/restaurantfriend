@@ -176,7 +176,9 @@ export const SECTIONS: NavSection[] = [
       { slug: "items", label: "Items", href: "/production-items", built: true },
       { slug: "elements", label: "Elements", href: "/elements", built: true },
       { slug: "recipes", label: "Recipes", href: "/recipes", built: true },
-      stub("production", "batch-logs", "Batch Logs"),
+      // Element actuals — phase 5. `resolveRoute` prefix-matches, so
+      // /batch-logs/[id] lights this without an `also`.
+      { slug: "batch-logs", label: "Batch Logs", href: "/batch-logs", built: true },
     ],
   },
   {

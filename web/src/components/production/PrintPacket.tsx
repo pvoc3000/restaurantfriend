@@ -40,13 +40,21 @@ function initialParts(): PacketPart[] {
 
 export function PrintPacket({
   scheduleIds,
-  editable,
+  stampable,
   label = "Print packet…",
   onPrinted,
 }: {
   scheduleIds: string[];
-  /** Purchaser+ — below it the PDF still renders, but the print isn't stamped. */
-  editable: boolean;
+  /**
+   * Supervisor and up — migration 044's `mark_schedule_printed`.
+   *
+   * It was purchaser+ until phase 5, which was the wrong line: printing the
+   * packet is part of the same closing routine as counting the case, and the
+   * person doing one is doing the other. Below it the PDF still renders and the
+   * schedules simply aren't stamped, which is what the note at the foot of the
+   * dialog says.
+   */
+  stampable: boolean;
   label?: string;
   onPrinted?: () => void;
 }) {
@@ -98,9 +106,12 @@ export function PrintPacket({
 
         // Stamped only after the document exists. A print stamp on a render
         // that threw would tell the list a kitchen has paper it does not have.
-        if (editable) {
-          const { data } = await supabase.auth.getUser();
-          const stampError = await stampPrinted(supabase, scheduleIds, data.user?.id ?? null);
+        //
+        // The author comes from `auth.uid()` inside the function now, rather
+        // than from a `getUser()` round trip out here — the server already
+        // knows who is asking, and the client's answer was only ever a copy.
+        if (stampable) {
+          const stampError = await stampPrinted(supabase, scheduleIds);
           if (stampError) setFailed(stampError);
         }
         setOpen(false);
@@ -176,10 +187,10 @@ export function PrintPacket({
               ))}
             </ul>
 
-            {!editable ? (
+            {!stampable ? (
               <p className="text-xs text-muted">
                 The packet will print, but the schedules won&rsquo;t be stamped
-                as printed — that needs purchaser access.
+                as printed — that needs supervisor access.
               </p>
             ) : null}
           </div>

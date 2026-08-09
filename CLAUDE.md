@@ -1780,8 +1780,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    misreading recorded above, and three are junk ("test" twice, "fgdfg").
    `--include-contested` overrides it. Never upserts: one human decision already
    on file was left untouched, and a second `--apply` wrote 0.
-4f. 🚧 **Production** — specced 2026-08-07; **PHASE 1 BUILT the same day
-   (migration 036, NEEDS APPLYING)**. Read **`docs/production-brief.md`** before
+4f. 🚧 **Production** — specced 2026-08-07; **ALL FIVE PHASES NOW BUILT**
+   (036–044; **044 NEEDS APPLYING**, everything before it is applied).
+   *Probe, don't read this line* — it has been wrong in both directions for four
+   different migrations. Read **`docs/production-brief.md`** before
    designing or touching anything here — the whole design was settled in
    conversation with Mark and the brief carries the decisions, the migration
    traps, and what the exports actually say.
@@ -2771,13 +2773,116 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    keydown at all). So Option-drag cannot be driven through the pane — dispatch
    the `pointerup` yourself with `altKey: true`. `window.confirm` is inert there
    too; override it.
-   **Phase 5 is NOT built**: batches + actuals (was 041, now 042). `made`/`leftover` ship as
-   columns and render read-only, because a supervisor writing them needs
-   COLUMN-scoped access this table's RLS deliberately doesn't give — that is
-   029's `report_pooled_tips` shape, a definer function naming exactly those
-   columns, and it belongs in phase 5 rather than in a loosened policy here.
-   Note the brief's numbering is off by TWO now — 038 was spent on the name
-   constraint and 041 on the recipe sheet.
+   **Shipped 2026-08-09, phase 5 — ACTUALS (migration 044, NEEDS APPLYING).**
+   The other half of every document phase 4 produces: what actually happened.
+   Three pieces, all Mark's calls this session.
+   **(a) `made` / `leftover` on a schedule's lines**, which 040 created and
+   nothing had ever written — all 64 lines of the two real 2026-08-09 schedules
+   were null, so the list's Counted column read an em dash on every row and the
+   `sold` the view already computes had never had a non-null input.
+   **`sold` STAYS DERIVED and its one definition is SQL**:
+   `v_production_schedule_lines` computes it, had no reader in `web/src` until
+   now, and PO detail and the item history both select the view — so there is no
+   TypeScript twin to drift and one place for the POS seam to land.
+   **SUPERVISORS MAY COUNT, THROUGH A COLUMN-SCOPED DEFINER**
+   (`set_schedule_actual`), which is 029's `report_pooled_tips` shape and what
+   040's own RLS block said this phase needed. RLS filters ROWS; "a supervisor
+   may set these two and nothing else" is a COLUMN rule, and a widened UPDATE
+   policy would also hand them `par`, `par_source`, `planned_par` and the whole
+   cost snapshot. The whitelist is a `case when` inside the UPDATE, never
+   dynamic SQL.
+   **That forced `InlineValue`'s one new prop, `onWrite`** — the cell's write is
+   the only thing that changes, so the arithmetic evaluator, Escape-reverts and
+   reopen-on-failure all survive. **Without it the failure is SILENT**: a direct
+   update by a supervisor matches zero rows and PostgREST returns NO error, so
+   the component reports success, `router.refresh()` hands back the old value,
+   and the number vanishes. Verified on the harness — the RPC writes 1 row while
+   the direct write changes 0 and errors not at all.
+   **The function takes a COLUMN NAME rather than both values**: a pair-writing
+   one would need the sibling cell's rendered value, so editing `made` could
+   resurrect a `leftover` just cleared. `counted_by`/`counted_at` clear only
+   when the write empties the LAST of the two, in one statement against the
+   row's own values — a read-then-write would lose a number when two people
+   count one line at once.
+   **A SUPERVISOR MAY ALSO PRINT** (`mark_schedule_printed`, Mark's call): the
+   packet stamp was purchaser+, which is the same silent zero-row write one
+   table up, and printing is the same closing routine the counts are entered in.
+   `stampPrinted` loops the definer instead of one `.in()` update, and the
+   author now comes from `auth.uid()` inside it rather than a `getUser()` round
+   trip.
+   **(b) The batch log — `production_batches`**, the module's last unbuilt
+   table, with `/batch-logs` + a record, a photo in a new private
+   `batch-photos` bucket (018's template, its own bucket on 041's test —
+   a supervisor may photograph a batch and may not upload a recipe image), and
+   `next_batch_number` seeded at **30000** (006's idiom; FMP's own maximum is
+   19,541, so the seed is provably clear rather than merely chosen).
+   **A BATCH IS A SUPERVISOR'S OWN RECORD, so it is a POLICY, not a function** —
+   the first write policy in this schema to name `supervisor`, which 020
+   predicted in those words. That asymmetry with (a) is the thing to understand
+   before editing either: a schedule line is a purchaser's document with two
+   supervisor-writable cells (a COLUMN rule → a function), a batch is theirs
+   entirely (a ROW rule → a policy). Delete stays purchaser+: correcting a batch
+   is editing it; erasing the record that one happened is a different act.
+   **A batch names TWO people** — `created_by` stamps the app user for audit,
+   `operator_employee_id` names who actually made it, because the overnight
+   baker has an HR record and no login. That needed
+   **`production_operators()`**, a definer returning employee **id and name
+   only**: 020 gates `employees` READ to owner/admin, so a supervisor logging a
+   batch cannot read the one table that knows the name. CLAUDE.md 4c predicted
+   this function in as many words. Verified: as a supervisor
+   `select * from employees` returns **0 rows** while the function returns the
+   roster.
+   **`generate_production_batches` reads `schedule_class = 'WEEKLY'` ONLY**
+   (159 of 470 elements) and covers **one kitchen, one week**, Monday-start,
+   normalising whatever day you pick. AB (49) and DONUT (18) are never
+   generated and reach the log by hand — the thing most likely to look like a
+   bug when a donut element never appears. It follows 040's guards in 040's
+   order so there is one rule to learn: skip and name, `p_replace` to touch,
+   and a batch carrying a YIELD raises unless allowed. **It never deletes**,
+   unlike 040 — a schedule must equal what the plans say, where a batch log is
+   a checklist somebody is working.
+   **FILEMAKER'S 4,437 `TO DO` ROWS ARE NOT A DISEASE**, and a first reading of
+   them as pre-generate-and-protect was wrong (Mark, 2026-08-09): an employee
+   GENERATES the week and works the list down, so `to_do` is the default status
+   of a generated checklist. Decision 6 is about a document defended against
+   overwriting; nothing here is defended. Hence all five FMP statuses stay,
+   `status` defaults to `to_do` on a generated row, and the freehand New batch
+   dialog writes `complete` — you are recording something you just made.
+   **ONE ROW OF `production_element_days` IS ONE BATCH**, not one element-day:
+   Raised Dough on a Monday morning is four rows. Verified on the harness —
+   generation wrote exactly 4 for that morning plus 1 elsewhere, ordered
+   1 · 2 · 3 · Caramel (`sort` nulls last, 040's flavour-batch rule).
+   **There is deliberately no `expandWeek()` in TypeScript.** Mirroring the SQL
+   rule so a dialog could preview the week is 016's `nextDeliveryDate` trap, and
+   here the rule decides what a kitchen is told to make. The receipt reports
+   what happened instead.
+   **(c) The two-week history** on the item record — a matrix, not a
+   `DataTable` (one record's fourteen days, `/price-grid`'s call). It is
+   **DENSE**: a day with no schedule and a scheduled day nobody counted are
+   different sentences, and a list built from the rows that exist can say
+   neither, because both are absences. **Two shops on one night are ONE day and
+   their pars SUM** — proved on the real 2026-08-09 pair, which folds DF01's 36
+   and DF02's 18 into a single row reading 54. The average **divides by nights
+   COUNTED and says so**: over the window instead would turn five counted
+   nights into a figure two-thirds too low that looks entirely plausible.
+   Verified: all 44 migrations replay on the Docker harness, and every rule was
+   checked by BREAKING it. As a real authenticated supervisor the RPC writes
+   while a direct update changes **0 rows with NO error**, `par` is unreachable
+   both ways, the whitelist RAISES, clearing both actuals clears the author,
+   `next_batch_number` returns 30000 then 30001, an insert writes 1 row and a
+   **delete changes 0 with no error**; staff get a raise from all four
+   functions; `anon` gets "permission denied for function" from all five; a
+   junk storage path is refused by the POLICY rather than a cast error; and
+   040's own suite still carries actuals forward and still RAISES without
+   `p_allow_actuals` — now over actuals a FUNCTION wrote. **769 fixtures pass**,
+   38 new. `production_batches` did not exist and nothing referenced it, so
+   nothing here changed under an existing reader.
+   **NOT verified, and it is the honest gap:** nothing has been walked in a
+   browser. 044 is not applied to the live database, so `/schedules/[id]` says
+   so out loud (the repo's own pattern) rather than rendering an empty table
+   until Mark runs it.
+   Note the brief's numbering is off by THREE now — 038 was spent on the name
+   constraint, 041 on the recipe sheet and 042 on the recipe cost column.
    **A HEAD COUNT PROBE CANNOT TELL "EMPTY" FROM "MISSING"** — probing 039 with
    `.select("*", { count: "exact", head: true })` returned `null` and NO error
    for a table that did not exist. A HEAD response has no body to carry the
@@ -2946,6 +3051,20 @@ mean where FileMaker rounded up. 33 rows skipped and named (employee ids `387B`
 and `001` match nobody). All 35 migrations apply on the Docker harness, and the
 whole 46,553-row file was replayed through the real constraints there before it
 went near production. See build step 4e.
+**044 is NOT APPLIED yet** (written 2026-08-09) — production phase 5's actuals.
+*Probe, don't trust this line.* Cheap probes, in order of what they'd catch:
+`select count(*) from production_batches` (0 once applied, an error before);
+`select last_value, is_called from production_batch_number_seq` (30000, false —
+so the FIRST `next_batch_number` returns 30000, not 30001);
+`select column_name from information_schema.columns where table_name =
+'production_schedule_items' and column_name in ('counted_by','counted_at')`
+(2 rows); and `select id, public from storage.buckets where id='batch-photos'`
+(1 row, false). For the four functions, call one via RPC with a bogus uuid —
+each raises from its FIRST statement ("No such schedule line", "unknown
+location") without doing any work.
+**Until it is applied `/schedules/[id]` says so** rather than rendering an empty
+line table, and so do the item record's history block and the element record's
+Recent batches. The schedules LIST and everything else are unaffected.
 **036 is APPLIED and LOADED** (Mark, 2026-08-07) — 470 elements · 59
 element-locations · 128 recipes · 493 versions · 3,765 lines · 2,914 steps, with
 **128 masters for 128 families**, verified by the loader's own sanity counts and
@@ -3184,7 +3303,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary — a VALUE or a filter's VIEW; `variant="inline"` in a cell, `variant="field"` as a standalone box. Opens below the field, portals so panes can't clip it |
   | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons; `onSubmit` makes Enter commit (opt-in — see the Enter bullet below) |
   | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands; shares `lib/anchoredPanel` with PickList, so it escapes scroll panes the same way |
-  | `catalog/InlineValue` | a hand-wired edit-in-place, or a bare `<input type="date">` | any editable cell — `kind` text / number / date / **pick**; `multiline` for prose (textarea, ⌘↵ saves); `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column; `arrayColumn` + `arrayIndex` + `arrayStrip` + `arrayWidth` to edit ONE SLOT of a Postgres array (the `par_by_weekday` idiom, which had no editor until the recipe sheet). An array column CONSTRAINED against a sibling array must write both in one statement — that is what `alsoUpdate` is for. `emptyClassName` styles the cell when it holds NOTHING (faint by default; the plan matrix wants a yellow "—", and a caller CAN'T do this through `className`, because Tailwind resolves competing utilities by stylesheet order); `ariaLabel` names the cell where no `<dt>` does — a grid of identical cells otherwise all announce as "—, click to edit" |
+  | `catalog/InlineValue` | a hand-wired edit-in-place, or a bare `<input type="date">` | any editable cell — `kind` text / number / date / **pick**; `multiline` for prose (textarea, ⌘↵ saves); `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column; `arrayColumn` + `arrayIndex` + `arrayStrip` + `arrayWidth` to edit ONE SLOT of a Postgres array (the `par_by_weekday` idiom, which had no editor until the recipe sheet). An array column CONSTRAINED against a sibling array must write both in one statement — that is what `alsoUpdate` is for. `emptyClassName` styles the cell when it holds NOTHING (faint by default; the plan matrix wants a yellow "—", and a caller CAN'T do this through `className`, because Tailwind resolves competing utilities by stylesheet order); `ariaLabel` names the cell where no `<dt>` does — a grid of identical cells otherwise all announce as "—, click to edit". **`onWrite` replaces the UPDATE and nothing else** — for a column whose rule is COLUMN-scoped and so lives behind a definer function (044's `made`/`leftover`); without it the cell issues a plain update that matches zero rows, returns NO error, and silently loses what was typed |
   | `ui/SectionHeading` | a hand-styled `<h2>` | the heading over a block on a detail screen (16px bold black, optional `count`) |
   | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style. Selected cell is ALWAYS black; `count` and `href` are the only options |
   | **`ui/FilterMenus`** + `lib/filterMenus` | several `TabPicker`s stacked, or a row of hand-wired `PickList`s | a list filtering on THREE OR MORE dimensions AT ONCE — a row of labelled popup menus that AND together ("FilterMenus" is the name to call it by; NOT `catalog/ListFilters`, which is the older fixed search+category+active row). A dimension declares `matches`, never a pre-filtered list, which is what makes the option counts CONDITIONED ON THE OTHER MENUS (and never on their own, or every option but the chosen one reads 0). "All" is supplied, not declared; the bar owns the result count and a Clear, because four collapsed menus can hide a list while the screen looks unfiltered. Values live in the URL via `parseFilterValues`/`filterHref` + `history.replaceState`, and a value no option offers is DROPPED rather than obeyed. ONE dimension stays a `TabPicker` — this is not a replacement for it |

@@ -10,9 +10,11 @@
 // reds 2; making `rememberIn` always return a fresh object reds 2.
 
 import {
+  SECTIONS,
   findSection,
   findSub,
   navPathKey,
+  resolveRoute,
   sectionHref,
   subHref,
   type NavSection,
@@ -190,4 +192,38 @@ test("a remembered sub that no longer exists doesn't lose the section", () => {
   // leaves behind in a live session.
   const memory: NavMemory = { subs: { purchasing: "retired-sub" }, paths: {} };
   eq(sectionHref(section("purchasing"), memory, DF01, null), "/vendors");
+});
+
+/* -- production phase 5 flipped Batch Logs from a stub to a real screen ---- */
+
+test("the Batch Logs sub is built and points at /batch-logs", () => {
+  const sub = findSub(findSection("production")!, "batch-logs")!;
+  ok(sub, "the sub still exists");
+  ok(sub.built, "and is no longer a /soon/ stub");
+  eq(sub.href, "/batch-logs");
+});
+
+test("a batch RECORD lights the Batch Logs tab without needing an `also`", () => {
+  // resolveRoute prefix-matches, longest wins — which is why /batch-logs/[id]
+  // needs no extra wiring and why a sibling route starting with the same
+  // letters would.
+  const at = resolveRoute("/batch-logs/9d1f0f8e-0000-4000-8000-000000000000");
+  eq(at?.sectionSlug, "production");
+  eq(at?.subSlug, "batch-logs");
+});
+
+test("no production sub is a stub any more except by intent", () => {
+  // Phase 5 was the last one. If this goes red, a screen was added as a stub
+  // and the roadmap note in CLAUDE.md needs to say so.
+  const stubs = findSection("production")!
+    .subs.filter((s) => !s.built)
+    .map((s) => s.slug);
+  eq(stubs, []);
+});
+
+test("every built sub has a real href, not a /soon/ one", () => {
+  const wrong = SECTIONS.flatMap((s) => s.subs)
+    .filter((s) => s.built && s.href.startsWith("/soon/"))
+    .map((s) => s.slug);
+  eq(wrong, []);
 });

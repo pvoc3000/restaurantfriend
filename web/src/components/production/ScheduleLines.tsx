@@ -20,7 +20,74 @@ export type ScheduleLineRow = ScheduleLine & {
   unit_price: number | null;
   cost_unresolved: number | null;
   costed_at: string | null;
+  /** From `v_production_schedule_lines`, never computed here — see the Sold
+   *  column. Null until something has been counted. */
+  sold: number | null;
+  /** When somebody last counted this line. 044 stores the author beside it;
+   *  the date is the half worth showing without a second query for names. */
+  counted_at: string | null;
 };
+
+/**
+ * `made` or `leftover`, written through migration 044's definer function.
+ *
+ * NOT `.from("production_schedule_items").update(…)`, and the difference is
+ * invisible until it bites: RLS filters ROWS, and "a supervisor may set these
+ * two and nothing else" is a COLUMN rule, so the table's own UPDATE policy
+ * names purchaser+ only. A direct write by a supervisor matches zero rows and
+ * PostgREST returns NO error — the cell would report success and the number
+ * would vanish on the next refresh. The function RAISES instead, so a refusal
+ * arrives as a sentence in the cell.
+ *
+ * `countable` is deliberately a different gate from the screen's `editable`:
+ * everything else on this table is purchaser+, and these two cells are the only
+ * ones a supervisor may touch.
+ */
+function ActualCell({
+  row,
+  column,
+  countable,
+}: {
+  row: ScheduleLineRow;
+  column: "made" | "leftover";
+  countable: boolean;
+}) {
+  const supabase = createClient();
+  const value = row[column];
+  const counted = row.counted_at
+    ? `Counted ${row.counted_at.slice(0, 10)}`
+    : undefined;
+
+  if (!countable) {
+    return value === null ? (
+      <span className="text-faint">—</span>
+    ) : (
+      <span className={`${READ_ONLY_VALUE} tabular-nums`} title={counted}>
+        {value}
+      </span>
+    );
+  }
+
+  return (
+    <InlineValue
+      table="production_schedule_items"
+      id={row.id}
+      column={column}
+      kind="number"
+      align="right"
+      value={value}
+      ariaLabel={`${column === "made" ? "Made" : "Left over"}, ${row.item_name}`}
+      onWrite={async (next) => {
+        const { error } = await supabase.rpc("set_schedule_actual", {
+          p_line_id: row.id,
+          p_column: column,
+          p_value: next,
+        });
+        return { error: error ? error.message : null };
+      }}
+    />
+  );
+}
 
 type Grouping = "type" | "tray" | "none";
 
@@ -45,11 +112,15 @@ export function ScheduleLines({
   rows,
   rolled,
   editable,
+  countable,
   add,
 }: {
   rows: ScheduleLineRow[];
   rolled: RollType[];
+  /** Purchaser+ — the par, the note, adding and striking lines. */
   editable: boolean;
+  /** Supervisor and up — the two counting cells, and only those. */
+  countable: boolean;
   add: React.ReactNode;
 }) {
   const supabase = createClient();
@@ -270,15 +341,7 @@ export function ScheduleLines({
       width: 90,
       align: "right",
       sortValue: (r) => r.made ?? -1,
-      // Phase 5 owns these. Read-only until the batch screen exists, because a
-      // supervisor writing them needs column-scoped access this table's RLS
-      // deliberately doesn't give (029's `report_pooled_tips` shape).
-      render: (r) =>
-        r.made === null ? (
-          <span className="text-faint">—</span>
-        ) : (
-          <span className={`${READ_ONLY_VALUE} tabular-nums`}>{r.made}</span>
-        ),
+      render: (r) => <ActualCell row={r} column="made" countable={countable} />,
     },
     {
       key: "leftover",
@@ -287,11 +350,31 @@ export function ScheduleLines({
       align: "right",
       sortValue: (r) => r.leftover ?? -1,
       hideWhenCompact: true,
+      render: (r) => <ActualCell row={r} column="leftover" countable={countable} />,
+    },
+    {
+      key: "sold",
+      label: "Sold",
+      width: 90,
+      align: "right",
+      sortValue: (r) => r.sold ?? -1,
+      // DERIVED, and read-only for the reason it has no column: made − leftover
+      // is computed by `v_production_schedule_lines` and nowhere else, so there
+      // is one definition of it and one place for a POS feed to land later.
+      //
+      // It can go NEGATIVE, and it is shown that way rather than clamped:
+      // yesterday's carryover counted into today's leftovers is a real thing
+      // that happens, and a floor at zero would hide it.
       render: (r) =>
-        r.leftover === null ? (
+        r.sold === null ? (
           <span className="text-faint">—</span>
         ) : (
-          <span className={`${READ_ONLY_VALUE} tabular-nums`}>{r.leftover}</span>
+          <span
+            className={`${READ_ONLY_VALUE} tabular-nums ${r.sold < 0 ? "text-mark" : ""}`}
+            title={r.sold < 0 ? "More left over than made — carried over from another day?" : undefined}
+          >
+            {r.sold}
+          </span>
         ),
     },
     {

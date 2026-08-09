@@ -13,6 +13,9 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { ProductionItemFields } from "@/components/production/ProductionItemFields";
 import { ProductionItemLocations } from "@/components/production/ProductionItemLocations";
+import { ProductionItemHistory } from "@/components/production/ProductionItemHistory";
+import { historyWindow, type HistoryLine } from "@/lib/productionHistory";
+import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 
 /**
  * One item: what it is, what it is made of, what that costs, and what each shop
@@ -38,17 +41,51 @@ export async function ProductionItemDetail({
   const { graph, error } = await loadProductionGraph(supabase);
   if (error) return <LoadError message={error} />;
 
+  // "Today" from the ORG's timezone, never the server's — a UTC host rolls the
+  // date at 5pm local, which would drop the newest night off the fortnight
+  // every evening, exactly when somebody is counting it.
+  const fortnight = historyWindow(
+    guideToday(session.orgSettings.timezone ?? serverTimeZone()).date
+  );
+
   const elementNames = new Map([...graph!.byId].map(([eid, e]) => [eid, e.name]));
-  const [{ graph: items, error: itemError }, { data: row, error: rowError }] = await Promise.all([
+  const [
+    { graph: items, error: itemError },
+    { data: row, error: rowError },
+    { data: historyRows, error: historyError },
+  ] = await Promise.all([
     loadItemGraph(supabase, elementNames),
     supabase
       .from("production_items")
       .select("id, name, notes, is_active, tally_box_size")
       .eq("id", id)
       .maybeSingle(),
+    // 040 built `production_schedule_items_item_idx` for exactly this query and
+    // said so: "phase 5's two-week history on the Item screen, joined to the
+    // parent's date".
+    supabase
+      .from("v_production_schedule_lines")
+      .select("schedule_date, location_id, par, made, leftover, sold")
+      .eq("item_id", id)
+      .gte("schedule_date", fortnight.from)
+      .lte("schedule_date", fortnight.to),
   ]);
   if (itemError || rowError) return <LoadError message={itemError ?? rowError!.message} />;
   if (!row) notFound();
+
+  // The history is NOT folded into the page's own error: a fortnight that can't
+  // be read must not blank an otherwise perfectly good item record. It isn't
+  // swallowed either — an empty grid asserts that nothing was made for two
+  // weeks, which is the one claim that block exists to make (018's pattern).
+  const history = {
+    lines: (historyRows ?? []) as HistoryLine[],
+    error: historyError
+      ? `The last two weeks could not be read: ${historyError.message}` +
+        (/counted_at|sold|v_production_schedule_lines/.test(historyError.message)
+          ? " — migration 044 has not been applied yet."
+          : "")
+      : null,
+  };
 
   const item = items!.items.find((i) => i.id === id);
   if (!item) notFound();
@@ -209,6 +246,12 @@ export async function ProductionItemDetail({
         locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
         gridPrice={price.cell?.price ?? null}
         editable={editable}
+      />
+
+      <ProductionItemHistory
+        lines={history.lines}
+        dates={fortnight.dates}
+        unavailable={history.error}
       />
     </div>
   );

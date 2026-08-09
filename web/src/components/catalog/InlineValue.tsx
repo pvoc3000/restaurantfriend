@@ -122,6 +122,7 @@ export function InlineValue({
   arrayStrip,
   arrayWidth,
   match,
+  onWrite,
   scale,
   multiline = false,
   collapseWhenEmpty = false,
@@ -219,6 +220,29 @@ export function InlineValue({
    */
   match?: Record<string, string>;
   /**
+   * Write this cell through something OTHER than an update to `table`.
+   *
+   * Everything else about the cell is unchanged — the arithmetic evaluator,
+   * Escape-reverts, reopen-on-failure, the dotted underline, the aria name —
+   * only the statement at the end differs. `table` and `column` are still
+   * required, and are what the error text and the accessible name are built
+   * from.
+   *
+   * It exists because RLS filters ROWS and some rules are about COLUMNS.
+   * `production_schedule_items.made` is the case that forced it: a supervisor
+   * may set it and may not touch `par` or the cost snapshot beside it, so
+   * migration 044 exposes it as a definer function. Without this prop the cell
+   * would issue a plain UPDATE, which for a supervisor matches zero rows and
+   * returns NO ERROR — the component would report success, `router.refresh()`
+   * would hand back the old value, and the number they typed would vanish with
+   * nothing on screen to say why.
+   *
+   * Return `{ error }` — a string to show in the cell, or null for success.
+   * Resolve the "wrote nothing" case yourself: a definer function that RAISES
+   * gives a sentence, where a zero-row update gives silence.
+   */
+  onWrite?: (next: string | number | null) => Promise<{ error: string | null }>;
+  /**
    * A column STORED in one unit and read in another.
    *
    * `format` is display-only and editing deliberately shows the raw value, which
@@ -308,6 +332,24 @@ export function InlineValue({
 
     setSaving(true);
     setError(null);
+
+    // A caller-supplied write replaces the statement and nothing else. It is
+    // checked FIRST so none of the row-identity machinery below applies: a
+    // definer function is handed the id it needs by the closure, and asking a
+    // cell that writes through an RPC for a `match` would be asking it to
+    // describe an update it never makes.
+    if (onWrite) {
+      const { error } = await onWrite(next);
+      setSaving(false);
+      if (error) {
+        setError(error);
+        if (reopen) setEditing(true);
+        return;
+      }
+      router.refresh();
+      return;
+    }
+
     // One or the other; a cell with neither would silently update every row in
     // the table, so this is a hard stop rather than a default.
     const where = match ?? (id ? { id } : null);

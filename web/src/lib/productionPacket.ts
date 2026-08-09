@@ -408,17 +408,24 @@ function stockLabel(count: number | null, size: number | null, unit: string | nu
  */
 export async function stampPrinted(
   supabase: SupabaseClient,
-  scheduleIds: string[],
-  userId: string | null
+  scheduleIds: string[]
 ): Promise<string | null> {
-  const { data, error } = await supabase
-    .from("production_schedules")
-    .update({ printed_at: new Date().toISOString(), printed_by: userId })
-    .in("id", scheduleIds)
-    .select("id");
-  // A write matching no policy changes nothing and PostgREST returns NO error,
-  // so the row count is the only honest check — the employee-delete lesson.
-  if (error) return error.message;
-  if ((data ?? []).length === 0) return "Nothing was stamped as printed — you may not have permission.";
+  // THROUGH THE DEFINER, one call per schedule, not an `.in()` update.
+  //
+  // `production_schedules`' UPDATE policy is purchaser+, and printing the
+  // night's packet is the same closing routine the counts are entered in — so
+  // a supervisor pressing Print would have matched zero rows and got NO error
+  // back (Mark, 2026-08-09). Migration 044's `mark_schedule_printed` stamps
+  // `printed_at`/`printed_by` and can reach nothing else on the schedule.
+  //
+  // A loop rather than one statement because a definer function takes one row;
+  // a packet is rarely more than a handful of nights, and the alternative is an
+  // array-argument function whose only job is a loop in a different language.
+  // It stops at the first refusal, which is the honest report: they will all
+  // fail the same way.
+  for (const id of scheduleIds) {
+    const { error } = await supabase.rpc("mark_schedule_printed", { p_schedule_id: id });
+    if (error) return error.message;
+  }
   return null;
 }

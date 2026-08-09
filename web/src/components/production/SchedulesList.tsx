@@ -63,11 +63,12 @@ const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: ScheduleRow) => string>
  */
 export function SchedulesList({
   rows,
-  editable,
+  stampable,
   today,
 }: {
   rows: ScheduleRow[];
-  editable: boolean;
+  /** Supervisor and up — the only thing this list writes is the print stamp. */
+  stampable: boolean;
   today: string;
 }) {
   const [tier, setTier] = useState<Tier>("upcoming");
@@ -378,7 +379,7 @@ export function SchedulesList({
           </span>
           <PrintPacket
             scheduleIds={[...checked]}
-            editable={editable}
+            stampable={stampable}
             onPrinted={() => setChecked(new Set())}
           />
           <button

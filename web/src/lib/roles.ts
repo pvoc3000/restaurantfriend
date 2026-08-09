@@ -56,6 +56,45 @@ export function canWriteCatalog(role: Role): boolean {
   return role === "owner" || role === "admin" || role === "purchaser";
 }
 
+/**
+ * Record what a shift actually produced — production phase 5.
+ *
+ * The first predicate in this file that admits a supervisor, and it is the
+ * reason the role exists (020: "when supervisors get shift reports and
+ * production schedules, those tables' own policies name the role").
+ *
+ * It mirrors migration 044's `set_schedule_actual`, which checks this same set
+ * inside the function because RLS filters ROWS and "a supervisor may set made
+ * and leftover and nothing else" is a COLUMN rule. Reaching for
+ * `canWriteCatalog` here instead would lock supervisors out of the whole
+ * feature while the function kept working — the cell simply wouldn't be
+ * offered — which is why the fixtures assert both halves.
+ *
+ * `mark_schedule_printed` names the same set: printing the night's packet is
+ * the same closing routine the counts are entered in.
+ */
+export function canEnterCounts(role: Role): boolean {
+  return (
+    role === "owner" ||
+    role === "admin" ||
+    role === "purchaser" ||
+    role === "supervisor"
+  );
+}
+
+/**
+ * Log a batch — migration 044's `production_batches` write policies and
+ * `generate_production_batches`.
+ *
+ * The same set as `canEnterCounts` today, and named separately for the reason
+ * `canReadHr` gives: "may record what the case sold" and "may record what came
+ * out of the mixer" are different questions with the same answer today, and one
+ * of them will move first. DELETING a batch is purchaser+ — `canWriteCatalog`
+ * — because correcting a batch is editing it and erasing the record that one
+ * happened is a different act.
+ */
+export const canLogBatch = canEnterCounts;
+
 /** Invite people, change roles, remove access. 001's members_write. */
 export function canManageMembers(role: Role): boolean {
   return role === "owner" || role === "admin";

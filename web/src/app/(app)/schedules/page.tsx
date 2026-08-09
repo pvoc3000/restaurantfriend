@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
+import { canWriteCatalog, canEnterCounts } from "@/lib/roles";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SchedulesList, type ScheduleRow } from "@/components/production/SchedulesList";
 import { GenerateSchedules } from "@/components/production/GenerateSchedules";
@@ -22,7 +22,11 @@ import { GenerateSchedules } from "@/components/production/GenerateSchedules";
 export default async function SchedulesPage() {
   const session = await getAppSession();
   const supabase = await createClient();
+  // Generating a day is purchaser+; stamping a packet as printed is supervisor
+  // and up (migration 044), because printing is part of the closing routine
+  // rather than a catalog write.
   const editable = canWriteCatalog(session.membership.role);
+  const countable = canEnterCounts(session.membership.role);
   const today = guideToday(session.orgSettings.timezone ?? serverTimeZone()).date;
 
   // A window rather than the whole history: a fortnight either side is the
@@ -129,7 +133,7 @@ export default async function SchedulesPage() {
           are picked up whenever generation runs.
         </p>
       ) : (
-        <SchedulesList rows={rows} editable={editable} today={today} />
+        <SchedulesList rows={rows} stampable={countable} today={today} />
       )}
     </div>
   );

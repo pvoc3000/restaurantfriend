@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
+import { canWriteCatalog, canEnterCounts } from "@/lib/roles";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
@@ -40,6 +40,10 @@ export async function ScheduleDetail({
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canWriteCatalog(session.membership.role);
+  // Two gates, not one. Everything on this screen is purchaser+ EXCEPT the two
+  // counting cells, which migration 044 opens to a supervisor through a
+  // column-scoped definer function — see `ActualCell`.
+  const countable = canEnterCounts(session.membership.role);
 
   const { data: schedule, error } = await supabase
     .from("production_schedules")
@@ -63,14 +67,22 @@ export async function ScheduleDetail({
   }
   if (!schedule) notFound();
 
-  const [{ data: lineRows }, { data: yieldRows }, { data: members }, { data: catalog }] =
-    await Promise.all([
+  const [
+    { data: lineRows, error: lineErr },
+    { data: yieldRows },
+    { data: members },
+    { data: catalog },
+  ] = await Promise.all([
+      // THE VIEW, not the table. `sold` is defined once, in SQL
+      // (v_production_schedule_lines), so there is no TypeScript twin to drift
+      // from and one place for a POS feed to land later. It is
+      // `security_invoker`, so the same RLS applies either way.
       supabase
-        .from("production_schedule_items")
+        .from("v_production_schedule_lines")
         .select(
           `id, item_id, item_name, item_type, subtype, finish, size, tally_box_size,
            tray_capacity, tray_number, tray_band, par, planned_par, par_source, made, leftover,
-           note, unit_cost, unit_price, cost_unresolved, costed_at, sort`
+           sold, counted_at, note, unit_cost, unit_price, cost_unresolved, costed_at, sort`
         )
         .eq("schedule_id", id)
         .order("sort"),
@@ -86,6 +98,22 @@ export async function ScheduleDetail({
         .eq("is_active", true)
         .order("name"),
     ]);
+
+  // NOT folded into the page's own error, and not swallowed either. An empty
+  // line table asserts that a night has nothing to make, which is the one claim
+  // this screen exists to make — so a failure has to say so in words. 018's
+  // pattern, and the reason it earns a branch here is that 044 adds a column to
+  // the view this now selects.
+  if (lineErr) {
+    return (
+      <p className="text-sm text-accent">
+        Could not load this schedule&rsquo;s items: {lineErr.message}
+        {/counted_at|sold|v_production_schedule_lines/.test(lineErr.message)
+          ? " — migration 044 has not been applied yet."
+          : ""}
+      </p>
+    );
+  }
 
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
   const nameByUser = new Map(
@@ -112,6 +140,8 @@ export async function ScheduleDetail({
     par_source: (l.par_source ?? "plan") as string,
     made: (l.made ?? null) as number | null,
     leftover: (l.leftover ?? null) as number | null,
+    sold: (l.sold ?? null) as number | null,
+    counted_at: (l.counted_at ?? null) as string | null,
     note: (l.note ?? null) as string | null,
     unit_cost: (l.unit_cost ?? null) as number | null,
     unit_price: (l.unit_price ?? null) as number | null,
@@ -125,6 +155,8 @@ export async function ScheduleDetail({
   const parTotal = rows.reduce((n, r) => n + r.par, 0);
   const manualCount = rows.filter((r) => r.par_source === "manual").length;
   const uncosted = rows.filter((r) => r.costed_at === null).length;
+  const countedLines = rows.filter((r) => r.made !== null || r.leftover !== null).length;
+  const soldTotal = rows.reduce((n, r) => n + (r.sold ?? 0), 0);
 
   const onSchedule = new Set(rows.map((r) => r.item_id));
   const addable: AddableItem[] = (catalog ?? [])
@@ -182,6 +214,19 @@ export async function ScheduleDetail({
               : ""}
           </span>
         </Field>
+        <Field label="Counted">
+          {/* How far through the night's counting somebody is — the question a
+              schedule from last week is opened to answer, and the one thing the
+              lines below can only be scanned for. `sold` is the view's, never
+              re-derived here. */}
+          {countedLines === 0 ? (
+            <span className={`${READ_ONLY_VALUE} text-faint`}>not counted</span>
+          ) : (
+            <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
+              {countedLines} of {rows.length} · {soldTotal.toLocaleString()} sold
+            </span>
+          )}
+        </Field>
         <Field label="Printed">
           {schedule.printed_at ? (
             <span className={`${READ_ONLY_VALUE} text-muted`}>
@@ -232,13 +277,14 @@ export async function ScheduleDetail({
         hasActuals={rows.some((r) => r.made !== null || r.leftover !== null)}
         lineCount={rows.length}
         editable={editable}
-        print={<PrintPacket scheduleIds={[id]} editable={editable} label="Print…" />}
+        print={<PrintPacket scheduleIds={[id]} stampable={countable} label="Print…" />}
       />
 
       <ScheduleLines
         rows={rows}
         rolled={rolled}
         editable={editable}
+        countable={countable}
         add={
           editable ? (
             <AddScheduleItems
