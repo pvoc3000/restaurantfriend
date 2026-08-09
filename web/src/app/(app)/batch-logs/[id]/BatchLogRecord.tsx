@@ -60,8 +60,8 @@ export async function BatchLogRecord({
       supabase
         .from("production_batches")
         .select(
-          `id, log_id, batch_number, element_id, location_id, is_generated,
-           batch_label, sort, status, operator_employee_id, created_by,
+          `id, log_id, element_id, is_generated,
+           batch_label, sort, status, operator_employee_id,
            recipe_version_label, batch_amount, batch_unit,
            par_count, par_size, par_unit,
            on_hand_count, on_hand_size, on_hand_unit,
@@ -91,19 +91,14 @@ export async function BatchLogRecord({
       | null;
     return {
       id: b.id as string,
-      logDate,
-      logStatus: (log.status ?? "open") as string,
-      batch_number: b.batch_number as string,
       element_name: element?.name ?? "—",
       element_type: element?.element_type ?? null,
-      kitchenCode: codeById.get(b.location_id as string) ?? "—",
-      batch_label: (b.batch_label ?? null) as string | null,
-      sort: (b.sort ?? null) as number | null,
-      status: (b.status ?? "to_do") as string,
       operatorName: b.operator_employee_id
         ? nameById.get(b.operator_employee_id as string) ?? null
         : null,
-      createdByName: b.created_by ? memberById.get(b.created_by as string) ?? null : null,
+      batch_label: (b.batch_label ?? null) as string | null,
+      sort: (b.sort ?? null) as number | null,
+      status: (b.status ?? "to_do") as string,
       recipe_version_label: (b.recipe_version_label ?? null) as string | null,
       batch_amount: num(b.batch_amount),
       batch_unit: (b.batch_unit ?? null) as string | null,

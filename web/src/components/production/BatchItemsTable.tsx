@@ -11,7 +11,6 @@ import { usePublishRecordSet } from "@/lib/recordSet";
 import {
   BATCH_STATUS_LABEL,
   BATCH_STATUS_OPTIONS,
-  batchDate,
   describeAmount,
   isBatchOutstanding,
   amountTotal,
@@ -19,22 +18,14 @@ import {
 
 export type BatchRow = {
   id: string;
-  /** The LOG's date. An item has no date of its own since 045 — see the page. */
-  logDate: string;
-  batch_number: string;
   element_name: string;
   element_type: string | null;
-  kitchenCode: string;
-  /** The LOG's status — open or complete. The batch's own status is separate. */
-  logStatus: string;
+  /** The EMPLOYEE who made it — FileMaker's "Prepared by". ONE per batch, and
+   *  it varies row to row: different people take different elements. */
+  operatorName: string | null;
   batch_label: string | null;
   sort: number | null;
   status: string;
-  /** The EMPLOYEE who made it — FileMaker's "Prepared by". */
-  operatorName: string | null;
-  /** The app user who entered the record — FileMaker's "By". A different
-   *  person from the operator more often than not. */
-  createdByName: string | null;
   recipe_version_label: string | null;
   batch_amount: number | null;
   batch_unit: string | null;
@@ -148,7 +139,7 @@ export function BatchItemsTable({
   const [tier, setTier] = useState<Tier>("all");
   const [grouping, setGrouping] = useState<Grouping>("type");
   const [term, setTerm] = useState("");
-  const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "date", dir: "asc" });
+  const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "element", dir: "asc" });
 
   const counts = useMemo(
     () => ({
@@ -167,10 +158,8 @@ export function BatchItemsTable({
       if (!q) return true;
       return [
         r.element_name,
-        r.batch_number,
-        r.kitchenCode,
-        r.batch_label ?? "",
         r.operatorName ?? "",
+        r.batch_label ?? "",
         r.notes ?? "",
       ]
         .join(" ")
@@ -182,15 +171,11 @@ export function BatchItemsTable({
   const visible = useMemo(() => {
     const value = (r: BatchRow): string | number => {
       switch (sort.key) {
-        case "date": return r.logDate;
         case "element": return r.element_name;
-        case "location": return r.kitchenCode;
         case "type": return r.element_type ?? "";
-        case "status": return r.status;
         case "operator": return r.operatorName ?? "";
-        case "number": return r.batch_number;
-        case "kitchen": return r.kitchenCode;
-        default: return r.logDate;
+        case "status": return r.status;
+        default: return r.element_name;
       }
     };
     const dir = sort.dir === "asc" ? 1 : -1;
@@ -217,29 +202,37 @@ export function BatchItemsTable({
     visible.map((r) => ({ id: r.id, href: `/batches/${r.id}` }))
   );
 
-  // MARK'S ORDER, 2026-08-09, and it is FileMaker's own Batch Logs list — its
-  // search globals are date · location · order · batch · element · elementType
-  // · employee, which is this row read left to right.
+  // MARK'S ORDER, 2026-08-09, pared back to what varies ROW TO ROW.
   //
-  // Day-of-week and SHIFT are gone. They belong to the element SCHEDULE, which
-  // is what generation reads; a logged batch carries the date it was generated
-  // for and nothing about the rhythm that proposed it.
+  // FileMaker's list ran date · location · order · batch · element · type ·
+  // prepared by · par · on hand · made · note · by · status, because it was one
+  // flat table of every batch ever. This one sits INSIDE a log, so Date,
+  // Location and By say the same thing on all thirty rows as the header above
+  // them, and the batch NUMBER identifies a row you already have in front of
+  // you (Mark, 2026-08-09: "no longer needed in batch items now that they are
+  // in the master batch log record" … "batch is also no longer needed").
+  //
+  // PREPARED BY STAYS, and it was taken out and put back the same day — worth
+  // recording because the argument for removing it was wrong in an instructive
+  // way. FileMaker's screen reads "Campos, Crystal" on all sixteen rows, which
+  // looks like a fact about the LOG rather than the batch. It isn't: "one person
+  // could do one element, and another person another element" (Mark,
+  // 2026-08-09). One person happening to work a whole round is not the same as
+  // the column belonging to the round.
+  //
+  // And ONE PERSON PER BATCH is the rule, not a limitation — "not two people
+  // doing one element". So `operator_employee_id` is singular on purpose and
+  // wants no join table.
+  //
+  // ORDER STAYS (Mark: "that's something probably only I use when I do
+  // production, but it's useful to me and I want to keep it") — it is thinly
+  // filled today, 1 of 30 at DF02, and that is a data gap rather than a reason
+  // to drop the column.
+  //
+  // PREPARED BY stays and is not the same fact: it is the EMPLOYEE who made the
+  // batch, which varies row to row, where By was the app user who entered the
+  // record — one person for the whole log.
   const columns: DataColumn<BatchRow>[] = [
-    {
-      key: "date",
-      label: "Date",
-      width: 120,
-      pinned: true,
-      sortValue: (r) => r.logDate,
-      render: (r) => <span className="text-muted">{batchDate(r.logDate)}</span>,
-    },
-    {
-      key: "location",
-      label: "Location",
-      width: 100,
-      sortValue: (r) => r.kitchenCode,
-      render: (r) => <span className="font-medium">{r.kitchenCode}</span>,
-    },
     {
       key: "sort",
       label: "Order",
@@ -257,22 +250,6 @@ export function BatchItemsTable({
         ),
     },
     {
-      key: "number",
-      label: "Batch",
-      width: 100,
-      align: "right",
-      sortValue: (r) => r.batch_number,
-      render: (r) => (
-        <span
-          className="tabular-nums text-muted"
-          title={r.generated ? "From the weekly round" : "Logged by hand"}
-        >
-          {r.batch_number}
-          {r.generated ? "" : "*"}
-        </span>
-      ),
-    },
-    {
       key: "element",
       label: "Element",
       width: 260,
@@ -281,6 +258,13 @@ export function BatchItemsTable({
       render: (r) => (
         <Link href={`/batches/${r.id}`} className="font-medium hover:underline">
           {r.element_name}
+          {/* The marker moved here off the batch number, which the master now
+              carries: a row nobody generated still has to explain itself. */}
+          {r.generated ? null : (
+            <span className="ml-1.5 text-muted" title="Logged by hand">
+              *
+            </span>
+          )}
         </Link>
       ),
     },
@@ -357,23 +341,6 @@ export function BatchItemsTable({
         ),
     },
     {
-      key: "by",
-      // NOT "prepared by". FileMaker's own list carries both and so does this:
-      // PREPARED BY is the employee who made it — often somebody with no login
-      // at all — and BY is whoever entered the record. Two people, two columns,
-      // which is the whole reason 044 stores both.
-      label: "By",
-      width: 120,
-      sortValue: (r) => r.createdByName ?? "",
-      hideWhenCompact: true,
-      render: (r) =>
-        r.createdByName ? (
-          <span className="text-muted">{r.createdByName}</span>
-        ) : (
-          <span className="text-faint">—</span>
-        ),
-    },
-    {
       key: "status",
       label: "Status",
       width: 150,
@@ -388,7 +355,7 @@ export function BatchItemsTable({
             nullable={false}
             options={BATCH_STATUS_OPTIONS}
             value={r.status}
-            ariaLabel={`Status, ${r.element_name} ${batchDate(r.logDate)}`}
+            ariaLabel={`Status, ${r.element_name}`}
           />
         ) : (
           <span className={READ_ONLY_VALUE}>
