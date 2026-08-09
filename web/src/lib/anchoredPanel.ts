@@ -116,8 +116,10 @@ export function useAnchoredPanel({
 }): AnchorBox | null {
   const [box, setBox] = useState<AnchorBox | null>(null);
 
-  // Measured off the trigger at open time, and again if the panel's own size
-  // changes under it (a filtered list shrinks as you type).
+  // Measured off the trigger at open time, and again if the trigger resizes.
+  // This is the FIRST pass and it always places the panel below — where it
+  // actually ends up is settled by the fitting pass beneath, which is the only
+  // one that can know how tall the panel is.
   useLayoutEffect(() => {
     if (!open) return;
     const measure = () => {
@@ -135,6 +137,73 @@ export function useAnchoredPanel({
     if (triggerRef.current) observer.observe(triggerRef.current);
     return () => observer.disconnect();
   }, [open, align, triggerRef]);
+
+  /**
+   * KEEP THE WHOLE PANEL ON SCREEN (Mark, 2026-08-08: near the bottom of the
+   * window "most of it can't be seen").
+   *
+   * The first pass can only anchor the panel; it cannot place it, because a
+   * panel that hasn't rendered has no height to fit. So this is a second pass,
+   * and it has to be one: the caller only renders the panel once `box` exists,
+   * which makes measuring it a chicken-and-egg the two passes break.
+   *
+   * FLIP FIRST, CLAMP SECOND. Below the trigger is the natural place and stays
+   * the default; when the panel would run past the bottom it goes ABOVE, still
+   * attached to the trigger, which is what a reader expects of a menu. Only if
+   * it fits in neither is it clamped into the viewport — it is capped at 320px
+   * by `MENU_PANEL_CLASS` and scrolls its own rows, so there is always somewhere
+   * for it to sit.
+   *
+   * It runs in a LAYOUT effect, so the correction lands before paint and the
+   * panel never appears in the wrong place first.
+   *
+   * Everything is recomputed from the TRIGGER, never from the panel's current
+   * position, so the answer is the same every time and the loop settles after
+   * one correction. The >1px guard is what stops it observing its own write —
+   * the same rule the receiving screen's measured height follows.
+   *
+   * The panel is observed as well as the trigger, because its height genuinely
+   * changes under you: typing in the find box filters a 320px list down to two
+   * rows, and a panel placed ABOVE has to follow its own bottom edge back down
+   * to stay attached.
+   */
+  useLayoutEffect(() => {
+    if (!open || !box) return;
+    const fit = () => {
+      const panel = panelRef.current;
+      const trigger = triggerRef.current;
+      if (!panel || !trigger) return;
+      const t = trigger.getBoundingClientRect();
+      const h = panel.offsetHeight;
+      const w = panel.offsetWidth;
+      if (!h || !w) return;
+
+      const MARGIN = 8;
+      let top = t.bottom + 2;
+      if (top + h + MARGIN > window.innerHeight) {
+        const above = t.top - 2 - h;
+        top = above >= MARGIN ? above : Math.max(MARGIN, window.innerHeight - MARGIN - h);
+      }
+
+      // `align="right"` panels are drawn with `translateX(-100%)` by the caller,
+      // so the box's own `left` is their RIGHT edge. Shifting the box by the
+      // overflow works for both, since the transform moves with it.
+      let left = align === "right" ? t.right : t.left;
+      const leftEdge = align === "right" ? left - w : left;
+      const overflowRight = leftEdge + w + MARGIN - window.innerWidth;
+      if (overflowRight > 0) left -= overflowRight;
+      const overflowLeft = MARGIN - (align === "right" ? left - w : left);
+      if (overflowLeft > 0) left += overflowLeft;
+
+      if (Math.abs(top - box.top) > 1 || Math.abs(left - box.left) > 1) {
+        setBox({ top, left, width: box.width });
+      }
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    if (panelRef.current) observer.observe(panelRef.current);
+    return () => observer.disconnect();
+  }, [open, box, align, triggerRef, panelRef]);
 
   useEffect(() => {
     if (!open) return;

@@ -20,7 +20,7 @@ export default async function PlansPage() {
   const [{ data: plans, error }, { data: trays }, { data: slots }] = await Promise.all([
     supabase
       .from("production_plans")
-      .select("id, title, location_id, kitchen_location_id, starts_on, ends_on, is_active")
+      .select("id, title, location_id, kitchen_location_id, starts_on, ends_on, is_active, notes")
       .order("starts_on", { ascending: false }),
     supabase.from("production_plan_trays").select("id, plan_id"),
     supabase.from("production_plan_tray_items").select("id, tray_id"),
@@ -60,6 +60,7 @@ export default async function PlansPage() {
     starts_on: p.starts_on as string,
     ends_on: (p.ends_on ?? null) as string | null,
     is_active: (p.is_active ?? true) as boolean,
+    notes: (p.notes ?? null) as string | null,
     sellsCode: codeById.get(p.location_id as string) ?? "—",
     kitchenCode: p.kitchen_location_id
       ? codeById.get(p.kitchen_location_id as string) ?? "—"
@@ -90,7 +91,7 @@ export default async function PlansPage() {
           once, and their union is that shop&rsquo;s menu.
         </p>
       ) : (
-        <PlansList rows={rows} editable={editable} />
+        <PlansList rows={rows} orgId={session.membership.org_id} editable={editable} />
       )}
     </div>
   );

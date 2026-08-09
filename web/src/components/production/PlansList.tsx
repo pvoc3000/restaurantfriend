@@ -1,14 +1,24 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { RowMenu } from "@/components/ui/RowMenu";
+import { createClient } from "@/lib/supabase/client";
 import { usePublishRecordSet } from "@/lib/recordSet";
-import { overlappingPlans, planRange, type PlanSummary } from "@/lib/productionPlans";
+import {
+  overlappingPlans,
+  planRange,
+  duplicateTitle,
+  REVIEW_DEFAULTS_PARAM,
+  type PlanSummary,
+} from "@/lib/productionPlans";
 
 export type PlanRow = PlanSummary & {
+  notes: string | null;
   sellsCode: string;
   kitchenCode: string | null;
   trayCount: number;
@@ -29,8 +39,19 @@ type Tier = "active" | "all";
  * the same day is the FEATURE — their union is that shop's menu — and what the
  * reader needs to know is that pars will SUM, which is a warning's job.
  */
-export function PlansList({ rows, editable }: { rows: PlanRow[]; editable: boolean }) {
+export function PlansList({
+  rows,
+  orgId,
+  editable,
+}: {
+  rows: PlanRow[];
+  orgId: string;
+  editable: boolean;
+}) {
+  const router = useRouter();
   const [tier, setTier] = useState<Tier>("active");
+  const [pending, start] = useTransition();
+  const [failed, setFailed] = useState<string | null>(null);
 
   const visible = useMemo(
     () => rows.filter((r) => (tier === "active" ? r.is_active : true)),
@@ -42,6 +63,152 @@ export function PlansList({ rows, editable }: { rows: PlanRow[]; editable: boole
     "/plans",
     visible.map((r) => ({ id: r.id, href: `/plans/${r.id}` }))
   );
+
+  /**
+   * Copy a plan and everything under it — trays, and the slots on them with
+   * their pars.
+   *
+   * THE COPY ARRIVES INACTIVE, and that is the one deviation from "an exact
+   * copy". Decision 9 makes a shop's menu the UNION of its active plans and
+   * their pars SUM, so an active duplicate covering the same dates would
+   * silently double that shop's production the next time anyone generated. The
+   * list's own Active toggle is one tap away, which makes turning it on a
+   * deliberate act rather than a consequence.
+   *
+   * Written parent-first — plan, then trays, then slots — because a child with
+   * no parent cannot exist, while a plan with no trays is visible and one
+   * gesture from being fixed.
+   */
+  function duplicatePlan(row: PlanRow) {
+    setFailed(null);
+    start(async () => {
+      const supabase = createClient();
+      const title = duplicateTitle(rows.map((r) => r.title), row.title);
+
+      const { data: made, error } = await supabase
+        .from("production_plans")
+        .insert({
+          org_id: orgId,
+          location_id: row.location_id,
+          kitchen_location_id: row.kitchen_location_id,
+          title,
+          starts_on: row.starts_on,
+          ends_on: row.ends_on,
+          is_active: false,
+          notes: row.notes ?? null,
+        })
+        .select("id");
+      if (error || !made?.length) {
+        setFailed(error?.message ?? "That plan could not be duplicated.");
+        return;
+      }
+      const planId = made[0].id as string;
+
+      const { data: trays, error: trayError } = await supabase
+        .from("production_plan_trays")
+        .select("id, tray_number, band, sort, notes")
+        .eq("plan_id", row.id);
+      if (trayError) {
+        setFailed(`${title} was created, but its trays could not be read: ${trayError.message}`);
+        return;
+      }
+      if (!trays?.length) {
+        router.push(`/plans/${planId}`);
+        return;
+      }
+
+      const { data: madeTrays, error: copyError } = await supabase
+        .from("production_plan_trays")
+        .insert(
+          trays.map((t) => ({
+            org_id: orgId,
+            plan_id: planId,
+            tray_number: t.tray_number as string,
+            band: (t.band ?? null) as string | null,
+            sort: t.sort as number | null,
+            notes: (t.notes ?? null) as string | null,
+          }))
+        )
+        // Ordered so the new ids line up with the ones they came from — the
+        // insert's own return order is not something to rely on.
+        .select("id, tray_number");
+      if (copyError || madeTrays?.length !== trays.length) {
+        setFailed(
+          `${title} was created, but its trays could not be copied: ${
+            copyError?.message ?? "nothing was written"
+          }`
+        );
+        return;
+      }
+      const newTrayByNumber = new Map(
+        madeTrays.map((t) => [t.tray_number as string, t.id as string])
+      );
+
+      const { data: slots, error: slotReadError } = await supabase
+        .from("production_plan_tray_items")
+        .select("tray_id, weekday, item_id, par, sort")
+        .in("tray_id", trays.map((t) => t.id as string));
+      if (slotReadError) {
+        setFailed(`${title} was created, but its items could not be read: ${slotReadError.message}`);
+        return;
+      }
+      const oldNumberById = new Map(trays.map((t) => [t.id as string, t.tray_number as string]));
+      const rowsToWrite = (slots ?? []).flatMap((s) => {
+        const trayId = newTrayByNumber.get(oldNumberById.get(s.tray_id as string) ?? "");
+        return trayId
+          ? [{
+              org_id: orgId,
+              tray_id: trayId,
+              weekday: Number(s.weekday),
+              item_id: s.item_id as string,
+              // The par travels, exactly as it does on a drag-copy. Where the
+              // shop's own default disagrees, the new plan OFFERS it.
+              par: s.par === null ? null : Number(s.par),
+              sort: s.sort as number | null,
+            }]
+          : [];
+      });
+      if (rowsToWrite.length) {
+        const { data: copied, error: slotError } = await supabase
+          .from("production_plan_tray_items")
+          .insert(rowsToWrite)
+          .select("id");
+        if (slotError || copied?.length !== rowsToWrite.length) {
+          setFailed(
+            `${title} was created, but its items could not be copied: ${
+              slotError?.message ?? "nothing was written"
+            }`
+          );
+          return;
+        }
+      }
+      router.push(`/plans/${planId}?${REVIEW_DEFAULTS_PARAM}=review`);
+    });
+  }
+
+  /** Take a plan off the book — 039 cascades its trays, and those their slots. */
+  function deletePlan(row: PlanRow) {
+    const held = row.trayCount
+      ? ` and its ${row.trayCount} tray${row.trayCount === 1 ? "" : "s"}${
+          row.slotCount ? ` carrying ${row.slotCount} item${row.slotCount === 1 ? "" : "s"}` : ""
+        }`
+      : "";
+    if (!window.confirm(`Delete "${row.title}"${held}? This cannot be undone.`)) return;
+    setFailed(null);
+    start(async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from("production_plans")
+        .delete()
+        .eq("id", row.id)
+        .select("id");
+      if (error || !data?.length) {
+        setFailed(error?.message ?? "That plan could not be deleted.");
+        return;
+      }
+      router.refresh();
+    });
+  }
 
   const columns: DataColumn<PlanRow>[] = [
     {
@@ -130,9 +297,45 @@ export function PlansList({ rows, editable }: { rows: PlanRow[]; editable: boole
       sortValue: (r) => r.slotCount,
       render: (r) => <span className="tabular-nums text-muted">{r.slotCount}</span>,
     },
+    // The row's own commands, in the app's ⋯ idiom. Unlabelled and pinned out
+    // of the Columns menu: it is a control column, not a field.
+    ...(editable
+      ? ([
+          {
+            key: "actions",
+            label: "",
+            width: 60,
+            align: "right",
+            render: (r: PlanRow) => (
+              <RowMenu
+                label={`Actions for ${r.title}`}
+                items={[
+                  {
+                    label: "Duplicate plan",
+                    hint: "An inactive copy, with its trays, items and pars",
+                    disabled: pending,
+                    onSelect: () => duplicatePlan(r),
+                  },
+                  {
+                    label: "Delete plan",
+                    hint: r.trayCount
+                      ? `Removes it and its ${r.trayCount} tray${r.trayCount === 1 ? "" : "s"}`
+                      : "Removes it from the book",
+                    danger: true,
+                    disabled: pending,
+                    onSelect: () => deletePlan(r),
+                  },
+                ]}
+              />
+            ),
+          },
+        ] as DataColumn<PlanRow>[])
+      : []),
   ];
 
   return (
+    <>
+      {failed ? <p className="mb-3 text-[13px] text-accent">{failed}</p> : null}
     <DataTable
       rows={visible}
       columns={columns}
@@ -152,5 +355,6 @@ export function PlansList({ rows, editable }: { rows: PlanRow[]; editable: boole
         />
       }
     />
+    </>
   );
 }

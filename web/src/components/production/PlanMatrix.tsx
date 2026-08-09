@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { Fragment, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -8,11 +8,53 @@ import { createClient } from "@/lib/supabase/client";
 import { PickList } from "@/components/ui/PickList";
 import { TextInput } from "@/components/ui/TextInput";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
-import { WEEKDAYS, buildMatrix } from "@/lib/productionPlans";
+import { RowMenu } from "@/components/ui/RowMenu";
+import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { TabPicker } from "@/components/ui/TabPicker";
+import { StickyFooter } from "@/components/ui/StickyFooter";
+import {
+  WEEKDAYS,
+  buildMatrix,
+  defaultParFor,
+  slotParLabel,
+  stepPar,
+  nextTrayNumber,
+  type DefaultPars,
+  type TraySlot,
+  type MatrixGrouping,
+  type ItemTaxonomy,
+} from "@/lib/productionPlans";
+import { useSlotDrag, type SlotDragSource, type SlotDropTarget } from "@/lib/planSlotDrag";
 
 export type MatrixTray = { id: string; tray_number: string; band: string | null; sort: number | null };
-export type MatrixSlot = { id: string; tray_id: string; weekday: number; item_id: string };
-export type MatrixItem = { id: string; name: string; taxonomy: string };
+export type MatrixSlot = {
+  id: string;
+  tray_id: string;
+  weekday: number;
+  item_id: string;
+  par: number | null;
+};
+export type MatrixItem = {
+  id: string;
+  name: string;
+  taxonomy: string;
+  tally_box_size: number;
+  item_type: string | null;
+  subtype: string | null;
+  finish: string | null;
+};
+
+/**
+ * The tray column's fixed width — just the number and its band now that the
+ * row's controls have moved to the other end.
+ */
+const TRAY_COLUMN = 40;
+/**
+ * The controls column at the far right: the row's stepper pair (16px) beside
+ * `RowMenu`'s 36px trigger. It took the 20px the tray column gave up, so the
+ * seven days are exactly as wide as before.
+ */
+const MENU_COLUMN = 60;
 
 /**
  * The tray × weekday matrix — FileMaker's best idea in this module, and the one
@@ -24,10 +66,17 @@ export type MatrixItem = { id: string; name: string; taxonomy: string };
  * items rather than a value, and there is nothing to sort by.
  *
  * Editing is one item at a time and writes immediately, like `InlineValue`
- * everywhere else: there is no draft of a menu to save. Removing is an ✕ on the
- * chip. Both `.select()` their own result — with no matching RLS policy
- * Postgres changes nothing and PostgREST returns no error, which reads as a
- * cheerful success.
+ * everywhere else: there is no draft of a menu to save. Every write `.select()`s
+ * its own result — with no matching RLS policy Postgres changes nothing and
+ * PostgREST returns no error, which reads as a cheerful success.
+ *
+ * Since migration 043 a slot is `[item] [par]`, and the par has THREE states,
+ * which are the order guide's three: a number, a deliberate 0 ("on the menu,
+ * making none"), and null ("nobody has said"), rendered as a yellow "—".
+ *
+ * Four gestures share a cell and they must not fight: the item NAME is the drag
+ * handle, the steppers move the par by one box, the par itself is an
+ * `InlineValue` you click into, and the ✕ takes the item off the tray.
  */
 export function PlanMatrix({
   planId,
@@ -35,7 +84,9 @@ export function PlanMatrix({
   trays,
   slots,
   items,
+  defaultPars,
   bands,
+  reviewDefaults = false,
   editable,
 }: {
   planId: string;
@@ -43,8 +94,20 @@ export function PlanMatrix({
   trays: MatrixTray[];
   slots: MatrixSlot[];
   items: MatrixItem[];
+  /**
+   * Each item's DEFAULT par at the shop this plan sells at, seven ISO slots —
+   * the seed a new slot's par is prefilled from, and the only thing
+   * `production_item_locations.par_by_weekday` is still for.
+   */
+  defaultPars: DefaultPars;
   /** The band vocabulary already in use across this org's plans. */
   bands: string[];
+  /**
+   * Offer every shop default that disagrees with a par, not just the slots a
+   * drag just landed on — how a DUPLICATED plan opens, so the copy can be
+   * re-based on the new shop's own numbers one tap at a time.
+   */
+  reviewDefaults?: boolean;
   editable: boolean;
 }) {
   const router = useRouter();
@@ -52,54 +115,269 @@ export function PlanMatrix({
   const [failed, setFailed] = useState<string | null>(null);
   const [adding, setAdding] = useState<{ trayId: string; weekday: number } | null>(null);
   const [newTray, setNewTray] = useState(false);
+  const [editing, setEditing] = useState<MatrixTray | null>(null);
+  /**
+   * How the trays are ORDERED on screen. Local state, not the URL: it changes
+   * nothing about what the plan IS, `production_plan_trays.sort` is untouched
+   * either way, and a plan is read in one sitting.
+   */
+  const [grouping, setGrouping] = useState<MatrixGrouping>("tray");
+  /**
+   * Slots a drag has landed on, each with the destination's own default par —
+   * shown as a one-tap `→` beside that par when the two disagree.
+   *
+   * This is where "should the par travel or be re-seeded?" is answered: it
+   * TRAVELS, and the other answer is OFFERED, visible and reversible, instead of
+   * being encoded in which half of a cell you hit. The receiving screen's idiom
+   * — nothing prefills, the app's number sits beside yours and you take it.
+   *
+   * Held in state rather than derived, exactly like the receiving screen's undo
+   * band: plenty of slots legitimately differ from their default, and offering
+   * on all of them would be noise. This is about the ones you just moved.
+   *
+   * IT STAYS UNTIL DISMISSED (Mark, 2026-08-08). It used to clear on your next
+   * action, which meant moving three items and then touching anything lost the
+   * question before you had answered it — and the whole point of offering rather
+   * than applying is that you get to decide in your own time. A record rather
+   * than one entry, so a run of drags leaves a run of offers; each carries its
+   * own ✕, and taking one settles it.
+   */
+  const [landed, setLanded] = useState<Record<string, number>>({});
+  /** Slots whose offer has been answered "no" — needed for the review mode,
+   *  where the offer is DERIVED and so cannot be cleared by forgetting it. */
+  const [dismissed, setDismissed] = useState<Record<string, true>>({});
+
+  /** Stop offering for this slot, without changing its par. */
+  function dismissLanded(rowId: string) {
+    setDismissed((prev) => ({ ...prev, [rowId]: true }));
+    setLanded((prev) => {
+      if (!(rowId in prev)) return prev;
+      const next = { ...prev };
+      delete next[rowId];
+      return next;
+    });
+  }
+
+  /**
+   * The default this slot could take instead of the par it carries, or null for
+   * no offer.
+   *
+   * ONE function for both routes into it: a drag that just landed (`landed`,
+   * explicit and per-slot) and a whole duplicated plan (`reviewDefaults`,
+   * derived from every slot). Answering is the same act either way, so
+   * `dismissed` covers both — the derived offer cannot be cleared by forgetting
+   * it, which is why that set exists at all.
+   */
+  function suggestionFor(slot: TraySlot, weekday: number): number | null {
+    if (dismissed[slot.rowId]) return null;
+    const explicit = landed[slot.rowId];
+    if (explicit !== undefined) return explicit === slot.par ? null : explicit;
+    if (!reviewDefaults) return null;
+    const seeded = defaultParFor(defaultPars, slot.itemId, weekday);
+    return seeded !== null && seeded !== slot.par ? seeded : null;
+  }
+  const tableRef = useRef<HTMLTableElement | null>(null);
 
   const itemNames = new Map(items.map((i) => [i.id, i.name]));
-  const matrix = buildMatrix(trays, slots, itemNames);
+  // The step for a par is the item's OWN tally box size (037), so the number a
+  // par moves by and the number the printed tally strip counts in are one fact.
+  const boxSize = new Map(items.map((i) => [i.id, i.tally_box_size]));
+  const stepFor = (itemId: string) => boxSize.get(itemId) ?? 6;
+  // The taxonomy the `type` grouping sorts and bands by.
+  const taxonomy = new Map<string, ItemTaxonomy>(
+    items.map((i) => [i.id, { item_type: i.item_type, subtype: i.subtype, finish: i.finish }])
+  );
+  const matrix = buildMatrix(trays, slots, itemNames, grouping, taxonomy);
 
-  function addItem(trayId: string, weekday: number, itemId: string) {
-    if (!itemId) return;
+  /** One write, one refresh, one place to report the failure. */
+  function run(work: (supabase: ReturnType<typeof createClient>) => Promise<string | null>) {
     setFailed(null);
     start(async () => {
-      const supabase = createClient();
-      // org_id EXPLICITLY — design rule 1.
-      const { data, error } = await supabase
-        .from("production_plan_tray_items")
-        .insert({ org_id: orgId, tray_id: trayId, weekday, item_id: itemId })
-        .select("id");
-      if (error || !data?.length) {
-        setFailed(
-          /duplicate key|unique/.test(error?.message ?? "")
-            ? "That item is already on this tray that day."
-            : error?.message ?? "That could not be added."
-        );
+      const message = await work(createClient());
+      if (message) {
+        setFailed(message);
         return;
       }
-      setAdding(null);
       router.refresh();
     });
   }
 
+  function addItem(trayId: string, weekday: number, itemId: string) {
+    if (!itemId) return;
+    run(async (supabase) => {
+      // org_id EXPLICITLY — design rule 1.
+      //
+      // The par is SEEDED from the item's default at this shop on this weekday
+      // (043), and from here on the slot owns it: nothing re-reads the default,
+      // so changing it later does not move a plan already built. Null when the
+      // item has no default, or has one of zero — decision 2's third state,
+      // which needs no special case here.
+      const { data, error } = await supabase
+        .from("production_plan_tray_items")
+        .insert({
+          org_id: orgId,
+          tray_id: trayId,
+          weekday,
+          item_id: itemId,
+          par: defaultParFor(defaultPars, itemId, weekday),
+        })
+        .select("id");
+      if (error || !data?.length) {
+        return /duplicate key|unique/.test(error?.message ?? "")
+          ? "That item is already on this tray that day."
+          : error?.message ?? "That could not be added.";
+      }
+      setAdding(null);
+      return null;
+    });
+  }
+
   function removeSlot(rowId: string) {
-    setFailed(null);
-    start(async () => {
-      const supabase = createClient();
+    run(async (supabase) => {
       const { data, error } = await supabase
         .from("production_plan_tray_items")
         .delete()
         .eq("id", rowId)
         .select("id");
+      return error || !data?.length ? error?.message ?? "That could not be removed." : null;
+    });
+  }
+
+  /** One box up or down on a single slot. */
+  function stepSlot(slot: TraySlot, direction: 1 | -1) {
+    const next = stepPar(slot.par, stepFor(slot.itemId), direction);
+    if (next === slot.par) return; // already on the floor
+    run(async (supabase) => {
+      const { data, error } = await supabase
+        .from("production_plan_tray_items")
+        .update({ par: next })
+        .eq("id", slot.rowId)
+        .select("id");
+      return error || !data?.length ? error?.message ?? "That par could not be changed." : null;
+    });
+  }
+
+  /**
+   * One box up or down across the WHOLE tray row — FMP's second pair of
+   * steppers, beside the tray number.
+   *
+   * Grouped by the resulting value rather than one statement per slot: each item
+   * brings its own box size and each slot its own current par, but a tray's
+   * seven days usually land on two or three distinct answers, so this is two or
+   * three updates rather than a dozen.
+   */
+  function stepTray(days: TraySlot[][], direction: 1 | -1) {
+    const groups = new Map<number, string[]>();
+    for (const slot of days.flat()) {
+      const next = stepPar(slot.par, stepFor(slot.itemId), direction);
+      if (next === slot.par) continue;
+      groups.set(next, [...(groups.get(next) ?? []), slot.rowId]);
+    }
+    if (!groups.size) return;
+    run(async (supabase) => {
+      const results = await Promise.all(
+        [...groups].map(([par, ids]) =>
+          supabase.from("production_plan_tray_items").update({ par }).in("id", ids).select("id")
+        )
+      );
+      const bad = results.find((r) => r.error || !r.data?.length);
+      return bad ? bad.error?.message ?? "That tray could not be changed." : null;
+    });
+  }
+
+  /**
+   * Move an item to another slot, or COPY it there — whichever half of the
+   * destination cell you let go over.
+   *
+   * THE PAR ALWAYS TRAVELS. A move gets it for free, being the same row; a copy
+   * hands it over explicitly. It is the number you typed or stepped, and a
+   * reposition must not quietly rewrite it — nor may it re-read the item's
+   * default, which 043 spent a migration turning into a seed that is consumed
+   * once and never read again.
+   *
+   * Where the destination's own default disagrees, that is OFFERED afterwards
+   * (`landed`) rather than applied: a Wednesday 18 dragged to Saturday, where
+   * DF01 plans 36, is a real question, and the honest place to ask it is on the
+   * screen with both numbers visible.
+   */
+  function dropSlot(source: SlotDragSource, target: SlotDropTarget, copy: boolean) {
+    run(async (supabase) => {
+      const { data, error } = copy
+        ? await supabase
+            .from("production_plan_tray_items")
+            .insert({
+              org_id: orgId,
+              tray_id: target.trayId,
+              weekday: target.weekday,
+              item_id: source.itemId,
+              par: source.par,
+            })
+            .select("id")
+        : await supabase
+            .from("production_plan_tray_items")
+            .update({ tray_id: target.trayId, weekday: target.weekday })
+            .eq("id", source.rowId)
+            .select("id");
       if (error || !data?.length) {
-        setFailed(error?.message ?? "That could not be removed.");
-        return;
+        return /duplicate key|unique/.test(error?.message ?? "")
+          ? `${source.name} is already on that tray that day.`
+          : error?.message ?? `${source.name} could not be ${copy ? "copied" : "moved"}.`;
       }
-      router.refresh();
+      // The row that now sits at the destination: a copy's new id, or the moved
+      // row's own. Added to the offers already on screen rather than replacing
+      // them — a run of drags leaves a run of questions, each still answerable.
+      const suggested = defaultParFor(defaultPars, source.itemId, target.weekday);
+      if (suggested !== null && suggested !== source.par) {
+        const rowId = data[0].id as string;
+        setLanded((prev) => ({ ...prev, [rowId]: suggested }));
+      }
+      return null;
+    });
+  }
+
+  /** Take the destination's default for a slot a drag landed on. */
+  function takeSuggested(rowId: string, par: number) {
+    dismissLanded(rowId);
+    run(async (supabase) => {
+      const { data, error } = await supabase
+        .from("production_plan_tray_items")
+        .update({ par })
+        .eq("id", rowId)
+        .select("id");
+      return error || !data?.length ? error?.message ?? "That par could not be changed." : null;
+    });
+  }
+
+  const { dragging, startSlotDrag, chipRef, moveZoneRef, copyZoneRef } = useSlotDrag({
+    tableRef,
+    onDrop: dropSlot,
+  });
+
+  /**
+   * Change a tray's CATEGORY — "Edit category" on the ⋯ menu.
+   *
+   * The column is still `band`, which is what 039 called it and what every
+   * reader downstream selects; only the word on screen changed (Mark,
+   * 2026-08-08: "Category… would be more intuitive"). Same split as `admin`
+   * displaying as "Manager" — rename the label, leave the schema alone.
+   */
+  function setCategory(trayId: string, category: string) {
+    run(async (supabase) => {
+      const { data, error } = await supabase
+        .from("production_plan_trays")
+        .update({ band: category.trim() || null })
+        .eq("id", trayId)
+        .select("id");
+      if (error || !data?.length) {
+        return error?.message ?? "That category could not be changed.";
+      }
+      setEditing(null);
+      return null;
     });
   }
 
   function addTray(trayNumber: string, band: string) {
-    setFailed(null);
-    start(async () => {
-      const supabase = createClient();
+    run(async (supabase) => {
       const { data, error } = await supabase
         .from("production_plan_trays")
         .insert({
@@ -111,15 +389,93 @@ export function PlanMatrix({
         })
         .select("id");
       if (error || !data?.length) {
-        setFailed(
-          /duplicate key|unique/.test(error?.message ?? "")
-            ? `This plan already has a tray ${trayNumber.trim()}.`
-            : error?.message ?? "That tray could not be added."
-        );
-        return;
+        return /duplicate key|unique/.test(error?.message ?? "")
+          ? `This plan already has a tray ${trayNumber.trim()}.`
+          : error?.message ?? "That tray could not be added.";
       }
       setNewTray(false);
-      router.refresh();
+      return null;
+    });
+  }
+
+  /**
+   * Take a tray off the plan, and everything on it with it (039's slots cascade
+   * from the tray).
+   *
+   * It exists because DUPLICATE exists: a one-tap way to create a tray with no
+   * way to remove one is a one-way door, and the first thing anybody does with a
+   * copy button is make a copy they didn't want. `window.confirm` naming what is
+   * about to go, matching the PO batch-delete pattern — a tray carrying nine
+   * items is a real amount of work to lose.
+   */
+  function removeTray(tray: MatrixTray, days: TraySlot[][]) {
+    const held = days.flat().length;
+    if (
+      !window.confirm(
+        held
+          ? `Remove tray ${tray.tray_number} from this plan, and the ${held} item${
+              held === 1 ? "" : "s"
+            } on it?`
+          : `Remove tray ${tray.tray_number} from this plan?`
+      )
+    ) {
+      return;
+    }
+    run(async (supabase) => {
+      const { data, error } = await supabase
+        .from("production_plan_trays")
+        .delete()
+        .eq("id", tray.id)
+        .select("id");
+      return error || !data?.length
+        ? error?.message ?? "That tray could not be removed."
+        : null;
+    });
+  }
+
+  /**
+   * Copy a tray and everything on it, pars included — a display case is mostly
+   * variations on a tray you already built.
+   *
+   * Tray FIRST, then its slots: a tray with nothing on it is visible and one
+   * gesture from being fixed, where slots with no tray cannot exist at all.
+   */
+  function duplicateTray(tray: MatrixTray, days: TraySlot[][]) {
+    const number = nextTrayNumber(trays.map((t) => t.tray_number), tray.tray_number);
+    run(async (supabase) => {
+      const { data: made, error } = await supabase
+        .from("production_plan_trays")
+        .insert({
+          org_id: orgId,
+          plan_id: planId,
+          tray_number: number,
+          band: tray.band,
+          sort: trays.length + 1,
+        })
+        .select("id");
+      if (error || !made?.length) {
+        return error?.message ?? "That tray could not be duplicated.";
+      }
+      const rows = days.flatMap((day, i) =>
+        day.map((slot) => ({
+          org_id: orgId,
+          tray_id: made[0].id as string,
+          weekday: WEEKDAYS[i].iso,
+          item_id: slot.itemId,
+          par: slot.par,
+        }))
+      );
+      if (!rows.length) return null;
+      const { data: copied, error: slotError } = await supabase
+        .from("production_plan_tray_items")
+        .insert(rows)
+        .select("id");
+      if (slotError || copied?.length !== rows.length) {
+        return `Tray ${number} was created, but its items could not be copied: ${
+          slotError?.message ?? "nothing was written"
+        }`;
+      }
+      return null;
     });
   }
 
@@ -127,85 +483,358 @@ export function PlanMatrix({
     <div className="space-y-3">
       {failed ? <p className="text-[13px] text-accent">{failed}</p> : null}
 
+      {/* A control that changes what the list SHOWS goes with the list, never
+          in a command bar — and every one-of-N choice in this app is a
+          TabPicker. */}
+      {trays.length > 1 ? (
+        <div className="space-y-1.5">
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Group by
+          </span>
+          <TabPicker<MatrixGrouping>
+            ariaLabel="Group trays by"
+            value={grouping}
+            onChange={setGrouping}
+            options={[
+              { key: "tray", label: "Tray" },
+              { key: "category", label: "Category" },
+              { key: "type", label: "Item type" },
+            ]}
+          />
+        </div>
+      ) : null}
+
       <div className="overflow-x-auto">
-        <table className="w-full border-collapse text-[13px]">
+        {/* `table-fixed` is what makes the widths below actual widths. Without
+            it the browser lays the table out by content and a long item name
+            stretches its own column, so the seven days drift apart. */}
+        <table ref={tableRef} className="w-full table-fixed border-collapse text-[13px]">
           <thead>
             <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
-              <th className="w-[120px] px-2 py-2 text-left">Tray</th>
+              <th className="px-1 py-2 text-left" style={{ width: TRAY_COLUMN }}>
+                {/* "#" on screen (Mark, 2026-08-08) — the column holds "01",
+                    "7A", and the word was wider than the column it labelled.
+                    Still announced as "Tray", because a screen reader saying
+                    "number sign" names nothing. */}
+                <span aria-hidden="true">#</span>
+                <span className="sr-only">Tray</span>
+              </th>
               {WEEKDAYS.map((d) => (
-                <th key={d.iso} className="px-2 py-2 text-left">
+                <th
+                  key={d.iso}
+                  className="px-2 py-2 text-left"
+                  style={{ width: `calc((100% - ${TRAY_COLUMN + MENU_COLUMN}px) / 7)` }}
+                >
                   {d.short}
                 </th>
               ))}
+              <th className="px-1 py-2" style={{ width: MENU_COLUMN }}>
+                <span className="sr-only">Tray actions</span>
+              </th>
             </tr>
           </thead>
           <tbody>
-            {matrix.map((row) => (
-              <tr key={row.tray.id} className="align-top">
-                <td className="px-2 py-2">
-                  <span className="block font-medium">{row.tray.tray_number}</span>
-                  {row.tray.band ? (
-                    <span className="block text-[11px] uppercase tracking-[0.08em] text-subtle">
-                      {row.tray.band}
-                    </span>
-                  ) : null}
-                </td>
-                {row.days.map((day, i) => {
-                  const weekday = WEEKDAYS[i].iso;
-                  const isAdding =
-                    adding?.trayId === row.tray.id && adding?.weekday === weekday;
-                  return (
-                    <td key={weekday} className="px-1 py-2 align-top">
-                      <div className="flex flex-col gap-1">
-                        {day.map((slot) => (
-                          <span
-                            key={slot.rowId}
-                            className="group flex items-start gap-1 border border-hairline px-1.5 py-1 leading-tight"
-                          >
-                            <span className="min-w-0 flex-1 break-words">{slot.name}</span>
-                            {editable ? (
+            {matrix.map((row) => {
+              const tray = trays.find((t) => t.id === row.tray.id);
+              return (
+                <Fragment key={row.tray.id}>
+                {/* One band per run, black with white text — the same mark
+                    `DataTable` uses, because a grey wash against tall rows reads
+                    as one more row rather than as a break between runs. */}
+                {row.groupLabel ? (
+                  <tr>
+                    <td
+                      colSpan={WEEKDAYS.length + 2}
+                      className="bg-ink px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white"
+                    >
+                      {row.groupLabel}
+                      {/* The run's tray count, dimmed — `DataTable`'s own band
+                          treatment, so a grouped plan reads like every other
+                          grouped list in the app. */}
+                      <span className="ml-2 font-normal normal-case tracking-normal text-white/55">
+                        {row.groupCount}
+                      </span>
+                    </td>
+                  </tr>
+                ) : null}
+                {/* The CUT — FileMaker's second level, its BANANA / VANILLA
+                    headings. Black on white rather than a filled band (Mark,
+                    2026-08-08): a second black rule would read as another
+                    break of the same weight, where this is a heading INSIDE
+                    one. The gap that separates the runs is on the last row of
+                    each, not here. */}
+                {row.subGroupLabel ? (
+                  <tr>
+                    <td
+                      colSpan={WEEKDAYS.length + 2}
+                      className="px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink"
+                    >
+                      {row.subGroupLabel}
+                    </td>
+                  </tr>
+                ) : null}
+                <tr className="group/tray align-top">
+                  <td className={`px-1 py-2 ${row.endsSubGroup ? "pb-6" : ""}`}>
+                    <div className="min-w-0">
+                      <span className="block truncate font-medium">{row.tray.tray_number}</span>
+                      {row.tray.band ? (
+                        <span className="block truncate text-[10px] uppercase tracking-[0.08em] text-subtle">
+                          {row.tray.band}
+                        </span>
+                      ) : null}
+                    </div>
+                  </td>
+                  {row.days.map((day, i) => {
+                    const weekday = WEEKDAYS[i].iso;
+                    const isAdding =
+                      adding?.trayId === row.tray.id && adding?.weekday === weekday;
+                    return (
+                      <td
+                        key={weekday}
+                        data-tray-id={row.tray.id}
+                        data-weekday={weekday}
+                        className={`px-2 py-2 align-top ${row.endsSubGroup ? "pb-6" : ""}`}
+                      >
+                        <div className="flex flex-col gap-1">
+                          {day.map((slot) => (
+                            <span
+                              key={slot.rowId}
+                              // ONE line, TWO groups (Mark, 2026-08-08):
+                              // `[item ✕] [par ▲▼]`. The ✕ belongs with the
+                              // thing it removes and the steppers with the
+                              // number they move, so each pair reads as a pair —
+                              // which the old `name · steppers · par · ✕` did
+                              // not, having interleaved the two.
+                              className="group flex flex-col border border-hairline px-1.5 py-1 leading-tight"
+                            >
+                              <span className="flex items-start gap-1">
+                              <span className="flex min-w-0 flex-1 items-start gap-1">
+                              <span
+                                onPointerDown={
+                                  editable
+                                    ? (e) =>
+                                        startSlotDrag(e, {
+                                          rowId: slot.rowId,
+                                          itemId: slot.itemId,
+                                          name: slot.name,
+                                          par: slot.par,
+                                          trayId: row.tray.id,
+                                          weekday,
+                                        })
+                                    : undefined
+                                }
+                                title={
+                                  editable
+                                    ? "Drag to another day — hold Option to copy"
+                                    : undefined
+                                }
+                                className={`min-w-0 flex-1 break-words ${
+                                  editable ? "cursor-grab select-none touch-pan-y" : ""
+                                }`}
+                              >
+                                {slot.name}
+                              </span>
+                              {editable ? (
+                                <button
+                                  type="button"
+                                  onClick={() => removeSlot(slot.rowId)}
+                                  disabled={pending}
+                                  aria-label={`Remove ${slot.name} from tray ${row.tray.tray_number} on ${WEEKDAYS[i].long}`}
+                                  className="shrink-0 text-subtle opacity-0 transition-opacity hover:text-accent focus:opacity-100 group-hover:opacity-100"
+                                >
+                                  ✕
+                                </button>
+                              ) : null}
+                              </span>
+
+                              <span className="flex shrink-0 items-start gap-1">
+                                {/* Fixed width so the steppers sit at the same x
+                                    in every cell, however wide the number. */}
+                                <span className="w-6 shrink-0">
+                                  {editable ? (
+                                    <InlineValue
+                                      table="production_plan_tray_items"
+                                      id={slot.rowId}
+                                      column="par"
+                                      kind="number"
+                                      value={slot.par}
+                                      placeholder="—"
+                                      // Yellow rather than faint: an unset par is
+                                      // worth your eye, because that slot makes
+                                      // nothing. A zero is black — somebody said it.
+                                      emptyClassName="text-mark"
+                                      align="right"
+                                      ariaLabel={`How many ${slot.name} on tray ${row.tray.tray_number}, ${WEEKDAYS[i].long}`}
+                                    />
+                                  ) : (
+                                    <span
+                                      className={`${READ_ONLY_VALUE} block text-right tabular-nums ${
+                                        slot.par === null ? "text-mark" : ""
+                                      }`}
+                                    >
+                                      {slotParLabel(slot.par)}
+                                    </span>
+                                  )}
+                                </span>
+                                {editable ? (
+                                  <Steppers
+                                    disabled={pending}
+                                    onUp={() => stepSlot(slot, 1)}
+                                    onDown={() => stepSlot(slot, -1)}
+                                    labelUp={`Raise ${slot.name} by one box`}
+                                    labelDown={`Lower ${slot.name} by one box`}
+                                  />
+                                ) : null}
+                              </span>
+                              </span>
+
+                              {/* The destination's own default, offered on the
+                                  slot a drag just landed on — the receiving
+                                  screen's `→` idiom, so taking it is one tap and
+                                  ignoring it is none.
+
+                                  On its OWN line, which does not breach the
+                                  one-line rule above: that rule is about the
+                                  chip at REST, and this is a transient offer
+                                  that clears on your next action. Squeezed onto
+                                  the main line it took the width the name needs
+                                  and broke "Angry Samoa" into "Angr/y/Sam/oa". */}
+                              {editable && suggestionFor(slot, weekday) !== null ? (
+                                <span className="mt-0.5 flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => takeSuggested(slot.rowId, suggestionFor(slot, weekday) as number)}
+                                    disabled={pending}
+                                    title={`${WEEKDAYS[i].long}'s default here is ${suggestionFor(slot, weekday)} — use it instead of ${slotParLabel(slot.par)}`}
+                                    aria-label={`Use ${WEEKDAYS[i].long}'s default of ${suggestionFor(slot, weekday)} for ${slot.name}`}
+                                    className="whitespace-nowrap text-[11px] tabular-nums text-mark hover:text-ink"
+                                  >
+                                    → use default {suggestionFor(slot, weekday)}
+                                  </button>
+                                  {/* Its own ✕: the offer now outlives your next
+                                      action, so it needs a way to be answered
+                                      "no" as well as "yes". */}
+                                  <button
+                                    type="button"
+                                    onClick={() => dismissLanded(slot.rowId)}
+                                    title={`Keep ${slotParLabel(slot.par)} for ${slot.name}`}
+                                    aria-label={`Dismiss the default-par suggestion for ${slot.name} on ${WEEKDAYS[i].long}`}
+                                    className="text-[10px] leading-none text-subtle hover:text-ink"
+                                  >
+                                    ✕
+                                  </button>
+                                </span>
+                              ) : null}
+                            </span>
+                          ))}
+                          {editable ? (
+                            isAdding ? (
+                              <PickList
+                                variant="field"
+                                ariaLabel={`Add an item to tray ${row.tray.tray_number} on ${WEEKDAYS[i].long}`}
+                                value=""
+                                // "+ add" already said you want to choose
+                                // something, so the list is open when it
+                                // arrives — and since 307 items make it
+                                // searchable, the cursor lands in the find box
+                                // ready to type. Dismissing puts "+ add" back
+                                // rather than leaving an empty field where the
+                                // command used to be.
+                                defaultOpen
+                                onClose={() => setAdding(null)}
+                                onPick={(v) => addItem(row.tray.id, weekday, v)}
+                                // The hint carries the DEFAULT this item would
+                                // arrive with, so the number is on screen before
+                                // you choose rather than after — which is the
+                                // whole reason the defaults are fetched with the
+                                // page rather than looked up at click time.
+                                options={items.map((it) => {
+                                  const seed = defaultParFor(defaultPars, it.id, weekday);
+                                  return {
+                                    value: it.id,
+                                    label: it.name,
+                                    hint:
+                                      seed === null ? it.taxonomy : `${it.taxonomy} · par ${seed}`,
+                                  };
+                                })}
+                                placeholder="Which item…"
+                              />
+                            ) : (
                               <button
                                 type="button"
-                                onClick={() => removeSlot(slot.rowId)}
-                                disabled={pending}
-                                aria-label={`Remove ${slot.name} from tray ${row.tray.tray_number} on ${WEEKDAYS[i].long}`}
-                                className="shrink-0 text-subtle opacity-0 transition-opacity hover:text-accent focus:opacity-100 group-hover:opacity-100"
+                                onClick={() => setAdding({ trayId: row.tray.id, weekday })}
+                                className="border border-dashed border-hairline px-1.5 py-1 text-left text-[11px] uppercase tracking-[0.08em] text-subtle hover:border-ink hover:text-ink"
                               >
-                                ✕
+                                + add
                               </button>
-                            ) : null}
-                          </span>
-                        ))}
-                        {editable ? (
-                          isAdding ? (
-                            <PickList
-                              variant="field"
-                              ariaLabel={`Add an item to tray ${row.tray.tray_number} on ${WEEKDAYS[i].long}`}
-                              value=""
-                              onPick={(v) => addItem(row.tray.id, weekday, v)}
-                              options={items.map((it) => ({
-                                value: it.id,
-                                label: it.name,
-                                hint: it.taxonomy,
-                              }))}
-                              placeholder="Which item…"
-                            />
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => setAdding({ trayId: row.tray.id, weekday })}
-                              className="border border-dashed border-hairline px-1.5 py-1 text-left text-[11px] uppercase tracking-[0.08em] text-subtle hover:border-ink hover:text-ink"
-                            >
-                              + add
-                            </button>
-                          )
-                        ) : null}
-                      </div>
-                    </td>
-                  );
-                })}
-              </tr>
-            ))}
+                            )
+                          ) : null}
+                        </div>
+                      </td>
+                    );
+                  })}
+                  {/* The row's OWN controls, together at the end of the row it
+                      acts on (Mark, 2026-08-08): the stepper pair that moves the
+                      whole week, then the ⋯. `px-0` because the two of them are
+                      exactly this column's width and RowMenu's 36px trigger
+                      carries its own whitespace. */}
+                  <td className={`px-0 py-2 align-top ${row.endsSubGroup ? "pb-6" : ""}`}>
+                    <div className="flex items-start justify-end gap-1">
+                    {editable ? (
+                      // Dropped 5px to sit on the same line as every per-day
+                      // stepper in its row — which is exactly the chip's 1px
+                      // border plus its 4px top padding, the two things that
+                      // stand between a cell's top and the stepper inside it.
+                      // Measured, not guessed; if the chip's padding changes,
+                      // this changes with it.
+                      <span className="mt-[5px]">
+                        <Steppers
+                          disabled={pending}
+                          onUp={() => stepTray(row.days, 1)}
+                          onDown={() => stepTray(row.days, -1)}
+                          labelUp={`Raise every par on tray ${row.tray.tray_number} by one box`}
+                          labelDown={`Lower every par on tray ${row.tray.tray_number} by one box`}
+                        />
+                      </span>
+                    ) : null}
+                    {editable && tray ? (
+                      <RowMenu
+                        label={`Actions for tray ${row.tray.tray_number}`}
+                        items={[
+                          {
+                            label: "Edit category",
+                            hint: row.tray.band
+                              ? `Currently ${row.tray.band}`
+                              : "This tray has none",
+                            onSelect: () => setEditing(tray),
+                          },
+                          {
+                            label: "Duplicate",
+                            hint: "A new tray carrying the same items and pars",
+                            onSelect: () => duplicateTray(tray, row.days),
+                          },
+                          {
+                            label: "Delete",
+                            hint: (() => {
+                              const held = row.days.flat().length;
+                              return held
+                                ? `Removes the tray and the ${held} item${
+                                    held === 1 ? "" : "s"
+                                  } on it`
+                                : "Removes the tray from this plan";
+                            })(),
+                            danger: true,
+                            onSelect: () => removeTray(tray, row.days),
+                          },
+                        ]}
+                      />
+                    ) : null}
+                    </div>
+                  </td>
+                </tr>
+                </Fragment>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -217,14 +846,47 @@ export function PlanMatrix({
         </p>
       ) : null}
 
+      {/* PINNED to the foot of the window (Mark, 2026-08-08). A plan runs to a
+          dozen trays and more, so a command that lived under the table was a
+          scroll away from the rows you were building. `StickyFooter` measures
+          its own height into a spacer, so the table's last row never hides
+          behind it. */}
       {editable ? (
-        <button
-          type="button"
-          onClick={() => setNewTray(true)}
-          className="inline-flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
-        >
-          Add tray
-        </button>
+        <StickyFooter spacerClassName="-mt-3">
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setNewTray(true)}
+              className="inline-flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
+            >
+              Add tray
+            </button>
+            {/* The grand total, beside the command that changes it. It repeats
+                the heading's own count deliberately: once the footer is pinned
+                the heading has scrolled away, and this is the line that stays
+                with you while you build. */}
+            <span className="text-[13px] text-muted">
+              {trays.length} tray{trays.length === 1 ? "" : "s"} on this plan
+            </span>
+          </div>
+        </StickyFooter>
+      ) : null}
+
+      {/* The drag overlay: the two drop zones and the chip in hand. All three
+          are positioned, labelled and restyled by the hook through refs — no
+          state per pointer move, so dragging never re-renders the trays. */}
+      {dragging ? (
+        <>
+          <div ref={moveZoneRef} style={{ display: "none" }} />
+          <div ref={copyZoneRef} style={{ display: "none" }} />
+          <div
+            ref={chipRef}
+            style={{ left: dragging.x, top: dragging.y }}
+            className="pointer-events-none fixed z-[70] -translate-y-1/2 translate-x-3 whitespace-nowrap border border-ink bg-white px-2 py-1 text-[12px]"
+          >
+            {dragging.name}
+          </div>
+        </>
       ) : null}
 
       {newTray ? (
@@ -235,7 +897,60 @@ export function PlanMatrix({
           onAdd={addTray}
         />
       ) : null}
+
+      {editing ? (
+        <EditCategoryDialog
+          tray={editing}
+          bands={bands}
+          pending={pending}
+          onClose={() => setEditing(null)}
+          onSave={(category) => setCategory(editing.id, category)}
+        />
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * FMP's stacked pair, and the reason it is a pair rather than a number box: a
+ * par moves by whole boxes, so the gesture that changes it should too.
+ *
+ * NO BORDER (Mark, 2026-08-08). A box around a 7px glyph spends most of its
+ * width on the box, and two of them stacked read as a control you have to
+ * decipher. Bare arrows can be half again as large in the same space, which is
+ * what makes the pair legible at a glance — the glyph IS the affordance, and it
+ * darkens on hover like every other quiet control here.
+ */
+function Steppers({
+  onUp,
+  onDown,
+  disabled,
+  labelUp,
+  labelDown,
+}: {
+  onUp: () => void;
+  onDown: () => void;
+  disabled: boolean;
+  labelUp: string;
+  labelDown: string;
+}) {
+  const cell =
+    "flex h-3 w-4 items-center justify-center text-[11px] leading-none text-subtle transition-colors hover:text-ink disabled:opacity-30";
+  return (
+    <span className="flex shrink-0 flex-col">
+      <button type="button" onClick={onUp} disabled={disabled} aria-label={labelUp} className={cell}>
+        ▲
+      </button>
+      <button
+        type="button"
+        onClick={onDown}
+        disabled={disabled}
+        aria-label={labelDown}
+        className={cell}
+      >
+        ▼
+      </button>
+    </span>
   );
 }
 
@@ -259,6 +974,12 @@ function NewTrayDialog({
       onClose={onClose}
       busy={pending}
       width="max-w-md"
+      // Enter commits, guarded by exactly what the commit button's `disabled`
+      // asks — an Enter that fires a refused write is worse than one that does
+      // nothing.
+      onSubmit={() => {
+        if (!pending && trayNumber.trim() !== "") onAdd(trayNumber, band);
+      }}
       footer={
         <>
           <button type="button" onClick={onClose} disabled={pending} className={DIALOG_CANCEL_CLASS}>
@@ -292,11 +1013,11 @@ function NewTrayDialog({
         </div>
         <div className="space-y-1.5">
           <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-            Band
+            Category
           </span>
           <PickList
             variant="field"
-            ariaLabel="Band"
+            ariaLabel="Category"
             value={band}
             onPick={setBand}
             options={bands.map((b) => ({ value: b, label: b }))}
@@ -304,6 +1025,81 @@ function NewTrayDialog({
             placeholder="RAISED, CLASSIC, SIGNATURE…"
           />
         </div>
+      </div>
+    </Dialog>
+  );
+}
+
+/**
+ * Change one tray's category — the ⋯ menu's "Edit category".
+ *
+ * A dialog rather than an inline cell because the tray column is 40px wide and
+ * this is a vocabulary you pick from, not a number you nudge; and `allowNew`,
+ * because the list of categories is the org's own and legitimately grows.
+ */
+function EditCategoryDialog({
+  tray,
+  bands,
+  pending,
+  onClose,
+  onSave,
+}: {
+  tray: MatrixTray;
+  bands: string[];
+  pending: boolean;
+  onClose: () => void;
+  onSave: (category: string) => void;
+}) {
+  const [category, setCategory] = useState(tray.band ?? "");
+
+  return (
+    <Dialog
+      title={`Tray ${tray.tray_number} category`}
+      onClose={onClose}
+      busy={pending}
+      width="max-w-md"
+      onSubmit={() => {
+        if (!pending) onSave(category);
+      }}
+      footer={
+        <>
+          <button type="button" onClick={onClose} disabled={pending} className={DIALOG_CANCEL_CLASS}>
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={() => onSave(category)}
+            disabled={pending}
+            className={DIALOG_COMMIT_CLASS}
+          >
+            {pending ? "Saving…" : "Save"}
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-1.5">
+        <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+          Category
+        </span>
+        <PickList
+          variant="field"
+          ariaLabel="Category"
+          value={category}
+          onPick={setCategory}
+          options={bands.map((b) => ({ value: b, label: b }))}
+          allowNew
+          placeholder="RAISED, CLASSIC, SIGNATURE…"
+        />
+        {/* Clearing it is a real answer — a tray with no category groups under
+            "No category" rather than disappearing. */}
+        <button
+          type="button"
+          onClick={() => setCategory("")}
+          disabled={pending || category === ""}
+          className="text-[11px] uppercase tracking-[0.08em] text-subtle hover:text-ink disabled:opacity-35"
+        >
+          Clear
+        </button>
       </div>
     </Dialog>
   );

@@ -90,6 +90,12 @@ export function NewElement({ orgId, types }: { orgId: string; types: string[] })
           title="New element"
           onClose={close}
           busy={pending}
+          // Enter commits, guarded by exactly what the commit button's
+          // `disabled` asks — an Enter that fires a refused write is worse
+          // than one that does nothing.
+          onSubmit={() => {
+            if (ready && !pending) add();
+          }}
           width="max-w-lg"
           footer={
             <>

@@ -272,7 +272,13 @@ export function DerivedDay({
             <span className="text-mark">
               {r.kitchenSplit
                 ? "Override went to the other kitchen"
-                : `Suppressed for today${r.overrideNote ? ` — ${r.overrideNote}` : ""}`}
+                : // Since 043 a suppression has two authors, and they get two
+                  // sentences. A zero on the PLAN comes through as "making none
+                  // today"; an override-zero has its reason nulled by the fold,
+                  // so it falls through to the wording it always had — plus the
+                  // note, which only an override can carry.
+                  r.hiddenReason ??
+                  `Suppressed for today${r.overrideNote ? ` — ${r.overrideNote}` : ""}`}
             </span>
           );
         }

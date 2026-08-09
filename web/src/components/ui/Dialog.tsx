@@ -49,6 +49,7 @@ export function Dialog({
   bodyClassName = "p-6",
   busy = false,
   ariaLabel,
+  onSubmit,
 }: {
   /** Shown in the black title bar. */
   title: ReactNode;
@@ -78,6 +79,26 @@ export function Dialog({
   busy?: boolean;
   /** Defaults to `title` when that's a plain string. */
   ariaLabel?: string;
+  /**
+   * What Enter does — the panel's commit, for a dialog that is a FORM.
+   *
+   * OPT-IN, and that is the design rather than an unfinished job. This panel's
+   * `footer` is arbitrary JSX, so the component genuinely cannot tell which of
+   * your buttons is the commit; and it should not guess, because the answer is
+   * sometimes "none of them". A dialog is given one iff Enter is unambiguous
+   * and safe there:
+   *
+   * - a CREATE form with fields — New tray, New plan, New employee — where
+   *   typing and pressing Enter is what a form has always meant;
+   * - NOT a destructive confirm, where a stray Enter is exactly the keystroke
+   *   you cannot take back (`DIALOG_DANGER_CLASS` panels have none);
+   * - NOT a panel with several peer commands — the export panel's Download
+   *   beside Finalize — where "the commit" isn't a single thing.
+   *
+   * Pass the same guard the commit button's `disabled` uses; an Enter that
+   * fires a refused write is worse than one that does nothing.
+   */
+  onSubmit?: () => void;
 }) {
   useEffect(() => {
     if (busy) return;
@@ -85,11 +106,32 @@ export function Dialog({
       if (e.key === "Escape") {
         e.stopPropagation();
         onClose();
+        return;
       }
+      if (e.key !== "Enter" || !onSubmit) return;
+      // ⌘↵ and friends are somebody else's shortcut (a multiline cell saves on
+      // ⌘↵), and an IME's Enter is committing a character, not a form.
+      if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.isComposing) return;
+
+      const el = document.activeElement;
+      // In a TEXTAREA Enter is a newline; on a BUTTON or a link the browser is
+      // already about to activate the thing you focused, and committing as well
+      // would fire two actions from one keystroke — including "Cancel, then
+      // submit anyway".
+      if (el instanceof HTMLTextAreaElement) return;
+      if (el instanceof HTMLButtonElement || el instanceof HTMLAnchorElement) return;
+      if (el instanceof HTMLElement && el.isContentEditable) return;
+      // An open PickList or ⋯ menu owns Enter — it is choosing an option, and
+      // the panel is PORTALLED to the body, so its own handler cannot stop this
+      // window listener from seeing the same keystroke.
+      if (document.querySelector('[role="listbox"], [role="menu"]')) return;
+
+      e.preventDefault();
+      onSubmit();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [busy, onClose]);
+  }, [busy, onClose, onSubmit]);
 
   return (
     <div

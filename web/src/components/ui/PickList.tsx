@@ -59,6 +59,8 @@ export function PickList({
   align = "left",
   variant = "inline",
   className = "",
+  defaultOpen = false,
+  onClose,
 }: {
   value: string | null;
   options: PickOption[];
@@ -81,13 +83,36 @@ export function PickList({
    */
   variant?: "inline" | "field";
   className?: string;
+  /**
+   * Open the panel as soon as this renders, rather than waiting for a click.
+   *
+   * For a picker that a button has just REVEALED — the plan matrix's "+ add"
+   * swaps itself for one of these — where pressing the button already said
+   * "I want to choose something" and a second click to open the list is a tap
+   * spent on nothing. Only ever pass it when the picker was summoned by a
+   * deliberate act; a list that opens itself on page load is a popup.
+   */
+  defaultOpen?: boolean;
+  /**
+   * Called when the panel closes WITHOUT a pick — Escape, or a click away.
+   *
+   * Lets a caller that revealed the picker put its button back, so an abandoned
+   * choice leaves no empty field sitting where the command used to be.
+   */
+  onClose?: () => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [term, setTerm] = useState("");
   const [active, setActive] = useState(0);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
+  // The DISMISS path — Escape, or a click away. `choose` closes without coming
+  // through here, because a pick is not an abandonment and a caller that put
+  // its button back on every close would tear the picker down mid-choice.
+  const close = useCallback(() => {
+    setOpen(false);
+    onClose?.();
+  }, [onClose]);
   const box = useAnchoredPanel({ open, triggerRef, panelRef, align, onClose: close });
 
   // A search box only earns its place on a long list; on five options it's one
@@ -166,7 +191,10 @@ export function PickList({
         onClick={() => {
           setTerm("");
           setActive(Math.max(0, listed.findIndex((o) => o.value === value)));
-          setOpen((v) => !v);
+          // Closing by pressing the trigger again is an abandonment like any
+          // other, so it goes through `close` rather than flipping the flag.
+          if (open) close();
+          else setOpen(true);
         }}
         onKeyDown={onTriggerKey}
         className={

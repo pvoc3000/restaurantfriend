@@ -20,13 +20,24 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
  * vary by day: item 32 is 18 all week at DF02 and 18/18/18/18/24/36/36 at
  * DF01, because Friday and the weekend are busier.
  *
- * IT IS READ-ONLY HERE, deliberately and temporarily. `InlineValue` writes a
- * whole COLUMN, and a par cell has to write one SLOT of a Postgres array —
- * there is no `jsonPath` equivalent for that, so an editor means either a new
- * component holding the array in state or a widening of `InlineValue`. Showing
- * the seven numbers is most of the value and none of the risk; a half-built
- * editor that writes the wrong slot would be worse than none. The order guide
- * is where a par gets changed in anger anyway.
+ * SINCE MIGRATION 043 IT IS A DEFAULT, NOT THE PAR. The par lives on the plan
+ * slot; this is the number a NEW slot is seeded with when the item is added to
+ * a plan at that shop, and nothing reads it at generation.
+ *
+ * IT IS READ-ONLY HERE, and the reason is no longer the one that used to be
+ * written down. That reason — "`InlineValue` writes a whole column and a par
+ * cell has to write one slot of a Postgres array" — has been false since 041
+ * shipped `arrayColumn`/`arrayIndex`/`arrayStrip`/`arrayWidth` for the recipe
+ * sheet. The real reason now is stronger: after 043 an edit here changes
+ * NOTHING THAT EXISTS. It reaches no plan, no schedule and no day; it only
+ * changes what some future slot on some future plan will start at. A
+ * live-looking editor whose effect is invisible until an unrelated act, on an
+ * unrelated screen, at an unspecified later time is worse than a read-only
+ * figure — it lies about its own reach. Building it properly would also mean
+ * /price-grid's "set" INSERT button, since most (item, location) pairs have no
+ * row at all to write to, which is real work for a column scheduled to be
+ * dropped once real plans carry the numbers. The plan is where a par is
+ * changed in anger, and it is one tap away.
  *
  * Enumerating over ACTIVE locations, never all of them — design rule 3.
  */
@@ -70,7 +81,7 @@ export function ProductionItemLocations({
     },
     {
       key: "par",
-      label: "Par by weekday",
+      label: "Default par",
       width: 340,
       render: (l) => (
         <span className="flex flex-wrap gap-x-3 gap-y-1 tabular-nums">
@@ -137,8 +148,11 @@ export function ProductionItemLocations({
           <div className="space-y-1">
             <SectionHeading count={pars.length}>Per location</SectionHeading>
             <p className="max-w-[80ch] text-[13px] text-muted">
-              A par of “–” means this shop has no par for that day. A price here
-              overrides the grid for this item at this shop only.
+              The default par is what a plan slot starts with when this item is
+              added to a plan at that shop. Changing it does not change plans
+              that already exist — the number on the plan is the one that gets
+              made. A price here overrides the grid for this item at this shop
+              only.
             </p>
           </div>
         }

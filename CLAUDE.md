@@ -1957,11 +1957,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    a row, the dough included, rendered as **"1/340 of a batch"** because that is
    how a baker says it, and anything unpriced says so on its own line rather
    than being dropped from the total.
-   **Per-location pars are READ-ONLY, deliberately**: `InlineValue` writes a
-   whole COLUMN and a par cell must write one SLOT of a Postgres array, so an
-   editor means a new component or widening `InlineValue`. Showing the seven
-   numbers is most of the value and none of the risk, and the order guide is
-   where a par is changed in anger. **That is the obvious next thing to build.**
+   **Per-location pars are READ-ONLY, and since 043 they are a DEFAULT rather
+   than the par** — the number a new plan slot is seeded with, nothing more.
+   This line used to say the reason was that `InlineValue` writes a whole COLUMN
+   while a par cell must write one SLOT of an array, and that **"is the obvious
+   next thing to build"**. Both halves are wrong now: 041 shipped
+   `arrayColumn`/`arrayIndex`/`arrayStrip`/`arrayWidth` for the recipe sheet, and
+   043 made the editor beside the point. **Do NOT build it.** After 043 an edit
+   there changes nothing that exists — no plan, no schedule, no day, only what
+   some future slot starts at — and a live-looking editor whose effect is
+   invisible until an unrelated act on an unrelated screen lies about its own
+   reach. The par is edited on the PLAN.
    Nav: Operations > Prices was an existing named stub and now points at the
    grid; if staff look for it under Production instead, it is one line.
    **Shipped, phase 3 — migration 039, APPLIED 2026-08-07.** `/plans` and
@@ -1995,7 +2001,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    plans, 0 trays, 0 slots.
    **`locations.kitchen_by_weekday` / `shops_for` are now VESTIGIAL** and should
    be retired from the Location record; that is not done yet.
-   **Shipped, phase 4 — migration 040, NEEDS APPLYING.** `/schedules` +
+   **Shipped, phase 4 — migration 040, APPLIED** (this line said NEEDS APPLYING
+   until 2026-08-08; probed that day — the tables select and `production_day`
+   executes. *Probe, don't read this file.*) `/schedules` +
    `/schedules/[id]` + `/production-day`, the generation function, and the
    printed packet. A PLAN is a proposal; a SCHEDULE is the committed day.
    **THE DERIVED DAY IS A FUNCTION, and that is the decision a rewrite is most
@@ -2418,6 +2426,287 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Exercised against the live database and left as found: the radio wrote
    `cost_column = 2`, the mark moved, the headline re-quoted at x3/4, and it was
    set back to null (0 versions carry one).
+   **THE PAR MOVED ONTO THE PLAN SLOT 2026-08-08 (migration 043, NEEDS
+   APPLYING).** Mark: "production pars should probably live here in the plan
+   rather than off the production item… each tray would have two fields instead
+   of one: [production_item] [par]." A slot is already keyed (tray, weekday,
+   item) and a plan carries the selling location, so the par lands on exactly
+   the axes it needs — and the old home stated the weekday axis TWICE. Measured
+   before the change: **184 of 311 par arrays vary by weekday**
+   (`DF01 [18,18,18,18,24,36,36]`, the weekend ramp), so that second axis
+   carried real information and duplicated the plan's own. Done at the cheapest
+   possible moment — 1 plan, 2 trays, 1 slot, 0 overrides, 0 schedules, so
+   nothing to data-migrate.
+   **THREE STATES, AND THEY ARE THE ORDER GUIDE'S THREE.** A number makes it; a
+   deliberate **0** means "on the menu, making none" and reads as SUPPRESSED,
+   keeping its tray position (taking it off the tray is how you say it is off
+   the menu); **null** is silence, a yellow "—", and the day says "no par set".
+   Zero and null being different sentences is the whole point, and
+   `slotParLabel` exists so the classic `par || "—"` can't quietly merge them.
+   **`production_item_locations.par_by_weekday` is now a SEED, not a source**
+   (013's shape — a PO line snapshots its price and then owns it). Adding an
+   item to a Saturday cell at DF01 prefills from that item's Saturday default;
+   nothing reads the array again. **A default of ZERO seeds NULL**
+   (`nullif`, both in the backfill and in `defaultParFor`): an old-array zero
+   meant "we don't make it that day", which is silence, and seeding it through
+   would manufacture a decision nobody made. The invariant: **a suppressed line
+   always traces back to a human act on the plan.** Measured — only 3 zero slots
+   exist in the whole dataset, none at DF01 or DF02, so that rule is chosen for
+   the invariant rather than the data. **No `par_source` on the slot**: nothing
+   rewrites a plan slot, so a seeded number is just the number you accepted.
+   The column is dropped LATER, once real plans carry the numbers.
+   Two SQL hunks beyond the column, each guarding a specific failure:
+   **the reason pick in `production_day`'s `planned` CTE** now yields a reason
+   only when nothing in the group can be made — with the par on the slot two
+   plans genuinely disagree, and the old arbitrary pick would print "making none
+   today" beside a par of twelve (under 040 every row in a group read the SAME
+   array cell, so the pick was harmless); and **`is_suppressed` is
+   `coalesce`d** — `sum()` over all-null pars is NULL, `not NULL` is not false,
+   and that expression is filtered on in FOUR places in
+   `generate_production_schedules`. `generate_production_schedules` itself is
+   UNCHANGED.
+   Known consequence, accepted: the receipt's `not_made` warning now fires for
+   every deliberately-zeroed slot, every night. If that gets noisy the fix is a
+   distinct warning kind, not silence.
+   **FOUND, NOT FIXED — an item switched off at a shop STILL GETS MADE.**
+   `is_makeable` is not one of `production_day`'s return columns and never has
+   been, and the fold has never consulted it; generation filters on
+   `par > 0 and not is_suppressed`. So `il.is_active` produces the sentence
+   "item inactive at this shop" and gates nothing — under 040 exactly as now.
+   Latent today (**0 of 307 items and 0 of 325 item-locations are inactive**),
+   which is why it was left alone rather than folded into a migration about
+   where the par lives. **Ask Mark before changing it**; the honest options are
+   to let a structurally-unavailable item read as suppressed, or to gate
+   generation on `is_makeable`.
+   Verified: all 43 migrations apply on the Docker harness, `security_invoker`
+   and the `authenticated` grant both survive the view's drop-and-recreate,
+   every row of the suppression table asserts (including the two behaviour
+   changes — an item with NO item-location row now makes, and a zero on one
+   plan is not a veto over another plan's twelve), no `is_suppressed` is ever
+   null, generation writes 5 lines totalling 72 with each refusal named in its
+   own words, a regeneration deletes the newly-zeroed line while keeping a
+   `manual` line and carrying actuals forward, the actuals refusal raises, and
+   as real authenticated roles **staff read 15 slots and update 0 with NO
+   error** while a purchaser updates 15 and `anon` gets 0 rows from the view
+   and is refused `production_day` outright. **671 fixtures pass**, and each of
+   the five new rules was checked by breaking it.
+   Until 043 is applied the plan record SAYS SO — "column
+   production_plan_tray_items.par does not exist — migration 043 has not been
+   applied yet" (verified in the browser), rather than rendering an empty
+   matrix, which would be a false claim about the menu.
+   **043 IS APPLIED** (Mark, 2026-08-08). The backfill seeded the existing slot
+   and the app seeded the rest: DF01's Angry Samoa came through as
+   **18·18·18·18·24·36·36**, the weekend ramp, which is the ISO subscript proved
+   on real data rather than only in a fixture.
+   **THE MATRIX GREW FMP'S PAR CONTROLS the same day** (Mark, after using it).
+   Five changes, all his.
+   **The table is `table-fixed`** — it never was, so widths were suggestions the
+   content could override and a long item name stretched its own column. Tray is
+   60px (half what it was) and the seven days split what's left evenly.
+   **Two STACKED STEPPERS beside every par**, up and down, and a second pair
+   that moves the whole row — the latter at the END of the row, left of the ⋯
+   (Mark, 2026-08-08), so the two controls that act on the TRAY sit together
+   rather than one at each margin. The tray column gave up exactly what the
+   controls column took (60/40 → 40/60), so the seven days are unchanged, and
+   the 16+4+36 cluster fits its column exactly.
+   That row stepper carries **`mt-[5px]`**, which is the chip's 1px border plus
+   its 4px top padding — the two things between a day cell's top and the stepper
+   inside it — so it sits on the same line as every per-day stepper in its row
+   rather than 5px above them (Mark: "a little high"). Measured, not guessed; if
+   the chip's padding moves, this moves with it.
+   The tray column's header is **"#"** (Mark), the word being wider than the
+   40px column it labelled, with an `sr-only` "Tray" beside it because a screen
+   reader saying "number sign" names nothing. **They step by the item's
+   own `tally_box_size`** (037, default 6, per item) rather than a hardcoded 6 —
+   Mark's "always 6" and the tally strip's 6 are the same fact, a box of donuts,
+   so an item later set to tray in twelves plans in twelves for free.
+   **ZERO IS THE FLOOR** and **NULL COUNTS AS ZERO**: up from silence is one
+   box, down from it is a deliberate none. That does not violate the
+   suppressed-lines-trace-to-a-human rule — pressing a stepper IS the human act.
+   The row stepper GROUPS BY RESULTING VALUE, so a tray's seven days are two or
+   three updates rather than a dozen; each item brings its own box size.
+   **Drag an item to another slot** (`lib/planSlotDrag`, `useColumnDrag`'s shape
+   and its reasons: pointer events, never HTML5 DnD; state changes twice per
+   drag; every cell measured ONCE at pointer-down).
+   **THE DESTINATION OFFERS TWO DROP ZONES — Move left, Copy right** (Mark's
+   idea, 2026-08-08). Both outcomes are on screen and labelled, so there is no
+   invisible rule to know, and — the reason it earns its complexity — **copy
+   becomes reachable on TOUCH**, which a modifier key never was. Option still
+   forces a copy for the muscle memory, and while it is held BOTH zones relabel
+   to "Copy", so the screen never says one thing and does another.
+   That was chosen over splitting the zones by PAR (keep vs default), which was
+   the first proposal. The par question is answered one tap later and is
+   reversible; copy-on-touch is a capability that otherwise does not exist. Two
+   zones also stay two — splitting by par as well would have meant four targets
+   in a 153px cell, geometry that collapses to one zone whenever the default
+   agrees, and a mis-hit that produces a silently wrong number instead of a
+   visible extra chip.
+   **THE PAR ALWAYS TRAVELS**, move or copy: it is the number you typed, a
+   reposition must not rewrite it, and re-reading the default would undo what
+   043 made a seed. Where the destination's default DISAGREES it is offered
+   afterwards — `→ use default 24` on that slot, the receiving screen's idiom,
+   held in `landed` state rather than derived (plenty of slots legitimately
+   differ; this is about the ones you just moved).
+   **IT STAYS UNTIL DISMISSED** (Mark, 2026-08-08). It first cleared on your next
+   action, on the reasoning that an offer nobody answers should not linger — but
+   that made moving three items and then touching anything lose the question
+   before you had answered it, and the whole point of offering rather than
+   applying is that you decide in your own time. So `landed` is a RECORD keyed by
+   row: a run of drags leaves a run of offers, each with its own ✕, and taking
+   one settles it. Two things keep it honest without a sweeper: the offer only
+   renders while it still DISAGREES with the slot's par, so any other route to
+   that number retires it silently; and a key for a slot that no longer exists
+   simply never renders. It sits on its OWN line, which does not breach
+   the one-line rule: that rule is about the chip at REST, and squeezed onto the
+   main line the offer broke "Angry Samoa" into "Angr/y/Sam/oa".
+   **Only the item NAME is a handle**, since the chip now also holds two
+   steppers, the par's own `InlineValue` and the ✕. The chip relabels itself
+   "Copy …" while Option is down, and it listens for keydown/keyup as well as
+   pointermove — pressing Option without moving fires no pointer event at all.
+   **Duplicate a tray**, and — because that was a one-way door — **delete one**,
+   both in a **`ui/RowMenu`** in a 40px column at the END of the row (Mark,
+   2026-08-08, replacing a pair of Copy/Del links that appeared on hover beside
+   the tray number: "more discoverable", and worth the horizontal space). It is
+   the app's own ⋯ idiom, so it costs nothing to learn, anchors right, and
+   escapes the table the way `PickList` does.
+   `nextTrayNumber` counts a numeric label UP keeping its width and skips the
+   ones in use ("01" duplicated past a taken "02" becomes "03"); anything else
+   ("7A") takes a suffix, because incrementing a non-number is guesswork. The
+   tray is written BEFORE its slots — a tray with nothing on it is visible and
+   one gesture from fixed, where slots with no tray cannot exist. Delete is
+   `window.confirm` naming what goes ("…and the 7 items on it?"), the PO
+   batch-delete pattern; 039's slots cascade from the tray.
+   **THE CHIP IS ONE LINE OF TWO GROUPS** (Mark, 2026-08-08):
+   `[item ✕] [par ▲▼]`. The ✕ belongs with the thing it removes and the steppers
+   with the number they move, so each pair reads as a pair — which the original
+   `name · steppers · par · ✕` did not, having interleaved the two. **Written as
+   two stacked lines first and corrected**: Mark's brackets were GROUPS, not
+   rows. The ✕ occupies its 10px whether or not it is showing, so revealing it on
+   hover shifts nothing. Known cost of one line, and his call: at ≤1280px the
+   name gets ~63px of a 139px chip and wraps to two lines; by 1680 it has 120px
+   and does not.
+   **The steppers lost their borders** so the arrows could grow (7px → 11px). A
+   box around a 7px glyph spends most of its width on the box, and two stacked
+   read as something to decipher; bare arrows are the affordance, darkening on
+   hover like every other quiet control here.
+   **"+ add" OPENS THE LIST** (Mark, 2026-08-08: "right now it's a two click
+   process"). `ui/PickList` gained **`defaultOpen`** — the panel is up as soon as
+   it renders, because pressing the button already said you want to choose
+   something — and **`onClose`**, which fires only on the DISMISS path (Escape,
+   click away, or pressing the trigger again) and NOT on a pick, so the matrix
+   can put "+ add" back rather than leaving an empty field where the command
+   was. Since 307 items make the list searchable, the cursor lands in the find
+   box ready to type. Only ever pass `defaultOpen` to a picker a deliberate act
+   summoned; a list that opens itself on load is a popup.
+   The Trays block's explanatory paragraph is GONE (Mark).
+   **The plan's TITLE and both its SHOPS are inline-editable** (Mark,
+   2026-08-08) — the title where you read it, in the `h1`, and Sells at / Made
+   at as `kind="pick"` cells over the ACTIVE locations (design rule 3: a closed
+   shop is not one you can plan a menu for, while `session.locations` still
+   resolves the CODE of one, so an existing plan at a closed shop still renders
+   its name). `location_id` is NOT NULL; `kitchen_location_id` is nullable and
+   "not set" stays a real state, because 039 left the kitchen open for a plan
+   written before anyone decided, and decision 9's fallback then reads it as the
+   selling shop. Two things the title needed: **`InlineValue` now forwards
+   `ariaLabel` to the `PickList` on its `kind="pick"` branch** (it only reached
+   the text/number button before), and the title cell carries `uppercase`
+   EXPLICITLY — the browser reset sets `button { text-transform: none }`, so an
+   `h1`'s own `uppercase` does not reach a button inside it. Note
+   `emptyClassName` is a text/number-branch prop and does nothing on a pick.
+   **A tray's `band` IS ITS CATEGORY** (Mark, 2026-08-08: "more intuitive").
+   Label only — the column is still `band`, which is what 039 called it and what
+   `v_production_plan_days`, the schedule snapshot and the printed packet all
+   select. Same split as `admin` displaying as "Manager": rename the word, leave
+   the schema alone. It is editable from the ⋯ menu's **Edit category**, a dialog
+   with the same `allowNew` `PickList` the create form uses (the vocabulary is
+   the org's own and legitimately grows) plus a **Clear**, because having no
+   category is a real answer — such a tray groups under "No category" rather
+   than vanishing.
+   **Group by Tray, Category or Item type** — a `ui/TabPicker` above the table,
+   since a control that changes what a list SHOWS goes with the list.
+   **Item type is FileMaker's own banding**, from Mark's DONUTS screen: it bands
+   the donut TYPE (the black CAKE / MOCHI / OLD FASHIONED rules) and orders
+   WITHIN it by cut then finish. The band key and the sort key are deliberately
+   different things — banding on type+cut+finish would put a rule above almost
+   every tray, which names nothing. **Only the FIRST item on a tray's MONDAY
+   speaks for that tray** (Mark's instruction): a tray usually carries one kind
+   of donut all week, so one representative is enough, and naming a day makes
+   the answer stable instead of depending on which cell you looked at. A tray
+   with no Monday item sinks under "No type". Measured on the real 24-tray plan:
+   Cake 4 · Old Fashioned 1 · Raised 17 · Scrap 2, summing to 24.
+   **The CUT is a SECOND band under it** (Mark, 2026-08-08) — FMP's BANANA /
+   VANILLA headings — and deliberately a lighter one: black on white with a gap
+   after the run's last tray, not a second filled rule, because a second black
+   band would read as another break of the same weight where this is a heading
+   INSIDE one. Its run is keyed by the **(type, cut) PAIR**: two types can both
+   have a "Plain" cut, and keyed on the cut alone the second Plain run loses its
+   heading and reads as a continuation of the first. `endsSubGroup` marks the
+   LAST row of each run, which is what carries the gap — pinned by a fixture
+   that asserts the exact `[tray, cut, endsSubGroup]` triples, so marking the
+   run's start instead goes red.
+   Grouping is a
+   VIEW: `production_plan_trays.sort` is untouched either way, so the packet and
+   `production_day` keep reading the plan's real order however you are looking at
+   it, and `buildMatrix` sorts a COPY (checked by breaking it — an in-place
+   `trays.sort` turns one fixture red, and only after that fixture was rewritten
+   to use its own array, because the shared one had already been reordered by an
+   earlier test and the assertion passed while the bug was live).
+   `groupLabel` is set on the FIRST row of each run and null elsewhere —
+   `DataTable`'s rule that a grouping can only band what the ORDER already
+   groups, which is why the label comes from the same function that sorts —
+   and **`groupCount` rides with it**, the trays in THAT run, computed in the
+   same function for the same reason: it is the one that knows where the run
+   ends. Rendered `text-white/55` beside the label, `DataTable`'s own band
+   treatment. The band is black with white text, the same mark every other
+   grouped list uses, and uncategorised trays SINK (`lib/tableSort`'s empty-last
+   rule) under a "No category" band rather than a blank one. Local state, not
+   the URL: it changes nothing about what the plan is, and a plan is read in one
+   sitting.
+   **The grand total sits in the sticky footer** beside Add tray — it repeats
+   the section heading's own count deliberately, because once the footer is
+   pinned the heading has scrolled away. A fixture asserts the band counts SUM
+   to the tray count, so the two figures cannot drift into disagreeing.
+   **The PLAN LIST has a ⋯ too — Duplicate plan and Delete plan** (Mark,
+   2026-08-08), the same `ui/RowMenu` in an unlabelled last column, which keeps
+   it out of the Columns menu because it is a control rather than a field.
+   **THE DUPLICATE ARRIVES INACTIVE, and that is the one deviation from "an
+   exact copy".** Decision 9 makes a shop's menu the UNION of its active plans
+   and their pars SUM, so an active duplicate over the same dates would silently
+   DOUBLE that shop's production the next time anyone generated. The list's own
+   Active toggle is one tap away, which makes turning it on a deliberate act
+   rather than a consequence. Written parent-first (plan → trays → slots), and
+   the new trays are matched to the old by TRAY NUMBER rather than by insert
+   order, which is not a thing to rely on. `duplicateTitle` names it "… copy",
+   "… copy 2" — no unique constraint exists on the title, so this is for the
+   READER picking a plan out of a list.
+   **The copy opens OFFERING the shop's defaults** — `?defaults=review`, which
+   turns the drag-copy's `→ use default n` on for EVERY slot whose par disagrees
+   with its default rather than just the ones a drag landed on. `suggestionFor`
+   is the one function both routes go through, which is why `dismissed` had to
+   become its own set: a DERIVED offer cannot be cleared by forgetting it the
+   way an explicit one can. A parameter rather than stored state — the offer is
+   a question about a copy you just made, not a fact about the plan.
+   Verified end to end on the real 24-tray plan: the copy came out 24 trays, 225
+   slots, par total 4908 identical and inactive; **all 225 pars already matched
+   their DF01 defaults so it correctly showed ZERO offers**, and stepping one
+   par made exactly one appear. Delete named "…and its 24 trays carrying 225
+   items", cascaded, and left no orphans.
+   **Add tray is PINNED to the foot of the window** (`ui/StickyFooter`, Mark) —
+   a plan runs to a dozen trays and more, so a command under the table was a
+   scroll away from the rows you were building. Measured: the button holds y=668
+   at both scroll extremes, and the spacer keeps the last row clear of the bar.
+   Exercised against the live database and **left exactly as found**: the single
+   stepper 18→24, the row stepper moving all seven, a real pointer drag moving
+   Sunday between trays with its par, an Option-drag copying it, Copy creating
+   tray 03 with all seven slots, Del removing it, then the pars stepped back to
+   18·18·18·18·24·36·36 and tray 02 emptied. **677 fixtures pass**, 6 new.
+   **Harness note for anyone verifying a drag:** the browser pane's
+   `left_click_drag` DOES dispatch real pointerdown/move/up, but its coordinates
+   are **1.6× the CSS viewport**, and its `modifiers: "alt"` does **not** set
+   `altKey` on the dispatched events (measured: `alt=false` on every one, no
+   keydown at all). So Option-drag cannot be driven through the pane — dispatch
+   the `pointerup` yourself with `altKey: true`. `window.confirm` is inert there
+   too; override it.
    **Phase 5 is NOT built**: batches + actuals (was 041, now 042). `made`/`leftover` ship as
    columns and render read-only, because a supervisor writing them needs
    COLUMN-scoped access this table's RLS deliberately doesn't give — that is
@@ -2829,9 +3118,9 @@ weekday column, and 003 then silently made it per-vendor-item.
   | Reach for | Instead of | For |
   | --- | --- | --- |
   | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary — a VALUE or a filter's VIEW; `variant="inline"` in a cell, `variant="field"` as a standalone box. Opens below the field, portals so panes can't clip it |
-  | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons |
+  | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons; `onSubmit` makes Enter commit (opt-in — see the Enter bullet below) |
   | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands; shares `lib/anchoredPanel` with PickList, so it escapes scroll panes the same way |
-  | `catalog/InlineValue` | a hand-wired edit-in-place, or a bare `<input type="date">` | any editable cell — `kind` text / number / date / **pick**; `multiline` for prose (textarea, ⌘↵ saves); `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column; `arrayColumn` + `arrayIndex` + `arrayStrip` + `arrayWidth` to edit ONE SLOT of a Postgres array (the `par_by_weekday` idiom, which had no editor until the recipe sheet). An array column CONSTRAINED against a sibling array must write both in one statement — that is what `alsoUpdate` is for |
+  | `catalog/InlineValue` | a hand-wired edit-in-place, or a bare `<input type="date">` | any editable cell — `kind` text / number / date / **pick**; `multiline` for prose (textarea, ⌘↵ saves); `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column; `arrayColumn` + `arrayIndex` + `arrayStrip` + `arrayWidth` to edit ONE SLOT of a Postgres array (the `par_by_weekday` idiom, which had no editor until the recipe sheet). An array column CONSTRAINED against a sibling array must write both in one statement — that is what `alsoUpdate` is for. `emptyClassName` styles the cell when it holds NOTHING (faint by default; the plan matrix wants a yellow "—", and a caller CAN'T do this through `className`, because Tailwind resolves competing utilities by stylesheet order); `ariaLabel` names the cell where no `<dt>` does — a grid of identical cells otherwise all announce as "—, click to edit" |
   | `ui/SectionHeading` | a hand-styled `<h2>` | the heading over a block on a detail screen (16px bold black, optional `count`) |
   | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style. Selected cell is ALWAYS black; `count` and `href` are the only options |
   | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
@@ -3095,6 +3384,25 @@ weekday column, and 003 then silently made it per-vendor-item.
   `ui/Dialog`'s panel (`text-ink whitespace-normal`)**, which is the fix — patching
   each line only defers it to the next line. A new overlay that ISN'T a `Dialog`
   inherits the problem back.
+- **ENTER COMMITS A DIALOG THAT IS A FORM, and it is OPT-IN** (Mark,
+  2026-08-08: "why doesn't pressing enter dismiss our dialog panels?"). It never
+  did for two reasons: the panel is not a `<form>`, so there is no implicit
+  submit, and `footer` is arbitrary JSX, so `Dialog` genuinely cannot tell which
+  of a caller's buttons is the commit. It still can't — hence `onSubmit`, passed
+  by the caller with **the same guard the commit button's `disabled` uses**, an
+  Enter that fires a refused write being worse than one that does nothing.
+  Opt-in is the design, not an unfinished sweep: a dialog gets it iff Enter is
+  unambiguous AND safe. Create forms do (New tray, plan, element, employee,
+  shop section, pay period). **Destructive confirms deliberately do NOT** — a
+  stray Enter is exactly the keystroke you cannot take back — and neither do
+  panels with several peer commands, where "the commit" isn't one thing.
+  Four guards, each for a real collision, all verified in the browser: a
+  **TEXTAREA** keeps Enter as a newline; a focused **BUTTON or link** is already
+  about to be activated by the browser, so committing as well would fire two
+  actions from one keystroke (including "Cancel, then submit anyway"); an open
+  **`PickList` or ⋯ menu** owns Enter for choosing, and being portalled to the
+  body its own handler cannot stop this window listener seeing the same key; and
+  **modifiers/IME** are somebody else's (⌘↵ saves a multiline cell).
 - **A dialog pins its title bar and its footer, and scrolls only the middle**
   (`max-h-[85vh] flex flex-col` + `min-h-0 flex-1 overflow-y-auto` on the body).
   The overlay is fixed, so a dialog taller than the window cannot be scrolled by
@@ -3303,6 +3611,29 @@ weekday column, and 003 then silently made it per-vendor-item.
   trigger only greys out when NO option matches (`empty`), not merely when the
   value is falsy; and past 8 options the find box appears, which is what the
   native menu could never give an iPad.
+  **An anchored panel FITS ON SCREEN — it flips above the trigger rather than
+  running off the bottom** (Mark, 2026-08-08: near the foot of the window "most
+  of it can't be seen"). `useAnchoredPanel` places in TWO passes, and it has to:
+  the caller only renders the panel once `box` exists, so the first pass can
+  anchor it but cannot place it — a panel that hasn't rendered has no height to
+  fit. The second pass measures it and corrects, in a LAYOUT effect so nothing
+  is ever painted in the wrong place. **Flip first, clamp second**: below is the
+  default and stays it; a panel that would overrun goes ABOVE, still attached to
+  the trigger; only if it fits in neither is it clamped into the viewport, which
+  it always can be, being capped at 320px and able to scroll its own rows. The
+  same shift fixes horizontal overflow, and works for `align="right"` panels
+  even though the CALLER applies their `translateX(-100%)`, because moving the
+  box moves the transform with it.
+  Two rules keep it from oscillating: everything is recomputed from the
+  **TRIGGER**, never from the panel's current position, so the answer is the
+  same every pass; and a **>1px guard** stops it reacting to its own write —
+  the receiving screen's lesson. It observes the PANEL as well as the trigger,
+  because the height genuinely changes under you: typing in the find box
+  filters 320px down to two rows, and a panel placed above has to follow its
+  own bottom edge back down to stay attached.
+  Measured over 10 panels at 5 scroll positions, both kinds and both
+  alignments: zero off-screen, zero overflow on any edge; row menus flipped
+  above at trigger y 638/643/560 and stayed below at 510/398.
   **An anchored panel is at most 320px tall, and it closes on scroll EXCEPT its
   own** (2026-08-02, both from the item screen's section picker offering 77
   shelves). `MENU_PANEL_CLASS` was `max-h-[70vh]`, which grows with the display,

@@ -163,6 +163,12 @@ export function NewEmployee({
           title="New employee"
           onClose={close}
           busy={pending}
+          // Enter commits, guarded by exactly what the commit button's
+          // `disabled` asks — an Enter that fires a refused write is worse
+          // than one that does nothing.
+          onSubmit={() => {
+            if (ready && !pending) add();
+          }}
           width="max-w-2xl"
           footer={
             <>

@@ -107,6 +107,8 @@ export function InlineValue({
   placeholder = "—",
   align = "left",
   className = "",
+  emptyClassName = "text-faint",
+  ariaLabel,
   nullable = true,
   format,
   alsoUpdate,
@@ -138,6 +140,26 @@ export function InlineValue({
   placeholder?: string;
   align?: "left" | "right";
   className?: string;
+  /**
+   * What the resting cell wears when it holds NOTHING — faint by default,
+   * because an empty cell is usually just an empty cell.
+   *
+   * It is a prop rather than something the caller folds into `className`
+   * because Tailwind resolves competing utilities by STYLESHEET order, not by
+   * class-string order: `text-faint` and `text-mark` are two `@theme inline`
+   * entries in the same layer, so which one wins is a coin flip that a token
+   * reorder would silently flip back. The plan matrix needs a yellow "—" (an
+   * unset par is worth your eye, where a blank note is not), and this is the
+   * only way to say so reliably.
+   */
+  emptyClassName?: string;
+  /**
+   * The cell's accessible name. Defaults to `column`, which is right in a
+   * detail `dl` where a `<dt>` sits beside it and wrong in a grid of identical
+   * cells — the plan matrix is 7 × N par boxes that would otherwise all
+   * announce as "—, click to edit".
+   */
+  ariaLabel?: string;
   /** False for a NOT NULL column: clearing the cell asks for a value instead
    *  of handing back a raw Postgres null-violation. */
   nullable?: boolean;
@@ -341,7 +363,7 @@ export function InlineValue({
           allowNew={allowNew}
           disabled={saving}
           placeholder={placeholder}
-          ariaLabel={column}
+          ariaLabel={ariaLabel ?? column}
           align={align}
           onPick={(next) => void write(next === "" ? null : next, false)}
           className={className}
@@ -453,11 +475,12 @@ export function InlineValue({
       type="button"
       onClick={open}
       title="Click to edit"
+      aria-label={ariaLabel ?? column}
       // Dotted underline at rest — the quietest possible "this is editable".
       className={`w-full px-1 py-0.5 underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 ${
         align === "right" ? "text-right tabular-nums" : "text-left"
       } ${multiline ? "whitespace-pre-wrap" : ""} ${
-        shown === null || shown === "" ? "text-faint" : ""
+        shown === null || shown === "" ? emptyClassName : ""
       } ${className}`}
     >
       {shown === null || shown === ""
