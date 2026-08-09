@@ -2877,10 +2877,38 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `p_allow_actuals` — now over actuals a FUNCTION wrote. **769 fixtures pass**,
    38 new. `production_batches` did not exist and nothing referenced it, so
    nothing here changed under an existing reader.
-   **NOT verified, and it is the honest gap:** nothing has been walked in a
-   browser. 044 is not applied to the live database, so `/schedules/[id]` says
-   so out loud (the repo's own pattern) rather than rendering an empty table
-   until Mark runs it.
+   **044 APPLIED and the whole flow WALKED against the real DF01/DF02 data
+   2026-08-09, then left exactly as found** — 0 counted lines, 0 author stamps,
+   0 batches, 2 schedules, 64 lines, 0 storage objects. What that proved beyond
+   the harness: the count went through **`rpc/set_schedule_actual`, confirmed in
+   the browser's own network timeline with no PATCH on the table** (the one
+   thing a screenshot cannot tell you); Sold went to **−4 unclamped**, yellow,
+   with the carryover tooltip; regeneration kept the count AND `counted_by` /
+   `counted_at`; the item history folded DF01's 36 and DF02's 18 into ONE night
+   reading par 54; a week at DF01 generated **exactly 26 batches numbered from
+   30000** — matching a count derived independently from `production_element_days`
+   — with **zero of the 160 DONUT and 217 AB rows**; costing reported
+   "at least $10.85" with 4 ingredients unpriced; and a re-run added 0 and named
+   all 26.
+   **THREE BUGS ONLY RENDERING COULD CATCH**, all fixed the same day:
+   **(1) A grouped list sorted its bands by the LABEL string**, so a week read
+   Mon 8/3 → Thu 8/6 → Tue 8/4. Bands now sort by the ISO date underneath and
+   print the friendly form. `SchedulesList` had the same bug LATENT — invisible
+   only because one night exists today — and moved with it. The fixture asserts
+   the WRONG order too, so a "simplification" back to the label goes red.
+   **(2) `BatchLogDetail` is a SERVER component and passed `alsoUpdate` — a
+   function — to `InlineValue`**, which took the whole record down with
+   "Functions cannot be passed directly to Client Components". TypeScript and
+   lint both pass on it. The recipe-version cell is its own client component
+   now (`BatchVersionCell`); the rest of `src/` was swept for the same shape and
+   is clean. **Any `InlineValue` needing `alsoUpdate`, `onWrite`, `format` or
+   `scale` must be rendered from a client component.**
+   **(3) `ariaLabel` never reached a DATE cell** — forwarded to the `pick`
+   branch on 2026-08-08 and the date branch was missed, so every date cell
+   announced its raw column name ("batch_date") however carefully it was named.
+   Residue, and it is honest rather than removable: DF02's 2026-08-09 schedule
+   carries **`regeneration_count` 1** from the carry-forward test. That
+   regeneration really happened; resetting it would make the record lie.
    Note the brief's numbering is off by THREE now — 038 was spent on the name
    constraint, 041 on the recipe sheet and 042 on the recipe cost column.
    **A HEAD COUNT PROBE CANNOT TELL "EMPTY" FROM "MISSING"** — probing 039 with
@@ -3051,20 +3079,23 @@ mean where FileMaker rounded up. 33 rows skipped and named (employee ids `387B`
 and `001` match nobody). All 35 migrations apply on the Docker harness, and the
 whole 46,553-row file was replayed through the real constraints there before it
 went near production. See build step 4e.
-**044 is NOT APPLIED yet** (written 2026-08-09) — production phase 5's actuals.
-*Probe, don't trust this line.* Cheap probes, in order of what they'd catch:
-`select count(*) from production_batches` (0 once applied, an error before);
-`select last_value, is_called from production_batch_number_seq` (30000, false —
-so the FIRST `next_batch_number` returns 30000, not 30001);
-`select column_name from information_schema.columns where table_name =
-'production_schedule_items' and column_name in ('counted_by','counted_at')`
-(2 rows); and `select id, public from storage.buckets where id='batch-photos'`
-(1 row, false). For the four functions, call one via RPC with a bogus uuid —
-each raises from its FIRST statement ("No such schedule line", "unknown
-location") without doing any work.
-**Until it is applied `/schedules/[id]` says so** rather than rendering an empty
-line table, and so do the item record's history block and the element record's
-Recent batches. The schedules LIST and everything else are unaffected.
+**044 is APPLIED** (Mark, 2026-08-09) — production phase 5's actuals — and the
+whole flow was walked live the same day and left as found (see build step 4f).
+*Probe, don't trust this line.* `select count(*) from production_batches` (0 —
+the walk's 26 were deleted); `select last_value, is_called from
+production_batch_number_seq` (**30025, true** — the walk consumed 30000–30025,
+so the next `next_batch_number` returns **30026** and the first REAL batch will
+not be 30000. Gaps are normal; FMP's own run has thousands. Note this probe is
+SQL-EDITOR only: `next_batch_number` is definer and re-checks `user_org_ids()`,
+which a service_role script cannot satisfy — it answers "Not your organisation",
+which is migration 014's footgun and not a fault); `select column_name from
+information_schema.columns where
+table_name = 'production_schedule_items' and column_name in
+('counted_by','counted_at')` (2 rows); `select id, public from storage.buckets
+where id='batch-photos'` (1 row, false). For the five functions, call one via
+RPC with a bogus uuid — each raises from its FIRST statement ("No such schedule
+line", "unknown location") without doing any work, which is how their existence
+was confirmed.
 **036 is APPLIED and LOADED** (Mark, 2026-08-07) — 470 elements · 59
 element-locations · 128 recipes · 493 versions · 3,765 lines · 2,914 steps, with
 **128 masters for 128 families**, verified by the loader's own sanity counts and
