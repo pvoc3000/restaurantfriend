@@ -1,7 +1,7 @@
-import { BatchLogRecord } from "./BatchLogRecord";
+import { BatchDetail } from "./BatchDetail";
 
-// The body lives in BatchLogRecord; this page is its shell.
-export default async function BatchLogPage({
+// The body lives in BatchDetail; this page is its shell.
+export default async function BatchPage({
   params,
   searchParams,
 }: {
@@ -10,5 +10,5 @@ export default async function BatchLogPage({
 }) {
   const { id } = await params;
   const rawParams = await searchParams;
-  return <BatchLogRecord id={id} rawParams={rawParams} />;
+  return <BatchDetail id={id} rawParams={rawParams} />;
 }

@@ -34,7 +34,7 @@ import { BatchVersionCell } from "@/components/production/BatchVersionCell";
  *   what the round asked for · what this kitchen keeps on hand ·
  *   what was there before · what came out.
  */
-export async function BatchLogDetail({
+export async function BatchDetail({
   id,
   rawParams,
 }: {
@@ -134,7 +134,7 @@ export async function BatchLogDetail({
   };
   const verdict = yieldAgainstPar(amounts);
 
-  const trail = parseTrail(rawParams, { href: "/batch-logs", label: "Batch Log" });
+  const trail = parseTrail(rawParams, { href: "/batch-logs", label: "Batch Logs" });
 
   return (
     <div className="space-y-8">

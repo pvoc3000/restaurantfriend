@@ -227,3 +227,17 @@ test("every built sub has a real href, not a /soon/ one", () => {
     .map((s) => s.slug);
   eq(wrong, []);
 });
+
+test("a BATCH record lights Batch Logs, which needs an `also`", () => {
+  // /batches does not sit under /batch-logs, so prefix matching cannot find it
+  // — this is exactly the case `also` exists for.
+  const at = resolveRoute("/batches/9d1f0f8e-0000-4000-8000-000000000000");
+  eq(at?.sectionSlug, "production");
+  eq(at?.subSlug, "batch-logs");
+});
+
+test("a batch LOG record still lights it by prefix", () => {
+  const at = resolveRoute("/batch-logs/9d1f0f8e-0000-4000-8000-000000000000");
+  eq(at?.sectionSlug, "production");
+  eq(at?.subSlug, "batch-logs");
+});

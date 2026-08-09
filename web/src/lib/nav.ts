@@ -176,9 +176,16 @@ export const SECTIONS: NavSection[] = [
       { slug: "items", label: "Items", href: "/production-items", built: true },
       { slug: "elements", label: "Elements", href: "/elements", built: true },
       { slug: "recipes", label: "Recipes", href: "/recipes", built: true },
-      // Element actuals — phase 5. `resolveRoute` prefix-matches, so
-      // /batch-logs/[id] lights this without an `also`.
-      { slug: "batch-logs", label: "Batch Logs", href: "/batch-logs", built: true },
+      // Element actuals — phase 5. `resolveRoute` prefix-matches, so a LOG
+      // record lights this on its own; a BATCH record sits at /batches/[id],
+      // which does not sit under the href and so needs naming.
+      {
+        slug: "batch-logs",
+        label: "Batch Logs",
+        href: "/batch-logs",
+        built: true,
+        also: ["/batches"],
+      },
     ],
   },
   {

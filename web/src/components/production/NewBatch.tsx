@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
-import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
 
 /**
@@ -27,21 +26,24 @@ import { PickList } from "@/components/ui/PickList";
  * and the asymmetry is the point: generation writes a job to be done, and this
  * writes down something that already happened.
  *
- * EVERY BATCH BELONGS TO A LOG (045), so this finds that day's log for the
- * kitchen or makes one. There is no such thing as a loose batch — which is what
- * gives the date one home and keeps "a way to associate batch logs together"
- * true even for the ones nobody generated.
+ * EVERY BATCH BELONGS TO A LOG (045), and this command lives ON one — so the
+ * log is a prop and there is nothing to find or create. That is also why the
+ * dialog asks for no date: the log has it, and an item has none of its own.
  */
 export function NewBatch({
   orgId,
+  logId,
   locationId,
   locationCode,
-  today,
+  logDate,
 }: {
   orgId: string;
+  /** The log this batch joins. It is always known now — the command lives ON a
+   *  log — so there is no find-or-create left to do. */
+  logId: string;
   locationId: string;
   locationCode: string;
-  today: string;
+  logDate: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -52,7 +54,6 @@ export function NewBatch({
 
   const [elements, setElements] = useState<{ id: string; name: string; kind: string }[]>([]);
   const [elementId, setElementId] = useState<string | null>(null);
-  const [date, setDate] = useState<string | null>(today);
   const [label, setLabel] = useState<string | null>(null);
 
   // Loaded when the dialog opens, not on every page load: ~470 elements is a
@@ -73,13 +74,12 @@ export function NewBatch({
     };
   }, [open, elements.length, supabase]);
 
-  const ready = elementId !== null && date !== null;
+  const ready = elementId !== null;
 
   function close() {
     if (pending) return;
     setOpen(false);
     setElementId(null);
-    setDate(today);
     setLabel(null);
     setFailed(null);
   }
@@ -98,28 +98,11 @@ export function NewBatch({
         return;
       }
 
-      // The day's log, found or made. `upsert` on the unique (location, date)
-      // rather than select-then-insert: two people logging a stray batch on the
-      // same day would otherwise race, and the loser would get a constraint
-      // violation instead of a batch.
-      const { data: log, error: logError } = await supabase
-        .from("production_batch_logs")
-        .upsert(
-          { org_id: orgId, location_id: locationId, log_date: date },
-          { onConflict: "location_id,log_date", ignoreDuplicates: false }
-        )
-        .select("id")
-        .single();
-      if (logError) {
-        setFailed(logError.message);
-        return;
-      }
-
       const { data, error } = await supabase
         .from("production_batches")
         .insert({
           org_id: orgId,
-          log_id: log.id,
+          log_id: logId,
           element_id: elementId,
           location_id: locationId,
           batch_number: number as string,
@@ -135,7 +118,7 @@ export function NewBatch({
         return;
       }
       close();
-      router.push(`/batch-logs/${data.id}`);
+      router.push(`/batches/${data.id}`);
       router.refresh();
     });
   }
@@ -182,9 +165,9 @@ export function NewBatch({
           <div className="space-y-4">
             <p className="text-sm text-muted">
               For something the weekly round doesn&rsquo;t carry — an AB or
-              donut element, an extra batch, a test. It lands at {locationCode}{" "}
-              marked complete, on that day&rsquo;s log; the yield, who made it
-              and the photo go on the record.
+              donut element, an extra batch, a test. It joins the {locationCode}{" "}
+              log for {logDate}, marked complete; the yield, who made it and the
+              photo go on the record.
             </p>
 
             <label className="block space-y-1.5">
@@ -206,17 +189,6 @@ export function NewBatch({
             </label>
 
             <div className="grid gap-4 sm:grid-cols-2">
-              <label className="block space-y-1.5">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                  Day
-                </span>
-                <DateField
-                  value={date}
-                  onChange={setDate}
-                  ariaLabel="The day this batch was made"
-                />
-              </label>
-
               <label className="block space-y-1.5">
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
                   Which batch

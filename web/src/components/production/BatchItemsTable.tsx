@@ -100,39 +100,30 @@ function AmountCells({
   );
 }
 
-type Tier = "outstanding" | "today" | "done" | "all";
-type Grouping = "date" | "location" | "type" | "element" | "none";
+type Tier = "outstanding" | "done" | "all";
+type Grouping = "type" | "element" | "none";
 
 const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
-  date: (r) => batchDate(r.logDate),
-  location: (r) => r.kitchenCode,
   type: (r) => r.element_type ?? "No type",
   element: (r) => r.element_name,
 };
 
 /**
- * What the BANDS sort by, which is NOT always what they say.
- *
- * A day's label is "Mon 8/3", and sorting a week by that string puts Monday,
- * then Thursday, then Tuesday — alphabetical order, which is not an order any
- * kitchen works in. Caught on the real DF01 week. So the date grouping sorts by
- * the ISO date underneath and prints the friendly form; the others group by a
- * name, where the label IS the key.
+ * What the BANDS sort by, which is not always what they say — an unset type has
+ * to sink last rather than sort under the empty string (`lib/tableSort`'s rule).
  */
 const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
-  date: (r) => r.logDate,
-  location: (r) => r.kitchenCode,
-  type: (r) => r.element_type ?? "￿", // no type sinks last, lib/tableSort's rule
+  type: (r) => r.element_type ?? "￿",
   element: (r) => r.element_name.toLowerCase(),
 };
 
 /**
- * The week's batches, and what came out of them.
+ * ONE LOG's batches, and what came out of them.
  *
- * The tier that earns its place is OUTSTANDING — to-do plus in-progress — and
- * it is what the screen opens on, because a generated batch log is a CHECKLIST
- * somebody is working down (Mark, 2026-08-09) and "what is still to make" is
- * the question it exists to answer.
+ * It opens on ALL of them, grouped by item type — a log is a checklist you work
+ * down (Mark, 2026-08-09), and hiding the finished half of it would make the
+ * page shrink as the shift goes on. The To do tier is there for when the list
+ * is long enough that you want only what is left.
  *
  * The fast-moving cells edit in place. A batch's status and its yield are what
  * a baker changes twenty times a shift, and a navigation per batch at 5am would
@@ -143,37 +134,36 @@ const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
  * the 2026-08-05 lesson, since `DataTable` can only band what the ORDER already
  * groups.
  */
-export function BatchLogsList({
+export function BatchItemsTable({
   rows,
   editable,
+  add,
 }: {
   rows: BatchRow[];
   /** Supervisor and up — 044's `production_batches` write policies. */
   editable: boolean;
+  /** The "New batch" command, which belongs to the LOG rather than the table. */
+  add?: React.ReactNode;
 }) {
-  const [tier, setTier] = useState<Tier>("outstanding");
-  const [grouping, setGrouping] = useState<Grouping>("date");
+  const [tier, setTier] = useState<Tier>("all");
+  const [grouping, setGrouping] = useState<Grouping>("type");
   const [term, setTerm] = useState("");
   const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "date", dir: "asc" });
-
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const counts = useMemo(
     () => ({
       outstanding: rows.filter((r) => isBatchOutstanding(r.status)).length,
-      today: rows.filter((r) => r.logDate === today).length,
-      done: rows.filter((r) => r.status === "complete").length,
+      done: rows.filter((r) => r.status === "complete" || r.status === "skipped").length,
       all: rows.length,
     }),
-    [rows, today]
+    [rows]
   );
 
   const shown = useMemo(() => {
     const q = term.trim().toLowerCase();
     return rows.filter((r) => {
       if (tier === "outstanding" && !isBatchOutstanding(r.status)) return false;
-      if (tier === "today" && r.logDate !== today) return false;
-      if (tier === "done" && r.status !== "complete") return false;
+      if (tier === "done" && r.status !== "complete" && r.status !== "skipped") return false;
       if (!q) return true;
       return [
         r.element_name,
@@ -187,7 +177,7 @@ export function BatchLogsList({
         .toLowerCase()
         .includes(q);
     });
-  }, [rows, tier, term, today]);
+  }, [rows, tier, term]);
 
   const visible = useMemo(() => {
     const value = (r: BatchRow): string | number => {
@@ -210,12 +200,6 @@ export function BatchLogsList({
         const ag = groupOf(a), bg = groupOf(b);
         if (ag !== bg) return ag < bg ? -1 : 1;
       }
-      // The SUB-band can only band what the order already groups, same rule as
-      // the band above it — so within a date run, type leads the chosen sort.
-      if (grouping === "date") {
-        const at = a.element_type ?? "\uFFFF", bt = b.element_type ?? "\uFFFF";
-        if (at !== bt) return at < bt ? -1 : 1;
-      }
       const av = value(a), bv = value(b);
       if (av < bv) return -1 * dir;
       if (av > bv) return 1 * dir;
@@ -229,8 +213,8 @@ export function BatchLogsList({
   }, [shown, sort, grouping]);
 
   usePublishRecordSet(
-    "/batch-logs",
-    visible.map((r) => ({ id: r.id, href: `/batch-logs/${r.id}` }))
+    "/batches",
+    visible.map((r) => ({ id: r.id, href: `/batches/${r.id}` }))
   );
 
   // MARK'S ORDER, 2026-08-09, and it is FileMaker's own Batch Logs list — its
@@ -295,7 +279,7 @@ export function BatchLogsList({
       pinned: true,
       sortValue: (r) => r.element_name,
       render: (r) => (
-        <Link href={`/batch-logs/${r.id}`} className="font-medium hover:underline">
+        <Link href={`/batches/${r.id}`} className="font-medium hover:underline">
           {r.element_name}
         </Link>
       ),
@@ -419,11 +403,6 @@ export function BatchLogsList({
       ? undefined
       : {
           label: GROUP_LABEL[grouping],
-          // FileMaker's own batch log: a black date rule, then an ITEM TYPE
-          // heading inside it. Only under the DATE grouping — banding a date
-          // inside a type run, or a type inside a type run, says nothing.
-          subLabel:
-            grouping === "date" ? (r) => r.element_type ?? "No type" : undefined,
         };
 
   return (
@@ -440,6 +419,7 @@ export function BatchLogsList({
       empty={<p className="text-sm text-muted">No batches match.</p>}
       leading={
         <div className="flex flex-wrap items-end gap-4">
+          {add}
           <TextInput
             value={term}
             onValueChange={setTerm}
@@ -452,10 +432,9 @@ export function BatchLogsList({
             value={tier}
             onChange={setTier}
             options={[
-              { key: "outstanding" as Tier, label: "To do", count: counts.outstanding },
-              { key: "today" as Tier, label: "Today", count: counts.today },
-              { key: "done" as Tier, label: "Complete", count: counts.done },
               { key: "all" as Tier, label: "All", count: counts.all },
+              { key: "outstanding" as Tier, label: "To do", count: counts.outstanding },
+              { key: "done" as Tier, label: "Done", count: counts.done },
             ]}
           />
           <div className="space-y-1.5">
@@ -467,8 +446,6 @@ export function BatchLogsList({
               value={grouping}
               onChange={setGrouping}
               options={[
-                { key: "date" as Grouping, label: "Date" },
-                { key: "location" as Grouping, label: "Location" },
                 { key: "type" as Grouping, label: "Item type" },
                 { key: "element" as Grouping, label: "Element" },
                 { key: "none" as Grouping, label: "None" },
