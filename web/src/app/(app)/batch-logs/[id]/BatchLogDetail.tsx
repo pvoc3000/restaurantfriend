@@ -31,7 +31,7 @@ import { BatchVersionCell } from "@/components/production/BatchVersionCell";
  *
  * Four amounts sit on this record and they are four different facts, which the
  * layout says out loud rather than leaving to be inferred:
- *   what the schedule asked for · what this kitchen keeps on hand ·
+ *   what the round asked for · what this kitchen keeps on hand ·
  *   what was there before · what came out.
  */
 export async function BatchLogDetail({
@@ -259,7 +259,7 @@ export async function BatchLogDetail({
         <SectionHeading>The batch</SectionHeading>
         <p className="max-w-[80ch] text-[13px] text-muted">
           Four amounts, and they are four different facts. What the weekly
-          schedule asked for; what this kitchen keeps on hand; what was there
+          round asked for; what this kitchen keeps on hand; what was there
           before you started; and what came out.
         </p>
 

@@ -120,7 +120,7 @@ export function BatchActions({
       (hasYield
         ? `It has a recorded yield, which goes with it.\n\n`
         : "") +
-      `Generating the week again would put back anything the weekly schedule still carries — but not what somebody measured.`;
+      `Generating this day again would put back anything the weekly round still carries — but not what somebody measured.`;
     if (!window.confirm(message)) return;
 
     setBusy("delete");

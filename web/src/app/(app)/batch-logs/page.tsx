@@ -10,8 +10,13 @@ import { NewBatch } from "@/components/production/NewBatch";
 /**
  * The batch log — production brief phase 5, element actuals.
  *
- * One row per making of an element: what the weekly schedule asked for, what
- * came out, who made it. Migration 044.
+ * A LOG is the document — a date, who generated it, a status — and a BATCH is
+ * its item: one making of an element, what the round asked for, what came out,
+ * who made it. Migrations 044 and 045.
+ *
+ * The round has no days in it (Mark, 2026-08-09): the staff have a couple of
+ * days and choose the order, so a log carries the date it was generated and its
+ * items carry no date at all.
  *
  * SCOPED TO THE WORKING KITCHEN, and that is the OPPOSITE of `/schedules` on
  * purpose. A schedule's kitchen makes FOR several shops, so scoping that list

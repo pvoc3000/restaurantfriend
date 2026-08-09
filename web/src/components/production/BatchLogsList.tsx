@@ -281,7 +281,7 @@ export function BatchLogsList({
       render: (r) => (
         <span
           className="tabular-nums text-muted"
-          title={r.generated ? "From the weekly schedule" : "Logged by hand"}
+          title={r.generated ? "From the weekly round" : "Logged by hand"}
         >
           {r.batch_number}
           {r.generated ? "" : "*"}

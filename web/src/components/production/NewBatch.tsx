@@ -9,9 +9,9 @@ import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
 
 /**
- * Log a batch that isn't on the weekly schedule.
+ * Log a batch that isn't on the weekly round.
  *
- * Generation covers the WEEKLY-class rhythm; this covers everything else — an
+ * Generation covers the WEEKLY-class round; this covers everything else — an
  * AB or donut element, a second batch nobody planned, a test. `NewElement`'s
  * template: a command in the list's own row, a Dialog, an insert carrying
  * `org_id` EXPLICITLY (design rule 1 — a WITH CHECK is evaluated before the NOT
