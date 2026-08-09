@@ -8,6 +8,7 @@ import {
   ProductionItemsList,
   type ProductionItemRow,
 } from "@/components/production/ProductionItemsList";
+import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
 
 /**
  * The menu — production brief decision 4's operational taxonomy, and the
@@ -17,7 +18,14 @@ import {
  * purchasing (decision 11), price through the org grid and its overrides
  * (decision 10).
  */
-export default async function ProductionItemsPage() {
+export default async function ProductionItemsPage({
+  searchParams,
+}: {
+  // The filter menus and the search box ride in the URL — raw, because which
+  // values are real depends on the vocabulary the columns actually hold.
+  searchParams: Promise<RawSearchParams>;
+}) {
+  const params = await searchParams;
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canWriteCatalog(session.membership.role);
@@ -63,7 +71,12 @@ export default async function ProductionItemsPage() {
       <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
         Items
       </h1>
-      <ProductionItemsList rows={rows} editable={editable} />
+      <ProductionItemsList
+        rows={rows}
+        editable={editable}
+        initialFilters={params}
+        initialSearch={parseFilterSearch(params)}
+      />
     </div>
   );
 }

@@ -121,7 +121,14 @@ export function FilterMenus<T>({
                     hint: String(forThis[option.value] ?? 0),
                   })),
                 ]}
-                className="w-44"
+                // 160px, measured rather than chosen: at 176 a bar of five
+                // menus plus the search box wanted 1196px against the 1121 a
+                // 1280 window gives, so Price wrapped to a line of its own and
+                // read as a mistake. At 160 the same bar is 1084 and the row
+                // holds. The panel is sized to its own contents, so a long
+                // option ("Granulated Sugar") is still read in full where it is
+                // chosen; only the resting trigger truncates.
+                className="w-40"
               />
             </div>
           );
