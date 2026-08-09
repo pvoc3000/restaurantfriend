@@ -108,12 +108,8 @@ export default async function BatchLogsPage() {
         </div>
         {editable ? (
           <GenerateBatches
-            locations={session.activeLocations.map((l) => ({
-              id: l.id,
-              code: l.code,
-              name: l.name,
-            }))}
-            defaultLocationId={active.id}
+            locationId={active.id}
+            locationCode={active.code}
             today={today}
           />
         ) : null}

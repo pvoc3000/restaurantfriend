@@ -5,16 +5,24 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { batchDate } from "@/lib/productionBatches";
 import { DateField } from "@/components/ui/DateField";
-import { PickList } from "@/components/ui/PickList";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 
 /**
  * "Generate a batch log" — migration 045.
  *
- * A KITCHEN and a DATE. Not a week and not a weekday, because the round has no
- * days in it (Mark, 2026-08-09): a batch log is a collection of things to be
- * made sometime soon, and the staff choose the order. So the log carries the
- * date it was generated and the items carry no date at all.
+ * A DATE, at the kitchen you are standing in. Not a week and not a weekday,
+ * because the round has no days in it (Mark, 2026-08-09): a batch log is a
+ * collection of things to be made sometime soon, and the staff choose the
+ * order. So the log carries the date it was generated and the items carry no
+ * date at all.
+ *
+ * IT DOES NOT OFFER A KITCHEN, and that is a fix rather than a simplification.
+ * The list is scoped to the working kitchen (Mark's call, 2026-08-09 — "keep
+ * logs from each kitchen separated"), so a picker here could write a log the
+ * list would never show: generate for DF02 while standing at DF01 and it
+ * vanishes. That is exactly what happened. Generating follows the working
+ * location like every other operational screen (design rule 3); to make
+ * another kitchen's log, go and work at that kitchen.
  *
  * Generating the same day twice TOPS UP the same log rather than making a
  * second — the unique index on (location, date) says so, and the receipt says
@@ -46,19 +54,19 @@ const WARNING_TITLE: Record<string, string> = {
 };
 
 export function GenerateBatches({
-  locations,
-  defaultLocationId,
+  locationId,
+  locationCode,
   today,
 }: {
-  locations: { id: string; code: string; name: string }[];
-  defaultLocationId: string | null;
+  /** The WORKING kitchen. Not a choice — see the note above. */
+  locationId: string;
+  locationCode: string;
   today: string;
 }) {
   const supabase = createClient();
   const router = useRouter();
 
   const [open, setOpen] = useState(false);
-  const [kitchen, setKitchen] = useState<string | null>(defaultLocationId);
   const [logDate, setLogDate] = useState<string | null>(today);
   const [running, setRunning] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
@@ -68,16 +76,15 @@ export function GenerateBatches({
     setOpen(true);
     setReceipt(null);
     setError(null);
-    setKitchen(defaultLocationId);
     setLogDate(today);
   }
 
   async function run(replace: boolean) {
-    if (!kitchen || !logDate) return;
+    if (!logDate) return;
     setRunning(true);
     setError(null);
     const { data, error } = await supabase.rpc("generate_production_batches", {
-      p_location_id: kitchen,
+      p_location_id: locationId,
       p_log_date: logDate,
       p_replace: replace,
     });
@@ -141,7 +148,7 @@ export function GenerateBatches({
                 <button
                   type="button"
                   onClick={() => run(false)}
-                  disabled={running || !kitchen || !logDate}
+                  disabled={running || !logDate}
                   className={DIALOG_COMMIT_CLASS}
                 >
                   {running ? "Generating…" : "Generate"}
@@ -228,29 +235,23 @@ export function GenerateBatches({
           ) : (
             <div className="space-y-5">
               <p className="text-sm text-muted">
-                One kitchen, one day. Every element on that kitchen&rsquo;s
-                weekly round becomes one batch to do — what needs making, in no
-                particular order. Anything off the round is logged by hand.
-                Generating the same day again tops up the same log.
+                Every element on {locationCode}&rsquo;s weekly round becomes one
+                batch to do — what needs making, in no particular order. Anything
+                off the round is logged by hand. Generating the same day again
+                tops up the same log.
               </p>
 
               <div className="grid gap-4 sm:grid-cols-2">
-                <label className="space-y-1.5">
+                <div className="space-y-1.5">
                   <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
                     Kitchen
                   </span>
-                  <PickList
-                    value={kitchen}
-                    onPick={(next) => setKitchen(next || null)}
-                    variant="field"
-                    ariaLabel="Which kitchen"
-                    options={locations.map((l) => ({
-                      value: l.id,
-                      label: l.code,
-                      hint: l.name,
-                    }))}
-                  />
-                </label>
+                  {/* Stated, not chosen: a log belongs to the kitchen you are
+                      working at, and the list only shows that kitchen's. */}
+                  <span className="block h-9 border border-hairline px-3 py-1.5 text-sm text-muted">
+                    {locationCode}
+                  </span>
+                </div>
 
                 <label className="space-y-1.5">
                   <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
