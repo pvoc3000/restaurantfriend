@@ -36,26 +36,32 @@ export default async function BatchLogsPage() {
   const from = addDays(today, -14);
   const to = addDays(today, 21);
 
-  const [{ data: batches, error }, { data: employees }] = await Promise.all([
-    supabase
-      .from("production_batches")
-      // One string literal, never a concatenation: Supabase types the result
-      // from the select's literal type, and `"a" + "b"` widens to `string`.
-      .select(
-        `id, batch_date, batch_number, element_id, location_id, element_day_id,
-         batch_label, sort, shift, status, operator_employee_id, recipe_version_label,
-         batch_amount, batch_unit, par_count, par_size, par_unit,
-         yield_count, yield_size, yield_unit, notes, photo_path,
-         production_elements ( name, element_type )`
-      )
-      .eq("location_id", active.id)
-      .gte("batch_date", from)
-      .lte("batch_date", to)
-      .order("batch_date"),
-    // The roster, through 044's definer — `employees` READ is owner/admin only
-    // (020), so a supervisor cannot select that table at all. Two columns.
-    supabase.rpc("production_operators", { p_location_id: active.id }),
-  ]);
+  const [{ data: batches, error }, { data: employees }, { data: members }] =
+    await Promise.all([
+      supabase
+        .from("production_batches")
+        // One string literal, never a concatenation: Supabase types the result
+        // from the select's literal type, and `"a" + "b"` widens to `string`.
+        .select(
+          `id, batch_date, batch_number, element_id, location_id, element_day_id,
+           batch_label, sort, status, operator_employee_id, created_by,
+           recipe_version_label, batch_amount, batch_unit,
+           par_count, par_size, par_unit,
+           on_hand_count, on_hand_size, on_hand_unit,
+           yield_count, yield_size, yield_unit, notes, photo_path,
+           production_elements ( name, element_type )`
+        )
+        .eq("location_id", active.id)
+        .gte("batch_date", from)
+        .lte("batch_date", to)
+        .order("batch_date"),
+      // The roster, through 044's definer — `employees` READ is owner/admin only
+      // (020), so a supervisor cannot select that table at all. Two columns.
+      supabase.rpc("production_operators", { p_location_id: active.id }),
+      // Who ENTERED each record, which is a different person from who made it —
+      // FileMaker's list carries both and so does this.
+      supabase.from("org_members").select("user_id, display_name"),
+    ]);
 
   if (error) {
     return (
@@ -71,6 +77,9 @@ export default async function BatchLogsPage() {
   const nameById = new Map(
     ((employees ?? []) as { id: string; name: string }[]).map((e) => [e.id, e.name])
   );
+  const memberById = new Map(
+    (members ?? []).map((m) => [m.user_id as string, (m.display_name ?? null) as string | null])
+  );
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
 
   const rows: BatchRow[] = (batches ?? []).map((b) => {
@@ -84,12 +93,14 @@ export default async function BatchLogsPage() {
       element_name: element?.name ?? "—",
       element_type: element?.element_type ?? null,
       kitchenCode: codeById.get(b.location_id as string) ?? "—",
-      shift: (b.shift ?? null) as string | null,
       batch_label: (b.batch_label ?? null) as string | null,
       sort: (b.sort ?? null) as number | null,
       status: (b.status ?? "to_do") as string,
       operatorName: b.operator_employee_id
         ? nameById.get(b.operator_employee_id as string) ?? null
+        : null,
+      createdByName: b.created_by
+        ? memberById.get(b.created_by as string) ?? null
         : null,
       recipe_version_label: (b.recipe_version_label ?? null) as string | null,
       batch_amount: num(b.batch_amount),
@@ -97,6 +108,9 @@ export default async function BatchLogsPage() {
       par_count: num(b.par_count),
       par_size: num(b.par_size),
       par_unit: (b.par_unit ?? null) as string | null,
+      on_hand_count: num(b.on_hand_count),
+      on_hand_size: num(b.on_hand_size),
+      on_hand_unit: (b.on_hand_unit ?? null) as string | null,
       yield_count: num(b.yield_count),
       yield_size: num(b.yield_size),
       yield_unit: (b.yield_unit ?? null) as string | null,

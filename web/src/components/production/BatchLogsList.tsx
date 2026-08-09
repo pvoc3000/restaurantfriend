@@ -14,7 +14,7 @@ import {
   batchDate,
   describeAmount,
   isBatchOutstanding,
-  yieldAgainstPar,
+  amountTotal,
 } from "@/lib/productionBatches";
 
 export type BatchRow = {
@@ -24,17 +24,23 @@ export type BatchRow = {
   element_name: string;
   element_type: string | null;
   kitchenCode: string;
-  shift: string | null;
   batch_label: string | null;
   sort: number | null;
   status: string;
+  /** The EMPLOYEE who made it — FileMaker's "Prepared by". */
   operatorName: string | null;
+  /** The app user who entered the record — FileMaker's "By". A different
+   *  person from the operator more often than not. */
+  createdByName: string | null;
   recipe_version_label: string | null;
   batch_amount: number | null;
   batch_unit: string | null;
   par_count: number | null;
   par_size: number | null;
   par_unit: string | null;
+  on_hand_count: number | null;
+  on_hand_size: number | null;
+  on_hand_unit: string | null;
   yield_count: number | null;
   yield_size: number | null;
   yield_unit: string | null;
@@ -43,12 +49,61 @@ export type BatchRow = {
   hasPhoto: boolean;
 };
 
+/**
+ * A count × size unit trio, edited in place.
+ *
+ * Three cells rather than one box because that is what the amount IS — "3 ×
+ * 1.5 gal", which is exactly how FileMaker's own detail lays it out (# CONTAINERS
+ * × AMOUNT IN CONTAINER). Only the pair can be multiplied, and 036 parsed the
+ * free text into three columns precisely so it could be.
+ */
+function AmountCells({
+  row,
+  prefix,
+  editable,
+}: {
+  row: BatchRow;
+  prefix: "on_hand" | "yield";
+  editable: boolean;
+}) {
+  const count = prefix === "on_hand" ? row.on_hand_count : row.yield_count;
+  const size = prefix === "on_hand" ? row.on_hand_size : row.yield_size;
+  const unit = prefix === "on_hand" ? row.on_hand_unit : row.yield_unit;
+  const what = prefix === "on_hand" ? "On hand" : "Made";
+
+  if (!editable) {
+    return (
+      <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+        {describeAmount(count, size, unit)}
+      </span>
+    );
+  }
+  return (
+    <span className="flex flex-wrap items-baseline gap-1">
+      <InlineValue
+        table="production_batches" id={row.id} column={`${prefix}_count`} kind="number"
+        value={count} ariaLabel={`${what} count, ${row.element_name}`}
+      />
+      <span className="text-subtle">×</span>
+      <InlineValue
+        table="production_batches" id={row.id} column={`${prefix}_size`} kind="number"
+        value={size} ariaLabel={`${what} size, ${row.element_name}`}
+      />
+      <InlineValue
+        table="production_batches" id={row.id} column={`${prefix}_unit`}
+        value={unit} ariaLabel={`${what} unit, ${row.element_name}`}
+      />
+    </span>
+  );
+}
+
 type Tier = "outstanding" | "today" | "done" | "all";
-type Grouping = "date" | "shift" | "element" | "none";
+type Grouping = "date" | "location" | "type" | "element" | "none";
 
 const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
   date: (r) => batchDate(r.batch_date),
-  shift: (r) => r.shift ?? "No shift",
+  location: (r) => r.kitchenCode,
+  type: (r) => r.element_type ?? "No type",
   element: (r) => r.element_name,
 };
 
@@ -58,12 +113,13 @@ const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = 
  * A day's label is "Mon 8/3", and sorting a week by that string puts Monday,
  * then Thursday, then Tuesday — alphabetical order, which is not an order any
  * kitchen works in. Caught on the real DF01 week. So the date grouping sorts by
- * the ISO date underneath and prints the friendly form; the other two group by
- * a name, where the label IS the key.
+ * the ISO date underneath and prints the friendly form; the others group by a
+ * name, where the label IS the key.
  */
 const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
   date: (r) => r.batch_date,
-  shift: (r) => r.shift ?? "￿", // no shift sinks last, lib/tableSort's rule
+  location: (r) => r.kitchenCode,
+  type: (r) => r.element_type ?? "￿", // no type sinks last, lib/tableSort's rule
   element: (r) => r.element_name.toLowerCase(),
 };
 
@@ -120,7 +176,6 @@ export function BatchLogsList({
         r.element_name,
         r.batch_number,
         r.kitchenCode,
-        r.shift ?? "",
         r.batch_label ?? "",
         r.operatorName ?? "",
         r.notes ?? "",
@@ -136,7 +191,8 @@ export function BatchLogsList({
       switch (sort.key) {
         case "date": return r.batch_date;
         case "element": return r.element_name;
-        case "shift": return r.shift ?? "";
+        case "location": return r.kitchenCode;
+        case "type": return r.element_type ?? "";
         case "status": return r.status;
         case "operator": return r.operatorName ?? "";
         case "number": return r.batch_number;
@@ -168,14 +224,60 @@ export function BatchLogsList({
     visible.map((r) => ({ id: r.id, href: `/batch-logs/${r.id}` }))
   );
 
+  // MARK'S ORDER, 2026-08-09, and it is FileMaker's own Batch Logs list — its
+  // search globals are date · location · order · batch · element · elementType
+  // · employee, which is this row read left to right.
+  //
+  // Day-of-week and SHIFT are gone. They belong to the element SCHEDULE, which
+  // is what generation reads; a logged batch carries the date it was generated
+  // for and nothing about the rhythm that proposed it.
   const columns: DataColumn<BatchRow>[] = [
     {
       key: "date",
-      label: "Day",
+      label: "Date",
       width: 120,
       pinned: true,
       sortValue: (r) => r.batch_date,
       render: (r) => <span className="text-muted">{batchDate(r.batch_date)}</span>,
+    },
+    {
+      key: "location",
+      label: "Location",
+      width: 100,
+      sortValue: (r) => r.kitchenCode,
+      render: (r) => <span className="font-medium">{r.kitchenCode}</span>,
+    },
+    {
+      key: "sort",
+      label: "Order",
+      width: 80,
+      align: "right",
+      // The batch's place in the day. A LABEL with a number beside it, never an
+      // integer alone: 040 measured "Blueberry", "Caramel" and "x2" among the
+      // real values, so what sorts and what prints are two different things.
+      sortValue: (r) => r.sort ?? Number.MAX_SAFE_INTEGER,
+      render: (r) =>
+        r.batch_label ? (
+          <span className="tabular-nums text-muted">{r.batch_label}</span>
+        ) : (
+          <span className="text-faint">—</span>
+        ),
+    },
+    {
+      key: "number",
+      label: "Batch",
+      width: 100,
+      align: "right",
+      sortValue: (r) => r.batch_number,
+      render: (r) => (
+        <span
+          className="tabular-nums text-muted"
+          title={r.generated ? "From the weekly schedule" : "Logged by hand"}
+        >
+          {r.batch_number}
+          {r.generated ? "" : "*"}
+        </span>
+      ),
     },
     {
       key: "element",
@@ -186,26 +288,94 @@ export function BatchLogsList({
       render: (r) => (
         <Link href={`/batch-logs/${r.id}`} className="font-medium hover:underline">
           {r.element_name}
-          {r.batch_label ? <span className="ml-2 text-muted">#{r.batch_label}</span> : null}
         </Link>
       ),
     },
     {
-      key: "kitchen",
-      label: "Made at",
-      width: 100,
-      sortValue: (r) => r.kitchenCode,
-      render: (r) => <span className="font-medium">{r.kitchenCode}</span>,
+      key: "type",
+      label: "Item type",
+      width: 130,
+      sortValue: (r) => r.element_type ?? "",
+      render: (r) =>
+        r.element_type ? (
+          <span className="text-muted">{r.element_type}</span>
+        ) : (
+          <span className="text-faint">—</span>
+        ),
     },
     {
-      key: "shift",
-      label: "Shift",
+      key: "operator",
+      label: "Prepared by",
+      width: 160,
+      sortValue: (r) => r.operatorName ?? "",
+      render: (r) =>
+        r.operatorName ? (
+          <span className="text-muted">{r.operatorName}</span>
+        ) : (
+          <span className="text-faint">—</span>
+        ),
+    },
+    {
+      key: "par",
+      label: "Par",
       width: 120,
-      sortValue: (r) => r.shift ?? "",
+      // What this kitchen keeps on hand — the ASK, snapshotted at generation.
+      // Read-only: changing it here would make the row disagree with the
+      // element's own stock figure without saying so.
+      sortValue: (r) => amountTotal(r.par_count, r.par_size) ?? -1,
+      render: (r) => (
+        <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
+          {describeAmount(r.par_count, r.par_size, r.par_unit)}
+        </span>
+      ),
+    },
+    {
+      key: "onhand",
+      label: "On hand",
+      width: 190,
+      sortValue: (r) => amountTotal(r.on_hand_count, r.on_hand_size) ?? -1,
+      render: (r) => <AmountCells row={r} prefix="on_hand" editable={editable} />,
+    },
+    {
+      key: "made",
+      label: "Made",
+      width: 190,
+      sortValue: (r) => amountTotal(r.yield_count, r.yield_size) ?? -1,
+      render: (r) => <AmountCells row={r} prefix="yield" editable={editable} />,
+    },
+    {
+      key: "note",
+      label: "Note",
+      width: 220,
+      wrap: true,
+      sortValue: (r) => r.notes ?? "",
       hideWhenCompact: true,
       render: (r) =>
-        r.shift ? (
-          <span className="text-muted">{r.shift}</span>
+        editable ? (
+          <InlineValue
+            table="production_batches"
+            id={r.id}
+            column="notes"
+            value={r.notes}
+            ariaLabel={`Note, ${r.element_name}`}
+          />
+        ) : (
+          <span className={READ_ONLY_VALUE}>{r.notes ?? "—"}</span>
+        ),
+    },
+    {
+      key: "by",
+      // NOT "prepared by". FileMaker's own list carries both and so does this:
+      // PREPARED BY is the employee who made it — often somebody with no login
+      // at all — and BY is whoever entered the record. Two people, two columns,
+      // which is the whole reason 044 stores both.
+      label: "By",
+      width: 120,
+      sortValue: (r) => r.createdByName ?? "",
+      hideWhenCompact: true,
+      render: (r) =>
+        r.createdByName ? (
+          <span className="text-muted">{r.createdByName}</span>
         ) : (
           <span className="text-faint">—</span>
         ),
@@ -232,102 +402,6 @@ export function BatchLogsList({
             {BATCH_STATUS_LABEL[r.status as keyof typeof BATCH_STATUS_LABEL] ?? r.status}
           </span>
         ),
-    },
-    {
-      key: "asked",
-      label: "To make",
-      width: 110,
-      sortValue: (r) => r.batch_amount ?? -1,
-      hideWhenCompact: true,
-      // What the weekly schedule said. Read-only: it is a snapshot of the
-      // rhythm, and changing it here would make the row disagree with the
-      // schedule it came from without saying so.
-      render: (r) => (
-        <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
-          {describeAmount(r.batch_amount, null, r.batch_unit)}
-        </span>
-      ),
-    },
-    {
-      key: "yield",
-      label: "Yield",
-      width: 200,
-      sortValue: (r) => r.yield_count ?? -1,
-      // Count × size × unit, three cells, because that is what the amount IS —
-      // "2 × 22 qt" — and only the pair can be multiplied. FileMaker stored the
-      // same three and printed them joined.
-      render: (r) =>
-        editable ? (
-          <span className="flex flex-wrap items-baseline gap-1">
-            <InlineValue
-              table="production_batches" id={r.id} column="yield_count" kind="number"
-              value={r.yield_count} ariaLabel={`Yield count, ${r.element_name}`}
-            />
-            <span className="text-subtle">×</span>
-            <InlineValue
-              table="production_batches" id={r.id} column="yield_size" kind="number"
-              value={r.yield_size} ariaLabel={`Yield size, ${r.element_name}`}
-            />
-            <InlineValue
-              table="production_batches" id={r.id} column="yield_unit"
-              value={r.yield_unit} ariaLabel={`Yield unit, ${r.element_name}`}
-            />
-          </span>
-        ) : (
-          <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-            {describeAmount(r.yield_count, r.yield_size, r.yield_unit)}
-          </span>
-        ),
-    },
-    {
-      key: "par",
-      label: "Against par",
-      width: 140,
-      sortValue: (r) => r.par_count ?? -1,
-      hideWhenCompact: true,
-      render: (r) => {
-        const verdict = yieldAgainstPar(r);
-        const par = describeAmount(r.par_count, r.par_size, r.par_unit);
-        if (verdict === "unknown") {
-          return <span className="text-faint">{par}</span>;
-        }
-        // Yellow for a miss in either direction — worth an eye, not wrong. A
-        // batch under par may be exactly what was wanted.
-        return (
-          <span
-            className={verdict === "at" ? "text-muted" : "text-mark"}
-            title={`Par is ${par}`}
-          >
-            {verdict === "at" ? "at par" : verdict === "over" ? "over par" : "under par"}
-          </span>
-        );
-      },
-    },
-    {
-      key: "operator",
-      label: "Made by",
-      width: 160,
-      sortValue: (r) => r.operatorName ?? "",
-      render: (r) =>
-        r.operatorName ? (
-          <span className="text-muted">{r.operatorName}</span>
-        ) : (
-          <span className="text-faint">—</span>
-        ),
-    },
-    {
-      key: "number",
-      label: "Batch",
-      width: 100,
-      align: "right",
-      sortValue: (r) => r.batch_number,
-      hideWhenCompact: true,
-      render: (r) => (
-        <span className="tabular-nums text-subtle" title={r.generated ? "From the weekly schedule" : "Logged by hand"}>
-          {r.batch_number}
-          {r.generated ? "" : "*"}
-        </span>
-      ),
     },
   ];
 
@@ -379,8 +453,9 @@ export function BatchLogsList({
               value={grouping}
               onChange={setGrouping}
               options={[
-                { key: "date" as Grouping, label: "Day" },
-                { key: "shift" as Grouping, label: "Shift" },
+                { key: "date" as Grouping, label: "Date" },
+                { key: "location" as Grouping, label: "Location" },
+                { key: "type" as Grouping, label: "Item type" },
                 { key: "element" as Grouping, label: "Element" },
                 { key: "none" as Grouping, label: "None" },
               ]}
