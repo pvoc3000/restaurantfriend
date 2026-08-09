@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { TextInput } from "@/components/ui/TextInput";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { createClient } from "@/lib/supabase/client";
 import { usePublishRecordSet } from "@/lib/recordSet";
@@ -50,13 +51,39 @@ export function PlansList({
 }) {
   const router = useRouter();
   const [tier, setTier] = useState<Tier>("active");
+  const [search, setSearch] = useState("");
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
 
-  const visible = useMemo(
-    () => rows.filter((r) => (tier === "active" ? r.is_active : true)),
-    [rows, tier]
-  );
+  // This list had no search box at all, alone among the module's five (audit,
+  // 2026-08-09). It was defensible while a shop had two plans and indefensible
+  // the moment it has a season's worth — and a list you can filter but not
+  // search is the odd one out wherever you have just come from.
+  //
+  // Every text column it shows, and nothing it doesn't: the plan's name, both
+  // shop codes, the notes, and the dates in the form the In-force column PRINTS
+  // them (`planRange`, the same function that renders it) as well as the stored
+  // ISO — the schedules list's lesson, where searching what was on screen found
+  // nothing because the row stored the other spelling.
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    return rows.filter((r) => {
+      if (tier === "active" && !r.is_active) return false;
+      if (!q) return true;
+      return [
+        r.title,
+        r.sellsCode,
+        r.kitchenCode ?? "",
+        r.notes ?? "",
+        r.starts_on,
+        r.ends_on ?? "",
+        planRange(r),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(q);
+    });
+  }, [rows, tier, search]);
   const overlaps = useMemo(() => overlappingPlans(rows), [rows]);
 
   usePublishRecordSet(
@@ -345,15 +372,25 @@ export function PlansList({
       columnChooser
       empty={<p className="text-sm text-muted">No plans match these filters.</p>}
       leading={
-        <TabPicker
-          ariaLabel="Which plans"
-          value={tier}
-          onChange={setTier}
-          options={[
-            { key: "active" as Tier, label: "Active", count: rows.filter((r) => r.is_active).length },
-            { key: "all" as Tier, label: "All", count: rows.length },
-          ]}
-        />
+        <div className="flex flex-wrap items-end gap-3">
+          <TextInput
+            value={search}
+            onValueChange={setSearch}
+            placeholder="Search plans"
+            aria-label="Search plans"
+            clearLabel="Clear the search"
+            className="w-64"
+          />
+          <TabPicker
+            ariaLabel="Which plans"
+            value={tier}
+            onChange={setTier}
+            options={[
+              { key: "active" as Tier, label: "Active", count: rows.filter((r) => r.is_active).length },
+              { key: "all" as Tier, label: "All", count: rows.length },
+            ]}
+          />
+        </div>
       }
     />
     </>

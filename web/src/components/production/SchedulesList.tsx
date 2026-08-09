@@ -28,6 +28,18 @@ export type ScheduleRow = {
 };
 
 type Tier = "upcoming" | "today" | "unprinted" | "all";
+
+/**
+ * What the From column says: where this day came from. One function, called by
+ * the column that renders it AND by the search that has to find it — a second
+ * copy of these three cases is a second thing to keep in step, and the one that
+ * would fall behind is the invisible one.
+ */
+function sourceLabel(r: ScheduleRow): string {
+  if (r.source === "plan") return "Plan";
+  if (r.source === "special_order") return r.title ?? "Special order";
+  return r.title ?? "By hand";
+}
 type Grouping = "date" | "kitchen" | "sells" | "none";
 
 const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: ScheduleRow) => string> = {
@@ -81,7 +93,23 @@ export function SchedulesList({
       if (tier === "today" && r.schedule_date !== today) return false;
       if (tier === "unprinted" && r.printedAt !== null) return false;
       if (!q) return true;
-      return [r.schedule_date, r.sellsCode, r.kitchenCode, r.title ?? "", r.note ?? ""]
+      // Both spellings of the date, because the column shows one and the row
+      // stores the other: `packetDate` prints "Thu 8/7/2026" where the column
+      // sorts on "2026-08-07". Searching only the stored form meant that typing
+      // what is printed in front of you — "Thu", "8/7" — found nothing, which
+      // reads as the schedule not being there.
+      return [
+        r.schedule_date,
+        packetDate(r.schedule_date),
+        r.sellsCode,
+        r.kitchenCode,
+        // The From column's own words, through the same function it renders
+        // with — so "by hand" finds the ones made by hand. Calling the helper
+        // rather than repeating its three cases is what stops the two drifting.
+        sourceLabel(r),
+        r.title ?? "",
+        r.note ?? "",
+      ]
         .join(" ")
         .toLowerCase()
         .includes(q);
@@ -205,15 +233,7 @@ export function SchedulesList({
       width: 110,
       sortValue: (r) => r.source,
       hideWhenCompact: true,
-      render: (r) => (
-        <span className="text-muted">
-          {r.source === "plan"
-            ? "Plan"
-            : r.source === "special_order"
-              ? r.title ?? "Special order"
-              : r.title ?? "By hand"}
-        </span>
-      ),
+      render: (r) => <span className="text-muted">{sourceLabel(r)}</span>,
     },
     {
       key: "lines",

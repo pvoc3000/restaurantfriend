@@ -56,7 +56,12 @@ export function RecipesList({ rows, editable }: { rows: RecipeRow[]; editable: b
       return (
         r.name.toLowerCase().includes(q) ||
         r.elementName.toLowerCase().includes(q) ||
-        (r.recipe_type ?? "").toLowerCase().includes(q)
+        (r.recipe_type ?? "").toLowerCase().includes(q) ||
+        // The Master column prints "v11", so "v11" should find it. The other
+        // thing that column says — "none" — is deliberately NOT matched here:
+        // the no-master tier beside the box already answers that, and a search
+        // term that secretly means a filter is a worse way to ask.
+        (r.masterLabel ? `v${r.masterLabel}`.toLowerCase().includes(q) : false)
       );
     });
   }, [rows, search, tier]);
