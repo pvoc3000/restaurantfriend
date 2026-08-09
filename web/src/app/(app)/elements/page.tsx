@@ -6,6 +6,7 @@ import { elementCost } from "@/lib/productionCost";
 import { ElementsList, type ElementRow } from "@/components/production/ElementsList";
 import { NewElement } from "@/components/production/NewElement";
 import type { ElementKind } from "@/lib/production";
+import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
 
 /**
  * The element catalog — production brief decision 2's merged component
@@ -15,7 +16,16 @@ import type { ElementKind } from "@/lib/production";
  * (see `loadProductionGraph`). They are never stored: decision 11, and the
  * reason FMP still shows 2022 prices in 2026.
  */
-export default async function ElementsPage() {
+export default async function ElementsPage({
+  searchParams,
+}: {
+  // The filter menus and the search box live in the URL, so a view survives a
+  // trip into an element and back — and can be sent to somebody. They are
+  // passed through RAW: which values are real depends on the vocabulary the
+  // column actually holds, which only the list itself knows.
+  searchParams: Promise<RawSearchParams>;
+}) {
+  const params = await searchParams;
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canWriteCatalog(session.membership.role);
@@ -72,7 +82,12 @@ export default async function ElementsPage() {
         ) : null}
       </div>
 
-      <ElementsList rows={rows} editable={editable} />
+      <ElementsList
+        rows={rows}
+        editable={editable}
+        initialFilters={params}
+        initialSearch={parseFilterSearch(params)}
+      />
     </div>
   );
 }

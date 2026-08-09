@@ -1,4 +1,4 @@
-// lib/listFilters — the brain behind `ui/FilterMenus`, the row of popup menus
+// lib/filterMenus — the brain behind `ui/FilterMenus`, the row of popup menus
 // that combine (Mark, 2026-08-09).
 //
 // The case to trust is the CONDITIONED COUNT, and specifically that a
@@ -17,9 +17,13 @@ import {
   applyListFilters,
   clearedFilters,
   filterCounts,
+  filterHref,
+  filterQuery,
   matchesDimension,
+  parseFilterSearch,
+  parseFilterValues,
   type FilterDimension,
-} from "../../src/lib/listFilters";
+} from "../../src/lib/filterMenus";
 import { eq, test } from "./harness";
 
 type Row = { name: string; kind: string; schedule: string | null; active: boolean };
@@ -175,4 +179,63 @@ test("clearedFilters puts every declared dimension back to All", () => {
   const cleared = clearedFilters(DIMS);
   eq(activeFilterCount(DIMS, cleared), 0);
   eq(applyListFilters(rows, DIMS, cleared).length, 6);
+});
+
+// --- the URL ----------------------------------------------------------------
+
+test("an unfiltered view writes NO query, so the list keeps one address", () => {
+  eq(filterQuery(DIMS, {}), "");
+  eq(filterQuery(DIMS, { kind: FILTER_ALL }), "", "All is not worth a parameter");
+  eq(filterHref("/elements", DIMS, {}), "/elements");
+});
+
+test("a set menu writes its key, and the search rides as q", () => {
+  eq(filterQuery(DIMS, { kind: "made" }), "kind=made");
+  eq(
+    filterHref("/elements", DIMS, { kind: "made", schedule: "WEEKLY" }, "glaze"),
+    "/elements?q=glaze&kind=made&schedule=WEEKLY"
+  );
+});
+
+test("a blank or whitespace search writes nothing", () => {
+  eq(filterQuery(DIMS, {}, "   "), "");
+  eq(filterQuery(DIMS, {}, "glaze"), "q=glaze");
+  eq(filterQuery(DIMS, {}, "  glaze  "), "q=glaze", "and it is trimmed");
+});
+
+test("a value for an UNDECLARED dimension never reaches the URL", () => {
+  eq(filterQuery(DIMS, { colour: "green", kind: "made" }), "kind=made");
+});
+
+test("round trip: what is written is what is read back", () => {
+  const values = { active: "active", kind: "purchased", schedule: "none" };
+  const query = filterQuery(DIMS, values, "cocoa");
+  const params = Object.fromEntries(new URLSearchParams(query));
+  eq(parseFilterValues(DIMS, params), values);
+  eq(parseFilterSearch(params), "cocoa");
+});
+
+test("A VALUE NO OPTION OFFERS IS DROPPED, not obeyed", () => {
+  // ?kind=cheese would otherwise filter to nothing while the menu — which shows
+  // a stored value even when it is off its own list — sat there reading
+  // "cheese". Not filtering is the better answer to a mistyped link.
+  eq(parseFilterValues(DIMS, { kind: "cheese" }), {});
+  eq(parseFilterValues(DIMS, { kind: "cheese", schedule: "AB" }), { schedule: "AB" });
+});
+
+test("a parameter for a dimension that doesn't exist is ignored", () => {
+  eq(parseFilterValues(DIMS, { colour: "green" }), {});
+});
+
+test("repeated parameters take the first, never the array", () => {
+  // Next hands `?kind=made&kind=manual` over as an array; a raw array reaching
+  // `matches` would compare an object to a string and quietly match nothing.
+  eq(parseFilterValues(DIMS, { kind: ["made", "manual"] }), { kind: "made" });
+  eq(parseFilterSearch({ q: ["a", "b"] }), "a");
+});
+
+test("an empty query parses to no filters at all", () => {
+  eq(parseFilterValues(DIMS, {}), {});
+  eq(parseFilterSearch({}), "");
+  eq(activeFilterCount(DIMS, parseFilterValues(DIMS, {})), 0);
 });

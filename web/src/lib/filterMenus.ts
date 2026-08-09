@@ -134,3 +134,88 @@ export function activeFilterCount<T>(
 export function clearedFilters<T>(dimensions: FilterDimension<T>[]): FilterValues {
   return Object.fromEntries(dimensions.map((d) => [d.key, FILTER_ALL]));
 }
+
+/* -------------------------------------------------------------------------
+ * THE URL
+ *
+ * Filters describe the VIEW, so they belong in the query string — the app's
+ * standing rule, and one that earns its keep far more here than it did with a
+ * single tab row: four combining menus make a view worth sending to someone,
+ * and worth getting back when you return from an element's own screen.
+ *
+ * Written with `history.replaceState`, never `router.replace`: everything the
+ * menus do is client-side over rows the server already sent, and a replace
+ * would re-run the server component — a full refetch and a fresh cost graph —
+ * on every keystroke and every pick. That is `ItemsList`'s reasoning and this
+ * follows it exactly.
+ * ------------------------------------------------------------------------- */
+
+/** Next hands searchParams over as string | string[] | undefined per key. */
+export type RawSearchParams = Record<string, string | string[] | undefined>;
+
+/** The search box's parameter. `q` because that is what /items already uses. */
+export const SEARCH_PARAM = "q";
+
+function one(value: string | string[] | undefined): string {
+  return (Array.isArray(value) ? value[0] : value) ?? "";
+}
+
+export function parseFilterSearch(params: RawSearchParams): string {
+  return one(params[SEARCH_PARAM]);
+}
+
+/**
+ * Read the declared dimensions out of a URL, KEEPING ONLY REAL OPTION VALUES.
+ *
+ * A value that no option offers is dropped rather than obeyed — `?kind=cheese`
+ * would otherwise filter to nothing while the menu, which shows a stored value
+ * even when it isn't on its list, sat there reading "cheese". An empty list
+ * under a menu naming something that does not exist is a worse answer to a
+ * mistyped link than simply not filtering.
+ *
+ * Validating here rather than on the server is deliberate: a dimension's
+ * options can depend on the data (the element schedules are whatever the column
+ * holds), and its `matches` is a closure, so the only place that knows the real
+ * vocabulary is the component holding it.
+ */
+export function parseFilterValues<T>(
+  dimensions: FilterDimension<T>[],
+  params: RawSearchParams
+): FilterValues {
+  const values: FilterValues = {};
+  for (const dimension of dimensions) {
+    const raw = one(params[dimension.key]);
+    if (raw && dimension.options.some((o) => o.value === raw)) values[dimension.key] = raw;
+  }
+  return values;
+}
+
+/**
+ * The query string for a view: the search term and any menu that is saying
+ * something. A menu on "All" writes NO parameter, so the unfiltered list keeps
+ * one canonical address — the same rule the recipe tabs follow.
+ */
+export function filterQuery<T>(
+  dimensions: FilterDimension<T>[],
+  values: FilterValues,
+  search = ""
+): string {
+  const params = new URLSearchParams();
+  if (search.trim()) params.set(SEARCH_PARAM, search.trim());
+  for (const dimension of dimensions) {
+    const chosen = values[dimension.key] ?? FILTER_ALL;
+    if (chosen !== FILTER_ALL) params.set(dimension.key, chosen);
+  }
+  return params.toString();
+}
+
+/** That query on a path: `/elements?kind=made&schedule=WEEKLY`. */
+export function filterHref<T>(
+  path: string,
+  dimensions: FilterDimension<T>[],
+  values: FilterValues,
+  search = ""
+): string {
+  const query = filterQuery(dimensions, values, search);
+  return query ? `${path}?${query}` : path;
+}

@@ -9,7 +9,7 @@ import {
   filterCounts,
   type FilterDimension,
   type FilterValues,
-} from "@/lib/listFilters";
+} from "@/lib/filterMenus";
 
 /**
  * A ROW OF POPUP MENUS THAT COMBINE — the app's second filter idiom, for a list

@@ -7,6 +7,7 @@ import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { usePublishRecordSet } from "@/lib/recordSet";
+import { withFrom } from "@/lib/breadcrumbs";
 import {
   ELEMENT_KINDS,
   elementKindLabel,
@@ -15,9 +16,12 @@ import {
 } from "@/lib/production";
 import {
   applyListFilters,
+  filterHref,
+  parseFilterValues,
   type FilterDimension,
   type FilterValues,
-} from "@/lib/listFilters";
+  type RawSearchParams,
+} from "@/lib/filterMenus";
 import { formatCost, unresolvedSummary, type Cost } from "@/lib/productionCost";
 
 export type ElementRow = {
@@ -84,10 +88,22 @@ const NO_SCHEDULE = "none";
  *   "No section" being a real option on an item's shelf: without it there is no
  *   way to see the ones that have none, which is the set most worth working on.
  */
-export function ElementsList({ rows, editable }: { rows: ElementRow[]; editable: boolean }) {
-  const [search, setSearch] = useState("");
-  const [filters, setFilters] = useState<FilterValues>({});
-
+export function ElementsList({
+  rows,
+  editable,
+  initialFilters,
+  initialSearch = "",
+}: {
+  rows: ElementRow[];
+  editable: boolean;
+  /** The URL's query, raw — validated below against the real vocabulary. */
+  initialFilters?: RawSearchParams;
+  initialSearch?: string;
+}) {
+  // DECLARED BEFORE THE STATE THAT IS VALIDATED AGAINST IT. `parseFilterValues`
+  // needs the options to know which of the URL's values are real, and a hook's
+  // initialiser runs during the render that declares it — so the order of these
+  // two lines is load-bearing, not style.
   const dimensions = useMemo<FilterDimension<ElementRow>[]>(() => {
     // Whatever the column actually holds, Mark's three first.
     const schedules = [...new Set(rows.map((r) => r.schedule_class).filter(Boolean) as string[])];
@@ -140,6 +156,46 @@ export function ElementsList({ rows, editable }: { rows: ElementRow[]; editable:
     ];
   }, [rows]);
 
+  const [search, setSearch] = useState(initialSearch);
+  const [filters, setFilters] = useState<FilterValues>(() =>
+    parseFilterValues(dimensions, initialFilters ?? {})
+  );
+
+  /**
+   * Every change rewrites the URL — `history.replaceState`, not `router.replace`.
+   *
+   * All the filtering here happens in the browser over rows the server has
+   * already sent, and a `router.replace` would re-run the page's server
+   * component on every keystroke: 470 elements, four queries, and the whole
+   * cost graph resolved again to produce exactly the rows already on screen.
+   * That is the reasoning `/items` recorded when it did this first.
+   *
+   * `replaceState` rather than `pushState` for the same reason that list does
+   * it: typing six letters into a search box should not put six entries in the
+   * history, so Back leaves the list rather than un-typing it a character at a
+   * time.
+   */
+  function writeUrl(nextFilters: FilterValues, nextSearch: string) {
+    window.history.replaceState(
+      null,
+      "",
+      filterHref("/elements", dimensions, nextFilters, nextSearch)
+    );
+  }
+
+  function changeFilters(next: FilterValues) {
+    setFilters(next);
+    writeUrl(next, search);
+  }
+
+  function changeSearch(next: string) {
+    setSearch(next);
+    writeUrl(filters, next);
+  }
+
+  /** This view's own address — what a link back from an element returns to. */
+  const listHref = filterHref("/elements", dimensions, filters, search);
+
   // SEARCH FIRST, THEN THE MENUS — so the menus' counts describe the list you
   // are looking at rather than the whole catalog. The other order would have a
   // menu offer "Weekly 158" while the search has already cut you to nine.
@@ -162,10 +218,25 @@ export function ElementsList({ rows, editable }: { rows: ElementRow[]; editable:
     [searched, dimensions, filters]
   );
 
+  /**
+   * WHAT THE ELEMENT LINKS CARRY, now that the view has an address.
+   *
+   * `withFrom` stamps the FILTERED list onto every link, which does two things
+   * that were not working before. Coming back from an element lands on the view
+   * you left rather than on the unfiltered catalog — the reason for putting the
+   * filters in the URL at all. And the record book appears: element detail
+   * looks its found set up by `crumbPath` of the crumb that led it there, and
+   * with no crumb there was nothing to look up, so first/prev/next/last has
+   * been silently absent from this screen since it shipped. `crumbPath` drops
+   * the query, so the key stays a bare "/elements" however the list is filtered.
+   */
+  const detailHref = (id: string) =>
+    withFrom(`/elements/${id}`, { href: listHref, label: "Elements" });
+
   // The list publishes what it is showing, so a detail screen can walk it.
   usePublishRecordSet(
     "/elements",
-    visible.map((r) => ({ id: r.id, href: `/elements/${r.id}` }))
+    visible.map((r) => ({ id: r.id, href: detailHref(r.id) }))
   );
 
   const columns: DataColumn<ElementRow>[] = [
@@ -188,7 +259,7 @@ export function ElementsList({ rows, editable }: { rows: ElementRow[]; editable:
       pinned: true,
       sortValue: (r) => r.name,
       render: (r) => (
-        <Link href={`/elements/${r.id}`} className="font-medium hover:underline">
+        <Link href={detailHref(r.id)} className="font-medium hover:underline">
           {r.name}
         </Link>
       ),
@@ -274,7 +345,7 @@ export function ElementsList({ rows, editable }: { rows: ElementRow[]; editable:
             noun="elements"
             dimensions={dimensions}
             values={filters}
-            onChange={setFilters}
+            onChange={changeFilters}
             leading={
               <div className="space-y-1.5">
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
@@ -282,7 +353,7 @@ export function ElementsList({ rows, editable }: { rows: ElementRow[]; editable:
                 </span>
                 <TextInput
                   value={search}
-                  onValueChange={setSearch}
+                  onValueChange={changeSearch}
                   placeholder="Name, type, schedule…"
                   className="w-64"
                   aria-label="Search elements"

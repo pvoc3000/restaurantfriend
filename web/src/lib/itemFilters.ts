@@ -43,8 +43,15 @@ export const DEFAULT_ITEM_FILTERS: ItemFilters = {
   dir: "asc",
 };
 
-/** Next passes searchParams as string | string[] | undefined per key. */
-export type RawSearchParams = Record<string, string | string[] | undefined>;
+/**
+ * Next passes searchParams as string | string[] | undefined per key.
+ *
+ * Defined once in `lib/filterMenus` (which owns the app's general URL-filter
+ * contract) and re-exported here, so the pages that already import it from this
+ * module keep working and there is still only one definition.
+ */
+export type { RawSearchParams } from "./filterMenus";
+type RawSearchParams = Record<string, string | string[] | undefined>;
 
 function one(value: string | string[] | undefined): string {
   return (Array.isArray(value) ? value[0] : value) ?? "";
