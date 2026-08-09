@@ -635,7 +635,7 @@ export function TimesheetsList({
           placeholder="Search this pay period"
           aria-label="Search timesheets"
           clearLabel="Clear the search"
-          className="h-9 w-64 text-sm"
+          className="w-64"
         />
 
         <div className="space-y-1.5">

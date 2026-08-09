@@ -199,7 +199,7 @@ export function NewEmployee({
                   onValueChange={setFirstName}
                   aria-label="First name"
                   autoFocus
-                  className="h-9 w-full text-sm"
+                  className="w-full"
                 />
               </Field>
               <Field label="Last name" required>
@@ -207,7 +207,7 @@ export function NewEmployee({
                   value={lastName}
                   onValueChange={setLastName}
                   aria-label="Last name"
-                  className="h-9 w-full text-sm"
+                  className="w-full"
                 />
               </Field>
             </div>
@@ -220,7 +220,7 @@ export function NewEmployee({
                   value={nickname}
                   onValueChange={setNickname}
                   aria-label="Nickname"
-                  className="h-9 w-full text-sm"
+                  className="w-full"
                 />
               </Field>
               <Field label="Status">
@@ -290,7 +290,7 @@ export function NewEmployee({
                   onValueChange={setPhone}
                   type="tel"
                   aria-label="Phone"
-                  className="h-9 w-full text-sm"
+                  className="w-full"
                 />
               </Field>
               <Field label="Email">
@@ -299,7 +299,7 @@ export function NewEmployee({
                   onValueChange={setEmail}
                   type="email"
                   aria-label="Email"
-                  className="h-9 w-full text-sm"
+                  className="w-full"
                 />
               </Field>
             </div>

@@ -288,7 +288,7 @@ export function AppAccess({
                 placeholder="name@example.com"
                 aria-label="Email to invite"
                 clearLabel="Clear the email"
-                className="h-9 w-full text-sm"
+                className="w-full"
               />
             </div>
             <div className="space-y-1.5">

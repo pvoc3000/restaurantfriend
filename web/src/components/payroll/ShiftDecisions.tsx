@@ -186,12 +186,13 @@ export function ShiftPremium({
               className="w-40"
             />
             <TextInput
+              size="sm"
               value={reason}
               onValueChange={setReason}
               placeholder={needsReason ? "Why (required)" : "Why (optional)"}
               aria-label="Reason for this decision"
               clearLabel="Clear the reason"
-              className="h-8 w-64 text-[13px]"
+              className="w-64"
             />
             <button type="button" disabled={!ready} onClick={record} className={BUTTON}>
               {pending ? "Saving…" : existing ? "Change" : "Record"}
@@ -336,12 +337,13 @@ export function ShiftTips({
       {editable && locationId && (
         <div className="flex flex-wrap items-center gap-2">
           <TextInput
+            size="sm"
             value={entry}
             onValueChange={setEntry}
             placeholder={effective === null ? "Card tips, e.g. 423.50" : "Replace the figure"}
             aria-label={`Pooled tips for ${locationCode ?? "this shop"} on ${businessDate}`}
             clearLabel="Clear"
-            className="h-8 w-44 text-[13px]"
+            className="w-44"
           />
           <button type="button" disabled={!ready} onClick={report} className={BUTTON}>
             {pending ? "Saving…" : "Report"}

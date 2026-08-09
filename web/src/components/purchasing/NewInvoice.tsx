@@ -273,7 +273,7 @@ export function NewInvoice({
                   onValueChange={setInvoiceNumber}
                   aria-label="Invoice number"
                   placeholder="Rent has none"
-                  className="h-9 w-full text-sm"
+                  className="w-full"
                 />
               </Field>
               <Field label="Total">
@@ -282,7 +282,7 @@ export function NewInvoice({
                   onValueChange={setTotal}
                   aria-label="Total"
                   inputMode="decimal"
-                  className="h-9 w-full text-sm"
+                  className="w-full"
                 />
               </Field>
               <Field label="Invoice date">

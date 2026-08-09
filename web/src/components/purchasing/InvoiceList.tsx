@@ -521,7 +521,7 @@ export function InvoiceList({
             onValueChange={(q) => update({ q })}
             placeholder="Search invoice number, vendor or PO…"
             clearLabel="Clear the search"
-            className="h-9 w-72 text-sm"
+            className="w-72"
           />
 
           <TabPicker

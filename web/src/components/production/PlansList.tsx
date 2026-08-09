@@ -343,6 +343,7 @@ export function PlansList({
       storageKey="production-plans"
       compactBelow={1100}
       columnChooser
+      empty={<p className="text-sm text-muted">No plans match these filters.</p>}
       leading={
         <TabPicker
           ariaLabel="Which plans"

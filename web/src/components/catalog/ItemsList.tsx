@@ -351,7 +351,7 @@ export function ItemsList({
           onValueChange={(q) => update({ q })}
           placeholder="Search name or category…"
           clearLabel="Clear the search"
-          className="h-9 w-72 text-sm"
+          className="w-72"
         />
         {/* A PickList, not a native <select> (Mark, 2026-08-01 — he named this
             one). Past 8 categories it also gains the find box, which the OS

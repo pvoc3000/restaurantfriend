@@ -107,7 +107,7 @@ export function InventoryItemPicker({
             onValueChange={setTerm}
             placeholder="Search inventory items by name…"
             clearLabel="Clear the search"
-            className="h-9 w-80 text-sm"
+            className="w-80"
           />
           {canSearch && results.length === 0 && (
             <span className="text-xs text-subtle">No items match.</span>

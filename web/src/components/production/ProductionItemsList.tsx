@@ -212,6 +212,7 @@ export function ProductionItemsList({
       compactBelow={1280}
       columnChooser
       group={group}
+      empty={<p className="text-sm text-muted">No items match these filters.</p>}
       leading={
         <div className="space-y-3">
           <div className="flex flex-wrap items-end gap-3">

@@ -172,7 +172,7 @@ export function AddShopSection({
                   inputMode="decimal"
                   aria-label="Sort order"
                   autoFocus
-                  className="h-9 w-24 text-sm"
+                  className="w-24"
                 />
               </Field>
               <Field label="Area" required>
@@ -192,7 +192,7 @@ export function AddShopSection({
                   value={subArea}
                   onValueChange={setSubArea}
                   aria-label="Sub area"
-                  className="h-9 w-44 text-sm"
+                  className="w-44"
                 />
               </Field>
             </div>
@@ -206,7 +206,7 @@ export function AddShopSection({
                   setName(next);
                 }}
                 aria-label="Display name"
-                className="h-9 w-full text-sm"
+                className="w-full"
               />
             </Field>
 

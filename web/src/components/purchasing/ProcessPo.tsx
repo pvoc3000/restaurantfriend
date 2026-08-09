@@ -385,7 +385,7 @@ export function ProcessPo({
                   disabled={busy !== null}
                   onValueChange={(next) => setCompose({ ...compose, [field]: next })}
                   clearLabel={`Clear ${label}`}
-                  className="w-full py-1"
+                  className="w-full"
                 />
               </label>
             ))}

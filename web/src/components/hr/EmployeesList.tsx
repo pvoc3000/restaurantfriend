@@ -358,7 +358,7 @@ export function EmployeesList({
             placeholder="Search people"
             aria-label="Search people"
             clearLabel="Clear the search"
-            className="h-9 w-72 text-sm"
+            className="w-72"
           />
           <PickList
             value={location}

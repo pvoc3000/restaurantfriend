@@ -628,7 +628,7 @@ export function OrderGuide({
           onValueChange={setTerm}
           placeholder="Jump to item, vendor or section…"
           clearLabel="Clear the search"
-          className="h-9 w-72"
+          className="w-72"
         />
         {/* Segmented control: these four are one choice, so they read as
             one object rather than four loose buttons. */}

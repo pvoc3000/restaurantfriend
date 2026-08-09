@@ -176,6 +176,7 @@ export function RecipesList({ rows, editable }: { rows: RecipeRow[]; editable: b
       compactBelow={1280}
       columnChooser
       group={group}
+      empty={<p className="text-sm text-muted">No recipes match these filters.</p>}
       leading={
         <div className="flex flex-wrap items-end gap-3">
           <TextInput

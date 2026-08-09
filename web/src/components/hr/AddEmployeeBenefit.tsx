@@ -181,7 +181,7 @@ export function AddEmployeeBenefit({
                       ? "none"
                       : benefit.default_amount.toFixed(2)
                   }
-                  className="h-9 w-28 text-sm"
+                  className="w-28"
                 />
               </Field>
             </div>

@@ -159,6 +159,15 @@ export function DataTable<T>({
    */
   fill?: boolean;
   maxHeightClass?: string;
+  /**
+   * What to say instead of the table when there are no rows — "No vendors match
+   * these filters." Optional: without it the table says "Nothing to show.", so
+   * a list can't accidentally have no empty state at all.
+   *
+   * It replaces the TABLE, never the strip. `leading` (this list's search box
+   * and filters) and the columns eye render either way — see the empty branch
+   * for why that isn't merely tidier.
+   */
   empty?: ReactNode;
   /**
    * Makes rows expandable: a chevron joins the first cell, and `render` fills a
@@ -356,8 +365,85 @@ export function DataTable<T>({
     return runs;
   }, [sorted, banding]);
 
+  // space-y-2, not 1 (Mark, 2026-08-01): once the strip above carried real
+  // content — a heading, a filter bar — sitting 4px off the column labels it
+  // read as crowding them rather than belonging to them. This is the gap
+  // between the strip and the table, and between the table and the
+  // reset-widths footer.
+  const rootClass = fill ? "flex h-full min-h-0 flex-col gap-y-2" : "space-y-2";
+
+  /* Directly above the LAST column header, at the table's right edge
+     (Mark, 2026-07-31). It belongs to the table, not to each list's filter
+     row: it acts on these columns, and every list putting it somewhere
+     slightly different is how you end up hunting for it.
+
+     It is the only thing on this strip. A `tools` slot lived here for one
+     commit, holding the PO list's select-all opposite the chooser; that
+     checkbox belongs in the selection column's `header` cell, where every
+     list's has always gone, so the slot went with it rather than staying
+     as a second way to do the same thing. */
+  const strip = (columnChooser || leading) && (
+    // `leading` on the left, the eye on the right, one row — and the eye
+    // gets a cell of its OWN (Mark, 2026-08-01: "so when the screen gets
+    // smaller the other elements wrap but the eye stays in place"). NOT
+    // flex-wrap on this row: the leading content is what wraps, inside its
+    // own `min-w-0 flex-1` box, so the eye never breaks onto a line of its
+    // own and never leaves the table's right edge. Measured before the
+    // fix at 1440: the filters overflowed and pushed the eye to a second
+    // line, left-aligned, which looked like a stray button.
+    // items-end: the eye belongs to the column headers directly beneath it
+    // (Mark, 2026-08-01), so it sits at the BOTTOM of the strip — beside
+    // the last row of a wrapping filter block, not floating at the top of
+    // it.
+    <div className="flex items-end justify-between gap-x-4">
+      <div className="min-w-0 flex-1">{leading}</div>
+      {/* The ordered list, not the declared one — the checklist reads in
+          the same order as the table it acts on. It gets `compact` so its
+          checkboxes can tell the truth about the width tier. */}
+      {columnChooser && (
+        // `-mb-1` because `items-end` aligns BOXES and the eye is a 32px
+        // button centring a 24px glyph, so its artwork stops 4px short of
+        // its own bottom edge. Against a ~20px heading that read as the eye
+        // floating above the line rather than sitting on it (Mark,
+        // 2026-08-02). Nudging the button rather than shifting the glyph
+        // inside it keeps the hover wash centred on the artwork, which is
+        // the thing the button's size exists to do.
+        <div className="-mb-1 shrink-0">
+          <ColumnsMenu storageKey={storageKey} columns={orderedColumns} compact={compact} />
+        </div>
+      )}
+    </div>
+  );
+
+  // AN EMPTY TABLE STILL RENDERS ITS STRIP, and that is the whole of this
+  // branch (Mark, 2026-08-09, searching the element list: "when I add the final
+  // 'y' the whole page goes blank and I have to reload to recover").
+  //
+  // It used to return `empty ?? null`, which threw away `leading` — and
+  // `leading` is where the search box and the filter tabs live. So narrowing a
+  // list to nothing removed the very controls you would use to widen it again,
+  // leaving a page with a heading and nothing under it and no way back except a
+  // reload. The search TERM was never lost; the field to edit it was. On a
+  // screen whose body is only this table (the element catalog, the recipe list)
+  // that reads as the page having crashed.
+  //
+  // The table itself still doesn't render, which the two layout hooks above
+  // depend on — see the `rows.length > 0` note there. And an `empty` message is
+  // now a caption UNDER the filters rather than a replacement for them, which
+  // is what every caller passing one already meant.
   if (rows.length === 0) {
-    return empty ? <>{empty}</> : null;
+    return (
+      <div className={rootClass}>
+        {strip}
+        {empty ?? (
+          // A default, so a list gets an honest empty state by existing rather
+          // than by remembering to ask for one. Every table here is either a
+          // filtered list or a record's own child rows, and "nothing to show"
+          // is true of both; a caller with something better to say passes it.
+          <p className="text-sm text-muted">Nothing to show.</p>
+        )}
+      </div>
+    );
   }
 
   function toggleSort(key: string) {
@@ -417,58 +503,8 @@ export function DataTable<T>({
   };
 
   return (
-    // space-y-2, not 1 (Mark, 2026-08-01): once the strip above carried real
-    // content — a heading, a filter bar — sitting 4px off the column labels it
-    // read as crowding them rather than belonging to them. This is the gap
-    // between the strip and the table, and between the table and the
-    // reset-widths footer.
-    <div
-      className={
-        fill ? "flex h-full min-h-0 flex-col gap-y-2" : "space-y-2"
-      }
-    >
-      {/* Directly above the LAST column header, at the table's right edge
-          (Mark, 2026-07-31). It belongs to the table, not to each list's filter
-          row: it acts on these columns, and every list putting it somewhere
-          slightly different is how you end up hunting for it.
-
-          It is the only thing on this strip. A `tools` slot lived here for one
-          commit, holding the PO list's select-all opposite the chooser; that
-          checkbox belongs in the selection column's `header` cell, where every
-          list's has always gone, so the slot went with it rather than staying
-          as a second way to do the same thing. */}
-      {(columnChooser || leading) && (
-        // `leading` on the left, the eye on the right, one row — and the eye
-        // gets a cell of its OWN (Mark, 2026-08-01: "so when the screen gets
-        // smaller the other elements wrap but the eye stays in place"). NOT
-        // flex-wrap on this row: the leading content is what wraps, inside its
-        // own `min-w-0 flex-1` box, so the eye never breaks onto a line of its
-        // own and never leaves the table's right edge. Measured before the
-        // fix at 1440: the filters overflowed and pushed the eye to a second
-        // line, left-aligned, which looked like a stray button.
-        // items-end: the eye belongs to the column headers directly beneath it
-        // (Mark, 2026-08-01), so it sits at the BOTTOM of the strip — beside
-        // the last row of a wrapping filter block, not floating at the top of
-        // it.
-        <div className="flex items-end justify-between gap-x-4">
-          <div className="min-w-0 flex-1">{leading}</div>
-          {/* The ordered list, not the declared one — the checklist reads in
-              the same order as the table it acts on. It gets `compact` so its
-              checkboxes can tell the truth about the width tier. */}
-          {columnChooser && (
-            // `-mb-1` because `items-end` aligns BOXES and the eye is a 32px
-            // button centring a 24px glyph, so its artwork stops 4px short of
-            // its own bottom edge. Against a ~20px heading that read as the eye
-            // floating above the line rather than sitting on it (Mark,
-            // 2026-08-02). Nudging the button rather than shifting the glyph
-            // inside it keeps the hover wash centred on the artwork, which is
-            // the thing the button's size exists to do.
-            <div className="-mb-1 shrink-0">
-              <ColumnsMenu storageKey={storageKey} columns={orderedColumns} compact={compact} />
-            </div>
-          )}
-        </div>
-      )}
+    <div className={rootClass}>
+      {strip}
       <div ref={paneRef} className={wrapper}>
         {/* 13px on a tablet, 15 at a desk (Mark, 2026-07-31) — the row has
             less width to give at the small end, and smaller type buys back

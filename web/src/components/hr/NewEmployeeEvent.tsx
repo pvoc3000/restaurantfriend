@@ -180,7 +180,7 @@ export function NewEmployeeEvent({
                 value={headline}
                 onValueChange={setHeadline}
                 aria-label="What happened"
-                className="h-9 w-full text-sm"
+                className="w-full"
               />
             </Field>
 
@@ -193,7 +193,7 @@ export function NewEmployeeEvent({
                 value={detail}
                 onValueChange={setDetail}
                 aria-label="More detail"
-                className="h-9 w-full text-sm"
+                className="w-full"
               />
             </Field>
 

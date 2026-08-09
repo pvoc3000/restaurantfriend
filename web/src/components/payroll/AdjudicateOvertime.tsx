@@ -150,12 +150,13 @@ export function AdjudicateOvertime({
       ) : (
         <div className="space-y-2">
           <TextInput
+            size="sm"
             value={reason}
             onValueChange={setReason}
             placeholder="Why (required to keep the imported figures)"
             aria-label="Reason for this overtime decision"
             clearLabel="Clear the reason"
-            className="h-8 w-full text-[13px]"
+            className="w-full"
           />
           <div className="flex flex-wrap items-center gap-2">
             <button

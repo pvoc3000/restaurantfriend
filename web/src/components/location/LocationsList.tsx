@@ -190,7 +190,7 @@ export function LocationsList({
           // h-9 and text-sm, like every other list's search box — without them
           // the input takes the browser's default height and stands taller
           // than the same field on Vendors, Inventory and the PO list.
-          className="h-9 w-72 text-sm"
+          className="w-72"
         />
         <span className="text-sm text-muted">
           {shown.length === rows.length

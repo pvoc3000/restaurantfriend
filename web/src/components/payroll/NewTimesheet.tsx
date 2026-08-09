@@ -366,7 +366,7 @@ export function NewTimesheet({
                     placeholder="6:00am"
                     aria-label="Clock in"
                     clearLabel="Clear"
-                    className="h-9 w-32 text-sm"
+                    className="w-32"
                   />
                 </label>
                 <label className="space-y-1.5">
@@ -379,7 +379,7 @@ export function NewTimesheet({
                     placeholder="2:30pm"
                     aria-label="Clock out"
                     clearLabel="Clear"
-                    className="h-9 w-32 text-sm"
+                    className="w-32"
                   />
                 </label>
                 <label className="space-y-1.5">
@@ -392,7 +392,7 @@ export function NewTimesheet({
                     placeholder="0.50"
                     aria-label="Unpaid break in hours"
                     clearLabel="Clear"
-                    className="h-9 w-28 text-sm"
+                    className="w-28"
                   />
                 </label>
                 <p className="pb-1.5 text-sm text-muted">
@@ -436,7 +436,7 @@ export function NewTimesheet({
                     placeholder="8.00"
                     aria-label="Hours"
                     clearLabel="Clear"
-                    className="h-9 w-28 text-sm"
+                    className="w-28"
                   />
                 </label>
                 {payKind === "sick" && (
@@ -459,7 +459,7 @@ export function NewTimesheet({
                 placeholder="Forgot to clock in; confirmed with the closing manager"
                 aria-label="Reason"
                 clearLabel="Clear the reason"
-                className="h-9 w-full text-sm"
+                className="w-full"
               />
               {/* Required, like every other decision in this module. A row that
                   someone typed into payroll with no account of why is the one

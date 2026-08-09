@@ -651,7 +651,7 @@ export function PurchaseOrderList({
           onValueChange={(q) => update({ q })}
           placeholder="Search PO number or vendor…"
           clearLabel="Clear the search"
-          className="h-9 w-64 text-sm"
+          className="w-64"
         />
 
         <TabPicker

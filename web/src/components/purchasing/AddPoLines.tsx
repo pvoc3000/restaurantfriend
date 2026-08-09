@@ -235,7 +235,7 @@ export function AddPoLines({
                 onValueChange={setSearch}
                 placeholder="Search this vendor's items"
                 clearLabel="Clear the search"
-                className="h-9 w-72 text-sm"
+                className="w-72"
               />
               <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
                 {filtered.length} of {rows.length} active

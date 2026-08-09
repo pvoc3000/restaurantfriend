@@ -241,7 +241,7 @@ export function NewPayPeriod({
                 placeholder="Optional"
                 aria-label="Note"
                 clearLabel="Clear the note"
-                className="h-9 w-full text-sm"
+                className="w-full"
               />
             </label>
 

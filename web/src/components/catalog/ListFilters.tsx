@@ -62,7 +62,7 @@ export function ListFilters({
           onValueChange={onTerm}
           placeholder={placeholder}
           clearLabel="Clear the search"
-          className="h-9 w-72 text-sm"
+          className="w-72"
         />
 
         {categories && onCategory && (

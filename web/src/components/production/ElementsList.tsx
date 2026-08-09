@@ -61,9 +61,14 @@ export function ElementsList({ rows, editable }: { rows: ElementRow[]; editable:
         return false;
       }
       if (!q) return true;
+      // Every column you can READ, you can search — including SCHEDULE (Mark,
+      // 2026-08-09), which is how you pull up everything on the weekly bake.
+      // A search that silently ignores a column the table is showing reads as
+      // the term not being in the data.
       return (
         r.name.toLowerCase().includes(q) ||
         (r.element_type ?? "").toLowerCase().includes(q) ||
+        (r.schedule_class ?? "").toLowerCase().includes(q) ||
         (r.source ?? "").toLowerCase().includes(q)
       );
     });
@@ -172,6 +177,7 @@ export function ElementsList({ rows, editable }: { rows: ElementRow[]; editable:
       compactBelow={1280}
       columnChooser
       group={group}
+      empty={<p className="text-sm text-muted">No elements match these filters.</p>}
       leading={
         <div className="space-y-3">
           <div className="flex flex-wrap items-end gap-3">

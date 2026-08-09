@@ -211,7 +211,7 @@ export function PayPeriodActions({
                 placeholder="Homebase re-sent the period with three corrected shifts"
                 aria-label="Reason for reopening"
                 clearLabel="Clear the reason"
-                className="h-9 w-full text-sm"
+                className="w-full"
               />
             </label>
             <p className="text-[13px] text-muted">

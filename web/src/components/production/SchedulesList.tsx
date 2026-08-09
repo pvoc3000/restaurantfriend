@@ -308,6 +308,7 @@ export function SchedulesList({
         compactBelow={1200}
         columnChooser
         group={group}
+        empty={<p className="text-sm text-muted">No schedules match these filters.</p>}
         sort={sort}
         onSortChange={setSort}
         leading={

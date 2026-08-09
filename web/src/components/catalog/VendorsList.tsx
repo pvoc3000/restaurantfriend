@@ -255,7 +255,7 @@ export function VendorsList({
           onValueChange={(q) => update({ q })}
           placeholder="Search name, type, account…"
           clearLabel="Clear the search"
-          className="h-9 w-72 text-sm"
+          className="w-72"
         />
         {/* A PickList, not a native <select> (Mark, 2026-08-01 — he named this
             one): the OS menu was the last thing on this row that didn't look
