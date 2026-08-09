@@ -63,8 +63,12 @@ function vocabulary(
  * Grouped by TYPE — few values, many rows each (Raised 244, Cake 32 of 307),
  * which is the test a column has to pass to earn a band.
  *
- * FIVE COMBINING MENUS (`ui/FilterMenus`), Mark's list: Active, Finish, Dough,
- * Costed, Priced. The tab row they replace held four cells answering three
+ * FIVE COMBINING MENUS (`ui/FilterMenus`) — Mark's list, in the columns' own
+ * order: Status · Dough · Finish · Cost · Price. He named Finish before Dough
+ * and then asked for them swapped, which is the right instinct: the bar is read
+ * against the table directly beneath it, so a menu row that disagrees with the
+ * column order makes you check the label every time.
+ * The tab row they replace held four cells answering three
  * different questions — one was activity, two were whether a figure resolves —
  * so "the unpriced raised donuts finished in BOH Glaze" could not be asked at
  * all. Labels follow the element list rather than the words Mark used, so the
@@ -112,17 +116,21 @@ export function ProductionItemsList({
         ],
         matches: (r, v) => (v === "active" ? r.is_active : !r.is_active),
       },
-      {
-        key: "finish",
-        label: "Finish",
-        options: vocabulary(rows, (r) => r.finish),
-        matches: (r, v) => (v === NONE ? r.finish === null : r.finish === v),
-      },
+      // DOUGH BEFORE FINISH, matching the columns (Mark, 2026-08-09). The menus
+      // are read against the table directly under them, so a bar whose order
+      // disagrees with the columns makes you check the label every time. This
+      // is also the order a donut is made in.
       {
         key: "dough",
         label: "Dough",
         options: vocabulary(rows, (r) => r.baseName),
         matches: (r, v) => (v === NONE ? r.baseName === null : r.baseName === v),
+      },
+      {
+        key: "finish",
+        label: "Finish",
+        options: vocabulary(rows, (r) => r.finish),
+        matches: (r, v) => (v === NONE ? r.finish === null : r.finish === v),
       },
       {
         key: "cost",
@@ -245,7 +253,7 @@ export function ProductionItemsList({
       ),
     },
     // DOUGH BEFORE FINISH (Mark, 2026-08-09) — the order a donut is made in,
-    // which is also the order the two menus above sit in.
+    // and the order the filter menus sit in. Keep the two in step.
     {
       key: "dough",
       label: "Dough",
