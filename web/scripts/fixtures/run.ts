@@ -17,6 +17,7 @@ import "./homebaseImport.fixtures";
 import "./invoiceDate.fixtures";
 import "./invoiceMatch.fixtures";
 import "./invoices.fixtures";
+import "./listFilters.fixtures";
 import "./nav.fixtures";
 import "./overtime.fixtures";
 import "./overtimeOrder.fixtures";

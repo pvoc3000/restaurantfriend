@@ -4,10 +4,20 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { usePublishRecordSet } from "@/lib/recordSet";
-import { elementKindLabel, type ElementKind } from "@/lib/production";
+import {
+  ELEMENT_KINDS,
+  elementKindLabel,
+  ELEMENT_KIND_LABEL,
+  type ElementKind,
+} from "@/lib/production";
+import {
+  applyListFilters,
+  type FilterDimension,
+  type FilterValues,
+} from "@/lib/listFilters";
 import { formatCost, unresolvedSummary, type Cost } from "@/lib/productionCost";
 
 export type ElementRow = {
@@ -24,7 +34,28 @@ export type ElementRow = {
   recipeCount: number;
 };
 
-type Tier = "all" | "made" | "purchased" | "manual" | "uncosted";
+/**
+ * FileMaker's own three, in the order Mark named them (2026-08-09), and
+ * measured against the live catalog the same day: WEEKLY 158, AB 47, DONUT 18.
+ *
+ * `production_elements.schedule_class` is plain text with no check constraint,
+ * so this list is a PRESENTATION order rather than the vocabulary itself —
+ * anything else the column holds is appended below rather than being made
+ * unreachable. That is the "Sold as" lesson: a value left off a list with no
+ * `allowNew` doesn't merely go unlisted, it becomes unfindable, while rows
+ * carrying it keep rendering, which is what hid that gap for four days.
+ */
+const SCHEDULE_ORDER = ["DONUT", "AB", "WEEKLY"];
+
+/** Title case for display; the stored values are shouted. */
+function scheduleLabel(value: string): string {
+  return value.length <= 2
+    ? value.toUpperCase()
+    : value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
+/** The unset option can't be "", so "none" is the word for carrying no schedule. */
+const NO_SCHEDULE = "none";
 
 /**
  * The element catalog.
@@ -34,45 +65,102 @@ type Tier = "all" | "made" | "purchased" | "manual" | "uncosted";
  * rows). The band appears only when the sort is Type, so it can't become a
  * heading every few rows.
  *
- * The **Uncosted** tier is not a category, it is the catalog cleanup: 155 of the
- * migrated elements resolve to no cost at all, and until somebody works through
- * them every recipe containing one prints "≥". Giving it a tab makes the
- * backlog a place you can go rather than a footnote under each recipe.
+ * FOUR COMBINING MENUS RATHER THAN ONE ROW OF TABS (Mark, 2026-08-09: "instead
+ * of single filter with all options displayed, lets try a row of popup menus to
+ * combine filter options"). The single `TabPicker` mixed two questions into one
+ * row — three of its five cells were the KIND and the fourth was whether a cost
+ * resolves — so asking both at once was impossible and the row could only grow.
+ *
+ * Two of the four are Mark's list applied as written. The other two are here
+ * because dropping them would have deleted working behaviour:
+ *
+ * - **Cost** carries the old Uncosted tier, which is not a category but the
+ *   catalog cleanup: 209 elements resolve to no cost at all, and until somebody
+ *   works through them every recipe containing one prints "≥". It is better off
+ *   as a menu than as a tab, because "uncosted AND on the weekly bake" is now a
+ *   question you can ask.
+ * - **Schedule's "None"** is 247 of the 470 elements — more than half the
+ *   catalog, and invisible under Mark's three named values. Same argument as
+ *   "No section" being a real option on an item's shelf: without it there is no
+ *   way to see the ones that have none, which is the set most worth working on.
  */
 export function ElementsList({ rows, editable }: { rows: ElementRow[]; editable: boolean }) {
   const [search, setSearch] = useState("");
-  const [tier, setTier] = useState<Tier>("all");
+  const [filters, setFilters] = useState<FilterValues>({});
 
-  const counts = useMemo(
-    () => ({
-      all: rows.length,
-      made: rows.filter((r) => r.kind === "made").length,
-      purchased: rows.filter((r) => r.kind === "purchased").length,
-      manual: rows.filter((r) => r.kind === "manual").length,
-      uncosted: rows.filter((r) => r.cost.cost === null).length,
-    }),
-    [rows]
-  );
+  const dimensions = useMemo<FilterDimension<ElementRow>[]>(() => {
+    // Whatever the column actually holds, Mark's three first.
+    const schedules = [...new Set(rows.map((r) => r.schedule_class).filter(Boolean) as string[])];
+    schedules.sort((a, b) => {
+      const ai = SCHEDULE_ORDER.indexOf(a.toUpperCase());
+      const bi = SCHEDULE_ORDER.indexOf(b.toUpperCase());
+      if (ai !== bi) return (ai < 0 ? 99 : ai) - (bi < 0 ? 99 : bi);
+      return a.localeCompare(b);
+    });
 
-  const visible = useMemo(() => {
+    return [
+      {
+        key: "active",
+        label: "Status",
+        options: [
+          { value: "active", label: "Active" },
+          { value: "inactive", label: "Inactive" },
+        ],
+        matches: (r, v) => (v === "active" ? r.is_active : !r.is_active),
+      },
+      {
+        // Labelled for the column it filters. Mark called this "element type",
+        // but the table's TYPE column is `element_type` (Topping, Glaze) and
+        // this is `kind` — a menu named after the wrong neighbour would be a
+        // small lie repeated on every visit.
+        key: "kind",
+        label: "Kind",
+        options: ELEMENT_KINDS.map((k) => ({ value: k, label: ELEMENT_KIND_LABEL[k] })),
+        matches: (r, v) => r.kind === v,
+      },
+      {
+        key: "schedule",
+        label: "Schedule",
+        options: [
+          ...schedules.map((s) => ({ value: s, label: scheduleLabel(s) })),
+          { value: NO_SCHEDULE, label: "None" },
+        ],
+        matches: (r, v) =>
+          v === NO_SCHEDULE ? r.schedule_class === null : r.schedule_class === v,
+      },
+      {
+        key: "cost",
+        label: "Cost",
+        options: [
+          { value: "costed", label: "Costed" },
+          { value: "uncosted", label: "Uncosted" },
+        ],
+        matches: (r, v) => (v === "uncosted" ? r.cost.cost === null : r.cost.cost !== null),
+      },
+    ];
+  }, [rows]);
+
+  // SEARCH FIRST, THEN THE MENUS — so the menus' counts describe the list you
+  // are looking at rather than the whole catalog. The other order would have a
+  // menu offer "Weekly 158" while the search has already cut you to nine.
+  const searched = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (tier === "uncosted" ? r.cost.cost !== null : tier !== "all" && r.kind !== tier) {
-        return false;
-      }
-      if (!q) return true;
+    if (!q) return rows;
+    return rows.filter((r) =>
       // Every column you can READ, you can search — including SCHEDULE (Mark,
       // 2026-08-09), which is how you pull up everything on the weekly bake.
       // A search that silently ignores a column the table is showing reads as
       // the term not being in the data.
-      return (
-        r.name.toLowerCase().includes(q) ||
-        (r.element_type ?? "").toLowerCase().includes(q) ||
-        (r.schedule_class ?? "").toLowerCase().includes(q) ||
-        (r.source ?? "").toLowerCase().includes(q)
-      );
-    });
-  }, [rows, search, tier]);
+      [r.name, r.element_type ?? "", r.schedule_class ?? "", r.source ?? ""].some((field) =>
+        field.toLowerCase().includes(q)
+      )
+    );
+  }, [rows, search]);
+
+  const visible = useMemo(
+    () => applyListFilters(searched, dimensions, filters),
+    [searched, dimensions, filters]
+  );
 
   // The list publishes what it is showing, so a detail screen can walk it.
   usePublishRecordSet(
@@ -180,28 +268,30 @@ export function ElementsList({ rows, editable }: { rows: ElementRow[]; editable:
       empty={<p className="text-sm text-muted">No elements match these filters.</p>}
       leading={
         <div className="space-y-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <TextInput
-              value={search}
-              onValueChange={setSearch}
-              placeholder="Search elements"
-              className="w-64"
-              aria-label="Search elements"
-            />
-            <TabPicker
-              ariaLabel="Kind"
-              value={tier}
-              onChange={setTier}
-              options={[
-                { key: "all" as Tier, label: "All", count: counts.all },
-                { key: "made" as Tier, label: "Made", count: counts.made },
-                { key: "purchased" as Tier, label: "Purchased", count: counts.purchased },
-                { key: "manual" as Tier, label: "Manual", count: counts.manual },
-                { key: "uncosted" as Tier, label: "Uncosted", count: counts.uncosted },
-              ]}
-            />
-          </div>
-          {tier === "uncosted" && counts.uncosted > 0 ? (
+          <FilterMenus
+            rows={searched}
+            total={rows.length}
+            noun="elements"
+            dimensions={dimensions}
+            values={filters}
+            onChange={setFilters}
+            leading={
+              <div className="space-y-1.5">
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  Search
+                </span>
+                <TextInput
+                  value={search}
+                  onValueChange={setSearch}
+                  placeholder="Name, type, schedule…"
+                  className="w-64"
+                  aria-label="Search elements"
+                  clearLabel="Clear the search"
+                />
+              </div>
+            }
+          />
+          {filters.cost === "uncosted" ? (
             <p className="max-w-[80ch] text-[13px] text-muted">
               These resolve to no cost at all — a purchased element with no
               inventory item, a made one with no recipe, or a manual one with no
