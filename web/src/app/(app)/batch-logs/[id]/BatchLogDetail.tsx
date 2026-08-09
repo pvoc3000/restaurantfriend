@@ -19,6 +19,7 @@ import {
 import { BATCH_PHOTO_BUCKET, BATCH_PHOTO_TTL_SECONDS } from "@/lib/batchPhotos";
 import { BatchPhoto } from "@/components/production/BatchPhoto";
 import { BatchActions } from "@/components/production/BatchActions";
+import { BatchVersionCell } from "@/components/production/BatchVersionCell";
 
 /**
  * One batch — production brief decision 8, element actuals.
@@ -204,18 +205,13 @@ export async function BatchLogDetail({
 
         <Field label="Recipe version">
           {editable && versionOptions.length > 0 ? (
-            <InlineValue
-              table="production_batches" id={id} column="recipe_version_id" kind="pick"
-              options={versionOptions}
+            // Its own client component, because writing the label alongside the
+            // id needs `alsoUpdate` — a FUNCTION, which cannot cross a server
+            // component's boundary. See BatchVersionCell.
+            <BatchVersionCell
+              batchId={id}
               value={(batch.recipe_version_id ?? null) as string | null}
-              ariaLabel="Which recipe version"
-              // The LABEL is a snapshot beside the link: 036 makes
-              // `version_label` editable text, so a rename must not rewrite what
-              // last month's batch says it followed (038's rule).
-              alsoUpdate={(next) => ({
-                recipe_version_label:
-                  versionOptions.find((v) => v.value === next)?.label ?? null,
-              })}
+              options={versionOptions}
             />
           ) : (
             <span className={`${READ_ONLY_VALUE} text-muted`}>

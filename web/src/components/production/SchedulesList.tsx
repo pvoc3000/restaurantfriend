@@ -49,6 +49,20 @@ const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: ScheduleRow) => string>
 };
 
 /**
+ * What the BANDS sort by, which is NOT what they say.
+ *
+ * A date's label is "SUN 8/9/2026", and ordering a window by that string reads
+ * FRI, MON, SAT, SUN, THU — alphabetical, which is not an order anybody wants.
+ * It stayed invisible while only one night existed; found on the batch log's
+ * own week and fixed in both places at once.
+ */
+const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: ScheduleRow) => string> = {
+  date: (r) => r.schedule_date,
+  kitchen: (r) => r.kitchenCode,
+  sells: (r) => r.sellsCode,
+};
+
+/**
  * The nights, most recent first.
  *
  * The tier that earns its place is UNPRINTED: at closing the question is "what
@@ -133,7 +147,7 @@ export function SchedulesList({
       }
     };
     const dir = sort.dir === "asc" ? 1 : -1;
-    const groupOf = grouping === "none" ? null : GROUP_LABEL[grouping];
+    const groupOf = grouping === "none" ? null : GROUP_KEY[grouping];
     return [...shown].sort((a, b) => {
       // The group leads, ALWAYS ascending — a run is a table of contents, not
       // the thing you sorted. Except by DATE, where "most recent first" is what

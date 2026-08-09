@@ -430,7 +430,11 @@ export function InlineValue({
           value={value === null ? null : String(value)}
           disabled={saving}
           required={!nullable}
-          ariaLabel={column}
+          // The same gap the `pick` branch had until 2026-08-08: `ariaLabel`
+          // reached the text/number button and nothing else, so a date cell
+          // announced its raw COLUMN NAME ("batch_date") however carefully the
+          // caller had named it.
+          ariaLabel={ariaLabel ?? column}
           className={className}
           collapseWhenEmpty={collapseWhenEmpty}
           onChange={(next) => {

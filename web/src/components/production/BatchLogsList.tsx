@@ -53,6 +53,21 @@ const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = 
 };
 
 /**
+ * What the BANDS sort by, which is NOT always what they say.
+ *
+ * A day's label is "Mon 8/3", and sorting a week by that string puts Monday,
+ * then Thursday, then Tuesday — alphabetical order, which is not an order any
+ * kitchen works in. Caught on the real DF01 week. So the date grouping sorts by
+ * the ISO date underneath and prints the friendly form; the other two group by
+ * a name, where the label IS the key.
+ */
+const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
+  date: (r) => r.batch_date,
+  shift: (r) => r.shift ?? "￿", // no shift sinks last, lib/tableSort's rule
+  element: (r) => r.element_name.toLowerCase(),
+};
+
+/**
  * The week's batches, and what came out of them.
  *
  * The tier that earns its place is OUTSTANDING — to-do plus in-progress — and
@@ -130,7 +145,7 @@ export function BatchLogsList({
       }
     };
     const dir = sort.dir === "asc" ? 1 : -1;
-    const groupOf = grouping === "none" ? null : GROUP_LABEL[grouping];
+    const groupOf = grouping === "none" ? null : GROUP_KEY[grouping];
     return [...shown].sort((a, b) => {
       if (groupOf) {
         const ag = groupOf(a), bg = groupOf(b);
