@@ -703,7 +703,7 @@ export function PlanMatrix({
                 title={`Replace those pars with ${locationCode}'s defaults`}
                 className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-40"
               >
-                Use defaults
+                Use {locationCode} defaults
               </button>
               {/* The reverse, and the riskier direction: it writes the SHOP's
                   catalog, which every future plan seeds from. It reads as a peer
@@ -717,7 +717,7 @@ export function PlanMatrix({
                 title={`Make this plan's pars ${locationCode}'s defaults — changes the shop's catalog`}
                 className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-40"
               >
-                Update defaults
+                Update {locationCode} defaults
               </button>
             </>
           ) : null}
