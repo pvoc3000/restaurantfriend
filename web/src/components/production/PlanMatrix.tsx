@@ -667,63 +667,6 @@ export function PlanMatrix({
       {/* A control that changes what the list SHOWS goes with the list, never
           in a command bar — and every one-of-N choice in this app is a
           TabPicker. */}
-      {/* The pars against this shop's own defaults. Always available, so the
-          question can be asked without a duplicate or a move to prompt it —
-          and it says the count BEFORE you turn it on, which is what you need
-          to decide whether to. */}
-      {editable && (differing.length > 0 || review) ? (
-        <div className="flex flex-wrap items-center gap-3 border-l-2 border-mark pl-3 text-[13px]">
-          <span className="text-muted">
-            {differing.length === 0 ? (
-              <>Every par matches {locationCode}&rsquo;s defaults.</>
-            ) : (
-              <>
-                <span className="font-medium text-ink">
-                  {differing.length} par{differing.length === 1 ? "" : "s"}
-                </span>{" "}
-                differ{differing.length === 1 ? "s" : ""} from {locationCode}&rsquo;s defaults.
-              </>
-            )}
-          </span>
-          {differing.length ? (
-            <button
-              type="button"
-              onClick={() => setReview((v) => !v)}
-              className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
-            >
-              {review ? "Stop checking" : "Check pars"}
-            </button>
-          ) : null}
-          {review && differing.length ? (
-            <>
-              <button
-                type="button"
-                onClick={takeAllSuggested}
-                disabled={pending}
-                title={`Replace those pars with ${locationCode}'s defaults`}
-                className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-40"
-              >
-                Use {locationCode} defaults
-              </button>
-              {/* The reverse, and the riskier direction: it writes the SHOP's
-                  catalog, which every future plan seeds from. It reads as a peer
-                  of its opposite (Mark, 2026-08-08) — the app's one button
-                  weight, outlined and white — so the warning lives entirely in
-                  the confirm, which names the blast radius. */}
-              <button
-                type="button"
-                onClick={updateAllDefaults}
-                disabled={pending}
-                title={`Make this plan's pars ${locationCode}'s defaults — changes the shop's catalog`}
-                className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-40"
-              >
-                Update {locationCode} defaults
-              </button>
-            </>
-          ) : null}
-        </div>
-      ) : null}
-
       {trays.length > 1 ? (
         <div className="space-y-1.5">
           <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
@@ -1111,7 +1054,7 @@ export function PlanMatrix({
           behind it. */}
       {editable ? (
         <StickyFooter spacerClassName="-mt-3">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <button
               type="button"
               onClick={() => setNewTray(true)}
@@ -1126,6 +1069,62 @@ export function PlanMatrix({
             <span className="text-[13px] text-muted">
               {trays.length} tray{trays.length === 1 ? "" : "s"} on this plan
             </span>
+            {/* The pars against this shop's own defaults. Always available, so the
+                question can be asked without a duplicate or a move to prompt it —
+                and it says the count BEFORE you turn it on, which is what you need
+                to decide whether to. */}
+            {editable && (differing.length > 0 || review) ? (
+              <div className="flex flex-wrap items-center gap-3 border-l-2 border-mark pl-3 text-[13px]">
+                <span className="text-muted">
+                  {differing.length === 0 ? (
+                    <>Every par matches {locationCode}&rsquo;s defaults.</>
+                  ) : (
+                    <>
+                      <span className="font-medium text-ink">
+                        {differing.length} par{differing.length === 1 ? "" : "s"}
+                      </span>{" "}
+                      differ{differing.length === 1 ? "s" : ""} from {locationCode}&rsquo;s defaults.
+                    </>
+                  )}
+                </span>
+                {differing.length ? (
+                  <button
+                    type="button"
+                    onClick={() => setReview((v) => !v)}
+                    className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
+                  >
+                    {review ? "Stop checking" : "Check pars"}
+                  </button>
+                ) : null}
+                {review && differing.length ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={takeAllSuggested}
+                      disabled={pending}
+                      title={`Replace those pars with ${locationCode}'s defaults`}
+                      className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-40"
+                    >
+                      Use {locationCode} defaults
+                    </button>
+                    {/* The reverse, and the riskier direction: it writes the SHOP's
+                        catalog, which every future plan seeds from. It reads as a peer
+                        of its opposite (Mark, 2026-08-08) — the app's one button
+                        weight, outlined and white — so the warning lives entirely in
+                        the confirm, which names the blast radius. */}
+                    <button
+                      type="button"
+                      onClick={updateAllDefaults}
+                      disabled={pending}
+                      title={`Make this plan's pars ${locationCode}'s defaults — changes the shop's catalog`}
+                      className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-40"
+                    >
+                      Update {locationCode} defaults
+                    </button>
+                  </>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         </StickyFooter>
       ) : null}

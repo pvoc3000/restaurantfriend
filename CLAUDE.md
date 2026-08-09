@@ -2708,6 +2708,14 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    The **Trays** section heading is GONE with them (Mark) — the pinned footer
    already says "24 trays on this plan", and a heading that only restated a
    count was pushing the band that matters down the page.
+   **That whole band lives IN THE FOOTER, just after the tray count** (Mark,
+   2026-08-08), which is where this screen's persistent commands already were.
+   It costs nothing to put there: `StickyFooter` measures its own height into
+   its spacer, so the band appearing — or wrapping on a narrow window — keeps
+   the last tray row clear by itself. Measured at 1280: the footer holds
+   everything on one 60px line, and scrolled to the bottom the last row ends
+   exactly at the footer's top edge. When nothing differs and review is off the
+   band is absent entirely, so the quiet state is the footer as it was.
    **EVERY "use the default" HAS ITS REVERSE** (Mark, 2026-08-08) — the
    receiving screen's two-stage price button in a plan's terms: take the app's
    figure, or tell the app yours. Per slot, `↑ set default n` sits on its own
