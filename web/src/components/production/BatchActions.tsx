@@ -120,7 +120,7 @@ export function BatchActions({
       (hasYield
         ? `It has a recorded yield, which goes with it.\n\n`
         : "") +
-      `Generating this day again would put back anything the weekly round still carries — but not what somebody measured.`;
+      `Generating this day again would put it back if the weekly round still carries it — but not what somebody measured.`;
     if (!window.confirm(message)) return;
 
     setBusy("delete");
@@ -146,7 +146,9 @@ export function BatchActions({
       return;
     }
     if (photoPath) await supabase.storage.from(BATCH_PHOTO_BUCKET).remove([photoPath]);
-    router.push("/batch-logs");
+    // No navigation: this lives in the pane on the batch's own log, and the
+    // list is where you already are. The pane falls back to the first row by
+    // itself once the row is gone.
     router.refresh();
   }
 

@@ -39,10 +39,9 @@ export type BatchFieldsRow = {
 /**
  * One batch's editable fields — FileMaker's INFO tab.
  *
- * ONE component for two homes: the detail pane pinned under the batch log, and
- * `/batches/[id]` on its own. That is the whole reason it exists as a piece —
- * two field sets over one table drift, and the second one never behaves quite
- * like the first (the `ui/Dialog` story).
+ * It has ONE home — the detail pane pinned under the batch log — and is its own
+ * component anyway, because the pane is already carrying a table, a header and
+ * two commands, and a hundred lines of `dl` inside it would bury all four.
  *
  * Laid out the way FileMaker lays it out, because the shape carries meaning:
  * what the round ASKED for and what the kitchen KEEPS sit above what was

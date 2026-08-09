@@ -1,11 +1,11 @@
 "use client";
 
 import { useRef, useState } from "react";
-import Link from "next/link";
 import type { PickOption } from "@/components/ui/PickList";
 import { useExactViewportHeight, useViewportAtLeast } from "@/lib/tableHead";
 import { BatchItemsTable, type BatchRow } from "@/components/production/BatchItemsTable";
 import { BatchFields, type BatchFieldsRow } from "@/components/production/BatchFields";
+import { BatchActions } from "@/components/production/BatchActions";
 
 /**
  * A batch log, laid out the way FileMaker's is: the items on top, ONE batch's
@@ -15,8 +15,13 @@ import { BatchFields, type BatchFieldsRow } from "@/components/production/BatchF
  * WHY A PINNED PANE AND NOT A ROUTE. Working a log is one task with thirty
  * repetitions — pick a row, type what came out, pick the next. A navigation per
  * batch would make that thirty round trips and lose the list's scroll each
- * time. `/batches/[id]` still exists for a link from elsewhere, and it renders
- * the SAME `BatchFields`, so the two cannot drift.
+ * time.
+ *
+ * There is NO route for a single batch. One existed and was deleted the same
+ * day: "there will never be any use for the standalone batch log item record.
+ * It will always be done in the pinned detail pane" (Mark, 2026-08-09). So this
+ * pane carries everything a batch record did — its fields, and its Cost and
+ * Delete commands — and nothing renders a batch anywhere else.
  *
  * THE HEIGHT IS MEASURED, never a CSS constant. What sits above this row varies
  * — the log's own fields wrap at narrow widths, the actions band comes and goes
@@ -33,7 +38,9 @@ export function BatchLogItems({
   orgId,
   operators,
   versionsByElement,
+  locationId,
   editable,
+  removable,
   add,
 }: {
   rows: BatchRow[];
@@ -42,7 +49,10 @@ export function BatchLogItems({
   orgId: string;
   operators: PickOption[];
   versionsByElement: Record<string, PickOption[]>;
+  locationId: string;
   editable: boolean;
+  /** Purchaser+ — 044's delete policy, narrower than the edit one. */
+  removable: boolean;
   add?: React.ReactNode;
 }) {
   const [picked, setPicked] = useState<string | null>(null);
@@ -89,35 +99,42 @@ export function BatchLogItems({
       >
         <header className="flex shrink-0 items-baseline gap-3 bg-ink px-4 py-2 text-white">
           <h2 className="text-xs font-semibold uppercase tracking-[0.12em]">
-            {selected ? (
-              <>
-                Batch {selected.batch_number} — {selected.element_name}
-              </>
-            ) : (
-              "No batch selected"
-            )}
+            {selected ? selected.element_name : "No batch selected"}
           </h2>
           {selected ? (
-            <Link
-              href={`/batches/${selected.id}`}
-              className="ml-auto text-[11px] uppercase tracking-[0.08em] text-white/70 underline underline-offset-[3px] hover:text-white"
-            >
-              Open on its own
-            </Link>
+            // The batch NUMBER, which is the one identifier the list stopped
+            // showing — it has to be legible somewhere.
+            <span className="ml-auto text-[11px] tabular-nums tracking-[0.08em] text-white/70">
+              {selected.generated ? "" : "by hand · "}
+              {selected.batch_number}
+            </span>
           ) : null}
         </header>
 
         <div className={`overflow-y-auto p-4 ${wide ? "min-h-0 flex-1" : "max-h-[46vh]"}`}>
           {selected ? (
-            <BatchFields
-              row={selected}
-              orgId={orgId}
-              operators={operators}
-              versions={
-                selected.element_id ? versionsByElement[selected.element_id] ?? [] : []
-              }
-              editable={editable}
-            />
+            <div className="space-y-4">
+              <BatchFields
+                row={selected}
+                orgId={orgId}
+                operators={operators}
+                versions={
+                  selected.element_id ? versionsByElement[selected.element_id] ?? [] : []
+                }
+                editable={editable}
+              />
+              <BatchActions
+                batchId={selected.id}
+                elementId={selected.element_id}
+                locationId={locationId}
+                elementName={selected.element_name}
+                batchNumber={selected.batch_number}
+                hasYield={selected.yield_count !== null || selected.yield_size !== null}
+                photoPath={selected.photo_path}
+                editable={editable}
+                removable={removable}
+              />
+            </div>
           ) : (
             <p className="text-sm text-muted">
               Pick a batch above to fill this in.

@@ -1,13 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import type { SortDir } from "@/lib/tableSort";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { usePublishRecordSet } from "@/lib/recordSet";
 import {
   BATCH_STATUS_LABEL,
   BATCH_STATUS_OPTIONS,
@@ -157,10 +155,8 @@ export function BatchItemsTable({
     });
   }, [shown, sort, grouping]);
 
-  usePublishRecordSet(
-    "/batches",
-    visible.map((r) => ({ id: r.id, href: `/batches/${r.id}` }))
-  );
+  // No `usePublishRecordSet`: the record book walks a LIST of records, and a
+  // batch has no route to walk to — it is only ever the pane's subject.
 
   // MARK'S ORDER, 2026-08-09, pared back to what varies ROW TO ROW.
   //
@@ -215,34 +211,23 @@ export function BatchItemsTable({
       width: 260,
       pinned: true,
       sortValue: (r) => r.element_name,
-      render: (r) =>
-        onSelect ? (
-          // A BUTTON, not a link: the destination is the pane below, and the
-          // pane's own header carries the way out to /batches/[id]. It is also
-          // the keyboard path to a selection the row click makes with a mouse —
-          // a `<tr>` cannot be focused.
-          <button
-            type="button"
-            onClick={() => onSelect(r.id)}
-            className="text-left font-medium hover:underline"
-          >
-            {r.element_name}
-            {r.generated ? null : (
-              <span className="ml-1.5 text-muted" title="Logged by hand">
-                *
-              </span>
-            )}
-          </button>
-        ) : (
-          <Link href={`/batches/${r.id}`} className="font-medium hover:underline">
-            {r.element_name}
-            {r.generated ? null : (
-              <span className="ml-1.5 text-muted" title="Logged by hand">
-                *
-              </span>
-            )}
-          </Link>
-        ),
+      // A BUTTON, and there is no link branch because there is nowhere to link
+      // to: a batch has no route of its own. It is the KEYBOARD path to the
+      // selection a row click makes with a mouse — a `<tr>` cannot be focused.
+      render: (r) => (
+        <button
+          type="button"
+          onClick={() => onSelect?.(r.id)}
+          className="text-left font-medium hover:underline"
+        >
+          {r.element_name}
+          {r.generated ? null : (
+            <span className="ml-1.5 text-muted" title="Logged by hand">
+              *
+            </span>
+          )}
+        </button>
+      ),
     },
     {
       key: "type",

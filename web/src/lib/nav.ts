@@ -176,16 +176,12 @@ export const SECTIONS: NavSection[] = [
       { slug: "items", label: "Items", href: "/production-items", built: true },
       { slug: "elements", label: "Elements", href: "/elements", built: true },
       { slug: "recipes", label: "Recipes", href: "/recipes", built: true },
-      // Element actuals — phase 5. `resolveRoute` prefix-matches, so a LOG
-      // record lights this on its own; a BATCH record sits at /batches/[id],
-      // which does not sit under the href and so needs naming.
-      {
-        slug: "batch-logs",
-        label: "Batch Logs",
-        href: "/batch-logs",
-        built: true,
-        also: ["/batches"],
-      },
+      // Element actuals — phase 5. `resolveRoute` prefix-matches, so a log
+      // record lights this without an `also`. There is deliberately no route
+      // for a single BATCH: it is only ever worked in the pinned pane on its
+      // log (Mark, 2026-08-09 — "there will never be any use for the standalone
+      // batch log item record").
+      { slug: "batch-logs", label: "Batch Logs", href: "/batch-logs", built: true },
     ],
   },
   {

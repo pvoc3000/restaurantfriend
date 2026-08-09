@@ -64,7 +64,7 @@ export async function ElementDetail({
   const { data: recentBatches, error: batchError } = await supabase
     .from("production_batches")
     .select(
-      `id, batch_number, batch_label, status, location_id,
+      `id, log_id, batch_number, batch_label, status, location_id,
        yield_count, yield_size, yield_unit,
        production_batch_logs!inner ( log_date )`
     )
@@ -212,7 +212,10 @@ export async function ElementDetail({
             {(recentBatches ?? []).map((b) => (
               <li key={b.id as string} className="flex flex-wrap items-baseline gap-3 px-3 py-2">
                 <Link
-                  href={`/batch-logs/${b.id}`}
+                  // The LOG, not the batch: a batch has no route of its own,
+                  // and this linked a batch id at the log's path — a 404 that
+                  // predates the split.
+                  href={`/batch-logs/${b.log_id as string}`}
                   className="w-24 shrink-0 font-medium hover:underline"
                 >
                   {batchDate(

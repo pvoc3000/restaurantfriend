@@ -228,15 +228,15 @@ test("every built sub has a real href, not a /soon/ one", () => {
   eq(wrong, []);
 });
 
-test("a BATCH record lights Batch Logs, which needs an `also`", () => {
-  // /batches does not sit under /batch-logs, so prefix matching cannot find it
-  // — this is exactly the case `also` exists for.
-  const at = resolveRoute("/batches/9d1f0f8e-0000-4000-8000-000000000000");
-  eq(at?.sectionSlug, "production");
-  eq(at?.subSlug, "batch-logs");
+test("there is NO route for a single batch", () => {
+  // A batch is only ever worked in the pinned pane on its log (Mark,
+  // 2026-08-09), so /batches resolves to nothing at all — and this is the
+  // fixture that goes red if somebody adds the route back without the `also`
+  // that would then be needed.
+  eq(resolveRoute("/batches/9d1f0f8e-0000-4000-8000-000000000000"), null);
 });
 
-test("a batch LOG record still lights it by prefix", () => {
+test("a batch LOG record lights Batch Logs by prefix", () => {
   const at = resolveRoute("/batch-logs/9d1f0f8e-0000-4000-8000-000000000000");
   eq(at?.sectionSlug, "production");
   eq(at?.subSlug, "batch-logs");

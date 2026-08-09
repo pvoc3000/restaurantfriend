@@ -98,7 +98,7 @@ export function NewBatch({
         return;
       }
 
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("production_batches")
         .insert({
           org_id: orgId,
@@ -118,7 +118,8 @@ export function NewBatch({
         return;
       }
       close();
-      router.push(`/batches/${data.id}`);
+      // No navigation: a batch has no route. It appears in the log's list, and
+      // the pane is one click away — which is the whole point of the pane.
       router.refresh();
     });
   }

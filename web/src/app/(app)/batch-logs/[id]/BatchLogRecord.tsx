@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canLogBatch } from "@/lib/roles";
+import { canLogBatch, canWriteCatalog } from "@/lib/roles";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
@@ -36,6 +36,10 @@ export async function BatchLogRecord({
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canLogBatch(session.membership.role);
+  // Deleting a batch is purchaser+ where editing one is supervisor+: correcting
+  // a batch is editing it, and erasing the record that one happened is a
+  // different act (044's policies).
+  const removable = canWriteCatalog(session.membership.role);
 
   const { data: log, error } = await supabase
     .from("production_batch_logs")
@@ -291,7 +295,9 @@ export async function BatchLogRecord({
           orgId={session.membership.org_id}
           operators={operatorOptions}
           versionsByElement={versionsByElement}
+          locationId={log.location_id as string}
           editable={editable}
+          removable={removable}
           add={
             editable ? (
               <NewBatch
