@@ -1,10 +1,54 @@
+import type { SupabaseClient } from "@supabase/supabase-js";
+
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canLogBatch } from "@/lib/roles";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { addDays } from "@/lib/productionBatches";
+import { batchLogRangeStart, parseBatchLogRange } from "@/lib/batchLogFilters";
 import { BatchLogsIndex, type BatchLogRow } from "@/components/production/BatchLogsIndex";
 import { GenerateBatches } from "@/components/production/GenerateBatches";
+
+/** One page of the window, swept until it runs out. See the call site. */
+async function fetchLogs(
+  supabase: SupabaseClient,
+  locationId: string,
+  from: string | null,
+  to: string
+) {
+  const PAGE = 1000;
+  const out: Record<string, unknown>[] = [];
+  for (let start = 0; ; start += PAGE) {
+    // One string literal, never a concatenation: Supabase types the result from
+    // the select's literal type, and `"a" + "b"` widens to `string`.
+    //
+    // The items come back as an embed rather than a second query — a log is
+    // asked "how far through are you", and that is two numbers, not rows.
+    let query = supabase
+      .from("production_batch_logs")
+      .select(
+        `id, log_date, location_id, status, generated_by, generated_at,
+         printed_at, note,
+         production_batches ( id, status )`
+      )
+      .eq("location_id", locationId)
+      .lte("log_date", to)
+      // Ordered, and not only for display: a `.range()` sweep with no ORDER BY
+      // returns rows in whatever order Postgres likes, so pages overlap and
+      // rows go missing (the timesheets-audit lesson). `id` breaks the tie,
+      // because two kitchens can share a date and `log_date` alone is not a
+      // total order.
+      .order("log_date", { ascending: false })
+      .order("id")
+      .range(start, start + PAGE - 1);
+    if (from) query = query.gte("log_date", from);
+
+    const { data, error } = await query;
+    if (error) return { data: null, error };
+    out.push(...data);
+    if (data.length < PAGE) return { data: out, error: null };
+  }
+}
 
 /**
  * The batch logs — the MASTER records, one per kitchen per day.
@@ -22,39 +66,39 @@ import { GenerateBatches } from "@/components/production/GenerateBatches";
  * kitchen and belongs to it, so the shop you are standing in is the right
  * default (design rule 3).
  */
-export default async function BatchLogsPage() {
+export default async function BatchLogsPage({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const rawParams = await searchParams;
+  const range = parseBatchLogRange(rawParams.range);
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canLogBatch(session.membership.role);
-  const today = guideToday(session.orgSettings.timezone ?? serverTimeZone()).date;
+  const timeZone = session.orgSettings.timezone ?? serverTimeZone();
+  const today = guideToday(timeZone).date;
   const active = session.activeLocation;
 
   if (!active) {
     return <p className="text-sm text-muted">Pick a location to see its batch logs.</p>;
   }
 
-  // A window rather than the whole history: a log is worked within a few days
-  // of being made, and this table grows by a row a day forever.
-  const from = addDays(today, -60);
+  // The window's BACK edge is the reader's (lib/batchLogFilters). Its FORWARD
+  // edge is not, and stays fixed: generation is allowed to run ahead of time
+  // (040's rule), so a log dated next week is real work you must be able to
+  // reach — but nothing is ever generated a year out, so there is no window to
+  // choose. A range chip that moved both edges would let you hide tomorrow's
+  // log by asking for less history, which is two questions on one control.
+  const from = batchLogRangeStart(range, timeZone);
   const to = addDays(today, 21);
 
   const [{ data: logs, error }, { data: members }] = await Promise.all([
-    supabase
-      .from("production_batch_logs")
-      // One string literal, never a concatenation: Supabase types the result
-      // from the select's literal type, and `"a" + "b"` widens to `string`.
-      //
-      // The items come back as an embed rather than a second query — a log is
-      // asked "how far through are you", and that is two numbers, not rows.
-      .select(
-        `id, log_date, location_id, status, generated_by, generated_at,
-         printed_at, note,
-         production_batches ( id, status )`
-      )
-      .eq("location_id", active.id)
-      .gte("log_date", from)
-      .lte("log_date", to)
-      .order("log_date", { ascending: false }),
+    // POSTGREST RETURNS AT MOST 1,000 ROWS AND SAYS NOTHING ABOUT IT, and All
+    // time is already 609 rows the day 046 lands. A single select would start
+    // silently dropping the oldest kitchen-days somewhere in 2027 — with the
+    // list looking complete, which is how this trap always presents.
+    fetchLogs(supabase, active.id, from, to),
     supabase.from("org_members").select("user_id, display_name"),
   ]);
 
@@ -116,14 +160,27 @@ export default async function BatchLogsPage() {
       </div>
 
       {rows.length === 0 ? (
-        <p className="max-w-[80ch] text-sm text-muted">
-          No batch logs at {active.code}{" "}yet. Generating one turns that
-          kitchen&rsquo;s weekly round into a batch to do per element — what
-          needs making, in no particular order — and anything off the round is
-          logged by hand on the log itself.
-        </p>
+        // TWO DIFFERENT SENTENCES, because they are two different facts. With a
+        // window in force an empty list usually means "not in these 90 days",
+        // and telling somebody their kitchen has never made anything — over six
+        // years of history sitting one chip away — would be plainly false.
+        <div className="max-w-[80ch] space-y-3">
+          {range === "all" ? (
+            <p className="text-sm text-muted">
+              No batch logs at {active.code}{" "}yet. Generating one turns that
+              kitchen&rsquo;s weekly round into a batch to do per element — what
+              needs making, in no particular order — and anything off the round
+              is logged by hand on the log itself.
+            </p>
+          ) : (
+            <p className="text-sm text-muted">
+              No batch logs at {active.code} in this window.
+            </p>
+          )}
+          <BatchLogsIndex rows={rows} range={range} params={rawParams} />
+        </div>
       ) : (
-        <BatchLogsIndex rows={rows} />
+        <BatchLogsIndex rows={rows} range={range} params={rawParams} />
       )}
     </div>
   );

@@ -9,6 +9,11 @@ import { TextInput } from "@/components/ui/TextInput";
 import { READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { batchDate } from "@/lib/productionBatches";
+import {
+  BATCH_LOG_RANGES,
+  batchLogRangeHref,
+  type BatchLogRange,
+} from "@/lib/batchLogFilters";
 
 export type BatchLogRow = {
   id: string;
@@ -51,8 +56,27 @@ const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: BatchLogRow) => string> =
  * through is that day" is the question you open this screen with, and it is the
  * one thing no other column can be scanned for.
  */
-export function BatchLogsIndex({ rows }: { rows: BatchLogRow[] }) {
-  const [tier, setTier] = useState<Tier>("open");
+export function BatchLogsIndex({
+  rows,
+  range,
+  params,
+}: {
+  rows: BatchLogRow[];
+  /**
+   * How far back the SERVER fetched. Unlike every other control on this list it
+   * is not local state: it bounds the query, so it has to reach the server
+   * component, which means the URL (see lib/batchLogFilters).
+   */
+  range: BatchLogRange;
+  /** Whatever else is in the URL, so a range chip keeps it. */
+  params: Record<string, string | string[] | undefined>;
+}) {
+  // ALL, not Open (Mark, 2026-08-09). Open was the right default while this
+  // screen held one row: a log is a thing you work, so the one being worked is
+  // what you came for. 046 changed the shape of the list under it — 439 of
+  // DF02's 440 logs are complete history — so the default now hid 99.8% of the
+  // screen and read as an empty page beside a chip saying "Complete 439".
+  const [tier, setTier] = useState<Tier>("all");
   const [grouping, setGrouping] = useState<Grouping>("none");
   const [term, setTerm] = useState("");
   const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "date", dir: "desc" });
@@ -233,6 +257,12 @@ export function BatchLogsIndex({ rows }: { rows: BatchLogRow[] }) {
       onSortChange={setSort}
       empty={<p className="text-sm text-muted">No logs match.</p>}
       leading={
+        // SEARCH FIRST (Mark, 2026-08-09: "the search bar ... should be all the
+        // way to the left, not in between two filter pickers"). It had been
+        // dropped in beside the range picker when that was added, which left
+        // one text field wedged between two chip bars — every other list in
+        // this app opens with its search box, and the eye goes to the left edge
+        // of the row for the thing you type into.
         <div className="flex flex-wrap items-end gap-4">
           <TextInput
             value={term}
@@ -241,6 +271,23 @@ export function BatchLogsIndex({ rows }: { rows: BatchLogRow[] }) {
             aria-label="Search batch logs"
             className="w-64"
           />
+          {/* HREF CELLS, not an onChange — this one is a navigation, because the
+              rows it wants do not exist on the client yet. The order guide's day
+              strip is the same control for the same reason. */}
+          <div className="space-y-1.5">
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+              Show
+            </span>
+            <TabPicker
+              ariaLabel="How far back to look"
+              value={range}
+              options={BATCH_LOG_RANGES.map((r) => ({
+                key: r.key,
+                label: r.label,
+                href: batchLogRangeHref(r.key, params),
+              }))}
+            />
+          </div>
           <TabPicker
             ariaLabel="Which logs"
             value={tier}
