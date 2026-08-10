@@ -14,6 +14,7 @@ import {
   daySourceIndex,
   expansionKey,
   groupGuide,
+  lastPurchaseLabel,
   matchesGuideFilter,
   vendorTotals,
   serializeGuideView,
@@ -28,6 +29,7 @@ import {
   type GuideFilter,
   type GuideGrouping,
   type GuideRow,
+  type LastPurchase,
 } from "@/lib/orderGuide";
 import type { Reminder } from "@/lib/reminders";
 import { GuideLine } from "./GuideLine";
@@ -67,6 +69,8 @@ const SHOW_ITEM_PAR: boolean = false;
  */
 export function OrderGuide({
   rows,
+  lastPurchases,
+  lastPurchaseError,
   entries: initialEntries,
   reminders,
   weekday,
@@ -81,6 +85,10 @@ export function OrderGuide({
   canGeneratePos,
 }: {
   rows: GuideRow[];
+  /** Migration 048 — the most recent non-void purchase per item-location. */
+  lastPurchases: LastPurchase[];
+  /** Set only while 048 is unapplied; see the note where it's rendered. */
+  lastPurchaseError: string | null;
   entries: GuideEntry[];
   /** Due at this location and not yet dismissed (spec §2 step 1). */
   reminders: Reminder[];
@@ -286,6 +294,16 @@ export function OrderGuide({
   // Leaving the guide for an item must lead back to the guide — and to the day
   // you were walking, not whichever day defaults today.
   const here = { href: `/order-guide?day=${weekday}`, label: "Order Guide" };
+
+  /**
+   * Last purchase keyed by item-location, so an item header is a map lookup
+   * rather than a scan of ~450 rows per header.
+   */
+  const lastByItemLocation = useMemo(() => {
+    const map = new Map<string, LastPurchase>();
+    for (const p of lastPurchases) map.set(p.item_location_id, p);
+    return map;
+  }, [lastPurchases]);
 
   // Every day-relevant line keyed by item, so an item header can ask "is there
   // anything behind my triangle" without rescanning the whole day.
@@ -550,6 +568,19 @@ export function OrderGuide({
             Refresh
           </button>
         </div>
+
+        {/* The guide is the screen the shop is walked on, so a view it can't
+            read must not take it down — every row, quantity and total above
+            still renders and only the last-purchase line is missing. But it
+            isn't swallowed either: an absent line and "never ordered here" look
+            identical, so without this the headers would quietly assert
+            something false about every item. One muted sentence, gone the
+            moment 048 lands. */}
+        {lastPurchaseError && (
+          <p className="text-[12px] text-subtle">
+            Last-ordered is unavailable — {lastPurchaseError}
+          </p>
+        )}
 
         {/* All seven days, always, as one segmented control, directly under
             the title. The guide exists every day — picking one scopes the
@@ -845,28 +876,29 @@ export function OrderGuide({
                         order boxes, because it's the number you order up TO;
                         it's off behind SHOW_ITEM_PAR while Mark lives without
                         it, leaving only the NO PAR marker for items missing
-                        one. */}
+                        one. What's on the right now is the last purchase. */}
                     <tr>
                       <td colSpan={7} className="px-0 pb-0 pt-12">
                         <div className="flex items-end gap-4 border-b-2 border-ink px-4 pb-2 max-[1180px]:px-2">
-                          <span className="flex items-center gap-3">
-                            <Link
-                              href={withFrom(`/items/${item.inventory_item_id}`, here)}
-                              className="text-[22px] font-bold uppercase leading-tight tracking-[0.06em] text-ink no-underline hover:underline"
-                            >
-                              {item.item_name}
-                            </Link>
+                          <span className="flex min-w-0 items-center gap-3">
                             {/* The day's other sources for THIS item, without
-                                leaving Favorites (see applyExpansions). It
-                                trails the name rather than leading it (Mark,
-                                2026-07-26) — the name is what you're scanning
-                                for down the walk, so nothing should sit to the
-                                left of it. A bare triangle at the scale of that
-                                name rather than DataTable's small bordered box:
-                                this header is a 22px title read standing up and
-                                the control has to be hittable at arm's length.
-                                Absent entirely outside Favorites — see
-                                canExpand. */}
+                                leaving Favorites (see applyExpansions).
+
+                                IT LEADS THE NAME (Mark, 2026-08-10), reversing
+                                his own 2026-07-26 call that nothing should sit
+                                to the left of the thing you scan for. What
+                                changed is that the triangle is now a column in
+                                its own right: every header has one, live or
+                                greyed, so trailing the name put it at a ragged
+                                left edge that moved with the length of every
+                                item name. Leading, the triangles line up and
+                                the names still start on one margin.
+
+                                A bare triangle at the scale of that name rather
+                                than DataTable's small bordered box: this header
+                                is a 22px title read standing up and the control
+                                has to be hittable at arm's length. Absent
+                                entirely outside Favorites — see canExpand. */}
                             {canExpand &&
                               (item.expandable ? (
                                 <button
@@ -901,8 +933,40 @@ export function OrderGuide({
                                   ▶
                                 </span>
                               ))}
+                            <Link
+                              href={withFrom(`/items/${item.inventory_item_id}`, here)}
+                              className="truncate text-[22px] font-bold uppercase leading-tight tracking-[0.06em] text-ink no-underline hover:underline"
+                            >
+                              {item.item_name}
+                            </Link>
                           </span>
-                          <span className="ml-auto">
+                          {/* WHAT THIS ITEM WAS LAST BOUGHT, AND AS WHAT
+                              (Mark, 2026-08-10). It sits where the par used to,
+                              which is the slot hiding the par freed up — and it
+                              earns it for the same reason the par had it: this
+                              is the fact you want while looking AT the item,
+                              not while deciding a single line.
+
+                              Right-aligned and quiet. It is context, not the
+                              decision, so it must never compete with the name
+                              on its left or the order boxes below. `truncate`
+                              because a vendor description is arbitrary text and
+                              this header has a fixed line. */}
+                          <span className="ml-auto min-w-0 shrink-[3] text-right text-xs tracking-[0.02em] text-muted">
+                            {/* Suppressed entirely when the view is unreadable,
+                                because `lastPurchaseLabel` renders a missing
+                                row as "never ordered here" — true when the view
+                                answered and said nothing, a lie when it never
+                                answered at all. The note under the title
+                                carries the reason instead. */}
+                            {!lastPurchaseError &&
+                              lastPurchaseLabel(
+                                lastByItemLocation.get(item.lines[0].item_location_id),
+                                item.item_name,
+                                item.base_unit
+                              )}
+                          </span>
+                          <span className="shrink-0">
                             {item.par_qty === null ? (
                               // A missing par is a gap to fix, not an alarm —
                               // red is reserved for the number you order up to.

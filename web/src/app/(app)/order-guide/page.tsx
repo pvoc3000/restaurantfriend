@@ -10,6 +10,7 @@ import {
   GUIDE_VIEW_COOKIE,
   type GuideEntry,
   type GuideRow,
+  type LastPurchase,
 } from "@/lib/orderGuide";
 import { REMINDER_SELECT, type Reminder } from "@/lib/reminders";
 import { OrderGuide } from "@/components/purchasing/OrderGuide";
@@ -27,6 +28,13 @@ const SELECT = `
   pack_count, pack_size, pack_unit,
   effective_price, unit_price, vendor_minimum, vendor_delivery_days,
   should_order, is_favorite, vendor_order_days, item_order_days, favorite_days
+`;
+
+/** Only what the item header renders — see the note on SELECT above. */
+const LAST_PURCHASE_SELECT = `
+  item_location_id, last_order_date, vendor_item_id, vendor_name,
+  vendor_item_description, brand, package_desc, package_content,
+  pack_count, pack_size, pack_unit
 `;
 
 function one(value: string | string[] | undefined): string {
@@ -96,6 +104,23 @@ export default async function OrderGuidePage({
     .order("show_on_date")
     .then((r) => r);
 
+  /**
+   * WHEN THIS ITEM WAS LAST BOUGHT, AND AS WHAT (Mark, 2026-08-10) — migration
+   * 048's view, one row per item-location at this location.
+   *
+   * On the wire with the entries and reminders for the same reason: it doesn't
+   * depend on the guide rows and the guide query is ~850ms, so overlapped it
+   * costs nothing on the clock. ~450 rows at DF01, against the guide's 875.
+   *
+   * `.then()` is what puts it on the wire — a Supabase query builder is a lazy
+   * thenable and assigning it sends nothing.
+   */
+  const lastPurchasePromise = supabase
+    .from("v_item_last_purchase")
+    .select(LAST_PURCHASE_SELECT)
+    .eq("location_id", locationId)
+    .then((r) => r);
+
   // Membership is the view's job now: one line per orderable vendor item ×
   // inventory item at this location, plan row or not. The old hand-rolled
   // merge of "plan rows plus their alternates" is gone with it.
@@ -134,6 +159,19 @@ export default async function OrderGuidePage({
 
   const { data: entryRows } = await entriesPromise;
   const { data: reminderRows } = await remindersPromise;
+  /**
+   * A MISSING VIEW MUST NOT TAKE THE GUIDE DOWN. Until 048 is applied this
+   * errors, and the guide is the screen the shop is walked on — so the rows,
+   * the quantities and the totals all still render and only the last-purchase
+   * line is absent.
+   *
+   * But it isn't swallowed either: an absent line and "never bought" look
+   * identical, so the header would quietly assert something false about every
+   * item. The error rides through to a single muted note under the title,
+   * which disappears the moment the migration lands.
+   */
+  const { data: lastPurchaseRows, error: lastPurchaseError } =
+    await lastPurchasePromise;
 
   return (
     <OrderGuide
@@ -148,6 +186,8 @@ export default async function OrderGuidePage({
       // want anyway.
       key={`${locationId}:${guideDate}`}
       rows={rows}
+      lastPurchases={(lastPurchaseRows ?? []) as unknown as LastPurchase[]}
+      lastPurchaseError={lastPurchaseError?.message ?? null}
       entries={(entryRows ?? []) as GuideEntry[]}
       reminders={(reminderRows ?? []) as unknown as Reminder[]}
       weekday={weekday}

@@ -18,6 +18,7 @@ import "./gustoExport.fixtures";
 import "./homebaseImport.fixtures";
 import "./invoiceDate.fixtures";
 import "./invoiceMatch.fixtures";
+import "./lastPurchase.fixtures";
 import "./invoices.fixtures";
 import "./filterMenus.fixtures";
 import "./nav.fixtures";

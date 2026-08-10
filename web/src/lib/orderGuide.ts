@@ -2,6 +2,7 @@
 // view `v_order_guide` — never materialized, never cached (design rule 4).
 
 import { todayInTimeZone } from "./today";
+import { vendorItemTitle } from "./catalog";
 
 export type GuideRow = {
   item_location_id: string;
@@ -251,6 +252,28 @@ export function suggestQty(
 }
 
 /** One inventory item and its plan lines — the guide's unit of display. */
+/**
+ * The most recent non-void purchase of an item AT THIS LOCATION — migration
+ * 048's `v_item_last_purchase`, one row per item-location.
+ *
+ * The vendor-item slots are here so the guide can name that source with
+ * `lib/catalog.vendorItemTitle`, the same way its own lines and the vendor-item
+ * record do. Naming it a third way would be a third thing to reconcile.
+ */
+export type LastPurchase = {
+  item_location_id: string;
+  last_order_date: string;
+  vendor_item_id: string | null;
+  vendor_name: string | null;
+  vendor_item_description: string | null;
+  brand: string | null;
+  package_desc: string | null;
+  package_content: number | null;
+  pack_count: number | null;
+  pack_size: number | null;
+  pack_unit: string | null;
+};
+
 export type GuideItem = {
   inventory_item_id: string;
   item_name: string;
@@ -650,3 +673,50 @@ export function guideToday(timeZone: string): { date: string; weekday: number } 
 // serverTimeZone moved to lib/today alongside todayInTimeZone — the PO list's
 // date windows need the same fallback, and one definition can't drift.
 export { serverTimeZone } from "./today";
+
+
+/**
+ * The item header's one-line answer to "when did we last buy this, and as
+ * what" (Mark, 2026-08-10). Location-scoped, because that is what migration
+ * 048's view means and what you're standing in.
+ *
+ *     last 2026-08-04 · Chefs Warehouse · ORG BLACKBERRY 6/6OZ
+ *
+ * The source is named with `vendorItemTitle`, so a purchase of something the
+ * vendor never described reads the same composed way the guide's own lines and
+ * the vendor-item record do — a third wording for one thing would be a third
+ * thing to keep in step.
+ *
+ * NEVER PURCHASED SAYS SO, and says "here". An empty header would be
+ * indistinguishable from the migration not being applied, and "never ordered"
+ * without the qualifier is a claim about the org that this view can't make:
+ * the item may well be bought weekly at the other shop.
+ */
+export function lastPurchaseLabel(
+  purchase: LastPurchase | undefined,
+  itemName: string,
+  baseUnit: string
+): string {
+  if (!purchase) return "never ordered here";
+
+  const source = vendorItemTitle(
+    {
+      description: purchase.vendor_item_description,
+      brand: purchase.brand,
+      package_desc: purchase.package_desc,
+      pack_count: purchase.pack_count,
+      pack_size: purchase.pack_size,
+      pack_unit: purchase.pack_unit,
+      package_content: purchase.package_content,
+    },
+    itemName,
+    baseUnit
+  );
+
+  // Slots collapse rather than leaving a bare separator — the same rule
+  // `slashLabel` follows, for the same reason: " · · " reads as missing data
+  // where an absent field should read as an absent field.
+  return [`last ${purchase.last_order_date}`, purchase.vendor_name, source]
+    .filter((part): part is string => !!part)
+    .join(" · ");
+}

@@ -182,8 +182,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    shows that item's other sources orderable today (`isDayRelevant` = vendor
    order day ∧ item order day, i.e. the `All` tier). Costs no query — the page
    already loads every orderable line for the weekday and filters in the
-   browser. The triangle TRAILS the item name (Mark, 2026-07-26 — the name is
-   what you scan for down the walk, so nothing sits to its left) and is offered
+   browser. The triangle **LEADS the item name** (Mark, 2026-08-10), reversing
+   his own 2026-07-26 call that it should TRAIL it because "the name is what you
+   scan for down the walk, so nothing sits to its left". What changed is that
+   the triangle became a column in its own right — every header carries one,
+   live or greyed — so trailing put it at a ragged left edge that moved with the
+   length of every item name. Leading, the triangles line up and the names still
+   start on one margin. It is offered
    **only under Favorites, with Ignore-days OFF**: All already shows every
    day-relevant source, Skipped is a burn-down of what you haven't looked at,
    under Will order you're reviewing decisions rather than shopping for
@@ -3203,6 +3208,26 @@ never put "6 ×" on a purchase order. Pinned by
 guard: it prints `"6 × 0 EA"`, which is exactly the garbage the constraint was
 imagined to be preventing and which the reader prevents by itself. Probe with
 `select conname from pg_constraint where conrelid = 'public.vendor_items'::regclass`.
+
+**Migration 048 gives the guide's item header a last purchase (NEEDS
+APPLYING).** `v_item_last_purchase` — one row per item-location, the most
+recent non-void order AT THIS LOCATION, carrying the date AND the vendor item
+it was bought as. 004's `v_item_last_ordered` answers half of it and CANNOT
+answer the other half: it is `max(po.order_date)` grouped by item-location, so
+the aggregate discards the row the date came from. Additive rather than a
+widening, because three screens read 004's shape and `lib/lastOrdered` buckets
+it. Security is 014's pattern exactly — `security_invoker = false` plus ONE
+top-level `user_org_ids()` guard — which means it inherits 014's FOOTGUN:
+**service_role reads it EMPTY**, so an audit script will report that nothing was
+ever bought. Verified on the Docker harness as a real `authenticated` member
+(`current_user` asserted): it picks the later of two purchases, composes from an
+undescribed vendor item, agrees with 004 on the date, returns exactly one row
+per item-location, and `anon` is refused outright. The `po.status <> 'void'`
+guard is load-bearing and was proved so — without it the fixture's header names
+a voided order dated five days later. **Until it is applied the guide says so**
+in one muted line under the title and suppresses the per-item label entirely,
+because an absent line and "never ordered here" look identical and the header
+would otherwise assert something false about every item.
 
 Migration 019 gives the attachment somewhere to put what the invoice SAYS —
 `extraction` jsonb, `extracted_at`, `extraction_model`. On the attachment rather
