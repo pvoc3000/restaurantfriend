@@ -60,6 +60,9 @@ function scheduleLabel(value: string): string {
 
 /** The unset option can't be "", so "none" is the word for carrying no schedule. */
 const NO_SCHEDULE = "none";
+/** The same for TYPE, and a separate constant because the two are unrelated
+ *  columns that happen to share a spelling for "unset". */
+const NO_TYPE = "none";
 
 /**
  * The element catalog.
@@ -69,13 +72,14 @@ const NO_SCHEDULE = "none";
  * rows). The band appears only when the sort is Type, so it can't become a
  * heading every few rows.
  *
- * FOUR COMBINING MENUS RATHER THAN ONE ROW OF TABS (Mark, 2026-08-09: "instead
+ * FIVE COMBINING MENUS RATHER THAN ONE ROW OF TABS (Mark, 2026-08-09: "instead
  * of single filter with all options displayed, lets try a row of popup menus to
  * combine filter options"). The single `TabPicker` mixed two questions into one
  * row — three of its five cells were the KIND and the fourth was whether a cost
  * resolves — so asking both at once was impossible and the row could only grow.
  *
- * Two of the four are Mark's list applied as written. The other two are here
+ * Two of them are Mark's list applied as written; TYPE was asked for separately
+ * (2026-08-09) and sits between Kind and Schedule. The other two are here
  * because dropping them would have deleted working behaviour:
  *
  * - **Cost** carries the old Uncosted tier, which is not a category but the
@@ -114,6 +118,15 @@ export function ElementsList({
       return a.localeCompare(b);
     });
 
+    // FROM THE DATA, not a declared list. `element_type` is plain text with no
+    // check constraint — the same footing `schedule_class` is on — so the
+    // vocabulary is whatever the catalog holds (16 values today: Topping 63,
+    // Glaze 43, Ice Cream 24, down to Signature 1). Hardcoding it would mean a
+    // type nobody could filter by the moment somebody typed a new one, and
+    // silently: the rows would still be there, just unreachable from this menu.
+    const types = [...new Set(rows.map((r) => r.element_type).filter(Boolean) as string[])];
+    types.sort((a, b) => a.localeCompare(b));
+
     return [
       {
         key: "active",
@@ -133,6 +146,24 @@ export function ElementsList({
         label: "Kind",
         options: ELEMENT_KINDS.map((k) => ({ value: k, label: ELEMENT_KIND_LABEL[k] })),
         matches: (r, v) => r.kind === v,
+      },
+      {
+        // BETWEEN KIND AND SCHEDULE (Mark, 2026-08-09), which is also where it
+        // belongs by reading order: Kind is what an element IS to the app
+        // (made, purchased, manual), Type is what it is to the KITCHEN (a
+        // glaze, a topping), and Schedule is when it gets made. The menus now
+        // read narrow-to-broad down that row and match the table's own column
+        // order, so the menu and the column it filters line up.
+        key: "type",
+        label: "Type",
+        options: [
+          ...types.map((t) => ({ value: t, label: t })),
+          // 203 of 470 elements carry no type — 43% of the catalog, which is
+          // invisible without this and is the set most worth working through.
+          // Schedule's "None" is here for the same reason at 247.
+          { value: NO_TYPE, label: "None" },
+        ],
+        matches: (r, v) => (v === NO_TYPE ? r.element_type === null : r.element_type === v),
       },
       {
         key: "schedule",
