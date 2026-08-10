@@ -898,7 +898,22 @@ export function OrderGuide({
                             that chain, which is the point of it: a baseline is
                             for text, and a 28px control has no business
                             claiming one. */}
-                          <span className="flex min-w-0 items-baseline gap-3">
+                          {/* PULLED 6px LEFT (Mark, 2026-08-10), and it is an
+                              optical correction rather than a layout change.
+                              The ▶ is centred inside a 28px hit box, so while
+                              the box lines up with the heart below it — both at
+                              64px — the INK starts at 70.21, measured. Six
+                              pixels right of every other left edge on the
+                              screen, which is what Mark saw and sized by eye.
+
+                              A negative margin on this group rather than
+                              padding on the row: the row carries the 2px rule
+                              under the item name, and that must keep spanning
+                              the table. Flex lays out in order, so the
+                              last-purchase label following the name comes along
+                              for free — "the whole inventory item line" — while
+                              the ml-auto par marker stays pinned right. */}
+                          <span className="-ml-1.5 flex min-w-0 items-baseline gap-3">
                             {/* The day's other sources for THIS item, without
                                 leaving Favorites (see applyExpansions).
 
