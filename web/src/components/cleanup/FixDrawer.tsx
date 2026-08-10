@@ -284,6 +284,8 @@ function PackageContentEditor({
       <div className="flex items-center gap-2">
         <input
           inputMode="decimal"
+          // CalcKeys: the operator strip for iOS's number pad.
+          data-rf-calc=""
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           className="w-16 border border-ink px-2 py-1"
@@ -292,6 +294,8 @@ function PackageContentEditor({
         <span className="text-subtle">×</span>
         <input
           inputMode="decimal"
+          // CalcKeys: the operator strip for iOS's number pad.
+          data-rf-calc=""
           value={size}
           onChange={(e) => setSize(e.target.value)}
           placeholder="size"
@@ -378,6 +382,8 @@ function PriceEditor({
         <span className="text-subtle">$</span>
         <input
           inputMode="decimal"
+          // CalcKeys: the operator strip for iOS's number pad.
+          data-rf-calc=""
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           placeholder="0.00"
@@ -435,6 +441,8 @@ function ParEditor({
       <div className="flex items-center gap-2">
         <input
           inputMode="decimal"
+          // CalcKeys: the operator strip for iOS's number pad.
+          data-rf-calc=""
           value={par}
           onChange={(e) => setPar(e.target.value)}
           placeholder={`e.g. 100 (${baseUnit})`}

@@ -213,6 +213,8 @@ export function GuideLine({
         <span className="inline-flex items-baseline gap-1.5">
           <input
             inputMode="decimal"
+            // CalcKeys: the operator strip for iOS's number pad.
+            data-rf-calc=""
             disabled={saving}
             value={onHandDraft ?? (onHand === null ? "" : String(onHand))}
             onChange={(e) => setOnHandDraft(e.target.value)}
@@ -279,6 +281,8 @@ export function GuideLine({
           </button>
           <input
             inputMode="decimal"
+            // CalcKeys: the operator strip for iOS's number pad.
+            data-rf-calc=""
             disabled={saving}
             value={qtyDraft ?? (qty === null ? "" : String(qty))}
             onChange={(e) => setQtyDraft(e.target.value)}

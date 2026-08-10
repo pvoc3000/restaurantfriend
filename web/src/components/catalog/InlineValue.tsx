@@ -492,6 +492,9 @@ export function InlineValue({
           // No date here any more — `kind="date"` returned above with a picker
           // that's always on screen.
           inputMode={kind === "number" ? "decimal" : undefined}
+          // The number pad has no operators, so `ui/CalcKeys` offers them on a
+          // touch device. Only on the kind that runs `evaluateNumeric`.
+          {...(kind === "number" ? { "data-rf-calc": "" } : {})}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={save}
           onKeyDown={(e) => {

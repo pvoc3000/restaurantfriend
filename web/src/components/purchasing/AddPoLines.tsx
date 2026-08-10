@@ -319,6 +319,8 @@ export function AddPoLines({
 
                         <input
                           inputMode="decimal"
+                          // CalcKeys: the operator strip for iOS's number pad.
+                          data-rf-calc=""
                           value={drafts[vi.id] ?? ""}
                           onChange={(e) =>
                             setDrafts((prev) => ({ ...prev, [vi.id]: e.target.value }))

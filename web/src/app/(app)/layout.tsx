@@ -1,4 +1,5 @@
 import { AppHeader } from "@/components/AppHeader";
+import { CalcKeys } from "@/components/ui/CalcKeys";
 import { InactiveLocationGate } from "@/components/InactiveLocationGate";
 import { ScrollMemory } from "@/components/ScrollMemory";
 import { getAppSession } from "@/lib/session";
@@ -42,6 +43,10 @@ export default async function AppLayout({
           the time this one's effect runs (effects go child-first, siblings in
           order). */}
       <ScrollMemory locationId={session.activeLocation?.id ?? null} />
+      {/* Also renders nothing until a `data-rf-calc` field is focused on a
+          touch device: the six operator keys iOS's number pad doesn't carry,
+          so `lib/calc` expressions are typeable on an iPad. */}
+      <CalcKeys />
     </>
   );
 }
