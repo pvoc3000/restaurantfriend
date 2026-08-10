@@ -193,9 +193,12 @@ export function GuideLine({
               vendor names stay on one left margin down the whole walk. */}
           <span
             aria-hidden
-            className={
-              row.is_favorite ? "text-[var(--rf-yellow-500)]" : "text-transparent"
-            }
+            // BLACK (Mark, 2026-08-10), where it was yellow. That leaves the
+            // star as the only coloured thing on the row, which is the right
+            // way round: a favorite is structural — most visible lines are one
+            // — while the last-bought source is the exception worth the eye.
+            // Two yellow marks side by side competed and neither won.
+            className={row.is_favorite ? "text-ink" : "text-transparent"}
             title={row.is_favorite ? "Favorite — the preferred source this day" : undefined}
           >
             {/* U+2665 followed by U+FE0E, the text variation selector. Both
