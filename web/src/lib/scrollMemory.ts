@@ -39,9 +39,33 @@
 
 import { useEffect, useRef, useSyncExternalStore, type RefObject } from "react";
 
-/** ~200ms at 60fps. Long enough for the list to reach full height, short
- *  enough that a scroll you start yourself is never fought for long. */
-const SETTLE_FRAMES = 12;
+/**
+ * How long to keep trying to put the position back.
+ *
+ * This was 12 FRAMES (~200ms), on the reasoning that a list reaches full height
+ * within a few frames of mounting. That is true of the list — and false of the
+ * SCREEN, which is the thing being measured. Every slow route has a
+ * `loading.tsx`, and Next commits the URL and shows that fallback IMMEDIATELY:
+ * the shell's `usePathname()` flips, this effect re-runs, and it restores
+ * against a one-line loading page. `scrollTo(4000)` on a 900px document clamps
+ * to 0, the twelve frames run out while the spinner is still up, and by the
+ * time the rows arrive nothing is left to put the position back. The memory was
+ * never wrong; it just never got applied — which from the outside reads as
+ * scroll memory not working at all (Mark, 2026-08-10, on the PO list).
+ *
+ * Measured on `/purchase-orders`: 494ms, 540ms and 1614ms to render its 186
+ * rows, against a 200ms budget. So the budget is a WALL CLOCK sized to outlast
+ * a slow route, not a frame count sized to outlast a paint.
+ *
+ * Waiting longer costs nothing: re-asserting a position the document is too
+ * short to hold is a no-op, and the reader touching the page surrenders
+ * instantly (see `surrender`) — which is what stops this fighting anyone.
+ *
+ * The order guide is the one screen that never had this bug, and the reason is
+ * the tell: it names its own key from a component that only mounts once the
+ * data has arrived, so its restore has always started with the content there.
+ */
+const RESTORE_DEADLINE_MS = 3000;
 
 /** Persist at most this often while scrolling; the rest rides on the unmount. */
 const WRITE_EVERY_MS = 120;
@@ -175,7 +199,7 @@ export function useScrollMemory(key: string, ref?: RefObject<HTMLElement | null>
     // going past are the ones we're scrolling THROUGH, and recording a 0 from
     // the top of a half-built list is exactly how the memory gets erased.
     let restoring = target > 0;
-    let frames = 0;
+    const restoreUntil = performance.now() + RESTORE_DEADLINE_MS;
 
     // The last position we believe in, kept in a variable rather than read back
     // off the scroller when it's needed: by the time this re-keys or unmounts,
@@ -231,14 +255,16 @@ export function useScrollMemory(key: string, ref?: RefObject<HTMLElement | null>
     const settle = () => {
       if (!restoring) return;
       setY(target);
-      frames += 1;
-      // Within a pixel is arrived. Otherwise the list is still too short to
-      // reach the target, so wait a frame and ask again.
-      if (frames < SETTLE_FRAMES && Math.abs(getY() - target) > 1) {
-        requestAnimationFrame(settle);
-      } else {
+      // Within a pixel is arrived, and arriving is the only success condition —
+      // note that reaching it PROVES the content is there, since a document too
+      // short to hold the target clamps short of it. Anything else means the
+      // screen is still building (most often: its loading.tsx is still up), so
+      // ask again next frame until the deadline. See RESTORE_DEADLINE_MS.
+      if (Math.abs(getY() - target) <= 1 || performance.now() > restoreUntil) {
         restoring = false;
+        return;
       }
+      requestAnimationFrame(settle);
     };
 
     // There is deliberately no pagehide flush any more. It existed to catch a
