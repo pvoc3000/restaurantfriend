@@ -120,3 +120,29 @@ export function looksLikeExpression(input: string): boolean {
   const s = input.replace(NOISE, "");
   return /[+*/×÷()]/.test(s) || /.-/.test(s);
 }
+
+/**
+ * True while `input` is obviously MID-EXPRESSION rather than wrong — it ends on
+ * an operator or an open paren, or leaves a paren unclosed.
+ *
+ * `ui/CalcPad` shows a live result as you tap, and without this it would also
+ * shout "can't read" the instant you press ×, since "5×" genuinely doesn't
+ * parse. That warning would then be on screen for most of the time anyone
+ * spends typing, which is the fussiness that sank the first attempt at making
+ * these fields usable on an iPad. Half an expression is not a mistake.
+ *
+ * Deliberately syntactic and shallow: it answers "is the person still typing",
+ * not "will this parse" — `evaluateNumeric` is the authority on the second, and
+ * a second, subtler judge of the same question would only drift from it.
+ */
+export function looksUnfinished(input: string): boolean {
+  const s = input.replace(NOISE, "");
+  if (s === "") return false;
+  if (/[+\-*/×÷(]$/.test(s)) return true;
+  let depth = 0;
+  for (const c of s) {
+    if (c === "(") depth++;
+    else if (c === ")") depth--;
+  }
+  return depth > 0;
+}

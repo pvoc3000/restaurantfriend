@@ -15,6 +15,7 @@ import {
 import { money } from "@/lib/purchaseOrders";
 import { packLabel, packageDivisor, parPackageLabel } from "@/lib/catalog";
 import { evaluateNumeric } from "@/lib/calc";
+import { useCalcField } from "@/components/ui/CalcPad";
 
 /**
  * One plan line, laid out in the columns the FMP guide used because they're the
@@ -45,6 +46,7 @@ export function GuideLine({
   onCommit: (patch: Partial<EntryState>) => void;
   saving: boolean;
 }) {
+  const calcField = useCalcField();
   const [qtyDraft, setQtyDraft] = useState<string | null>(null);
   const [onHandDraft, setOnHandDraft] = useState<string | null>(null);
 
@@ -212,9 +214,7 @@ export function GuideLine({
       <td className="px-4 py-4 align-middle text-right max-[1180px]:px-2">
         <span className="inline-flex items-baseline gap-1.5">
           <input
-            inputMode="decimal"
-            // CalcKeys: the operator strip for iOS's number pad.
-            data-rf-calc=""
+            {...calcField}
             disabled={saving}
             value={onHandDraft ?? (onHand === null ? "" : String(onHand))}
             onChange={(e) => setOnHandDraft(e.target.value)}
@@ -280,9 +280,7 @@ export function GuideLine({
             −
           </button>
           <input
-            inputMode="decimal"
-            // CalcKeys: the operator strip for iOS's number pad.
-            data-rf-calc=""
+            {...calcField}
             disabled={saving}
             value={qtyDraft ?? (qty === null ? "" : String(qty))}
             onChange={(e) => setQtyDraft(e.target.value)}

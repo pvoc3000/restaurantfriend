@@ -16,6 +16,7 @@ import { evaluateNumeric } from "@/lib/calc";
 import { BaseUnitEditor } from "@/components/catalog/BaseUnitEditor";
 import type { QueueItem } from "@/app/(app)/cleanup/page";
 import { FavoritesEditor } from "./FavoritesEditor";
+import { useCalcField } from "@/components/ui/CalcPad";
 
 /** Which favorite an editor is about — several can be broken on one item. */
 function FavoriteHeading({ f }: { f: CleanupFavorite }) {
@@ -239,6 +240,7 @@ function PackageContentEditor({
   onChanged: () => void;
 }) {
   const supabase = createClient();
+  const calcField = useCalcField();
   const [amount, setAmount] = useState("1");
   const [size, setSize] = useState("");
   const [unit, setUnit] = useState(baseUnit);
@@ -283,9 +285,7 @@ function PackageContentEditor({
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2">
         <input
-          inputMode="decimal"
-          // CalcKeys: the operator strip for iOS's number pad.
-          data-rf-calc=""
+          {...calcField}
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           className="w-16 border border-ink px-2 py-1"
@@ -293,9 +293,7 @@ function PackageContentEditor({
         />
         <span className="text-subtle">×</span>
         <input
-          inputMode="decimal"
-          // CalcKeys: the operator strip for iOS's number pad.
-          data-rf-calc=""
+          {...calcField}
           value={size}
           onChange={(e) => setSize(e.target.value)}
           placeholder="size"
@@ -356,6 +354,7 @@ function PriceEditor({
   onChanged: () => void;
 }) {
   const supabase = createClient();
+  const calcField = useCalcField();
   const [price, setPrice] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -381,9 +380,7 @@ function PriceEditor({
       <div className="flex items-center gap-2">
         <span className="text-subtle">$</span>
         <input
-          inputMode="decimal"
-          // CalcKeys: the operator strip for iOS's number pad.
-          data-rf-calc=""
+          {...calcField}
           value={price}
           onChange={(e) => setPrice(e.target.value)}
           placeholder="0.00"
@@ -415,6 +412,7 @@ function ParEditor({
   onChanged: () => void;
 }) {
   const supabase = createClient();
+  const calcField = useCalcField();
   const [par, setPar] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -440,9 +438,7 @@ function ParEditor({
     <div className="space-y-2 text-sm">
       <div className="flex items-center gap-2">
         <input
-          inputMode="decimal"
-          // CalcKeys: the operator strip for iOS's number pad.
-          data-rf-calc=""
+          {...calcField}
           value={par}
           onChange={(e) => setPar(e.target.value)}
           placeholder={`e.g. 100 (${baseUnit})`}

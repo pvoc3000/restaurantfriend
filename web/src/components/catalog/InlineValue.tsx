@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { evaluateNumeric, looksLikeExpression } from "@/lib/calc";
 import { DateField } from "@/components/ui/DateField";
 import { PickList, type PickOption } from "@/components/ui/PickList";
+import { useCalcField } from "@/components/ui/CalcPad";
 
 /**
  * One inline-editable cell: click, type, Enter or blur to save. The write is a
@@ -273,6 +274,7 @@ export function InlineValue({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const calcField = useCalcField();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
@@ -491,10 +493,10 @@ export function InlineValue({
           autoComplete="off"
           // No date here any more — `kind="date"` returned above with a picker
           // that's always on screen.
-          inputMode={kind === "number" ? "decimal" : undefined}
-          // The number pad has no operators, so `ui/CalcKeys` offers them on a
-          // touch device. Only on the kind that runs `evaluateNumeric`.
-          {...(kind === "number" ? { "data-rf-calc": "" } : {})}
+          // iOS's number pad has no operators, so on a touch device the field
+          // asks for no system keyboard at all and `ui/CalcPad` supplies one
+          // that has them. Only on the kind that runs `evaluateNumeric`.
+          {...(kind === "number" ? calcField : {})}
           onChange={(e) => setDraft(e.target.value)}
           onBlur={save}
           onKeyDown={(e) => {

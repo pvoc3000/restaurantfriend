@@ -13,6 +13,7 @@ import { packLabel } from "@/lib/catalog";
 import { evaluateNumeric } from "@/lib/calc";
 import { TextInput } from "@/components/ui/TextInput";
 import { Dialog, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
+import { useCalcField } from "@/components/ui/CalcPad";
 
 /**
  * "Add item" on PO detail: everything this vendor currently sells, with a
@@ -93,6 +94,8 @@ export function AddPoLines({
   const vendorName = order.vendors?.name ?? "Vendor";
   const router = useRouter();
   const supabase = createClient();
+
+  const calcField = useCalcField();
 
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -318,9 +321,7 @@ export function AddPoLines({
                         </span>
 
                         <input
-                          inputMode="decimal"
-                          // CalcKeys: the operator strip for iOS's number pad.
-                          data-rf-calc=""
+                          {...calcField}
                           value={drafts[vi.id] ?? ""}
                           onChange={(e) =>
                             setDrafts((prev) => ({ ...prev, [vi.id]: e.target.value }))

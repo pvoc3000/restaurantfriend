@@ -4,6 +4,7 @@
 // exits non-zero on the first failure it reports.
 
 import "./breakPunches.fixtures";
+import "./calcPad.fixtures";
 import "./batchLogFilters.fixtures";
 import "./breakRules.fixtures";
 import "./columnOrder.fixtures";
