@@ -879,8 +879,26 @@ export function OrderGuide({
                         one. What's on the right now is the last purchase. */}
                     <tr>
                       <td colSpan={7} className="px-0 pb-0 pt-12">
-                        <div className="flex items-end gap-4 border-b-2 border-ink px-4 pb-2 max-[1180px]:px-2">
-                          <span className="flex min-w-0 items-center gap-3">
+                        {/* items-BASELINE, not items-end (Mark, 2026-08-10: the last-purchase
+                            text "appears 1 or 2 px lower than the inventory item").
+                            It was 2.5px, measured. Bottom-aligning a 12px line
+                            against a 22px one lines up their line BOXES, and a
+                            line box is font metrics plus half-leading, so the
+                            two baselines land apart — which is what the eye
+                            reads. Sharing a baseline is the only alignment that
+                            makes two different sizes look set on one line. */}
+                        <div className="flex items-baseline gap-4 border-b-2 border-ink px-4 pb-2 max-[1180px]:px-2">
+                          {/* items-BASELINE here too, with the triangle opted OUT via self-center.
+                            A flex container's baseline comes from its first
+                            item that PARTICIPATES in baseline alignment, and
+                            the triangle is first in the DOM — so while it
+                            participated, the group handed the row the button's
+                            baseline instead of the name's and the label landed
+                            0.75px high. self-center takes the button out of
+                            that chain, which is the point of it: a baseline is
+                            for text, and a 28px control has no business
+                            claiming one. */}
+                          <span className="flex min-w-0 items-baseline gap-3">
                             {/* The day's other sources for THIS item, without
                                 leaving Favorites (see applyExpansions).
 
@@ -915,7 +933,7 @@ export function OrderGuide({
                                       ? "Show only today's favorites"
                                       : "Show every source orderable today"
                                   }
-                                  className="flex h-7 w-7 shrink-0 items-center justify-center text-[20px] leading-none text-ink transition-colors hover:text-muted"
+                                  className="flex h-7 w-7 shrink-0 self-center items-center justify-center text-[20px] leading-none text-ink transition-colors hover:text-muted"
                                 >
                                   {isOpen ? "▼" : "▶"}
                                 </button>
@@ -928,7 +946,7 @@ export function OrderGuide({
                                 <span
                                   aria-hidden
                                   title="No other sources orderable today"
-                                  className="flex h-7 w-7 shrink-0 items-center justify-center text-[20px] leading-none text-faint"
+                                  className="flex h-7 w-7 shrink-0 self-center items-center justify-center text-[20px] leading-none text-faint"
                                 >
                                   ▶
                                 </span>
@@ -941,18 +959,20 @@ export function OrderGuide({
                             </Link>
                           </span>
                           {/* WHAT THIS ITEM WAS LAST BOUGHT, AND AS WHAT
-                              (Mark, 2026-08-10). It sits where the par used to,
-                              which is the slot hiding the par freed up — and it
-                              earns it for the same reason the par had it: this
-                              is the fact you want while looking AT the item,
-                              not while deciding a single line.
+                              (Mark, 2026-08-10). It follows the name directly
+                              and stays left (Mark, same day) — it first sat at
+                              the far right, in the slot hiding the par freed
+                              up, where it was a line of text with the width of
+                              the screen between it and the thing it describes.
+                              Beside the name it reads as a subtitle of that
+                              name, which is what it is.
 
-                              Right-aligned and quiet. It is context, not the
-                              decision, so it must never compete with the name
-                              on its left or the order boxes below. `truncate`
-                              because a vendor description is arbitrary text and
-                              this header has a fixed line. */}
-                          <span className="ml-auto min-w-0 shrink-[3] text-right text-xs tracking-[0.02em] text-muted">
+                              Quiet, and it never competes: it is context, not
+                              the decision. `truncate` with a shrink of 3 so it
+                              gives way three times faster than the item name —
+                              a vendor description is arbitrary text and this
+                              header is one line. */}
+                          <span className="min-w-0 shrink-[3] truncate text-xs tracking-[0.02em] text-muted">
                             {/* Suppressed entirely when the view is unreadable,
                                 because `lastPurchaseLabel` renders a missing
                                 row as "never ordered here" — true when the view
@@ -966,7 +986,7 @@ export function OrderGuide({
                                 item.base_unit
                               )}
                           </span>
-                          <span className="shrink-0">
+                          <span className="ml-auto shrink-0">
                             {item.par_qty === null ? (
                               // A missing par is a gap to fix, not an alarm —
                               // red is reserved for the number you order up to.
