@@ -88,11 +88,11 @@ export function useCalcField() {
  * lives — because that is where a hand already expects them, and this is the
  * one surface in the app that nobody should have to learn.
  *
- *     C   (   )   ÷
+ *     ⌫   (   )   ÷
  *     7   8   9   ×
  *     4   5   6   −
  *     1   2   3   +
- *     ⌫   0   .   =
+ *     C   0   .   =
  *
  * `(` and `)` are ADJACENT, which the first cut got wrong by splitting them
  * across the two function corners to mirror Apple's `%` and `+/−`. A pair of
@@ -107,12 +107,31 @@ export function useCalcField() {
 type Key = readonly [label: string, action: string, tone: "fn" | "digit" | "op"];
 
 const KEYS: ReadonlyArray<Key> = [
-  ["C", "clear", "fn"], ["(", "(", "fn"],     [")", ")", "fn"],    ["÷", "÷", "op"],
+  ["⌫", "back", "fn"],  ["(", "(", "fn"],     [")", ")", "fn"],    ["÷", "÷", "op"],
   ["7", "7", "digit"],  ["8", "8", "digit"],  ["9", "9", "digit"], ["×", "×", "op"],
   ["4", "4", "digit"],  ["5", "5", "digit"],  ["6", "6", "digit"], ["−", "-", "op"],
   ["1", "1", "digit"],  ["2", "2", "digit"],  ["3", "3", "digit"], ["+", "+", "op"],
-  ["⌫", "back", "fn"],  ["0", "0", "digit"],  [".", ".", "digit"], ["=", "done", "op"],
+  ["C", "clear", "fn"], ["0", "0", "digit"],  [".", ".", "digit"], ["=", "done", "op"],
 ];
+
+/**
+ * PER-GLYPH OPTICAL CORRECTIONS. Type is drawn, not measured, so a character
+ * centred by its bounding box can still sit off-centre to the eye — and two of
+ * these do (Mark, 2026-08-10).
+ *
+ * `⌫` (U+232B) carries its mass in the box on the RIGHT and tapers to a point
+ * on the left, so geometric centring reads as pushed right.
+ *
+ * `=` is two thin strokes with no ascender or descender, so at the size that
+ * suits `+` and `×` it reads noticeably smaller than they do.
+ *
+ * SIZE IS A LOOKUP, NOT AN EXTRA CLASS, and that is deliberate: Tailwind
+ * resolves competing utilities by STYLESHEET order, so appending `text-[30px]`
+ * after `text-[24px]` is a coin flip that a token reorder would silently flip
+ * back. Exactly one text-size utility is ever emitted per key.
+ */
+const KEY_SIZE: Record<string, string> = { "=": "text-[32px]" };
+const KEY_NUDGE: Record<string, string> = { "⌫": "-translate-x-[3px]" };
 
 /** Apple's dark-mode calculator palette. */
 const TONE: Record<Key[2], string> = {
@@ -397,11 +416,17 @@ export function CalcPad() {
               }}
               tabIndex={-1}
               aria-label={label}
+              // The size branch keys off the LABEL, not the action. It used to
+              // read `action === "done"`, sized for the word "Done" — so when
+              // that key became `=` it kept the 13px caption type and looked
+              // shrunken beside the other operators (Mark, 2026-08-10). Keyed
+              // this way it corrects itself if a key is ever worded again.
               className={`flex aspect-square items-center justify-center rounded-full leading-none ${
-                action === "done"
+                KEY_SIZE[label] ??
+                (label.length > 1
                   ? "text-[13px] font-semibold uppercase tracking-[0.04em]"
-                  : "text-[24px] font-normal"
-              } ${TONE[tone]}`}
+                  : "text-[24px] font-normal")
+              } ${KEY_NUDGE[label] ?? ""} ${TONE[tone]}`}
             >
               {label}
             </button>
