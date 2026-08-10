@@ -115,22 +115,39 @@ const KEYS: ReadonlyArray<Key> = [
 ];
 
 /**
- * PER-GLYPH OPTICAL CORRECTIONS. Type is drawn, not measured, so a character
- * centred by its bounding box can still sit off-centre to the eye — and two of
- * these do (Mark, 2026-08-10).
+ * EVERY KEY IS A SINGLE GLYPH — no words, no captions (Mark, 2026-08-10: "all
+ * glyphs instead of a mix of glyphs and captions… would probably look more
+ * coherent"). It already was, as of `Done` becoming `=`; what remained was a
+ * size branch that rendered caption type for any label longer than one
+ * character, unreachable and quietly waiting to be wrong. Gone. If a key ever
+ * needs a word, that is a decision to take deliberately, not a fallback to
+ * inherit.
  *
- * `⌫` (U+232B) carries its mass in the box on the RIGHT and tapers to a point
- * on the left, so geometric centring reads as pushed right.
+ * WHAT MAKES THEM COHERENT IS OPTICAL SIZE, NOT ONE SIZE. A glyph is drawn
+ * inside its em box at whatever proportion the typeface chose, so setting every
+ * key to 24px makes them equal by measurement and unequal to the eye: `+` and
+ * `×` occupy about two-thirds the height of an `8`, and `=` — two thin strokes,
+ * no ascender, no descender — less again. Sizing each class until they LOOK the
+ * same is what "coherent" actually asks for. Digits and the rest sit at the
+ * base; the four operators come up, and `=` further still.
  *
- * `=` is two thin strokes with no ascender or descender, so at the size that
- * suits `+` and `×` it reads noticeably smaller than they do.
+ * `⌫` (U+232B) needs the other kind of correction: its mass is the box on the
+ * RIGHT and it tapers to a point on the left, so centring by the bounding box
+ * reads as pushed right.
  *
  * SIZE IS A LOOKUP, NOT AN EXTRA CLASS, and that is deliberate: Tailwind
  * resolves competing utilities by STYLESHEET order, so appending `text-[30px]`
  * after `text-[24px]` is a coin flip that a token reorder would silently flip
  * back. Exactly one text-size utility is ever emitted per key.
  */
-const KEY_SIZE: Record<string, string> = { "=": "text-[32px]" };
+const KEY_SIZE_BASE = "text-[24px]";
+const KEY_SIZE: Record<string, string> = {
+  "÷": "text-[29px]",
+  "×": "text-[29px]",
+  "−": "text-[29px]",
+  "+": "text-[29px]",
+  "=": "text-[32px]",
+};
 const KEY_NUDGE: Record<string, string> = { "⌫": "-translate-x-[3px]" };
 
 /** Apple's dark-mode calculator palette. */
@@ -416,16 +433,8 @@ export function CalcPad() {
               }}
               tabIndex={-1}
               aria-label={label}
-              // The size branch keys off the LABEL, not the action. It used to
-              // read `action === "done"`, sized for the word "Done" — so when
-              // that key became `=` it kept the 13px caption type and looked
-              // shrunken beside the other operators (Mark, 2026-08-10). Keyed
-              // this way it corrects itself if a key is ever worded again.
-              className={`flex aspect-square items-center justify-center rounded-full leading-none ${
-                KEY_SIZE[label] ??
-                (label.length > 1
-                  ? "text-[13px] font-semibold uppercase tracking-[0.04em]"
-                  : "text-[24px] font-normal")
+              className={`flex aspect-square items-center justify-center rounded-full font-normal leading-none ${
+                KEY_SIZE[label] ?? KEY_SIZE_BASE
               } ${KEY_NUDGE[label] ?? ""} ${TONE[tone]}`}
             >
               {label}
