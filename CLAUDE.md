@@ -4663,7 +4663,20 @@ weekday column, and 003 then silently made it per-vendor-item.
   none, which is why that script refuses the whole run rather than stopping
   partway.
 - Favorites = plan rows (`order_guide_plan_days`): the preferred source per
-  weekday, ★-marked, overridable in the moment. Since 008 a favorite is one of
+  weekday, **♥-marked** on the guide, overridable in the moment. The heart and
+  the **★** beside a line's description are a PAIR and mean opposite halves of
+  one question (Mark, 2026-08-10): ♥ is the source you INTEND to buy, ★ is the
+  one you actually DID buy last (migration 048). They routinely disagree — on
+  DF01's Monday, Coke, Mexican carries two hearts and the star sits on the
+  dearer of them — which is the whole reason both are shown. Both glyphs carry
+  U+FE0E so Apple platforms can't render them as colour emoji, which would
+  ignore the yellow and break "colour means record state". The star is absent
+  rather than transparent on lines that aren't it, unlike the heart: most lines
+  never carry one, and a reserved slot would cost description width to say
+  nothing. NO star anywhere under an item does not mean "never bought" — the
+  last purchase may have been from a source that isn't orderable today, so
+  isn't on screen to mark; the header's date is the authority.
+  Since 008 a favorite is one of
   four should-order conditions, not guide membership. The real vendor decision
   is basket-level: a **vendor
   totals bar** shows each vendor's running subtotal vs its minimum

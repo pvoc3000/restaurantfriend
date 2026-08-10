@@ -34,6 +34,7 @@ export function GuideLine({
   ignoreDays,
   itemPar,
   baseUnit,
+  wasLastPurchased,
   onCommit,
   saving,
 }: {
@@ -43,6 +44,8 @@ export function GuideLine({
   ignoreDays: boolean;
   itemPar: number | null;
   baseUnit: string;
+  /** This is the source the item was most recently bought from here (048). */
+  wasLastPurchased: boolean;
   onCommit: (patch: Partial<EntryState>) => void;
   saving: boolean;
 }) {
@@ -177,7 +180,17 @@ export function GuideLine({
       <td className="whitespace-nowrap py-4 pl-4 pr-4 align-middle max-[1180px]:whitespace-normal max-[1180px]:px-2">
         <div className="flex items-baseline gap-1.5">
           {/* Favorites carry a marker so "All" can be scanned: the source
-              you'd normally take, whether or not it's today's work. */}
+              you'd normally take, whether or not it's today's work.
+
+              A HEART, not a star (Mark, 2026-08-10). The two marks now mean
+              two different things on the same row — a favorite is what you
+              INTEND to buy, the star beside the description is what you
+              actually DID buy last time — and one glyph can't carry both.
+              The heart is also the commoner reading of "favourite" outside
+              this app, which leaves the star free for the fact.
+
+              Transparent rather than absent when not a favorite, so the
+              vendor names stay on one left margin down the whole walk. */}
           <span
             aria-hidden
             className={
@@ -185,7 +198,15 @@ export function GuideLine({
             }
             title={row.is_favorite ? "Favorite — the preferred source this day" : undefined}
           >
-            ★
+            {/* U+2665 followed by U+FE0E, the text variation selector. Both
+                glyphs carry one. Neither character defaults to emoji, and
+                Chromium draws both as text — but Apple platforms reach for
+                Apple Color Emoji more eagerly than most, and Mark reads this
+                app in Safari on a Mac and an iPad. A red emoji heart would
+                ignore the yellow entirely and break the one rule the design
+                system is strictest about, that colour means record state.
+                Invisible, costs nothing, removes the whole class. */}
+            {"\u2665\uFE0E"}
           </span>
           <Link
             href={withFrom(`/vendors/${row.vendor_id}`, here)}
@@ -213,6 +234,34 @@ export function GuideLine({
         >
           {describes ?? "—"}
         </Link>
+        {/* THE SOURCE WE ACTUALLY BOUGHT LAST TIME (Mark, 2026-08-10), from
+            migration 048 — the same fact the item header states as a date,
+            here pointing at the line it refers to. The header tells you WHEN
+            and the star tells you WHICH, and neither is much use alone on an
+            item with four sources.
+
+            A star, freed up by the favorite marker becoming a heart. The pair
+            reads as intent vs record: ♥ is the source you mean to buy, ★ is
+            the one you did. They often disagree, which is the whole point of
+            showing both.
+
+            It trails the description rather than leading it, because unlike
+            the heart this is not a column: most lines never carry one, and a
+            reserved slot on every row would cost 16px of description width to
+            say nothing. Absent, not transparent, for the same reason.
+
+            No star at all is a real answer here and doesn't mean "never
+            bought": the last purchase may have been from a source that isn't
+            orderable today, and so isn't on screen to mark. */}
+        {wasLastPurchased && (
+          <span
+            className="ml-1.5 text-[var(--rf-yellow-500)]"
+            title="Last bought from this source"
+            aria-label="Last bought from this source"
+          >
+            {"\u2605\uFE0E"}
+          </span>
+        )}
         {pack && (
           <div className="mt-0.5 whitespace-nowrap text-xs tabular-nums text-muted">
             {pack}

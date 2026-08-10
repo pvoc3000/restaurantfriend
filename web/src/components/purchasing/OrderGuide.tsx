@@ -1020,6 +1020,14 @@ export function OrderGuide({
                         ignoreDays={ignoreDays}
                         itemPar={item.par_qty}
                         baseUnit={item.base_unit}
+                        // Compared against the LINE's own vendor item, not the
+                        // item's — an item with four sources gets at most one
+                        // star, on the one it was actually bought from.
+                        wasLastPurchased={
+                          !lastPurchaseError &&
+                          lastByItemLocation.get(row.item_location_id)
+                            ?.vendor_item_id === row.vendor_item_id
+                        }
                         saving={saving}
                         onCommit={(patch) => commit(row, patch)}
                       />
