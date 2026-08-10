@@ -193,11 +193,12 @@ export function GuideLine({
               vendor names stay on one left margin down the whole walk. */}
           <span
             aria-hidden
-            // BLACK (Mark, 2026-08-10), where it was yellow. That leaves the
-            // star as the only coloured thing on the row, which is the right
-            // way round: a favorite is structural — most visible lines are one
-            // — while the last-bought source is the exception worth the eye.
-            // Two yellow marks side by side competed and neither won.
+            // Black, like the star below it (Mark, 2026-08-10 — the heart
+            // first, then the star). BOTH marks are now uncoloured, which is
+            // the design system applying rather than being bent: colour means
+            // record STATE, and neither of these is a state. A favorite is an
+            // intention and a last purchase is history; the two are told apart
+            // by SHAPE, which is what a glyph is for.
             className={row.is_favorite ? "text-ink" : "text-transparent"}
             title={row.is_favorite ? "Favorite — the preferred source this day" : undefined}
           >
@@ -258,7 +259,7 @@ export function GuideLine({
             orderable today, and so isn't on screen to mark. */}
         {wasLastPurchased && (
           <span
-            className="ml-1.5 text-[var(--rf-yellow-500)]"
+            className="ml-1.5 text-ink"
             title="Last bought from this source"
             aria-label="Last bought from this source"
           >

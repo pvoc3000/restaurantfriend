@@ -4668,13 +4668,12 @@ weekday column, and 003 then silently made it per-vendor-item.
   one question (Mark, 2026-08-10): ♥ is the source you INTEND to buy, ★ is the
   one you actually DID buy last (migration 048). They routinely disagree — on
   DF01's Monday, Coke, Mexican carries two hearts and the star sits on the
-  dearer of them — which is the whole reason both are shown. The heart is BLACK
-  and the star YELLOW (Mark, 2026-08-10): a favorite is structural, since most
-  visible lines are one, while the last-bought source is the exception worth
-  the eye — two coloured marks side by side competed and neither won. Both
-  glyphs carry U+FE0E so Apple platforms can't render them as colour emoji,
-  which would ignore the colour entirely and break "colour means record
-  state". The star is absent
+  dearer of them — which is the whole reason both are shown. BOTH ARE BLACK
+  (Mark, 2026-08-10, in two steps — the heart, then the star), which is the
+  design system applying rather than being bent: colour means record STATE and
+  neither of these is a state, so they are told apart by SHAPE. Both glyphs
+  carry U+FE0E so Apple platforms can't render them as colour emoji — a red
+  heart would put colour on a row that has deliberately given it up. The star is absent
   rather than transparent on lines that aren't it, unlike the heart: most lines
   never carry one, and a reserved slot would cost description width to say
   nothing. NO star anywhere under an item does not mean "never bought" — the
