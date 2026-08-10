@@ -80,15 +80,43 @@ export function useCalcField() {
   } as const;
 }
 
-/** [what it says, what it does]. */
-type Key = readonly [label: string, action: string];
+/**
+ * [what it says, what it does, how it's painted].
+ *
+ * THE LAYOUT IS APPLE'S CALCULATOR, KEY FOR KEY (Mark, 2026-08-10, with a
+ * screenshot: "copy this UI"). Four columns, operators down the right, the
+ * commit where `=` lives — because that is where a hand already expects them,
+ * and this is the one surface in the app that nobody should have to learn.
+ *
+ * Our four function keys take the positions Apple gives `⌫ AC %` and `+/−`:
+ *
+ *     ⌫   C   (   ÷
+ *     7   8   9   ×
+ *     4   5   6   −
+ *     1   2   3   +
+ *     )   0   .   Done
+ *
+ * `(` and `)` are split across the two function corners, which is the one place
+ * this diverges in feel — they'd rather be adjacent. Keeping the right column
+ * purely operators is worth more: it's the column you reach for without
+ * looking.
+ */
+type Key = readonly [label: string, action: string, tone: "fn" | "digit" | "op"];
 
 const KEYS: ReadonlyArray<Key> = [
-  ["7", "7"], ["8", "8"], ["9", "9"], ["÷", "÷"], ["⌫", "back"],
-  ["4", "4"], ["5", "5"], ["6", "6"], ["×", "×"], ["(", "("],
-  ["1", "1"], ["2", "2"], ["3", "3"], ["−", "-"], [")", ")"],
-  ["0", "0"], [".", "."], ["C", "clear"], ["+", "+"], ["Done", "done"],
+  ["⌫", "back", "fn"],  ["C", "clear", "fn"], ["(", "(", "fn"],   ["÷", "÷", "op"],
+  ["7", "7", "digit"],  ["8", "8", "digit"],  ["9", "9", "digit"], ["×", "×", "op"],
+  ["4", "4", "digit"],  ["5", "5", "digit"],  ["6", "6", "digit"], ["−", "-", "op"],
+  ["1", "1", "digit"],  ["2", "2", "digit"],  ["3", "3", "digit"], ["+", "+", "op"],
+  [")", ")", "fn"],     ["0", "0", "digit"],  [".", ".", "digit"], ["Done", "done", "op"],
 ];
+
+/** Apple's dark-mode calculator palette. */
+const TONE: Record<Key[2], string> = {
+  fn: "bg-[#6b6b6d] text-white active:bg-[#8a8a8c]",
+  digit: "bg-[#4d4d4f] text-white active:bg-[#6b6b6d]",
+  op: "bg-[#ff9f0a] text-white active:bg-[#ffb340]",
+};
 
 /**
  * Drive a controlled React input from outside React. Assigning `el.value`
@@ -249,11 +277,18 @@ export function CalcPad() {
 
   return (
     <div
-      // THE SCRIM. z-[80] is above anchored panels (70), the top of the app's
+      // THE CATCHER — full screen, and INVISIBLE (Mark, 2026-08-10: "no
+      // dimming"). z-[80] is above anchored panels (70), the top of the app's
       // ladder: this stands in for the system keyboard, so nothing may cover
-      // it. `bg-black/55` is `ui/Dialog`'s own scrim — the app has one weight
-      // of dimming and this is a second thing that dims, not a new kind.
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 p-4"
+      // it.
+      //
+      // It still covers everything even with nothing painted, which is what
+      // keeps "tap anywhere else to finish" working. Known cost of losing the
+      // dimming, and accepted: the page behind now LOOKS live while it isn't,
+      // so the first tap outside spends itself on dismissing rather than on
+      // whatever you aimed at. That is how every popover in the app behaves,
+      // but the scrim used to say so and now nothing does.
+      className="fixed inset-0 z-[80] flex items-center justify-center p-4"
       // A tap OUTSIDE the pad does what Done does. preventDefault first, or the
       // tap blurs the field by itself and the save happens without us — which
       // is the same outcome by luck rather than by decision, and on a field
@@ -264,53 +299,61 @@ export function CalcPad() {
       }}
     >
       <div
-        // A black border AND a white hairline outside it. The readout band is
-        // `bg-ink`, so on a dark background — the masthead, which the scrim
-        // dims but does not lighten — a black border on a black band has no
-        // edge at all and the pad reads as starting at the keys. The two
-        // hairlines cover each other's blind spot: black shows against the
-        // dimmed page, white against anything dark. No layout cost either way.
-        className="w-[min(24rem,calc(100vw-2rem))] border border-ink bg-white ring-1 ring-white"
+        // THIS PANEL DELIBERATELY DOES NOT LOOK LIKE THE APP (Mark, 2026-08-10,
+        // with a screenshot of macOS Calculator: "copy this UI"). Dark, round
+        // corners, circular keys, orange operators, a drop shadow — four house
+        // rules broken at once.
+        //
+        // The justification isn't that Mark asked, though he did. It's that
+        // this is the one element in the app that ISN'T app chrome: it stands
+        // in for the system keyboard, and a system keyboard has never matched
+        // the app it types into. Looking like the calculator everyone already
+        // owns is the whole point — nobody should have to learn this surface,
+        // and its own conventions carry more than ours would. Every other
+        // control on screen stays black and white and square.
+        //
+        // Keep it self-contained: these literals are the calculator's palette,
+        // not new tokens, and nothing else in the app should reach for them.
+        className="w-[min(21rem,calc(100vw-2rem))] rounded-[22px] bg-[#1c1c1e] p-3 shadow-[0_10px_44px_rgba(0,0,0,0.38)] ring-1 ring-white/10"
         // A tap anywhere on the pad, including its gaps, must not move focus —
-        // and must not reach the scrim, or every key press would also commit.
+        // and must not reach the catcher, or every key press would also commit.
         onPointerDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
         }}
       >
-        {/* THE READOUT — the thing Apple's pad could never give: what you have
-            typed and what it comes to, before you commit it. An expression you
-            can't check is an expression you have to trust.
-
-            Centred behind a scrim it does a second job: the field itself is
-            dimmed and may be off screen entirely, so while the pad is up this
-            IS the field — which is why it's set larger than a table cell. */}
-        <div className="flex min-h-11 items-baseline justify-between gap-3 border-b border-ink bg-ink px-4 py-2.5">
-          <span className="truncate font-mono text-[19px] text-white">
-            {draft || " "}
-          </span>
-          {showsResult && (
-            <span className="shrink-0 font-mono text-[19px] font-bold text-white">
-              = {result}
-            </span>
-          )}
-          {showsRefusal && (
-            <span className="shrink-0 text-[11px] uppercase tracking-[0.12em] text-mark">
-              can&rsquo;t read
-            </span>
-          )}
+        {/* THE READOUT, Apple's way round: the expression small and grey above,
+            what it comes to large and white below, both right-aligned so the
+            digits line up as they grow.
+            
+            It does a second job here that a calculator's doesn't have to. The
+            field being edited is somewhere behind this panel and may be off
+            screen entirely, so while the pad is up this IS the field — which is
+            why it gets two lines and 40px of type rather than a caption. */}
+        <div className="px-3 pb-3 pt-2 text-right">
+          <div className="h-5 truncate font-mono text-[15px] leading-5 text-white/45">
+            {showsResult ? draft : showsRefusal ? "can’t read that" : "\u00a0"}
+          </div>
+          <div
+            className={`truncate font-mono text-[40px] font-light leading-tight ${
+              showsRefusal ? "text-[#ff9f0a]" : "text-white"
+            }`}
+          >
+            {showsResult ? result : draft || "0"}
+          </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-1.5 p-1.5">
-          {KEYS.map(([label, action]) => (
+        <div className="grid grid-cols-4 gap-2.5">
+          {KEYS.map(([label, action, tone]) => (
             <button
               key={label}
               type="button"
               // Act on pointerdown and preventDefault: focus must never leave
               // the field (a blur would save a half-typed expression), and
               // acting here means the key doesn't depend on a compatibility
-              // click arriving after we've cancelled the default. stopPropagation
-              // keeps it off the scrim, whose own handler commits.
+              // click arriving after we've cancelled the default.
+              // stopPropagation keeps it off the catcher, whose own handler
+              // commits.
               onPointerDown={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
@@ -318,16 +361,11 @@ export function CalcPad() {
               }}
               tabIndex={-1}
               aria-label={label}
-              // Done is BLACK, which is the panel-commit exception rather than
-              // a breach of "every button is white": this is a panel producing
-              // one outcome, and its commit sits among character keys rather
-              // than among peer commands. It is also where every keyboard on
-              // earth puts its return key.
-              className={`h-14 border border-ink text-[19px] font-semibold leading-none active:bg-ink active:text-white ${
+              className={`flex aspect-square items-center justify-center rounded-full leading-none ${
                 action === "done"
-                  ? "bg-ink text-[13px] uppercase tracking-[0.08em] text-white"
-                  : "bg-white text-ink"
-              }`}
+                  ? "text-[13px] font-semibold uppercase tracking-[0.04em]"
+                  : "text-[24px] font-normal"
+              } ${TONE[tone]}`}
             >
               {label}
             </button>
