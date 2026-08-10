@@ -58,9 +58,35 @@ const MAX_BYTES = 8 * 1024 * 1024;
 // prose. Two rules the schema layer enforces: every object needs
 // `additionalProperties: false`, and every property must be listed in
 // `required` — optionality is expressed by allowing null, not by omission.
+//
+// **THERE IS A HARD CAP OF 16 UNION-TYPED PARAMETERS PER SCHEMA**, and this
+// schema hit it. A field written `anyOf: [{type}, {type:"null"}]` counts as one
+// union, each declared property counting once however deep it sits, and the
+// Invoices module's eight new header fields plus `alt_product_id` took the
+// total to 21. The API answers a 400 naming the exact numbers ("21 parameters
+// with type arrays or anyOf … limit: 16"), so the failure is at REQUEST time
+// and every read fails — not a bad reading, no reading at all.
+//
+// The budget is spent where null carries meaning that no other value can:
+// **a missing NUMBER is null, and a missing STRING is ""**. That asymmetry is
+// the whole trick. For money, null and zero are different claims — "the page
+// prints no tax line" against "the page prints tax of $0.00" — and collapsing
+// them would make `invoice_total` fail to reconcile against the lines for a
+// reason nobody could see. For text there is no such pair: an empty product ID
+// and an absent one are the same fact, so "" says it without costing a union.
+//
+// `normalizeBlanks` below turns those empty strings back into nulls before the
+// reading is stored, so `purchase_order_attachments.extraction` keeps exactly
+// the shape it has always had and nothing in `web/` changes. Readings stored
+// before this are unaffected.
 // ---------------------------------------------------------------------------
 
 const nullable = (type: string) => ({ anyOf: [{ type }, { type: "null" }] });
+
+// A text field that says "not printed" with an empty string rather than null —
+// see the union-cap note above. Kept as its own name so the intent is legible
+// at each field and a future field picks the right one on purpose.
+const optionalText = { type: "string" };
 
 const INVOICE_SCHEMA = {
   type: "object",
@@ -83,24 +109,24 @@ const INVOICE_SCHEMA = {
     "notes",
   ],
   properties: {
-    vendor_name: nullable("string"),
-    invoice_number: nullable("string"),
-    invoice_date: nullable("string"),
+    vendor_name: optionalText,
+    invoice_number: optionalText,
+    invoice_date: optionalText,
     // When the goods actually moved, if the page says. Kept separate from
     // invoice_date because a distributor bills on a cycle and delivers on a
     // day, and receiving cares about the day — this is what the receiving
     // screen offers as the order's delivery date.
-    ship_date: nullable("string"),
+    ship_date: optionalText,
     // When the money is owed. The single highest-value field for the Invoices
     // module: it is what turns a list of bills into an aging report.
-    due_date: nullable("string"),
-    terms: nullable("string"),
+    due_date: optionalText,
+    terms: optionalText,
     // OUR purchase order number, as the vendor printed it back to us — a free,
     // exact join key that turns "which order is this?" into a lookup. Also
     // declared per LINE below, because a distributor consolidating two orders
     // prints the PO per line, which is precisely the one-invoice-two-orders
     // case the Invoices module has to handle.
-    purchase_order_number: nullable("string"),
+    purchase_order_number: optionalText,
     // The foot of the invoice. These matter because a delivery fee, a fuel
     // surcharge or a container deposit is on the invoice and on NO purchase
     // order line — without somewhere to put them, invoice_total never equals
@@ -133,7 +159,7 @@ const INVOICE_SCHEMA = {
           // The vendor's own SKU. This is the join key — a purchase order line
           // snapshots the same value in `product_id` — so it matters far more
           // than anything else on the line.
-          product_id: nullable("string"),
+          product_id: optionalText,
           // A SECOND number for the same line, when the page prints more than
           // one. Distributors running SAP print both a catalog number and an
           // internal MATERIAL number, and WHICH of them is the one we ordered
@@ -141,16 +167,16 @@ const INVOICE_SCHEMA = {
           // under PRODUCT ID on one line and under MATERIAL on the other three.
           // With one field the model has to choose, and a right answer sits on
           // the page unused.
-          alt_product_id: nullable("string"),
+          alt_product_id: optionalText,
           description: { type: "string" },
           qty: nullable("number"),
           unit_price: nullable("number"),
           extended: nullable("number"),
-          pack: nullable("string"),
+          pack: optionalText,
           // OUR purchase order number for THIS line, when the page prints one
           // per line rather than once at the top. That disagreement between
           // lines is exactly where a consolidated invoice splits.
-          purchase_order_number: nullable("string"),
+          purchase_order_number: optionalText,
         },
       },
     },
@@ -158,18 +184,46 @@ const INVOICE_SCHEMA = {
     // dropped. Named `notes`, not `unreadable`, because a field called
     // "unreadable" invites the model to report only illegibility and stay quiet
     // about the judgements it made, which are just as worth seeing.
-    notes: nullable("string"),
+    notes: optionalText,
   },
 };
+
+// The empty strings the schema asks for, turned back into the nulls every
+// reader already expects. Applied once, to the whole parsed answer, before it
+// is stored — so `extraction` keeps the shape it has had since migration 019
+// and nothing in `web/src` needs to learn about the sentinel.
+//
+// It walks every string in the tree rather than naming fields, which is safe
+// here because the schema has no string whose empty value is meaningful:
+// `description` is the only required-non-null string, and a line described by
+// nothing is a line with nothing to show either way.
+function normalizeBlanks(value: unknown): unknown {
+  if (typeof value === "string") return value.trim() === "" ? null : value;
+  if (Array.isArray(value)) return value.map(normalizeBlanks);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([k, v]) => [
+        k,
+        normalizeBlanks(v),
+      ])
+    );
+  }
+  return value;
+}
 
 const PROMPT = `You are reading a supplier invoice for a bakery's receiving desk.
 
 Transcribe every line item exactly as printed. Do not compute, correct, or
 tidy: if the arithmetic on the page is wrong, report what is printed.
 
+HOW TO SAY "NOT PRINTED": for a TEXT field use an empty string ""; for a NUMBER
+or true/false field use null. Both mean the same thing — the page does not show
+it — and neither is ever a guess. Never write the words "N/A", "unknown", "-"
+or "none" into a text field; an empty string is how that is said.
+
 - product_id is the SUPPLIER'S item or SKU number for that line, as printed.
   It is the single most important field — it is what this invoice gets matched
-  against. If a line has no printed item number, use null; never invent one and
+  against. If a line has no printed item number, use ""; never invent one and
   never substitute a different number from the row.
 - alt_product_id is a SECOND item number printed for the same line, when the
   page carries more than one such column. Distributors commonly print both a
@@ -178,7 +232,7 @@ tidy: if the arithmetic on the page is wrong, report what is printed.
   the item or product number in product_id and the other in alt_product_id.
   Report BOTH whenever both are printed, even if one column is blank on this
   particular row — a blank PRODUCT ID with a filled MATERIAL means product_id
-  is null and alt_product_id carries the material number. Use null when the
+  is "" and alt_product_id carries the material number. Use "" when the
   line really does show only one number, and never repeat the same number in
   both fields. Do not put a quantity, a price, a case count, a purchase order
   number or a line number here; only an identifier for the ITEM.
@@ -190,20 +244,21 @@ tidy: if the arithmetic on the page is wrong, report what is printed.
   does — a line billed by actual weight, say — report the rate as printed and
   say so in "notes"; do not adjust a number to make the arithmetic close.
 - pack is the pack or size text if the line shows one ("12 x 32 oz", "CS").
-- Use null for any field not printed on that line. Do not guess.
+- For any field not printed on that line, say so the way that field's type
+  requires — "" for text, null for numbers. Do not guess.
 - Skip subtotal, tax, delivery, and total rows — those are not line items.
   Put the invoice's grand total in invoice_total, and the foot amounts in the
   header fields described below.
 - ship_date is the date the goods MOVED, taken from a field the page labels as
   such: Ship Date, Date Shipped, Delivered, Delivery Date, Service Date. Many
-  invoices print no such field — use null then. Never copy the invoice date
+  invoices print no such field — use "" then. Never copy the invoice date
   into it, and never take an order date, a due date, or a payment-terms date:
   those are different facts and one of them being wrong here would put the
   wrong day on a purchase order.
 - due_date is the date payment is DUE, taken only from a field the page labels
   as such: Due Date, Payment Due, Pay By. Never derive it from the terms — "Net
   30" is not a date, and computing one would put an invented deadline on a bill.
-  Use null when no due date is printed.
+  Use "" when no due date is printed.
 - terms is the payment terms exactly as printed ("Net 30", "COD", "2% 10 Net
   30"). Transcribe, do not normalize: "30 days" stays "30 days".
 - invoice_date, ship_date and due_date as YYYY-MM-DD.
@@ -212,9 +267,9 @@ tidy: if the arithmetic on the page is wrong, report what is printed.
   Number, Purchase Order, Customer Order, Order No. or similar. It is NOT the
   invoice number, and it is NOT an internal order, pick, route or reference
   number the vendor generated for itself. If one number at the top covers the
-  whole page, put it in the header field and leave every line's null. If the
+  whole page, put it in the header field and leave every line's "". If the
   page prints a purchase order number per LINE and they differ, report each on
-  its own line. Use null when no customer order number appears at all.
+  its own line. Use "" when no customer order number appears at all.
 - subtotal, tax, freight and other_charges are the amounts printed at the FOOT
   of the invoice. Never compute them and never derive one from the others. A
   delivery charge, fuel surcharge or drop fee is freight; a container deposit,
@@ -409,7 +464,10 @@ Deno.serve(async (req) => {
 
     let extraction: unknown;
     try {
-      extraction = JSON.parse(text.text);
+      // Normalized on the way in, not on the way out: the empty strings are an
+      // artifact of the union cap (see the schema note above) and no reader
+      // should ever meet one.
+      extraction = normalizeBlanks(JSON.parse(text.text));
     } catch {
       return json(502, { error: "the model's answer was not valid JSON" });
     }
