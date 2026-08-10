@@ -90,9 +90,6 @@ const KEYS: ReadonlyArray<Key> = [
   ["0", "0"], [".", "."], ["C", "clear"], ["+", "+"], ["Done", "done"],
 ];
 
-/** Keep in step with the grid below; the scroll-clear check reads it. */
-const PAD_H = 292;
-
 /**
  * Drive a controlled React input from outside React. Assigning `el.value`
  * directly is swallowed — React's value tracker sees no change, `onChange`
@@ -146,20 +143,38 @@ export function CalcPad() {
     return () => target.removeEventListener("input", read);
   }, [target]);
 
-  // KEEP THE FIELD IN SIGHT. With no system keyboard, Safari has nothing to
-  // scroll for and won't — so a field near the foot of the window would sit
-  // behind the pad, which is the one way this could be worse than what it
-  // replaced. Deferred a tick so the pad is laid out and any pane the field
-  // lives in has settled.
+  /**
+   * A STRANDED SCRIM IS THE WORST THING THIS COULD DO, so don't rely on
+   * `focusout` alone to take it down.
+   *
+   * `InlineValue` unmounts its input on Escape and after a save, and a focused
+   * element being removed is exactly the case where browsers have historically
+   * disagreed about firing blur/focusout — WebKit especially, which is what
+   * this runs on. If it doesn't fire, the pad is left pointing at a detached
+   * node with a full-screen scrim over the app and every key inert: it reads as
+   * the app having frozen, and only a reload clears it.
+   *
+   * So watch for the target leaving the document and drop it. Cheap in the way
+   * that matters — the observer exists only while the pad is up, and its
+   * callback is one `isConnected` read.
+   */
   useEffect(() => {
-    if (!target || !coarse) return;
-    const id = setTimeout(() => {
-      const covered =
-        target.getBoundingClientRect().bottom > window.innerHeight - PAD_H - 16;
-      if (covered) target.scrollIntoView({ block: "center" });
-    }, 60);
-    return () => clearTimeout(id);
-  }, [target, coarse]);
+    if (!target) return;
+    const observer = new MutationObserver(() => {
+      if (!target.isConnected) setTarget(null);
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    return () => observer.disconnect();
+  }, [target]);
+
+  // NOTHING SCROLLS THE FIELD INTO VIEW ANY MORE, and that's the point of
+  // centring (Mark, 2026-08-10: "can it appear as an overlay center of the
+  // screen with a dim background"). While the pad sat at the foot of the window
+  // it could cover the very field you were editing, so it measured and scrolled
+  // — a lurch under your hands at the moment you started typing. Centred behind
+  // a scrim there is nothing to avoid: everything else is dimmed anyway, and
+  // the readout IS the field while the pad is up. The page stays exactly where
+  // you left it.
 
   if (!target || !coarse) return null;
 
@@ -210,7 +225,15 @@ export function CalcPad() {
     }
     // Every field commits on blur — InlineValue saves, the guide's boxes
     // upsert — so leaving IS the commit, and one route out keeps them uniform.
-    if (action === "done") return el.blur();
+    // Clearing `target` as well is belt and braces: normally the blur's own
+    // focusout does it, and on a detached node (see the observer above) blur is
+    // a no-op, so without this a tap on the scrim couldn't dismiss the pad
+    // either. Idempotent when focusout does arrive.
+    if (action === "done") {
+      el.blur();
+      setTarget(null);
+      return;
+    }
     write(action);
   }
 
@@ -226,60 +249,90 @@ export function CalcPad() {
 
   return (
     <div
-      // Above anchored panels (70), the top of the app's ladder: this stands in
-      // for the system keyboard, so nothing may cover it.
-      className="fixed bottom-4 left-1/2 z-[80] w-[min(22rem,calc(100vw-2rem))] -translate-x-1/2 border border-ink bg-white"
-      // A tap anywhere on the pad, including its gaps, must not move focus.
-      onPointerDown={(e) => e.preventDefault()}
+      // THE SCRIM. z-[80] is above anchored panels (70), the top of the app's
+      // ladder: this stands in for the system keyboard, so nothing may cover
+      // it. `bg-black/55` is `ui/Dialog`'s own scrim — the app has one weight
+      // of dimming and this is a second thing that dims, not a new kind.
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-black/55 p-4"
+      // A tap OUTSIDE the pad does what Done does. preventDefault first, or the
+      // tap blurs the field by itself and the save happens without us — which
+      // is the same outcome by luck rather than by decision, and on a field
+      // whose editor unmounts on blur it would race the commit.
+      onPointerDown={(e) => {
+        e.preventDefault();
+        press("done");
+      }}
     >
-      {/* THE READOUT — the thing Apple's pad could never give: what you have
-          typed and what it comes to, before you commit it. An expression you
-          can't check is an expression you have to trust. */}
-      <div className="flex items-baseline justify-between gap-3 border-b border-ink bg-ink px-3 py-2">
-        <span className="truncate font-mono text-[15px] text-white">
-          {draft || " "}
-        </span>
-        {showsResult && (
-          <span className="shrink-0 font-mono text-[15px] font-bold text-white">
-            = {result}
-          </span>
-        )}
-        {showsRefusal && (
-          <span className="shrink-0 text-[11px] uppercase tracking-[0.12em] text-mark">
-            can&rsquo;t read
-          </span>
-        )}
-      </div>
+      <div
+        // A black border AND a white hairline outside it. The readout band is
+        // `bg-ink`, so on a dark background — the masthead, which the scrim
+        // dims but does not lighten — a black border on a black band has no
+        // edge at all and the pad reads as starting at the keys. The two
+        // hairlines cover each other's blind spot: black shows against the
+        // dimmed page, white against anything dark. No layout cost either way.
+        className="w-[min(24rem,calc(100vw-2rem))] border border-ink bg-white ring-1 ring-white"
+        // A tap anywhere on the pad, including its gaps, must not move focus —
+        // and must not reach the scrim, or every key press would also commit.
+        onPointerDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
+        {/* THE READOUT — the thing Apple's pad could never give: what you have
+            typed and what it comes to, before you commit it. An expression you
+            can't check is an expression you have to trust.
 
-      <div className="grid grid-cols-5 gap-1.5 p-1.5">
-        {KEYS.map(([label, action]) => (
-          <button
-            key={label}
-            type="button"
-            // Act on pointerdown and preventDefault: focus must never leave the
-            // field (a blur would save a half-typed expression), and acting
-            // here means the key doesn't depend on a compatibility click
-            // arriving after we've cancelled the default.
-            onPointerDown={(e) => {
-              e.preventDefault();
-              press(action);
-            }}
-            tabIndex={-1}
-            aria-label={label}
-            // Done is BLACK, which is the panel-commit exception rather than a
-            // breach of "every button is white": this is a panel producing one
-            // outcome, and its commit sits among character keys rather than
-            // among peer commands. It is also where every keyboard on earth
-            // puts its return key.
-            className={`h-12 border border-ink text-[17px] font-semibold leading-none active:bg-ink active:text-white ${
-              action === "done"
-                ? "bg-ink text-[13px] uppercase tracking-[0.08em] text-white"
-                : "bg-white text-ink"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+            Centred behind a scrim it does a second job: the field itself is
+            dimmed and may be off screen entirely, so while the pad is up this
+            IS the field — which is why it's set larger than a table cell. */}
+        <div className="flex min-h-11 items-baseline justify-between gap-3 border-b border-ink bg-ink px-4 py-2.5">
+          <span className="truncate font-mono text-[19px] text-white">
+            {draft || " "}
+          </span>
+          {showsResult && (
+            <span className="shrink-0 font-mono text-[19px] font-bold text-white">
+              = {result}
+            </span>
+          )}
+          {showsRefusal && (
+            <span className="shrink-0 text-[11px] uppercase tracking-[0.12em] text-mark">
+              can&rsquo;t read
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-5 gap-1.5 p-1.5">
+          {KEYS.map(([label, action]) => (
+            <button
+              key={label}
+              type="button"
+              // Act on pointerdown and preventDefault: focus must never leave
+              // the field (a blur would save a half-typed expression), and
+              // acting here means the key doesn't depend on a compatibility
+              // click arriving after we've cancelled the default. stopPropagation
+              // keeps it off the scrim, whose own handler commits.
+              onPointerDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                press(action);
+              }}
+              tabIndex={-1}
+              aria-label={label}
+              // Done is BLACK, which is the panel-commit exception rather than
+              // a breach of "every button is white": this is a panel producing
+              // one outcome, and its commit sits among character keys rather
+              // than among peer commands. It is also where every keyboard on
+              // earth puts its return key.
+              className={`h-14 border border-ink text-[19px] font-semibold leading-none active:bg-ink active:text-white ${
+                action === "done"
+                  ? "bg-ink text-[13px] uppercase tracking-[0.08em] text-white"
+                  : "bg-white text-ink"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
