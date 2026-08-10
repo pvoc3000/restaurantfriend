@@ -29,3 +29,23 @@
  */
 export const DANGER_BUTTON_CLASS =
   "h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35";
+
+/**
+ * The ordinary command button — the ONE button this design system has.
+ *
+ * `DANGER_BUTTON_CLASS` has been here since the sweep and this one hadn't,
+ * which is backwards: the red exception was shared while the rule it excepts
+ * was retyped at every call site. That cost exactly what you would expect
+ * (Mark, 2026-08-09: "the add batch button looks bigger than the mark complete
+ * button") — the batch log had `px-4 py-2 text-[13px]` on one and a local
+ * `h-8 px-3 text-[11px]` on another, sitting in the same row as an `h-9` Delete,
+ * so three commands that do the same KIND of thing came out three heights.
+ *
+ * It is deliberately dimension-for-dimension the red one, minus the colour: a
+ * destructive command and an ordinary one differ in what they mean, not in how
+ * big they are, and now they cannot drift apart.
+ *
+ * Positional classes stay at the CALL SITE, same rule as above.
+ */
+export const BUTTON_CLASS =
+  "inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";

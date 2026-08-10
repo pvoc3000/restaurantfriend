@@ -3,11 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { batchDate } from "@/lib/productionBatches";
 
-const COMMAND =
-  "inline-flex h-8 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-3 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+// The shared weight, so this row's commands cannot come out a different height
+// from the Delete beside them (`ui/buttons`). `shrink-0` is positional and so
+// stays here.
+const COMMAND = `${BUTTON_CLASS} shrink-0`;
 
 /**
  * The commands on one batch log: close it, reopen it, delete it.

@@ -5,15 +5,17 @@
 // gallons instead of twelve), and a par comparison that treats a missing or
 // differently-united par as zero, which calls every batch a success.
 
-import { test, eq, ok } from "./harness";
+import { eq, no, ok, test } from "./harness";
 import {
   BATCH_STATUSES,
   BATCH_STATUS_LABEL,
-  isBatchOutstanding,
-  describeAmount,
   amountTotal,
-  yieldAgainstPar,
   batchDate,
+  batchMadeNothing,
+  batchStatusTone,
+  describeAmount,
+  isBatchOutstanding,
+  yieldAgainstPar,
 } from "../../src/lib/productionBatches";
 
 /* -- status --------------------------------------------------------------- */
@@ -146,4 +148,45 @@ test("batchDate does not shift west of Greenwich", () => {
   eq(batchDate("2026-08-10"), "Mon 8/10");
   eq(batchDate("2026-01-01"), "Thu 1/1");
   process.env.TZ = before;
+});
+
+/* -- status colour, and what counts as "made nothing" ---------------------- */
+
+test("batchStatusTone: three statuses carry a colour and two deliberately don't", () => {
+  eq(batchStatusTone("complete"), "text-[var(--rf-green-600)]", "complete is green");
+  eq(batchStatusTone("to_do"), "text-accent", "to do is red");
+  eq(batchStatusTone("skipped"), "text-faint", "skipped is the LIGHTER grey");
+  eq(batchStatusTone("in_progress"), "", "in progress is uncoloured");
+  eq(batchStatusTone("test"), "", "test is uncoloured");
+  eq(batchStatusTone("something_new"), "", "an unknown status never guesses a colour");
+});
+
+test("batchMadeNothing: a recorded ZERO is not a blank, and neither is a lone size", () => {
+  // FileMaker writes `0 × 3 gal` constantly — somebody stating that nothing came
+  // out. Dimming only the empty cell left these reading as a normal round.
+  ok(
+    batchMadeNothing({ status: "complete", yield_count: 0, yield_size: 3 }),
+    "0 × 3 made nothing"
+  );
+  ok(
+    batchMadeNothing({ status: "complete", yield_count: null, yield_size: null }),
+    "nothing recorded made nothing"
+  );
+  ok(
+    batchMadeNothing({ status: "skipped", yield_count: 4, yield_size: 1.5 }),
+    "skipped wins even with a yield on the row"
+  );
+  // The one a naive `!yield_count` gets wrong: a single 3-gallon tub, count null.
+  no(
+    batchMadeNothing({ status: "complete", yield_count: null, yield_size: 3 }),
+    "a lone size IS a real amount"
+  );
+  no(
+    batchMadeNothing({ status: "complete", yield_count: 4, yield_size: 1.5 }),
+    "4 × 1.5 made something"
+  );
+  no(
+    batchMadeNothing({ status: "to_do", yield_count: 2, yield_size: 22 }),
+    "an unfinished batch that already has a yield made something"
+  );
 });

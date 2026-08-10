@@ -17,6 +17,15 @@ export type BatchFieldsRow = {
   operator_employee_id: string | null;
   recipe_version_id: string | null;
   recipe_version_label: string | null;
+  /**
+   * The element's MASTER version, for the Recipe tab to fall back to.
+   *
+   * A fallback and never a substitute: a batch that names a version is read
+   * against THAT one, because making the master current must not rewrite what
+   * last month's batch says it followed. Only a batch with no version at all —
+   * anything logged by hand — borrows the master.
+   */
+  masterVersionId: string | null;
   scale_label: string | null;
   batch_amount: number | null;
   batch_unit: string | null;
@@ -34,6 +43,8 @@ export type BatchFieldsRow = {
   photo_name: string | null;
   photoUrl: string | null;
   generated: boolean;
+  /** From FileMaker (046) — see `BatchRow.migrated`. */
+  migrated: boolean;
 };
 
 /**
@@ -47,6 +58,13 @@ export type BatchFieldsRow = {
  * what the round ASKED for and what the kitchen KEEPS sit above what was
  * actually there and what came out, so the two measurements read against the
  * two claims rather than against each other.
+ *
+ * THREE COLUMNS, and they are FMP's own (Mark, 2026-08-09, with the screenshot):
+ * the fields, then the photograph over the notes, then the element's HISTORY.
+ * The amounts used to have a column to themselves and now sit with the fields,
+ * which is what makes room for the third — and reads better besides, because
+ * "on hand 3 × 1.5 gal" is a fact about this batch in the same way its status
+ * is, not a separate register.
  */
 export function BatchFields({
   row,
@@ -54,6 +72,8 @@ export function BatchFields({
   operators,
   versions,
   editable,
+  history,
+  fill = false,
 }: {
   row: BatchFieldsRow;
   orgId: string;
@@ -61,20 +81,56 @@ export function BatchFields({
   /** The element's own recipe versions. Empty when it has none. */
   versions: PickOption[];
   editable: boolean;
+  /**
+   * The third column — every previous making of this element. Passed in rather
+   * than rendered here because it is the one part of the pane that fetches, and
+   * this component is otherwise pure props.
+   */
+  history?: React.ReactNode;
+  /**
+   * Take the pane's height and let each COLUMN scroll itself, rather than
+   * sitting at content height inside one scroller.
+   *
+   * Only above `lg`, where the pane is pinned and has a definite height to
+   * divide. Stacked, the three columns are one on top of another and the tab
+   * scrolls as a whole — giving them a share of a height there would hand an
+   * iPad three ~150px boxes inside a scrolling page.
+   */
+  fill?: boolean;
 }) {
   return (
-    <div className="grid gap-x-8 gap-y-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)]">
-      {/* -- what it is ---------------------------------------------------- */}
-      <dl className="grid gap-x-6 gap-y-3 text-sm sm:grid-cols-2">
+    <div
+      // THE HISTORY IS THE WIDE ONE (Mark, 2026-08-09: "make the History list in
+      // the detail pane wide. There's room"). It carries five columns of figures
+      // where the photo/notes column carries a thumbnail and a line of text, so
+      // the middle track gives up most of its share. Measured at 1512: history
+      // 470px against 300, which stops Made wrapping "0 × 3 gal" onto two lines
+      // and lets a note sit on one.
+      className={`grid gap-x-8 gap-y-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.65fr)_minmax(0,1.75fr)] ${
+        fill ? "min-h-0 flex-1" : ""
+      }`}
+    >
+      {/* -- what it is, and the four amounts ------------------------------ */}
+      {/* Each column carries its OWN scroll in fill mode. The fields are a
+          fixed set and rarely need it; the notes and the history both can, and
+          a column that scrolls its neighbours' content is the thing this
+          layout exists to avoid. */}
+      <dl
+        className={`grid grid-cols-[7.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1.5 text-sm ${
+          fill ? "min-h-0 overflow-y-auto pr-1" : ""
+        }`}
+      >
         <Field label="Status">
           {editable ? (
+            // Uppercase on the CONTROL — a wrapper's `text-transform` never
+            // reaches a button (the reset sets it to none).
             <InlineValue
               table="production_batches" id={row.id} column="status" kind="pick"
               nullable={false} options={BATCH_STATUS_OPTIONS}
-              value={row.status} ariaLabel="Batch status"
+              value={row.status} className="uppercase" ariaLabel="Batch status"
             />
           ) : (
-            <span className={READ_ONLY_VALUE}>
+            <span className={`${READ_ONLY_VALUE} uppercase`}>
               {BATCH_STATUS_LABEL[row.status as keyof typeof BATCH_STATUS_LABEL] ?? row.status}
             </span>
           )}
@@ -86,7 +142,7 @@ export function BatchFields({
               editing it would make the record claim to be a different one. */}
           <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
             {row.batch_number}
-            {row.generated ? "" : " · by hand"}
+            {row.generated || row.migrated ? "" : " · by hand"}
           </span>
         </Field>
 
@@ -129,20 +185,6 @@ export function BatchFields({
           )}
         </Field>
 
-        <Field label="Scale">
-          {editable ? (
-            <InlineValue
-              table="production_batches" id={row.id} column="scale_label"
-              value={row.scale_label} ariaLabel="Which batch size was run"
-            />
-          ) : (
-            <span className={`${READ_ONLY_VALUE} text-muted`}>{row.scale_label ?? "—"}</span>
-          )}
-        </Field>
-      </dl>
-
-      {/* -- the four amounts ---------------------------------------------- */}
-      <dl className="grid gap-x-6 gap-y-3 text-sm">
         <Field label="Asked for">
           <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
             {describeAmount(row.batch_amount, null, row.batch_unit)}
@@ -161,8 +203,16 @@ export function BatchFields({
         </Field>
       </dl>
 
-      {/* -- notes and the photograph -------------------------------------- */}
-      <div className="space-y-4">
+      {/* -- the photograph, and the notes --------------------------------- */}
+      <div className={`space-y-4 ${fill ? "min-h-0 overflow-y-auto pr-1" : ""}`}>
+        <BatchPhoto
+          batchId={row.id}
+          orgId={orgId}
+          url={row.photoUrl}
+          path={row.photo_path}
+          name={row.photo_name}
+          editable={editable}
+        />
         <div>
           <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
             Notes
@@ -178,15 +228,12 @@ export function BatchFields({
             )}
           </dd>
         </div>
-        <BatchPhoto
-          batchId={row.id}
-          orgId={orgId}
-          url={row.photoUrl}
-          path={row.photo_path}
-          name={row.photo_name}
-          editable={editable}
-        />
       </div>
+
+      {/* -- every previous making of this element --------------------------
+          `min-h-0` and nothing else: the history component takes the height and
+          scrolls its own rows (see its `fill`). */}
+      <div className={fill ? "flex min-h-0 flex-col" : ""}>{history}</div>
     </div>
   );
 }
@@ -221,7 +268,9 @@ function Triple({
     );
   }
   return (
-    <span className="flex flex-wrap items-baseline gap-1">
+    // NO WRAP: a count, an × and a size are one reading, and broken over three
+    // lines they read as three empty fields.
+    <span className="flex items-baseline gap-1">
       <InlineValue
         table="production_batches" id={row.id} column={`${prefix}_count`} kind="number"
         value={count} ariaLabel={`${what} count`}
@@ -239,11 +288,23 @@ function Triple({
   );
 }
 
+/**
+ * A LABEL BESIDE ITS VALUE, not over it — FileMaker's own arrangement, and here
+ * it is load-bearing rather than cosmetic.
+ *
+ * Stacked in two columns, each field got ~145px, which is narrower than a
+ * `Triple` — so "3 × 1.5 gal" wrapped to three lines and the two amounts that
+ * matter most read as six stray em dashes. Beside its label each field has the
+ * column's full width, the pane is ten short rows instead of five tall ones,
+ * and it fits the fixed height without scrolling.
+ */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{label}</dt>
-      <dd className="mt-0.5">{children}</dd>
-    </div>
+    <>
+      <dt className="pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+        {label}
+      </dt>
+      <dd className="min-w-0">{children}</dd>
+    </>
   );
 }

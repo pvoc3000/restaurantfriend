@@ -62,26 +62,43 @@ export async function BatchLogRecord({
   }
   if (!log) notFound();
 
-  const [{ data: batches, error: itemErr }, { data: employees }, { data: members }] =
-    await Promise.all([
-      supabase
-        .from("production_batches")
-        .select(
-          `id, log_id, element_id, is_generated, batch_number,
-           batch_label, sort, status, operator_employee_id,
-           recipe_version_id, recipe_version_label, scale_label,
-           batch_amount, batch_unit,
-           par_count, par_size, par_unit,
-           on_hand_count, on_hand_size, on_hand_unit,
-           yield_count, yield_size, yield_unit, notes, photo_path, photo_name,
-           production_elements ( name, element_type )`
-        )
-        .eq("log_id", id),
-      // 044's definer — `employees` READ is owner/admin only (020), so this is
-      // the only way a supervisor can name who made something.
-      supabase.rpc("production_operators", { p_location_id: log.location_id as string }),
-      supabase.from("org_members").select("user_id, display_name"),
-    ]);
+  const BATCH_COLUMNS = `id, log_id, element_id, is_generated, batch_number,
+     batch_label, sort, status, operator_employee_id,
+     recipe_version_id, recipe_version_label, scale_label,
+     batch_amount, batch_unit,
+     par_count, par_size, par_unit,
+     on_hand_count, on_hand_size, on_hand_unit,
+     yield_count, yield_size, yield_unit, notes, photo_path, photo_name,
+     production_elements ( name, element_type )`;
+
+  const [batchesResult, { data: employees }, { data: members }] = await Promise.all([
+    supabase
+      .from("production_batches")
+      .select(`${BATCH_COLUMNS}, legacy_id`)
+      .eq("log_id", id),
+    // 044's definer — `employees` READ is owner/admin only (020), so this is
+    // the only way a supervisor can name who made something.
+    supabase.rpc("production_operators", { p_location_id: log.location_id as string }),
+    supabase.from("org_members").select("user_id, display_name"),
+  ]);
+
+  // ONE RETRY WITHOUT `legacy_id`, for the window before 046 is applied.
+  //
+  // Every other screen in this app announces a missing column rather than
+  // hiding it — 018's and 019's pattern — and that is right where the column is
+  // the POINT of the block. Here it decides one asterisk. Taking a thirty-row
+  // work list down over a marker would be the tail wagging the dog, so the
+  // select degrades instead, and the only visible consequence is that a
+  // migrated batch would read "by hand" — which cannot happen anyway, since
+  // nothing is migrated until the migration this column comes from is applied.
+  //
+  // It costs a second round trip exactly once per page load in that window, and
+  // never afterwards. Delete the fallback when 046 has been applied everywhere.
+  const missingLegacyId =
+    batchesResult.error !== null && /legacy_id/.test(batchesResult.error.message);
+  const { data: batches, error: itemErr } = missingLegacyId
+    ? await supabase.from("production_batches").select(BATCH_COLUMNS).eq("log_id", id)
+    : batchesResult;
 
   const nameById = new Map(
     ((employees ?? []) as { id: string; name: string }[]).map((e) => [e.id, e.name])
@@ -127,6 +144,9 @@ export async function BatchLogRecord({
     : { data: [] };
 
   const versionsByElement: Record<string, { value: string; label: string; hint?: string }[]> = {};
+  // The element's MASTER, which the pane's Recipe tab falls back to for a batch
+  // that names no version of its own — see `BatchFieldsRow.masterVersionId`.
+  const masterByElement = new Map<string, string>();
   for (const v of (versionRows ?? []) as unknown as {
     id: string;
     version_label: string;
@@ -139,7 +159,22 @@ export async function BatchLogRecord({
       label: v.version_label,
       hint: v.is_master ? "master" : undefined,
     });
+    // 036 enforces one master per FAMILY with a partial unique index, and an
+    // element can carry several families — so first master wins rather than
+    // last, which keeps the answer stable under the query's own order.
+    if (v.is_master && !masterByElement.has(key)) masterByElement.set(key, v.id);
   }
+
+  /**
+   * Did this batch come from FileMaker?
+   *
+   * Read through a cast because the two selects above differ by one column, so
+   * the union type has no `legacy_id` on it — which is the fallback working as
+   * designed rather than a hole. `!= null` catches undefined (the degraded
+   * select) and null (an app row) with one test.
+   */
+  const migratedOf = (b: unknown) =>
+    (b as { legacy_id?: string | null }).legacy_id != null;
 
   const fields: Record<string, BatchFieldsRow> = {};
 
@@ -170,6 +205,7 @@ export async function BatchLogRecord({
       yield_size: num(b.yield_size),
       yield_unit: (b.yield_unit ?? null) as string | null,
       generated: (b.is_generated ?? false) as boolean,
+      migrated: migratedOf(b),
       notes: (b.notes ?? null) as string | null,
       hasPhoto: b.photo_path !== null,
     };
@@ -188,6 +224,9 @@ export async function BatchLogRecord({
       operator_employee_id: (b.operator_employee_id ?? null) as string | null,
       recipe_version_id: (b.recipe_version_id ?? null) as string | null,
       recipe_version_label: (b.recipe_version_label ?? null) as string | null,
+      masterVersionId: b.element_id
+        ? masterByElement.get(b.element_id as string) ?? null
+        : null,
       scale_label: (b.scale_label ?? null) as string | null,
       batch_amount: num(b.batch_amount),
       batch_unit: (b.batch_unit ?? null) as string | null,
@@ -205,6 +244,7 @@ export async function BatchLogRecord({
       photo_name: (b.photo_name ?? null) as string | null,
       photoUrl: path ? signedByPath.get(path) ?? null : null,
       generated: (b.is_generated ?? false) as boolean,
+      migrated: migratedOf(b),
     };
   }
 
@@ -268,7 +308,22 @@ export async function BatchLogRecord({
           )}
         </span>
 
-        <span className="ml-auto">
+        {/* Add batch sits to the LEFT of Mark complete (Mark, 2026-08-09), in
+            the log's own command cluster rather than in the table's filter row.
+            It is a command about the LOG — it adds a line to this document —
+            where the row it used to share holds controls that change what the
+            list SHOWS. Reading right to left the cluster is now destructive,
+            terminal, additive, which is the order the PO screens already use. */}
+        <span className="ml-auto flex items-center gap-3">
+          {editable ? (
+            <NewBatch
+              orgId={session.membership.org_id}
+              logId={id}
+              locationId={log.location_id as string}
+              locationCode={kitchenCode}
+              logDate={logDate}
+            />
+          ) : null}
           <BatchLogActions
             logId={id}
             status={(log.status ?? "open") as string}
@@ -298,17 +353,6 @@ export async function BatchLogRecord({
           locationId={log.location_id as string}
           editable={editable}
           removable={removable}
-          add={
-            editable ? (
-              <NewBatch
-                orgId={session.membership.org_id}
-                logId={id}
-                locationId={log.location_id as string}
-                locationCode={kitchenCode}
-                logDate={logDate}
-              />
-            ) : null
-          }
         />
       )}
     </div>

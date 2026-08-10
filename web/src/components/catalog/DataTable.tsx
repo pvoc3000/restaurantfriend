@@ -119,6 +119,24 @@ export type DataGroup<T> = {
    * caller's comparator must sort by the sub-key within each run.
    */
   subLabel?: (row: T) => string;
+  /**
+   * Open each run with a HEADING — black caps text over a rule — instead of the
+   * filled black band.
+   *
+   * Mark, 2026-08-09, on the batch log: "the bands in the list don't need to be
+   * black. Black all caps text should suffice." That is not a second opinion
+   * about the band; it is the FileMaker screen beside it. FMP bands the DATE in
+   * black and sets the item type under it as underlined black text — and a log
+   * has ONE date, so the only grouping left on this screen is the one FMP
+   * itself renders as a heading. This is exactly `subLabel`'s treatment,
+   * promoted to the top level for a table whose runs never have a band above
+   * them.
+   *
+   * It is also the lighter mark for a lighter break, which is the distinction
+   * the plan matrix already draws between its type band and its cut heading.
+   * Everything else keeps the band — one style per weight, not per caller.
+   */
+  heading?: boolean;
 };
 
 /**
@@ -151,6 +169,7 @@ export function DataTable<T>({
   onSortChange,
   columnChooser = false,
   leading,
+  dense = false,
 }: {
   rows: T[];
   columns: DataColumn<T>[];
@@ -262,6 +281,22 @@ export function DataTable<T>({
    * table.
    */
   leading?: ReactNode;
+  /**
+   * Tighter rows — 36px against the standard 56.
+   *
+   * For a table that shares its screen with a PINNED DETAIL PANE, where every
+   * pixel a row spends is one the list doesn't have: the batch log's frame is
+   * one viewport tall and the pane under it takes a fixed slice, so 56px rows
+   * left about six of thirty batches on screen (Mark, 2026-08-09: "tighten up
+   * the line height on the list items"). FileMaker's own batch log runs ~29px
+   * and fits the whole round.
+   *
+   * NOT a general density setting to sprinkle about. 56px is the standard
+   * because it is a comfortable touch target, and giving that up is only worth
+   * it where the list is half a screen and you are picking from it rather than
+   * reading it.
+   */
+  dense?: boolean;
 }) {
   const defaultWidths = useMemo<ColumnWidths>(
     () => Object.fromEntries(columns.map((c) => [c.key, c.width])),
@@ -300,7 +335,17 @@ export function DataTable<T>({
   // A pane ends where the window does, unless the caller named a height. Same
   // hazard, same guard: a paned table that starts empty would otherwise keep
   // whatever height it first computed against a pane that wasn't there.
-  useFillViewportHeight(paneRef, scroll && !maxHeightClass && rows.length > 0);
+  //
+  // `!fill` IS LOAD-BEARING and was missing (Mark, 2026-08-09: "the list doesn't
+  // seem attached to split view… if you drag the split view past it the list
+  // stops resizing"). In fill mode the PARENT owns the height — that is the
+  // whole meaning of the prop — so measuring the window here writes a second,
+  // competing answer onto the same node. On the batch log the two disagreed the
+  // moment the divider moved: the flex-basis said "58% of the frame" and this
+  // hook said "as far as the window minus what follows you", and the smaller
+  // won. Dragging down past that point did nothing at all, which reads exactly
+  // as the list not being part of the split.
+  useFillViewportHeight(paneRef, scroll && !fill && !maxHeightClass && rows.length > 0);
 
   // COMPACT: below `compactBelow` the marked columns come out, so the table
   // narrows enough to fit — which is what lets its labels stick. A threshold of
@@ -616,19 +661,43 @@ export function DataTable<T>({
                       ActionBar — and it's the mark FMP used for exactly this.
                       One style for every list that groups, not a per-caller
                       option: the same argument the TabPicker settled. */}
-                  {startsGroup && (
-                    <tr className="bg-ink text-white">
-                      <td
-                        colSpan={visibleColumns.length}
-                        className="px-3 py-2 text-xs font-semibold tracking-[0.12em] uppercase"
-                      >
-                        {label}
-                        <span className="ml-2 font-normal tracking-normal text-white/55 normal-case">
-                          {groupRows.get(label)?.length ?? 0}
-                        </span>
-                      </td>
-                    </tr>
-                  )}
+                  {startsGroup &&
+                    (banding!.heading ? (
+                      // The lighter mark — see DataGroup.heading. Same treatment
+                      // as a sub-heading, because that is what it is.
+                      <tr>
+                        <td
+                          colSpan={visibleColumns.length}
+                          // A HAIRLINE, not the black rule a sub-heading uses
+                          // (Mark, 2026-08-09: "make the dividing line in the
+                          // list light grey instead of black. They're really
+                          // not necessary"). The caps text is already doing the
+                          // work; the rule is only there to stop the heading
+                          // floating between two runs, and at black it was a
+                          // third weight of line in a table that has two.
+                          className={`border-b border-hairline px-3 pb-1 text-xs font-semibold uppercase tracking-[0.08em] text-ink ${
+                            index === 0 ? "pt-1" : "pt-4"
+                          }`}
+                        >
+                          {label}
+                          <span className="ml-2 font-normal tracking-normal text-subtle normal-case">
+                            {groupRows.get(label)?.length ?? 0}
+                          </span>
+                        </td>
+                      </tr>
+                    ) : (
+                      <tr className="bg-ink text-white">
+                        <td
+                          colSpan={visibleColumns.length}
+                          className="px-3 py-2 text-xs font-semibold tracking-[0.12em] uppercase"
+                        >
+                          {label}
+                          <span className="ml-2 font-normal tracking-normal text-white/55 normal-case">
+                            {groupRows.get(label)?.length ?? 0}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
                   {startsSubGroup && (
                     <tr>
                       <td
@@ -692,9 +761,9 @@ export function DataTable<T>({
                           // px-3 at every width, matching the header (which
                           // needed the 8px back — see ColumnHeader). The xl step
                           // to px-4 was buying air a dense table can't afford.
-                          className={`h-14 px-3 py-4 ${col.wrap ? "" : "truncate"} ${
-                            col.align === "right" ? "text-right tabular-nums" : ""
-                          }`}
+                          className={`px-3 ${dense ? "h-9 py-1" : "h-14 py-4"} ${
+                            col.wrap ? "" : "truncate"
+                          } ${col.align === "right" ? "text-right tabular-nums" : ""}`}
                         >
                           {content}
                         </td>

@@ -59,6 +59,64 @@ export function isBatchOutstanding(status: string): boolean {
   return status === "to_do" || status === "in_progress";
 }
 
+/**
+ * THE ROW'S COLOUR, by status — FileMaker's own batch log, where a whole line is
+ * green when it was made, grey when it was skipped and red when it is still to
+ * do (Mark, 2026-08-09, and visible in both of his screenshots: one log reads
+ * green and grey down the page, the other is red top to bottom because nothing
+ * on it had been started).
+ *
+ * A REAL EXCEPTION to "colour only ever means record STATE", and it is the rule
+ * rather than a breach of it: a batch's status IS its state, which is exactly
+ * what the design system reserves colour for. What it does not license is
+ * colouring a row by anything else here.
+ *
+ * `in_progress` and `test` deliberately get nothing. Three colours over five
+ * values is a legible code; five is a key you have to learn, and neither of
+ * those two is a state you scan a list for — you scan for what is done, what is
+ * left, and what nobody is going to make.
+ *
+ * Green is `--rf-green-600`, the app's existing green TEXT (five other callers),
+ * NOT `text-go`, which is the pale `green-200` FILL and unreadable as type.
+ */
+export function batchStatusTone(status: string): string {
+  switch (status) {
+    case "complete":
+      return "text-[var(--rf-green-600)]";
+    case "skipped":
+      // `text-faint` (neutral-400), not `text-subtle` (Mark, 2026-08-09:
+      // "use a lighter grey for skipped"). A skipped batch is the one row on the
+      // log you have decided not to think about, so it should fall further back
+      // than ordinary secondary text — and this is the same grey the history
+      // list already dims its unmade rounds with, which is the same fact said
+      // in two places.
+      return "text-faint";
+    case "to_do":
+      return "text-accent";
+    default:
+      return "";
+  }
+}
+
+/**
+ * Did anything actually come out of this batch?
+ *
+ * THREE WAYS TO HAVE MADE NOTHING and only one of them is an empty field: the
+ * status says skipped, or the yield is a recorded zero (FileMaker writes
+ * `0 × 3 gal` constantly), or nobody wrote anything down. `amountTotal` is what
+ * tells `0 × 3` from `4 × 3`; a plain `!yield_count` would also catch a real
+ * batch measured as a single 3-gallon tub, whose count is null.
+ */
+export function batchMadeNothing(batch: {
+  status: string;
+  yield_count: number | null;
+  yield_size: number | null;
+}): boolean {
+  if (batch.status === "skipped") return true;
+  const total = amountTotal(batch.yield_count, batch.yield_size);
+  return total === null || total === 0;
+}
+
 /* -- amounts -------------------------------------------------------------- */
 
 /**

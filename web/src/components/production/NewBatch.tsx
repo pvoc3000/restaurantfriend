@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { PickList } from "@/components/ui/PickList";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 
 /**
  * Log a batch that isn't on the weekly round.
@@ -129,9 +130,13 @@ export function NewBatch({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="border border-ink bg-white px-4 py-2 text-[13px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white"
+        className={`${BUTTON_CLASS} shrink-0`}
       >
-        New batch
+        {/* "Add batch", not the app's usual `New <thing>` (Mark, 2026-08-09).
+            The convention is for a command that creates a RECORD you then go
+            to; this one puts a line on the log you are already looking at, and
+            nothing navigates. Add is the honest verb for that. */}
+        Add batch
       </button>
 
       {open && (

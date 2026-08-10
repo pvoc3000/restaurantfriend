@@ -37,7 +37,8 @@ import Link from "next/link";
 export type SectionNavItem<K extends string = string> = {
   key: K;
   label: string;
-  href: string;
+  /** Omit only when the nav is driven by `onSelect`. */
+  href?: string;
   /** Shown after the label, dimmed and tabular. */
   count?: number;
 };
@@ -48,9 +49,26 @@ export function SectionNav<K extends string>({
   orientation = "vertical",
   ariaLabel,
   className = "",
+  onSelect,
 }: {
   items: readonly SectionNavItem<K>[];
   value: K;
+  /**
+   * Sections of a record that has NO ROUTE — the batch log's detail pane, where
+   * the subject is whichever row you clicked and lives in React state.
+   *
+   * Given this, each item renders as a button rather than a Link. Everything
+   * else is identical, deliberately: the argument above is about how a record's
+   * sections should LOOK and how state should read on them, and that doesn't
+   * change because the record happens not to have an address. What would change
+   * it is being a filter — and switching Info to Recipe is not narrowing the
+   * batch, it is looking at another part of the same one.
+   *
+   * A URL was the alternative and is wrong here for a concrete reason: a batch
+   * is picked from a list of thirty, so the tab flips constantly, and each flip
+   * would be a navigation that re-runs the whole log's server component.
+   */
+  onSelect?: (key: K) => void;
   /**
    * `horizontal` is the narrow-screen form — the same links in a row above the
    * content, because a column of five costs 180px before anything is read.
@@ -70,24 +88,41 @@ export function SectionNav<K extends string>({
     >
       {items.map((item) => {
         const on = item.key === value;
-        return (
-          <Link
-            key={item.key}
-            href={item.href}
-            aria-current={on ? "page" : undefined}
-            // `py-1` rather than nothing: these are touch targets on an iPad,
-            // and a 12px line of text is not one on its own. No horizontal
-            // padding in the vertical form — the labels have to start on the
-            // same left edge as the content beside them, and 8px of padding
-            // would put them a visible step to its left.
-            className={`inline-flex items-center gap-2 whitespace-nowrap py-1 text-[12px] uppercase tracking-[0.06em] no-underline transition-colors ${
-              on ? "font-bold text-ink" : "font-semibold text-muted hover:text-ink"
-            }`}
-          >
+        // `py-1` rather than nothing: these are touch targets on an iPad, and a
+        // 12px line of text is not one on its own. No horizontal padding in the
+        // vertical form — the labels have to start on the same left edge as the
+        // content beside them, and 8px of padding would put them a visible step
+        // to its left.
+        const className = `inline-flex items-center gap-2 whitespace-nowrap py-1 text-[12px] uppercase tracking-[0.06em] no-underline transition-colors ${
+          on ? "font-bold text-ink" : "font-semibold text-muted hover:text-ink"
+        }`;
+        const body = (
+          <>
             {item.label}
             {item.count !== undefined && (
               <span className="font-normal tabular-nums opacity-55">{item.count}</span>
             )}
+          </>
+        );
+
+        return onSelect ? (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => onSelect(item.key)}
+            aria-current={on ? "page" : undefined}
+            className={className}
+          >
+            {body}
+          </button>
+        ) : (
+          <Link
+            key={item.key}
+            href={item.href ?? "#"}
+            aria-current={on ? "page" : undefined}
+            className={className}
+          >
+            {body}
           </Link>
         );
       })}
