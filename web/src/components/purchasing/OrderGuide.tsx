@@ -38,6 +38,25 @@ import { BackToTop } from "@/components/ui/BackToTop";
 import { usePublishedHeight } from "@/lib/tableHead";
 
 /**
+ * TRIAL, 2026-08-10 (Mark): the item header's par is hidden — "distracting…
+ * a little irrelevant" now that every line states its own par in its own
+ * packages under its own order box. It was the same number said twice, once in
+ * base units at 15px in red across the whole walk and once per line where you
+ * actually decide, and only the second reading is in the unit you order in.
+ *
+ * Flip to true to bring it back; nothing else moved. `itemPar` still reaches
+ * GuideLine, which is what the per-line "par 3 CS" and count mode's suggestion
+ * divide — this hides a restatement, it does not remove a number the guide
+ * computes from.
+ *
+ * The NO PAR marker is deliberately still shown. It isn't the thing that was
+ * distracting (faint grey, not red) and it's the only place on the walk that
+ * flags a missing par at item level — with this off, the header goes quiet
+ * except where there's a gap, which is the exception worth marking.
+ */
+const SHOW_ITEM_PAR: boolean = false;
+
+/**
  * The order guide (spec §4.6): the shop in walk order, item headers with par,
  * plan lines nested beneath, and the vendor totals bar tracking each vendor
  * against its minimum as you go.
@@ -821,9 +840,12 @@ export function OrderGuide({
                   const isOpen = expanded.has(itemKey);
                   return (
                   <Fragment key={item.inventory_item_id}>
-                    {/* Item header: bold caps over a 2px black rule, par in
-                        red on the right — directly above the order boxes,
-                        because it's the number you order up TO. */}
+                    {/* Item header: bold caps over a 2px black rule. The par
+                        used to sit in red on the right, directly above the
+                        order boxes, because it's the number you order up TO;
+                        it's off behind SHOW_ITEM_PAR while Mark lives without
+                        it, leaving only the NO PAR marker for items missing
+                        one. */}
                     <tr>
                       <td colSpan={7} className="px-0 pb-0 pt-12">
                         <div className="flex items-end gap-4 border-b-2 border-ink px-4 pb-2 max-[1180px]:px-2">
@@ -887,7 +909,7 @@ export function OrderGuide({
                               <span className="text-xs uppercase tracking-[0.12em] text-faint">
                                 no par
                               </span>
-                            ) : (
+                            ) : SHOW_ITEM_PAR ? (
                               // The ITEM's par, in base units, and nothing else
                               // (Mark, 2026-07-29). It used to append the
                               // favorite's package translation, but an item can
@@ -899,7 +921,7 @@ export function OrderGuide({
                               <span className="whitespace-nowrap text-[15px] font-bold uppercase tracking-[0.06em] text-accent">
                                 par {Number(item.par_qty)} {item.base_unit}
                               </span>
-                            )}
+                            ) : null}
                           </span>
                         </div>
                       </td>
