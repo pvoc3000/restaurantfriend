@@ -83,32 +83,35 @@ export function useCalcField() {
 /**
  * [what it says, what it does, how it's painted].
  *
- * THE LAYOUT IS APPLE'S CALCULATOR, KEY FOR KEY (Mark, 2026-08-10, with a
- * screenshot: "copy this UI"). Four columns, operators down the right, the
- * commit where `=` lives — because that is where a hand already expects them,
- * and this is the one surface in the app that nobody should have to learn.
+ * APPLE'S CALCULATOR, with Mark's own arrangement (2026-08-10, giving the grid
+ * key by key). Four columns, operators down the right, the commit where `=`
+ * lives — because that is where a hand already expects them, and this is the
+ * one surface in the app that nobody should have to learn.
  *
- * Our four function keys take the positions Apple gives `⌫ AC %` and `+/−`:
- *
- *     ⌫   C   (   ÷
+ *     C   (   )   ÷
  *     7   8   9   ×
  *     4   5   6   −
  *     1   2   3   +
- *     )   0   .   Done
+ *     ⌫   0   .   =
  *
- * `(` and `)` are split across the two function corners, which is the one place
- * this diverges in feel — they'd rather be adjacent. Keeping the right column
- * purely operators is worth more: it's the column you reach for without
- * looking.
+ * `(` and `)` are ADJACENT, which the first cut got wrong by splitting them
+ * across the two function corners to mirror Apple's `%` and `+/−`. A pair of
+ * brackets is one idea and reads as one; copying the positions of two keys we
+ * don't have was following the reference past the point it had anything to say.
+ * `⌫` takes the corner they vacated.
+ *
+ * `=` IS `Done` UNDER ITS PROPER NAME (Mark: "same as done, just labeled
+ * differently"). It evaluates and dismisses — which on this pad is one act,
+ * because the field behind is what holds the answer.
  */
 type Key = readonly [label: string, action: string, tone: "fn" | "digit" | "op"];
 
 const KEYS: ReadonlyArray<Key> = [
-  ["⌫", "back", "fn"],  ["C", "clear", "fn"], ["(", "(", "fn"],   ["÷", "÷", "op"],
+  ["C", "clear", "fn"], ["(", "(", "fn"],     [")", ")", "fn"],    ["÷", "÷", "op"],
   ["7", "7", "digit"],  ["8", "8", "digit"],  ["9", "9", "digit"], ["×", "×", "op"],
   ["4", "4", "digit"],  ["5", "5", "digit"],  ["6", "6", "digit"], ["−", "-", "op"],
   ["1", "1", "digit"],  ["2", "2", "digit"],  ["3", "3", "digit"], ["+", "+", "op"],
-  [")", ")", "fn"],     ["0", "0", "digit"],  [".", ".", "digit"], ["Done", "done", "op"],
+  ["⌫", "back", "fn"],  ["0", "0", "digit"],  [".", ".", "digit"], ["=", "done", "op"],
 ];
 
 /** Apple's dark-mode calculator palette. */
@@ -224,6 +227,15 @@ export function CalcPad() {
     // A selection is deleted whole; otherwise take the character before the
     // caret, which is what a backspace key means.
     const from = start === end ? Math.max(0, start - 1) : start;
+    // NOTHING LEFT TO DELETE IS A NO-OP, NEVER AN EXIT (Mark, 2026-08-10: "it
+    // should just get to zero and stay there"). The readout already prints an
+    // empty field as `0`, so a pad you can't backspace your way out of reads
+    // exactly like a calculator sitting at zero.
+    //
+    // Empty is left EMPTY rather than made a literal "0", and that matters on
+    // the order guide: a quantity has three states, and an explicit 0 ("we're
+    // ordering none") is a different sentence from untouched. Writing a 0 here
+    // to satisfy the readout would take away the only way back to untouched.
     if (from === end) return;
     setNativeValue(el, el.value.slice(0, from) + el.value.slice(end));
     caretTo(el, from);
@@ -288,8 +300,8 @@ export function CalcPad() {
       // so the first tap outside spends itself on dismissing rather than on
       // whatever you aimed at. That is how every popover in the app behaves,
       // but the scrim used to say so and now nothing does.
-      className="fixed inset-0 z-[80] flex items-center justify-center p-4"
-      // A tap OUTSIDE the pad does what Done does. preventDefault first, or the
+      className="fixed inset-0 z-[80] flex items-center justify-center"
+      // A tap OUTSIDE the pad does what `=` does. preventDefault first, or the
       // tap blurs the field by itself and the save happens without us — which
       // is the same outcome by luck rather than by decision, and on a field
       // whose editor unmounts on blur it would race the commit.
@@ -298,6 +310,30 @@ export function CalcPad() {
         press("done");
       }}
     >
+      {/* THE GUARD RING — transparent, and the reason the pad stopped
+          dismissing itself while you were using it.
+
+          Mark, 2026-08-10: "I don't like when the calc dismisses if you hit
+          delete enough times to clear the number." Backspace never dismissed
+          anything — 4 presses in the harness empty the field and leave the pad
+          up. What dismisses is the CATCHER, and the panel's own padding put it
+          only 12px outside the edge of a corner key. Hammer ⌫ in the bottom-left
+          and a finger that drifts a few millimetres lands on it.
+
+          The timing is the tell: this appeared when the scrim came off. While
+          the page was dimmed you could SEE where the panel ended; invisible,
+          that boundary is a guess, and a miss costs you the whole pad.
+
+          So 28px of transparent margin absorbs a near miss instead. A tap that
+          genuinely means "somewhere else" is still further out than that, and
+          still finishes the edit. */}
+      <div
+        className="p-7"
+        onPointerDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+      >
       <div
         // THIS PANEL DELIBERATELY DOES NOT LOOK LIKE THE APP (Mark, 2026-08-10,
         // with a screenshot of macOS Calculator: "copy this UI"). Dark, round
@@ -314,7 +350,7 @@ export function CalcPad() {
         //
         // Keep it self-contained: these literals are the calculator's palette,
         // not new tokens, and nothing else in the app should reach for them.
-        className="w-[min(21rem,calc(100vw-2rem))] rounded-[22px] bg-[#1c1c1e] p-3 shadow-[0_10px_44px_rgba(0,0,0,0.38)] ring-1 ring-white/10"
+        className="w-[min(21rem,calc(100vw-4.5rem))] rounded-[22px] bg-[#1c1c1e] p-3 shadow-[0_10px_44px_rgba(0,0,0,0.38)] ring-1 ring-white/10"
         // A tap anywhere on the pad, including its gaps, must not move focus —
         // and must not reach the catcher, or every key press would also commit.
         onPointerDown={(e) => {
@@ -371,6 +407,7 @@ export function CalcPad() {
             </button>
           ))}
         </div>
+      </div>
       </div>
     </div>
   );
