@@ -13,7 +13,7 @@ import {
   type GuideRow,
 } from "@/lib/orderGuide";
 import { money } from "@/lib/purchaseOrders";
-import { packLabel, packageDivisor, parPackageLabel } from "@/lib/catalog";
+import { packLabel, packageDivisor, parPackageLabel, vendorItemTitle } from "@/lib/catalog";
 import { evaluateNumeric } from "@/lib/calc";
 import { useCalcField } from "@/components/ui/CalcPad";
 
@@ -105,6 +105,37 @@ export function GuideLine({
 
   const arrives = deliveryLabel(row.vendor_delivery_days);
   const pack = packLabel(row, baseUnit);
+  /**
+   * What this line calls itself. The vendor's own description when they gave
+   * one; failing that the house format the vendor-item screen composes —
+   * "Flour, Cake // Giustos // 1 × 50 lbs" (Mark, 2026-08-10).
+   *
+   * It replaces an em dash, which on a walk is the least useful thing a line
+   * can say: you're looking at a source you can't tell apart from the one above
+   * it, on the one screen where telling them apart is the whole task. Measured
+   * on DF01's Monday: 100 of 875 orderable lines carry no description, and the
+   * composed form leaves NONE of them still showing a dash — every one has at
+   * least an item name. Mostly the non-food end of the catalog, where nobody
+   * ever typed a vendor description: "Batteries, AAA // EA", "Advil // EA",
+   * "Puree, Passion Fruit // Bakemark // 6 × 30 oz".
+   *
+   * `vendorItemTitle` rather than a local compose, so the guide and the record
+   * agree about what an undescribed vendor item is called. Costs no query — the
+   * view already carries every slot it reads.
+   */
+  const describes = vendorItemTitle(
+    {
+      description: row.vendor_item_description,
+      brand: row.brand,
+      package_desc: row.package_desc,
+      pack_count: row.pack_count,
+      pack_size: row.pack_size,
+      pack_unit: row.pack_unit,
+      package_content: row.package_content,
+    },
+    row.item_name,
+    baseUnit
+  );
   // The same par the item header states, said in THIS line's packages — the
   // unit the box beside it counts in.
   const parPack = parPackageLabel(par, divisor, row.package_desc);
@@ -180,7 +211,7 @@ export function GuideLine({
           href={withFrom(`/vendor-items/${row.vendor_item_id}`, here)}
           className="no-underline hover:underline"
         >
-          {row.vendor_item_description ?? "—"}
+          {describes ?? "—"}
         </Link>
         {pack && (
           <div className="mt-0.5 whitespace-nowrap text-xs tabular-nums text-muted">

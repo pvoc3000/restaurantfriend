@@ -10,7 +10,7 @@
 // 013's generation function makes the same decision in SQL
 // (`when vi.pack_size is not null then …`). If one changes, change both.
 
-import { packLabel } from "../../src/lib/catalog";
+import { packLabel, vendorItemTitle } from "../../src/lib/catalog";
 import { eq, test } from "./harness";
 
 const noPack = { pack_count: null, pack_size: null, pack_unit: null, package_content: null };
@@ -65,4 +65,94 @@ test("packLabel: the pack beats a stored content that disagrees", () => {
     "12 × 16 oz",
     "structure wins"
   );
+});
+
+// ---------------------------------------------------------------------------
+// vendorItemTitle — what a vendor item is CALLED when the vendor never
+// described it.
+//
+// It had no coverage while the vendor-item screen was its only caller. As of
+// 2026-08-10 the order guide renders it on every line (Mark: use the same
+// calculated title "anytime there isn't a description"), which on DF01's Monday
+// is 875 rows, 100 of them undescribed — so it is now load-bearing on the
+// busiest screen in the app rather than on one record at a time.
+
+const anon = {
+  description: null,
+  brand: null,
+  package_desc: null,
+  pack_count: null,
+  pack_size: null,
+  pack_unit: null,
+  package_content: null,
+};
+
+test("vendorItemTitle: the vendor's own description wins outright", () => {
+  // Their wording is how THEY name the product, which is what you check an
+  // order against — so it beats anything we could assemble.
+  eq(
+    vendorItemTitle(
+      { ...anon, description: "ORG BLACKBERRY 6/6OZ", brand: "Packer", pack_size: 6, pack_unit: "oz" },
+      "Blackberries, Fresh",
+      "oz"
+    ),
+    "ORG BLACKBERRY 6/6OZ",
+    "described"
+  );
+});
+
+test("vendorItemTitle: a blank description is no description", () => {
+  // The guide's real case — the column is text, and empty is commoner than null.
+  eq(
+    vendorItemTitle({ ...anon, description: "   ", brand: "Packer" }, "Blackberries, Fresh", "oz"),
+    "Blackberries, Fresh // Packer",
+    "whitespace only"
+  );
+});
+
+test("vendorItemTitle: undescribed composes item // brand // pack", () => {
+  eq(
+    vendorItemTitle(
+      { ...anon, brand: "Giustos", pack_count: 1, pack_size: 50, pack_unit: "lbs" },
+      "Flour, Cake",
+      "lbs"
+    ),
+    "Flour, Cake // Giustos // 1 × 50 lbs",
+    "all three slots"
+  );
+});
+
+test("vendorItemTitle: an empty slot COLLAPSES, never leaving a bare separator", () => {
+  // "Flour //  // CS" reads as missing data; an absent field should read as an
+  // absent field. This is the case the non-food catalog actually hits — 
+  // "Batteries, AAA // EA", with no brand anyone ever typed.
+  eq(
+    vendorItemTitle({ ...anon, package_desc: "EA" }, "Batteries, AAA", "ea"),
+    "Batteries, AAA // EA",
+    "no brand"
+  );
+  eq(
+    vendorItemTitle({ ...anon, brand: "Bakemark" }, "Puree, Passion Fruit", "oz"),
+    "Puree, Passion Fruit // Bakemark",
+    "no pack"
+  );
+});
+
+test("vendorItemTitle: with no pack structure it takes the base-unit total, then the type", () => {
+  eq(
+    vendorItemTitle({ ...anon, package_content: 1, package_desc: "CS" }, "Masking Tape", "ea"),
+    "Masking Tape // 1 ea",
+    "content beats the bare type"
+  );
+  eq(
+    vendorItemTitle({ ...anon, package_desc: "CS" }, "Masking Tape", "ea"),
+    "Masking Tape // CS",
+    "type is the last resort"
+  );
+});
+
+test("vendorItemTitle: nothing to say is NULL, so a caller can still show its dash", () => {
+  // A vendor item with nothing in it but a vendor. The guide falls back to an
+  // em dash here, which is honest — measured, no DF01 line reaches it.
+  eq(vendorItemTitle(anon, null, "ea"), null, "empty");
 });
