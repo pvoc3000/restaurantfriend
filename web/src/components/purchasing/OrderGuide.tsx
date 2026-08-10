@@ -38,6 +38,7 @@ import { Reminders } from "./Reminders";
 import { ActionBar, ActionBarButton } from "@/components/ui/ActionBar";
 import { BackToTop } from "@/components/ui/BackToTop";
 import { usePublishedHeight } from "@/lib/tableHead";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * TRIAL, 2026-08-10 (Mark): the item header's par is hidden — "distracting…
@@ -476,11 +477,9 @@ export function OrderGuide({
     ].filter(Boolean);
 
     if (
-      !window.confirm(
-        `Clear the whole guide for ${guideDate} at ${locationCode}?\n\n` +
+      !(await confirmDialog({ ...splitConfirmMessage(`Clear the whole guide for ${guideDate} at ${locationCode}?\n\n` +
           `This resets every line to untouched, discarding ${parts.join(", ")}.` +
-          `\n\nPurchase orders already generated are not affected. This cannot be undone.`
-      )
+          `\n\nPurchase orders already generated are not affected. This cannot be undone.`), confirmLabel: "Clear guide", tone: "danger" }))
     )
       return;
 

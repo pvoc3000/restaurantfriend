@@ -15,6 +15,7 @@ import {
   type InvoiceCreationOrder,
 } from "@/lib/invoiceFromExtraction";
 import type { InvoiceExtraction } from "@/lib/invoiceExtraction";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * Attaching, reading and removing a PO's paperwork — the writes, shared by the
@@ -245,9 +246,7 @@ export function useAttachmentActions({
     attachment: Pick<PoAttachment, "id" | "file_name" | "storage_path">
   ) {
     if (
-      !window.confirm(
-        `Remove ${attachment.file_name ?? "this attachment"} from this order?\n\nThis cannot be undone.`
-      )
+      !(await confirmDialog({ ...splitConfirmMessage(`Remove ${attachment.file_name ?? "this attachment"} from this order?\n\nThis cannot be undone.`), confirmLabel: "Remove", tone: "danger" }))
     ) {
       return;
     }

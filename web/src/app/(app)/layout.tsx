@@ -1,5 +1,6 @@
 import { AppHeader } from "@/components/AppHeader";
 import { CalcPad } from "@/components/ui/CalcPad";
+import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { InactiveLocationGate } from "@/components/InactiveLocationGate";
 import { ScrollMemory } from "@/components/ScrollMemory";
 import { getAppSession } from "@/lib/session";
@@ -18,7 +19,11 @@ export default async function AppLayout({
   const session = await getAppSession();
 
   return (
-    <>
+    // Every confirm in the app is asked through this (Mark, 2026-08-10) — one
+    // panel, so a call site is a line rather than its own dialog. It wraps the
+    // whole shell because the questions are asked from the masthead's drawers
+    // as well as from the page.
+    <ConfirmProvider>
       <AppHeader session={session} />
       {/* The page gutter. 48px on a desk, 16px below 1280 — an iPad portrait
           window has no 96px to spare, and the order guide's row is the widest
@@ -47,6 +52,6 @@ export default async function AppLayout({
           touch device — then it IS the keyboard: digits and operators
           together, so `lib/calc` expressions are typeable on an iPad. */}
       <CalcPad />
-    </>
+    </ConfirmProvider>
   );
 }

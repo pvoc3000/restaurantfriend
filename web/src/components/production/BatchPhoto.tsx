@@ -9,6 +9,7 @@ import {
   batchPhotoPath,
   batchPhotoRejection,
 } from "@/lib/batchPhotos";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * The picture on a batch log — FileMaker's container field on Batch Logs.
@@ -95,9 +96,9 @@ export function BatchPhoto({
     });
   }
 
-  function clear() {
+  async function clear() {
     if (!path) return;
-    if (!window.confirm("Remove this photo?")) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage("Remove this photo?"), confirmLabel: "Remove", tone: "danger" }))) return;
     const previous = path;
     setError(null);
     start(async () => {

@@ -9,6 +9,7 @@ import {
   recipeImagePath,
   recipeImageRejection,
 } from "@/lib/recipeImages";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * FileMaker's container field on a procedure step: one picture per step.
@@ -101,9 +102,9 @@ export function RecipeStepImage({
     });
   }
 
-  function clear() {
+  async function clear() {
     if (!path) return;
-    if (!window.confirm("Remove this picture?")) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage("Remove this picture?"), confirmLabel: "Remove", tone: "danger" }))) return;
     const previous = path;
     setError(null);
     start(async () => {

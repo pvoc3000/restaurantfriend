@@ -55,6 +55,7 @@ import { DocumentPane } from "./DocumentPane";
 import { InvoiceSummary } from "./InvoiceSummary";
 import { ReceivingRow } from "./ReceivingRow";
 import { useAttachmentActions } from "./useAttachmentActions";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * Receiving a delivery: the invoice on one side, the order's lines on the
@@ -396,7 +397,7 @@ export function Receiving({
       (caveats.length > 0
         ? `\n\nStill unresolved:\n· ${caveats.join("\n· ")}\n\nClosing anyway is fine — it just means you're done with this order.`
         : "\n\nEverything is received, reconciled and filed.");
-    if (!window.confirm(message)) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Close order" }))) return;
     setError(null);
     const { data, error: closeError } = await supabase
       .from("purchase_orders")

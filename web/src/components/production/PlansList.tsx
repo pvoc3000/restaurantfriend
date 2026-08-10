@@ -17,6 +17,7 @@ import {
   REVIEW_DEFAULTS_PARAM,
   type PlanSummary,
 } from "@/lib/productionPlans";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 export type PlanRow = PlanSummary & {
   notes: string | null;
@@ -214,13 +215,13 @@ export function PlansList({
   }
 
   /** Take a plan off the book — 039 cascades its trays, and those their slots. */
-  function deletePlan(row: PlanRow) {
+  async function deletePlan(row: PlanRow) {
     const held = row.trayCount
       ? ` and its ${row.trayCount} tray${row.trayCount === 1 ? "" : "s"}${
           row.slotCount ? ` carrying ${row.slotCount} item${row.slotCount === 1 ? "" : "s"}` : ""
         }`
       : "";
-    if (!window.confirm(`Delete "${row.title}"${held}? This cannot be undone.`)) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(`Delete "${row.title}"${held}? This cannot be undone.`), confirmLabel: "Delete plan", tone: "danger" }))) return;
     setFailed(null);
     start(async () => {
       const supabase = createClient();

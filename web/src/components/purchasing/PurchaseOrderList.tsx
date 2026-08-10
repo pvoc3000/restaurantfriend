@@ -39,6 +39,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
 import type { PoListRow } from "@/app/(app)/purchase-orders/page";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 // Widths and hidden columns share this key — one table, one identity.
 const PO_WIDTHS_KEY = "rf.purchaseOrders.columnWidths.v2";
@@ -256,7 +257,7 @@ export function PurchaseOrderList({
       `Close ${selectedCloseable.length} order${selectedCloseable.length === 1 ? "" : "s"}?` +
       (caveats.length > 0 ? `\n\nStill unresolved:\n· ${caveats.join("\n· ")}` : "") +
       "\n\nClosed means done being worked on; you can reopen from the status menu.";
-    if (!window.confirm(message)) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Close orders" }))) return;
 
     setBatchBusy("closed");
     setBatchError(null);
@@ -327,7 +328,7 @@ export function PurchaseOrderList({
           } not a draft (${[...new Set(nonDraft.map((po) => po.status))].join(", ")}).` +
           " Deleting sent or received orders erases order history permanently."
         : "\n\nThis cannot be undone.");
-    if (!window.confirm(message)) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Delete", tone: "danger" }))) return;
 
     setBatchBusy("delete");
     setBatchError(null);

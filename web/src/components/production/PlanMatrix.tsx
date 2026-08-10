@@ -26,6 +26,7 @@ import {
 } from "@/lib/productionPlans";
 import { useSlotDrag, type SlotDragSource, type SlotDropTarget } from "@/lib/planSlotDrag";
 import { withSlot } from "@/lib/production";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 export type MatrixTray = { id: string; tray_number: string; band: string | null; sort: number | null };
 export type MatrixSlot = {
@@ -402,12 +403,10 @@ export function PlanMatrix({
    * usually land on a handful of distinct numbers, so this is a few statements
    * rather than one per slot.
    */
-  function takeAllSuggested() {
+  async function takeAllSuggested() {
     if (!differing.length) return;
     if (
-      !window.confirm(
-        `Set ${differing.length} par${differing.length === 1 ? "" : "s"} to ${locationCode}'s defaults? The numbers currently on those slots are replaced.`
-      )
+      !(await confirmDialog({ ...splitConfirmMessage(`Set ${differing.length} par${differing.length === 1 ? "" : "s"} to ${locationCode}'s defaults? The numbers currently on those slots are replaced.`), confirmLabel: "Use defaults" }))
     ) {
       return;
     }
@@ -472,7 +471,7 @@ export function PlanMatrix({
    * and they share one seven-slot array, so writing them separately would have
    * each overwrite the last.
    */
-  function updateAllDefaults() {
+  async function updateAllDefaults() {
     if (!differing.length) return;
     const byItem = new Map<string, (number | null)[]>();
     for (const row of matrix) {
@@ -489,11 +488,9 @@ export function PlanMatrix({
     }
     if (!byItem.size) return;
     if (
-      !window.confirm(
-        `Set ${locationCode}'s DEFAULT pars from this plan — ${byItem.size} item${
+      !(await confirmDialog({ ...splitConfirmMessage(`Set ${locationCode}'s DEFAULT pars from this plan — ${byItem.size} item${
           byItem.size === 1 ? "" : "s"
-        }? This changes the shop's catalog, not just this plan, and every future plan seeds from it.`
-      )
+        }? This changes the shop's catalog, not just this plan, and every future plan seeds from it.`), confirmLabel: "Update defaults" }))
     ) {
       return;
     }
@@ -585,20 +582,18 @@ export function PlanMatrix({
    *
    * It exists because DUPLICATE exists: a one-tap way to create a tray with no
    * way to remove one is a one-way door, and the first thing anybody does with a
-   * copy button is make a copy they didn't want. `window.confirm` naming what is
+   * copy button is make a copy they didn't want. A confirm naming what is
    * about to go, matching the PO batch-delete pattern — a tray carrying nine
    * items is a real amount of work to lose.
    */
-  function removeTray(tray: MatrixTray, days: TraySlot[][]) {
+  async function removeTray(tray: MatrixTray, days: TraySlot[][]) {
     const held = days.flat().length;
     if (
-      !window.confirm(
-        held
+      !(await confirmDialog({ ...splitConfirmMessage(held
           ? `Remove tray ${tray.tray_number} from this plan, and the ${held} item${
               held === 1 ? "" : "s"
             } on it?`
-          : `Remove tray ${tray.tray_number} from this plan?`
-      )
+          : `Remove tray ${tray.tray_number} from this plan?`), confirmLabel: "Delete tray", tone: "danger" }))
     ) {
       return;
     }

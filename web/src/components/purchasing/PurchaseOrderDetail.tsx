@@ -34,6 +34,7 @@ import { OrderBar } from "./OrderBar";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 import { nextDeliveryDate } from "@/lib/poProcessing";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * PO detail: what was ordered, what arrived, and the gap between them.
@@ -117,7 +118,7 @@ export function PurchaseOrderDetail({
             received.length === 1 ? "has" : "have"
           } a received quantity — deleting erases that history permanently.`
         : "\n\nThis cannot be undone.");
-    if (!window.confirm(message)) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Delete", tone: "danger" }))) return;
 
     setBusy(true);
     setError(null);
@@ -171,7 +172,7 @@ export function PurchaseOrderDetail({
       (caveats.length > 0
         ? `\n\nStill unresolved:\n· ${caveats.join("\n· ")}\n\nClosing anyway is fine — it just means you're done with this order.`
         : "\n\nEverything is received, reconciled and filed.");
-    if (!window.confirm(message)) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Close order" }))) return;
     await setStatus("closed");
   }
 

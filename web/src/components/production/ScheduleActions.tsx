@@ -8,6 +8,7 @@ import { itemCost } from "@/lib/productionCost";
 import { resolveItemPrice } from "@/lib/productionPrice";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { ProgressBand } from "@/components/ui/ProgressBand";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 const COMMAND =
   "inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
@@ -143,7 +144,7 @@ export function ScheduleActions({
         ? `\n\nThis night has counted quantities. They are kept — a line the plans still carry keeps its count — but a line the plans have DROPPED goes, and its count with it.`
         : "") +
       `\n\nLines you added by hand are left alone.`;
-    if (!window.confirm(message)) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Regenerate" }))) return;
 
     setBusy("regenerate");
     setError(null);
@@ -173,7 +174,7 @@ export function ScheduleActions({
       `${lineCount} ${lineCount === 1 ? "item" : "items"} go with it` +
       (hasActuals ? `, including counted quantities somebody entered` : "") +
       `.\n\nGenerating the day again would rebuild it from the plans.`;
-    if (!window.confirm(message)) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Delete", tone: "danger" }))) return;
 
     setBusy("delete");
     setError(null);

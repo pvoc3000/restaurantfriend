@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { UNIT_OPTIONS, UNIT_PICK_OPTIONS, normalizeUnit } from "@/lib/units";
 import { PickList } from "@/components/ui/PickList";
 import { derivedPackContent } from "@/lib/catalog";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * The unit this item is counted in — pars, on-hand counts, and every vendor
@@ -128,23 +129,22 @@ export function BaseUnitEditor({
    * screen would tell you. So the warning becomes the confirm. Same two actions
    * as before, minus a control that showed an unsaved value.
    *
-   * window.confirm rather than a styled dialog, matching Clear guide and the PO
-   * batch delete: the house pattern for a far-reaching action is a plain confirm
-   * that names what's about to happen.
+   * A confirm rather than an inline warning, matching Clear guide and the PO
+   * batch delete: the house pattern for a far-reaching action is a confirm that
+   * names what's about to happen. (`ui/ConfirmDialog` since 2026-08-10; it was
+   * `window.confirm` until the app grew its own.)
    */
-  function choose(chosen: string) {
+  async function choose(chosen: string) {
     if (chosen === baseUnit) return;
     const parLine =
       defaultPar !== null && defaultPar !== undefined
         ? `The par stays ${Number(defaultPar)} — now meaning ${Number(defaultPar)} ${chosen}, not ${Number(defaultPar)} ${baseUnit}.`
         : `Pars are NOT converted — each location keeps the number it has, now read as ${chosen} rather than ${baseUnit}.`;
-    const ok = window.confirm(
-      `Count this item in ${chosen} instead of ${baseUnit}?\n\n` +
+    const ok = (await confirmDialog({ ...splitConfirmMessage(`Count this item in ${chosen} instead of ${baseUnit}?\n\n` +
         `This applies at EVERY location, not just this one.\n\n` +
         `Package contents that can be worked out from their pack are recomputed; ` +
         `the rest are left for you and will show up in the cleanup queue.\n\n` +
-        parLine
-    );
+        parLine), confirmLabel: "Change unit" }));
     // Snap back on cancel, so the control never shows a value that isn't saved.
     if (!ok) {
       setNext(baseUnit);

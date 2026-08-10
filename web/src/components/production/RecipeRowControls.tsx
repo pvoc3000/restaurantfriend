@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { freezeScales, type ScalableLine, type ScaleColumn } from "@/lib/production";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * The AUTO box — FileMaker's `AutoUpdate_bool`, one per ingredient row, sitting
@@ -161,7 +162,7 @@ export function HideOnPrint({
 /**
  * Take a row off the recipe.
  *
- * `window.confirm`, matching the PO batch-delete pattern, and it NAMES the row
+ * A confirm, matching the PO batch-delete pattern, and it NAMES the row
  * — a grid of numbered rows is exactly where a delete lands on the wrong one.
  * The delete `.select()`s its own result for the reason 023 taught: with no
  * matching policy Postgres removes zero rows and PostgREST returns no error, so
@@ -189,8 +190,8 @@ export function DeleteRecipeRow({
         disabled={pending}
         title={`Remove ${what}`}
         aria-label={`Remove ${what}`}
-        onClick={() => {
-          if (!window.confirm(`Remove ${what} from this version?\n\nThis cannot be undone.`)) {
+        onClick={async () => {
+          if (!(await confirmDialog({ ...splitConfirmMessage(`Remove ${what} from this version?\n\nThis cannot be undone.`), confirmLabel: "Remove", tone: "danger" }))) {
             return;
           }
           setError(null);

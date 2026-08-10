@@ -10,6 +10,7 @@ import { TabPicker } from "@/components/ui/TabPicker";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { formatBatches, tallyBoxes, type RollType, type ScheduleLine } from "@/lib/productionSchedule";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 export type ScheduleLineRow = ScheduleLine & {
   planned_par: number | null;
@@ -172,7 +173,7 @@ export function ScheduleLines({
         ? `\n\n${counted.length} of them ${counted.length === 1 ? "has" : "have"} a counted quantity, which will be discarded.`
         : "") +
       `\n\nRegenerating this day would bring back anything the plans still carry.`;
-    if (!window.confirm(message)) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Take off schedule", tone: "danger" }))) return;
 
     setBusy(true);
     setError(null);

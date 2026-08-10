@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { BATCH_PHOTO_BUCKET } from "@/lib/batchPhotos";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * The command on one batch: delete it.
@@ -57,7 +58,7 @@ export function BatchActions({
         ? `It has a recorded yield, which goes with it.\n\n`
         : "") +
       `Generating this day again would put it back if the weekly round still carries it — but not what somebody measured.`;
-    if (!window.confirm(message)) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Delete", tone: "danger" }))) return;
 
     setBusy("delete");
     setError(null);

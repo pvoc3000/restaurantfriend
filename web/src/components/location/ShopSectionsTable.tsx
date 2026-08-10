@@ -7,6 +7,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { TextInput } from "@/components/ui/TextInput";
 import { AddShopSection } from "./AddShopSection";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 const SECTION_WIDTHS_KEY = "rf.shopSections.columnWidths.v1";
 
@@ -66,14 +67,14 @@ export function ShopSectionsTable({
     );
   }, [rows, search]);
 
-  function remove(row: ShopSectionRow) {
+  async function remove(row: ShopSectionRow) {
     const warning =
       row.item_count > 0
         ? `Delete "${row.display_name}"?\n\n${row.item_count} item${
             row.item_count === 1 ? "" : "s"
           } here will move to "No section" on the order guide. Nothing is deleted with it.`
         : `Delete "${row.display_name}"?`;
-    if (!window.confirm(warning)) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(warning), confirmLabel: "Delete", tone: "danger" }))) return;
 
     setFailed(null);
     startTransition(async () => {

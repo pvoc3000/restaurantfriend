@@ -12,6 +12,7 @@ import {
   DIALOG_COMMIT_CLASS,
 } from "@/components/ui/Dialog";
 import { ROLE_LABEL, ROLE_OPTIONS, type Role } from "@/lib/roles";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * Who can sign in, as what — the block that replaces FMP's ADMIN tab.
@@ -118,11 +119,9 @@ export function AppAccess({
 
   async function revoke() {
     if (
-      !window.confirm(
-        `Remove ${employeeName}'s access to the app?\n\n` +
+      !(await confirmDialog({ ...splitConfirmMessage(`Remove ${employeeName}'s access to the app?\n\n` +
           "They'll be signed out and won't be able to sign back in. Their " +
-          "employee record and everything they've done stays."
-      )
+          "employee record and everything they've done stays."), confirmLabel: "Revoke access", tone: "danger" }))
     ) {
       return;
     }

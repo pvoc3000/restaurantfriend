@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { batchDate } from "@/lib/productionBatches";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 // The shared weight, so this row's commands cannot come out a different height
 // from the Delete beside them (`ui/buttons`). `shrink-0` is positional and so
@@ -54,7 +55,7 @@ export function BatchLogActions({
         `${outstanding} of ${batches} ${outstanding === 1 ? "batch has" : "batches have"} ` +
         `not been marked complete or skipped.\n\n` +
         `Closing it anyway is fine — you can reopen it.`;
-      if (!window.confirm(message)) return;
+      if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Close log" }))) return;
     }
     setBusy(next);
     setError(null);
@@ -82,7 +83,7 @@ export function BatchLogActions({
       `Delete the ${batchDate(logDate)} batch log at ${kitchenCode}?\n\n` +
       `${batches} ${batches === 1 ? "batch goes" : "batches go"} with it, including anything ` +
       `somebody measured.\n\nGenerating the day again would rebuild what the round still carries.`;
-    if (!window.confirm(message)) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Delete", tone: "danger" }))) return;
 
     setBusy("delete");
     setError(null);

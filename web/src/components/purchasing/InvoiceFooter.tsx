@@ -7,6 +7,7 @@ import { ATTACHMENT_BUCKET } from "@/lib/attachments";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { InvoiceStatus } from "@/lib/invoices";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * The invoice's own footer — Close · Void · Approve, right-aligned, in the
@@ -58,12 +59,10 @@ export function InvoiceFooter({
 
   async function setApproval(approved: boolean) {
     if (approved && caveats.length > 0) {
-      const ok = window.confirm(
-        `Approve this invoice for payment?\n\n` +
+      const ok = (await confirmDialog({ ...splitConfirmMessage(`Approve this invoice for payment?\n\n` +
           caveats.map((c) => `• ${c}`).join("\n") +
           `\n\nApproving anyway is fine — it just records that you've said this ` +
-          `bill is payable.`
-      );
+          `bill is payable.`), confirmLabel: "Approve" }));
       if (!ok) return;
     }
 
@@ -101,10 +100,8 @@ export function InvoiceFooter({
   async function setStatus(next: "void" | "open") {
     if (
       next === "void" &&
-      !window.confirm(
-        "Void this invoice?\n\nIt stays on file and stops counting toward what " +
-          "you owe. A voided invoice can't be approved until it's reopened."
-      )
+      !(await confirmDialog({ ...splitConfirmMessage("Void this invoice?\n\nIt stays on file and stops counting toward what " +
+          "you owe. A voided invoice can't be approved until it's reopened."), confirmLabel: "Void", tone: "danger" }))
     ) {
       return;
     }
@@ -142,13 +139,11 @@ export function InvoiceFooter({
    */
   async function destroy() {
     if (
-      !window.confirm(
-        `Delete this invoice?\n\n` +
+      !(await confirmDialog({ ...splitConfirmMessage(`Delete this invoice?\n\n` +
           `Its lines go with it. Any document filed only here is removed; a ` +
           `document that also belongs to a purchase order stays on that order.\n\n` +
           `This is for an invoice filed by mistake. To keep the record but stop ` +
-          `it counting toward what you owe, use Void instead.\n\nThis cannot be undone.`
-      )
+          `it counting toward what you owe, use Void instead.\n\nThis cannot be undone.`), confirmLabel: "Delete", tone: "danger" }))
     ) {
       return;
     }

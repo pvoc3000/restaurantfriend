@@ -25,6 +25,7 @@ import { DocumentChip } from "@/components/ui/DocumentChip";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { RevealPanel } from "@/components/ui/RevealPanel";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * One document's expiry, on the chip.
@@ -199,9 +200,7 @@ export function EmployeeDocuments({
 
   async function remove(doc: SignedEmployeeDocument) {
     if (
-      !window.confirm(
-        `Remove ${doc.file_name ?? "this document"} from this employee's file?\n\nThis cannot be undone.`
-      )
+      !(await confirmDialog({ ...splitConfirmMessage(`Remove ${doc.file_name ?? "this document"} from this employee's file?\n\nThis cannot be undone.`), confirmLabel: "Remove", tone: "danger" }))
     ) {
       return;
     }
