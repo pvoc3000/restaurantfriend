@@ -100,9 +100,18 @@ export function useCalcField() {
  * don't have was following the reference past the point it had anything to say.
  * `⌫` takes the corner they vacated.
  *
- * `=` IS `Done` UNDER ITS PROPER NAME (Mark: "same as done, just labeled
- * differently"). It evaluates and dismisses — which on this pad is one act,
- * because the field behind is what holds the answer.
+ * `=` EVALUATES AND STAYS (Mark, 2026-08-10: "make the [=] button not dismiss
+ * the panel… I can always tap outside of it to make it go away"). It was `Done`
+ * under its proper name, on the reasoning that evaluating and leaving were one
+ * act here because the field behind holds the answer. They aren't: `=` on a
+ * calculator collapses the expression to its result and leaves you sitting on
+ * it, ready to keep going — 5×3 = 15, then ÷2. Dismissing on it made the answer
+ * the end of the conversation, and cost you the pad every time you wanted to
+ * check a number before committing to it.
+ *
+ * So `=` writes the result into the field and holds focus, and LEAVING is one
+ * gesture with one meaning: tap outside. That is also the only route that
+ * commits, since every field here saves on blur.
  */
 type Key = readonly [label: string, action: string, tone: "fn" | "digit" | "op"];
 
@@ -111,7 +120,7 @@ const KEYS: ReadonlyArray<Key> = [
   ["7", "7", "digit"],  ["8", "8", "digit"],  ["9", "9", "digit"], ["×", "×", "op"],
   ["4", "4", "digit"],  ["5", "5", "digit"],  ["6", "6", "digit"], ["−", "-", "op"],
   ["1", "1", "digit"],  ["2", "2", "digit"],  ["3", "3", "digit"], ["+", "+", "op"],
-  ["C", "clear", "fn"], ["0", "0", "digit"],  [".", ".", "digit"], ["=", "done", "op"],
+  ["C", "clear", "fn"], ["0", "0", "digit"],  [".", ".", "digit"], ["=", "equals", "op"],
 ];
 
 /**
@@ -290,17 +299,50 @@ export function CalcPad() {
     }, 0);
   }
 
+  /**
+   * Collapse the expression to its answer, in the field, and stay.
+   *
+   * NOTHING TO EVALUATE IS A NO-OP, NEVER AN EXIT — the same rule `back` keeps,
+   * and for the same reason: `=` on a half-typed "5×" is a mis-tap, and taking
+   * the pad down would answer it by throwing the expression away. An empty
+   * field, an unfinished one and an unreadable one all leave the field exactly
+   * as it is, which is what the readout is already saying in words.
+   *
+   * The readout follows for free. Once the field holds the answer, `draft` IS
+   * the result, so `showsResult` goes false and the small grey expression line
+   * clears — the same thing a calculator does when you press it.
+   */
+  function equals() {
+    const el = target;
+    if (!el) return;
+    const text = el.value.trim();
+    if (text === "") return;
+    const value = evaluateNumeric(text);
+    if (value === null) return;
+    const next = String(value);
+    if (next === el.value) return;
+    setNativeValue(el, next);
+    caretTo(el, next.length);
+  }
+
   function press(action: string) {
     const el = target;
     if (!el) return;
     if (action === "back") return back();
+    if (action === "equals") return equals();
     if (action === "clear") {
       setNativeValue(el, "");
       caretTo(el, 0);
       return;
     }
-    // Every field commits on blur — InlineValue saves, the guide's boxes
-    // upsert — so leaving IS the commit, and one route out keeps them uniform.
+    // NO KEY SENDS THIS ANY MORE — the catcher is its only caller, so "done"
+    // means "the reader tapped outside" and nothing else. Keeping it an action
+    // rather than inlining it at the catcher is deliberate: `write`'s fallthrough
+    // below would otherwise type a stray character into the field for any action
+    // it doesn't recognise, and this is the one that must never be typed.
+    //
+    // Every field commits on blur — InlineValue saves, the guide's boxes upsert
+    // — so leaving IS the commit, and there is now exactly one way to leave.
     // Clearing `target` as well is belt and braces: normally the blur's own
     // focusout does it, and on a detached node (see the observer above) blur is
     // a no-op, so without this a tap on the scrim couldn't dismiss the pad
