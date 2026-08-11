@@ -811,9 +811,31 @@ export function OrderGuide({
                 // can use width, so it should get it.
                 ["Order", "w-64 pr-0 text-right max-[1180px]:w-auto"],
               ].map(([label, extra]) => (
+                // CELL PADDING TAKES A SECOND STEP AT 880 — px-4 → px-2 → px-1
+                // — and it buys the guide a real margin on a small iPad (Mark,
+                // 2026-08-10: the 10th-gen "seems to zoom in when changing
+                // orientation", while the 12.9" Pro was fine).
+                //
+                // A table cannot render below its min-content, and the six
+                // columns left at this width bottomed out at 795px against the
+                // 788px a 820pt portrait iPad has to give. So the guide was
+                // ~7px wider than the screen at every rotation — enough for
+                // iOS Safari to rescale the page to fit, which is what reads as
+                // "it zoomed in". The 12.9" hands it 992px and never came near
+                // the floor, which is exactly why one iPad showed it and the
+                // other didn't.
+                //
+                // The padding is the honest lever, because the alternative is
+                // dropping another column and the ones left all earn their
+                // place (see the notes above — Sugg is what count mode is FOR).
+                // 4px a side over six columns takes the floor 795 → 751, so the
+                // walk now clears a portrait 10th-gen by ~37px with its full
+                // 16px page gutter intact, rather than by 5px with the table
+                // overrunning the gutter. Safari sets type slightly wider than
+                // Chromium, and that margin is what absorbs it.
                 <th
                   key={label}
-                  className={`sticky top-[calc(var(--rf-header-h)_+_var(--rf-guide-controls-h))] z-20 bg-white px-4 py-3 font-normal shadow-[inset_0_-2px_0_var(--rf-neutral-900)] max-[1180px]:px-2 ${extra}`}
+                  className={`sticky top-[calc(var(--rf-header-h)_+_var(--rf-guide-controls-h))] z-20 bg-white px-4 py-3 font-normal shadow-[inset_0_-2px_0_var(--rf-neutral-900)] max-[1180px]:px-2 max-[880px]:px-1 ${extra}`}
                 >
                   {label}
                 </th>
@@ -926,7 +948,7 @@ export function OrderGuide({
                             Anything added to this row from now on inherits
                             that: it can be as long as it likes, and it will be
                             clipped rather than pushing the walk sideways. */}
-                        <div className="flex w-0 min-w-full items-baseline gap-4 border-b-2 border-ink px-4 pb-2 max-[1180px]:px-2">
+                        <div className="flex w-0 min-w-full items-baseline gap-4 border-b-2 border-ink px-4 pb-2 max-[1180px]:px-2 max-[880px]:px-1">
                           {/* items-BASELINE here too, with the triangle opted OUT via self-center.
                             A flex container's baseline comes from its first
                             item that PARTICIPATES in baseline alignment, and

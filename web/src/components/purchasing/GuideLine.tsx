@@ -177,7 +177,7 @@ export function GuideLine({
     >
       {/* Vendor over brand, the way the printed guide reads. Generous row
           padding on purpose — the walk is read standing up. */}
-      <td className="whitespace-nowrap py-4 pl-4 pr-4 align-middle max-[1180px]:whitespace-normal max-[1180px]:px-2">
+      <td className="whitespace-nowrap py-4 pl-4 pr-4 align-middle max-[1180px]:whitespace-normal max-[1180px]:px-2 max-[880px]:px-1">
         <div className="flex items-baseline gap-1.5">
           {/* Favorites carry a marker so "All" can be scanned: the source
               you'd normally take, whether or not it's today's work.
@@ -231,7 +231,7 @@ export function GuideLine({
           underneath. Pack still reads the way the case is labelled — "12 × 32
           oz" — because that's what you check a delivery against (§4.6), and it
           stays nowrap at every width so "12 ×" never parts from "32 oz". */}
-      <td className="px-4 py-4 align-middle text-body max-[1180px]:px-2">
+      <td className="px-4 py-4 align-middle text-body max-[1180px]:px-2 max-[880px]:px-1">
         <Link
           href={withFrom(`/vendor-items/${row.vendor_item_id}`, here)}
           className="no-underline hover:underline"
@@ -273,7 +273,7 @@ export function GuideLine({
         )}
       </td>
 
-      <td className="whitespace-nowrap px-4 py-4 align-middle text-right tabular-nums text-muted max-[1180px]:whitespace-normal max-[1180px]:px-2">
+      <td className="whitespace-nowrap px-4 py-4 align-middle text-right tabular-nums text-muted max-[1180px]:whitespace-normal max-[1180px]:px-2 max-[880px]:px-1">
         {money(row.effective_price)}
         {/* Two decimals to read, four to compare (Mark, 2026-07-29). The view
             already computes this to 4dp — `toFixed` only ever changed the
@@ -295,7 +295,7 @@ export function GuideLine({
           counts packages, and a case count typed in here is the easiest
           mistake on the screen to make — so each input now names its own unit:
           "oz" here, "par 3 CS" under the order box. */}
-      <td className="px-4 py-4 align-middle text-right max-[1180px]:px-2">
+      <td className="px-4 py-4 align-middle text-right max-[1180px]:px-2 max-[880px]:px-1">
         <span className="inline-flex items-baseline gap-1.5">
           <input
             {...calcField}
@@ -349,7 +349,7 @@ export function GuideLine({
       {/* Never wraps, at any width: the −/box/+ is the one thing on the line
           you touch, and it has to stay one object. It and the on-hand box are
           the row's two hard floors — everything else gives way around them. */}
-      <td className="whitespace-nowrap py-4 pl-4 pr-0 align-middle max-[1180px]:pl-2">
+      <td className="whitespace-nowrap py-4 pl-4 pr-0 align-middle max-[1180px]:pl-2 max-[880px]:pl-1">
         <div className="flex items-center justify-end gap-2">
           <span className="mr-1 text-xs font-semibold uppercase tracking-[0.06em] text-body">
             {row.package_desc ?? ""}
