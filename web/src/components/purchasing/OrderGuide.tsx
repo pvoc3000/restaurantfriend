@@ -836,7 +836,14 @@ export function OrderGuide({
                           below 1180px — the browser clamps a colSpan to the
                           real column count, so the band still spans the row. */}
                       <td colSpan={7} className="px-4 py-0 xl:px-8">
-                        <div className="flex min-h-20 items-center gap-6">
+                        {/* w-0 min-w-full: SIZE ME FROM THE TABLE, never the
+                            table from me. See the item header below for the
+                            whole argument — a banner row spans every column, so
+                            whatever it can't wrap is added to the table's
+                            minimum and pushes the guide off the side of an
+                            iPad. A section name is one long word away from
+                            doing exactly what the last-purchase line did. */}
+                        <div className="flex min-h-20 w-0 min-w-full items-center gap-6">
                           <span className="text-[36px] font-bold uppercase leading-none tracking-[-0.02em] text-white">
                             {section.label}
                           </span>
@@ -886,7 +893,40 @@ export function OrderGuide({
                             two baselines land apart — which is what the eye
                             reads. Sharing a baseline is the only alignment that
                             makes two different sizes look set on one line. */}
-                        <div className="flex items-baseline gap-4 border-b-2 border-ink px-4 pb-2 max-[1180px]:px-2">
+                        {/* w-0 min-w-full, and it is load-bearing on an iPad
+                            (Mark, 2026-08-10: content wider than the screen on
+                            two of them, and only on this screen).
+
+                            `truncate` is `white-space: nowrap`, and a nowrap
+                            element's MIN-CONTENT is its whole string. `min-w-0`
+                            doesn't reduce that — it only licenses flex
+                            shrinking against a DEFINITE width, and this cell
+                            has none: it spans all seven columns of an
+                            auto-layout table, so the table's width is being
+                            derived FROM this content. The truncation therefore
+                            never got a chance to happen; the table just grew.
+                            Measured at 820px: the columns' own minimum is
+                            795px, and the item headers were forcing 1210 —
+                            "STICKER, SAFETY SEAL · last 2026-08-10 · Amazon ·
+                            Food Grade Tamper Evident Safety Seal Stickers"
+                            being set as one unbreakable line. Every one of the
+                            eight widest rows was an item header, which is what
+                            named the culprit: the last-purchase subtitle,
+                            added the same day.
+
+                            width:0 makes the intrinsic contribution zero (a
+                            percentage min-width is ignored while the browser
+                            is measuring), then min-width:100% fills the cell
+                            once the columns are settled. So the row still
+                            spans the table and its 2px rule still runs the
+                            full width — the ONLY thing that changes is that it
+                            stops voting on how wide the table is, and `truncate`
+                            starts doing its job. 1210 → 799 in a 788px box.
+
+                            Anything added to this row from now on inherits
+                            that: it can be as long as it likes, and it will be
+                            clipped rather than pushing the walk sideways. */}
+                        <div className="flex w-0 min-w-full items-baseline gap-4 border-b-2 border-ink px-4 pb-2 max-[1180px]:px-2">
                           {/* items-BASELINE here too, with the triangle opted OUT via self-center.
                             A flex container's baseline comes from its first
                             item that PARTICIPATES in baseline alignment, and
