@@ -345,6 +345,10 @@ export function CalcPad() {
         e.preventDefault();
         press("done");
       }}
+      // Suppress only — `press("done")` stays on pointerdown, so a tap outside
+      // commits exactly once. This stops the synthesised mousedown blurring the
+      // field a second time, by its own route, after we have already decided.
+      onMouseDown={(e) => e.preventDefault()}
     >
       {/* THE GUARD RING — transparent, and the reason the pad stopped
           dismissing itself while you were using it.
@@ -369,6 +373,11 @@ export function CalcPad() {
           e.preventDefault();
           e.stopPropagation();
         }}
+        // See the key buttons: pointerdown alone doesn't hold focus in WebKit.
+        onMouseDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
       >
       <div
         // THIS PANEL DELIBERATELY DOES NOT LOOK LIKE THE APP (Mark, 2026-08-10,
@@ -390,6 +399,11 @@ export function CalcPad() {
         // A tap anywhere on the pad, including its gaps, must not move focus —
         // and must not reach the catcher, or every key press would also commit.
         onPointerDown={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        // See the key buttons: pointerdown alone doesn't hold focus in WebKit.
+        onMouseDown={(e) => {
           e.preventDefault();
           e.stopPropagation();
         }}
@@ -430,6 +444,28 @@ export function CalcPad() {
                 e.preventDefault();
                 e.stopPropagation();
                 press(action);
+              }}
+              // AND AGAIN ON MOUSEDOWN, which is not belt and braces — it is
+              // the only one of the two WebKit is known to honour for keeping
+              // focus. iOS builds pointer events on top of touches and then
+              // synthesises a mouse sequence, and `preventDefault()` on the
+              // POINTER event does not reliably cancel the focus change that
+              // rides the synthesised `mousedown`. Chromium suppresses it from
+              // the pointerdown alone, which is why the pad tests clean on a
+              // desktop and only misbehaves on the iPad.
+              //
+              // Losing focus here is not cosmetic: the field's focusout is what
+              // CalcPad reads as "the reader has left", so it takes the pad down
+              // — on EVERY key (Mark, 2026-08-10). The digit still lands, since
+              // pointerdown already ran, which is the tell.
+              //
+              // `TextInput`'s ✕ learned exactly this and for exactly this
+              // reason ("without it the field blurs on press"). It acts on
+              // pointerdown and nowhere else, so this handler only ever
+              // suppresses — it can never double-press.
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
               }}
               tabIndex={-1}
               aria-label={label}
