@@ -14,6 +14,7 @@ import { ElementLocationRows } from "@/components/production/ElementLocationRows
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { BATCH_STATUS_LABEL, batchDate, describeAmount } from "@/lib/productionBatches";
 import { elementTypeVocabulary, type ElementKind } from "@/lib/production";
+import { ElementActions } from "@/components/production/ElementActions";
 
 /**
  * One element: what it is, what it costs today, where its recipes are, and what
@@ -255,6 +256,24 @@ export async function ElementDetail({
           </ul>
         )}
       </section>
+
+      {/* ---- the end of the record --------------------------------------- */}
+      {/* Bottom LEFT, after everything — the placement Mark settled on for the
+          employee record in 2026-08-02 after trying it beside the name, under
+          the record book and bottom right. You pass what the element costs,
+          what it is made into and what has been made from it before you reach
+          the one control that destroys it. */}
+      {editable ? (
+        <div className="flex justify-start pt-4">
+          <ElementActions
+            elementId={id}
+            name={element.name as string}
+            isActive={(element.is_active ?? true) as boolean}
+            variant="button"
+            afterDelete={{ href: "/elements" }}
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

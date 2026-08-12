@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
+import { ElementActions } from "@/components/production/ElementActions";
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { usePublishRecordSet } from "@/lib/recordSet";
@@ -351,6 +352,27 @@ export function ElementsList({
         </span>
       ),
     },
+    // The row's own commands, in the app's ⋯ idiom. Unlabelled, so it stays out
+    // of the Columns menu and holds its declared slot through a drag: it is a
+    // control column, not a field.
+    ...(editable
+      ? ([
+          {
+            key: "actions",
+            label: "",
+            width: 60,
+            align: "right",
+            render: (r: ElementRow) => (
+              <ElementActions
+                elementId={r.id}
+                name={r.name}
+                isActive={r.is_active}
+                variant="row"
+              />
+            ),
+          },
+        ] as DataColumn<ElementRow>[])
+      : []),
   ];
 
   const group: DataGroup<ElementRow> = {

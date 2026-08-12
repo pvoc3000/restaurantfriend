@@ -30,6 +30,7 @@ import "./payrollBenefits.fixtures";
 import "./poFilters.fixtures";
 import "./productionBatches.fixtures";
 import "./productionCost.fixtures";
+import "./productionElements.fixtures";
 import "./productionHistory.fixtures";
 import "./productionItems.fixtures";
 import "./productionPlans.fixtures";
