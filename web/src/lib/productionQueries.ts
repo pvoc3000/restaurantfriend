@@ -266,6 +266,7 @@ export async function loadItemGraph(
       qty: e.qty === null ? null : Number(e.qty),
       unit: (e.unit ?? null) as string | null,
       element_id: (e.element_id ?? null) as string | null,
+      sort: e.sort === null || e.sort === undefined ? null : Number(e.sort),
     });
     edgesByItem.set(key, list);
   }
@@ -320,6 +321,37 @@ export async function loadItemGraph(
       })),
       overridesByItem,
     },
+    error: null,
+  };
+}
+
+/**
+ * Every ACTIVE element, id and name, for a picker to choose from.
+ *
+ * Separate from `loadProductionGraph`, which loads the same table but for
+ * COSTING and therefore loads all 470 whether they are retired or not — a
+ * resolver has to be able to price a component that is already on a BOM. A
+ * picker is the opposite question: what may be added NOW. Offering an inactive
+ * element there would make deactivating one mean nothing, which is the whole
+ * answer `ElementActions` gives for the 412 that cannot be deleted.
+ *
+ * Paginated like everything else here — PostgREST truncates at 1,000 rows in
+ * silence, and this catalog is at 470 and grows.
+ */
+export async function loadElementOptions(
+  supabase: SupabaseClient
+): Promise<{ options: { value: string; label: string }[]; error: string | null }> {
+  const { data, error } = await fetchAll(
+    supabase,
+    "production_elements",
+    "id, name, is_active",
+    "name"
+  );
+  if (error) return { options: [], error: error.message };
+  return {
+    options: data
+      .filter((e) => e.is_active !== false)
+      .map((e) => ({ value: e.id as string, label: e.name as string })),
     error: null,
   };
 }

@@ -78,6 +78,13 @@ export type CostLine = {
   qty: number | null;
   unit: string | null;
   element_id: string | null;
+  /**
+   * Where the row sits in its list. Nothing about COSTING reads it — a total is
+   * a total in any order — but the screens that render these lines do, and a
+   * row you have just added has to land somewhere predictable rather than
+   * wherever its uuid happens to fall.
+   */
+  sort?: number | null;
 };
 
 /** Why a cost could not be resolved, in the words the UI shows. */

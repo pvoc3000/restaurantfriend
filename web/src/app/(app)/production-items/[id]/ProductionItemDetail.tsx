@@ -1,17 +1,16 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
-import { loadProductionGraph, loadItemGraph } from "@/lib/productionQueries";
-import { itemCost, lineCost, matchYield, versionBatchCost, formatCost } from "@/lib/productionCost";
+import { loadProductionGraph, loadItemGraph, loadElementOptions } from "@/lib/productionQueries";
+import { itemCost, lineCost, matchYield, versionBatchCost } from "@/lib/productionCost";
 import { resolveItemPrice } from "@/lib/productionPrice";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
-import { SectionHeading } from "@/components/ui/SectionHeading";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { ProductionItemFields } from "@/components/production/ProductionItemFields";
+import { ItemComponents } from "@/components/production/ItemComponents";
 import { ProductionItemLocations } from "@/components/production/ProductionItemLocations";
 import { ProductionItemHistory } from "@/components/production/ProductionItemHistory";
 import { historyWindow, type HistoryLine } from "@/lib/productionHistory";
@@ -53,6 +52,7 @@ export async function ProductionItemDetail({
     { graph: items, error: itemError },
     { data: row, error: rowError },
     { data: historyRows, error: historyError },
+    { options: elementOptions },
   ] = await Promise.all([
     loadItemGraph(supabase, elementNames),
     supabase
@@ -69,6 +69,9 @@ export async function ProductionItemDetail({
       .eq("item_id", id)
       .gte("schedule_date", fortnight.from)
       .lte("schedule_date", fortnight.to),
+    // The Add picker's vocabulary. Active elements only — see the helper for
+    // why the costing graph beside it can't answer this.
+    loadElementOptions(supabase),
   ]);
   if (itemError || rowError) return <LoadError message={itemError ?? rowError!.message} />;
   if (!row) notFound();
@@ -108,11 +111,21 @@ export async function ProductionItemDetail({
       ? baseBatch.cost * Number(rule.portion_of_batch) * Number(rule.size_factor ?? 1)
       : null;
 
-  const componentRows = item.elements.map((line) => ({
-    line,
-    name: line.element_id ? elementNames.get(line.element_id) ?? "—" : line.label ?? "—",
-    cost: lineCost(line, graph!.byId, locationId),
-  }));
+  // BY `sort`, then by name. The loader sweeps this table ordered by `id`, so
+  // until now the breakdown's row order was the order uuids happened to fall
+  // in — invisible while nothing could add a row, and arbitrary the moment
+  // something can. 037 indexes `(item_id, sort)` for exactly this.
+  const componentRows = item.elements
+    .map((line) => ({
+      line,
+      name: line.element_id ? elementNames.get(line.element_id) ?? "—" : line.label ?? "—",
+      cost: lineCost(line, graph!.byId, locationId),
+    }))
+    .sort(
+      (a, b) =>
+        (a.line.sort ?? Number.MAX_SAFE_INTEGER) - (b.line.sort ?? Number.MAX_SAFE_INTEGER) ||
+        a.name.localeCompare(b.name)
+    );
 
   // Vocabularies: whatever the catalog already uses, so the pickers offer the
   // real words before offering to invent one.
@@ -174,71 +187,34 @@ export async function ProductionItemDetail({
         />
       </div>
 
-      <section className="space-y-2">
-        <SectionHeading count={componentRows.length + (base ? 1 : 0)}>
-          What it costs
-        </SectionHeading>
-        <table className="w-full max-w-[70ch] border-collapse text-[14px]">
-          <thead>
-            <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
-              <th className="px-3 py-2 text-left">Component</th>
-              <th className="px-3 py-2 text-right">Amount</th>
-              <th className="px-3 py-2 text-right">Cost</th>
-            </tr>
-          </thead>
-          <tbody>
-            {base ? (
-              <tr className="hover:bg-neutral-50">
-                <td className="px-3 py-2">
-                  <Link href={`/elements/${base.id}`} className="hover:underline">
-                    {base.name}
-                  </Link>
-                  <span className="block text-[12px] text-subtle">the dough</span>
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums text-muted">
-                  {rule?.portion_of_batch
-                    ? `${fraction(Number(rule.portion_of_batch) * Number(rule.size_factor ?? 1))} of a batch`
-                    : <span className="text-mark">no yield rule</span>}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {doughCost === null ? <span className="text-mark">—</span> : `$${doughCost.toFixed(4)}`}
-                </td>
-              </tr>
-            ) : null}
-            {componentRows.map(({ line, name, cost: c }) => (
-              <tr key={line.id} className="hover:bg-neutral-50">
-                <td className="px-3 py-2">
-                  {line.element_id ? (
-                    <Link href={`/elements/${line.element_id}`} className="hover:underline">
-                      {name}
-                    </Link>
-                  ) : (
-                    <span className="text-muted">{name}</span>
-                  )}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums text-muted">
-                  {line.qty === null ? "—" : `${line.qty} ${line.unit ?? ""}`.trim()}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums">
-                  {c.cost === null ? <span className="text-mark">—</span> : `$${c.cost.toFixed(4)}`}
-                </td>
-              </tr>
-            ))}
-            <tr className="border-t border-ink font-medium">
-              <td className="px-3 py-2" colSpan={2}>
-                Total
-              </td>
-              <td className="px-3 py-2 text-right tabular-nums">{formatCost(cost)}</td>
-            </tr>
-          </tbody>
-        </table>
-        {componentRows.length === 0 && !base ? (
-          <p className="text-[13px] text-muted">
-            Nothing recorded — this item has no dough and no components, so it
-            costs nothing until one is added.
-          </p>
-        ) : null}
-      </section>
+      <ItemComponents
+        itemId={id}
+        orgId={session.membership.org_id}
+        dough={
+          base
+            ? {
+                id: base.id,
+                name: base.name,
+                amount: rule?.portion_of_batch
+                  ? `${fraction(Number(rule.portion_of_batch) * Number(rule.size_factor ?? 1))} of a batch`
+                  : null,
+                cost: doughCost,
+              }
+            : null
+        }
+        rows={componentRows.map(({ line, name, cost: c }) => ({
+          id: line.id,
+          elementId: line.element_id,
+          name,
+          qty: line.qty,
+          unit: line.unit,
+          cost: c.cost,
+          sort: line.sort ?? null,
+        }))}
+        total={cost}
+        options={elementOptions}
+        editable={editable}
+      />
 
       <ProductionItemLocations
         itemId={id}
