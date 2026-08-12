@@ -13,7 +13,7 @@ import { ElementFields } from "@/components/production/ElementFields";
 import { ElementLocationRows } from "@/components/production/ElementLocationRows";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { BATCH_STATUS_LABEL, batchDate, describeAmount } from "@/lib/productionBatches";
-import type { ElementKind } from "@/lib/production";
+import { elementTypeVocabulary, type ElementKind } from "@/lib/production";
 
 /**
  * One element: what it is, what it costs today, where its recipes are, and what
@@ -57,7 +57,9 @@ export async function ElementDetail({
            is_active, notes, on_weekly_log, weekly_sort, weekly_amount, weekly_unit`
         )
         .eq("element_id", id),
-      supabase.from("production_elements").select("element_type").not("element_type", "is", null),
+      // The TYPE menu is the recipe types, not the element types in use —
+      // `elementTypeVocabulary` says why.
+      supabase.from("production_recipes").select("recipe_type").not("recipe_type", "is", null),
     ]);
 
   // The last ten times this was made — what `production_batches_element_idx`
@@ -99,9 +101,9 @@ export async function ElementDetail({
     ? element.inventory_items[0]
     : element.inventory_items;
 
-  const typeVocabulary = [
-    ...new Set((types ?? []).map((t) => t.element_type as string).filter(Boolean)),
-  ].sort();
+  const typeVocabulary = elementTypeVocabulary(
+    (types ?? []).map((t) => t.recipe_type as string | null)
+  );
 
   const trail = parseTrail(rawParams, { href: "/elements", label: "Elements" });
 

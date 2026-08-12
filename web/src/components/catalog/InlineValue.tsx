@@ -115,6 +115,7 @@ export function InlineValue({
   alsoUpdate,
   options,
   allowNew = false,
+  clearable,
   jsonColumn,
   jsonPath,
   jsonDocument,
@@ -184,6 +185,13 @@ export function InlineValue({
   options?: PickOption[];
   /** kind="pick" only — let a value off the list be typed in (categories). */
   allowNew?: boolean;
+  /**
+   * kind="pick" only — offer a "None" row that writes null. DEFAULTS TO
+   * `nullable`, so every pick cell over a nullable column can be emptied and no
+   * cell over a NOT NULL one offers a write the database would reject. Pass it
+   * explicitly only to overrule that.
+   */
+  clearable?: boolean;
   /** The jsonb column to write, when this cell edits a key inside one. */
   jsonColumn?: string;
   /** Path to the key within that column, e.g. ["shipping", "street1"]. */
@@ -405,6 +413,7 @@ export function InlineValue({
           value={value === null ? null : String(value)}
           options={options ?? []}
           allowNew={allowNew}
+          clearable={clearable ?? nullable}
           disabled={saving}
           placeholder={placeholder}
           ariaLabel={ariaLabel ?? column}

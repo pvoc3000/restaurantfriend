@@ -146,6 +146,7 @@ export function NewElement({ orgId, types }: { orgId: string; types: string[] })
                 onPick={setElementType}
                 options={types.map((t) => ({ value: t, label: t }))}
                 allowNew
+                clearable
                 ariaLabel="Type"
                 placeholder="Glaze, Topping, Cream…"
               />

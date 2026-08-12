@@ -9,7 +9,9 @@
  *
  * Element TYPE and SCHEDULE CLASS are the opposite — a kitchen invents a
  * category faster than a migration can be written — so those are free text in
- * the schema and the screens offer a PickList over whatever exists, `allowNew`.
+ * the schema and the screens offer a PickList, `allowNew`. Type lists whatever
+ * already exists; schedule lists the two Mark named and lets the rest be typed
+ * (see `SCHEDULE_CLASS_OPTIONS`).
  */
 
 export const ELEMENT_KINDS = ["made", "purchased", "manual"] as const;
@@ -32,6 +34,66 @@ export const ELEMENT_KIND_OPTIONS = ELEMENT_KINDS.map((value) => ({
   value,
   label: ELEMENT_KIND_LABEL[value],
   hint: ELEMENT_KIND_HINT[value],
+}));
+
+/**
+ * The element's production rhythm — the Schedule field on element detail
+ * (Mark, 2026-08-11: "a popup menu … Daily and Weekly").
+ *
+ * THE VALUES ARE UPPERCASE AND THAT IS LOAD-BEARING, not house style.
+ * `generate_production_batches` (044) selects `schedule_class = 'WEEKLY'` with
+ * an exact string comparison, and `lib/productionPacket` builds the AB and
+ * Weekly element sheets by filtering on `'AB'` / `'WEEKLY'`. A menu that wrote
+ * "Weekly" would quietly drop 45 active elements out of batch generation while
+ * the screen went on reading correctly. Only the LABEL is title case.
+ *
+ * `allowNew` at the call site, and it is not tidiness: the live catalog also
+ * holds AB (47 elements) and DONUT (16), and `PickList` with a closed set does
+ * not merely hide a value from the menu — it makes it UNENTERABLE, while the
+ * stored ones keep rendering, which is what hides the gap (the `GAL`/`QT`
+ * lesson in CLAUDE.md). AB in particular is the AB element sheet's only
+ * source. Leaving them off the LIST is Mark's call; leaving them unreachable
+ * would be a bug.
+ */
+export const SCHEDULE_CLASSES = ["DAILY", "WEEKLY"] as const;
+
+/**
+ * The element TYPE vocabulary — the recipe types, plus one (Mark, 2026-08-11:
+ * "the same as recipe types, plus 'Ingredient' and Add New").
+ *
+ * IT IS THE RECIPE TYPES AND NOT THE ELEMENT TYPES ALREADY IN USE, which is
+ * the point and the thing a tidy-up would undo. `production_recipes.recipe_type`
+ * holds eight values (Cookie · Donut · Filling · Glaze · Ice Cream · Misc ·
+ * Signature · Topping) and `production_elements.element_type` holds sixteen —
+ * the eight plus Cleaning, Bagging, Cream, Jam, Fruit, AB Duties, Ice Cream Cup
+ * and Cookie Sandwich Supreme, FileMaker's drift. Offering what exists would
+ * offer the drift back. `Ingredient` is the one thing an element is that a
+ * recipe never is: a purchased component, which is 203 of the 210 untyped rows.
+ *
+ * The list is DERIVED from the recipes rather than written down here, so the
+ * two vocabularies cannot diverge — "same as recipe types" is a rule about a
+ * relationship, not a snapshot of eight strings.
+ *
+ * `allowNew` at every call site, which is what makes the narrowing safe: the
+ * off-list values stay typeable and a stored one still renders (PickList lists
+ * the current value first whether or not it is on the menu).
+ */
+export const INGREDIENT_ELEMENT_TYPE = "Ingredient";
+
+export function elementTypeVocabulary(
+  recipeTypes: (string | null | undefined)[]
+): string[] {
+  const set = new Set<string>([INGREDIENT_ELEMENT_TYPE]);
+  for (const t of recipeTypes) {
+    const v = (t ?? "").trim();
+    if (v) set.add(v);
+  }
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+export const SCHEDULE_CLASS_OPTIONS = SCHEDULE_CLASSES.map((value) => ({
+  value,
+  label: value.charAt(0) + value.slice(1).toLowerCase(),
 }));
 
 export function elementKindLabel(kind: string | null): string {

@@ -5,7 +5,7 @@ import { loadProductionGraph } from "@/lib/productionQueries";
 import { elementCost } from "@/lib/productionCost";
 import { ElementsList, type ElementRow } from "@/components/production/ElementsList";
 import { NewElement } from "@/components/production/NewElement";
-import type { ElementKind } from "@/lib/production";
+import { elementTypeVocabulary, type ElementKind } from "@/lib/production";
 import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
 
 /**
@@ -31,13 +31,18 @@ export default async function ElementsPage({
   const editable = canWriteCatalog(session.membership.role);
   const locationId = session.activeLocation?.id ?? null;
 
-  const [{ graph, error }, { data: catalog, error: catalogError }] = await Promise.all([
-    loadProductionGraph(supabase),
-    supabase
-      .from("production_elements")
-      .select("id, name, kind, element_type, schedule_class, is_active")
-      .order("name"),
-  ]);
+  const [{ graph, error }, { data: catalog, error: catalogError }, { data: recipeTypes }] =
+    await Promise.all([
+      loadProductionGraph(supabase),
+      supabase
+        .from("production_elements")
+        .select("id, name, kind, element_type, schedule_class, is_active")
+        .order("name"),
+      // Only the New element dialog reads this — the list's own TYPE filter is
+      // built from the rows, because a filter has to offer what is actually
+      // there or it cannot find anything.
+      supabase.from("production_recipes").select("recipe_type").not("recipe_type", "is", null),
+    ]);
 
   if (error || catalogError) {
     const message = error ?? catalogError?.message ?? "";
@@ -66,10 +71,14 @@ export default async function ElementsPage({
     };
   });
 
-  // The type vocabulary is whatever exists — a kitchen invents a category
-  // faster than a migration can be written, so the picker offers these and
-  // allows new ones.
-  const types = [...new Set(rows.map((r) => r.element_type).filter(Boolean))].sort() as string[];
+  // The recipe types plus Ingredient, matching the element record's own Type
+  // menu — a create form offering a different vocabulary than the screen you
+  // land on is exactly the drift these shared parts exist to prevent. Still
+  // `allowNew`, because a kitchen invents a category faster than a migration
+  // can be written.
+  const types = elementTypeVocabulary(
+    (recipeTypes ?? []).map((t) => t.recipe_type as string | null)
+  );
 
   return (
     <div className="space-y-6">

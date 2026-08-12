@@ -38,7 +38,8 @@ export type PickOption = {
  * The stored value is ALWAYS shown even when it isn't on the list: the catalog
  * holds values this vocabulary doesn't (FMP wrote sizes into package_desc), and
  * a control that silently swapped one for a neighbour would be an edit nobody
- * asked for. It's listed first, marked as the current value.
+ * asked for. It's listed above the vocabulary, marked as the current value —
+ * under the clear row, where there is one.
  *
  * TWO TRIGGERS, one list (Mark, 2026-08-01). `inline` is the original: the
  * dotted underline `InlineValue` rests in, for a cell whose value you edit in
@@ -55,6 +56,8 @@ export function PickList({
   placeholder = "—",
   disabled = false,
   allowNew = false,
+  clearable = false,
+  clearLabel = "None",
   ariaLabel,
   align = "left",
   variant = "inline",
@@ -74,6 +77,31 @@ export function PickList({
    * the package tokens a vendor reads on an order.
    */
   allowNew?: boolean;
+  /**
+   * Offer a row that EMPTIES the field (Mark, 2026-08-11: "a clear option would
+   * be useful on the picklist throughout the app"). Until this there was no way
+   * back out of a pick at all — choosing IS the edit, so every value you could
+   * reach was another value, and a field picked by mistake stayed picked.
+   *
+   * `InlineValue` passes `nullable` straight into this, which is what makes it
+   * "throughout the app" without a sweep: that flag already says whether the
+   * column accepts null, so a NOT NULL cell keeps offering no way to empty it
+   * and no cell can offer a write the database would reject.
+   *
+   * IT SUPPRESSES ITSELF when the caller already declares an option whose value
+   * is `""` — "No section" on an item's shelf, "All categories" in a filter.
+   * Those are the same answer in the caller's own words, and two rows saying it
+   * would read as two different things.
+   *
+   * It joins the LIST and not `options`, which is what keeps the trigger's
+   * empty state the app's faint "—" rather than a black "None": 203 of 470
+   * elements have no type because nobody has got to them, and a full-strength
+   * label would report that as a decision. It is first, so it is in one place
+   * whether or not the current value is on the list.
+   */
+  clearable?: boolean;
+  /** The clear row's word, when "None" isn't the right one. */
+  clearLabel?: string;
   ariaLabel?: string;
   align?: "left" | "right";
   /**
@@ -120,10 +148,21 @@ export function PickList({
   const searchable = options.length > 8 || allowNew;
 
   const known = options.some((o) => o.value === value);
-  const listed: PickOption[] =
-    value && !known
-      ? [{ value, label: value, hint: "current value", group: "Current" }, ...options]
-      : options;
+  // A null column and a `""` option are the same answer, and `choose` already
+  // treats them as one. Comparing raw would leave the clear row unticked while
+  // it IS the current state.
+  const selected = value ?? "";
+  const clearOption: PickOption | null =
+    clearable && !options.some((o) => o.value === "")
+      ? { value: "", label: clearLabel }
+      : null;
+  const listed: PickOption[] = [
+    ...(clearOption ? [clearOption] : []),
+    ...(value && !known
+      ? [{ value, label: value, hint: "current value", group: "Current" }]
+      : []),
+    ...options,
+  ];
 
   const q = term.trim().toLowerCase();
   const shown = q
@@ -144,7 +183,7 @@ export function PickList({
   function onTriggerKey(e: React.KeyboardEvent) {
     if (!open && (e.key === "ArrowDown" || e.key === "Enter" || e.key === " ")) {
       e.preventDefault();
-      setActive(Math.max(0, shown.findIndex((o) => o.value === value)));
+      setActive(Math.max(0, shown.findIndex((o) => o.value === selected)));
       setOpen(true);
     }
   }
@@ -177,6 +216,10 @@ export function PickList({
   const rows = shown.map((o, i) => ({
     option: o,
     header: o.group && o.group !== shown[i - 1]?.group ? o.group : null,
+    // The clear row is an action, not a value, so it is ruled off from the
+    // vocabulary underneath it — the same treatment `Add "…"` gets at the
+    // other end of the list.
+    divider: o === clearOption,
   }));
 
   return (
@@ -190,7 +233,7 @@ export function PickList({
         aria-label={ariaLabel}
         onClick={() => {
           setTerm("");
-          setActive(Math.max(0, listed.findIndex((o) => o.value === value)));
+          setActive(Math.max(0, listed.findIndex((o) => o.value === selected)));
           // Closing by pressing the trigger again is an abandonment like any
           // other, so it goes through `close` rather than flipping the flag.
           if (open) close();
@@ -264,21 +307,21 @@ export function PickList({
             {shown.length === 0 && !offerNew && (
               <p className="px-3 py-2 text-sm text-muted">Nothing matches.</p>
             )}
-            {rows.map(({ option: o, header }, i) => {
+            {rows.map(({ option: o, header, divider }, i) => {
               return (
                 <div key={`${o.group ?? ""}:${o.value}`}>
                   {header && <p className={MENU_HEADER_CLASS}>{header}</p>}
                   <button
                     type="button"
                     role="option"
-                    aria-selected={o.value === value}
+                    aria-selected={o.value === selected}
                     onMouseEnter={() => setActive(i)}
                     onClick={() => choose(o.value)}
-                    className={`${MENU_ITEM_CLASS} flex items-baseline gap-2 ${menuItemState(
-                      i === active
-                    )}`}
+                    className={`${MENU_ITEM_CLASS} flex items-baseline gap-2 ${
+                      divider ? "border-b border-hairline" : ""
+                    } ${menuItemState(i === active)}`}
                   >
-                    <span className={o.value === value ? "font-semibold" : ""}>
+                    <span className={o.value === selected ? "font-semibold" : ""}>
                       {o.label}
                     </span>
                     {o.hint && (
@@ -288,7 +331,7 @@ export function PickList({
                         {o.hint}
                       </span>
                     )}
-                    {o.value === value && (
+                    {o.value === selected && (
                       <span aria-hidden className="ml-auto text-xs">
                         ✓
                       </span>

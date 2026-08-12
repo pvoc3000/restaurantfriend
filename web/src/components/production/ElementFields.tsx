@@ -1,7 +1,12 @@
 "use client";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { ELEMENT_KIND_OPTIONS, elementKindLabel, type ElementKind } from "@/lib/production";
+import {
+  ELEMENT_KIND_OPTIONS,
+  SCHEDULE_CLASS_OPTIONS,
+  elementKindLabel,
+  type ElementKind,
+} from "@/lib/production";
 import { formatCost, unresolvedSummary, type Cost } from "@/lib/productionCost";
 import Link from "next/link";
 
@@ -77,13 +82,21 @@ export function ElementFields({
         )}
       </Row>
 
+      {/* Free text until 2026-08-11, which is how DAILY and Daily could both
+          exist. `allowNew` because the catalog still holds AB and DONUT and a
+          closed list would make them unenterable — see SCHEDULE_CLASS_OPTIONS
+          for why the values are uppercase. */}
       <Row label="Schedule">
         {editable ? (
           <InlineValue
             table="production_elements"
             id={element.id}
             column="schedule_class"
+            kind="pick"
+            allowNew
+            ariaLabel="Schedule"
             value={element.schedule_class}
+            options={SCHEDULE_CLASS_OPTIONS}
           />
         ) : (
           <span className={READ_ONLY_VALUE}>{element.schedule_class ?? "—"}</span>
