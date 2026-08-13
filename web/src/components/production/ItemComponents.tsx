@@ -32,7 +32,8 @@ export type ComponentRow = {
 export type DoughRow = {
   id: string;
   name: string;
-  /** "1/340 of a batch", or null when no yield rule matches. */
+  /** "1 ea" — one unit of the dough, times the size factor. Null when no
+   *  yield rule matches, so we do not know if this is a mini or a giant. */
   amount: string | null;
   cost: number | null;
 };
@@ -44,7 +45,9 @@ export type DoughRow = {
  *
  * THE DOUGH ROW IS NOT ONE OF THESE AND TAKES NO CONTROLS. It is
  * `production_items.base_element_id` plus a `production_batch_yields` rule, so
- * it has no amount of its own to edit — its "1/340 of a batch" is the rule's,
+ * it has no amount of its own to edit — one regular donut is ONE unit of its
+ * dough (the recipe's Expected Yield row says how many a batch makes) and the
+ * only thing left to state is the size factor, which is the rule's and
  * shared by every item of that cut, and editing it here would silently reprice
  * a hundred other items. That is also why it is not deletable from this table:
  * "remove the dough" is a different act from "remove a component", it is a

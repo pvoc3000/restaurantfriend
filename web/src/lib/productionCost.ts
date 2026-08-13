@@ -126,6 +126,8 @@ export type Unresolved = {
     | "no recipe"              // made, but no master version
     | "no ingredients"         // made, and the master version is an empty document
     | "no yield"               // made, but the version doesn't say how much it makes
+    | "no prep time"           // made, but the recipe never says how long it takes
+    | "no labour rate"         // the hours are known and the shop has no rate
     | "no batch yield"         // an ITEM whose (type, subtype, size) has no dough rule
     | "no quantity"            // a line with no amount
     | "incompatible units"     // the line's unit can't reach the element's
@@ -271,41 +273,25 @@ export function elementCost(
   if (!version) {
     return { cost: null, unit: null, unresolved: [{ elementId: element.id, name: element.name, reason: "no recipe" }] };
   }
-  const batch = versionBatchCost(version, byId, ctx, new Set(seen).add(element.id));
-
   // WHAT ONE OF THESE COSTS IS `recipeCostMatrix`, AT THE COLUMN THE RECIPE IS
-  // COSTED AT. Not a second arithmetic that happens to agree — the same
-  // function the Costs block prints, read at the same column (Mark, 2026-08-12:
-  // "just do one calculation (that includes labor) and use it everywhere …
-  // use the value in the cost matrix").
-  //
-  // Which means an element's cost INCLUDES ITS LABOUR: the prep-time row times
-  // the shop's hourly rate, divided over the yield like everything else. Before
-  // this the block said $0.53 a donut and `elementCost` said $0.17, and the
-  // whole of the difference was the $122.50 of work nobody was charging for.
-  //
-  // The yield is the recipe's own "Expected Yield" ROW, never the version's
-  // `yield_amount` column — two answers to one question, and over the 128
-  // masters 84 agree, 19 differ and 25 have neither. The row wins because it is
-  // what the kitchen reads: on the printed sheet, per batch size, maintained by
-  // whoever maintains the recipe.
-  if (batch.cost === null) {
+  // COSTED AT — see `versionCostedBatch`, which both this and `itemCost` go
+  // through so a donut's dough and the same dough on its own screen cannot
+  // disagree.
+  const batch = versionCostedBatch(
+    version,
+    byId,
+    ctx,
+    element.name,
+    new Set(seen).add(element.id)
+  );
+
+  if (batch.subtotal === null) {
     return { cost: null, unit: null, unresolved: batch.unresolved };
   }
 
-  const matrix = recipeCostMatrix({
-    columns: scaleColumns(version.scale_labels ?? null, version.scale_multipliers ?? null),
-    lines: version.lines,
-    baseIngredientCost: batch.cost,
-    laborRate: ctx.laborRate,
-    costColumn: version.cost_column ?? null,
-  });
-  const chosen = defaultColumn(matrix);
-
-  if (chosen === null || chosen.costPer === null) {
+  if (!batch.yieldQty) {
     // The batch cost is still real and worth showing; what we can't do is
-    // divide it into a per-unit figure. `costPer` is null for exactly one
-    // reason once the ingredients priced — no yield to divide by.
+    // divide it into a per-unit figure.
     return {
       cost: null,
       unit: null,
@@ -316,9 +302,106 @@ export function elementCost(
     };
   }
   return {
-    cost: chosen.costPer,
-    unit: chosen.yieldUnit,
+    cost: batch.subtotal / batch.yieldQty,
+    unit: batch.yieldUnit,
     unresolved: batch.unresolved,
+  };
+}
+
+/**
+ * ONE BATCH OF A MADE ELEMENT, ALL IN — what it costs at the column the recipe
+ * is costed at, and how much that batch makes.
+ *
+ * THIS IS THE ONE PLACE A BATCH IS PRICED, and it exists because there were two
+ * (Mark, 2026-08-12: "just do one calculation (that includes labor) and use it
+ * everywhere … use the value in the cost matrix"). `elementCost` read the
+ * matrix and `itemCost` read `versionBatchCost` directly, so a raised donut's
+ * dough contributed $0.0168 while the very same dough quoted $0.5282 on its own
+ * screen — a 31× understatement on 152 of the 307 items, and the whole of it
+ * was the $122.50 of prep time. Route both through here and the two cannot
+ * drift again; there is nothing left to drift.
+ *
+ * Two things it settles that a caller must not settle for itself:
+ *
+ * THE YIELD is the recipe's own "Expected Yield" ROW, never the version's
+ * `yield_amount` column — two answers to one question, and over the 128 masters
+ * 84 agree, 19 differ and 25 have neither. The row wins because it is what the
+ * kitchen reads: on the printed sheet, per batch size, maintained by whoever
+ * maintains the recipe.
+ *
+ * INGREDIENTS AND YIELD MOVE TOGETHER. Both are taken at the chosen column, so
+ * `subtotal / yieldQty` is right at any of them. Take one without the other and
+ * the answer is out by that column's multiplier.
+ */
+export function versionCostedBatch(
+  version: CostVersion,
+  byId: Map<string, CostElement>,
+  ctx: CostContext,
+  /** What to call this recipe in an `unresolved` entry — the element's own
+   *  name, so "2 not priced: Raised Dough" reads as a place to go. */
+  name: string,
+  seen: Set<string> = new Set()
+): {
+  /** The ingredients at the chosen column. */
+  ingredients: number | null;
+  /** Ingredients PLUS labour — what a batch actually costs to produce. */
+  subtotal: number | null;
+  /** The expected-yield row at the same column. */
+  yieldQty: number | null;
+  yieldUnit: string | null;
+  unresolved: Unresolved[];
+} {
+  const batch = versionBatchCost(version, byId, ctx, seen);
+  const none = {
+    ingredients: null,
+    subtotal: null,
+    yieldQty: null,
+    yieldUnit: null,
+    unresolved: batch.unresolved,
+  };
+  if (batch.cost === null) return none;
+
+  const matrix = recipeCostMatrix({
+    columns: scaleColumns(version.scale_labels ?? null, version.scale_multipliers ?? null),
+    lines: version.lines,
+    baseIngredientCost: batch.cost,
+    laborRate: ctx.laborRate,
+    costColumn: version.cost_column ?? null,
+  });
+  const chosen = defaultColumn(matrix);
+  if (chosen === null) return none;
+
+  // UNCHARGED LABOUR IS AN UNKNOWN COST, NOT A ZERO — this module's founding
+  // rule, applied to the half of a cost that arrived last.
+  //
+  // Labour comes from the prep-time row, and 97 of the 128 master recipes have
+  // none: every glaze, every icing, most fillings. Before this the subtotal
+  // quietly became ingredients-only and `formatCost` printed a confident
+  // "$0.12" — the app advertising that costs include labour while three
+  // recipes in four silently omitted it, which is exactly the confident
+  // always-too-low number the `unresolved` list exists to prevent.
+  //
+  // Said only when there are ingredients to cost: a version of nothing but
+  // metadata rows already reports "no ingredients", and a second complaint
+  // about its missing prep time names no useful fix.
+  const unresolved = [...batch.unresolved];
+  if (version.lines.some((l) => l.element_id)) {
+    if (chosen.laborHours === null) {
+      unresolved.push({ elementId: null, name, reason: "no prep time" });
+    } else if (ctx.laborRate === null) {
+      // The hours are on the recipe and the shop has no rate to price them at.
+      // A different gap with a different fix, so it says so rather than
+      // blaming the recipe.
+      unresolved.push({ elementId: null, name, reason: "no labour rate" });
+    }
+  }
+
+  return {
+    ingredients: chosen.ingredients,
+    subtotal: chosen.subtotal,
+    yieldQty: chosen.yieldQty,
+    yieldUnit: chosen.yieldUnit,
+    unresolved,
   };
 }
 
@@ -450,10 +533,16 @@ export function unresolvedSummary(cost: Cost): string | null {
  *    of a batch, mini donuts are 1/3 the size of a regular donut, giant donuts
  *    are 2x a regular donut"
  *
- * So the dough contributes `batch cost x portion_of_batch x size_factor`, and
- * the rule lives in `production_batch_yields` as editable data rather than as a
- * constant here — Mark asked for "a better way to do it" and the better way
- * starts with being able to change it without a migration.
+ * BOTH HALVES OF THAT ARE STILL TRUE AND ONLY ONE OF THEM IS STORED. "1/340 of
+ * a batch" is a statement about the batch's YIELD, and the recipe already makes
+ * it — so a regular donut is ONE UNIT of its dough and the recipe says how many
+ * units a batch makes (Mark, 2026-08-13: "the expected yield IS the portion of
+ * a batch. They're the same thing. Use the yield."). What no recipe can say is
+ * that a mini is a third of a regular, so `size_factor` stays.
+ *
+ * `production_batch_yields.portion_of_batch` therefore has no reader in this
+ * module. It is not dropped: `lib/productionSchedule` still turns a night's
+ * pars into batches with it.
  */
 export type ItemBom = {
   id: string;
@@ -517,22 +606,45 @@ export function itemCost(
       unresolved.push({ elementId: item.base_element_id, name: "the dough", reason: "no recipe" });
     } else {
       const rule = matchYield(item, yields);
-      if (!rule || rule.portion_of_batch === null) {
+      if (!rule) {
         // A size nobody has measured yet costs nothing AND says so, rather
-        // than defaulting to a confident wrong number.
+        // than defaulting to a confident wrong number. `size_factor` is what
+        // the rule is still consulted for — see below — and a missing rule
+        // means we do not know whether this is a mini or a giant.
         unresolved.push({ elementId: base.id, name: base.name, reason: "no batch yield" });
       } else {
-        // The BATCH cost, not the per-unit cost: portion_of_batch is a
-        // fraction OF A BATCH, so dividing by the yield first and multiplying
-        // by the portion would be the same number twice.
-        const batch = base.master
-          ? versionBatchCost(base.master, byId, ctx, new Set([base.id]))
-          : elementCost(base, byId, ctx);
-        if (batch.cost === null) unresolved.push(...batch.unresolved);
+        // ONE REGULAR DONUT IS ONE UNIT OF ITS DOUGH, and `portion_of_batch` is
+        // NOT consulted (Mark, 2026-08-13: "the expected yield. Portion of
+        // batch is a made up variable. The expected yield IS the portion of a
+        // batch. They're the same thing. Use the yield.").
+        //
+        // He is right that they are one fact, and the two spellings of it had
+        // drifted: measured over the live catalog, `1 / portion_of_batch` and
+        // the Expected Yield row agree on Raised Donut (340) and Apple Fritter
+        // (16) and disagree on every cake dough (a yield row of 15 against
+        // portions of 1/30, 1/35 and 1/40). Raised agreed only because its
+        // recipe carries a `cost_column` putting its yield row at 340 — so
+        // until this, moving that radio from ×1 to TEST silently repriced every
+        // raised donut from $0.5282 to $0.2999. A donut's cost must not depend
+        // on which column somebody is reading a recipe at.
+        //
+        // So the dough is now exactly like every other component on the item:
+        // it costs what the element costs. `elementCost` already takes the
+        // yield row at the costed column, which is the one place that fact
+        // lives. The only thing left for the rule to say is `size_factor` — a
+        // mini is a third of a regular and a giant is more — which is a fact
+        // about the SHAPE and belongs nowhere else.
+        //
+        // `portion_of_batch` still has one reader, `lib/productionSchedule`'s
+        // element demand, which turns a night's pars into BATCHES to make. That
+        // is what the kitchen is told to produce rather than what it costs, so
+        // it is deliberately left alone here.
+        const per = elementCost(base, byId, ctx);
+        if (per.cost === null) unresolved.push(...per.unresolved);
         else {
-          total += batch.cost * Number(rule.portion_of_batch) * Number(rule.size_factor ?? 1);
+          total += per.cost * Number(rule.size_factor ?? 1);
           priced += 1;
-          unresolved.push(...batch.unresolved);
+          unresolved.push(...per.unresolved);
         }
       }
     }
@@ -681,4 +793,34 @@ export function recipeCostMatrix({
 /** The figures for the column this recipe is costed at — the block's headline. */
 export function defaultColumn(matrix: CostColumnFigures[]): CostColumnFigures | null {
   return matrix.find((c) => c.isDefault) ?? matrix[0] ?? null;
+}
+
+/**
+ * HOW MANY A BATCH MAKES — the Expected Yield row at the column the recipe is
+ * costed at, and nothing else.
+ *
+ * The same answer `elementCost` divides by, reached without walking the graph:
+ * production wants the yield without wanting the money, and pricing a whole BOM
+ * to read one row would also report cost gaps as production gaps. Passing null
+ * for both money inputs is not a trick — the matrix computes each column's
+ * yield from the lines regardless, and `costPer` is simply the figure we are
+ * not asking for.
+ *
+ * This is what makes `lib/productionSchedule` able to state a night's dough in
+ * batches without a second definition of a batch (Mark, 2026-08-13: "the
+ * expected yield IS the portion of a batch").
+ */
+export function batchYield(element: CostElement): { qty: number | null; unit: string | null } {
+  const version = element.master;
+  if (!version) return { qty: null, unit: null };
+  const chosen = defaultColumn(
+    recipeCostMatrix({
+      columns: scaleColumns(version.scale_labels ?? null, version.scale_multipliers ?? null),
+      lines: version.lines,
+      baseIngredientCost: null,
+      laborRate: null,
+      costColumn: version.cost_column ?? null,
+    })
+  );
+  return { qty: chosen?.yieldQty ?? null, unit: chosen?.yieldUnit ?? null };
 }

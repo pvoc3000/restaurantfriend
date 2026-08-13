@@ -575,6 +575,64 @@ test("the element's cost and the block's headline are THE SAME NUMBER", () => {
   eq(elementCost(el, graph(f, el), at).cost, defaultColumn(matrix)!.costPer, "same value");
 });
 
+/* -- uncharged labour is an UNKNOWN cost, not a zero (2026-08-13) ---------- */
+
+test("a recipe with NO prep-time row is a LOWER BOUND, not a complete cost", () => {
+  // 97 of the 128 master recipes have no prep row — every glaze, every icing,
+  // most fillings. Until this, the subtotal quietly became ingredients-only
+  // and `formatCost` printed a confident "$0.40": the app advertising that
+  // costs include labour while three recipes in four silently omitted it.
+  const f = flour();
+  const el: CostElement = {
+    id: "el", name: "Lemon Glaze", kind: "made",
+    manual_cost: null, manual_cost_unit: null,
+    master: {
+      id: "v",
+      lines: [
+        { id: "y", label: "Expected Yield", qty: 10, unit: "qt", element_id: null },
+        { id: "l", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" },
+      ],
+    },
+  };
+  const c = elementCost(el, graph(f, el), { locationId: DF01, laborRate: 35 });
+  eq(c.cost, 0.4, "it still costs what it can");
+  eq(formatCost(c), "≥ $0.40", "and stops claiming that is the whole of it");
+  eq(c.unresolved[0].reason, "no prep time");
+  ok(unresolvedSummary(c)?.includes("Lemon Glaze"), "named, so there is somewhere to go");
+});
+
+test("hours on the recipe and no rate at the shop blames the SHOP, not the recipe", () => {
+  // Two different gaps with two different fixes, so they are two reasons.
+  const f = flour();
+  const el = withLabour(null);
+  const c = elementCost(el, graph(f, el), { locationId: DF01, laborRate: null });
+  eq(c.unresolved[0].reason, "no labour rate");
+  ok(formatCost(c).startsWith("≥ "), `got ${formatCost(c)}`);
+});
+
+test("a recipe that states its hours at a shop with a rate is COMPLETE", () => {
+  const f = flour();
+  const el = withLabour(null);
+  const c = elementCost(el, graph(f, el), { locationId: DF01, laborRate: 35 });
+  eq(c.unresolved.length, 0, "nothing outstanding");
+  ok(!formatCost(c).startsWith("≥"), `got ${formatCost(c)}`);
+});
+
+test("a version of nothing but metadata rows does not ALSO blame its prep time", () => {
+  // "no ingredients" is the whole story; a second complaint names no fix.
+  const el: CostElement = {
+    id: "el", name: "Glaze", kind: "made",
+    manual_cost: null, manual_cost_unit: null,
+    master: {
+      id: "v",
+      lines: [{ id: "y", label: "Expected Yield", qty: 10, unit: "qt", element_id: null }],
+    },
+  };
+  const c = elementCost(el, graph(el), { locationId: DF01, laborRate: 35 });
+  eq(c.unresolved.length, 1);
+  eq(c.unresolved[0].reason, "no ingredients");
+});
+
 test("labour is charged at the SHOP's rate, so two shops cost differently", () => {
   const f = flour();
   const el = withLabour(1);

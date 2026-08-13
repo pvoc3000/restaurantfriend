@@ -5,6 +5,7 @@
 
 import {
   itemCost,
+  elementCost,
   matchYield,
   type BatchYield,
   type CostElement,
@@ -37,7 +38,16 @@ const EVENT = "loc-event";
 
 /* -- the dough rule -------------------------------------------------------- */
 
-/** A raised dough whose BATCH costs $340, so 1/340 of it is exactly $1. */
+/**
+ * A raised dough: $100 of flour a batch, and the batch makes 100 donuts — so
+ * one donut of dough is exactly $1.
+ *
+ * THE YIELD ROW IS THE ONLY THING THAT SETS THAT (Mark, 2026-08-13: "the
+ * expected yield IS the portion of a batch. They're the same thing. Use the
+ * yield."). `RAISED` below still carries a `portion_of_batch` of 1/340 — a
+ * deliberately absurd second answer, kept so the cases can prove costing
+ * ignores it. If it were ever consulted again a donut would cost $0.29.
+ */
 function dough(): CostElement {
   return {
     id: "el-dough",
@@ -49,8 +59,8 @@ function dough(): CostElement {
       id: "v",
       lines: [
         // The yield is a LINE, not a column — see `elementCost`.
-        { id: "yield", label: "Expected Yield", qty: 100, unit: "lbs", element_id: null },
-        { id: "l", label: "Flour", qty: 340, unit: "lbs", element_id: "el-flour" },
+        { id: "yield", label: "Expected Yield", qty: 100, unit: "ea", element_id: null },
+        { id: "l", label: "Flour", qty: 100, unit: "lbs", element_id: "el-flour" },
       ],
     },
   };
@@ -83,11 +93,37 @@ function donut(over: Partial<ItemBom> = {}): ItemBom {
   };
 }
 
-test("a regular donut costs 1/340 of its dough's BATCH", () => {
-  // The batch is 340 lbs of $1 flour = $340. Mark's rule: 1/340 → $1.00.
+test("a regular donut is ONE UNIT of its dough", () => {
+  // $100 a batch over a yield of 100 → $1.00 each.
   const c = itemCost(donut(), graph(dough(), flour), RAISED, AT_DF01);
   ok(c.cost !== null && Math.abs(c.cost - 1) < 0.0001, `expected $1.00, got ${c.cost}`);
   eq(c.unit, "each");
+});
+
+test("PORTION_OF_BATCH IS IGNORED — the yield row decides, and only it", () => {
+  // The rule and the recipe disagree here on purpose: the rule says 1/340 of a
+  // batch and the recipe says a batch makes 100. Measured over the live
+  // catalog they disagree on every cake dough (a yield row of 15 against
+  // portions of 1/30, 1/35, 1/40), and they used to be BOTH consulted — the
+  // item through the portion, the element through the yield — so one donut had
+  // two costs. Change the portion to anything and this must not move.
+  const g = graph(dough(), flour);
+  const wild: BatchYield[] = RAISED.map((r) => ({ ...r, portion_of_batch: 1 / 7 }));
+  const a = itemCost(donut(), g, RAISED, AT_DF01);
+  const b = itemCost(donut(), g, wild, AT_DF01);
+  eq(a.cost, b.cost, "the portion has no say");
+  ok(a.cost !== null && Math.abs(a.cost - 1) < 0.0001, `still $1.00, got ${a.cost}`);
+});
+
+test("the dough costs what the DOUGH costs — one call, not two", () => {
+  // The invariant that replaces the old batch arithmetic: a regular donut's
+  // dough IS `elementCost` of that dough, so the item screen and the element
+  // screen cannot disagree, and neither can follow a cost-column radio the
+  // other does not see.
+  const g = graph(dough(), flour);
+  const per = elementCost(dough(), g, AT_DF01);
+  const item = itemCost(donut(), g, RAISED, AT_DF01);
+  eq(item.cost, per.cost, "same number");
 });
 
 test("a mini is a THIRD of a regular and a giant is TWICE it (Mark's rule)", () => {
@@ -98,13 +134,12 @@ test("a mini is a THIRD of a regular and a giant is TWICE it (Mark's rule)", () 
   ok(giant.cost !== null && Math.abs(giant.cost - 2) < 0.0001, `giant ${giant.cost}`);
 });
 
-test("the dough reads the BATCH cost, not the per-unit cost", () => {
-  // The trap: `elementCost` on a made element divides by the yield. Doing that
-  // AND multiplying by portion_of_batch applies the yield twice, which here
-  // would give $0.01 instead of $1.00 — a hundredfold error that still looks
-  // like a plausible ingredient cost.
+test("the yield is applied ONCE — not twice, and not never", () => {
+  // The old trap was applying it twice (dividing by the yield AND multiplying
+  // by a portion), which gave $0.01 for a $1.00 donut. The new one would be
+  // applying it never. $1.00 is the only answer that is neither.
   const c = itemCost(donut(), graph(dough(), flour), RAISED, AT_DF01);
-  ok(c.cost !== null && c.cost > 0.5, `the yield was applied twice: ${c.cost}`);
+  ok(c.cost !== null && Math.abs(c.cost - 1) < 0.0001, `got ${c.cost}`);
 });
 
 test("toppings are added on top of the dough", () => {
@@ -129,6 +164,60 @@ test("a size with NO yield rule costs nothing and names the gap", () => {
 });
 
 /* -- which rule applies ---------------------------------------------------- */
+
+/* -- the dough is charged like every other component (2026-08-13) ---------- */
+
+/** The same dough with a prep-time row: 2 hr, which at $35 is $70 of labour. */
+function doughWithLabour(): CostElement {
+  const d = dough();
+  d.master!.lines = [
+    { id: "prep", label: "Prep Time", qty: 2, unit: "hr", element_id: null },
+    ...d.master!.lines,
+  ];
+  return d;
+}
+
+test("THE DOUGH'S LABOUR IS CHARGED — an item and its dough are one number", () => {
+  // The bug this pins shipped and was measured on the real catalog: `itemCost`
+  // priced the dough with `versionBatchCost` (ingredients only) while every
+  // other component on the item went through `elementCost` (which includes
+  // labour). A raised donut's dough contributed $0.0168 where the element
+  // screen quoted $0.5282 for the very same dough.
+  //
+  // Here: $100 of flour + 2 hr x $35 = $170 a batch, over a yield of 100 →
+  // $1.70 a donut. Ingredients-only gives $1.00, which is what the old code
+  // said.
+  const at = { locationId: DF01, laborRate: 35 };
+  const g = graph(doughWithLabour(), flour);
+  const c = itemCost(donut(), g, RAISED, at);
+  ok(c.cost !== null && Math.abs(c.cost - 1.7) < 1e-9, `expected $1.70, got ${c.cost}`);
+
+  // And it is not merely "bigger" — it is EXACTLY what the dough itself costs.
+  // Two calls that must never diverge again.
+  const per = elementCost(doughWithLabour(), g, at);
+  eq(c.cost, per.cost, "the item's dough IS the dough's cost");
+});
+
+test("with no labour rate the dough falls back to ingredients, and SAYS SO", () => {
+  const c = itemCost(donut(), graph(doughWithLabour(), flour), RAISED, AT_DF01);
+  ok(c.cost !== null && Math.abs(c.cost - 1) < 1e-9, `ingredients only: ${c.cost}`);
+  // Not silently — the figure is a lower bound and the item names why.
+  ok(
+    c.unresolved.some((u) => u.reason === "no labour rate"),
+    `expected a labour-rate gap, got ${JSON.stringify(c.unresolved)}`
+  );
+});
+
+test("a dough with NO prep-time row makes the item a lower bound", () => {
+  // 97 of the 128 master recipes have no prep row. The item still costs what
+  // it can — it just stops claiming the figure is complete.
+  const c = itemCost(donut(), graph(dough(), flour), RAISED, { locationId: DF01, laborRate: 35 });
+  ok(c.cost !== null && Math.abs(c.cost - 1) < 1e-9, `got ${c.cost}`);
+  ok(
+    c.unresolved.some((u) => u.reason === "no prep time"),
+    `expected a prep-time gap, got ${JSON.stringify(c.unresolved)}`
+  );
+});
 
 test("the MOST SPECIFIC yield rule wins", () => {
   const rules: BatchYield[] = [

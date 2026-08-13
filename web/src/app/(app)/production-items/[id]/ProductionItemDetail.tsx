@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph, loadItemGraph, loadElementOptions } from "@/lib/productionQueries";
-import { itemCost, lineCost, matchYield, versionBatchCost, costContext } from "@/lib/productionCost";
+import { itemCost, lineCost, matchYield, elementCost, costContext } from "@/lib/productionCost";
 import { resolveItemPrice } from "@/lib/productionPrice";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
@@ -108,12 +108,14 @@ export async function ProductionItemDetail({
 
   const rule = matchYield(item, items!.yields);
   const base = item.base_element_id ? graph!.byId.get(item.base_element_id) ?? null : null;
-  const baseBatch = base?.master
-    ? versionBatchCost(base.master, graph!.byId, costs, new Set([base.id]))
-    : null;
+  // THE SAME CALL `itemCost` MAKES, so the breakdown sums to the total it sits
+  // under. This was a third implementation of the dough — it multiplied the
+  // ingredients-only batch by `portion_of_batch` — and so disagreed with the
+  // headline above it twice over.
+  const doughUnit = base ? elementCost(base, graph!.byId, costs) : null;
   const doughCost =
-    baseBatch?.cost !== null && baseBatch !== null && rule?.portion_of_batch
-      ? baseBatch.cost * Number(rule.portion_of_batch) * Number(rule.size_factor ?? 1)
+    doughUnit?.cost !== null && doughUnit !== null && rule
+      ? doughUnit.cost * Number(rule.size_factor ?? 1)
       : null;
 
   // BY `sort`, then by name. The loader sweeps this table ordered by `id`, so
@@ -200,8 +202,13 @@ export async function ProductionItemDetail({
             ? {
                 id: base.id,
                 name: base.name,
-                amount: rule?.portion_of_batch
-                  ? `${fraction(Number(rule.portion_of_batch) * Number(rule.size_factor ?? 1))} of a batch`
+                // A regular donut is ONE of whatever the recipe's Expected
+                // Yield row counts, and a mini is a third of one — so the row
+                // reads "1 ea" or "1/3 ea" rather than the old "1/340 of a
+                // batch", which stated the yield a second time and disagreed
+                // with it on every cake dough.
+                amount: rule
+                  ? `${fraction(Number(rule.size_factor ?? 1))} ${doughUnit?.unit ?? "unit"}`
                   : null,
                 cost: doughCost,
               }
