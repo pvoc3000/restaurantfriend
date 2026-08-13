@@ -8,10 +8,9 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Switch } from "@/components/ui/Switch";
 import { spaceBelow, useViewportAtLeast } from "@/lib/tableHead";
-import { unresolvedSummary } from "@/lib/productionCost";
 import { recipeHref } from "@/lib/recipes";
 import { scaleColumns } from "@/lib/production";
-import { recipeCostMatrix, defaultColumn, type CostLine } from "@/lib/recipeCosts";
+import { recipeCostMatrix, type CostLine } from "@/lib/recipeCosts";
 import { RecipeCosts } from "./RecipeCosts";
 import type { SheetVersion } from "./RecipeVersionSheet";
 
@@ -140,12 +139,18 @@ export function RecipeInfo({
     };
   }, [wide]);
 
-  // THE CHOSEN COLUMN LIVES HERE, not inside the costs block, because two
-  // things read it: the matrix, and the Batch cost fact at the top of the
-  // screen (Mark, 2026-08-08 — "batch cost in the top header should change
-  // depending on what is selected in the cost area"). A figure quoted in two
-  // places from two different columns is the duplication this tab has spent
-  // the day removing.
+  // The chosen column. It lived here rather than inside the costs block
+  // because a "Batch cost" fact at the top of the screen read it too; that
+  // fact is GONE (Mark, 2026-08-12: "batch cost in this screenshot isn't
+  // useful information (it's also wrong as it doesn't include labor …). You
+  // can get rid of it") — it quoted the INGREDIENTS row of the matrix, so on
+  // Raisied Donut v11 it said $57.08 where the block's own subtotal at the
+  // same column said $179.58. One figure short of the labour, three inches
+  // above the table that had it right.
+  //
+  // The state stays here anyway: it is the block's own selection and lifting
+  // it costs nothing, where pushing it down would mean the matrix computed in
+  // two places.
   const [chosen, setChosen] = useState<number | null>(version.cost_column);
 
   const columns = scaleColumns(version.scale_labels, version.scale_multipliers);
@@ -156,7 +161,6 @@ export function RecipeInfo({
     laborRate,
     costColumn: chosen,
   });
-  const at = defaultColumn(matrix);
 
   return (
     <div className="flex flex-col gap-5">
@@ -191,27 +195,6 @@ export function RecipeInfo({
           </Fact>
           <Fact label="Tools">
             <Editable id={version.id} column="tools" value={version.tools} editable={editable} multiline />
-          </Fact>
-          <Fact label="Batch cost">
-            {/* Follows the cost column. The gaps note goes on its OWN LINE,
-                never beside the figure — set inline it read "≥ $7.385 not
-                priced", the count's first digit running onto the cents. A
-                WRAPPER, not `block` on the spans: READ_ONLY_VALUE carries
-                `inline-block`, and Tailwind resolves competing display
-                utilities by stylesheet order rather than class-string order. */}
-            <span className="flex flex-col items-start">
-              <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-                {at?.ingredients === null || at === null
-                  ? "—"
-                  : `${version.batchCost.unresolved.length ? "≥ " : ""}$${at.ingredients.toFixed(2)}`}
-                <span className="ml-2 text-[12px] font-normal text-muted">at {at?.column.label}</span>
-              </span>
-              {unresolvedSummary(version.batchCost) ? (
-                <span className={`${READ_ONLY_VALUE} text-[13px] text-mark`}>
-                  {unresolvedSummary(version.batchCost)}
-                </span>
-              ) : null}
-            </span>
           </Fact>
         </dl>
         </div>

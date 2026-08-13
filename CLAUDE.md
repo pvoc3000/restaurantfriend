@@ -2395,10 +2395,14 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    is sized to the matrix (`xl:w-[32rem]`) rather than to a share of the row:
    given a fraction it came out 394px for a 508px matrix, so the one block whose
    point is the comparison across it had to be scrolled to be read.
-   **Batch cost at the top follows the chosen column**, so the state lives in
-   `RecipeInfo` and the matrix is computed once and passed down — a figure quoted
-   twice from two different columns is the duplication this tab spent the day
-   removing. **Item is the ingredient grid's SECOND column**, after Sort, the
+   **The Batch cost fact at the top is GONE** (Mark, 2026-08-12: "batch cost in
+   this screenshot isn't useful information (it's also wrong as it doesn't
+   include labor …). You can get rid of it"). It quoted the matrix's INGREDIENTS
+   row, so on Raisied Donut v11 it read $57.08 three inches above the block's
+   own subtotal of $179.58 at the same column — one figure short of the labour.
+   The chosen column's state stays in `RecipeInfo`: it is the block's own
+   selection, lifting it costs nothing, and pushing it down would mean the
+   matrix computed in two places. **Item is the ingredient grid's SECOND column**, after Sort, the
    multiplier row is a single `×` centred over the AUTO column it governs, and
    **AUTO is a CHECKBOX** — Mark, 2026-08-08: "we have both toggle switches and
    check boxes in the ingredient list. Pick one." Two shapes for one kind of
