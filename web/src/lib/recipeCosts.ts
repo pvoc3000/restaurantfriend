@@ -11,29 +11,15 @@
 
 import {
   columnCell,
+  metadataLine,
   type ScalableLine,
   type ScaleColumn,
 } from "./production";
 
-/**
- * The metadata rows FileMaker keeps in the ingredient list, by the label the
- * migration writes for them.
- *
- * Matching on a NAME is normally how this codebase gets things wrong, so it is
- * worth saying why it is safe here: these are not user-typed strings that
- * happen to look alike. FileMaker holds them as three pseudo-items in
- * `Recipe_Items` with exactly these names, and
- * `migration/backfill-recipe-metadata-rows.mjs` writes the label itself from a
- * fixed map. A row called "Prep Time" on a recipe got that name from one place.
- *
- * A recipe that has none of them simply reports no labour and no yield, which
- * is honest — 101 of the 493 versions carry none.
- */
-export const METADATA_LABELS = {
-  mixer: "mixer size",
-  yield: "expected yield",
-  prep: "prep time",
-} as const;
+// Re-exported from `lib/production`, which is where they moved when
+// `productionCost` needed them too. Kept here so this module's own callers
+// don't have to care which file they live in.
+export { METADATA_LABELS, metadataLine } from "./production";
 
 export type CostLine = ScalableLine & { label: string | null };
 
@@ -53,15 +39,6 @@ export type CostColumnFigures = {
   /** The column this recipe is costed at (migration 042). */
   isDefault: boolean;
 };
-
-/** The line carrying one of the metadata rows, if the version has it. */
-export function metadataLine(
-  lines: readonly CostLine[],
-  which: keyof typeof METADATA_LABELS
-): CostLine | null {
-  const want = METADATA_LABELS[which];
-  return lines.find((l) => (l.label ?? "").trim().toLowerCase() === want) ?? null;
-}
 
 /**
  * Every batch column, costed.

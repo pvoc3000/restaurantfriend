@@ -36,9 +36,11 @@ function dough(): CostElement {
     manual_cost_unit: null,
     master: {
       id: "v",
-      yield_amount: 100,
-      yield_unit: "lbs",
-      lines: [{ id: "l", label: "Flour", qty: 340, unit: "lbs", element_id: "el-flour" }],
+      lines: [
+        // The yield is a LINE, not a column — see `elementCost`.
+        { id: "yield", label: "Expected Yield", qty: 100, unit: "lbs", element_id: null },
+        { id: "l", label: "Flour", qty: 340, unit: "lbs", element_id: "el-flour" },
+      ],
     },
   };
 }

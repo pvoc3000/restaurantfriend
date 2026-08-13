@@ -14,8 +14,9 @@
  *   purchased → its inventory item → the effective vendor price (design rule 6:
  *               a location override beats the catalog price), divided by the
  *               package content to get a cost per base unit.
- *   made      → its master recipe version's lines, summed, divided by the
- *               version's yield.
+ *   made      → its master recipe version's lines, summed, divided by that
+ *               recipe's own "Expected Yield" row (NOT the version's
+ *               `yield_amount` column — see `elementCost`).
  *   manual    → the set cost it carries.
  *
  * ---------------------------------------------------------------------------
@@ -33,6 +34,7 @@
  */
 
 import { convert } from "./units";
+import { metadataLine } from "./production";
 
 export type ElementKind = "made" | "purchased" | "manual";
 
@@ -65,10 +67,17 @@ export type CostVendorItem = {
   vendor_item_location_prices?: { location_id: string; price: number | null }[];
 };
 
+/**
+ * A recipe version as COSTING sees it: its lines, and nothing else.
+ *
+ * NO `yield_amount` / `yield_unit`. Those columns still exist on the table and
+ * are still shown on the Info tab, but costing does not read them and must not
+ * — the yield is the "Expected Yield" line, which is why the divisor is in
+ * `lines` like everything else. Leaving them on this type is how the next
+ * reader reaches for the wrong one.
+ */
 export type CostVersion = {
   id: string;
-  yield_amount: number | null;
-  yield_unit: string | null;
   lines: CostLine[];
 };
 
@@ -208,7 +217,38 @@ export function elementCost(
     return { cost: null, unit: null, unresolved: [{ elementId: element.id, name: element.name, reason: "no recipe" }] };
   }
   const batch = versionBatchCost(version, byId, locationId, new Set(seen).add(element.id));
-  if (!version.yield_amount) {
+
+  // THE YIELD IS THE RECIPE'S OWN "EXPECTED YIELD" ROW, ALWAYS (Mark,
+  // 2026-08-12: "we should not use production_recipe_versions.yield_amount to
+  // determine costs. we should use the recipe yield number, always and forever").
+  //
+  // The version carries a `yield_amount` COLUMN as well and this deliberately
+  // ignores it. They are two answers to one question and they disagree:
+  // measured over the 128 masters, 84 agree, 19 differ and 25 have neither.
+  // Where they differ the gap is not small — Lemon Curd 35 against 2.4, the
+  // cake donuts 30 against 15 — so the column was quietly costing nineteen
+  // recipes wrong, one of them by more than fourteen times.
+  //
+  // The row wins because it is what the kitchen reads. It is on the printed
+  // sheet, it is per batch size, and it is maintained by whoever maintains the
+  // recipe; the column is FileMaker's single `Yield` field, lifted once at
+  // migration and edited by almost nobody since.
+  //
+  // The BASE column's amount, not a scaled one: `versionBatchCost` sums each
+  // line's `qty`, which is the base column, so the divisor has to be the base
+  // column's yield or the two halves are different batch sizes. 042's
+  // `cost_column` still only drives the Costs matrix.
+  // NOTHING TO DIVIDE MEANS NOTHING TO SAY ABOUT THE DIVISOR. If the batch came
+  // back unpriced it has already explained why — no ingredients, or ingredients
+  // nobody has costed — and leading with "no yield" would answer a question the
+  // reader has not reached yet.
+  if (batch.cost === null) {
+    return { cost: null, unit: null, unresolved: batch.unresolved };
+  }
+
+  const yieldRow = metadataLine(version.lines, "yield");
+  const yieldQty = yieldRow?.qty ?? null;
+  if (yieldQty === null || yieldQty === 0) {
     // The batch cost is still real and worth showing; what we can't do is
     // divide it into a per-unit figure.
     return {
@@ -221,8 +261,8 @@ export function elementCost(
     };
   }
   return {
-    cost: batch.cost === null ? null : batch.cost / Number(version.yield_amount),
-    unit: version.yield_unit,
+    cost: batch.cost / Number(yieldQty),
+    unit: yieldRow?.unit ?? null,
     unresolved: batch.unresolved,
   };
 }
@@ -256,12 +296,18 @@ export function versionBatchCost(
     unresolved.push(...result.unresolved);
   }
 
-  // A version with no lines at all costs nothing AND had nothing to report,
-  // so it used to come back as an unexplained null — an element reading "—"
-  // with no reason beside it, which is the one thing this module's whole
+  // A version with nothing PRICEABLE in it costs nothing AND had nothing to
+  // report, so it used to come back as an unexplained null — an element reading
+  // "—" with no reason beside it, which is the one thing this module's whole
   // unresolved-list exists to prevent. Measured against the live catalog: one
   // element (Toasted Coconut) is exactly this.
-  if (!version.lines.length) {
+  //
+  // "Nothing priceable" and "no lines" are NOT the same test, and the
+  // difference started mattering when the yield became a line: a version whose
+  // only rows are Expected Yield and Mixer Size has lines and still has no
+  // ingredients. Free-text rows ("pinch of salt") count as nothing here too,
+  // which is right — they price nothing.
+  if (!version.lines.some((l) => l.element_id)) {
     unresolved.push({ elementId: null, name: "this recipe", reason: "no ingredients" });
   }
   return { cost: priced ? total : null, unit: null, unresolved };

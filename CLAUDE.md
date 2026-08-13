@@ -2206,13 +2206,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    keeps them instead of `continue`-ing past. **`counts.magic` became a SUBSET of
    `counts.ingredient` when it did**, so it must not be added to the accounting
    total again or every run reports 668 phantom rows.
-   The version COLUMNS stay and are not a duplicate: they come from the recipe
-   record's own `Yield` / `PrepTime_text`, which FileMaker also keeps and also
-   prints in the header. `yield_amount` is load-bearing besides — costing
-   divides a made element's batch by it. **Known and NOT fixed:** the screen's
-   Facts block still states yield/mixer/prep beside the rows that now say it per
-   column, and on Raisied Donut v11 the two disagree (30 ea vs 34→340 ea). Ask
-   Mark before removing either.
+   The version COLUMNS stay: they come from the recipe record's own `Yield` /
+   `PrepTime_text`, which FileMaker also keeps and also prints in the header.
+   **`yield_amount` is NOT what costing divides by — since 2026-08-12 the
+   Expected Yield ROW is, always** (see "THE YIELD IS THE RECIPE'S OWN ROW"
+   below). The column is now display-only.
    **THE ELEMENT'S NAME LEADS; `label` is only a fallback**, on the sheet and in
    the PDF. FMP's `columnName_t` is an override that goes STALE when a version
    is copied: Banana Cake Donut v10 still carries "Coffee" and "Amoretti
@@ -2422,14 +2420,51 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `mixer_size` and `prep_time` now have NO reader in `web/src` at all — the
    columns keep FileMaker's single value and the transform still fills them.
    **The costed yield moved to the COSTS block rather than going with them**,
-   which is the one part of this that isn't a deletion. `yield_amount` is what
-   `lib/productionCost` divides a made element's batch by, so it is the number
-   behind every figure the app quotes — deleting its only editor would have left
-   that invisible and unfixable. It is NOT the Expected Yield row: measured over
-   all 493 versions, 284 agree, 71 differ, 137 have no row at all, and **19 of
-   the 128 masters would move if costing were switched to the row — some by 4×,
-   one by 14×**. So they stay two numbers with two homes, and the follow-up
-   remains a deliberate costing change rather than a tidy-up.
+   which is the one part of this that isn't a deletion. At the time `yield_amount`
+   was what `lib/productionCost` divided by, so deleting its only editor would
+   have left the number behind every figure the app quotes invisible and
+   unfixable. **That follow-up has since been taken — see "THE YIELD IS THE
+   RECIPE'S OWN ROW" below** — so the column no longer costs anything, and the
+   editor in the Costs block is now a display of FileMaker's single value.
+   Whether it earns its place there at all is worth a look.
+
+   **THE YIELD IS THE RECIPE'S OWN "EXPECTED YIELD" ROW, ALWAYS AND FOREVER**
+   (Mark, 2026-08-12: "we should not use production_recipe_versions.yield_amount
+   to determine costs. we should use the recipe yield number, always and
+   forever"). `elementCost` divides a made element's batch by
+   `metadataLine(version.lines, "yield")`, and `CostVersion` no longer CARRIES
+   `yield_amount` / `yield_unit` — which is the guarantee rather than a tidy-up:
+   a caller cannot supply the column, so the resolver cannot read it. The graph
+   loader stopped selecting it too.
+   Why the row wins: it is what the kitchen reads, it is on the printed sheet,
+   it is per batch size, and it is maintained by whoever maintains the recipe.
+   The column is FileMaker's single `Yield` field, lifted once at migration and
+   edited by almost nobody since. Two answers to one question, and they
+   disagree — measured over the 128 masters, **84 agree, 19 differ, 25 have
+   neither**, and where they differ the gap is not small.
+   Measured through the real resolver over the live catalog, both ways: **20
+   made elements moved, 0 lost a cost, 0 gained one.** Lemon Curd $0.0928 →
+   $1.3535 (the column said 35 where the row says 2.4), the cake donuts double
+   (30 against 15), Vanilla Cake Donut halves, Raised Donut $0.2074 → $0.1830.
+   Units were checked before the switch and agree on all 103 masters carrying
+   both; the 3 exceptions are null on both sides, so `unit` comes from the row
+   too with nothing to lose.
+   Two guards moved with it, each fixture-tested by breaking it. A **zero**
+   yield is refused rather than dividing by it. And **"no ingredients" now asks
+   whether any line carries an `element_id`**, not whether `lines` is empty —
+   the yield row IS a line, so the old test would have let a version of nothing
+   but metadata rows come back as an unexplained null, which is the one outcome
+   that module exists to prevent. `elementCost` also reports the BATCH's own
+   reasons before "no yield": an empty recipe has neither, and "no ingredients"
+   is the more useful thing to say first.
+   `METADATA_LABELS` / `metadataLine` moved from `lib/recipeCosts` to
+   `lib/production` when both cost modules needed them — `lib/production`
+   imports nothing, which is what keeps the two from becoming a cycle.
+   **Still open, and it is DATA rather than code:** Raised Donut's row says 34
+   where Mark's own packet arithmetic says a batch makes 340, so its per-donut
+   cost is an order of magnitude light. The rule now makes that fixable in one
+   visible place — the row on the Ingredients tab — instead of in a column
+   nobody reads.
    Exercised against the live database and left as found: the radio wrote
    `cost_column = 2`, the mark moved, the headline re-quoted at x3/4, and it was
    set back to null (0 versions carry one).

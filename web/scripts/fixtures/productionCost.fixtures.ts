@@ -78,8 +78,10 @@ test("made element costs its batch ÷ its yield", () => {
     id: "el-glaze", name: "Speedy Glaze", kind: "made",
     manual_cost: null, manual_cost_unit: null,
     master: {
-      id: "v-1", yield_amount: 10, yield_unit: "qt",
-      lines: [{ id: "l-1", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" }],
+      id: "v-1",
+      lines: [
+        { id: "yield-10", label: "Expected Yield", qty: 10, unit: "qt", element_id: null },
+        { id: "l-1", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" }],
     },
   };
   // 20 lbs x $0.20 = $4.00 the batch, over 10 qt = $0.40/qt
@@ -157,8 +159,9 @@ test("an unpriced ingredient does not silently contribute zero", () => {
     manual_cost: null, manual_cost_unit: null, inventory: null,
   };
   const version = {
-    id: "v", yield_amount: 10, yield_unit: "qt",
+    id: "v",
     lines: [
+      { id: "yield-10", label: "Expected Yield", qty: 10, unit: "qt", element_id: null },
       { id: "l1", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" },
       { id: "l2", label: "Flavoring", qty: 1, unit: "lbs", element_id: "el-x" },
     ],
@@ -176,8 +179,10 @@ test("an unpriced ingredient does not silently contribute zero", () => {
 test("a fully priced batch is NOT marked as a lower bound", () => {
   const f = flour();
   const version = {
-    id: "v", yield_amount: 10, yield_unit: "qt",
-    lines: [{ id: "l1", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" }],
+    id: "v",
+    lines: [
+      { id: "yield-10", label: "Expected Yield", qty: 10, unit: "qt", element_id: null },
+      { id: "l1", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" }],
   };
   const c = versionBatchCost(version, graph(f), DF01);
   eq(formatCost(c), "$4.00");
@@ -189,11 +194,11 @@ test("a fully priced batch is NOT marked as a lower bound", () => {
 test("a BOM cycle reports itself instead of recursing forever", () => {
   const a: CostElement = {
     id: "a", name: "Glaze A", kind: "made", manual_cost: null, manual_cost_unit: null,
-    master: { id: "va", yield_amount: 1, yield_unit: "qt", lines: [{ id: "la", label: "B", qty: 1, unit: "qt", element_id: "b" }] },
+    master: { id: "va", lines: [{ id: "yield-va", label: "Expected Yield", qty: 1, unit: "qt", element_id: null }, { id: "la", label: "B", qty: 1, unit: "qt", element_id: "b" }] },
   };
   const b: CostElement = {
     id: "b", name: "Glaze B", kind: "made", manual_cost: null, manual_cost_unit: null,
-    master: { id: "vb", yield_amount: 1, yield_unit: "qt", lines: [{ id: "lb", label: "A", qty: 1, unit: "qt", element_id: "a" }] },
+    master: { id: "vb", lines: [{ id: "yield-vb", label: "Expected Yield", qty: 1, unit: "qt", element_id: null }, { id: "lb", label: "A", qty: 1, unit: "qt", element_id: "a" }] },
   };
   const c = elementCost(a, graph(a, b), DF01);
   eq(c.cost, null);
@@ -205,8 +210,9 @@ test("an element used twice in one tree is not mistaken for a cycle", () => {
   // were the latter, the second use of Flour here would report a false cycle.
   const f = flour();
   const version = {
-    id: "v", yield_amount: 2, yield_unit: "qt",
+    id: "v",
     lines: [
+      { id: "yield-2", label: "Expected Yield", qty: 2, unit: "qt", element_id: null },
       { id: "l1", label: "Flour", qty: 10, unit: "lbs", element_id: "el-flour" },
       { id: "l2", label: "More flour", qty: 10, unit: "lbs", element_id: "el-flour" },
     ],
@@ -254,7 +260,7 @@ test("a recipe with NO ingredients says so instead of returning an unexplained n
   const el: CostElement = {
     id: "e", name: "Toasted Coconut", kind: "made",
     manual_cost: null, manual_cost_unit: null,
-    master: { id: "v", yield_amount: 4, yield_unit: "qt", lines: [] },
+    master: { id: "v", lines: [] },
   };
   const c = elementCost(el, graph(el), DF01);
   eq(c.cost, null);
@@ -276,7 +282,7 @@ test("a recipe with no yield still reports its batch cost's gaps", () => {
     id: "e", name: "Mystery Glaze", kind: "made",
     manual_cost: null, manual_cost_unit: null,
     master: {
-      id: "v", yield_amount: null, yield_unit: null,
+      id: "v",
       lines: [{ id: "l", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" }],
     },
   };
@@ -308,4 +314,110 @@ test("a SUB-CENT cost keeps four decimals instead of rounding to free", () => {
   eq(formatCost({ cost: 4.125, unit: "lbs", unresolved: [] }), "$4.13");
   // A real zero is a real zero — "Water, Room Temp" is priced at $0.
   eq(formatCost({ cost: 0, unit: "g", unresolved: [] }), "$0.00");
+});
+
+/* -- the yield is the RECIPE'S ROW, always (Mark, 2026-08-12) --------------- */
+
+test("a made element divides by its Expected Yield ROW", () => {
+  const f = flour();
+  const el: CostElement = {
+    id: "el", name: "Speedy Glaze", kind: "made",
+    manual_cost: null, manual_cost_unit: null,
+    master: {
+      id: "v",
+      lines: [
+        { id: "y", label: "Expected Yield", qty: 10, unit: "qt", element_id: null },
+        { id: "l", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" },
+      ],
+    },
+  };
+  // 20 lbs at $0.20/lb = $4.00 the batch, over 10 qt = $0.40 a quart.
+  const c = elementCost(el, graph(f, el), DF01);
+  eq(c.cost, 0.4, "per-unit cost");
+  eq(c.unit, "qt", "the unit comes from the row too");
+});
+
+test("the yield ROW is used even where a version column would disagree", () => {
+  // The whole point of the 2026-08-12 change. `production_recipe_versions`
+  // still HAS a yield column and costing must never read it — measured over
+  // the 128 masters, 19 disagree, Lemon Curd by more than fourteen times.
+  // There is nowhere to put the column in this fixture BECAUSE `CostVersion`
+  // no longer carries it, which is the guarantee: a caller cannot supply it,
+  // so `elementCost` cannot read it.
+  const f = flour();
+  const el: CostElement = {
+    id: "el", name: "Lemon Curd", kind: "made",
+    manual_cost: null, manual_cost_unit: null,
+    master: {
+      id: "v",
+      lines: [
+        { id: "y", label: "Expected Yield", qty: 2.4, unit: "kg", element_id: null },
+        { id: "l", label: "Flour", qty: 12, unit: "lbs", element_id: "el-flour" },
+      ],
+    },
+  };
+  // 12 lbs at $0.20 = $2.40 the batch. Over the ROW's 2.4 that is $1.00; over
+  // the column's 35 it would have been $0.0686 — the fourteen-fold error.
+  const got = elementCost(el, graph(f, el), DF01).cost ?? 0;
+  ok(Math.abs(got - 1) < 1e-9, `$2.40 over 2.4 is $1.00, not $0.07 — got ${got}`);
+});
+
+test("the yield row is matched by name, case and spacing aside", () => {
+  const f = flour();
+  const make = (label: string): CostElement => ({
+    id: "el", name: "Glaze", kind: "made",
+    manual_cost: null, manual_cost_unit: null,
+    master: {
+      id: "v",
+      lines: [
+        { id: "y", label, qty: 10, unit: "qt", element_id: null },
+        { id: "l", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" },
+      ],
+    },
+  });
+  for (const label of ["Expected Yield", "expected yield", "  EXPECTED YIELD  "]) {
+    const el = make(label);
+    eq(elementCost(el, graph(f, el), DF01).cost, 0.4, `matched "${label}"`);
+  }
+  // Anything else is an ordinary line and does not become the divisor.
+  const other = make("Expected Yields");
+  eq(elementCost(other, graph(f, other), DF01).cost, null, "not a yield row");
+});
+
+test("a zero yield is refused rather than dividing by it", () => {
+  const f = flour();
+  const el: CostElement = {
+    id: "el", name: "Glaze", kind: "made",
+    manual_cost: null, manual_cost_unit: null,
+    master: {
+      id: "v",
+      lines: [
+        { id: "y", label: "Expected Yield", qty: 0, unit: "qt", element_id: null },
+        { id: "l", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" },
+      ],
+    },
+  };
+  const c = elementCost(el, graph(f, el), DF01);
+  eq(c.cost, null, "no Infinity");
+  ok(c.unresolved.some((u) => u.reason === "no yield"));
+});
+
+test("a version of nothing but metadata rows has no ingredients", () => {
+  // `lines.length` was the old test and it is not the same question: the yield
+  // row IS a line, so a version carrying only metadata would have come back an
+  // unexplained null — the one outcome this module exists to prevent.
+  const el: CostElement = {
+    id: "el", name: "Glaze", kind: "made",
+    manual_cost: null, manual_cost_unit: null,
+    master: {
+      id: "v",
+      lines: [
+        { id: "y", label: "Expected Yield", qty: 10, unit: "qt", element_id: null },
+        { id: "m", label: "Mixer Size", qty: 20, unit: "qt", element_id: null },
+      ],
+    },
+  };
+  const c = elementCost(el, graph(el), DF01);
+  eq(c.cost, null);
+  eq(c.unresolved[0].reason, "no ingredients", "and it says so first");
 });

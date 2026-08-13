@@ -350,3 +350,44 @@ export function bakersPercent(
   if (!basis) return lines.map(() => null);
   return grams.map((g) => (g === null ? null : (g / basis) * 100));
 }
+
+
+/**
+ * The metadata rows FileMaker keeps in the ingredient list, by the label the
+ * migration writes for them.
+ *
+ * These are NOT ingredients: they are `production_recipe_lines` with a label
+ * and no `element_id`, so they cost nothing and price nothing. They are here
+ * rather than in the version's columns because each one is per BATCH SIZE —
+ * measured over the export, the single column disagrees with the rows on 196 of
+ * 198 mixer sizes, 349 of 376 yields and 57 of 94 prep times.
+ *
+ * MATCHING BY NAME IS SAFE HERE and nowhere near as fragile as it looks: 036's
+ * transform lifts them from FileMaker's `Recipe_Items` with exactly these
+ * names, and `migration/backfill-recipe-metadata-rows.mjs` writes the label
+ * from a fixed map. A row called "Prep Time" got that name from one place.
+ *
+ * They live in this module, not in `lib/recipeCosts`, because BOTH cost modules
+ * need them now — `productionCost` reads the yield row to price a made element
+ * (Mark, 2026-08-12: "we should not use production_recipe_versions.yield_amount
+ * to determine costs, we should use the recipe yield number, always and
+ * forever") and `recipeCosts` reads the yield and prep rows for the matrix.
+ * `lib/production` imports nothing, so putting them here is what keeps the two
+ * from becoming a cycle.
+ */
+export const METADATA_LABELS = {
+  mixer: "mixer size",
+  yield: "expected yield",
+  prep: "prep time",
+} as const;
+
+export type MetadataRow = keyof typeof METADATA_LABELS;
+
+/** The metadata row of a given kind, or null where the version carries none. */
+export function metadataLine<T extends { label: string | null }>(
+  lines: readonly T[],
+  which: MetadataRow
+): T | null {
+  const want = METADATA_LABELS[which];
+  return lines.find((l) => (l.label ?? "").trim().toLowerCase() === want) ?? null;
+}

@@ -85,7 +85,7 @@ export async function loadProductionGraph(
     // screen, never what an element costs. ~128 rows, one page.
     supabase
       .from("production_recipe_versions")
-      .select("id, recipe_id, yield_amount, yield_unit, is_master")
+      .select("id, recipe_id, is_master")
       .eq("is_master", true)
       .order("id"),
     // Only the master versions' lines are needed for costing, but filtering
@@ -97,13 +97,12 @@ export async function loadProductionGraph(
   const failed = [elements, recipes, versions, lines].find((r) => r.error);
   if (failed?.error) return { graph: null, error: failed.error.message };
 
-  const masterByRecipe = new Map<string, { id: string; yield_amount: number | null; yield_unit: string | null }>();
+  // Not the yield columns: costing divides by the "Expected Yield" LINE, which
+  // arrives with the rest of the lines below. Selecting them here is how the
+  // wrong one gets read again.
+  const masterByRecipe = new Map<string, { id: string }>();
   for (const v of versions.data ?? []) {
-    masterByRecipe.set(v.recipe_id as string, {
-      id: v.id as string,
-      yield_amount: v.yield_amount === null ? null : Number(v.yield_amount),
-      yield_unit: (v.yield_unit ?? null) as string | null,
-    });
+    masterByRecipe.set(v.recipe_id as string, { id: v.id as string });
   }
 
   type GraphLine = {
@@ -132,7 +131,7 @@ export async function loadProductionGraph(
   // costing has to pick one; the first by name is at least stable, and the
   // element screen shows both so the choice is visible rather than hidden.
   const recipeCountByElement = new Map<string, number>();
-  const masterByElement = new Map<string, { id: string; yield_amount: number | null; yield_unit: string | null }>();
+  const masterByElement = new Map<string, { id: string }>();
   const recipeNameByElement = new Map<string, string>();
   for (const r of (recipes.data ?? []).slice().sort((a, b) =>
     String(a.name).localeCompare(String(b.name))
@@ -177,9 +176,9 @@ export async function loadProductionGraph(
         : null,
       master: master
         ? {
+            // NO yield columns: costing divides by the "Expected Yield" LINE,
+            // which is already in `lines`. See `elementCost`.
             id: master.id,
-            yield_amount: master.yield_amount,
-            yield_unit: master.yield_unit,
             lines: linesByVersion.get(master.id) ?? [],
           }
         : null,

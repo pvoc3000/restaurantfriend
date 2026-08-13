@@ -234,8 +234,6 @@ export async function RecipeDetail({
         batchCost: versionBatchCost(
           {
             id: v.id,
-            yield_amount: v.yield_amount === null ? null : Number(v.yield_amount),
-            yield_unit: v.yield_unit,
             lines: lines.map((l) => ({
               id: l.id,
               label: l.label,
