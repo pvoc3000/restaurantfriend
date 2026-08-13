@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph } from "@/lib/productionQueries";
-import { versionBatchCost, costContext } from "@/lib/productionCost";
+import { elementCost, costContext } from "@/lib/productionCost";
 import { RecipesList, type RecipeRow } from "@/components/production/RecipesList";
 
 /**
@@ -27,7 +27,7 @@ export default async function RecipesPage() {
       .select(
         `id, name, recipe_type, is_active, element_id,
          production_elements ( id, name ),
-         production_recipe_versions ( id, version_label, is_master, yield_amount, yield_unit )`
+         production_recipe_versions ( id, version_label, is_master )`
       )
       .order("name"),
     loadProductionGraph(supabase),
@@ -43,8 +43,8 @@ export default async function RecipesPage() {
     );
   }
 
-  // The master version's lines, for the batch cost. `loadProductionGraph`
-  // already holds them keyed by element, so this needs no further query.
+  // The master version's lines, for the cost. `loadProductionGraph` already
+  // holds them keyed by element, so this needs no further query.
   const rows: RecipeRow[] = (recipes ?? []).map((r) => {
     const element = Array.isArray(r.production_elements)
       ? r.production_elements[0]
@@ -53,8 +53,6 @@ export default async function RecipesPage() {
       id: string;
       version_label: string;
       is_master: boolean;
-      yield_amount: number | null;
-      yield_unit: string | null;
     }[];
     const master = versions.find((v) => v.is_master) ?? null;
 
@@ -62,9 +60,16 @@ export default async function RecipesPage() {
     // Only cost from the graph's master if it IS this family's master — an
     // element with two families has one master in the graph and the other
     // family must not borrow it.
-    const costable = node?.master && master && node.master.id === master.id ? node.master : null;
-    const batchCost = costable
-      ? versionBatchCost(costable, graph!.byId, costs)
+    const costable = node?.master && master && node.master.id === master.id ? node : null;
+    // `elementCost` ITSELF, not a figure assembled here — so a recipe's cost in
+    // this list, on the element screen and in the Costs block's headline are
+    // one call at one column, labour and all (Mark, 2026-08-12: "just do one
+    // calculation … and use it everywhere"). This column used to be
+    // `versionBatchCost` under the name "Batch cost", which is ingredients only
+    // — the very figure Mark had removed from the recipe screen the same day
+    // for being "wrong as it doesn't include labor", still printed here.
+    const cost = costable
+      ? elementCost(costable, graph!.byId, costs)
       : { cost: null, unit: null, unresolved: [] };
 
     return {
@@ -76,11 +81,7 @@ export default async function RecipesPage() {
       elementName: (element?.name ?? "—") as string,
       versionCount: versions.length,
       masterLabel: master?.version_label ?? null,
-      batchCost,
-      yieldAmount: master?.yield_amount === null || master?.yield_amount === undefined
-        ? null
-        : Number(master.yield_amount),
-      yieldUnit: master?.yield_unit ?? null,
+      cost,
     };
   });
 

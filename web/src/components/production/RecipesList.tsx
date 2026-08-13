@@ -18,10 +18,15 @@ export type RecipeRow = {
   elementName: string;
   versionCount: number;
   masterLabel: string | null;
-  /** What one batch of the master version costs, live. */
-  batchCost: Cost;
-  yieldAmount: number | null;
-  yieldUnit: string | null;
+  /**
+   * What ONE of this recipe costs to make — `elementCost` itself, so it is the
+   * same number the element screen and the Costs block's headline quote, at the
+   * column the recipe is costed at and with its labour in it. Its `unit` is the
+   * expected-yield row's, which is why the Yield column that used to sit beside
+   * this one is gone: it read the retired `yield_amount` COLUMN, disagreed with
+   * the row on 19 of the 128 masters, and had no editor anywhere in the app.
+   */
+  cost: Cost;
 };
 
 type Tier = "active" | "all" | "no-master";
@@ -141,27 +146,23 @@ export function RecipesList({ rows, editable }: { rows: RecipeRow[]; editable: b
         ),
     },
     {
-      key: "yield",
-      label: "Yield",
-      width: 130,
-      hideWhenCompact: true,
-      sortValue: (r) => r.yieldAmount,
-      render: (r) => (
-        <span className="tabular-nums text-muted">
-          {r.yieldAmount === null ? "—" : `${r.yieldAmount} ${r.yieldUnit ?? ""}`.trim()}
-        </span>
-      ),
-    },
-    {
       key: "cost",
-      label: "Batch cost",
-      width: 150,
+      label: "Cost",
+      width: 170,
       align: "right",
-      sortValue: (r) => r.batchCost.cost,
+      sortValue: (r) => r.cost.cost,
       sortTiebreaks: [(r) => r.name],
       render: (r) => (
-        <span className="tabular-nums" title={unresolvedSummary(r.batchCost) ?? undefined}>
-          {formatCost(r.batchCost)}
+        <span className="tabular-nums" title={unresolvedSummary(r.cost) ?? undefined}>
+          {formatCost(r.cost)}
+          {/* The unit is what makes the figure readable: half this catalog is
+              priced per gram and the other half per each, and "$0.0024" beside
+              "$0.53" says nothing without it. */}
+          {r.cost.cost === null ? null : (
+            <span className="ml-1 text-[12px] font-normal text-muted">
+              / {r.cost.unit ?? "unit"}
+            </span>
+          )}
         </span>
       ),
     },
