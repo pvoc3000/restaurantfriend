@@ -2428,11 +2428,14 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    editor in the Costs block is now a display of FileMaker's single value.
    Whether it earns its place there at all is worth a look.
 
-   **THE YIELD IS THE RECIPE'S OWN "EXPECTED YIELD" ROW, ALWAYS AND FOREVER**
-   (Mark, 2026-08-12: "we should not use production_recipe_versions.yield_amount
-   to determine costs. we should use the recipe yield number, always and
-   forever"). `elementCost` divides a made element's batch by
-   `metadataLine(version.lines, "yield")`, and `CostVersion` no longer CARRIES
+   **THE YIELD IS THE RECIPE'S OWN "EXPECTED YIELD" ROW, AT THE COLUMN THE
+   RECIPE IS COSTED AT** (Mark, 2026-08-12: "we should not use
+   production_recipe_versions.yield_amount to determine costs. we should use the
+   recipe yield number, always and forever" — then, seeing the block: "use the
+   yield in the column that is chosen for costing").
+   `elementCost` divides a made element's batch by
+   `metadataLine(version.lines, "yield")` at 042's `cost_column`, and
+   `CostVersion` no longer CARRIES
    `yield_amount` / `yield_unit` — which is the guarantee rather than a tidy-up:
    a caller cannot supply the column, so the resolver cannot read it. The graph
    loader stopped selecting it too.
@@ -2457,6 +2460,34 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    that module exists to prevent. `elementCost` also reports the BATCH's own
    reasons before "no yield": an empty recipe has neither, and "no ingredients"
    is the more useful thing to say first.
+   **INGREDIENTS AND YIELD MOVE TOGETHER OR THE ANSWER IS OUT BY THE
+   MULTIPLIER.** `versionBatchCost` sums each line's `qty`, which is the BASE
+   column, so costing at x1 means scaling that by the column's multiplier as
+   well as taking that column's yield. Raisied Donut v11 is the worked example:
+   $5.71 over 34, or $57.08 over 340 at x1 — take one without the other and it
+   is a tenth or ten times the truth. Which is also why choosing a column
+   USUALLY changes nothing: both sides scale by the same multiplier and cancel.
+   Measured over the live catalog, base versus chosen: **100 made elements the
+   same, 0 different** — only one version carries a `cost_column` at all and its
+   yield strip is proportional. It matters exactly where the yield row is one
+   somebody turned AUTO off for and typed (30 of the 493 versions), and there
+   the chosen column is the only honest answer. The `%` column can never be the
+   costed one, and a `cost_column` pointing at a slot the strip no longer has
+   falls back to the base — `recipeCosts` falls back the same way, so the block
+   and the element always quote the same column.
+   **The "Costed yield" field is GONE from the Costs block** (Mark, 2026-08-12:
+   "redundant and unnecessary because the user can already choose the batch size
+   for costing purposes"). `yield_amount` now has NO editor anywhere in the app
+   and exactly one reader — the recipes LIST's Yield column, which is still
+   FileMaker's single value and may disagree with the row.
+   **The block's headline and an element's cost are NOT the same number, and the
+   difference is LABOUR.** Raisied Donut v11 reads $0.53 per ea at x1, which is
+   (ingredients + prep-time × the shop's rate) ÷ 340; `elementCost` gives
+   ~$0.17, ingredients only, because `lineCost` returns nothing for a line with
+   no `element_id` and every metadata row is one. So a donut's cost includes the
+   flour in its dough and excludes every minute spent making it. Mark has raised
+   this ("prep time … should add labor costs to the recipe") and it is NOT
+   built — see the fourth-kind note under decision 2.
    `METADATA_LABELS` / `metadataLine` moved from `lib/recipeCosts` to
    `lib/production` when both cost modules needed them — `lib/production`
    imports nothing, which is what keeps the two from becoming a cycle.

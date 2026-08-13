@@ -421,3 +421,81 @@ test("a version of nothing but metadata rows has no ingredients", () => {
   eq(c.cost, null);
   eq(c.unresolved[0].reason, "no ingredients", "and it says so first");
 });
+
+/* -- costing at the CHOSEN batch column (Mark, 2026-08-12) ------------------ */
+
+/** Raisied Donut v11's real shape: base TEST ×1, then x1/2 ×5, x3/4 ×7.5, x1 ×10. */
+function scaled(costColumn: number | null, yieldStrip?: (number | null)[]): CostElement {
+  return {
+    id: "el", name: "Raised Donut", kind: "made",
+    manual_cost: null, manual_cost_unit: null,
+    master: {
+      id: "v",
+      scale_labels: ["TEST", "x1/2", "x3/4", "x1", "%"],
+      scale_multipliers: [1, 5, 7.5, 10, 1],
+      cost_column: costColumn,
+      lines: [
+        {
+          id: "y", label: "Expected Yield", qty: 34, unit: "ea", element_id: null,
+          ...(yieldStrip
+            ? { scaleAuto: false, scaleAmounts: yieldStrip, scaleUnits: [null, "ea", "ea", "ea", null] }
+            : {}),
+        },
+        { id: "l", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" },
+      ],
+    },
+  };
+}
+
+test("a proportional recipe costs the same at every column", () => {
+  // Both sides scale by the same multiplier and cancel: base $4.00 over 34, or
+  // $40.00 over 340. This is why the choice usually changes nothing, and why
+  // getting it wrong is invisible until it isn't.
+  const f = flour();
+  const at = (col: number | null) => elementCost(scaled(col), graph(f, scaled(col)), DF01).cost ?? 0;
+  const base = at(null);
+  ok(Math.abs(base - 4 / 34) < 1e-9, `base column: ${base}`);
+  for (const col of [1, 2, 3]) {
+    ok(Math.abs(at(col) - base) < 1e-9, `column ${col} agrees with the base`);
+  }
+});
+
+test("INGREDIENTS SCALE WITH THE YIELD, or the answer is out by the multiplier", () => {
+  // The failure this guards: taking the x1 column's yield (340) against the
+  // BASE column's ingredients ($4.00) gives $0.0118 — a tenth of the truth.
+  const f = flour();
+  const el = scaled(3);
+  const c = elementCost(el, graph(f, el), DF01);
+  ok(Math.abs((c.cost ?? 0) - 40 / 340) < 1e-9, `$40 over 340, got ${c.cost}`);
+  ok(Math.abs((c.cost ?? 0) - 4 / 340) > 1e-6, "NOT base ingredients over x1 yield");
+});
+
+test("a TYPED yield strip is what makes the chosen column matter", () => {
+  // AUTO off and the x1 yield typed as 300 rather than the proportional 340 —
+  // 30 of the 493 versions are like this, and they are the whole reason the
+  // column has to be honoured rather than assumed to cancel.
+  const f = flour();
+  const el = scaled(3, [null, 170, 255, 300, null]);
+  const c = elementCost(el, graph(f, el), DF01);
+  ok(Math.abs((c.cost ?? 0) - 40 / 300) < 1e-9, `$40 over the typed 300, got ${c.cost}`);
+  eq(c.unit, "ea", "the unit comes from that column's cell");
+});
+
+test("a cost_column pointing at a slot that no longer exists falls back to the base", () => {
+  // The strip was shortened after somebody chose it. Costing at nothing would
+  // be worse than costing at the base, and `recipeCosts` falls back the same
+  // way so the block and the element quote the same column.
+  const f = flour();
+  const el = scaled(9);
+  const c = elementCost(el, graph(f, el), DF01);
+  ok(Math.abs((c.cost ?? 0) - 4 / 34) < 1e-9, `base column, got ${c.cost}`);
+});
+
+test("the % column is never the costed one", () => {
+  // Slot 4 is "%", a share of the batch rather than a batch size. Choosing it
+  // must not make the divisor a percentage.
+  const f = flour();
+  const el = scaled(4);
+  const c = elementCost(el, graph(f, el), DF01);
+  ok(Math.abs((c.cost ?? 0) - 4 / 34) < 1e-9, `fell back to the base, got ${c.cost}`);
+});

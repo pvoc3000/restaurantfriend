@@ -34,7 +34,7 @@
  */
 
 import { convert } from "./units";
-import { metadataLine } from "./production";
+import { columnCell, metadataLine, scaleColumns } from "./production";
 
 export type ElementKind = "made" | "purchased" | "manual";
 
@@ -68,25 +68,38 @@ export type CostVendorItem = {
 };
 
 /**
- * A recipe version as COSTING sees it: its lines, and nothing else.
+ * A recipe version as COSTING sees it: its lines, and the batch size it is
+ * costed AT.
  *
- * NO `yield_amount` / `yield_unit`. Those columns still exist on the table and
- * are still shown on the Info tab, but costing does not read them and must not
- * — the yield is the "Expected Yield" line, which is why the divisor is in
- * `lines` like everything else. Leaving them on this type is how the next
- * reader reaches for the wrong one.
+ * NO `yield_amount` / `yield_unit`. Those columns still exist on the table but
+ * nothing costs from them and nothing may — the yield is the "Expected Yield"
+ * line, which is why the divisor is in `lines` like everything else. Leaving
+ * them on this type is how the next reader reaches for the wrong one.
  */
 export type CostVersion = {
   id: string;
   lines: CostLine[];
+  /** 041's strip — what batch sizes this version has, and what each multiplies
+   *  the base by. Absent means the version has only its base column. */
+  scale_labels?: string[] | null;
+  scale_multipliers?: number[] | null;
+  /** Migration 042 — which of them the recipe is costed at. Null = the base. */
+  cost_column?: number | null;
 };
 
 export type CostLine = {
   id: string;
   label: string | null;
+  /** The BASE column's amount. Every other column is derived — see 041. */
   qty: number | null;
   unit: string | null;
   element_id: string | null;
+  /** 041's per-line strip, read only for the yield row and only when the row
+   *  is typed rather than computed. Costing ignores it for ingredients, which
+   *  scale by the column's multiplier like the matrix does. */
+  scaleAuto?: boolean;
+  scaleAmounts?: (number | null)[] | null;
+  scaleUnits?: (string | null)[] | null;
   /**
    * Where the row sits in its list. Nothing about COSTING reads it — a total is
    * a total in any order — but the screens that render these lines do, and a
@@ -218,36 +231,58 @@ export function elementCost(
   }
   const batch = versionBatchCost(version, byId, locationId, new Set(seen).add(element.id));
 
-  // THE YIELD IS THE RECIPE'S OWN "EXPECTED YIELD" ROW, ALWAYS (Mark,
-  // 2026-08-12: "we should not use production_recipe_versions.yield_amount to
-  // determine costs. we should use the recipe yield number, always and forever").
+  // THE YIELD IS THE RECIPE'S OWN "EXPECTED YIELD" ROW, AT THE BATCH SIZE THE
+  // RECIPE IS COSTED AT (Mark, 2026-08-12: "we should not use
+  // production_recipe_versions.yield_amount to determine costs. we should use
+  // the recipe yield number, always and forever" — then, seeing the block:
+  // "use the yield in the column that is chosen for costing").
   //
   // The version carries a `yield_amount` COLUMN as well and this deliberately
   // ignores it. They are two answers to one question and they disagree:
   // measured over the 128 masters, 84 agree, 19 differ and 25 have neither.
   // Where they differ the gap is not small — Lemon Curd 35 against 2.4, the
-  // cake donuts 30 against 15 — so the column was quietly costing nineteen
-  // recipes wrong, one of them by more than fourteen times.
+  // cake donuts 30 against 15. The row wins because it is what the kitchen
+  // reads: it is on the printed sheet, it is per batch size, and it is
+  // maintained by whoever maintains the recipe.
   //
-  // The row wins because it is what the kitchen reads. It is on the printed
-  // sheet, it is per batch size, and it is maintained by whoever maintains the
-  // recipe; the column is FileMaker's single `Yield` field, lifted once at
-  // migration and edited by almost nobody since.
+  // INGREDIENTS AND YIELD MOVE TOGETHER OR THE ANSWER IS NONSENSE. The batch
+  // cost above is the BASE column's — `lineCost` reads each line's `qty`, which
+  // is the base amount — so costing at x1 means scaling that by the column's
+  // multiplier as well as taking the column's yield. Raisied Donut v11 is the
+  // worked example: base ingredients $5.71 over base yield 34, or $57.08 over
+  // 340 at x1. Take one without the other and it is out by a factor of ten.
   //
-  // The BASE column's amount, not a scaled one: `versionBatchCost` sums each
-  // line's `qty`, which is the base column, so the divisor has to be the base
-  // column's yield or the two halves are different batch sizes. 042's
-  // `cost_column` still only drives the Costs matrix.
-  // NOTHING TO DIVIDE MEANS NOTHING TO SAY ABOUT THE DIVISOR. If the batch came
-  // back unpriced it has already explained why — no ingredients, or ingredients
-  // nobody has costed — and leading with "no yield" would answer a question the
-  // reader has not reached yet.
+  // Which is also why choosing a column USUALLY changes nothing: both sides
+  // scale by the same multiplier and cancel. It matters exactly where the yield
+  // row is one somebody turned AUTO off for and typed — 30 of the 493 versions
+  // — and there the chosen column is the only honest answer.
   if (batch.cost === null) {
     return { cost: null, unit: null, unresolved: batch.unresolved };
   }
 
+  const columns = scaleColumns(version.scale_labels ?? null, version.scale_multipliers ?? null)
+    // The `%` column is a share of the batch, not a batch size — nothing is
+    // ever costed at it.
+    .filter((c) => !c.isPercent);
+  const baseColumn = columns[0] ?? null;
+  const baseIndex = baseColumn?.index ?? 0;
+  const baseMultiplier = baseColumn?.multiplier ?? 1;
+  // A `cost_column` pointing at a slot this version no longer has — the strip
+  // was shortened after somebody chose it — falls back to the base rather than
+  // costing at nothing. `recipeCosts` does the same, so the block and the
+  // element agree about which column they are quoting.
+  const chosen =
+    columns.find((c) => c.index === version.cost_column) ?? baseColumn;
+
   const yieldRow = metadataLine(version.lines, "yield");
-  const yieldQty = yieldRow?.qty ?? null;
+  const yieldCell = yieldRow
+    ? chosen
+      ? columnCell(yieldRow, chosen, baseMultiplier, baseIndex)
+      : { qty: yieldRow.qty, unit: yieldRow.unit }
+    : null;
+  const yieldQty = yieldCell?.qty ?? null;
+  const factor = chosen && baseMultiplier ? chosen.multiplier / baseMultiplier : 1;
+
   if (yieldQty === null || yieldQty === 0) {
     // The batch cost is still real and worth showing; what we can't do is
     // divide it into a per-unit figure.
@@ -261,8 +296,8 @@ export function elementCost(
     };
   }
   return {
-    cost: batch.cost / Number(yieldQty),
-    unit: yieldRow?.unit ?? null,
+    cost: (batch.cost * factor) / Number(yieldQty),
+    unit: yieldCell?.unit ?? null,
     unresolved: batch.unresolved,
   };
 }

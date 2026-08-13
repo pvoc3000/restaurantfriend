@@ -85,24 +85,43 @@ export async function loadProductionGraph(
     // screen, never what an element costs. ~128 rows, one page.
     supabase
       .from("production_recipe_versions")
-      .select("id, recipe_id, is_master")
+      .select("id, recipe_id, is_master, scale_labels, scale_multipliers, cost_column")
       .eq("is_master", true)
       .order("id"),
     // Only the master versions' lines are needed for costing, but filtering
     // them here would need the version ids first — a fifth round trip to save
     // a few thousand rows we are already holding. Fetched flat and filtered.
-    fetchAll(supabase, "production_recipe_lines", "id, version_id, element_id, label, qty, unit"),
+    // `scale_*` for the yield row: a version where somebody turned AUTO off has
+    // typed per-column yields, and those are what costing must divide by.
+    fetchAll(
+      supabase,
+      "production_recipe_lines",
+      "id, version_id, element_id, label, qty, unit, scale_auto, scale_amounts, scale_units"
+    ),
   ]);
 
   const failed = [elements, recipes, versions, lines].find((r) => r.error);
   if (failed?.error) return { graph: null, error: failed.error.message };
 
-  // Not the yield columns: costing divides by the "Expected Yield" LINE, which
+  // NOT the yield columns: costing divides by the "Expected Yield" LINE, which
   // arrives with the rest of the lines below. Selecting them here is how the
-  // wrong one gets read again.
-  const masterByRecipe = new Map<string, { id: string }>();
+  // wrong one gets read again. The SCALE strip and `cost_column` are a
+  // different matter — they say which batch size the recipe is costed at, and
+  // both the yield and the ingredients are taken at it.
+  type MasterRef = {
+    id: string;
+    scale_labels: string[] | null;
+    scale_multipliers: number[] | null;
+    cost_column: number | null;
+  };
+  const masterByRecipe = new Map<string, MasterRef>();
   for (const v of versions.data ?? []) {
-    masterByRecipe.set(v.recipe_id as string, { id: v.id as string });
+    masterByRecipe.set(v.recipe_id as string, {
+      id: v.id as string,
+      scale_labels: (v.scale_labels ?? null) as string[] | null,
+      scale_multipliers: (v.scale_multipliers ?? null) as number[] | null,
+      cost_column: v.cost_column === null || v.cost_column === undefined ? null : Number(v.cost_column),
+    });
   }
 
   type GraphLine = {
@@ -111,6 +130,9 @@ export async function loadProductionGraph(
     qty: number | null;
     unit: string | null;
     element_id: string | null;
+    scaleAuto: boolean;
+    scaleAmounts: (number | null)[] | null;
+    scaleUnits: (string | null)[] | null;
   };
   const linesByVersion = new Map<string, GraphLine[]>();
   for (const l of lines.data ?? []) {
@@ -122,6 +144,12 @@ export async function loadProductionGraph(
       qty: l.qty === null ? null : Number(l.qty),
       unit: (l.unit ?? null) as string | null,
       element_id: (l.element_id ?? null) as string | null,
+      scaleAuto: l.scale_auto !== false,
+      scaleAmounts:
+        (l.scale_amounts as (number | string | null)[] | null)?.map((n) =>
+          n === null || n === "" ? null : Number(n)
+        ) ?? null,
+      scaleUnits: (l.scale_units ?? null) as (string | null)[] | null,
     });
     linesByVersion.set(key, list);
   }
@@ -131,7 +159,7 @@ export async function loadProductionGraph(
   // costing has to pick one; the first by name is at least stable, and the
   // element screen shows both so the choice is visible rather than hidden.
   const recipeCountByElement = new Map<string, number>();
-  const masterByElement = new Map<string, { id: string }>();
+  const masterByElement = new Map<string, MasterRef>();
   const recipeNameByElement = new Map<string, string>();
   for (const r of (recipes.data ?? []).slice().sort((a, b) =>
     String(a.name).localeCompare(String(b.name))
@@ -180,6 +208,9 @@ export async function loadProductionGraph(
             // which is already in `lines`. See `elementCost`.
             id: master.id,
             lines: linesByVersion.get(master.id) ?? [],
+            scale_labels: master.scale_labels,
+            scale_multipliers: master.scale_multipliers,
+            cost_column: master.cost_column,
           }
         : null,
     });
