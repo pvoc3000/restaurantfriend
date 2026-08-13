@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
-import { loadProductionGraph } from "@/lib/productionQueries";
+import { loadProductionGraph, loadElementOptions } from "@/lib/productionQueries";
 import { lineCost, versionBatchCost } from "@/lib/productionCost";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
@@ -42,8 +42,12 @@ export async function RecipeDetail({
   const editable = canWriteCatalog(session.membership.role);
   const locationId = session.activeLocation?.id ?? null;
 
-  const [{ data: recipe, error }, { graph, error: graphError }, { data: shop }] =
-    await Promise.all([
+  const [
+    { data: recipe, error },
+    { graph, error: graphError },
+    { data: shop },
+    { options: elementOptions },
+  ] = await Promise.all([
     supabase
       .from("production_recipes")
       .select(
@@ -70,6 +74,10 @@ export async function RecipeDetail({
       locationId
         ? supabase.from("locations").select("labor_rate").eq("id", locationId).maybeSingle()
         : Promise.resolve({ data: null }),
+      // The ingredient picker's vocabulary — active elements only, which the
+      // costing graph beside it deliberately cannot answer (it loads retired
+      // ones too, because a resolver has to price what is already on a recipe).
+      loadElementOptions(supabase),
     ]);
 
   if (error || graphError) {
@@ -286,10 +294,12 @@ export async function RecipeDetail({
       />
 
       {/* The identity block sits ABOVE the split and is INDENTED to the content
-          column: `lg:ml-48` is the sidebar's `lg:w-40` plus the row's `lg:gap-8`.
+          column: `lg:ml-36` is the sidebar's `lg:w-28` plus the row's `lg:gap-8`.
           THOSE THREE VALUES ARE COUPLED — change one and the heading drifts off
-          the content it belongs to. The employee record is the worked example. */}
-      <div className="space-y-3 lg:ml-48">
+          the content it belongs to. The employee record is the worked example,
+          and it keeps the wider `w-40`: it has five sections with longer words
+          ("Employment"), where this has two. */}
+      <div className="space-y-3 lg:ml-36">
         <div className="space-y-2">
           <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
             <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
@@ -351,7 +361,18 @@ export async function RecipeDetail({
               }))}
             />
           </div>
-          <div className="hidden shrink-0 lg:block lg:w-40">
+          {/* NARROWER THAN THE EMPLOYEE RECORD'S, and the width is the point (Mark,
+              2026-08-11: "the area with the vertical menu on the left side is
+              much larger than it needs to be — you can make it smaller to free
+              up space for the ingredient list"). It was 160px for two words.
+              It went to 64 on that instruction and back up to 128 the same day,
+              when the split into three tabs made the longest label
+              "Ingredients" rather than "Recipe" — MEASURED at 91px, so 112
+              holds it with room. The width follows whatever the labels
+              actually are; it is not a number written down once.
+              Still 32px narrower than the employee record's, which has five
+              sections. */}
+          <div className="hidden shrink-0 lg:block lg:w-28">
             <SectionNav
               ariaLabel="Recipe sections"
               value={tab}
@@ -378,7 +399,12 @@ export async function RecipeDetail({
                 params={rawParams}
               />
             ) : (
-              <RecipeVersionSheet version={current} editable={editable} />
+              <RecipeVersionSheet
+                version={current}
+                editable={editable}
+                elementOptions={elementOptions}
+                show={tab === "procedure" ? "procedure" : "ingredients"}
+              />
             )}
           </div>
         </div>

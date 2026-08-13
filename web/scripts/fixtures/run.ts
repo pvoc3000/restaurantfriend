@@ -31,6 +31,7 @@ import "./poFilters.fixtures";
 import "./productionBatches.fixtures";
 import "./productionCost.fixtures";
 import "./productionElements.fixtures";
+import "./recipeIngredients.fixtures";
 import "./productionHistory.fixtures";
 import "./productionItems.fixtures";
 import "./productionPlans.fixtures";

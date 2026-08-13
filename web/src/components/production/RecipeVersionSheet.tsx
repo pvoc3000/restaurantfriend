@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useRef } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { PickList, type PickOption } from "@/components/ui/PickList";
+import { ingredientChoice, ingredientUpdate } from "@/lib/recipes";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { useExactViewportHeight } from "@/lib/tableHead";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -123,9 +127,25 @@ const W_SPARE = 72;
 export function RecipeVersionSheet({
   version,
   editable,
+  elementOptions,
+  show,
 }: {
   version: SheetVersion;
   editable: boolean;
+  /** The element catalog, for naming an ingredient. Active elements only. */
+  elementOptions: PickOption[];
+  /**
+   * Which of the two lists this render is. They were on ONE screen until
+   * 2026-08-11 and are now a tab each (Mark: "it's a little crowded
+   * vertically") — a seventy-row ingredient grid and a fifteen-step procedure
+   * splitting one viewport left both of them short.
+   *
+   * A prop rather than two components: everything above them — the scale
+   * columns, the base multiplier, the measured frame — is computed from the
+   * same version, and two components would either compute it twice or need a
+   * third to hold it.
+   */
+  show: "ingredients" | "procedure";
 }) {
   const columns = scaleColumns(version.scale_labels, version.scale_multipliers);
   const baseColumn: ScaleColumn | null = columns[0] ?? null;
@@ -164,15 +184,16 @@ export function RecipeVersionSheet({
     null
   );
 
-  // BOTH LISTS ON SCREEN AT ONCE (Mark, 2026-08-08). A recipe is read as two
-  // documents together — what goes in, and what you do with it — and a
-  // seventy-row ingredient grid pushed the procedure a page and a half down.
-  // So they split the window and scroll their own rows, the Info tab's
-  // arrangement applied to the tab it was really needed on.
+  // ONE LIST FILLS THE WINDOW. They shared it from 2026-08-08 until
+  // 2026-08-11, when the crowding that arrangement was meant to cure came back
+  // at half the height (Mark: "it's a little crowded vertically") — a
+  // seventy-row grid and a fifteen-step procedure both want a screen, and
+  // giving each half of one made neither readable. A tab each now, so whichever
+  // you are reading gets all of it.
   //
-  // The frame fills the window exactly, and the two lists split it EVENLY
-  // (Mark, 2026-08-08). The floor is small on purpose: it is the fallback for a
-  // window too short to divide, not a target — a generous floor makes the page
+  // The frame still fills the window exactly. The floor is small on purpose: it
+  // is the fallback for a window too short to divide, not a target — a
+  // generous floor makes the page
   // scroll on every laptop, which is the opposite of filling it.
   const frame = useRef<HTMLDivElement>(null);
   useExactViewportHeight(frame, true, 360);
@@ -182,6 +203,7 @@ export function RecipeVersionSheet({
       {/* ------------------------------------------------------------------ */}
       {/* Ingredients                                                         */}
       {/* ------------------------------------------------------------------ */}
+      {show === "ingredients" ? (
       <section className="flex min-h-0 basis-0 grow flex-col gap-3">
         <SectionHeading count={version.lines.length}>Ingredients</SectionHeading>
 
@@ -330,7 +352,7 @@ export function RecipeVersionSheet({
                   </td>
 
                   <td className="px-3 py-2">
-                    <ItemCell line={line} editable={editable} />
+                    <ItemCell line={line} editable={editable} options={elementOptions} />
                   </td>
 
                   {baseColumn ? (
@@ -439,14 +461,17 @@ export function RecipeVersionSheet({
             orgId={version.org_id}
             lastSort={lastLineSort}
             what="ingredient"
-            placeholder="Name the ingredient — link it to an element on the row"
+            placeholder="Choose an element…"
+            options={elementOptions}
           />
         ) : null}
       </section>
+      ) : null}
 
       {/* ------------------------------------------------------------------ */}
       {/* Procedure                                                           */}
       {/* ------------------------------------------------------------------ */}
+      {show === "procedure" ? (
       <section className="flex min-h-0 basis-0 grow flex-col gap-3">
         <SectionHeading count={version.steps.length}>Procedure</SectionHeading>
 
@@ -544,6 +569,7 @@ export function RecipeVersionSheet({
           />
         ) : null}
       </section>
+      ) : null}
 
     </div>
   );
@@ -611,21 +637,31 @@ function padTo(strip: number[] | null, width: number): (number | null)[] {
  * What the line IS — the element it names, with FMP's `columnName_t` override
  * under it.
  *
- * A line with no element is a real state and not a gap: 1,459 of FileMaker's
- * own ingredient lines are a name and an amount with nothing behind them
- * ("pinch of salt"), which is why 036 made `element_id` nullable. Those cost
- * nothing and say so in the Cost column.
+ * A line with no element is a real state and not a gap: FileMaker has ingredient
+ * lines that are a name and an amount with nothing behind them ("pinch of
+ * salt"), which is why 036 made `element_id` nullable. Those cost nothing and
+ * say so in the Cost column.
+ *
+ * BUT AN UNLINKED LINE MUST BE ABLE TO BECOME A LINKED ONE, and until
+ * 2026-08-11 it could not: this cell was an `InlineValue` over `label`, so the
+ * only thing you could change about a nameless line was its name. Nothing in
+ * `web/src` wrote `element_id` at all, which made every line the app itself
+ * added permanently uncosted. It is a `PickList` over the catalog now, the same
+ * control the foot of the list uses, with the line's current free text carried
+ * as the current value so choosing is a correction rather than a retype.
  */
-function ItemCell({ line, editable }: { line: SheetLine; editable: boolean }) {
+function ItemCell({
+  line,
+  editable,
+  options,
+}: {
+  line: SheetLine;
+  editable: boolean;
+  options: PickOption[];
+}) {
   if (!line.elementId) {
     return editable ? (
-      <InlineValue
-        table="production_recipe_lines"
-        id={line.id}
-        column="label"
-        value={line.label}
-        placeholder="—"
-      />
+      <LinkIngredient line={line} options={options} />
     ) : (
       <span className={`${READ_ONLY_VALUE} text-muted`}>{line.label ?? "—"}</span>
     );
@@ -654,6 +690,66 @@ function ItemCell({ line, editable }: { line: SheetLine; editable: boolean }) {
       ) : line.label && line.label !== line.elementName ? (
         <span className={`${READ_ONLY_VALUE} text-[12px] text-subtle`}>{line.label}</span>
       ) : null}
+    </span>
+  );
+}
+
+/**
+ * The name cell on a line with no element — choose one from the catalog, or
+ * keep calling it whatever you called it.
+ *
+ * The line's own free text is the PickList's CURRENT VALUE, which is what makes
+ * this read as a correction rather than a fresh question: `PickList` always
+ * lists a stored value it doesn't recognise, marked as current, above the
+ * vocabulary. So a line reading "Scrap Dough" opens with "Scrap Dough" ticked
+ * and every element underneath it.
+ *
+ * Not an `InlineValue kind="pick"`, which would be the obvious reach: that
+ * writes ONE column, and the two answers here go to different ones —
+ * `element_id` for a catalog element, `label` for a name that isn't one. Its
+ * `onWrite` escape hatch could carry it, but the value it hands back is the
+ * cell's column, so the branch would still live out here. This is small enough
+ * to own its own write.
+ */
+function LinkIngredient({ line, options }: { line: SheetLine; options: PickOption[] }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const elementIds = useMemo(() => new Set(options.map((o) => o.value)), [options]);
+
+  return (
+    <span className="flex w-full flex-col items-start">
+      <PickList
+        value={line.label}
+        options={options}
+        allowNew
+        clearable
+        disabled={pending}
+        placeholder="—"
+        ariaLabel={`What line ${line.sort ?? ""} is`.trim()}
+        onPick={(next) => {
+          setError(null);
+          start(async () => {
+            const update = ingredientUpdate(ingredientChoice(next, elementIds));
+            const { data, error: e } = await supabase
+              .from("production_recipe_lines")
+              .update(update)
+              .eq("id", line.id)
+              .select("id");
+            if (e) {
+              setError(e.message);
+              return;
+            }
+            if (!data?.length) {
+              setError("not allowed");
+              return;
+            }
+            router.refresh();
+          });
+        }}
+      />
+      {error && <span className="px-1 text-[11px] text-accent">{error}</span>}
     </span>
   );
 }

@@ -177,24 +177,36 @@ test("an ordinary ingredient is never mistaken for one", () => {
 /* -- the record's address --------------------------------------------------- */
 
 test("an unknown tab shows the record rather than an error", () => {
-  eq(parseRecipeTab("recipe"), "recipe");
+  eq(parseRecipeTab("ingredients"), "ingredients");
+  eq(parseRecipeTab("procedure"), "procedure");
   eq(parseRecipeTab("nonsense"), "info");
   eq(parseRecipeTab(undefined), "info");
+});
+
+test("the RETIRED `recipe` tab lands on the ingredients, not on info", () => {
+  // Every link, bookmark and remembered nav path written before the
+  // 2026-08-11 split says `tab=recipe` and meant the ingredients. Falling back
+  // to `info` like any other unrecognised value would drop all of them on the
+  // wrong screen — which is the one case the catch-all gets wrong.
+  eq(parseRecipeTab("recipe"), "ingredients");
 });
 
 test("the defaults write no parameter, so the record keeps one canonical address", () => {
   eq(recipeHref("abc", { tab: "info" }), "/recipes/abc");
   eq(recipeHref("abc", { tab: "info", version: null }), "/recipes/abc");
-  eq(recipeHref("abc", { tab: "recipe" }), "/recipes/abc?tab=recipe");
-  eq(recipeHref("abc", { tab: "recipe", version: "11" }), "/recipes/abc?tab=recipe&v=11");
+  eq(recipeHref("abc", { tab: "ingredients" }), "/recipes/abc?tab=ingredients");
+  eq(
+    recipeHref("abc", { tab: "procedure", version: "11" }),
+    "/recipes/abc?tab=procedure&v=11"
+  );
 });
 
 test("the breadcrumb trail rides through a tab change", () => {
   // Without this, moving between tabs strips the trail that led here and the
   // record book loses its found set.
   eq(
-    recipeHref("abc", { tab: "recipe", version: "11" }, { from: "/vendors", fromLabel: "Vendors", tab: "info", v: "10" }),
-    "/recipes/abc?from=%2Fvendors&fromLabel=Vendors&tab=recipe&v=11"
+    recipeHref("abc", { tab: "ingredients", version: "11" }, { from: "/vendors", fromLabel: "Vendors", tab: "info", v: "10" }),
+    "/recipes/abc?from=%2Fvendors&fromLabel=Vendors&tab=ingredients&v=11"
   );
 });
 
