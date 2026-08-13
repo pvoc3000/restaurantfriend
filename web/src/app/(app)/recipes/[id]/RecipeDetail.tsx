@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph, loadElementOptions } from "@/lib/productionQueries";
-import { lineCost, versionBatchCost } from "@/lib/productionCost";
+import { versionBatchCost } from "@/lib/productionCost";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
@@ -195,17 +195,6 @@ export async function RecipeDetail({
               ) ?? null,
             scaleUnits: l.scale_units ?? null,
             hideOnPrint: l.hide_on_print === true,
-            cost: lineCost(
-              {
-                id: l.id,
-                label: l.label,
-                qty: l.qty === null ? null : Number(l.qty),
-                unit: l.unit,
-                element_id: l.element_id,
-              },
-              graph!.byId,
-              locationId
-            ),
           };
         });
 

@@ -16,7 +16,7 @@ import {
   type ScaleColumn,
 } from "@/lib/production";
 import { convert } from "@/lib/units";
-import { unresolvedSummary, type Cost } from "@/lib/productionCost";
+import type { Cost } from "@/lib/productionCost";
 import { RecipeScaleCell } from "./RecipeScaleCell";
 import { ScaleAutoBox, HideOnPrint, DeleteRecipeRow } from "./RecipeRowControls";
 import { RecipeStepImage } from "./RecipeStepImage";
@@ -36,8 +36,6 @@ export type SheetLine = {
   scaleAmounts: (number | null)[] | null;
   scaleUnits: (string | null)[] | null;
   hideOnPrint: boolean;
-  /** What this line contributes to the batch, live. */
-  cost: Cost;
 };
 
 export type SheetStep = {
@@ -94,8 +92,15 @@ const W_SORT = 56;
 const W_AUTO = 56;
 const W_SCALE = 118;
 const W_ITEM = 200;
-const W_NOTE = 170;
-const W_COST = 72;
+/* THE NOTE IS THE ONLY FLEXIBLE COLUMN (Mark, 2026-08-11: "all the columns are
+   fixed width it seems, which is fine, but the notes column width should be
+   flexible"). Every other column holds something of known size — a number, a
+   unit, a checkbox, a glyph — so widening them buys nothing, while a note is
+   prose and can always use more. Its `<col>` therefore carries NO width at all:
+   under `table-layout: fixed` the one column without one absorbs whatever is
+   left over, and this is the MINIMUM the table reserves for it before the whole
+   grid starts to scroll instead. */
+const W_NOTE_MIN = 120;
 const W_HIDE = 48;
 const W_TRASH = 40;
 /* The trailing "add a batch size" slot. Narrow on purpose — it holds a name and
@@ -170,8 +175,7 @@ export function RecipeVersionSheet({
     columns.length * W_SCALE +
     (spare === null ? 0 : W_SPARE) +
     W_ITEM +
-    W_NOTE +
-    W_COST +
+    W_NOTE_MIN +
     W_HIDE +
     W_TRASH;
 
@@ -224,8 +228,8 @@ export function RecipeVersionSheet({
               {headerSlots.slice(1).map((column, i) => (
                 <col key={i} style={{ width: column ? W_SCALE : W_SPARE }} />
               ))}
-              <col style={{ width: W_NOTE }} />
-              <col style={{ width: W_COST }} />
+              {/* No width: the leftover lands here. See W_NOTE_MIN. */}
+              <col />
               <col style={{ width: W_HIDE }} />
               <col style={{ width: W_TRASH }} />
             </colgroup>
@@ -271,7 +275,14 @@ export function RecipeVersionSheet({
                     ) : null}
                   </th>
                 ))}
-                <th colSpan={5} />
+                {/* Note · Hide · Trash — the three columns after the scale block, and
+                    it MUST equal them. It read 5 against four trailing columns
+                    until 2026-08-11 and nothing showed, because every column
+                    was a fixed width and the two phantom ones simply took
+                    slack off the end. The moment Note became the flexible
+                    column, Note was what paid for them: 46px instead of 138.
+                    A header row that over-spans invents columns. */}
+                <th colSpan={3} />
               </tr>
 
               {/* The batch names — what each column MAKES, and the reason the
@@ -307,7 +318,14 @@ export function RecipeVersionSheet({
                     editable={editable}
                   />
                 ))}
-                <th colSpan={5} />
+                {/* Note · Hide · Trash — the three columns after the scale block, and
+                    it MUST equal them. It read 5 against four trailing columns
+                    until 2026-08-11 and nothing showed, because every column
+                    was a fixed width and the two phantom ones simply took
+                    slack off the end. The moment Note became the flexible
+                    column, Note was what paid for them: 46px instead of 138.
+                    A header row that over-spans invents columns. */}
+                <th colSpan={3} />
               </tr>
 
               <tr className="text-[11px] uppercase tracking-[0.12em] text-ink [&>th]:sticky [&>th]:top-[62px] [&>th]:z-20 [&>th]:border-b-2 [&>th]:border-ink [&>th]:bg-white">
@@ -319,7 +337,6 @@ export function RecipeVersionSheet({
                   <th key={`h${i}`} />
                 ))}
                 <th className="px-3 py-2 text-left">Note</th>
-                <th className="px-3 py-2 text-right">Cost</th>
                 <th className="px-2 py-2 text-center">Hide</th>
                 <th />
               </tr>
@@ -411,21 +428,6 @@ export function RecipeVersionSheet({
                       />
                     ) : (
                       <span className={READ_ONLY_VALUE}>{line.note ?? ""}</span>
-                    )}
-                  </td>
-
-                  <td
-                    className="px-3 py-2 text-right tabular-nums"
-                    title={unresolvedSummary(line.cost) ?? undefined}
-                  >
-                    {line.cost.cost === null ? (
-                      line.elementId ? (
-                        <span className="text-mark">—</span>
-                      ) : (
-                        ""
-                      )
-                    ) : (
-                      `$${line.cost.cost.toFixed(2)}`
                     )}
                   </td>
 
