@@ -103,10 +103,19 @@ const W_ITEM = 200;
 const W_NOTE_MIN = 120;
 const W_HIDE = 48;
 const W_TRASH = 40;
-/* The trailing "add a batch size" slot. Narrow on purpose — it holds a name and
-   nothing else until it becomes a real column, and a full-width empty column at
-   the end of every row costs more than the affordance is worth. */
-const W_SPARE = 72;
+/* The trailing "add a batch size" slot — a NARROW AFFORDANCE, not a column
+   (Mark, 2026-08-11). It was a full 72px column slot, on the reasoning that it
+   becomes one; but it is a column-sized hole in every row of the grid for
+   something you press a handful of times in a recipe's life, and on a
+   five-column version it was the sixth column's worth of width that pushed the
+   table past the window.
+
+   Pressing it CREATES the column with a name you then edit in place, rather
+   than being an editor itself: an input in a 28px cell is not an input. Naming
+   it is one tap later, in the real column, where there is room — and clearing
+   that name removes the column again, because `scaleColumns` drops an
+   unlabelled slot. So a mis-tap is one gesture from undone. */
+const W_SPARE = 28;
 
 /**
  * One version of a recipe, set the way FileMaker set it and — since 2026-08-08
@@ -285,20 +294,28 @@ export function RecipeVersionSheet({
                 <th colSpan={3} />
               </tr>
 
-              {/* The batch names — what each column MAKES, and the reason the
-                  labels are content rather than a fixed ×½/×¾/×1 ladder. */}
-              {/* STACKED STICKY OFFSETS. The three header rows scroll as one, so
-                  each is pinned below the last: 26px is the multiplier row's own
-                  height (12px text over `pb-1`) and 62 is that plus the batch
-                  names'. Measured, not guessed — and stable, because both rows
-                  are fixed type at fixed padding. */}
-              <tr className="[&>th]:sticky [&>th]:top-[26px] [&>th]:z-20 [&>th]:bg-white">
-                <th />
-                <th />
-                {/* The base column, then the AUTO column's own empty cell, then
-                    the rest — the switch sits BETWEEN the first two amount
-                    columns, which is what it governs, so every header row has
-                    to step over it. */}
+              {/* THE BATCH NAMES ARE COLUMN TITLES (Mark, 2026-08-11: "can the
+                  batch names be on the same horizontal plane as the column
+                  titles?"). They were a row of their own between the
+                  multipliers and Sort/Item/Auto/Note/Hide — three header rows
+                  where two will do, and the names sitting a line above the
+                  headings they are peers of. They ARE headings: "X2.5" names
+                  its column exactly the way "Note" names its own.
+
+                  So this row carries both, and every column is now labelled in
+                  one place. It also gives the list back a row of height, which
+                  is the point of the tab split above.
+
+                  STACKED STICKY OFFSETS: two rows now, not three. 26px is the
+                  multiplier row's own height (12px text over `pb-1`), measured
+                  — and stable, because that row is fixed type at fixed
+                  padding. */}
+              <tr className="text-[11px] uppercase tracking-[0.12em] text-ink [&>th]:sticky [&>th]:top-[26px] [&>th]:z-20 [&>th]:border-b-2 [&>th]:border-ink [&>th]:bg-white">
+                <th className="px-2 py-2 text-left">Sort</th>
+                <th className="px-3 py-2 text-left">Item</th>
+                {/* The base column, then the AUTO column's own cell, then the
+                    rest — the switch sits BETWEEN the first two amount columns,
+                    which is what it governs, so the row has to step over it. */}
                 <ScaleLabelCell
                   version={version}
                   column={headerSlots[0] ?? null}
@@ -306,7 +323,7 @@ export function RecipeVersionSheet({
                   width={width}
                   editable={editable}
                 />
-                <th />
+                <th className="px-2 py-2 text-center">Auto</th>
                 {headerSlots.slice(1).map((column, i) => (
                   <ScaleLabelCell
                     key={`l${i}`}
@@ -317,24 +334,6 @@ export function RecipeVersionSheet({
                     width={width}
                     editable={editable}
                   />
-                ))}
-                {/* Note · Hide · Trash — the three columns after the scale block, and
-                    it MUST equal them. It read 5 against four trailing columns
-                    until 2026-08-11 and nothing showed, because every column
-                    was a fixed width and the two phantom ones simply took
-                    slack off the end. The moment Note became the flexible
-                    column, Note was what paid for them: 46px instead of 138.
-                    A header row that over-spans invents columns. */}
-                <th colSpan={3} />
-              </tr>
-
-              <tr className="text-[11px] uppercase tracking-[0.12em] text-ink [&>th]:sticky [&>th]:top-[62px] [&>th]:z-20 [&>th]:border-b-2 [&>th]:border-ink [&>th]:bg-white">
-                <th className="px-2 py-2 text-left">Sort</th>
-                <th className="px-3 py-2 text-left">Item</th>
-                <th />
-                <th className="px-2 py-2 text-center">Auto</th>
-                {headerSlots.slice(1).map((_, i) => (
-                  <th key={`h${i}`} />
                 ))}
                 <th className="px-3 py-2 text-left">Note</th>
                 <th className="px-2 py-2 text-center">Hide</th>
@@ -598,35 +597,111 @@ function ScaleLabelCell({
   width: number;
   editable: boolean;
 }) {
+  // The spare slot is 28px of affordance, not a column. See W_SPARE.
+  if (!column) {
+    return editable ? (
+      <th className="px-0 py-2 text-center">
+        <AddScaleColumn version={version} index={index} width={width} />
+      </th>
+    ) : (
+      <th />
+    );
+  }
+
   return (
-    <th className="px-2 pb-2 text-left">
+    <th className="px-2 py-2 text-left">
       {editable ? (
         <InlineValue
           table="production_recipe_versions"
           id={version.id}
           column="scale_labels"
-          value={column?.label ?? null}
-          placeholder={column ? "—" : "+"}
+          value={column.label}
+          placeholder="—"
           className="font-semibold uppercase tracking-[0.06em]"
           arrayColumn="scale_labels"
           arrayIndex={index}
           arrayStrip={version.scale_labels}
           arrayWidth={Math.max(width, index + 1)}
-          // The two strips are read in step by `scaleColumns`, so a new label
-          // needs its multiplier slot to exist as well — otherwise the arrays
-          // are different lengths and the version's own check constraint
-          // refuses the write.
-          alsoUpdate={() =>
-            column ? null : { scale_multipliers: padTo(version.scale_multipliers, index + 1) }
-          }
         />
       ) : (
         <span className={`${READ_ONLY_VALUE} font-semibold uppercase tracking-[0.06em]`}>
-          {column?.label ?? ""}
+          {column.label}
         </span>
       )}
     </th>
   );
+}
+
+/**
+ * The narrow `+` at the end of the header — press it and the version grows a
+ * batch size.
+ *
+ * IT WRITES BOTH STRIPS IN ONE STATEMENT. `scaleColumns` reads labels and
+ * multipliers in step, and 036's check constraint refuses a version whose two
+ * arrays are different lengths — so a label without its multiplier slot is a
+ * write the database rejects.
+ *
+ * The new column is named "NEW" rather than left blank, because a blank one
+ * would not exist: `scaleColumns` drops an unlabelled slot, so an empty label
+ * writes a row nobody can see. Clearing that name in the real column is
+ * therefore also how you REMOVE a batch size, which is what makes pressing this
+ * by accident cost one gesture.
+ */
+function AddScaleColumn({
+  version,
+  index,
+  width,
+}: {
+  version: SheetVersion;
+  index: number;
+  width: number;
+}) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [pending, start] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+
+  return (
+    <button
+      type="button"
+      disabled={pending}
+      title="Add a batch size"
+      aria-label="Add a batch size"
+      onClick={() =>
+        start(async () => {
+          setError(null);
+          const labels = padStrings(version.scale_labels, index + 1);
+          labels[index] = "New";
+          const { data, error: e } = await supabase
+            .from("production_recipe_versions")
+            .update({
+              scale_labels: labels,
+              scale_multipliers: padTo(version.scale_multipliers, Math.max(width, index + 1)),
+            })
+            .eq("id", version.id)
+            .select("id");
+          if (e) {
+            setError(e.message);
+            return;
+          }
+          if (!data?.length) {
+            setError("not allowed");
+            return;
+          }
+          router.refresh();
+        })
+      }
+      className="px-1 text-[15px] leading-none text-subtle hover:text-ink disabled:opacity-35"
+    >
+      {error ? <span className="text-[11px] text-accent">!</span> : "+"}
+    </button>
+  );
+}
+
+function padStrings(strip: string[] | null, width: number): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < width; i++) out.push(strip?.[i] ?? "");
+  return out;
 }
 
 function padTo(strip: number[] | null, width: number): (number | null)[] {
