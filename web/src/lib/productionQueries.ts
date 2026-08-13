@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { batchYield } from "./productionCost";
 import type { BatchYield, CostElement, ItemBom } from "./productionCost";
 import type { PriceGridCell, PriceGridOverride } from "./productionPrice";
 
@@ -384,4 +385,114 @@ export async function loadElementOptions(
       .map((e) => ({ value: e.id as string, label: e.name as string })),
     error: null,
   };
+}
+
+/* ========================================================================== */
+/* How many a batch makes                                                      */
+/* ========================================================================== */
+
+/**
+ * `unitsPerBatch` for every item, in four small queries.
+ *
+ * NOT `loadProductionGraph` — that fetches ~470 elements with their whole
+ * vendor-item tree and 3,765 recipe lines in order to price a BOM, and the
+ * schedule screen wants one row per recipe. This asks only for the Expected
+ * Yield rows, which is a few hundred rows rather than a few thousand, and it
+ * reaches the same answer because `batchYield` reads the same column selection
+ * (migration 042's `cost_column`) from the same strip.
+ *
+ * It builds `CostElement`s carrying ONLY a master version, which is all
+ * `batchYield` looks at. They are not costable and must not be handed to
+ * `elementCost` — hence the narrow return type rather than a graph.
+ */
+export async function loadDoughYields(
+  supabase: SupabaseClient
+): Promise<{ unitsPerBatch: Map<string, number | null>; error: string | null }> {
+  const [items, recipes, versions, lines] = await Promise.all([
+    fetchAll(supabase, "production_items", "id, base_element_id"),
+    fetchAll(supabase, "production_recipes", "id, element_id, name"),
+    supabase
+      .from("production_recipe_versions")
+      .select("id, recipe_id, scale_labels, scale_multipliers, cost_column")
+      .eq("is_master", true)
+      .order("id"),
+    // The metadata rows only. `metadataLine` matches case- and space-
+    // insensitively, so the filter is deliberately loose and the exact match
+    // happens in TypeScript — one place, the same one every other reader uses.
+    fetchAll(
+      supabase,
+      "production_recipe_lines",
+      "id, version_id, label, qty, unit, scale_auto, scale_amounts, scale_units",
+      "id"
+    ).then((r) => ({
+      ...r,
+      data: r.data.filter((l) =>
+        /^\s*(expected yield|prep time|mixer size)\s*$/i.test(String(l.label ?? ""))
+      ),
+    })),
+  ]);
+
+  const failed = [items, recipes, versions, lines].find((r) => r.error);
+  if (failed?.error) return { unitsPerBatch: new Map(), error: failed.error.message };
+
+  const byVersion = new Map<string, Record<string, unknown>[]>();
+  for (const l of lines.data ?? []) {
+    const key = l.version_id as string;
+    byVersion.set(key, [...(byVersion.get(key) ?? []), l]);
+  }
+
+  const masterByRecipe = new Map<string, Record<string, unknown>>();
+  for (const v of versions.data ?? []) masterByRecipe.set(v.recipe_id as string, v);
+
+  // The element's master is the master of its FIRST recipe family by name —
+  // the same tie-break `loadProductionGraph` makes, so the two cannot pick
+  // different versions of the same dough.
+  const masterByElement = new Map<string, Record<string, unknown>>();
+  for (const r of (recipes.data ?? [])
+    .slice()
+    .sort((a, b) => String(a.name).localeCompare(String(b.name)))) {
+    const m = masterByRecipe.get(r.id as string);
+    if (m && !masterByElement.has(r.element_id as string)) {
+      masterByElement.set(r.element_id as string, m);
+    }
+  }
+
+  const unitsPerBatch = new Map<string, number | null>();
+  for (const item of items.data ?? []) {
+    const m = item.base_element_id ? masterByElement.get(item.base_element_id as string) : null;
+    if (!m) {
+      unitsPerBatch.set(item.id as string, null);
+      continue;
+    }
+    const element: CostElement = {
+      id: "",
+      name: "",
+      kind: "made",
+      manual_cost: null,
+      manual_cost_unit: null,
+      master: {
+        id: m.id as string,
+        scale_labels: (m.scale_labels ?? null) as string[] | null,
+        scale_multipliers: (m.scale_multipliers ?? null) as number[] | null,
+        cost_column:
+          m.cost_column === null || m.cost_column === undefined ? null : Number(m.cost_column),
+        lines: (byVersion.get(m.id as string) ?? []).map((l) => ({
+          id: l.id as string,
+          label: (l.label ?? null) as string | null,
+          qty: l.qty === null ? null : Number(l.qty),
+          unit: (l.unit ?? null) as string | null,
+          element_id: null,
+          scaleAuto: l.scale_auto !== false,
+          scaleAmounts:
+            (l.scale_amounts as (number | string | null)[] | null)?.map((n) =>
+              n === null || n === "" ? null : Number(n)
+            ) ?? null,
+          scaleUnits: (l.scale_units ?? null) as (string | null)[] | null,
+        })),
+      },
+    };
+    unitsPerBatch.set(item.id as string, batchYield(element).qty);
+  }
+
+  return { unitsPerBatch, error: null };
 }

@@ -8,6 +8,7 @@ import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { packetDate, rollUp, type ScheduleLine } from "@/lib/productionSchedule";
+import { loadDoughYields } from "@/lib/productionQueries";
 import type { BatchYield } from "@/lib/productionCost";
 import { ScheduleLines, type ScheduleLineRow } from "@/components/production/ScheduleLines";
 import { ScheduleActions } from "@/components/production/ScheduleActions";
@@ -72,6 +73,7 @@ export async function ScheduleDetail({
     { data: yieldRows },
     { data: members },
     { data: catalog },
+    { unitsPerBatch },
   ] = await Promise.all([
       // THE VIEW, not the table. `sold` is defined once, in SQL
       // (v_production_schedule_lines), so there is no TypeScript twin to drift
@@ -97,6 +99,11 @@ export async function ScheduleDetail({
         .select("id, name, item_type, subtype, finish, size, tally_box_size, tray_capacity")
         .eq("is_active", true)
         .order("name"),
+      // How many a batch of each item's dough makes — the recipe's own Expected
+      // Yield row, which is what states a run in batches (Mark, 2026-08-13).
+      // The NARROW loader, not the costing graph: this screen wants one row per
+      // recipe, not a priced BOM.
+      loadDoughYields(supabase),
     ]);
 
   // NOT folded into the page's own error, and not swallowed either. An empty
@@ -151,7 +158,7 @@ export async function ScheduleDetail({
 
   const yields = (yieldRows ?? []) as BatchYield[];
   const lines: ScheduleLine[] = rows;
-  const rolled = rollUp(lines, "item", yields);
+  const rolled = rollUp(lines, "item", yields, unitsPerBatch);
   const parTotal = rows.reduce((n, r) => n + r.par, 0);
   const manualCount = rows.filter((r) => r.par_source === "manual").length;
   const uncosted = rows.filter((r) => r.costed_at === null).length;

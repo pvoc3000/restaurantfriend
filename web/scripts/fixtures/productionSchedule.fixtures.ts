@@ -211,28 +211,75 @@ const near = (a: number | null, b: number, what: string) => {
   if (a === null || Math.abs(a - b) > 0.005) throw new Error(`${what}: expected ~${b}, got ${a}`);
 };
 
+/**
+ * HOW MANY ONE BATCH MAKES — the recipe's Expected Yield row, which since
+ * 2026-08-13 is the only thing that says how much dough a run takes (Mark: "the
+ * expected yield IS the portion of a batch. They're the same thing. Use the
+ * yield.").
+ *
+ * These are the values that reproduce FileMaker's own printed packet, and note
+ * they are the RECIPROCALS of `YIELDS`' portions above — which is the point:
+ * where the two agree the arithmetic is unchanged, and the real catalog's cake
+ * doughs move only because their yield rows say 15 where the portion says 30.
+ * `YIELDS` keeps its now-unread `portion_of_batch` so these cases can prove it
+ * is unread.
+ */
+const PER_BATCH: Record<string, number> = {
+  "Cake/Banana": 30,
+  "Old Fashioned/Promise Ring": 60,
+  "Scrap/Fritter": 16,
+};
+function units(lines: ScheduleLine[]): Map<string, number | null> {
+  const m = new Map<string, number | null>();
+  for (const l of lines) {
+    const named = PER_BATCH[`${l.item_type}/${l.subtype}`];
+    m.set(l.item_id, named ?? (l.item_type === "Raised" ? 340 : null));
+  }
+  return m;
+}
+const count = (lines: ScheduleLine[]) => batchCount(lines, YIELDS, units(lines));
+
 test("batch size reproduces the printed cake figures exactly", () => {
-  near(batchCount([line({ subtype: "Banana", par: 15 })], YIELDS).batches, 0.5, "BANANA 15 -> 0.50");
-  near(batchCount([line({ item_type: "Old Fashioned", subtype: "Promise Ring", par: 33 })], YIELDS).batches,
+  near(count([line({ subtype: "Banana", par: 15 })]).batches, 0.5, "BANANA 15 -> 0.50");
+  near(count([line({ item_type: "Old Fashioned", subtype: "Promise Ring", par: 33 })]).batches,
     0.55, "OLD FASHIONED 33 -> 0.55");
-  near(batchCount([line({ item_type: "Scrap", subtype: "Fritter", par: 20 })], YIELDS).batches,
+  near(count([line({ item_type: "Scrap", subtype: "Fritter", par: 20 })]).batches,
     1.25, "FRITTER 20 -> 1.25");
 });
 
+test("PORTION_OF_BATCH IS IGNORED here too — the yield row decides", () => {
+  // The premade schedule's batch figure and the element sheet's dough demand
+  // are one fact, so they had to move together or the packet would contradict
+  // itself. Change the portion to anything and the run must not move.
+  const ls = [line({ subtype: "Banana", par: 15 })];
+  const wild: BatchYield[] = YIELDS.map((y) => ({ ...y, portion_of_batch: 1 / 7 }));
+  near(batchCount(ls, wild, units(ls)).batches, 0.5, "the portion has no say");
+});
+
+test("a recipe that never says how much it makes contributes nothing AND says so", () => {
+  // The new failure mode, and it must be as loud as the old one: a dough whose
+  // Expected Yield row is missing cannot state a run in batches.
+  const ls = [line({ subtype: "Banana", par: 15 })];
+  const blank = new Map<string, number | null>([[ls[0].item_id, null]]);
+  const c = batchCount(ls, YIELDS, blank);
+  eq(c.batches, null, "never a confident zero");
+  eq(c.unresolved[0].reason, "no yield");
+});
+
 test("size_factor is applied — a mini is a third of a regular", () => {
-  const regular = batchCount([line({ item_type: "Raised", subtype: "Bismark", size: "Regular", par: 30 })], YIELDS);
-  const mini = batchCount([line({ item_type: "Raised", subtype: "Bismark", size: "Mini", par: 30 })], YIELDS);
-  near(regular.batches, 30 / 340, "regular");
-  near(mini.batches, 30 / 340 / 3, "mini");
+  near(count([line({ item_type: "Raised", subtype: "Bismark", size: "Regular", par: 30 })]).batches,
+    30 / 340, "regular");
+  near(count([line({ item_type: "Raised", subtype: "Bismark", size: "Mini", par: 30 })]).batches,
+    30 / 340 / 3, "mini");
 });
 
 test("an item with NO batch rule contributes nothing AND says so", () => {
   // The phase-2 lesson: a silently-too-small dough figure still looks like a
   // plausible number. Defaulting to zero here is the dangerous failure.
-  const mixed = batchCount(
-    [line({ subtype: "Banana", par: 15 }), line({ item_type: "Mochi", subtype: "Krinkle", par: 18 })],
-    YIELDS
-  );
+  const mixed = count([
+    line({ subtype: "Banana", par: 15 }),
+    line({ item_type: "Mochi", subtype: "Krinkle", par: 18 }),
+  ]);
   near(mixed.batches, 0.5, "only the rule we have");
   eq(mixed.unresolved.length, 1, "and the gap is named");
   eq(mixed.unresolved[0].reason, "no batch yield");
@@ -240,7 +287,7 @@ test("an item with NO batch rule contributes nothing AND says so", () => {
 });
 
 test("no rules at all is null, never 0.00", () => {
-  const none = batchCount([line({ item_type: "Mochi", subtype: "Krinkle", par: 18 })], YIELDS);
+  const none = count([line({ item_type: "Mochi", subtype: "Krinkle", par: 18 })]);
   eq(none.batches, null, "batches");
   eq(formatBatches(none), "", "prints nothing rather than a confident zero");
 });
@@ -248,10 +295,10 @@ test("no rules at all is null, never 0.00", () => {
 test("the PDF spells the lower bound out, because Helvetica has no >= glyph", () => {
   // It rendered as a stray "e" on the recipe sheet, which did not merely lose
   // the claim — it replaced it with a typo.
-  const partial = batchCount(
-    [line({ subtype: "Banana", par: 15 }), line({ item_type: "Mochi", par: 6 })],
-    YIELDS
-  );
+  const partial = count([
+    line({ subtype: "Banana", par: 15 }),
+    line({ item_type: "Mochi", par: 6 }),
+  ]);
   no(formatBatches(partial).includes("≥"), "no >= in the printed string");
 });
 
@@ -259,15 +306,12 @@ test("a type's batch figure is the SUM of its subtypes', not a separate sum", ()
   // RAISED 0.60 on the real packet is Bismark 0.14 + Promise Ring 0.38 +
   // Bullseye 0.05 + Danish 0.03. Computed twice, the page could disagree with
   // itself; computed as the sum, it cannot.
-  const raised = rollUp(
-    [
-      line({ item_type: "Raised", subtype: "Bismark", size: "Regular", par: 60 }),
-      line({ item_type: "Raised", subtype: "Danish", size: "Regular", par: 12 }),
-      line({ item_type: "Raised", subtype: "Promise Ring", size: "Regular", par: 156 }),
-    ],
-    "subtype",
-    YIELDS
-  );
+  const ls = [
+    line({ item_type: "Raised", subtype: "Bismark", size: "Regular", par: 60 }),
+    line({ item_type: "Raised", subtype: "Danish", size: "Regular", par: 12 }),
+    line({ item_type: "Raised", subtype: "Promise Ring", size: "Regular", par: 156 }),
+  ];
+  const raised = rollUp(ls, "subtype", YIELDS, units(ls));
   const subs = raised[0].sizes[0].subtypes;
   const parts = subs.reduce((n, s) => n + (s.batches.batches ?? 0), 0);
   near(raised[0].batches.batches, parts, "type = sum of subtypes");
@@ -279,9 +323,21 @@ test("a type's batch figure is the SUM of its subtypes', not a separate sum", ()
 const RAISED = "el-raised";
 const GLAZE = "el-glaze";
 
+/**
+ * The dough carries a MASTER VERSION now, because how many a batch makes is the
+ * recipe's own Expected Yield row rather than a `portion_of_batch` beside it
+ * (Mark, 2026-08-13). A dough with no recipe can no longer state a run in
+ * batches — which is a real new failure mode, pinned below.
+ */
 function graph(): Map<string, CostElement> {
   return new Map<string, CostElement>([
-    [RAISED, { id: RAISED, name: "Raised Dough", kind: "made", manual_cost: null, manual_cost_unit: null }],
+    [RAISED, {
+      id: RAISED, name: "Raised Dough", kind: "made", manual_cost: null, manual_cost_unit: null,
+      master: {
+        id: "v-raised",
+        lines: [{ id: "y", label: "Expected Yield", qty: 340, unit: "ea", element_id: null }],
+      },
+    }],
     [GLAZE, { id: GLAZE, name: "BOH Glaze", kind: "made", manual_cost: null, manual_cost_unit: null }],
   ]);
 }
@@ -310,6 +366,34 @@ test("dough demand accumulates across every item that shares it", () => {
   const dough = demand.find((d) => d.elementId === RAISED)!;
   near(dough.batches, 216 / 340, "one dough for two cuts");
   eq(dough.name, "Raised Dough");
+});
+
+test("THE PACKET CANNOT CONTRADICT ITSELF — both batch figures are one rule", () => {
+  // The premade schedule's "0.60 batches" and the element sheet's dough demand
+  // answer the same question from two functions. They used to share
+  // `portion_of_batch`; they now share the recipe's Expected Yield row, and if
+  // only one had been moved the two halves of one printed packet would disagree.
+  const ls = [
+    line({ item_id: "king", item_type: "Raised", subtype: "Bismark", size: "Regular", par: 60 }),
+    line({ item_id: "panda", item_type: "Raised", subtype: "Promise Ring", size: "Regular", par: 156 }),
+  ];
+  const perItem = new Map<string, number | null>([["king", 340], ["panda", 340]]);
+  const rolled = rollUp(ls, "subtype", YIELDS, perItem);
+  const demand = elementDemand(ls, items(), graph(), YIELDS);
+  const dough = demand.find((d) => d.elementId === RAISED)!;
+  near(rolled[0].batches.batches, dough.batches ?? 0, "roll-up = element sheet");
+});
+
+test("a dough with NO recipe cannot state a run, and says which", () => {
+  const bare = graph();
+  bare.set(RAISED, { ...bare.get(RAISED)!, master: null });
+  const demand = elementDemand(
+    [line({ item_id: "king", item_type: "Raised", subtype: "Bismark", par: 60 })],
+    items(), bare, YIELDS
+  );
+  const dough = demand.find((d) => d.elementId === RAISED)!;
+  eq(dough.batches, null, "never a confident zero");
+  eq(dough.unresolved[0].reason, "no yield");
 });
 
 test("component demand is the edge quantity times the par", () => {

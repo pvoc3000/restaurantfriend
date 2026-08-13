@@ -29,6 +29,7 @@
 
 import {
   matchYield,
+  batchYield,
   versionBatchCost,
   elementCost,
   lineCost,
@@ -215,7 +216,11 @@ const name = (v: string | null | undefined) => (v ?? "").trim();
 export function rollUp(
   lines: ScheduleLine[],
   grain: Grain,
-  yields: BatchYield[] = []
+  yields: BatchYield[] = [],
+  /** See `batchCount` — how many donuts one batch of each item's dough makes.
+   *  Empty means no group can state its batches, which is what a caller that
+   *  has not loaded the recipes should say rather than guess. */
+  unitsPerBatch: Map<string, number | null> = new Map()
 ): RollType[] {
   const types = new Map<string, Map<string, Map<string, ScheduleLine[]>>>();
 
@@ -246,7 +251,7 @@ export function rollUp(
               subtype,
               size,
               total: sum(group),
-              batches: batchCount(group, yields),
+              batches: batchCount(group, yields, unitsPerBatch),
               rows: leafRows(group, grain),
             }));
           return {
@@ -337,26 +342,61 @@ export type BatchCount = {
   unresolved: Unresolved[];
 };
 
-export function batchCount(lines: ScheduleLine[], yields: BatchYield[]): BatchCount {
+export function batchCount(
+  lines: ScheduleLine[],
+  yields: BatchYield[],
+  /**
+   * How many donuts one batch of each item's dough makes — `batchYield` of the
+   * item's base element, keyed by item id. Built once by the caller because
+   * this function is called per subtype group and the answer is per item.
+   */
+  unitsPerBatch: Map<string, number | null>
+): BatchCount {
   let total = 0;
   let counted = 0;
   const unresolved: Unresolved[] = [];
 
   for (const line of lines) {
     const rule = matchYield(line, yields);
-    if (!rule || rule.portion_of_batch === null) {
+    if (!rule) {
+      // The rule is still consulted, but only for `size_factor` — without it we
+      // do not know whether this is a mini or a giant.
       unresolved.push({ elementId: null, name: line.item_name, reason: "no batch yield" });
+      continue;
+    }
+    // THE RECIPE SAYS HOW MANY A BATCH MAKES; `portion_of_batch` is not read
+    // (Mark, 2026-08-13). One regular donut is one unit of dough, so a run of
+    // `par` donuts is `par x size_factor` units, which is that over the yield.
+    const per = unitsPerBatch.get(line.item_id) ?? null;
+    if (!per) {
+      unresolved.push({ elementId: null, name: line.item_name, reason: "no yield" });
       continue;
     }
     // Per LINE, then summed — not `groupTotal x rule`. Within one
     // (type, subtype, size) group the rule is the same for every line today, so
     // the two agree; doing it per line is what keeps them agreeing if a rule is
     // ever stated more narrowly.
-    total += (Number(line.par) || 0) * Number(rule.portion_of_batch) * Number(rule.size_factor ?? 1);
+    total += ((Number(line.par) || 0) * Number(rule.size_factor ?? 1)) / per;
     counted += 1;
   }
 
   return { batches: counted ? total : null, unresolved };
+}
+
+/**
+ * `batchCount`'s third argument, built from the item catalog and the cost
+ * graph — the one place production asks a recipe how much it makes.
+ */
+export function unitsPerBatchByItem(
+  items: Iterable<{ id: string; base_element_id: string | null }>,
+  byId: Map<string, CostElement>
+): Map<string, number | null> {
+  const out = new Map<string, number | null>();
+  for (const item of items) {
+    const dough = item.base_element_id ? byId.get(item.base_element_id) : null;
+    out.set(item.id, dough ? batchYield(dough).qty : null);
+  }
+  return out;
 }
 
 function addBatches(parts: BatchCount[]): BatchCount {
@@ -445,10 +485,18 @@ export function elementDemand(
     if (item.base_element_id) {
       const e = bucket(item.base_element_id);
       const rule = matchYield(line, yields);
-      if (!rule || rule.portion_of_batch === null) {
+      // Same rule as `batchCount`, same reason: the recipe's Expected Yield row
+      // says how many a batch makes, and `portion_of_batch` is the same fact
+      // said twice. The two figures must move together or the packet's element
+      // sheet contradicts its own premade schedule.
+      const dough = byId.get(item.base_element_id);
+      const perBatch = dough ? batchYield(dough).qty : null;
+      if (!rule) {
         e.unresolved.push({ elementId: item.base_element_id, name: line.item_name, reason: "no batch yield" });
+      } else if (!perBatch) {
+        e.unresolved.push({ elementId: item.base_element_id, name: line.item_name, reason: "no yield" });
       } else {
-        e.batches = (e.batches ?? 0) + par * Number(rule.portion_of_batch) * Number(rule.size_factor ?? 1);
+        e.batches = (e.batches ?? 0) + (par * Number(rule.size_factor ?? 1)) / perBatch;
       }
     }
 

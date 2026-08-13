@@ -27,6 +27,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   elementDemand,
+  unitsPerBatchByItem,
   type ElementDemand,
   type ItemDemandSource,
   type ScheduleLine,
@@ -85,6 +86,9 @@ export type PacketData = {
   schedules: PacketSchedule[];
   kitchens: PacketKitchen[];
   yields: BatchYield[];
+  /** How many donuts one batch of each item's dough makes — the recipe's own
+   *  Expected Yield row. `rollUp` needs it to state a run in batches. */
+  unitsPerBatch: Map<string, number | null>;
 };
 
 /** PostgREST caps a select at 1,000 rows and says nothing about it. */
@@ -119,7 +123,7 @@ export async function fetchPacketData(
   scheduleIds: string[]
 ): Promise<PacketData> {
   if (scheduleIds.length === 0) {
-    return { orgName: "", printedOn: today(), schedules: [], kitchens: [], yields: [] };
+    return { orgName: "", printedOn: today(), schedules: [], kitchens: [], yields: [], unitsPerBatch: new Map() };
   }
 
   const [{ data: org }, { data: scheduleRows, error: schedErr }] = await Promise.all([
@@ -384,6 +388,7 @@ export async function fetchPacketData(
       (a, b) => a.date.localeCompare(b.date) || a.kitchenCode.localeCompare(b.kitchenCode)
     ),
     yields,
+    unitsPerBatch: unitsPerBatchByItem(itemById.values(), elementById),
   };
 }
 

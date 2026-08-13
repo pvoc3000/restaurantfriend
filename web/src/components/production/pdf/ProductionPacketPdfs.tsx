@@ -215,7 +215,7 @@ function Fragmentish({ children }: { children: React.ReactNode }) {
 /* -- the premade schedule: the RECORD --------------------------------------- */
 
 function PremadePage({ schedule, packet }: { schedule: PacketSchedule; packet: PacketData }) {
-  const rolled = rollUp(schedule.lines, "item", packet.yields);
+  const rolled = rollUp(schedule.lines, "item", packet.yields, packet.unitsPerBatch);
   return (
     <Page size="LETTER" style={styles.page} wrap>
       <View style={styles.headerRow}>
@@ -353,7 +353,7 @@ function TrayGuidePage({
   packet: PacketData;
   grain: Grain;
 }) {
-  const rolled = rollUp(kitchen.lines, grain, packet.yields);
+  const rolled = rollUp(kitchen.lines, grain, packet.yields, packet.unitsPerBatch);
   const total = totalDonuts(kitchen.lines);
   return (
     <Page size="LETTER" style={styles.page} wrap>
