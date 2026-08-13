@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph } from "@/lib/productionQueries";
-import { versionBatchCost } from "@/lib/productionCost";
+import { versionBatchCost, costContext } from "@/lib/productionCost";
 import { RecipesList, type RecipeRow } from "@/components/production/RecipesList";
 
 /**
@@ -15,7 +15,11 @@ export default async function RecipesPage() {
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canWriteCatalog(session.membership.role);
-  const locationId = session.activeLocation?.id ?? null;
+  // The WORKING shop, and its labour rate: both are costing inputs (Mark,
+  // 2026-08-12, "each location has its own vendor item and labor costs") — a
+  // price override beats the catalog price, and a recipe's prep time is hours
+  // until this shop's rate turns it into money.
+  const costs = costContext(session.activeLocation);
 
   const [{ data: recipes, error }, { graph, error: graphError }] = await Promise.all([
     supabase
@@ -60,7 +64,7 @@ export default async function RecipesPage() {
     // family must not borrow it.
     const costable = node?.master && master && node.master.id === master.id ? node.master : null;
     const batchCost = costable
-      ? versionBatchCost(costable, graph!.byId, locationId)
+      ? versionBatchCost(costable, graph!.byId, costs)
       : { cost: null, unit: null, unresolved: [] };
 
     return {

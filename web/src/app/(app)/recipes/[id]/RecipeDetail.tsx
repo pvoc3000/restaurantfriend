@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph, loadElementOptions } from "@/lib/productionQueries";
-import { versionBatchCost } from "@/lib/productionCost";
+import { versionBatchCost, costContext } from "@/lib/productionCost";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
@@ -40,12 +40,15 @@ export async function RecipeDetail({
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canWriteCatalog(session.membership.role);
-  const locationId = session.activeLocation?.id ?? null;
+  // The WORKING shop, and its labour rate: both are costing inputs (Mark,
+  // 2026-08-12, "each location has its own vendor item and labor costs") — a
+  // price override beats the catalog price, and a recipe's prep time is hours
+  // until this shop's rate turns it into money.
+  const costs = costContext(session.activeLocation);
 
   const [
     { data: recipe, error },
     { graph, error: graphError },
-    { data: shop },
     { options: elementOptions },
   ] = await Promise.all([
     supabase
@@ -68,12 +71,6 @@ export async function RecipeDetail({
       .eq("id", id)
       .maybeSingle(),
       loadProductionGraph(supabase),
-      // The shop's hourly rate, for the costs block. NOT folded into
-      // `getAppSession` — it is one column read by one screen, and the session
-      // is paid for by every screen there is.
-      locationId
-        ? supabase.from("locations").select("labor_rate").eq("id", locationId).maybeSingle()
-        : Promise.resolve({ data: null }),
       // The ingredient picker's vocabulary — active elements only, which the
       // costing graph beside it deliberately cannot answer (it loads retired
       // ones too, because a resolver has to price what is already on a recipe).
@@ -243,19 +240,20 @@ export async function RecipeDetail({
             })),
           },
           graph!.byId,
-          locationId
+          costs
         ),
       };
     });
 
   // Labour is charged at the WORKING shop's rate, which is a fact about who is
   // doing the making rather than about the recipe — so the same recipe read at
-  // DF01 and at EVENT legitimately costs different amounts to produce. Taken
-  // from the session's own list rather than a query: `session.locations` holds
-  // every location, closed ones included, which is what a lookup wants.
-  const laborRate = shop?.labor_rate === undefined || shop?.labor_rate === null
-    ? null
-    : Number(shop.labor_rate);
+  // DF01 and at EVENT legitimately costs different amounts to produce.
+  //
+  // It used to be its own query here, on the argument that it was one column
+  // read by one screen. It is read by every screen that quotes a cost now, so
+  // it rides on the session's locations instead and this screen lost a round
+  // trip rather than gaining one.
+  const laborRate = costs.laborRate;
 
   const trail = parseTrail(rawParams, { href: "/recipes", label: "Recipes" });
 

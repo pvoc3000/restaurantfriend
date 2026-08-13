@@ -2480,14 +2480,37 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    for costing purposes"). `yield_amount` now has NO editor anywhere in the app
    and exactly one reader — the recipes LIST's Yield column, which is still
    FileMaker's single value and may disagree with the row.
-   **The block's headline and an element's cost are NOT the same number, and the
-   difference is LABOUR.** Raisied Donut v11 reads $0.53 per ea at x1, which is
-   (ingredients + prep-time × the shop's rate) ÷ 340; `elementCost` gives
-   ~$0.17, ingredients only, because `lineCost` returns nothing for a line with
-   no `element_id` and every metadata row is one. So a donut's cost includes the
-   flour in its dough and excludes every minute spent making it. Mark has raised
-   this ("prep time … should add labor costs to the recipe") and it is NOT
-   built — see the fourth-kind note under decision 2.
+   **THERE IS ONE COST CALCULATION AND IT IS `recipeCostMatrix`** (Mark,
+   2026-08-12: "why are you reinventing the wheel? The cost per each is already
+   a calculated value … Just do one calculation (that includes labor) and use it
+   everywhere" — then "use the value in the cost matrix"). It lives in
+   `lib/productionCost`, NOT in `lib/recipeCosts`, which is now a re-export shim
+   for the components: what an element costs and what the block prints are the
+   same call at the same column, so the arithmetic belongs in the costing module
+   and the block is a view of it.
+   The drift it removes was real and shipped: the block said **$0.53** a donut
+   while `elementCost` said **$0.17**, and the whole of the difference was
+   $122.50 of prep time nobody was charging for. `elementCost` now reads
+   `defaultColumn(matrix).costPer`, so a made element's cost INCLUDES ITS
+   LABOUR — the prep-time row times the hourly rate, over the yield like
+   everything else. Measured at DF01's $35/hr: **69 made elements unchanged, 31
+   gained labour, 0 newly costed**, and Raised Donut reads $0.5282 where the
+   block reads $0.53. Some of the 31 move enormously (Candied Walnut Topping
+   ×52, Hot Fudge ×25) — that is a signal about small or wrong Expected Yield
+   rows, not about the rule, and it is worth walking.
+   **`CostContext` replaced the bare `locationId`** on `elementCost`,
+   `versionBatchCost`, `lineCost` and `itemCost`. Both halves are per-shop
+   (Mark, 2026-08-12, after trying the opposite for ten minutes: "each location
+   has its own vendor item and labor costs") — design rule 6's price override,
+   and `locations.labor_rate`. So the same recipe at DF01 and DF02 legitimately
+   costs different amounts to make. `costContext(session.activeLocation)` is the
+   one line a caller needs, and `locations.labor_rate` now rides on the session
+   rather than being fetched per screen: it went from one column read by one
+   screen to one read by every screen that quotes a cost.
+   **A version with NO scale strip gets an implicit base column.** 11 of the 493
+   carry no labels, and an empty column list would have made them cost nothing
+   and render an empty block. The synthesised column is unnamed on purpose —
+   inventing "Base" would put a word on the sheet FileMaker never had.
    `METADATA_LABELS` / `metadataLine` moved from `lib/recipeCosts` to
    `lib/production` when both cost modules needed them — `lib/production`
    imports nothing, which is what keeps the two from becoming a cycle.

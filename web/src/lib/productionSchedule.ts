@@ -36,6 +36,7 @@ import {
   type CostElement,
   type CostLine,
   type Unresolved,
+  type CostContext,
 } from "./productionCost";
 
 /* -------------------------------------------------------------------------- */
@@ -485,11 +486,11 @@ export function elementDemand(
 export function elementBatchCost(
   element: CostElement,
   byId: Map<string, CostElement>,
-  locationId: string | null
+  ctx: CostContext
 ) {
   return element.master
-    ? versionBatchCost(element.master, byId, locationId, new Set([element.id]))
-    : elementCost(element, byId, locationId);
+    ? versionBatchCost(element.master, byId, ctx, new Set([element.id]))
+    : elementCost(element, byId, ctx);
 }
 
 /** Re-exported so a renderer needs one import for a line's own cost. */

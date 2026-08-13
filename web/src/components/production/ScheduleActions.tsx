@@ -24,6 +24,7 @@ export function ScheduleActions({
   scheduleId,
   scheduleDate,
   locationId,
+  laborRate,
   sellsCode,
   kitchenCode,
   source,
@@ -34,7 +35,12 @@ export function ScheduleActions({
 }: {
   scheduleId: string;
   scheduleDate: string;
+  /** The SCHEDULE's shop, not the session's working one — recosting a night
+   *  has to price it where it was made, and both halves of that are per-shop:
+   *  the vendor price overrides and the labour rate. */
   locationId: string;
+  /** That shop's hourly rate, for the labour in every made element's cost. */
+  laborRate: number | null;
   sellsCode: string;
   kitchenCode: string;
   source: string;
@@ -99,7 +105,7 @@ export function ScheduleActions({
     for (const line of lines) {
       const item = itemById.get(line.item_id as string);
       if (!item) continue;
-      const cost = itemCost(item, graph.byId, items.yields, locationId);
+      const cost = itemCost(item, graph.byId, items.yields, { locationId, laborRate });
       const price = resolveItemPrice(
         item,
         locationId,

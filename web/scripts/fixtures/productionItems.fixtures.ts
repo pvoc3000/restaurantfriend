@@ -22,6 +22,17 @@ import {
 import { test, eq, ok } from "./harness";
 
 const DF01 = "loc-df01";
+/**
+ * The costing CONTEXT — a shop and its labour rate. `elementCost` and friends
+ * take this rather than a bare id, because a made element's cost now includes
+ * the prep time on its recipe and that is hours until a rate turns it into
+ * money.
+ *
+ * NO RATE by default: these cases pin the ingredient arithmetic, and a rate
+ * would fold labour into every expected figure. The ones that mean to test
+ * labour supply their own.
+ */
+const AT_DF01 = { locationId: DF01, laborRate: null };
 const EVENT = "loc-event";
 
 /* -- the dough rule -------------------------------------------------------- */
@@ -74,15 +85,15 @@ function donut(over: Partial<ItemBom> = {}): ItemBom {
 
 test("a regular donut costs 1/340 of its dough's BATCH", () => {
   // The batch is 340 lbs of $1 flour = $340. Mark's rule: 1/340 → $1.00.
-  const c = itemCost(donut(), graph(dough(), flour), RAISED, DF01);
+  const c = itemCost(donut(), graph(dough(), flour), RAISED, AT_DF01);
   ok(c.cost !== null && Math.abs(c.cost - 1) < 0.0001, `expected $1.00, got ${c.cost}`);
   eq(c.unit, "each");
 });
 
 test("a mini is a THIRD of a regular and a giant is TWICE it (Mark's rule)", () => {
   const g = graph(dough(), flour);
-  const mini = itemCost(donut({ size: "Mini" }), g, RAISED, DF01);
-  const giant = itemCost(donut({ size: "Giant" }), g, RAISED, DF01);
+  const mini = itemCost(donut({ size: "Mini" }), g, RAISED, AT_DF01);
+  const giant = itemCost(donut({ size: "Giant" }), g, RAISED, AT_DF01);
   ok(mini.cost !== null && Math.abs(mini.cost - 1 / 3) < 0.0001, `mini ${mini.cost}`);
   ok(giant.cost !== null && Math.abs(giant.cost - 2) < 0.0001, `giant ${giant.cost}`);
 });
@@ -92,7 +103,7 @@ test("the dough reads the BATCH cost, not the per-unit cost", () => {
   // AND multiplying by portion_of_batch applies the yield twice, which here
   // would give $0.01 instead of $1.00 — a hundredfold error that still looks
   // like a plausible ingredient cost.
-  const c = itemCost(donut(), graph(dough(), flour), RAISED, DF01);
+  const c = itemCost(donut(), graph(dough(), flour), RAISED, AT_DF01);
   ok(c.cost !== null && c.cost > 0.5, `the yield was applied twice: ${c.cost}`);
 });
 
@@ -104,7 +115,7 @@ test("toppings are added on top of the dough", () => {
   };
   const c = itemCost(
     donut({ elements: [{ id: "e", label: "Sprinkles", qty: 0.25, unit: "lbs", element_id: "el-spr" }] }),
-    graph(dough(), flour, sprinkles), RAISED, DF01
+    graph(dough(), flour, sprinkles), RAISED, AT_DF01
   );
   ok(c.cost !== null && Math.abs(c.cost - 2) < 0.0001, `$1 dough + $1 sprinkles, got ${c.cost}`);
 });
@@ -112,7 +123,7 @@ test("toppings are added on top of the dough", () => {
 test("a size with NO yield rule costs nothing and names the gap", () => {
   // Measured on the real catalog: `giant` and `42g` are used by items and have
   // no rule. Defaulting them to 1 would invent a number for 46 giant donuts.
-  const c = itemCost(donut({ size: "42g" }), graph(dough(), flour), RAISED, DF01);
+  const c = itemCost(donut({ size: "42g" }), graph(dough(), flour), RAISED, AT_DF01);
   eq(c.cost, null);
   ok(c.unresolved.some((u) => u.reason === "no batch yield"), "the gap is named");
 });

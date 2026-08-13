@@ -34,7 +34,13 @@
  */
 
 import { convert } from "./units";
-import { columnCell, metadataLine, scaleColumns } from "./production";
+import {
+  columnCell,
+  metadataLine,
+  scaleColumns,
+  type ScalableLine,
+  type ScaleColumn,
+} from "./production";
 
 export type ElementKind = "made" | "purchased" | "manual";
 
@@ -126,6 +132,42 @@ export type Unresolved = {
     | "cycle";                 // the BOM refers to itself
 };
 
+/**
+ * WHERE a cost is being asked from — and therefore what it costs.
+ *
+ * BOTH HALVES ARE PROPERTIES OF THE SHOP (Mark, 2026-08-12: "each location has
+ * its own vendor item and labor costs"). A `vendor_item_location_prices`
+ * override beats the catalog price, which is design rule 6, and labour is
+ * charged at that shop's `locations.labor_rate`. So the same recipe read at
+ * DF01 and at DF02 legitimately costs different amounts to make, and that is
+ * the answer rather than an inconsistency: 135 override rows exist and the two
+ * open shops have their own rates to move independently.
+ *
+ * One object rather than two positional arguments because the rate arrived
+ * later than the location, and a fifth positional `number | null` sitting next
+ * to `seen` is exactly the kind of thing that gets passed in the wrong slot.
+ */
+export type CostContext = {
+  locationId: string | null;
+  /** `locations.labor_rate`. Null charges NO labour rather than charging zero,
+   *  which are different claims — see `recipeCostMatrix`. */
+  laborRate: number | null;
+};
+
+/**
+ * The context for a screen's WORKING location — the one line every costing
+ * caller needs, so nobody has to remember that labour comes from a different
+ * column of the same row they already have.
+ */
+export function costContext(
+  location: { id: string; labor_rate: number | null } | null
+): CostContext {
+  return {
+    locationId: location?.id ?? null,
+    laborRate: location?.labor_rate ?? null,
+  };
+}
+
 export type Cost = {
   /** Cost per ONE of `unit`, or null when nothing at all could be resolved. */
   cost: number | null;
@@ -199,7 +241,7 @@ export function inventoryUnitCost(
 export function elementCost(
   element: CostElement,
   byId: Map<string, CostElement>,
-  locationId: string | null,
+  ctx: CostContext,
   seen: Set<string> = new Set()
 ): Cost {
   if (seen.has(element.id)) {
@@ -217,7 +259,7 @@ export function elementCost(
     if (!element.inventory) {
       return { cost: null, unit: null, unresolved: [{ elementId: element.id, name: element.name, reason: "no inventory item" }] };
     }
-    const { cost, reason } = inventoryUnitCost(element.inventory, locationId);
+    const { cost, reason } = inventoryUnitCost(element.inventory, ctx.locationId);
     if (cost === null) {
       return { cost: null, unit: null, unresolved: [{ elementId: element.id, name: element.name, reason: reason ?? "no vendor price" }] };
     }
@@ -229,63 +271,41 @@ export function elementCost(
   if (!version) {
     return { cost: null, unit: null, unresolved: [{ elementId: element.id, name: element.name, reason: "no recipe" }] };
   }
-  const batch = versionBatchCost(version, byId, locationId, new Set(seen).add(element.id));
+  const batch = versionBatchCost(version, byId, ctx, new Set(seen).add(element.id));
 
-  // THE YIELD IS THE RECIPE'S OWN "EXPECTED YIELD" ROW, AT THE BATCH SIZE THE
-  // RECIPE IS COSTED AT (Mark, 2026-08-12: "we should not use
-  // production_recipe_versions.yield_amount to determine costs. we should use
-  // the recipe yield number, always and forever" — then, seeing the block:
-  // "use the yield in the column that is chosen for costing").
+  // WHAT ONE OF THESE COSTS IS `recipeCostMatrix`, AT THE COLUMN THE RECIPE IS
+  // COSTED AT. Not a second arithmetic that happens to agree — the same
+  // function the Costs block prints, read at the same column (Mark, 2026-08-12:
+  // "just do one calculation (that includes labor) and use it everywhere …
+  // use the value in the cost matrix").
   //
-  // The version carries a `yield_amount` COLUMN as well and this deliberately
-  // ignores it. They are two answers to one question and they disagree:
-  // measured over the 128 masters, 84 agree, 19 differ and 25 have neither.
-  // Where they differ the gap is not small — Lemon Curd 35 against 2.4, the
-  // cake donuts 30 against 15. The row wins because it is what the kitchen
-  // reads: it is on the printed sheet, it is per batch size, and it is
-  // maintained by whoever maintains the recipe.
+  // Which means an element's cost INCLUDES ITS LABOUR: the prep-time row times
+  // the shop's hourly rate, divided over the yield like everything else. Before
+  // this the block said $0.53 a donut and `elementCost` said $0.17, and the
+  // whole of the difference was the $122.50 of work nobody was charging for.
   //
-  // INGREDIENTS AND YIELD MOVE TOGETHER OR THE ANSWER IS NONSENSE. The batch
-  // cost above is the BASE column's — `lineCost` reads each line's `qty`, which
-  // is the base amount — so costing at x1 means scaling that by the column's
-  // multiplier as well as taking the column's yield. Raisied Donut v11 is the
-  // worked example: base ingredients $5.71 over base yield 34, or $57.08 over
-  // 340 at x1. Take one without the other and it is out by a factor of ten.
-  //
-  // Which is also why choosing a column USUALLY changes nothing: both sides
-  // scale by the same multiplier and cancel. It matters exactly where the yield
-  // row is one somebody turned AUTO off for and typed — 30 of the 493 versions
-  // — and there the chosen column is the only honest answer.
+  // The yield is the recipe's own "Expected Yield" ROW, never the version's
+  // `yield_amount` column — two answers to one question, and over the 128
+  // masters 84 agree, 19 differ and 25 have neither. The row wins because it is
+  // what the kitchen reads: on the printed sheet, per batch size, maintained by
+  // whoever maintains the recipe.
   if (batch.cost === null) {
     return { cost: null, unit: null, unresolved: batch.unresolved };
   }
 
-  const columns = scaleColumns(version.scale_labels ?? null, version.scale_multipliers ?? null)
-    // The `%` column is a share of the batch, not a batch size — nothing is
-    // ever costed at it.
-    .filter((c) => !c.isPercent);
-  const baseColumn = columns[0] ?? null;
-  const baseIndex = baseColumn?.index ?? 0;
-  const baseMultiplier = baseColumn?.multiplier ?? 1;
-  // A `cost_column` pointing at a slot this version no longer has — the strip
-  // was shortened after somebody chose it — falls back to the base rather than
-  // costing at nothing. `recipeCosts` does the same, so the block and the
-  // element agree about which column they are quoting.
-  const chosen =
-    columns.find((c) => c.index === version.cost_column) ?? baseColumn;
+  const matrix = recipeCostMatrix({
+    columns: scaleColumns(version.scale_labels ?? null, version.scale_multipliers ?? null),
+    lines: version.lines,
+    baseIngredientCost: batch.cost,
+    laborRate: ctx.laborRate,
+    costColumn: version.cost_column ?? null,
+  });
+  const chosen = defaultColumn(matrix);
 
-  const yieldRow = metadataLine(version.lines, "yield");
-  const yieldCell = yieldRow
-    ? chosen
-      ? columnCell(yieldRow, chosen, baseMultiplier, baseIndex)
-      : { qty: yieldRow.qty, unit: yieldRow.unit }
-    : null;
-  const yieldQty = yieldCell?.qty ?? null;
-  const factor = chosen && baseMultiplier ? chosen.multiplier / baseMultiplier : 1;
-
-  if (yieldQty === null || yieldQty === 0) {
+  if (chosen === null || chosen.costPer === null) {
     // The batch cost is still real and worth showing; what we can't do is
-    // divide it into a per-unit figure.
+    // divide it into a per-unit figure. `costPer` is null for exactly one
+    // reason once the ingredients priced — no yield to divide by.
     return {
       cost: null,
       unit: null,
@@ -296,8 +316,8 @@ export function elementCost(
     };
   }
   return {
-    cost: (batch.cost * factor) / Number(yieldQty),
-    unit: yieldCell?.unit ?? null,
+    cost: chosen.costPer,
+    unit: chosen.yieldUnit,
     unresolved: batch.unresolved,
   };
 }
@@ -313,7 +333,7 @@ export function elementCost(
 export function versionBatchCost(
   version: CostVersion,
   byId: Map<string, CostElement>,
-  locationId: string | null,
+  ctx: CostContext,
   seen: Set<string> = new Set()
 ): Cost {
   let total = 0;
@@ -321,7 +341,7 @@ export function versionBatchCost(
   const unresolved: Unresolved[] = [];
 
   for (const line of version.lines) {
-    const result = lineCost(line, byId, locationId, seen);
+    const result = lineCost(line, byId, ctx, seen);
     if (result.cost === null) {
       unresolved.push(...result.unresolved);
       continue;
@@ -352,7 +372,7 @@ export function versionBatchCost(
 export function lineCost(
   line: CostLine,
   byId: Map<string, CostElement>,
-  locationId: string | null,
+  ctx: CostContext,
   seen: Set<string> = new Set()
 ): Cost {
   const named = line.label ?? "(unnamed line)";
@@ -369,7 +389,7 @@ export function lineCost(
     return { cost: null, unit: null, unresolved: [{ elementId: element.id, name: element.name, reason: "no quantity" }] };
   }
 
-  const per = elementCost(element, byId, locationId, seen);
+  const per = elementCost(element, byId, ctx, seen);
   if (per.cost === null) return { cost: null, unit: null, unresolved: per.unresolved };
 
   // The line's unit and the element's may differ — a recipe calls for 170 g of
@@ -484,7 +504,7 @@ export function itemCost(
   item: ItemBom,
   byId: Map<string, CostElement>,
   yields: BatchYield[],
-  locationId: string | null
+  ctx: CostContext
 ): Cost {
   let total = 0;
   let priced = 0;
@@ -506,8 +526,8 @@ export function itemCost(
         // fraction OF A BATCH, so dividing by the yield first and multiplying
         // by the portion would be the same number twice.
         const batch = base.master
-          ? versionBatchCost(base.master, byId, locationId, new Set([base.id]))
-          : elementCost(base, byId, locationId);
+          ? versionBatchCost(base.master, byId, ctx, new Set([base.id]))
+          : elementCost(base, byId, ctx);
         if (batch.cost === null) unresolved.push(...batch.unresolved);
         else {
           total += batch.cost * Number(rule.portion_of_batch) * Number(rule.size_factor ?? 1);
@@ -520,7 +540,7 @@ export function itemCost(
 
   // Everything on it.
   for (const line of item.elements) {
-    const result = lineCost(line, byId, locationId);
+    const result = lineCost(line, byId, ctx);
     if (result.cost === null) { unresolved.push(...result.unresolved); continue; }
     total += result.cost;
     priced += 1;
@@ -528,4 +548,137 @@ export function itemCost(
   }
 
   return { cost: priced ? total : null, unit: "each", unresolved };
+}
+
+/* ===========================================================================
+ * THE ONE COST CALCULATION
+ * ===========================================================================
+ *
+ * Mark, 2026-08-12: "why are you reinventing the wheel? The cost per each is
+ * already a calculated value, as displayed in the screenshot, but you're
+ * recalculating it somewhere else. That seems ripe for drift. Just do one
+ * calculation (that includes labor) and use it everywhere."
+ *
+ * He was right, and the drift was not hypothetical: the block said $0.53 per
+ * donut while `elementCost` said $0.17, because one charged the prep time and
+ * the other did not. Two answers to "what does one of these cost" is exactly
+ * the disease decision 11 exists to cure, and having them in two modules is
+ * how it got missed.
+ *
+ * So this is the calculation, and `elementCost` reads its chosen column rather
+ * than doing the arithmetic again. It lives HERE, in the costing module, and
+ * `lib/recipeCosts` re-exports it for the block that renders it — the block is
+ * a view of the calculation, not the home of it.
+ */
+
+/**
+ * What the matrix needs of a line — its name and its scaling, nothing else.
+ *
+ * Deliberately looser than `CostLine`: the matrix reads the prep and yield
+ * ROWS, which carry no element and no id it cares about. A `CostLine` is
+ * assignable to it, so the resolver can hand its own lines straight over.
+ */
+export type MatrixLine = ScalableLine & { label: string | null };
+
+export type CostColumnFigures = {
+  column: ScaleColumn;
+  /** What the ingredients come to at this batch size. */
+  ingredients: number | null;
+  /** The prep-time row at this column, in hours. */
+  laborHours: number | null;
+  labor: number | null;
+  subtotal: number | null;
+  /** The expected-yield row at this column. */
+  yieldQty: number | null;
+  yieldUnit: string | null;
+  /** Subtotal ÷ yield — what one donut costs to make at this batch size. */
+  costPer: number | null;
+  /** The column this recipe is costed at (migration 042). */
+  isDefault: boolean;
+};
+
+/**
+ * Every batch column, costed.
+ *
+ * INGREDIENTS SCALE AND LABOUR DOES NOT, which is the whole reason this matrix
+ * is worth printing rather than one figure. Ten times the batch is ten times the
+ * flour and nowhere near ten times the work — Banana Cake Donut v10 runs 0.5
+ * hours at its smallest batch and 0.7 at its largest — so the cost of one donut
+ * falls as the batch grows, and by a lot: FileMaker's own sheet reads $3.08 at
+ * the test batch against $0.61 at ×1. A recipe costed only at its base column
+ * would price the shop's actual output nearly five times too high.
+ *
+ * Labour is charged at the WORKING LOCATION's rate. It is a fact about the shop
+ * doing the making, not about the recipe, so a recipe read at DF01 and at EVENT
+ * legitimately costs different amounts to produce.
+ */
+export function recipeCostMatrix({
+  columns,
+  lines,
+  baseIngredientCost,
+  laborRate,
+  costColumn,
+}: {
+  columns: readonly ScaleColumn[];
+  lines: readonly MatrixLine[];
+  /** What the ingredients cost at the BASE column, from `versionBatchCost`. */
+  baseIngredientCost: number | null;
+  /** The shop's hourly rate — `locations.labor_rate`. Null charges no labour
+   *  rather than charging zero, which are different claims. */
+  laborRate: number | null;
+  /** Migration 042. Null = the base column. */
+  costColumn: number | null;
+}): CostColumnFigures[] {
+  // A version with NO strip at all still has one batch — the amounts on its
+  // lines. 11 of the 493 are like this, and without an implicit base column
+  // they would cost nothing at all and the block would render empty. The
+  // synthesised column is unnamed on purpose: there is no name to show, and
+  // inventing one ("Base") would put a word on the sheet FileMaker never had.
+  const priced = columns.filter((c) => !c.isPercent);
+  const withBase: readonly ScaleColumn[] = priced.length
+    ? priced
+    : [{ label: "", multiplier: 1, isPercent: false, index: 0 }];
+  const baseColumn = withBase[0] ?? null;
+  const baseIndex = baseColumn?.index ?? 0;
+  const base = baseColumn?.multiplier ?? 1;
+
+  const prep = metadataLine(lines, "prep");
+  const yields = metadataLine(lines, "yield");
+
+  // A cost column pointing at a slot this version doesn't have — the strip was
+  // shortened after somebody chose it — falls back to the base rather than
+  // marking nothing, so the block always says which column it is quoting.
+  const chosen = withBase.some((c) => c.index === costColumn) ? costColumn : baseIndex;
+
+  return withBase.map((column) => {
+    const factor = column.multiplier / (base || 1);
+    const ingredients = baseIngredientCost === null ? null : baseIngredientCost * factor;
+
+    const prepCell = prep ? columnCell(prep, column, base, baseIndex) : null;
+    const laborHours = prepCell?.qty ?? null;
+    const labor = laborHours === null || laborRate === null ? null : laborHours * laborRate;
+
+    const subtotal =
+      ingredients === null && labor === null ? null : (ingredients ?? 0) + (labor ?? 0);
+
+    const yieldCell = yields ? columnCell(yields, column, base, baseIndex) : null;
+    const yieldQty = yieldCell?.qty ?? null;
+
+    return {
+      column,
+      ingredients,
+      laborHours,
+      labor,
+      subtotal,
+      yieldQty,
+      yieldUnit: yieldCell?.unit ?? null,
+      costPer: subtotal === null || !yieldQty ? null : subtotal / yieldQty,
+      isDefault: column.index === chosen,
+    };
+  });
+}
+
+/** The figures for the column this recipe is costed at — the block's headline. */
+export function defaultColumn(matrix: CostColumnFigures[]): CostColumnFigures | null {
+  return matrix.find((c) => c.isDefault) ?? matrix[0] ?? null;
 }

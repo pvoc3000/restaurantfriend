@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph } from "@/lib/productionQueries";
-import { elementCost } from "@/lib/productionCost";
+import { elementCost, costContext } from "@/lib/productionCost";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -30,7 +30,11 @@ export async function ElementDetail({
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canWriteCatalog(session.membership.role);
-  const locationId = session.activeLocation?.id ?? null;
+  // The WORKING shop, and its labour rate: both are costing inputs (Mark,
+  // 2026-08-12, "each location has its own vendor item and labor costs") — a
+  // price override beats the catalog price, and a recipe's prep time is hours
+  // until this shop's rate turns it into money.
+  const costs = costContext(session.activeLocation);
 
   const [{ data: element, error }, { graph }, { data: recipes }, { data: locations }, { data: types }] =
     await Promise.all([
@@ -95,7 +99,7 @@ export async function ElementDetail({
 
   const node = graph?.byId.get(id) ?? null;
   const cost = node
-    ? elementCost(node, graph!.byId, locationId)
+    ? elementCost(node, graph!.byId, costs)
     : { cost: null, unit: null, unresolved: [] };
 
   const inventory = Array.isArray(element.inventory_items)

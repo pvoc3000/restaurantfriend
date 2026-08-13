@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph, loadItemGraph } from "@/lib/productionQueries";
-import { itemCost } from "@/lib/productionCost";
+import { itemCost, costContext } from "@/lib/productionCost";
 import { resolveItemPrice, margin } from "@/lib/productionPrice";
 import {
   ProductionItemsList,
@@ -30,6 +30,11 @@ export default async function ProductionItemsPage({
   const supabase = await createClient();
   const editable = canWriteCatalog(session.membership.role);
   const locationId = session.activeLocation?.id ?? null;
+  // The WORKING shop, and its labour rate: both are costing inputs (Mark,
+  // 2026-08-12, "each location has its own vendor item and labor costs") — a
+  // price override beats the catalog price, and a recipe's prep time is hours
+  // until this shop's rate turns it into money.
+  const costs = costContext(session.activeLocation);
 
   const { graph, error } = await loadProductionGraph(supabase);
   if (error) return <LoadError message={error} />;
@@ -39,7 +44,7 @@ export default async function ProductionItemsPage({
   if (itemError) return <LoadError message={itemError} />;
 
   const rows: ProductionItemRow[] = items!.items.map((i) => {
-    const cost = itemCost(i, graph!.byId, items!.yields, locationId);
+    const cost = itemCost(i, graph!.byId, items!.yields, costs);
     const resolved = resolveItemPrice(
       i,
       locationId,

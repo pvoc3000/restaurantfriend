@@ -271,6 +271,12 @@ export async function ScheduleDetail({
         scheduleId={id}
         scheduleDate={schedule.schedule_date as string}
         locationId={schedule.location_id as string}
+        // That shop's own rate, off the session's list — every location is on
+        // it, closed ones included, which is what a lookup wants.
+        laborRate={
+          session.locations.find((l) => l.id === (schedule.location_id as string))?.labor_rate ??
+          null
+        }
         sellsCode={sellsCode}
         kitchenCode={kitchenCode}
         source={(schedule.source ?? "plan") as string}

@@ -9,6 +9,21 @@ export type Location = {
   name: string;
   kind: "physical" | "virtual";
   is_active: boolean;
+  /**
+   * The shop's hourly labour rate — maintained on the Location record, read by
+   * PAYROLL, and since 2026-08-12 a COSTING input too: a made element's cost
+   * includes the prep time on its recipe, and that is hours until a rate turns
+   * it into money.
+   *
+   * It used to be fetched by the one screen that showed it, deliberately —
+   * "one column read by one screen, and the session is paid for by every
+   * screen there is". That stopped being true when the recipe block's
+   * arithmetic became the app's ONE cost calculation: it is now read by every
+   * screen that quotes a cost, which is most of Production. One more column on
+   * a query already fetching every location beats seven screens each making
+   * their own round trip.
+   */
+  labor_rate: number | null;
 };
 
 export type Membership = {
@@ -88,7 +103,7 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
     // the two fields on AppSession for which list a screen should reach for.
     supabase
       .from("locations")
-      .select("id, code, name, kind, is_active")
+      .select("id, code, name, kind, is_active, labor_rate")
       .order("code"),
   ]);
 
@@ -102,7 +117,12 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
 
   if (locationsError) throw locationsError;
 
-  const list = (locations ?? []) as Location[];
+  // `labor_rate` is a numeric column, and PostgREST hands numerics back as
+  // strings often enough that costing would silently multiply hours by "35".
+  const list = (locations ?? []).map((l) => ({
+    ...l,
+    labor_rate: l.labor_rate === null || l.labor_rate === undefined ? null : Number(l.labor_rate),
+  })) as Location[];
   const active = list.filter((l) => l.is_active);
   // Resolved over the FULL list, not the active one: a closed location as
   // working context would otherwise fall through to the `?? …[0]` and snap

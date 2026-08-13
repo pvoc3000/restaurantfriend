@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph, loadItemGraph, loadElementOptions } from "@/lib/productionQueries";
-import { itemCost, lineCost, matchYield, versionBatchCost } from "@/lib/productionCost";
+import { itemCost, lineCost, matchYield, versionBatchCost, costContext } from "@/lib/productionCost";
 import { resolveItemPrice } from "@/lib/productionPrice";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
@@ -36,6 +36,11 @@ export async function ProductionItemDetail({
   const supabase = await createClient();
   const editable = canWriteCatalog(session.membership.role);
   const locationId = session.activeLocation?.id ?? null;
+  // The WORKING shop, and its labour rate: both are costing inputs (Mark,
+  // 2026-08-12, "each location has its own vendor item and labor costs") — a
+  // price override beats the catalog price, and a recipe's prep time is hours
+  // until this shop's rate turns it into money.
+  const costs = costContext(session.activeLocation);
 
   const { graph, error } = await loadProductionGraph(supabase);
   if (error) return <LoadError message={error} />;
@@ -93,7 +98,7 @@ export async function ProductionItemDetail({
   const item = items!.items.find((i) => i.id === id);
   if (!item) notFound();
 
-  const cost = itemCost(item, graph!.byId, items!.yields, locationId);
+  const cost = itemCost(item, graph!.byId, items!.yields, costs);
   const price = resolveItemPrice(
     item, locationId, items!.grid, items!.gridOverrides,
     items!.overridesByItem.get(id) ?? []
@@ -104,7 +109,7 @@ export async function ProductionItemDetail({
   const rule = matchYield(item, items!.yields);
   const base = item.base_element_id ? graph!.byId.get(item.base_element_id) ?? null : null;
   const baseBatch = base?.master
-    ? versionBatchCost(base.master, graph!.byId, locationId, new Set([base.id]))
+    ? versionBatchCost(base.master, graph!.byId, costs, new Set([base.id]))
     : null;
   const doughCost =
     baseBatch?.cost !== null && baseBatch !== null && rule?.portion_of_batch
@@ -119,7 +124,7 @@ export async function ProductionItemDetail({
     .map((line) => ({
       line,
       name: line.element_id ? elementNames.get(line.element_id) ?? "—" : line.label ?? "—",
-      cost: lineCost(line, graph!.byId, locationId),
+      cost: lineCost(line, graph!.byId, costs),
     }))
     .sort(
       (a, b) =>

@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph } from "@/lib/productionQueries";
-import { elementCost } from "@/lib/productionCost";
+import { elementCost, costContext } from "@/lib/productionCost";
 import { ElementsList, type ElementRow } from "@/components/production/ElementsList";
 import { NewElement } from "@/components/production/NewElement";
 import { elementTypeVocabulary, type ElementKind } from "@/lib/production";
@@ -29,7 +29,11 @@ export default async function ElementsPage({
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canWriteCatalog(session.membership.role);
-  const locationId = session.activeLocation?.id ?? null;
+  // The WORKING shop, and its labour rate: both are costing inputs (Mark,
+  // 2026-08-12, "each location has its own vendor item and labor costs") — a
+  // price override beats the catalog price, and a recipe's prep time is hours
+  // until this shop's rate turns it into money.
+  const costs = costContext(session.activeLocation);
 
   const [{ graph, error }, { data: catalog, error: catalogError }, { data: recipeTypes }] =
     await Promise.all([
@@ -64,7 +68,7 @@ export default async function ElementsPage({
       schedule_class: (e.schedule_class ?? null) as string | null,
       is_active: (e.is_active ?? true) as boolean,
       cost: node
-        ? elementCost(node, graph!.byId, locationId)
+        ? elementCost(node, graph!.byId, costs)
         : { cost: null, unit: null, unresolved: [] },
       source: graph!.sourceByElement.get(e.id as string) ?? null,
       recipeCount: graph!.recipeCountByElement.get(e.id as string) ?? 0,
