@@ -3,7 +3,13 @@
 import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
-import { makeComparator, nextSortDir, type SortDir, type SortValue } from "@/lib/tableSort";
+import {
+  activeGrouping,
+  makeComparator,
+  nextSortDir,
+  type SortDir,
+  type SortValue,
+} from "@/lib/tableSort";
 import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
 import { isColumnVisible, useColumnVisibility } from "@/lib/columnVisibility";
 import {
@@ -228,8 +234,20 @@ export function DataTable<T>({
     summary?: (row: T) => ReactNode;
     canExpand?: (row: T) => boolean;
   };
-  /** Band rows before each run of like-labelled rows. See DataGroup. */
-  group?: DataGroup<T>;
+  /**
+   * Band rows before each run of like-labelled rows. See DataGroup.
+   *
+   * AN ARRAY DECLARES ONE GROUPING PER SORT COLUMN, which is how a list bands
+   * by whatever you are sorting by rather than by one fixed field: the
+   * production items list groups by Type when sorted by Type, by Cut when
+   * sorted by Cut, and by NOTHING when sorted by name (Mark, 2026-08-13 — "when
+   * sorting by item name there's no need to group the list by type"). Each
+   * entry needs its own `sortKey`; the first one matching the live sort wins,
+   * and no match means no bands.
+   *
+   * A single object is the ordinary case and behaves as before.
+   */
+  group?: DataGroup<T> | DataGroup<T>[];
   /**
    * Below this viewport width, drop every column marked `hideWhenCompact`.
    *
@@ -421,8 +439,15 @@ export function DataTable<T>({
   // a filter narrows the list.
   // A `sortKey` group bands only while that column is the sort. Resolved here
   // rather than at the call site because for an internally-sorted table the
-  // caller has no way to know what the sort currently is.
-  const banding = group && (!group.sortKey || group.sortKey === sort?.key) ? group : null;
+  // caller has no way to know what the sort currently is — which is also why an
+  // ARRAY has to be resolved here: picking "the grouping for the column you are
+  // sorting by" is a question only this component can answer.
+  //
+  // An entry with NO `sortKey` bands unconditionally, so in an array it would
+  // swallow every column after it. That is the caller's mistake to make and it
+  // reads the same as the single-object case, so it is left alone rather than
+  // guarded.
+  const banding = activeGrouping(group, sort?.key);
 
   // The rows under each band, kept rather than just counted — a `summary` needs
   // the run itself to total it, and the count is `.length` of the same thing.

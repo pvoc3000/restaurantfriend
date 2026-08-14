@@ -4,7 +4,7 @@
 // tiebreak that misbehaves looks like the list being randomly ordered rather
 // than like a bug in a shared function.
 
-import { makeComparator } from "../../src/lib/tableSort";
+import { makeComparator, activeGrouping } from "../../src/lib/tableSort";
 import { eq, test } from "./harness";
 
 type Po = { date: string | null; vendor: string; number: string };
@@ -105,4 +105,54 @@ test("numbers compare as numbers, not as text", () => {
     [...nums].sort(makeComparator<{ n: number }>({ value: (r) => r.n, dir: "asc" })).map((r) => r.n),
     [9, 20, 100]
   );
+});
+
+/* -- which grouping a table bands by (2026-08-13) --------------------------- */
+
+const byType = { sortKey: "type", label: "Type" };
+const byCut = { sortKey: "cut", label: "Cut" };
+const always = { sortKey: undefined, label: "Always" };
+
+test("an array bands by the column you are SORTING by", () => {
+  // The whole point: sort by Cut, band by Cut. A single fixed grouping banded
+  // by Type while you sorted by name, which cut an A-Z list into headings that
+  // named a field the order had nothing to do with.
+  eq(activeGrouping([byType, byCut], "cut"), byCut);
+  eq(activeGrouping([byType, byCut], "type"), byType);
+});
+
+test("a column NOBODY declared bands nothing", () => {
+  // Sorting by name, or by cost, or by margin: no band. 307 distinct names is
+  // 307 bands of one row, and a number groups nothing at all.
+  eq(activeGrouping([byType, byCut], "name"), null);
+  eq(activeGrouping([byType, byCut], "cost"), null);
+});
+
+test("an unsorted table bands nothing either", () => {
+  eq(activeGrouping([byType, byCut], undefined), null);
+});
+
+test("a LONE grouping with no sortKey still bands unconditionally", () => {
+  // The original contract, and what a table with one sensible grouping wants.
+  eq(activeGrouping(always, "anything"), always);
+  eq(activeGrouping(always, undefined), always);
+});
+
+test("a lone grouping with a sortKey obeys it", () => {
+  eq(activeGrouping(byType, "type"), byType);
+  eq(activeGrouping(byType, "name"), null);
+});
+
+test("no grouping at all is not an error", () => {
+  eq(activeGrouping(undefined, "type"), null);
+  eq(activeGrouping(null, "type"), null);
+});
+
+test("FIRST match wins, so a catch-all entry swallows everything after it", () => {
+  // Not a guard, a documented consequence: an entry with no `sortKey` inside an
+  // array applies to every column, so anything declared after it is dead. Worth
+  // a case so the behaviour is chosen rather than discovered.
+  eq(activeGrouping([always, byType], "type"), always);
+  eq(activeGrouping([byType, always], "type"), byType);
+  eq(activeGrouping([byType, always], "name"), always);
 });

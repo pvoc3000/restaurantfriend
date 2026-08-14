@@ -66,3 +66,29 @@ export function makeComparator<T>({
     return primary === 0 ? tieBreak() : primary * sign;
   };
 }
+
+/**
+ * WHICH GROUPING A TABLE IS BANDING BY, given what it is sorted by.
+ *
+ * A band can only band what the ORDER already groups, so a grouping declares
+ * the column it belongs to and appears only while that column is the sort.
+ * Passing an ARRAY declares one grouping per column, which is what lets a list
+ * band by whatever you are sorting by — Type when sorted by Type, Cut when
+ * sorted by Cut, and nothing at all when sorted by name (Mark, 2026-08-13:
+ * "when sorting by item name there's no need to group the list by type").
+ *
+ * Generic over `{ sortKey?: string }` rather than typed to `DataGroup` on
+ * purpose: this is the rule, not the payload, and keeping it ignorant of the
+ * component's own type is what lets it live in `lib` and be fixture-tested at
+ * all.
+ */
+export function activeGrouping<G extends { sortKey?: string }>(
+  group: G | G[] | undefined | null,
+  sortKey: string | undefined
+): G | null {
+  const applies = (g: G) => !g.sortKey || g.sortKey === sortKey;
+  if (Array.isArray(group)) return group.find(applies) ?? null;
+  // A LONE grouping with no `sortKey` bands unconditionally — the original
+  // contract, and what a table with only one sensible grouping wants.
+  return group && applies(group) ? group : null;
+}

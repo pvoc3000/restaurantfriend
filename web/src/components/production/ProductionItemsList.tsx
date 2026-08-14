@@ -368,10 +368,28 @@ export function ProductionItemsList({
     },
   ];
 
-  const group: DataGroup<ProductionItemRow> = {
-    sortKey: "name",
-    label: (r) => r.item_type ?? "No type",
-  };
+  /**
+   * ONE GROUPING PER SORT COLUMN — band by whatever you are sorting by.
+   *
+   * This used to be a single `{ sortKey: "name", label: item_type }`, which
+   * banded by TYPE while you were sorting by NAME: a heading every few rows
+   * cutting across an A-Z list, naming a field the order had nothing to do with
+   * (Mark, 2026-08-13: "when sorting by item name there's no need to group the
+   * list by type. When sorting by size, type, cut, or finish, you can group by
+   * those fields"). It was also backwards from the rule the rest of the app
+   * follows — a band can only band what the ORDER already groups, so it belongs
+   * on the column being sorted.
+   *
+   * Name is deliberately ABSENT: 307 distinct names is 307 bands of one row.
+   * So are Cost, Price, Margin and On it — a number bands nothing, and the
+   * count beside each label would read as a tally of a value nobody grouped by.
+   */
+  const groups: DataGroup<ProductionItemRow>[] = [
+    { sortKey: "type", label: (r) => r.item_type ?? "No type" },
+    { sortKey: "size", label: (r) => r.size ?? "No size" },
+    { sortKey: "cut", label: (r) => r.subtype ?? "No cut" },
+    { sortKey: "finish", label: (r) => r.finish ?? "No finish" },
+  ];
 
   return (
     <DataTable
@@ -386,7 +404,7 @@ export function ProductionItemsList({
       storageKey="production-items.v3"
       compactBelow={1280}
       columnChooser
-      group={group}
+      group={groups}
       empty={<p className="text-sm text-muted">No items match these filters.</p>}
       leading={
         <div className="space-y-3">
