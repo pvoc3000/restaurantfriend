@@ -41,7 +41,6 @@ export function RecipeInfo({
   recipeId,
   version,
   versions,
-  laborRate,
   locationCode,
   editable,
   params,
@@ -49,7 +48,6 @@ export function RecipeInfo({
   recipeId: string;
   version: SheetVersion;
   versions: SheetVersion[];
-  laborRate: number | null;
   locationCode: string | null;
   editable: boolean;
   params: Record<string, string | string[] | undefined>;
@@ -154,11 +152,16 @@ export function RecipeInfo({
   const [chosen, setChosen] = useState<number | null>(version.cost_column);
 
   const columns = scaleColumns(version.scale_labels, version.scale_multipliers);
+  // Labour comes from the version's own LABOUR LINES now, priced per shop off
+  // the element (migration 050), rather than from `locations.labor_rate` times
+  // a row matched by the label "prep time". Same arithmetic, and the block's
+  // Labor row still reports it — it is just sourced from the component list
+  // like everything else on the sheet.
   const matrix = recipeCostMatrix({
     columns,
     lines: version.lines as CostLine[],
     baseIngredientCost: version.batchCost.cost,
-    laborRate,
+    labor: version.labor,
     costColumn: chosen,
   });
 
@@ -234,7 +237,6 @@ export function RecipeInfo({
             <RecipeCosts
               version={version}
               matrix={matrix}
-              laborRate={laborRate}
               locationCode={locationCode}
               editable={editable}
               onChoose={setChosen}

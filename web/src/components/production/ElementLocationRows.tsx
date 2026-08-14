@@ -73,22 +73,42 @@ export function ElementLocationRows({
   locations,
   orgId,
   editable,
+  manual,
 }: {
   elementId: string;
   rows: ElementLocationRow[];
   locations: { id: string; code: string; name: string }[];
   orgId: string;
   editable: boolean;
+  /**
+   * A MANUAL element's per-shop cost — migration 050. Absent on made and
+   * purchased elements, which resolve their cost through a recipe or a vendor
+   * item and have no set cost to vary.
+   *
+   * This is where labour lives now (Mark, 2026-08-13: "make manual costing in
+   * an element a Per Location thing … The cost for the element would then be
+   * the working locations' cost"). A recipe line pointing at a `Labor` element
+   * carries HOURS; this is what an hour costs at each shop.
+   */
+  manual?: {
+    /** `production_elements.manual_cost` — the fallback where a shop has no row. */
+    base: number | null;
+    unit: string | null;
+    costs: { location_id: string; cost: number }[];
+  };
 }) {
   const byLocation = new Map(rows.map((r) => [r.location_id, r]));
+  const costByLocation = new Map((manual?.costs ?? []).map((c) => [c.location_id, c.cost]));
 
   type Line = {
     location: { id: string; code: string; name: string };
     row: ElementLocationRow | null;
+    cost: number | null;
   };
   const lines: Line[] = locations.map((l) => ({
     location: l,
     row: byLocation.get(l.id) ?? null,
+    cost: costByLocation.get(l.id) ?? null,
   }));
 
   const columns: DataColumn<Line>[] = [
@@ -134,6 +154,64 @@ export function ElementLocationRows({
         </span>
       ),
     },
+    // COST PER SHOP — migration 050, and only on a MANUAL element. A made or
+    // purchased one resolves its cost through a recipe or a vendor item, where
+    // the per-shop variation already lives (design rule 6).
+    //
+    // The column is present but the cell is a "set" button where no row exists,
+    // for the reason `/price-grid` needs the same: a cell with no override row
+    // has nothing to write to, so it CANNOT be an `InlineValue`. What it shows
+    // in the meantime is the element's own `manual_cost`, in grey, because that
+    // is genuinely what this shop pays — an empty cell would read as free.
+    ...(manual
+      ? [
+          {
+            key: "cost",
+            label: "Cost",
+            width: 170,
+            align: "right" as const,
+            sortValue: (l: Line) => l.cost ?? manual.base,
+            render: (l: Line) =>
+              l.cost !== null ? (
+                editable ? (
+                  <span className="inline-flex items-baseline gap-1">
+                    <InlineValue
+                      table="production_element_location_costs"
+                      match={{ element_id: elementId, location_id: l.location.id }}
+                      column="cost"
+                      kind="number"
+                      nullable={false}
+                      value={l.cost}
+                      ariaLabel={`Cost at ${l.location.code}`}
+                    />
+                    {manual.unit ? (
+                      <span className="text-[12px] text-muted">/ {manual.unit}</span>
+                    ) : null}
+                  </span>
+                ) : (
+                  <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+                    {l.cost}
+                    {manual.unit ? ` / ${manual.unit}` : ""}
+                  </span>
+                )
+              ) : (
+                <span className="inline-flex items-baseline gap-2">
+                  <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
+                    {manual.base === null ? "—" : `${manual.base}${manual.unit ? ` / ${manual.unit}` : ""}`}
+                  </span>
+                  {editable ? (
+                    <SetCost
+                      elementId={elementId}
+                      locationId={l.location.id}
+                      orgId={orgId}
+                      seed={manual.base}
+                    />
+                  ) : null}
+                </span>
+              ),
+          } as DataColumn<Line>,
+        ]
+      : []),
     {
       key: "weekly",
       label: "On round",
@@ -413,6 +491,66 @@ function MakeHere({
         className="border border-ink bg-white px-2 py-0.5 text-[11px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
       >
         {pending ? "Adding…" : "Make here"}
+      </button>
+      {failed ? <span className="text-[11px] text-accent">{failed}</span> : null}
+    </span>
+  );
+}
+
+/**
+ * Give this shop its own cost — the `/price-grid` "set" button, same problem.
+ *
+ * A cell with no override row has nothing for `InlineValue` to write to, so the
+ * row has to be INSERTED before it can be edited. It seeds from the element's
+ * own `manual_cost`, which is what the shop is paying anyway: the button is
+ * "make this editable here", not "change it".
+ */
+function SetCost({
+  elementId,
+  locationId,
+  orgId,
+  seed,
+}: {
+  elementId: string;
+  locationId: string;
+  orgId: string;
+  seed: number | null;
+}) {
+  const supabase = createClient();
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const [failed, setFailed] = useState<string | null>(null);
+
+  return (
+    <span className="flex flex-col items-start gap-0.5">
+      <button
+        type="button"
+        disabled={pending}
+        title="Give this shop its own cost for this element"
+        onClick={() =>
+          startTransition(async () => {
+            setFailed(null);
+            const { data, error } = await supabase
+              .from("production_element_location_costs")
+              // 050 makes `cost` NOT NULL — the row IS the statement — so it
+              // needs a value now. Zero rather than the element's cost would
+              // assert this shop gets it free.
+              .insert({ org_id: orgId, element_id: elementId, location_id: locationId, cost: seed ?? 0 })
+              .select("element_id");
+            if (error) {
+              setFailed(error.message);
+              return;
+            }
+            if (!data?.length) {
+              setFailed("Not allowed — you need purchaser access.");
+              return;
+            }
+            router.refresh();
+          })
+        }
+        className="border border-ink bg-white px-1.5 py-0.5 text-[11px] uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
+      >
+        {pending ? "…" : "Set"}
       </button>
       {failed ? <span className="text-[11px] text-accent">{failed}</span> : null}
     </span>

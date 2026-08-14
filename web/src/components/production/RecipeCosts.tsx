@@ -26,7 +26,6 @@ import type { SheetVersion } from "./RecipeVersionSheet";
 export function RecipeCosts({
   version,
   matrix,
-  laborRate,
   locationCode,
   editable,
   onChoose,
@@ -37,7 +36,6 @@ export function RecipeCosts({
    *  computed here would be a second answer waiting to disagree. */
   matrix: CostColumnFigures[];
   /** The working shop's hourly rate — labour is a fact about who is making it. */
-  laborRate: number | null;
   locationCode: string | null;
   editable: boolean;
   onChoose: (index: number | null) => void;
@@ -157,7 +155,12 @@ export function RecipeCosts({
               matrix={matrix}
               value={(c) => money(c.labor)}
               hint={(c) =>
-                c.laborHours === null ? null : `${c.laborHours} hr${laborRate ? ` × $${laborRate}` : ""}`
+                // JUST THE HOURS. This used to append "× $35" from
+                // `locations.labor_rate`, which since 050 is not a single
+                // number — a version can carry several labour lines at
+                // several rates, and naming one of them would be a guess. The
+                // money is the row's own value beside it.
+                c.laborHours === null ? null : `${c.laborHours} hr`
               }
             />
             <Row label="Subtotal" matrix={matrix} value={(c) => money(c.subtotal)} strong />

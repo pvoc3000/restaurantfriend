@@ -24,18 +24,13 @@ import { test, eq, ok, no } from "./harness";
 
 const DF01 = "loc-df01";
 /**
- * The costing CONTEXT — a shop and its labour rate. `elementCost` and friends
- * take this rather than a bare id, because a made element's cost now includes
- * the prep time on its recipe and that is hours until a rate turns it into
- * money.
- *
- * NO RATE by default: these cases pin the ingredient arithmetic, and a rate
- * would fold labour into every expected figure. The ones that mean to test
- * labour supply their own.
+ * The costing CONTEXT — just the shop. It carried a `laborRate` beside it until
+ * migration 050; labour is an ELEMENT now, so its rate arrives through the
+ * graph like every other price and the location alone is enough.
  */
-const AT_DF01 = { locationId: DF01, laborRate: null };
+const AT_DF01 = { locationId: DF01 };
 const DF02 = "loc-df02";
-const AT_DF02 = { locationId: DF02, laborRate: null };
+const AT_DF02 = { locationId: DF02 };
 
 function vendorItem(over: Partial<CostVendorItem> = {}): CostVendorItem {
   return {
@@ -517,7 +512,26 @@ test("the % column is never the costed one", () => {
 
 /* -- ONE calculation: the element's cost IS the matrix's (Mark, 2026-08-12) -- */
 
-/** Raisied Donut v11's shape, with a prep-time row so labour is real. */
+/**
+ * A LABOUR ELEMENT — manual, typed `Labor`, priced per shop (migration 050).
+ *
+ * $35/hr at DF01 and $25 at DF02, so a case can prove the rate follows the shop
+ * rather than a column on `locations`.
+ */
+const labour: CostElement = {
+  id: "el-labour",
+  name: "Prep Time",
+  kind: "manual",
+  element_type: "Labor",
+  manual_cost: 30,
+  manual_cost_unit: "hr",
+  location_costs: [
+    { location_id: DF01, cost: 35 },
+    { location_id: DF02, cost: 25 },
+  ],
+};
+
+/** Raisied Donut v11's shape, with a LABOUR LINE rather than a prep-time row. */
 function withLabour(costColumn: number | null): CostElement {
   return {
     id: "el", name: "Raised Donut", kind: "made",
@@ -530,9 +544,10 @@ function withLabour(costColumn: number | null): CostElement {
       lines: [
         { id: "y", label: "Expected Yield", qty: 34, unit: "ea", element_id: null },
         // AUTO off, so the hours are what somebody typed rather than ten times
-        // the base — which is the whole reason labour is worth a column.
+        // the base — which is the whole reason labour is worth a column, and
+        // the reason a labour line must never be summed with the flour.
         {
-          id: "p", label: "Prep Time", qty: 2.75, unit: "hr", element_id: null,
+          id: "p", label: "Prep Time", qty: 2.75, unit: "hr", element_id: "el-labour",
           scaleAuto: false, scaleAmounts: [null, 3.5], scaleUnits: [null, "hr"],
         },
         { id: "l", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" },
@@ -542,104 +557,69 @@ function withLabour(costColumn: number | null): CostElement {
 }
 
 test("a made element's cost INCLUDES its labour", () => {
-  // The drift this whole change exists to remove: the block said $0.53 a donut
-  // and `elementCost` said $0.17, and the difference was the work.
   const f = flour();
   const el = withLabour(1);
-  const at = { locationId: DF01, laborRate: 35 };
   // Ingredients $4.00 base × 10 = $40.00; labour 3.5 hr × $35 = $122.50;
   // over the x1 yield of 340.
-  const c = elementCost(el, graph(f, el), at);
+  const c = elementCost(el, graph(f, el, labour), AT_DF01);
   ok(Math.abs((c.cost ?? 0) - (40 + 122.5) / 340) < 1e-9, `got ${c.cost}`);
-
-  // And with no rate the labour is not charged — NOT charged as zero, which
-  // would be a different claim, but simply absent.
-  const noRate = elementCost(el, graph(f, el), { locationId: DF01, laborRate: null });
-  ok(Math.abs((noRate.cost ?? 0) - 40 / 340) < 1e-9, `ingredients only: ${noRate.cost}`);
 });
 
-test("the element's cost and the block's headline are THE SAME NUMBER", () => {
-  // Not "agree to a cent" — the same call. If these ever diverge it is because
-  // somebody reimplemented one of them, which is what happened before.
+test("LABOUR IS NEVER SCALED LIKE FLOUR — it is read AT the column", () => {
+  // The bug this whole shape exists to prevent. A labour line summed into the
+  // batch total would be multiplied by the column's ×10 along with the
+  // ingredients: 2.75 base hours would bill as 27.5, not the 3.5 the recipe
+  // says. Measured on the real catalog, 30 of the 31 versions carrying prep
+  // hours would be charged wrongly, one of them 24 hours for a half-hour job.
   const f = flour();
   const el = withLabour(1);
-  const at = { locationId: DF01, laborRate: 35 };
-  const batch = versionBatchCost(el.master!, graph(f, el), at);
-  const matrix = recipeCostMatrix({
-    columns: scaleColumns(el.master!.scale_labels ?? null, el.master!.scale_multipliers ?? null),
-    lines: el.master!.lines,
-    baseIngredientCost: batch.cost,
-    laborRate: 35,
-    costColumn: el.master!.cost_column ?? null,
-  });
-  eq(elementCost(el, graph(f, el), at).cost, defaultColumn(matrix)!.costPer, "same value");
+  const c = elementCost(el, graph(f, el, labour), AT_DF01);
+  const scaledWrong = (40 + 2.75 * 10 * 35) / 340;
+  ok(Math.abs((c.cost ?? 0) - scaledWrong) > 1e-6, `labour was scaled: ${c.cost}`);
 });
 
-/* -- uncharged labour is an UNKNOWN cost, not a zero (2026-08-13) ---------- */
-
-test("a recipe with NO prep-time row is a LOWER BOUND, not a complete cost", () => {
-  // 97 of the 128 master recipes have no prep row — every glaze, every icing,
-  // most fillings. Until this, the subtotal quietly became ingredients-only
-  // and `formatCost` printed a confident "$0.40": the app advertising that
-  // costs include labour while three recipes in four silently omitted it.
+test("the rate follows the SHOP, off the element (migration 050)", () => {
   const f = flour();
+  const el = withLabour(1);
+  const df01 = elementCost(el, graph(f, el, labour), AT_DF01).cost ?? 0;
+  const df02 = elementCost(el, graph(f, el, labour), AT_DF02).cost ?? 0;
+  ok(df01 > df02, "the dearer shop costs more");
+  ok(Math.abs(df01 - df02 - (3.5 * 35 - 3.5 * 25) / 340) < 1e-9, "by exactly the wage difference");
+});
+
+test("a shop with NO row falls back to the element's own manual cost", () => {
+  // 050 makes the override column NOT NULL, so the ABSENCE of a row is the one
+  // spelling of "nothing said here" — and `manual_cost` is what stops every
+  // manual element losing its cost the day the table ships.
+  const f = flour();
+  const el = withLabour(1);
+  const other = elementCost(el, graph(f, el, labour), { locationId: "loc-df09" });
+  ok(Math.abs((other.cost ?? 0) - (40 + 3.5 * 30) / 340) < 1e-9, `got ${other.cost}`);
+});
+
+test("a labour line is NOT counted as an ingredient", () => {
+  // Two ways to get this wrong and they cancel confusingly: summed AND priced
+  // per column is a double charge, summed and NOT priced is a scaled one. The
+  // ingredient half must be the flour alone.
+  const f = flour();
+  const el = withLabour(null);
+  const batch = versionBatchCost(el.master!, graph(f, el, labour), AT_DF01);
+  eq(batch.cost, 4, "$4.00 of flour, and nothing else");
+});
+
+test("a recipe of nothing but labour has no INGREDIENTS", () => {
   const el: CostElement = {
-    id: "el", name: "Lemon Glaze", kind: "made",
-    manual_cost: null, manual_cost_unit: null,
+    id: "el", name: "Cleaning", kind: "made", manual_cost: null, manual_cost_unit: null,
     master: {
       id: "v",
       lines: [
-        { id: "y", label: "Expected Yield", qty: 10, unit: "qt", element_id: null },
-        { id: "l", label: "Flour", qty: 20, unit: "lbs", element_id: "el-flour" },
+        { id: "y", label: "Expected Yield", qty: 1, unit: "ea", element_id: null },
+        { id: "p", label: "Prep Time", qty: 2, unit: "hr", element_id: "el-labour" },
       ],
     },
   };
-  const c = elementCost(el, graph(f, el), { locationId: DF01, laborRate: 35 });
-  eq(c.cost, 0.4, "it still costs what it can");
-  eq(formatCost(c), "≥ $0.40", "and stops claiming that is the whole of it");
-  eq(c.unresolved[0].reason, "no prep time");
-  ok(unresolvedSummary(c)?.includes("Lemon Glaze"), "named, so there is somewhere to go");
-});
-
-test("hours on the recipe and no rate at the shop blames the SHOP, not the recipe", () => {
-  // Two different gaps with two different fixes, so they are two reasons.
-  const f = flour();
-  const el = withLabour(null);
-  const c = elementCost(el, graph(f, el), { locationId: DF01, laborRate: null });
-  eq(c.unresolved[0].reason, "no labour rate");
-  ok(formatCost(c).startsWith("≥ "), `got ${formatCost(c)}`);
-});
-
-test("a recipe that states its hours at a shop with a rate is COMPLETE", () => {
-  const f = flour();
-  const el = withLabour(null);
-  const c = elementCost(el, graph(f, el), { locationId: DF01, laborRate: 35 });
-  eq(c.unresolved.length, 0, "nothing outstanding");
-  ok(!formatCost(c).startsWith("≥"), `got ${formatCost(c)}`);
-});
-
-test("a version of nothing but metadata rows does not ALSO blame its prep time", () => {
-  // "no ingredients" is the whole story; a second complaint names no fix.
-  const el: CostElement = {
-    id: "el", name: "Glaze", kind: "made",
-    manual_cost: null, manual_cost_unit: null,
-    master: {
-      id: "v",
-      lines: [{ id: "y", label: "Expected Yield", qty: 10, unit: "qt", element_id: null }],
-    },
-  };
-  const c = elementCost(el, graph(el), { locationId: DF01, laborRate: 35 });
-  eq(c.unresolved.length, 1);
-  eq(c.unresolved[0].reason, "no ingredients");
-});
-
-test("labour is charged at the SHOP's rate, so two shops cost differently", () => {
-  const f = flour();
-  const el = withLabour(1);
-  const cheap = elementCost(el, graph(f, el), { locationId: DF01, laborRate: 20 }).cost ?? 0;
-  const dear = elementCost(el, graph(f, el), { locationId: DF01, laborRate: 35 }).cost ?? 0;
-  ok(dear > cheap, "a higher rate costs more");
-  ok(Math.abs(dear - cheap - (122.5 - 70) / 340) < 1e-9, "by exactly the wage difference");
+  const c = elementCost(el, graph(el, labour), AT_DF01);
+  ok(c.unresolved.some((u) => u.reason === "no ingredients"), JSON.stringify(c.unresolved));
 });
 
 test("a version with NO scale strip still costs, at its own amounts", () => {

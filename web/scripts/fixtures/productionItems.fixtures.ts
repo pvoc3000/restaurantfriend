@@ -21,17 +21,8 @@ import {
 import { test, eq, ok } from "./harness";
 
 const DF01 = "loc-df01";
-/**
- * The costing CONTEXT — a shop and its labour rate. `elementCost` and friends
- * take this rather than a bare id, because a made element's cost now includes
- * the prep time on its recipe and that is hours until a rate turns it into
- * money.
- *
- * NO RATE by default: these cases pin the ingredient arithmetic, and a rate
- * would fold labour into every expected figure. The ones that mean to test
- * labour supply their own.
- */
-const AT_DF01 = { locationId: DF01, laborRate: null };
+/** The costing CONTEXT — just the shop; see productionCost.fixtures. */
+const AT_DF01 = { locationId: DF01 };
 const EVENT = "loc-event";
 
 /* -- an item is its component list, and nothing is special -------------------
@@ -158,32 +149,59 @@ test("an edge with NO quantity costs nothing and names the gap", () => {
   ok(c.unresolved.some((u) => u.reason === "no quantity"), "the gap is named");
 });
 
+/**
+ * Labour is an ELEMENT now (migration 050) — manual, typed `Labor`, priced per
+ * shop. $35/hr at DF01, and $20 at a second shop so a case can show the rate
+ * following the shop rather than a column on `locations`.
+ */
+const labour: CostElement = {
+  id: "el-labour", name: "Prep Time", kind: "manual", element_type: "Labor",
+  manual_cost: 20, manual_cost_unit: "hr",
+  location_costs: [{ location_id: DF01, cost: 35 }],
+};
+
+/** The same dough, with two hours of labour on its recipe. */
+function doughWithLabour(): CostElement {
+  const d = dough();
+  d.master!.lines = [
+    { id: "prep", label: "Prep Time", qty: 2, unit: "hr", element_id: "el-labour" },
+    ...d.master!.lines,
+  ];
+  return d;
+}
+
 test("THE BASE'S LABOUR IS CHARGED, like every other component", () => {
-  const d = dough();
-  d.master!.lines = [
-    { id: "prep", label: "Prep Time", qty: 2, unit: "hr", element_id: null },
-    ...d.master!.lines,
-  ];
-  const at = { locationId: DF01, laborRate: 35 };
-  const g = graph(d, flour);
-  const c = itemCost(donut(), g, at);
+  // $100 of flour + 2 hr × $35 = $170 a batch, over a yield of 100 → $1.70.
+  const g = graph(doughWithLabour(), flour, labour);
+  const c = itemCost(donut(), g, AT_DF01);
   ok(c.cost !== null && Math.abs(c.cost - 1.7) < 1e-9, `expected $1.70, got ${c.cost}`);
-  eq(c.cost, elementCost(d, g, at).cost, "the item's base IS the element's cost");
+  eq(c.cost, elementCost(doughWithLabour(), g, AT_DF01).cost, "the item's base IS the element's cost");
 });
 
-test("with no labour rate it falls back to ingredients, and SAYS SO", () => {
-  const d = dough();
-  d.master!.lines = [
-    { id: "prep", label: "Prep Time", qty: 2, unit: "hr", element_id: null },
-    ...d.master!.lines,
-  ];
-  const c = itemCost(donut(), graph(d, flour), AT_DF01);
-  ok(c.cost !== null && Math.abs(c.cost - 1) < 1e-9, `ingredients only: ${c.cost}`);
-  ok(c.unresolved.some((u) => u.reason === "no labour rate"), JSON.stringify(c.unresolved));
+test("AN ITEM CAN CARRY LABOUR OF ITS OWN — decorating is in no recipe", () => {
+  // What the old shape could not express at all: `itemCost` read
+  // `locations.labor_rate` never, so work done ON the donut rather than in a
+  // recipe was uncostable. Now it is an ordinary component carrying hours.
+  const c = itemCost(
+    donut({ elements: [
+      { id: "e0", label: null, qty: 1, unit: "ea", element_id: "el-dough" },
+      { id: "e1", label: "Decorating", qty: 0.02, unit: "hr", element_id: "el-labour" },
+    ] }),
+    graph(dough(), flour, labour), AT_DF01
+  );
+  ok(c.cost !== null && Math.abs(c.cost - (1 + 0.02 * 35)) < 1e-9, `got ${c.cost}`);
 });
 
-test("a base with NO prep-time row makes the item a lower bound", () => {
-  const c = itemCost(donut(), graph(dough(), flour), { locationId: DF01, laborRate: 35 });
+test("a shop with no rate row falls back to the element's own cost", () => {
+  const g = graph(doughWithLabour(), flour, labour);
+  const other = itemCost(donut(), g, { locationId: "loc-df09" });
+  ok(other.cost !== null && Math.abs(other.cost - (100 + 2 * 20) / 100) < 1e-9, `got ${other.cost}`);
+});
+
+test("a recipe with NO labour line makes the item a lower bound", () => {
+  // 97 of the 128 master recipes said nothing about how long they take, and
+  // that silence used to be invisible. Same sentence as before, new source.
+  const c = itemCost(donut(), graph(dough(), flour), AT_DF01);
   ok(c.cost !== null && Math.abs(c.cost - 1) < 1e-9, `got ${c.cost}`);
   ok(c.unresolved.some((u) => u.reason === "no prep time"), JSON.stringify(c.unresolved));
 });

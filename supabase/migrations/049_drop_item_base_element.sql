@@ -1,4 +1,10 @@
--- 045 — an item is a list of components, and none of them is special.
+-- 049 — an item is a list of components, and none of them is special.
+--
+-- NUMBERED 045 WHEN IT WAS WRITTEN AND APPLIED (2026-08-13), which collided
+-- with 045_batch_logs_and_items from 2026-08-09. Renamed 049 afterwards so the
+-- sequence stays unambiguous. Mark has already run this against the hosted
+-- database under its old name; it is idempotent (`drop column if exists`, and a
+-- view recreated from scratch), so a second run is harmless either way.
 --
 -- Mark, 2026-08-13: "get rid of the 'dough' field on production items. It's not
 -- necessary and doubles existing data. Components live in the component list
@@ -8,6 +14,7 @@
 --
 -- ===========================================================================
 -- RUN `migration/backfill-item-dough.mjs --apply` FIRST. THIS IS NOT OPTIONAL.
+-- (Done 2026-08-13.)
 --
 -- "It doubles existing data" was true of FileMaker, where the dough sat in
 -- `_idBase_t` AND in `_dependencies`, overlapping on 84 of 216 items. It is NOT

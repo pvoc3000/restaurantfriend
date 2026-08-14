@@ -75,7 +75,8 @@ export async function loadProductionGraph(
     fetchAll(
       supabase,
       "production_elements",
-      `id, name, kind, manual_cost, manual_cost_unit, inventory_item_id,
+      `id, name, kind, element_type, manual_cost, manual_cost_unit, inventory_item_id,
+       production_element_location_costs ( location_id, cost ),
        inventory_items ( id, name, base_unit,
          vendor_items ( id, price, package_content, is_active,
            vendor_item_location_prices ( location_id, price ) ) )`
@@ -187,6 +188,15 @@ export async function loadProductionGraph(
       kind: e.kind as CostElement["kind"],
       manual_cost: e.manual_cost === null ? null : Number(e.manual_cost),
       manual_cost_unit: (e.manual_cost_unit ?? null) as string | null,
+      // `Labor` here is load-bearing, not decoration: a line whose element
+      // carries it is HOURS and is read per column rather than summed with the
+      // flour. See `isLabor`.
+      element_type: (e.element_type ?? null) as string | null,
+      // Migration 050 — design rule 6's cascade for a manual element's cost.
+      location_costs: (e.production_element_location_costs ?? []) as {
+        location_id: string;
+        cost: number | null;
+      }[],
       inventory: inv
         ? {
             id: inv.id as string,

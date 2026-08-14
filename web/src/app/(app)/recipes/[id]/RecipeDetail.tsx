@@ -5,7 +5,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph, loadElementOptions } from "@/lib/productionQueries";
-import { versionBatchCost, costContext } from "@/lib/productionCost";
+import { versionBatchCost, laborResolver, costContext } from "@/lib/productionCost";
+import { scaleColumns } from "@/lib/production";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
@@ -228,8 +229,15 @@ export async function RecipeDetail({
             imageName: s.image_name,
             imageUrl: s.image_path ? (signed.get(s.image_path) ?? null) : null,
           })),
-        batchCost: versionBatchCost(
-          {
+        // ONE `CostVersion` FOR BOTH, and it must carry the scale strips —
+        // `laborResolver` reads a labour line's hours AT THE COLUMN through
+        // `columnCell`, so a line whose typed strip was dropped on the way in
+        // would silently fall back to the base hours on every batch size.
+        // `versionBatchCost` used to be handed a stripped-down copy here; it
+        // ignores the strips itself, but sharing one object is what stops the
+        // two disagreeing about what a line says.
+        ...(() => {
+          const cv = {
             id: v.id,
             lines: lines.map((l) => ({
               id: l.id,
@@ -237,23 +245,29 @@ export async function RecipeDetail({
               qty: l.qty,
               unit: l.unit,
               element_id: l.elementId,
+              scaleAuto: l.scaleAuto,
+              scaleAmounts: l.scaleAmounts,
+              scaleUnits: l.scaleUnits,
             })),
-          },
-          graph!.byId,
-          costs
-        ),
+            scale_labels: v.scale_labels,
+            scale_multipliers: v.scale_multipliers,
+            cost_column: v.cost_column === null ? null : Number(v.cost_column),
+          };
+          const base = scaleColumns(v.scale_labels, v.scale_multipliers).filter(
+            (c) => !c.isPercent
+          )[0];
+          return {
+            // Resolved on the SERVER: pricing a labour element needs the
+            // costing graph, which lives here and not in the sheet.
+            labor: laborResolver(
+              cv, graph!.byId, costs, base?.multiplier ?? 1, base?.index ?? 0
+            ),
+            batchCost: versionBatchCost(cv, graph!.byId, costs),
+          };
+        })(),
       };
     });
 
-  // Labour is charged at the WORKING shop's rate, which is a fact about who is
-  // doing the making rather than about the recipe — so the same recipe read at
-  // DF01 and at EVENT legitimately costs different amounts to produce.
-  //
-  // It used to be its own query here, on the argument that it was one column
-  // read by one screen. It is read by every screen that quotes a cost now, so
-  // it rides on the session's locations instead and this screen lost a round
-  // trip rather than gaining one.
-  const laborRate = costs.laborRate;
 
   const trail = parseTrail(rawParams, { href: "/recipes", label: "Recipes" });
 
@@ -378,7 +392,6 @@ export async function RecipeDetail({
                 recipeId={id}
                 version={current}
                 versions={versions}
-                laborRate={laborRate}
                 locationCode={session.activeLocation?.code ?? null}
                 editable={editable}
                 params={rawParams}

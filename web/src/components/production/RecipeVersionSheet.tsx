@@ -80,6 +80,12 @@ export type SheetVersion = {
   lines: SheetLine[];
   steps: SheetStep[];
   batchCost: Cost;
+  /**
+   * How to price this version's labour lines at a column — built on the server
+   * where the costing graph lives, because pricing an element needs the whole
+   * graph and this component has only the sheet.
+   */
+  labor: ((column: ScaleColumn) => { hours: number | null; cost: number | null }) | null;
 };
 
 /* Column widths, in the order FileMaker sets them out. Fixed pixels rather than

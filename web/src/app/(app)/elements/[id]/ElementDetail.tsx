@@ -42,7 +42,8 @@ export async function ElementDetail({
         .from("production_elements")
         .select(
           `id, name, kind, element_type, schedule_class, manual_cost, manual_cost_unit,
-           notes, is_active, inventory_item_id, inventory_items ( id, name )`
+           notes, is_active, inventory_item_id, inventory_items ( id, name ),
+           production_element_location_costs ( location_id, cost )`
         )
         .eq("id", id)
         .maybeSingle(),
@@ -184,6 +185,22 @@ export async function ElementDetail({
 
       <ElementLocationRows
         elementId={id}
+        // MANUAL ONLY (migration 050). A made element costs what its recipe
+        // costs and a purchased one what the vendor charges — both already vary
+        // by shop through their own overrides, so a third answer here would be
+        // a fourth place to state a price.
+        manual={
+          element.kind === "manual"
+            ? {
+                base: element.manual_cost === null ? null : Number(element.manual_cost),
+                unit: (element.manual_cost_unit ?? null) as string | null,
+                costs: ((element.production_element_location_costs ?? []) as {
+                  location_id: string;
+                  cost: number | string;
+                }[]).map((c) => ({ location_id: c.location_id, cost: Number(c.cost) })),
+              }
+            : undefined
+        }
         rows={(locations ?? []).map((l) => ({
           id: l.id as string,
           location_id: l.location_id as string,

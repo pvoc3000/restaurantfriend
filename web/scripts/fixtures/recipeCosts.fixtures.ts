@@ -7,7 +7,7 @@
 // ×1. Anything that quietly makes labour scale would pass a plausibility check
 // and be wrong by a factor of five at the batch the shop actually makes.
 
-import { scaleColumns } from "../../src/lib/production";
+import { columnCell, scaleColumns } from "../../src/lib/production";
 import {
   recipeCostMatrix,
   defaultColumn,
@@ -51,12 +51,30 @@ const FLOUR: CostLine = {
 
 const LINES = [FLOUR, PREP, YIELD];
 
+/**
+ * The LABOUR RESOLVER the matrix now takes, standing in for `laborResolver`
+ * over a graph. Since migration 050 labour is a component priced off its own
+ * element, so the matrix is handed a function rather than a rate — which is
+ * also what lets a version carry several labour lines at several rates.
+ *
+ * Reads the prep row AT THE COLUMN, exactly as the real one does.
+ */
+const RATE = 35;
+const labourFrom = (lines: readonly CostLine[], rate: number | null) =>
+  (column: (typeof COLUMNS)[number]) => {
+    const prep = lines.find((l) => (l.label ?? "").toLowerCase() === "prep time");
+    if (!prep) return { hours: null, cost: null };
+    const cell = columnCell(prep, column, COLUMNS[0].multiplier, COLUMNS[0].index);
+    if (cell.qty === null) return { hours: null, cost: null };
+    return { hours: cell.qty, cost: rate === null ? null : cell.qty * rate };
+  };
+
 const matrix = (over: Partial<Parameters<typeof recipeCostMatrix>[0]> = {}) =>
   recipeCostMatrix({
     columns: COLUMNS,
     lines: LINES,
     baseIngredientCost: 8.38,
-    laborRate: 35,
+    labor: labourFrom((over.lines as CostLine[]) ?? LINES, RATE),
     costColumn: null,
     ...over,
   });
@@ -109,14 +127,14 @@ test("the yield row is read per column, not divided out of one number", () => {
 
 test("no labour rate charges NO labour rather than zero", () => {
   // A shop with no rate set has not told us labour is free.
-  const m = matrix({ laborRate: null });
+  const m = matrix({ labor: labourFrom(LINES, null) });
   eq(m.map((c) => c.labor), [null, null, null, null]);
   // The subtotal is then the ingredients alone, not null — we do know that much.
   eq(m.map((c) => round(c.subtotal)), [8.38, 16.76, 25.14, 33.52]);
 });
 
 test("a version with no prep-time row reports no labour", () => {
-  const m = matrix({ lines: [FLOUR, YIELD] });
+  const m = matrix({ lines: [FLOUR, YIELD], labor: labourFrom([FLOUR, YIELD], RATE) });
   eq(m.map((c) => c.laborHours), [null, null, null, null]);
   eq(m.map((c) => c.labor), [null, null, null, null]);
 });
