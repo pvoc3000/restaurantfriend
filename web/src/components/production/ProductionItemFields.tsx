@@ -1,8 +1,7 @@
 "use client";
 
-import Link from "next/link";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { formatCost, unresolvedSummary, type Cost } from "@/lib/productionCost";
+import { formatCost, type Cost } from "@/lib/productionCost";
 import { formatMargin, margin, type ResolvedPrice } from "@/lib/productionPrice";
 
 export type ItemFieldsData = {
@@ -54,7 +53,6 @@ export function ProductionItemFields({
   vocab: Vocabularies;
   editable: boolean;
 }) {
-  const gaps = unresolvedSummary(cost);
   const m = margin(cost.cost, price.price);
 
   return (
@@ -82,32 +80,28 @@ export function ProductionItemFields({
       <Pick label="Price class" item={item} column="price_class" value={item.price_class} options={vocab.classes} editable={editable} />
       <Pick label="Finish" item={item} column="finish" value={item.finish} options={vocab.finishes} editable={editable} />
 
+      {/* NO "where this price came from" line under the value (Mark,
+          2026-08-13: "From the grid — Regular Tier 5 … can be removed"). It
+          restated the two fields sitting directly beside it — Price class and
+          Price tier are in this same block — and the one case it could tell you
+          something the fields cannot, a per-shop override, reads as a bare
+          number either way. */}
       <Row label="Price">
-        <span className="flex flex-col items-start">
-          <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-            {price.price === null ? "—" : `$${price.price.toFixed(2)}`}
-          </span>
-          <span className={`${READ_ONLY_VALUE} text-[13px] text-muted`}>
-            {price.source === "item"
-              ? "Set for this shop on this item"
-              : price.source === "location"
-                ? "This shop's grid price"
-                : price.source === "org"
-                  ? <>From the <Link href="/price-grid" className="underline">grid</Link>{price.cell ? ` — ${price.cell.price_class} ${price.cell.price_tier}` : ""}</>
-                  : "No price — this item has no class or tier"}
-          </span>
+        <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+          {price.price === null ? "—" : `$${price.price.toFixed(2)}`}
         </span>
       </Row>
 
       <Pick label="Size" item={item} column="size" value={item.size} options={vocab.sizes} editable={editable} />
 
+      {/* NO "7 not priced: Simple Syrup, Corn Syrup …" line either (Mark, same
+          day). The `≥` on the figure already says the cost is a lower bound,
+          and the What-it-costs table below this block names every component
+          including the unpriced ones — with a row each rather than four of
+          them and "and 4 more". `unresolvedSummary` still serves the lists,
+          where there is no breakdown to fall back on. */}
       <Row label="Cost">
-        <span className="flex flex-col items-start">
-          <span className={`${READ_ONLY_VALUE} tabular-nums`}>{formatCost(cost)}</span>
-          {gaps ? (
-            <span className={`${READ_ONLY_VALUE} text-[13px] text-mark`}>{gaps}</span>
-          ) : null}
-        </span>
+        <span className={`${READ_ONLY_VALUE} tabular-nums`}>{formatCost(cost)}</span>
       </Row>
 
       <Row label="Trays of">
