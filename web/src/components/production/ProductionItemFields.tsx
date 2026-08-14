@@ -59,39 +59,28 @@ export function ProductionItemFields({
 
   return (
     <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-6 gap-y-3 text-[14px] sm:grid-cols-[minmax(8rem,auto)_1fr_minmax(8rem,auto)_1fr]">
+      {/* THE SOURCE ORDER INTERLEAVES THE TWO COLUMNS, which is not the order
+          you read (Mark, 2026-08-13). The grid is four tracks — label, value,
+          label, value — and flows by ROW, so a pair written here lands side by
+          side. Reading DOWN, that gives what he asked for:
+
+            Type      Price tier        what the thing IS, left;
+            Cut       Price class       what it is worth, right.
+            Finish    Price
+            Size      Cost
+            Trays of  Margin
+            Notes
+
+          So the pairs below are (left, right), and moving one field means
+          moving its opposite number too or everything after it shifts by one.
+          Below `sm` the grid collapses to two tracks and this reads as one
+          column in source order, which is why the interleave has to stay
+          sensible read straight through as well. */}
       <Pick label="Type" item={item} column="item_type" value={item.item_type} options={vocab.types} editable={editable} />
-      <Pick label="Cut" item={item} column="subtype" value={item.subtype} options={vocab.subtypes} editable={editable} />
-      <Pick label="Size" item={item} column="size" value={item.size} options={vocab.sizes} editable={editable} />
-      <Pick label="Finish" item={item} column="finish" value={item.finish} options={vocab.finishes} editable={editable} />
-
-      <Row label="Trays of">
-        {/* Mark, 2026-08-07: the printed schedule's counting strip reads this.
-            Six for everything today; per item so it needn't stay that way. */}
-        {editable ? (
-          <InlineValue
-            table="production_items"
-            id={item.id}
-            column="tally_box_size"
-            kind="number"
-            nullable={false}
-            value={item.tally_box_size}
-          />
-        ) : (
-          <span className={READ_ONLY_VALUE}>{item.tally_box_size}</span>
-        )}
-      </Row>
-
-      <Pick label="Price class" item={item} column="price_class" value={item.price_class} options={vocab.classes} editable={editable} />
       <Pick label="Price tier" item={item} column="price_tier" value={item.price_tier} options={vocab.tiers} editable={editable} />
-
-      <Row label="Cost">
-        <span className="flex flex-col items-start">
-          <span className={`${READ_ONLY_VALUE} tabular-nums`}>{formatCost(cost)}</span>
-          {gaps ? (
-            <span className={`${READ_ONLY_VALUE} text-[13px] text-mark`}>{gaps}</span>
-          ) : null}
-        </span>
-      </Row>
+      <Pick label="Cut" item={item} column="subtype" value={item.subtype} options={vocab.subtypes} editable={editable} />
+      <Pick label="Price class" item={item} column="price_class" value={item.price_class} options={vocab.classes} editable={editable} />
+      <Pick label="Finish" item={item} column="finish" value={item.finish} options={vocab.finishes} editable={editable} />
 
       <Row label="Price">
         <span className="flex flex-col items-start">
@@ -108,6 +97,34 @@ export function ProductionItemFields({
                   : "No price — this item has no class or tier"}
           </span>
         </span>
+      </Row>
+
+      <Pick label="Size" item={item} column="size" value={item.size} options={vocab.sizes} editable={editable} />
+
+      <Row label="Cost">
+        <span className="flex flex-col items-start">
+          <span className={`${READ_ONLY_VALUE} tabular-nums`}>{formatCost(cost)}</span>
+          {gaps ? (
+            <span className={`${READ_ONLY_VALUE} text-[13px] text-mark`}>{gaps}</span>
+          ) : null}
+        </span>
+      </Row>
+
+      <Row label="Trays of">
+        {/* Mark, 2026-08-07: the printed schedule's counting strip reads this.
+            Six for everything today; per item so it needn't stay that way. */}
+        {editable ? (
+          <InlineValue
+            table="production_items"
+            id={item.id}
+            column="tally_box_size"
+            kind="number"
+            nullable={false}
+            value={item.tally_box_size}
+          />
+        ) : (
+          <span className={READ_ONLY_VALUE}>{item.tally_box_size}</span>
+        )}
       </Row>
 
       <Row label="Margin">
