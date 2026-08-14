@@ -199,7 +199,8 @@ export function VendorItemFields({
             <span className="text-accent">unlinked</span>
           )}
           <InventoryItemPicker
-            vendorItemId={vi.id}
+            table="vendor_items"
+            rowId={vi.id}
             currentItemId={vi.inventory_items?.id ?? null}
           />
         </dd>

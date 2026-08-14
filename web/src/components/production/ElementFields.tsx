@@ -1,6 +1,7 @@
 "use client";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { InventoryItemPicker } from "@/components/catalog/InventoryItemPicker";
 import {
   ELEMENT_KIND_OPTIONS,
   SCHEDULE_CLASS_OPTIONS,
@@ -138,20 +139,48 @@ export function ElementFields({
         </Row>
       ) : null}
 
+      {/* A PURCHASED element costs nothing until it resolves to an inventory
+          item, and until 2026-08-13 this row could only SAY so — there was no
+          writer for `production_elements.inventory_item_id` anywhere in the
+          app, so 76 active elements were permanently uncosted and the Uncosted
+          tier listed problems you could not act on (Mark: "this is something
+          the user needs to be able to do on our own").
+
+          The picker is `catalog/InventoryItemPicker`, the same control the
+          vendor item uses, rather than a second one: it is the same act
+          against the same table of 790 items, and two versions of it would
+          drift the way `ui/Dialog`'s three copies did.
+
+          `allowUnlink` because "none of these" is a real answer here. Several
+          of the 76 are cleaning duties and FileMaker metadata rows ("Fryer -
+          replace filter", "Total Base") that were typed `purchased` at
+          migration and should never resolve to an ingredient — for those the
+          honest fix is the Kind field above, not a link. */}
       {element.kind === "purchased" ? (
         <Row label="Inventory item">
-          {element.inventory_item_id ? (
-            <Link
-              href={`/items/${element.inventory_item_id}`}
-              className={`${READ_ONLY_VALUE} hover:underline`}
-            >
-              {element.inventoryName ?? "Linked item"}
-            </Link>
-          ) : (
-            <span className={`${READ_ONLY_VALUE} text-muted`}>
-              Not linked — this element has no cost until it is.
-            </span>
-          )}
+          <span className="inline-flex flex-col items-start gap-1">
+            {element.inventory_item_id ? (
+              <Link
+                href={`/items/${element.inventory_item_id}`}
+                className={`${READ_ONLY_VALUE} hover:underline`}
+              >
+                {element.inventoryName ?? "Linked item"}
+              </Link>
+            ) : (
+              <span className={`${READ_ONLY_VALUE} text-muted`}>
+                Not linked — this element has no cost until it is.
+              </span>
+            )}
+            {editable ? (
+              <InventoryItemPicker
+                table="production_elements"
+                rowId={element.id}
+                currentItemId={element.inventory_item_id}
+                initialTerm={element.name}
+                allowUnlink
+              />
+            ) : null}
+          </span>
         </Row>
       ) : null}
 

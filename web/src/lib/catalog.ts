@@ -351,3 +351,31 @@ export const ORDER_TYPE_OPTIONS: { value: string; label: string }[] = [
  */
 export const HERE_BADGE_CLASS =
   "ml-1.5 border border-ink bg-mark-fill px-1 text-[10px] uppercase tracking-[0.12em] text-ink";
+
+/**
+ * The words an inventory-item search runs, from what somebody typed.
+ *
+ * EVERY WORD IS ANDed BY THE CALLER, and that is the point. Inventory names are
+ * comma-inverted — "Strawberries, Sliced", "Jam, Fig", "Cinnamon, Ground" —
+ * while the things that need linking to them are written the way you say them.
+ * A single `%term%` substring match finds none of those: measured over the 76
+ * unlinked production elements, typing the element's own name returned a
+ * candidate for 8 of them under a substring match and 22 under this.
+ *
+ * PARENTHESES ARE OURS, NOT THEIRS. An element called "Fig Jam (bag)" wants
+ * "Jam, Fig"; the bracket says what form we buy it in, and ANDing "bag" against
+ * a catalog that never uses the word turns a findable item into no results.
+ *
+ * Two-letter minimum because a lone "a" or "of" matches everything, and six
+ * words because past that it is a sentence, not a name.
+ */
+export function inventorySearchWords(term: string): string[] {
+  return term
+    .trim()
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, " ")
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .split(" ")
+    .filter((w) => w.length >= 2)
+    .slice(0, 6);
+}
