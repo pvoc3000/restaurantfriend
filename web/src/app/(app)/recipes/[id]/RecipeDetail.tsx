@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph, loadElementOptions } from "@/lib/productionQueries";
-import { versionBatchCost, laborResolver, costContext } from "@/lib/productionCost";
+import { versionBatchCost, laborCells, costContext } from "@/lib/productionCost";
 import { scaleColumns } from "@/lib/production";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
@@ -253,14 +253,15 @@ export async function RecipeDetail({
             scale_multipliers: v.scale_multipliers,
             cost_column: v.cost_column === null ? null : Number(v.cost_column),
           };
-          const base = scaleColumns(v.scale_labels, v.scale_multipliers).filter(
-            (c) => !c.isPercent
-          )[0];
+          const cols = scaleColumns(v.scale_labels, v.scale_multipliers);
+          const base = cols.filter((c) => !c.isPercent)[0];
           return {
-            // Resolved on the SERVER: pricing a labour element needs the
-            // costing graph, which lives here and not in the sheet.
-            labor: laborResolver(
-              cv, graph!.byId, costs, base?.multiplier ?? 1, base?.index ?? 0
+            // Resolved on the SERVER, because pricing a labour element needs the
+            // costing graph — and MATERIALIZED, because the sheet is a client
+            // component and a function cannot cross that boundary. See
+            // `laborCells`.
+            labor: laborCells(
+              cv, graph!.byId, costs, cols, base?.multiplier ?? 1, base?.index ?? 0
             ),
             batchCost: versionBatchCost(cv, graph!.byId, costs),
           };

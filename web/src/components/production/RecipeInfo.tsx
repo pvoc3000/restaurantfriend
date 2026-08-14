@@ -11,6 +11,7 @@ import { spaceBelow, useViewportAtLeast } from "@/lib/tableHead";
 import { recipeHref } from "@/lib/recipes";
 import { scaleColumns } from "@/lib/production";
 import { recipeCostMatrix, type CostLine } from "@/lib/recipeCosts";
+import { laborFromCells } from "@/lib/productionCost";
 import { RecipeCosts } from "./RecipeCosts";
 import type { SheetVersion } from "./RecipeVersionSheet";
 
@@ -161,7 +162,7 @@ export function RecipeInfo({
     columns,
     lines: version.lines as CostLine[],
     baseIngredientCost: version.batchCost.cost,
-    labor: version.labor,
+    labor: laborFromCells(version.labor),
     costColumn: chosen,
   });
 

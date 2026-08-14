@@ -815,6 +815,45 @@ export function laborResolver(
   };
 }
 
+/**
+ * THE RESOLVER'S ANSWERS, MATERIALIZED PER COLUMN — what crosses the
+ * server/client boundary, because a FUNCTION CANNOT.
+ *
+ * `laborResolver` needs the costing graph, which lives on the server; the Costs
+ * block that renders its output is a client component. Handing the closure down
+ * as a prop throws at runtime ("Functions cannot be passed directly to Client
+ * Components") and neither `tsc` nor eslint says a word — the same trap
+ * CLAUDE.md records for `InlineValue`'s `alsoUpdate`, hit again here.
+ *
+ * So the server resolves every column up front and passes a plain object; the
+ * client turns it back into the function the matrix wants. Keyed by
+ * `ScaleColumn.index` — the STORED SLOT, never the position on screen, because
+ * a version with an unlabelled slot renders its third column second.
+ */
+export type LaborCells = Record<number, { hours: number | null; cost: number | null }>;
+
+export function laborCells(
+  version: CostVersion,
+  byId: Map<string, CostElement>,
+  ctx: CostContext,
+  columns: readonly ScaleColumn[],
+  baseMultiplier: number,
+  baseIndex: number
+): LaborCells {
+  const resolve = laborResolver(version, byId, ctx, baseMultiplier, baseIndex);
+  const out: LaborCells = {};
+  for (const column of columns) out[column.index] = resolve(column);
+  return out;
+}
+
+/** The client side of that boundary — the matrix's `labor` argument again. */
+export function laborFromCells(
+  cells: LaborCells | null | undefined
+): ((column: ScaleColumn) => { hours: number | null; cost: number | null }) | null {
+  if (!cells) return null;
+  return (column) => cells[column.index] ?? { hours: null, cost: null };
+}
+
 /** The figures for the column this recipe is costed at — the block's headline. */
 export function defaultColumn(matrix: CostColumnFigures[]): CostColumnFigures | null {
   return matrix.find((c) => c.isDefault) ?? matrix[0] ?? null;

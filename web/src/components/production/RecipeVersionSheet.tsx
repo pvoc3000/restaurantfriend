@@ -8,6 +8,7 @@ import { PickList, type PickOption } from "@/components/ui/PickList";
 import { ingredientChoice, ingredientUpdate } from "@/lib/recipes";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { useExactViewportHeight } from "@/lib/tableHead";
+import type { LaborCells } from "@/lib/productionCost";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import {
   scaleColumns,
@@ -81,11 +82,12 @@ export type SheetVersion = {
   steps: SheetStep[];
   batchCost: Cost;
   /**
-   * How to price this version's labour lines at a column — built on the server
-   * where the costing graph lives, because pricing an element needs the whole
-   * graph and this component has only the sheet.
+   * This version's labour, resolved per column on the SERVER (where the costing
+   * graph lives) and passed as DATA — `laborCells`, not the closure itself. A
+   * function cannot cross the server/client boundary, and nothing in the type
+   * system or the linter catches it.
    */
-  labor: ((column: ScaleColumn) => { hours: number | null; cost: number | null }) | null;
+  labor: LaborCells | null;
 };
 
 /* Column widths, in the order FileMaker sets them out. Fixed pixels rather than
