@@ -27,13 +27,12 @@
  * schema. Where a number looks arbitrary it is because the paper says so.
  */
 
+import { convert } from "./units";
 import {
-  matchYield,
   batchYield,
   versionBatchCost,
   elementCost,
   lineCost,
-  type BatchYield,
   type CostElement,
   type CostLine,
   type Unresolved,
@@ -184,7 +183,6 @@ export type RollSubtype = {
   subtype: string;
   size: string;
   total: number;
-  batches: BatchCount;
   rows: RollRow[];
 };
 
@@ -197,7 +195,6 @@ export type RollSize = {
 export type RollType = {
   itemType: string;
   total: number;
-  batches: BatchCount;
   sizes: RollSize[];
 };
 
@@ -213,15 +210,7 @@ const name = (v: string | null | undefined) => (v ?? "").trim();
  * on the 8/7 packet, whose types run CAKE · MOCHI · OLD FASHIONED · RAISED ·
  * SCRAP and whose subtypes and items are alphabetical within.
  */
-export function rollUp(
-  lines: ScheduleLine[],
-  grain: Grain,
-  yields: BatchYield[] = [],
-  /** See `batchCount` — how many donuts one batch of each item's dough makes.
-   *  Empty means no group can state its batches, which is what a caller that
-   *  has not loaded the recipes should say rather than guess. */
-  unitsPerBatch: Map<string, number | null> = new Map()
-): RollType[] {
+export function rollUp(lines: ScheduleLine[], grain: Grain): RollType[] {
   const types = new Map<string, Map<string, Map<string, ScheduleLine[]>>>();
 
   for (const line of lines) {
@@ -251,7 +240,6 @@ export function rollUp(
               subtype,
               size,
               total: sum(group),
-              batches: batchCount(group, yields, unitsPerBatch),
               rows: leafRows(group, grain),
             }));
           return {
@@ -261,15 +249,9 @@ export function rollUp(
           };
         });
 
-      // A type's batch figure is the SUM of its subtypes', which is what the
-      // real packet prints: RAISED's 0.60 is Bismark 0.14 + Promise Ring 0.38 +
-      // Bullseye 0.05 + Danish 0.03. Not a separate calculation — the same
-      // numbers added up, so the page can never disagree with itself.
-      const all = sizeRows.flatMap((s) => s.subtypes.map((x) => x.batches));
       return {
         itemType,
         total: sizeRows.reduce((n, s) => n + s.total, 0),
-        batches: addBatches(all),
         sizes: sizeRows,
       };
     });
@@ -286,9 +268,16 @@ function leafRows(lines: ScheduleLine[], grain: Grain): RollRow[] {
   if (grain === "item") {
     // One row per LINE, not per item name: "Angry Samoa" is four different
     // donuts (038), and two of them can legitimately share a night.
+    //
+    // FINISH THEN NAME. The roll-up already groups TYPE → SIZE → CUT, so
+    // ordering the leaves by finish completes the sequence Mark named
+    // (2026-08-13: "sorted and grouped by Type, Size, Cut, then Finish.
+    // THAT'S ALL YOU NEED"). It is a fourth SORT rather than a fourth band:
+    // this packet is verified line for line against FileMaker's own, and a new
+    // heading every few rows would change a page somebody reads at 4am.
     return lines
       .slice()
-      .sort((a, b) => byName(a.item_name, b.item_name))
+      .sort((a, b) => byName(name(a.finish), name(b.finish)) || byName(a.item_name, b.item_name))
       .map((l) => ({
         key: l.id,
         label: l.item_name,
@@ -323,130 +312,38 @@ function capacityOf(lines: ScheduleLine[]): number {
   return caps.length ? Math.min(...caps) : TRAY_CAPACITY;
 }
 
-/* -------------------------------------------------------------------------- */
-/* Batch size                                                                  */
-/* -------------------------------------------------------------------------- */
-
-/**
- * How much dough a run of donuts takes, in BATCHES.
- *
- * `unresolved` carries the same weight it does in `Cost`: an item whose
- * (type, subtype, size) has no rule in `production_batch_yields` contributes
- * NOTHING and says so, rather than defaulting to zero and quietly making the
- * figure too small. A renderer prints "AT LEAST 0.60" when the list is
- * non-empty — the PDF says it in words, because @react-pdf's Helvetica is
- * WinAnsi and has no `≥` glyph (it renders as a stray "e").
- */
-export type BatchCount = {
-  batches: number | null;
-  unresolved: Unresolved[];
-};
-
-export function batchCount(
-  lines: ScheduleLine[],
-  yields: BatchYield[],
-  /**
-   * How many donuts one batch of each item's dough makes — `batchYield` of the
-   * item's base element, keyed by item id. Built once by the caller because
-   * this function is called per subtype group and the answer is per item.
-   */
-  unitsPerBatch: Map<string, number | null>
-): BatchCount {
-  let total = 0;
-  let counted = 0;
-  const unresolved: Unresolved[] = [];
-
-  for (const line of lines) {
-    const rule = matchYield(line, yields);
-    if (!rule) {
-      // The rule is still consulted, but only for `size_factor` — without it we
-      // do not know whether this is a mini or a giant.
-      unresolved.push({ elementId: null, name: line.item_name, reason: "no batch yield" });
-      continue;
-    }
-    // THE RECIPE SAYS HOW MANY A BATCH MAKES; `portion_of_batch` is not read
-    // (Mark, 2026-08-13). One regular donut is one unit of dough, so a run of
-    // `par` donuts is `par x size_factor` units, which is that over the yield.
-    const per = unitsPerBatch.get(line.item_id) ?? null;
-    if (!per) {
-      unresolved.push({ elementId: null, name: line.item_name, reason: "no yield" });
-      continue;
-    }
-    // Per LINE, then summed — not `groupTotal x rule`. Within one
-    // (type, subtype, size) group the rule is the same for every line today, so
-    // the two agree; doing it per line is what keeps them agreeing if a rule is
-    // ever stated more narrowly.
-    total += ((Number(line.par) || 0) * Number(rule.size_factor ?? 1)) / per;
-    counted += 1;
-  }
-
-  return { batches: counted ? total : null, unresolved };
-}
-
-/**
- * `batchCount`'s third argument, built from the item catalog and the cost
- * graph — the one place production asks a recipe how much it makes.
- */
-export function unitsPerBatchByItem(
-  items: Iterable<{ id: string; base_element_id: string | null }>,
-  byId: Map<string, CostElement>
-): Map<string, number | null> {
-  const out = new Map<string, number | null>();
-  for (const item of items) {
-    const dough = item.base_element_id ? byId.get(item.base_element_id) : null;
-    out.set(item.id, dough ? batchYield(dough).qty : null);
-  }
-  return out;
-}
-
-function addBatches(parts: BatchCount[]): BatchCount {
-  const priced = parts.filter((p) => p.batches !== null);
-  return {
-    batches: priced.length ? priced.reduce((n, p) => n + (p.batches ?? 0), 0) : null,
-    unresolved: parts.flatMap((p) => p.unresolved),
-  };
-}
-
-/** "0.60", "1.05" — two places, the way the printed packet writes it. */
-export function formatBatches(count: BatchCount): string {
-  if (count.batches === null) return "";
-  const n = count.batches.toFixed(2);
-  return count.unresolved.length ? `AT LEAST ${n}` : n;
-}
-
-/* -------------------------------------------------------------------------- */
-/* Element demand                                                              */
-/* -------------------------------------------------------------------------- */
-
 /**
  * What the night takes out of the element catalog — the donut element sheet.
  *
- * The DOUGH comes from the item's `base_element_id` and its batch rule, in
- * batches. Everything else on the item comes from its BOM edges, in that
- * edge's own unit x the par.
+ * EVERY ELEMENT ARRIVES THE SAME WAY: the item's BOM edges, each edge's own
+ * quantity times the par. There is no separate path for the dough any more
+ * (Mark, 2026-08-13: "components live in the component list only"), because
+ * there is no longer a field that names one component as special — see
+ * `itemCost` for what that field cost us.
  *
- * Note what this deliberately does NOT do: it never falls back to zero. An item
- * with no batch rule, or an edge with no quantity, lands in `unresolved` and
- * the sheet says so — the phase-2 lesson that a hundredfold dough error still
- * looks like a plausible ingredient cost, so a silently-too-small number is the
- * dangerous kind.
+ * BATCHES ARE DERIVED, and now for ANY made element rather than only for a
+ * dough: the quantity this night needs over what one batch of it makes. So the
+ * sheet can tell a baker "1.61 batches of Raised Donut" and equally "0.4
+ * batches of Chocolate Glaze", which the old shape could not say at all.
+ *
+ * Note what this deliberately does NOT do: it never falls back to zero. An edge
+ * with no quantity lands in `unresolved` and the sheet says so — the phase-2
+ * lesson that a hundredfold dough error still looks like a plausible ingredient
+ * cost, so a silently-too-small number is the dangerous kind.
  */
 export type ItemDemandSource = {
   id: string;
-  item_type: string | null;
-  subtype: string | null;
-  size: string | null;
-  base_element_id: string | null;
-  /** The components besides the dough — `production_item_elements`. */
+  /** Everything it is made of — `production_item_elements`. */
   elements: CostLine[];
 };
 
 export type ElementDemand = {
   elementId: string;
   name: string;
-  /** Dough, in batches of the master recipe. Null when nothing resolved. */
+  /** The night's quantity over what one batch makes. Null unless the element is
+   *  made AND its recipe says how much a batch yields. */
   batches: number | null;
-  /** Components, in the edge's own unit. Null when nothing resolved. */
+  /** What the night needs, in the edge's own unit. */
   quantity: number | null;
   unit: string | null;
   unresolved: Unresolved[];
@@ -455,8 +352,7 @@ export type ElementDemand = {
 export function elementDemand(
   lines: ScheduleLine[],
   items: Map<string, ItemDemandSource>,
-  byId: Map<string, CostElement>,
-  yields: BatchYield[]
+  byId: Map<string, CostElement>
 ): ElementDemand[] {
   const out = new Map<string, ElementDemand>();
 
@@ -482,24 +378,6 @@ export function elementDemand(
     const item = items.get(line.item_id);
     if (!item) continue;
 
-    if (item.base_element_id) {
-      const e = bucket(item.base_element_id);
-      const rule = matchYield(line, yields);
-      // Same rule as `batchCount`, same reason: the recipe's Expected Yield row
-      // says how many a batch makes, and `portion_of_batch` is the same fact
-      // said twice. The two figures must move together or the packet's element
-      // sheet contradicts its own premade schedule.
-      const dough = byId.get(item.base_element_id);
-      const perBatch = dough ? batchYield(dough).qty : null;
-      if (!rule) {
-        e.unresolved.push({ elementId: item.base_element_id, name: line.item_name, reason: "no batch yield" });
-      } else if (!perBatch) {
-        e.unresolved.push({ elementId: item.base_element_id, name: line.item_name, reason: "no yield" });
-      } else {
-        e.batches = (e.batches ?? 0) + (par * Number(rule.size_factor ?? 1)) / perBatch;
-      }
-    }
-
     for (const edge of item.elements) {
       if (!edge.element_id) continue;
       const e = bucket(edge.element_id);
@@ -519,6 +397,24 @@ export function elementDemand(
       }
       e.quantity = (e.quantity ?? 0) + Number(edge.qty) * par;
     }
+  }
+
+  // Quantity → batches, for anything made whose recipe says how much it yields.
+  // Units have to agree: a glaze measured in oz against a recipe yielding qt
+  // would otherwise report a confidently wrong batch count, and `convert`
+  // refuses across families and for package units.
+  for (const e of out.values()) {
+    if (e.quantity === null) continue;
+    const element = byId.get(e.elementId);
+    if (!element) continue;
+    const made = batchYield(element);
+    if (!made.qty) continue;
+    const qty =
+      e.unit && made.unit && e.unit !== made.unit
+        ? convert(e.quantity, e.unit, made.unit)
+        : e.quantity;
+    if (qty === null) continue;
+    e.batches = qty / made.qty;
   }
 
   return [...out.values()].sort((a, b) =>

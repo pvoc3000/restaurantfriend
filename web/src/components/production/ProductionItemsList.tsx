@@ -26,7 +26,6 @@ export type ProductionItemRow = {
   subtype: string | null;
   finish: string | null;
   size: string | null;
-  baseName: string | null;
   price_class: string | null;
   price_tier: string | null;
   is_active: boolean;
@@ -76,15 +75,14 @@ function vocabulary(
  * whose value reads "Inactive" is a sentence that argues with itself), and
  * Cost / Price over Costed / Priced.
  *
- * FINISH AND DOUGH ARE THE DATA'S OWN VOCABULARY, not a written-down list:
- * `finish` holds 13 values today (Plain 234, BOH Glaze 33, Granulated Sugar 14,
- * then a long tail of ones and twos) and the dough is whatever `base_element_id`
- * resolves to. Past eight options `PickList` grows a find box by itself, which
- * is what makes a menu of thirteen glazes usable.
+ * THE TAXONOMY IS THE DATA'S OWN VOCABULARY, not a written-down list: `finish`
+ * holds 13 values today (Plain 234, BOH Glaze 33, Granulated Sugar 14, then a
+ * long tail of ones and twos), and Type, Size and Cut the same. Past eight
+ * options `PickList` grows a find box by itself, which is what makes a menu of
+ * thirteen glazes usable.
  *
- * Both carry NONE — 5 items have no finish and 91 no dough, and those are
- * exactly the rows somebody has to fix. The old tab row could not express
- * either.
+ * Each carries NONE — 5 items have no finish — and those are exactly the rows
+ * somebody has to fix. The old tab row could not express it.
  *
  * Status is latent today: all 307 items are active. It is here because Mark
  * asked for it and because the column is real; note the tab row DEFAULTED to
@@ -121,10 +119,22 @@ export function ProductionItemsList({
       // disagrees with the columns makes you check the label every time. This
       // is also the order a donut is made in.
       {
-        key: "dough",
-        label: "Dough",
-        options: vocabulary(rows, (r) => r.baseName),
-        matches: (r, v) => (v === NONE ? r.baseName === null : r.baseName === v),
+        key: "type",
+        label: "Type",
+        options: vocabulary(rows, (r) => r.item_type),
+        matches: (r, v) => (v === NONE ? r.item_type === null : r.item_type === v),
+      },
+      {
+        key: "size",
+        label: "Size",
+        options: vocabulary(rows, (r) => r.size),
+        matches: (r, v) => (v === NONE ? r.size === null : r.size === v),
+      },
+      {
+        key: "cut",
+        label: "Cut",
+        options: vocabulary(rows, (r) => r.subtype),
+        matches: (r, v) => (v === NONE ? r.subtype === null : r.subtype === v),
       },
       {
         key: "finish",
@@ -187,7 +197,7 @@ export function ProductionItemsList({
     return rows.filter(
       (r) =>
         r.name.toLowerCase().includes(q) ||
-        [r.item_type, r.subtype, r.finish, r.size, r.baseName].some((v) =>
+        [r.item_type, r.subtype, r.finish, r.size].some((v) =>
           (v ?? "").toLowerCase().includes(q)
         )
     );
@@ -252,16 +262,37 @@ export function ProductionItemsList({
         </span>
       ),
     },
-    // DOUGH BEFORE FINISH (Mark, 2026-08-09) — the order a donut is made in,
-    // and the order the filter menus sit in. Keep the two in step.
+    // TYPE · SIZE · CUT · FINISH, in that order, which is the order the premade
+    // schedule sorts and groups by (Mark, 2026-08-13: "Angry samoa type: Cake /
+    // cut: Vanilla / finish: Plain / size: regular … THAT'S ALL YOU NEED").
+    // They replace a Dough column, which named a field that no longer exists —
+    // an item is a list of components, and none of them is special.
     {
-      key: "dough",
-      label: "Dough",
-      width: 160,
+      key: "type",
+      label: "Type",
+      width: 120,
       hideWhenCompact: true,
-      sortValue: (r) => r.baseName ?? "",
+      sortValue: (r) => r.item_type ?? "",
       sortTiebreaks: [(r) => r.name],
-      render: (r) => <span className="text-muted">{r.baseName ?? "—"}</span>,
+      render: (r) => <span className="text-muted">{r.item_type ?? "—"}</span>,
+    },
+    {
+      key: "size",
+      label: "Size",
+      width: 100,
+      hideWhenCompact: true,
+      sortValue: (r) => r.size ?? "",
+      sortTiebreaks: [(r) => r.name],
+      render: (r) => <span className="text-muted">{r.size ?? "—"}</span>,
+    },
+    {
+      key: "cut",
+      label: "Cut",
+      width: 130,
+      hideWhenCompact: true,
+      sortValue: (r) => r.subtype ?? "",
+      sortTiebreaks: [(r) => r.name],
+      render: (r) => <span className="text-muted">{r.subtype ?? "—"}</span>,
     },
     {
       key: "finish",
@@ -352,7 +383,7 @@ export function ProductionItemsList({
       // dragged a column here would keep the old arrangement and the change
       // would look like it had not happened. Cost: dragged widths and hidden
       // columns on this one table go back to their defaults.
-      storageKey="production-items.v2"
+      storageKey="production-items.v3"
       compactBelow={1280}
       columnChooser
       group={group}

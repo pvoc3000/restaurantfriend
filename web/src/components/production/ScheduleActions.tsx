@@ -80,8 +80,7 @@ export function ScheduleActions({
       setError(graphErr ?? "The costing graph could not be read.");
       return;
     }
-    const elementNames = new Map([...graph.byId].map(([id, e]) => [id, e.name]));
-    const { graph: items, error: itemErr } = await loadItemGraph(supabase, elementNames);
+    const { graph: items, error: itemErr } = await loadItemGraph(supabase);
     if (!items) {
       setBusy(null);
       setError(itemErr ?? "The menu could not be read.");
@@ -105,7 +104,7 @@ export function ScheduleActions({
     for (const line of lines) {
       const item = itemById.get(line.item_id as string);
       if (!item) continue;
-      const cost = itemCost(item, graph.byId, items.yields, { locationId, laborRate });
+      const cost = itemCost(item, graph.byId, { locationId, laborRate });
       const price = resolveItemPrice(
         item,
         locationId,

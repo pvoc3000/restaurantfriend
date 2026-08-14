@@ -20,7 +20,6 @@ import {
   rollUp,
   tallyBoxes,
   trayRuler,
-  formatBatches,
   packetDate,
   totalDonuts,
   TRAY_CELLS,
@@ -44,7 +43,7 @@ export const PACKET_PARTS: { key: PacketPart; label: string; hint: string }[] = 
   { key: "baker", label: "Baker tray guide", hint: "what to cut" },
   { key: "fryer", label: "Fryer tray guide", hint: "what to prep" },
   { key: "decorator", label: "Decorator tray guide", hint: "what to decorate" },
-  { key: "donut", label: "Donut element sheet", hint: "dough batches" },
+  { key: "donut", label: "Donut element sheet", hint: "batches to make" },
   { key: "ab", label: "AB element sheet", hint: "the AB rhythm" },
   { key: "weekly", label: "Weekly element sheet", hint: "the weekly rhythm" },
 ];
@@ -215,7 +214,7 @@ function Fragmentish({ children }: { children: React.ReactNode }) {
 /* -- the premade schedule: the RECORD --------------------------------------- */
 
 function PremadePage({ schedule, packet }: { schedule: PacketSchedule; packet: PacketData }) {
-  const rolled = rollUp(schedule.lines, "item", packet.yields, packet.unitsPerBatch);
+  const rolled = rollUp(schedule.lines, "item");
   return (
     <Page size="LETTER" style={styles.page} wrap>
       <View style={styles.headerRow}>
@@ -276,9 +275,6 @@ function PremadeType({ type }: { type: RollType }) {
                 <Text style={styles.subtotalText}>
                   {(sub.subtype || "(no cut)").toUpperCase()} TOTAL: {fmt(sub.total)}
                 </Text>
-                {formatBatches(sub.batches) ? (
-                  <Text style={styles.subtotalBatch}>BATCH SIZE: {formatBatches(sub.batches)}</Text>
-                ) : null}
               </View>
             </View>
           ))}
@@ -296,9 +292,6 @@ function PremadeType({ type }: { type: RollType }) {
         <Text style={styles.grandTotalText}>
           {(type.itemType || "(no type)").toUpperCase()} TOTAL: {fmt(type.total)}
         </Text>
-        {formatBatches(type.batches) ? (
-          <Text style={styles.grandBatch}>BATCH SIZE: {formatBatches(type.batches)}</Text>
-        ) : null}
       </View>
     </View>
   );
@@ -353,7 +346,7 @@ function TrayGuidePage({
   packet: PacketData;
   grain: Grain;
 }) {
-  const rolled = rollUp(kitchen.lines, grain, packet.yields, packet.unitsPerBatch);
+  const rolled = rollUp(kitchen.lines, grain);
   const total = totalDonuts(kitchen.lines);
   return (
     <Page size="LETTER" style={styles.page} wrap>
@@ -416,11 +409,6 @@ function TrayGuidePage({
                       <Text style={styles.subtotalText}>
                         {(sub.subtype || "(no cut)").toUpperCase()} TOTAL: {fmt(sub.total)}
                       </Text>
-                      {formatBatches(sub.batches) ? (
-                        <Text style={styles.subtotalBatch}>
-                          BATCH SIZE: {formatBatches(sub.batches)}
-                        </Text>
-                      ) : null}
                     </View>
                   </View>
                 ))}
@@ -431,9 +419,6 @@ function TrayGuidePage({
               <Text style={styles.grandTotalText}>
                 {(type.itemType || "(no type)").toUpperCase()} TOTAL: {fmt(type.total)}
               </Text>
-              {formatBatches(type.batches) ? (
-                <Text style={styles.grandBatch}>BATCH SIZE: {formatBatches(type.batches)}</Text>
-              ) : null}
             </View>
           </View>
         ))
@@ -478,7 +463,8 @@ function DonutSheetPage({ kitchen, packet }: { kitchen: PacketKitchen; packet: P
 
       {dough.length === 0 ? (
         <Text style={styles.empty}>
-          No dough resolved for tonight. An item with no batch rule contributes
+          Nothing made resolved for tonight. An element whose recipe does not
+          say how much a batch yields contributes
           nothing and is listed below rather than counted as zero.
         </Text>
       ) : (
@@ -495,7 +481,7 @@ function DonutSheetPage({ kitchen, packet }: { kitchen: PacketKitchen; packet: P
                 {d.unresolved.length ? (
                   <Text style={styles.cellMuted}>
                     AT LEAST — {d.unresolved.length} item
-                    {d.unresolved.length === 1 ? "" : "s"} have no batch rule
+                    {d.unresolved.length === 1 ? "" : "s"} state no amount
                   </Text>
                 ) : null}
               </View>

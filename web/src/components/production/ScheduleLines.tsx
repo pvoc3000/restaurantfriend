@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
-import { formatBatches, tallyBoxes, type RollType, type ScheduleLine } from "@/lib/productionSchedule";
+import { tallyBoxes, type ScheduleLine } from "@/lib/productionSchedule";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 export type ScheduleLineRow = ScheduleLine & {
@@ -111,13 +111,11 @@ type Grouping = "type" | "tray" | "none";
  */
 export function ScheduleLines({
   rows,
-  rolled,
   editable,
   countable,
   add,
 }: {
   rows: ScheduleLineRow[];
-  rolled: RollType[];
   /** Purchaser+ — the par, the note, adding and striking lines. */
   editable: boolean;
   /** Supervisor and up — the two counting cells, and only those. */
@@ -132,17 +130,13 @@ export function ScheduleLines({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const batchByType = useMemo(
-    () => new Map(rolled.map((t) => [t.itemType, t.batches])),
-    [rolled]
-  );
 
   const sorted = useMemo(() => {
     const byName = (a: string, b: string) =>
       a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
     const key = (r: ScheduleLineRow) =>
       grouping === "type"
-        ? `${r.item_type ?? ""}|${r.size ?? ""}|${r.subtype ?? ""}`
+        ? `${r.item_type ?? ""}|${r.size ?? ""}|${r.subtype ?? ""}|${r.finish ?? ""}`
         : grouping === "tray"
           ? r.tray_number ?? "￿"
           : "";
@@ -406,17 +400,13 @@ export function ScheduleLines({
             grouping === "type"
               ? (r) => [r.item_type || "(no type)", r.size].filter(Boolean).join(" · ")
               : (r) => (r.tray_number ? `Tray ${r.tray_number}` : "Not on a tray"),
-          summary: (run) => {
-            const total = run.reduce((n, r) => n + r.par, 0);
-            const batches =
-              grouping === "type" ? batchByType.get(run[0]?.item_type ?? "") : undefined;
-            return {
-              par: <span className="tabular-nums">{total.toLocaleString()}</span>,
-              ...(batches && formatBatches(batches)
-                ? { boxes: <span className="text-[11px]">{formatBatches(batches)} batches</span> }
-                : {}),
-            };
-          },
+          summary: (run) => ({
+            par: (
+              <span className="tabular-nums">
+                {run.reduce((n, r) => n + r.par, 0).toLocaleString()}
+              </span>
+            ),
+          }),
         };
 
   return (

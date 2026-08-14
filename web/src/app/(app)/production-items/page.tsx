@@ -39,12 +39,11 @@ export default async function ProductionItemsPage({
   const { graph, error } = await loadProductionGraph(supabase);
   if (error) return <LoadError message={error} />;
 
-  const elementNames = new Map([...graph!.byId].map(([id, e]) => [id, e.name]));
-  const { graph: items, error: itemError } = await loadItemGraph(supabase, elementNames);
+  const { graph: items, error: itemError } = await loadItemGraph(supabase);
   if (itemError) return <LoadError message={itemError} />;
 
   const rows: ProductionItemRow[] = items!.items.map((i) => {
-    const cost = itemCost(i, graph!.byId, items!.yields, costs);
+    const cost = itemCost(i, graph!.byId, costs);
     const resolved = resolveItemPrice(
       i,
       locationId,
@@ -59,7 +58,6 @@ export default async function ProductionItemsPage({
       subtype: i.subtype,
       finish: i.finish,
       size: i.size,
-      baseName: i.baseName,
       price_class: i.price_class,
       price_tier: i.price_tier,
       is_active: i.is_active,

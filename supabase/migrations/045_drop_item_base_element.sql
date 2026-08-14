@@ -1,0 +1,62 @@
+-- 045 — an item is a list of components, and none of them is special.
+--
+-- Mark, 2026-08-13: "get rid of the 'dough' field on production items. It's not
+-- necessary and doubles existing data. Components live in the component list
+-- only." And, on why it was wrong in the first place: "Items can be anything.
+-- They don't even have to be a donut. Assuming they're donuts, or that they are
+-- a specific kind of donut, is weird and wrong."
+--
+-- ===========================================================================
+-- RUN `migration/backfill-item-dough.mjs --apply` FIRST. THIS IS NOT OPTIONAL.
+--
+-- "It doubles existing data" was true of FileMaker, where the dough sat in
+-- `_idBase_t` AND in `_dependencies`, overlapping on 84 of 216 items. It is NOT
+-- true of this database: 036's loader resolved that overlap by dropping any
+-- dependency edge naming the item's own base, so measured on 2026-08-13 ZERO of
+-- the 216 items carry their base as a component edge. Drop this column without
+-- the backfill and every one of them silently loses its largest component.
+--
+-- The backfill writes one `production_item_elements` row per item, carrying the
+-- old `production_batch_yields.size_factor` as an ordinary quantity in the
+-- base's own yield unit — so nothing reprices on the way through. Verify before
+-- running this:
+--
+--   select count(*) from production_items i
+--   where i.base_element_id is not null
+--     and not exists (
+--       select 1 from production_item_elements e
+--       where e.item_id = i.id and e.element_id = i.base_element_id);
+--
+-- That must return 0. It is 216 today.
+-- ===========================================================================
+--
+-- WHAT THIS ALSO RETIRES, WITHOUT DROPPING IT.
+--
+-- `production_batch_yields` now has no reader anywhere in the app. Its
+-- `portion_of_batch` lost its last one on 2026-08-13 (the recipe's own Expected
+-- Yield row says how many a batch makes — "the expected yield IS the portion of
+-- a batch. They're the same thing."), and `size_factor` is what the backfill
+-- just moved onto the edges.
+--
+-- The TABLE IS DELIBERATELY LEFT IN PLACE. Dropping it destroys the only record
+-- of where those 158 quantities came from, and it is the sole surviving copy of
+-- FileMaker's structure for them — worth keeping until the edges have been read
+-- in anger. It costs nothing: nothing selects it, and 001's org-scoped policies
+-- still apply. Drop it in a later migration once Mark is satisfied.
+--
+-- Nor does this migration touch the 58 items whose (item_type, subtype, size)
+-- matched no rule and whose edges therefore carry a NULL quantity. They cost
+-- nothing today and they cost nothing after, which is the point — the change is
+-- that the number is now a box on the item's own screen rather than a missing
+-- row in a shared table. 33 of them are `Raised/Promise Ring/Giant`, because
+-- the rules called "Giant" a SUBTYPE while the items call it a SIZE: exactly
+-- the failure that enumerating (type, subtype, size) triples invites, and
+-- exactly what this removal is for.
+
+alter table production_items
+  drop column if exists base_element_id;
+
+-- 037 indexed the column for the costing join. Postgres drops an index with its
+-- column, so this is a statement of intent rather than a necessary line — but
+-- naming it here is what tells the next reader it was not forgotten.
+drop index if exists production_items_base_element_idx;

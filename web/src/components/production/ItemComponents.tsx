@@ -28,40 +28,14 @@ export type ComponentRow = {
   sort: number | null;
 };
 
-/** The dough, which is a COLUMN on the item and not one of these rows. */
-export type DoughRow = {
-  id: string;
-  name: string;
-  /** "1 ea" — one unit of the dough, times the size factor. Null when no
-   *  yield rule matches, so we do not know if this is a mini or a giant. */
-  amount: string | null;
-  cost: number | null;
-};
-
 /**
  * What an item costs, one row per contributor — and, since 2026-08-11, the
  * place you change them (Mark: "delete elements from the 'cost' section of a
  * production item … add them … and edit their amounts").
- *
- * THE DOUGH ROW IS NOT ONE OF THESE AND TAKES NO CONTROLS. It is
- * `production_items.base_element_id` plus a `production_batch_yields` rule, so
- * it has no amount of its own to edit — one regular donut is ONE unit of its
- * dough (the recipe's Expected Yield row says how many a batch makes) and the
- * only thing left to state is the size factor, which is the rule's and
- * shared by every item of that cut, and editing it here would silently reprice
- * a hundred other items. That is also why it is not deletable from this table:
- * "remove the dough" is a different act from "remove a component", it is a
- * write to the ITEM rather than to a row, and nothing in the app sets it yet.
- * Deliberately left alone — ask before building it.
- *
- * A hand-rolled table rather than a `DataTable`, unchanged from what this
- * replaced: that component is for a list of RECORDS, and this is one record's
- * arithmetic, three columns wide, with a totals rule at the foot.
- */
+ * */
 export function ItemComponents({
   itemId,
   orgId,
-  dough,
   rows,
   total,
   options,
@@ -69,7 +43,6 @@ export function ItemComponents({
 }: {
   itemId: string;
   orgId: string;
-  dough: DoughRow | null;
   rows: ComponentRow[];
   total: Cost;
   /** Active elements, for the Add picker. */
@@ -164,7 +137,7 @@ export function ItemComponents({
 
   return (
     <section className="space-y-2">
-      <SectionHeading count={rows.length + (dough ? 1 : 0)}>What it costs</SectionHeading>
+      <SectionHeading count={rows.length}>What it costs</SectionHeading>
 
       <table className="w-full max-w-[70ch] border-collapse text-[14px]">
         <thead>
@@ -176,29 +149,7 @@ export function ItemComponents({
           </tr>
         </thead>
         <tbody>
-          {dough ? (
-            <tr className="hover:bg-neutral-50">
-              <td className="px-3 py-2">
-                <Link href={`/elements/${dough.id}`} className="hover:underline">
-                  {dough.name}
-                </Link>
-                <span className="block text-[12px] text-subtle">the dough</span>
-              </td>
-              <td className="px-3 py-2 text-right tabular-nums text-muted">
-                {dough.amount ?? <span className="text-mark">no yield rule</span>}
-              </td>
-              <td className="px-3 py-2 text-right tabular-nums">
-                {dough.cost === null ? (
-                  <span className="text-mark">—</span>
-                ) : (
-                  `$${dough.cost.toFixed(4)}`
-                )}
-              </td>
-              {/* No control: see the note at the top of this file. */}
-              {editable ? <td className="px-1 py-2" /> : null}
-            </tr>
-          ) : null}
-
+          
           {rows.map((row) => (
             <tr key={row.id} className="hover:bg-neutral-50">
               <td className="px-3 py-2">
@@ -216,8 +167,9 @@ export function ItemComponents({
                   // portion-size shape. `allowNew` on the unit because a BOM
                   // counts in whatever the kitchen counts in, and both are
                   // nullable, so both offer the clear row: 176 of the migrated
-                  // edges carry no quantity at all, which is a real state (the
-                  // dough's amount is derived, not stored).
+                  // edges carry no quantity at all, and so do the 58 bases
+                  // whose old size rule never matched — a real state, and now a
+                  // box to type into rather than a missing row in a table.
                   <span className="inline-flex items-baseline justify-end gap-1">
                     <InlineValue
                       table="production_item_elements"
@@ -283,10 +235,10 @@ export function ItemComponents({
         </tbody>
       </table>
 
-      {rows.length === 0 && !dough ? (
+      {rows.length === 0 ? (
         <p className="text-[13px] text-muted">
-          Nothing recorded — this item has no dough and no components, so it
-          costs nothing until one is added.
+          Nothing recorded — this item has no components, so it costs nothing
+          until one is added.
         </p>
       ) : null}
 

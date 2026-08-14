@@ -128,7 +128,6 @@ export type Unresolved = {
     | "no yield"               // made, but the version doesn't say how much it makes
     | "no prep time"           // made, but the recipe never says how long it takes
     | "no labour rate"         // the hours are known and the shop has no rate
-    | "no batch yield"         // an ITEM whose (type, subtype, size) has no dough rule
     | "no quantity"            // a line with no amount
     | "incompatible units"     // the line's unit can't reach the element's
     | "cycle";                 // the BOM refers to itself
@@ -522,135 +521,47 @@ export function unresolvedSummary(cost: Cost): string | null {
 /* ========================================================================== */
 
 /**
- * What one ITEM costs to make: its dough plus everything on it.
+ * What one ITEM costs to make: the sum of what it is made of.
  *
- * The dough is the part that is not like a recipe line. An item does not store
- * how much dough it uses — FileMaker never did either, which is why 176 of its
- * BOM edges carry no quantity — because the amount is a property of the KIND
- * of donut, not of the individual one. Mark's rule:
+ * THERE IS NO "DOUGH" HERE ANY MORE, and that is the point (Mark, 2026-08-13:
+ * "get rid of the 'dough' field on production items. It's not necessary and
+ * doubles existing data. Components live in the component list only.").
  *
- *   "each regular donut (promise rings, bismarks, bullseyes, letters) is 1/340
- *    of a batch, mini donuts are 1/3 the size of a regular donut, giant donuts
- *    are 2x a regular donut"
+ * `production_items.base_element_id` used to name one component specially, and
+ * because it was special it needed its own arithmetic: a
+ * `production_batch_yields` rule looked up by (item_type, subtype, size) said
+ * how much of it went into one donut. Which meant costing had to know what KIND
+ * of donut an item was — and, as Mark put it, "items can be anything. They
+ * don't even have to be a donut. Assuming they're donuts, or that they are a
+ * specific kind of donut, is weird and wrong."
  *
- * BOTH HALVES OF THAT ARE STILL TRUE AND ONLY ONE OF THEM IS STORED. "1/340 of
- * a batch" is a statement about the batch's YIELD, and the recipe already makes
- * it — so a regular donut is ONE UNIT of its dough and the recipe says how many
- * units a batch makes (Mark, 2026-08-13: "the expected yield IS the portion of
- * a batch. They're the same thing. Use the yield."). What no recipe can say is
- * that a mini is a third of a regular, so `size_factor` stays.
+ * It was also measurably failing: 58 of the 216 items with a base matched no
+ * rule, so their largest component silently cost nothing. 33 of those were
+ * `Raised/Promise Ring/Giant`, because the rules table treats "Giant" as a
+ * SUBTYPE while the items use it as a SIZE — the exact failure that enumerating
+ * (type, subtype, size) triples invites.
  *
- * `production_batch_yields.portion_of_batch` therefore has no reader in this
- * module. It is not dropped: `lib/productionSchedule` still turns a night's
- * pars into batches with it.
+ * `migration/backfill-item-dough.mjs` moved every base into
+ * `production_item_elements` carrying its old `size_factor` as an ordinary
+ * quantity, so nothing repriced on the way through, and migration 045 drops the
+ * column. An item is now a list of components and nothing else.
  */
 export type ItemBom = {
   id: string;
   name: string;
-  item_type: string | null;
-  subtype: string | null;
-  size: string | null;
-  base_element_id: string | null;
-  /** The components besides the dough. */
+  /** The things it is made of — `production_item_elements`. */
   elements: CostLine[];
 };
-
-export type BatchYield = {
-  item_type: string;
-  subtype: string | null;
-  size: string | null;
-  portion_of_batch: number | null;
-  size_factor: number | null;
-};
-
-/**
- * The rule for this item, MOST SPECIFIC FIRST.
- *
- * A rule may be stated at (type, subtype, size), at (type, subtype), at
- * (type, size) or at (type) alone, and the narrowest match wins — which is
- * what lets "all Raised is 1/340" coexist with "Cake Banana is 1/30" without
- * enumerating every cut. Null in a stored rule means "any".
- */
-export function matchYield(
-  item: { item_type: string | null; subtype: string | null; size: string | null },
-  yields: BatchYield[]
-): BatchYield | null {
-  const eq = (a: string | null, b: string | null) =>
-    (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
-  const candidates = yields.filter(
-    (y) =>
-      eq(y.item_type, item.item_type) &&
-      (y.subtype === null || eq(y.subtype, item.subtype)) &&
-      (y.size === null || eq(y.size, item.size))
-  );
-  if (!candidates.length) return null;
-  // Specificity = how many of the two optional columns the rule pins down.
-  const score = (y: BatchYield) => (y.subtype === null ? 0 : 1) + (y.size === null ? 0 : 1);
-  return candidates.slice().sort((a, b) => score(b) - score(a))[0];
-}
 
 export function itemCost(
   item: ItemBom,
   byId: Map<string, CostElement>,
-  yields: BatchYield[],
   ctx: CostContext
 ): Cost {
   let total = 0;
   let priced = 0;
   const unresolved: Unresolved[] = [];
 
-  // The dough.
-  if (item.base_element_id) {
-    const base = byId.get(item.base_element_id);
-    if (!base) {
-      unresolved.push({ elementId: item.base_element_id, name: "the dough", reason: "no recipe" });
-    } else {
-      const rule = matchYield(item, yields);
-      if (!rule) {
-        // A size nobody has measured yet costs nothing AND says so, rather
-        // than defaulting to a confident wrong number. `size_factor` is what
-        // the rule is still consulted for — see below — and a missing rule
-        // means we do not know whether this is a mini or a giant.
-        unresolved.push({ elementId: base.id, name: base.name, reason: "no batch yield" });
-      } else {
-        // ONE REGULAR DONUT IS ONE UNIT OF ITS DOUGH, and `portion_of_batch` is
-        // NOT consulted (Mark, 2026-08-13: "the expected yield. Portion of
-        // batch is a made up variable. The expected yield IS the portion of a
-        // batch. They're the same thing. Use the yield.").
-        //
-        // He is right that they are one fact, and the two spellings of it had
-        // drifted: measured over the live catalog, `1 / portion_of_batch` and
-        // the Expected Yield row agree on Raised Donut (340) and Apple Fritter
-        // (16) and disagree on every cake dough (a yield row of 15 against
-        // portions of 1/30, 1/35 and 1/40). Raised agreed only because its
-        // recipe carries a `cost_column` putting its yield row at 340 — so
-        // until this, moving that radio from ×1 to TEST silently repriced every
-        // raised donut from $0.5282 to $0.2999. A donut's cost must not depend
-        // on which column somebody is reading a recipe at.
-        //
-        // So the dough is now exactly like every other component on the item:
-        // it costs what the element costs. `elementCost` already takes the
-        // yield row at the costed column, which is the one place that fact
-        // lives. The only thing left for the rule to say is `size_factor` — a
-        // mini is a third of a regular and a giant is more — which is a fact
-        // about the SHAPE and belongs nowhere else.
-        //
-        // `portion_of_batch` still has one reader, `lib/productionSchedule`'s
-        // element demand, which turns a night's pars into BATCHES to make. That
-        // is what the kitchen is told to produce rather than what it costs, so
-        // it is deliberately left alone here.
-        const per = elementCost(base, byId, ctx);
-        if (per.cost === null) unresolved.push(...per.unresolved);
-        else {
-          total += per.cost * Number(rule.size_factor ?? 1);
-          priced += 1;
-          unresolved.push(...per.unresolved);
-        }
-      }
-    }
-  }
-
-  // Everything on it.
   for (const line of item.elements) {
     const result = lineCost(line, byId, ctx);
     if (result.cost === null) { unresolved.push(...result.unresolved); continue; }

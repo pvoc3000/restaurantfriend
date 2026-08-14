@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph, loadItemGraph, loadElementOptions } from "@/lib/productionQueries";
-import { itemCost, lineCost, matchYield, elementCost, costContext } from "@/lib/productionCost";
+import { itemCost, lineCost, costContext } from "@/lib/productionCost";
 import { resolveItemPrice } from "@/lib/productionPrice";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
@@ -59,7 +59,7 @@ export async function ProductionItemDetail({
     { data: historyRows, error: historyError },
     { options: elementOptions },
   ] = await Promise.all([
-    loadItemGraph(supabase, elementNames),
+    loadItemGraph(supabase),
     supabase
       .from("production_items")
       .select("id, name, notes, is_active, tally_box_size")
@@ -98,25 +98,13 @@ export async function ProductionItemDetail({
   const item = items!.items.find((i) => i.id === id);
   if (!item) notFound();
 
-  const cost = itemCost(item, graph!.byId, items!.yields, costs);
+  const cost = itemCost(item, graph!.byId, costs);
   const price = resolveItemPrice(
     item, locationId, items!.grid, items!.gridOverrides,
     items!.overridesByItem.get(id) ?? []
   );
 
   /* -- the breakdown, one row per contributor ------------------------------ */
-
-  const rule = matchYield(item, items!.yields);
-  const base = item.base_element_id ? graph!.byId.get(item.base_element_id) ?? null : null;
-  // THE SAME CALL `itemCost` MAKES, so the breakdown sums to the total it sits
-  // under. This was a third implementation of the dough — it multiplied the
-  // ingredients-only batch by `portion_of_batch` — and so disagreed with the
-  // headline above it twice over.
-  const doughUnit = base ? elementCost(base, graph!.byId, costs) : null;
-  const doughCost =
-    doughUnit?.cost !== null && doughUnit !== null && rule
-      ? doughUnit.cost * Number(rule.size_factor ?? 1)
-      : null;
 
   // BY `sort`, then by name. The loader sweeps this table ordered by `id`, so
   // until now the breakdown's row order was the order uuids happened to fall
@@ -184,8 +172,6 @@ export async function ProductionItemDetail({
             price_tier: item.price_tier,
             tally_box_size: Number(row.tally_box_size ?? 6),
             notes: (row.notes ?? null) as string | null,
-            base_element_id: item.base_element_id,
-            baseName: item.baseName,
           }}
           cost={cost}
           price={price}
@@ -197,23 +183,6 @@ export async function ProductionItemDetail({
       <ItemComponents
         itemId={id}
         orgId={session.membership.org_id}
-        dough={
-          base
-            ? {
-                id: base.id,
-                name: base.name,
-                // A regular donut is ONE of whatever the recipe's Expected
-                // Yield row counts, and a mini is a third of one — so the row
-                // reads "1 ea" or "1/3 ea" rather than the old "1/340 of a
-                // batch", which stated the yield a second time and disagreed
-                // with it on every cake dough.
-                amount: rule
-                  ? `${fraction(Number(rule.size_factor ?? 1))} ${doughUnit?.unit ?? "unit"}`
-                  : null,
-                cost: doughCost,
-              }
-            : null
-        }
         rows={componentRows.map(({ line, name, cost: c }) => ({
           id: line.id,
           elementId: line.element_id,
@@ -266,11 +235,6 @@ function distinct(values: (string | null)[]): string[] {
 }
 
 /** 0.00294 → "1/340", which is how a baker states it. */
-function fraction(value: number): string {
-  if (!value) return "—";
-  const denominator = Math.round(1 / value);
-  return denominator > 1 ? `1/${denominator}` : String(Math.round(value * 100) / 100);
-}
 
 function LoadError({ message }: { message: string }) {
   return (

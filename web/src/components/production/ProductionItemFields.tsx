@@ -16,8 +16,6 @@ export type ItemFieldsData = {
   price_tier: string | null;
   tally_box_size: number;
   notes: string | null;
-  base_element_id: string | null;
-  baseName: string | null;
 };
 
 export type Vocabularies = {
@@ -65,18 +63,6 @@ export function ProductionItemFields({
       <Pick label="Cut" item={item} column="subtype" value={item.subtype} options={vocab.subtypes} editable={editable} />
       <Pick label="Size" item={item} column="size" value={item.size} options={vocab.sizes} editable={editable} />
       <Pick label="Finish" item={item} column="finish" value={item.finish} options={vocab.finishes} editable={editable} />
-
-      <Row label="Dough">
-        {item.base_element_id ? (
-          <Link href={`/elements/${item.base_element_id}`} className={`${READ_ONLY_VALUE} hover:underline`}>
-            {item.baseName ?? "Linked element"}
-          </Link>
-        ) : (
-          <span className={`${READ_ONLY_VALUE} text-muted`}>
-            None — this item has no dough cost.
-          </span>
-        )}
-      </Row>
 
       <Row label="Trays of">
         {/* Mark, 2026-08-07: the printed schedule's counting strip reads this.

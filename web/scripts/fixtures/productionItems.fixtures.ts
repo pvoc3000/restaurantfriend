@@ -6,8 +6,6 @@
 import {
   itemCost,
   elementCost,
-  matchYield,
-  type BatchYield,
   type CostElement,
   type ItemBom,
 } from "../../src/lib/productionCost";
@@ -36,18 +34,20 @@ const DF01 = "loc-df01";
 const AT_DF01 = { locationId: DF01, laborRate: null };
 const EVENT = "loc-event";
 
-/* -- the dough rule -------------------------------------------------------- */
-
-/**
- * A raised dough: $100 of flour a batch, and the batch makes 100 donuts — so
- * one donut of dough is exactly $1.
+/* -- an item is its component list, and nothing is special -------------------
  *
- * THE YIELD ROW IS THE ONLY THING THAT SETS THAT (Mark, 2026-08-13: "the
- * expected yield IS the portion of a batch. They're the same thing. Use the
- * yield."). `RAISED` below still carries a `portion_of_batch` of 1/340 — a
- * deliberately absurd second answer, kept so the cases can prove costing
- * ignores it. If it were ever consulted again a donut would cost $0.29.
+ * `production_items.base_element_id` and `production_batch_yields` are GONE
+ * (Mark, 2026-08-13: "get rid of the 'dough' field on production items … 
+ * components live in the component list only", and "items can be anything.
+ * They don't even have to be a donut. Assuming they're donuts, or that they are
+ * a specific kind of donut, is weird and wrong.").
+ *
+ * So there is no dough arithmetic left to pin. What these cases pin instead is
+ * that there is NONE: an item costs the sum of its edges, the base among them,
+ * with no lookup by (item_type, subtype, size) anywhere.
  */
+
+/** A dough: $100 of flour a batch, and the batch makes 100 — $1.00 each. */
 function dough(): CostElement {
   return {
     id: "el-dough",
@@ -58,7 +58,6 @@ function dough(): CostElement {
     master: {
       id: "v",
       lines: [
-        // The yield is a LINE, not a column — see `elementCost`.
         { id: "yield", label: "Expected Yield", qty: 100, unit: "ea", element_id: null },
         { id: "l", label: "Flour", qty: 100, unit: "lbs", element_id: "el-flour" },
       ],
@@ -78,165 +77,115 @@ const flour: CostElement = {
   },
 };
 
-const RAISED: BatchYield[] = [
-  { item_type: "Raised", subtype: null, size: "Regular", portion_of_batch: 1 / 340, size_factor: 1 },
-  { item_type: "Raised", subtype: null, size: "Mini", portion_of_batch: 1 / 340, size_factor: 1 / 3 },
-  { item_type: "Raised", subtype: null, size: "Giant", portion_of_batch: 1 / 340, size_factor: 2 },
-];
-
 const graph = (...els: CostElement[]) => new Map(els.map((e) => [e.id, e]));
 
+/** The base arrives as an ordinary edge — 1 of it for a regular donut, which is
+ *  what `backfill-item-dough.mjs` wrote from the old `size_factor`. */
 function donut(over: Partial<ItemBom> = {}): ItemBom {
   return {
-    id: "it", name: "Plain", item_type: "Raised", subtype: "Promise Ring",
-    size: "Regular", base_element_id: "el-dough", elements: [], ...over,
+    id: "it",
+    name: "Plain",
+    elements: [{ id: "e0", label: "Raised Dough", qty: 1, unit: "ea", element_id: "el-dough" }],
+    ...over,
   };
 }
 
-test("a regular donut is ONE UNIT of its dough", () => {
-  // $100 a batch over a yield of 100 → $1.00 each.
-  const c = itemCost(donut(), graph(dough(), flour), RAISED, AT_DF01);
+test("an item costs the sum of its components, base included", () => {
+  const c = itemCost(donut(), graph(dough(), flour), AT_DF01);
   ok(c.cost !== null && Math.abs(c.cost - 1) < 0.0001, `expected $1.00, got ${c.cost}`);
   eq(c.unit, "each");
 });
 
-test("PORTION_OF_BATCH IS IGNORED — the yield row decides, and only it", () => {
-  // The rule and the recipe disagree here on purpose: the rule says 1/340 of a
-  // batch and the recipe says a batch makes 100. Measured over the live
-  // catalog they disagree on every cake dough (a yield row of 15 against
-  // portions of 1/30, 1/35, 1/40), and they used to be BOTH consulted — the
-  // item through the portion, the element through the yield — so one donut had
-  // two costs. Change the portion to anything and this must not move.
+test("the base is JUST A COMPONENT — no type, no cut, no size is consulted", () => {
+  // The whole point of dropping the field. An item carrying no taxonomy at all
+  // costs exactly the same as one carrying every field, because nothing looks
+  // anything up: "items can be anything. They don't even have to be a donut."
   const g = graph(dough(), flour);
-  const wild: BatchYield[] = RAISED.map((r) => ({ ...r, portion_of_batch: 1 / 7 }));
-  const a = itemCost(donut(), g, RAISED, AT_DF01);
-  const b = itemCost(donut(), g, wild, AT_DF01);
-  eq(a.cost, b.cost, "the portion has no say");
-  ok(a.cost !== null && Math.abs(a.cost - 1) < 0.0001, `still $1.00, got ${a.cost}`);
+  const bare = itemCost(donut(), g, AT_DF01);
+  const dressed = itemCost(
+    { ...donut(), name: "Angry Samoa" } as ItemBom,
+    g,
+    AT_DF01
+  );
+  eq(bare.cost, dressed.cost, "the taxonomy has no say");
 });
 
-test("the dough costs what the DOUGH costs — one call, not two", () => {
-  // The invariant that replaces the old batch arithmetic: a regular donut's
-  // dough IS `elementCost` of that dough, so the item screen and the element
-  // screen cannot disagree, and neither can follow a cost-column radio the
-  // other does not see.
+test("a mini is a third because its EDGE says so, not because a rule does", () => {
   const g = graph(dough(), flour);
-  const per = elementCost(dough(), g, AT_DF01);
-  const item = itemCost(donut(), g, RAISED, AT_DF01);
-  eq(item.cost, per.cost, "same number");
-});
-
-test("a mini is a THIRD of a regular and a giant is TWICE it (Mark's rule)", () => {
-  const g = graph(dough(), flour);
-  const mini = itemCost(donut({ size: "Mini" }), g, RAISED, AT_DF01);
-  const giant = itemCost(donut({ size: "Giant" }), g, RAISED, AT_DF01);
+  const mini = itemCost(
+    donut({ elements: [{ id: "e0", label: null, qty: 1 / 3, unit: "ea", element_id: "el-dough" }] }),
+    g, AT_DF01
+  );
+  const giant = itemCost(
+    donut({ elements: [{ id: "e0", label: null, qty: 2, unit: "ea", element_id: "el-dough" }] }),
+    g, AT_DF01
+  );
   ok(mini.cost !== null && Math.abs(mini.cost - 1 / 3) < 0.0001, `mini ${mini.cost}`);
   ok(giant.cost !== null && Math.abs(giant.cost - 2) < 0.0001, `giant ${giant.cost}`);
 });
 
-test("the yield is applied ONCE — not twice, and not never", () => {
-  // The old trap was applying it twice (dividing by the yield AND multiplying
-  // by a portion), which gave $0.01 for a $1.00 donut. The new one would be
-  // applying it never. $1.00 is the only answer that is neither.
-  const c = itemCost(donut(), graph(dough(), flour), RAISED, AT_DF01);
-  ok(c.cost !== null && Math.abs(c.cost - 1) < 0.0001, `got ${c.cost}`);
+test("the base costs what the ELEMENT costs — one call, not two", () => {
+  const g = graph(dough(), flour);
+  eq(itemCost(donut(), g, AT_DF01).cost, elementCost(dough(), g, AT_DF01).cost, "same number");
 });
 
-test("toppings are added on top of the dough", () => {
+test("toppings are added on top of the base", () => {
   const sprinkles: CostElement = {
     id: "el-spr", name: "Sprinkles", kind: "purchased",
     manual_cost: null, manual_cost_unit: null,
     inventory: { id: "i2", base_unit: "lbs", vendor_items: [{ id: "v2", price: 4, package_content: 1, is_active: true }] },
   };
   const c = itemCost(
-    donut({ elements: [{ id: "e", label: "Sprinkles", qty: 0.25, unit: "lbs", element_id: "el-spr" }] }),
-    graph(dough(), flour, sprinkles), RAISED, AT_DF01
+    donut({ elements: [
+      { id: "e0", label: null, qty: 1, unit: "ea", element_id: "el-dough" },
+      { id: "e1", label: "Sprinkles", qty: 0.25, unit: "lbs", element_id: "el-spr" },
+    ] }),
+    graph(dough(), flour, sprinkles), AT_DF01
   );
-  ok(c.cost !== null && Math.abs(c.cost - 2) < 0.0001, `$1 dough + $1 sprinkles, got ${c.cost}`);
+  ok(c.cost !== null && Math.abs(c.cost - 2) < 0.0001, `$1 base + $1 sprinkles, got ${c.cost}`);
 });
 
-test("a size with NO yield rule costs nothing and names the gap", () => {
-  // Measured on the real catalog: `giant` and `42g` are used by items and have
-  // no rule. Defaulting them to 1 would invent a number for 46 giant donuts.
-  const c = itemCost(donut({ size: "42g" }), graph(dough(), flour), RAISED, AT_DF01);
+test("an edge with NO quantity costs nothing and names the gap", () => {
+  // 58 items' bases arrived with a null qty because their old (type, subtype,
+  // size) rule matched nothing — 33 of them Raised/Promise Ring/Giant, since
+  // the rules called "Giant" a subtype and the items call it a size. Same
+  // as before: no cost, and said out loud.
+  const c = itemCost(
+    donut({ elements: [{ id: "e0", label: null, qty: null, unit: "ea", element_id: "el-dough" }] }),
+    graph(dough(), flour), AT_DF01
+  );
   eq(c.cost, null);
-  ok(c.unresolved.some((u) => u.reason === "no batch yield"), "the gap is named");
+  ok(c.unresolved.some((u) => u.reason === "no quantity"), "the gap is named");
 });
 
-/* -- which rule applies ---------------------------------------------------- */
-
-/* -- the dough is charged like every other component (2026-08-13) ---------- */
-
-/** The same dough with a prep-time row: 2 hr, which at $35 is $70 of labour. */
-function doughWithLabour(): CostElement {
+test("THE BASE'S LABOUR IS CHARGED, like every other component", () => {
   const d = dough();
   d.master!.lines = [
     { id: "prep", label: "Prep Time", qty: 2, unit: "hr", element_id: null },
     ...d.master!.lines,
   ];
-  return d;
-}
-
-test("THE DOUGH'S LABOUR IS CHARGED — an item and its dough are one number", () => {
-  // The bug this pins shipped and was measured on the real catalog: `itemCost`
-  // priced the dough with `versionBatchCost` (ingredients only) while every
-  // other component on the item went through `elementCost` (which includes
-  // labour). A raised donut's dough contributed $0.0168 where the element
-  // screen quoted $0.5282 for the very same dough.
-  //
-  // Here: $100 of flour + 2 hr x $35 = $170 a batch, over a yield of 100 →
-  // $1.70 a donut. Ingredients-only gives $1.00, which is what the old code
-  // said.
   const at = { locationId: DF01, laborRate: 35 };
-  const g = graph(doughWithLabour(), flour);
-  const c = itemCost(donut(), g, RAISED, at);
+  const g = graph(d, flour);
+  const c = itemCost(donut(), g, at);
   ok(c.cost !== null && Math.abs(c.cost - 1.7) < 1e-9, `expected $1.70, got ${c.cost}`);
-
-  // And it is not merely "bigger" — it is EXACTLY what the dough itself costs.
-  // Two calls that must never diverge again.
-  const per = elementCost(doughWithLabour(), g, at);
-  eq(c.cost, per.cost, "the item's dough IS the dough's cost");
+  eq(c.cost, elementCost(d, g, at).cost, "the item's base IS the element's cost");
 });
 
-test("with no labour rate the dough falls back to ingredients, and SAYS SO", () => {
-  const c = itemCost(donut(), graph(doughWithLabour(), flour), RAISED, AT_DF01);
-  ok(c.cost !== null && Math.abs(c.cost - 1) < 1e-9, `ingredients only: ${c.cost}`);
-  // Not silently — the figure is a lower bound and the item names why.
-  ok(
-    c.unresolved.some((u) => u.reason === "no labour rate"),
-    `expected a labour-rate gap, got ${JSON.stringify(c.unresolved)}`
-  );
-});
-
-test("a dough with NO prep-time row makes the item a lower bound", () => {
-  // 97 of the 128 master recipes have no prep row. The item still costs what
-  // it can — it just stops claiming the figure is complete.
-  const c = itemCost(donut(), graph(dough(), flour), RAISED, { locationId: DF01, laborRate: 35 });
-  ok(c.cost !== null && Math.abs(c.cost - 1) < 1e-9, `got ${c.cost}`);
-  ok(
-    c.unresolved.some((u) => u.reason === "no prep time"),
-    `expected a prep-time gap, got ${JSON.stringify(c.unresolved)}`
-  );
-});
-
-test("the MOST SPECIFIC yield rule wins", () => {
-  const rules: BatchYield[] = [
-    { item_type: "Cake", subtype: null, size: null, portion_of_batch: 1 / 40, size_factor: 1 },
-    { item_type: "Cake", subtype: "Banana", size: null, portion_of_batch: 1 / 30, size_factor: 1 },
-    { item_type: "Cake", subtype: "Banana", size: "Mini", portion_of_batch: 1 / 30, size_factor: 0.5 },
+test("with no labour rate it falls back to ingredients, and SAYS SO", () => {
+  const d = dough();
+  d.master!.lines = [
+    { id: "prep", label: "Prep Time", qty: 2, unit: "hr", element_id: null },
+    ...d.master!.lines,
   ];
-  eq(matchYield({ item_type: "Cake", subtype: "Vanilla", size: "Regular" }, rules)!.portion_of_batch, 1 / 40);
-  eq(matchYield({ item_type: "Cake", subtype: "Banana", size: "Regular" }, rules)!.portion_of_batch, 1 / 30);
-  eq(matchYield({ item_type: "Cake", subtype: "Banana", size: "Mini" }, rules)!.size_factor, 0.5);
+  const c = itemCost(donut(), graph(d, flour), AT_DF01);
+  ok(c.cost !== null && Math.abs(c.cost - 1) < 1e-9, `ingredients only: ${c.cost}`);
+  ok(c.unresolved.some((u) => u.reason === "no labour rate"), JSON.stringify(c.unresolved));
 });
 
-test("a type with no rule at all matches nothing rather than borrowing one", () => {
-  eq(matchYield({ item_type: "Mochi", subtype: "Krinkle", size: "Regular" }, RAISED), null);
-});
-
-test("matching ignores case and stray spaces, as the FMP data requires", () => {
-  const r = matchYield({ item_type: " raised ", subtype: "x", size: "REGULAR" }, RAISED);
-  ok(r !== null && r.size === "Regular");
+test("a base with NO prep-time row makes the item a lower bound", () => {
+  const c = itemCost(donut(), graph(dough(), flour), { locationId: DF01, laborRate: 35 });
+  ok(c.cost !== null && Math.abs(c.cost - 1) < 1e-9, `got ${c.cost}`);
+  ok(c.unresolved.some((u) => u.reason === "no prep time"), JSON.stringify(c.unresolved));
 });
 
 /* -- the price cascade ----------------------------------------------------- */

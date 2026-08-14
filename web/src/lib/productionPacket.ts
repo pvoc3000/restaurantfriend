@@ -27,12 +27,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   elementDemand,
-  unitsPerBatchByItem,
   type ElementDemand,
   type ItemDemandSource,
   type ScheduleLine,
 } from "./productionSchedule";
-import type { BatchYield, CostElement, CostLine } from "./productionCost";
+import type { CostElement, CostLine } from "./productionCost";
 
 export type PacketSchedule = {
   id: string;
@@ -85,10 +84,6 @@ export type PacketData = {
   printedOn: string;
   schedules: PacketSchedule[];
   kitchens: PacketKitchen[];
-  yields: BatchYield[];
-  /** How many donuts one batch of each item's dough makes — the recipe's own
-   *  Expected Yield row. `rollUp` needs it to state a run in batches. */
-  unitsPerBatch: Map<string, number | null>;
 };
 
 /** PostgREST caps a select at 1,000 rows and says nothing about it. */
@@ -123,7 +118,7 @@ export async function fetchPacketData(
   scheduleIds: string[]
 ): Promise<PacketData> {
   if (scheduleIds.length === 0) {
-    return { orgName: "", printedOn: today(), schedules: [], kitchens: [], yields: [], unitsPerBatch: new Map() };
+    return { orgName: "", printedOn: today(), schedules: [], kitchens: [] };
   }
 
   const [{ data: org }, { data: scheduleRows, error: schedErr }] = await Promise.all([
@@ -148,7 +143,7 @@ export async function fetchPacketData(
   const weekdays = [...new Set(schedules.map((s) => isoWeekday(s.schedule_date as string)))];
   const kitchenIds = [...new Set(schedules.map((s) => s.kitchen_location_id as string))];
 
-  const [lines, locations, members, yields, elementDays, elementLocs] = await Promise.all([
+  const [lines, locations, members, elementDays, elementLocs] = await Promise.all([
     fetchAll<Record<string, unknown>>(
       supabase,
       "production_schedule_items",
@@ -159,12 +154,6 @@ export async function fetchPacketData(
     ),
     supabase.from("locations").select("id, code").in("id", locationIds).then((r) => r.data ?? []),
     supabase.from("org_members").select("user_id, display_name").then((r) => r.data ?? []),
-    fetchAll<BatchYield>(
-      supabase,
-      "production_batch_yields",
-      "item_type, subtype, size, portion_of_batch, size_factor",
-      "item_type"
-    ),
     fetchAll<Record<string, unknown>>(
       supabase,
       "production_element_days",
@@ -256,14 +245,7 @@ export async function fetchPacketData(
   const itemById = new Map<string, ItemDemandSource>(
     items.map((i) => [
       i.id as string,
-      {
-        id: i.id as string,
-        item_type: (i.item_type ?? null) as string | null,
-        subtype: (i.subtype ?? null) as string | null,
-        size: (i.size ?? null) as string | null,
-        base_element_id: (i.base_element_id ?? null) as string | null,
-        elements: edgesByItem.get(i.id as string) ?? [],
-      },
+      { id: i.id as string, elements: edgesByItem.get(i.id as string) ?? [] },
     ])
   );
 
@@ -340,7 +322,7 @@ export async function fetchPacketData(
   const kitchenIdByCode = new Map(locations.map((l) => [l.code as string, l.id as string]));
   for (const k of kitchens.values()) {
     k.shopCodes.sort();
-    k.demand = elementDemand(k.lines, itemById, elementById, yields);
+    k.demand = elementDemand(k.lines, itemById, elementById);
 
     const kitchenId = kitchenIdByCode.get(k.kitchenCode);
     const weekday = isoWeekday(k.date);
@@ -387,8 +369,6 @@ export async function fetchPacketData(
     kitchens: [...kitchens.values()].sort(
       (a, b) => a.date.localeCompare(b.date) || a.kitchenCode.localeCompare(b.kitchenCode)
     ),
-    yields,
-    unitsPerBatch: unitsPerBatchByItem(itemById.values(), elementById),
   };
 }
 

@@ -7,9 +7,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
-import { packetDate, rollUp, type ScheduleLine } from "@/lib/productionSchedule";
-import { loadDoughYields } from "@/lib/productionQueries";
-import type { BatchYield } from "@/lib/productionCost";
+import { packetDate } from "@/lib/productionSchedule";
 import { ScheduleLines, type ScheduleLineRow } from "@/components/production/ScheduleLines";
 import { ScheduleActions } from "@/components/production/ScheduleActions";
 import { AddScheduleItems, type AddableItem } from "@/components/production/AddScheduleItems";
@@ -70,10 +68,8 @@ export async function ScheduleDetail({
 
   const [
     { data: lineRows, error: lineErr },
-    { data: yieldRows },
     { data: members },
     { data: catalog },
-    { unitsPerBatch },
   ] = await Promise.all([
       // THE VIEW, not the table. `sold` is defined once, in SQL
       // (v_production_schedule_lines), so there is no TypeScript twin to drift
@@ -88,9 +84,6 @@ export async function ScheduleDetail({
         )
         .eq("schedule_id", id)
         .order("sort"),
-      supabase
-        .from("production_batch_yields")
-        .select("item_type, subtype, size, portion_of_batch, size_factor"),
       supabase.from("org_members").select("user_id, display_name"),
       // Everything that could be ADDED by hand. Active only: a retired donut is
       // not something you reach for at 9pm.
@@ -99,11 +92,6 @@ export async function ScheduleDetail({
         .select("id, name, item_type, subtype, finish, size, tally_box_size, tray_capacity")
         .eq("is_active", true)
         .order("name"),
-      // How many a batch of each item's dough makes — the recipe's own Expected
-      // Yield row, which is what states a run in batches (Mark, 2026-08-13).
-      // The NARROW loader, not the costing graph: this screen wants one row per
-      // recipe, not a priced BOM.
-      loadDoughYields(supabase),
     ]);
 
   // NOT folded into the page's own error, and not swallowed either. An empty
@@ -156,9 +144,6 @@ export async function ScheduleDetail({
     costed_at: (l.costed_at ?? null) as string | null,
   }));
 
-  const yields = (yieldRows ?? []) as BatchYield[];
-  const lines: ScheduleLine[] = rows;
-  const rolled = rollUp(lines, "item", yields, unitsPerBatch);
   const parTotal = rows.reduce((n, r) => n + r.par, 0);
   const manualCount = rows.filter((r) => r.par_source === "manual").length;
   const uncosted = rows.filter((r) => r.costed_at === null).length;
@@ -295,7 +280,6 @@ export async function ScheduleDetail({
 
       <ScheduleLines
         rows={rows}
-        rolled={rolled}
         editable={editable}
         countable={countable}
         add={
