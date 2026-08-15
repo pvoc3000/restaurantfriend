@@ -53,7 +53,30 @@ export type FilterDimension<T> = {
   matches: (row: T, value: string) => boolean;
   /** What the unset option reads as, when "All" isn't the natural word. */
   allLabel?: string;
+  /**
+   * THE RESTING VALUE — what this dimension says when the URL says nothing, and
+   * the value that therefore writes no parameter.
+   *
+   * `FILTER_ALL` for a menu, which is the default and the whole story for the
+   * bar. It exists for the lists whose resting state is a real filter: recipes
+   * and plans open on ACTIVE, as the catalog lists always have, so "the plain
+   * `/recipes` shows every recipe" would be a change of behaviour rather than a
+   * change of address. With a default, "clear" means back to REST rather than
+   * back to everything — see `clearedFilters` — and `activeFilterCount` counts
+   * a dimension only when it has moved off it, so a list does not open reading
+   * "Clear 1 filter".
+   *
+   * A dimension with a default needs a real token for "no filter" (recipes
+   * writes `?tier=all`): an empty value cannot be written to a query string, so
+   * `FILTER_ALL` and "absent" would be the same URL and the default would win.
+   */
+  defaultValue?: string;
 };
+
+/** What this dimension says when nothing has been chosen. */
+export function dimensionDefault<T>(dimension: FilterDimension<T>): string {
+  return dimension.defaultValue ?? FILTER_ALL;
+}
 
 export type FilterValues = Record<string, string>;
 
@@ -63,7 +86,7 @@ export function matchesDimension<T>(
   row: T,
   values: FilterValues
 ): boolean {
-  const chosen = values[dimension.key] ?? FILTER_ALL;
+  const chosen = values[dimension.key] ?? dimensionDefault(dimension);
   return chosen === FILTER_ALL || dimension.matches(row, chosen);
 }
 
@@ -129,12 +152,16 @@ export function activeFilterCount<T>(
   dimensions: FilterDimension<T>[],
   values: FilterValues
 ): number {
-  return dimensions.filter((d) => (values[d.key] ?? FILTER_ALL) !== FILTER_ALL).length;
+  // Off its RESTING value, not off "All" — see `defaultValue`. Identical for
+  // every menu, which rests at "All".
+  return dimensions.filter(
+    (d) => (values[d.key] ?? dimensionDefault(d)) !== dimensionDefault(d)
+  ).length;
 }
 
-/** Every dimension back to "All". Values for unknown keys are dropped. */
+/** Every dimension back to rest. Values for unknown keys are dropped. */
 export function clearedFilters<T>(dimensions: FilterDimension<T>[]): FilterValues {
-  return Object.fromEntries(dimensions.map((d) => [d.key, FILTER_ALL]));
+  return Object.fromEntries(dimensions.map((d) => [d.key, dimensionDefault(d)]));
 }
 
 /* -------------------------------------------------------------------------
@@ -188,6 +215,12 @@ export function parseFilterValues<T>(
   for (const dimension of dimensions) {
     const raw = one(params[dimension.key]);
     if (raw && dimension.options.some((o) => o.value === raw)) values[dimension.key] = raw;
+    // A dimension that rests somewhere other than "All" states its resting
+    // value, so a caller can drive a control from this record alone. One that
+    // rests at "All" stays ABSENT, which is what every existing caller and
+    // fixture expects of an empty query.
+    else if (dimensionDefault(dimension) !== FILTER_ALL)
+      values[dimension.key] = dimensionDefault(dimension);
   }
   return values;
 }
@@ -248,8 +281,9 @@ export function filterQuery<T>(
   const params = new URLSearchParams();
   if (search.trim()) params.set(SEARCH_PARAM, search.trim());
   for (const dimension of dimensions) {
-    const chosen = values[dimension.key] ?? FILTER_ALL;
-    if (chosen !== FILTER_ALL) params.set(dimension.key, chosen);
+    const chosen = values[dimension.key] ?? dimensionDefault(dimension);
+    // The RESTING value writes nothing, so the plain list keeps one address.
+    if (chosen !== dimensionDefault(dimension)) params.set(dimension.key, chosen);
   }
   if (sort) {
     params.set(SORT_PARAM, sort.key);

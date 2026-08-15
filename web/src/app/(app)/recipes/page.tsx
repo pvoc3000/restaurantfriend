@@ -4,6 +4,7 @@ import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph } from "@/lib/productionQueries";
 import { elementCost, costContext } from "@/lib/productionCost";
 import { RecipesList, type RecipeRow } from "@/components/production/RecipesList";
+import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
 
 /**
  * The recipe families — the kitchen binder, costed.
@@ -11,7 +12,14 @@ import { RecipesList, type RecipeRow } from "@/components/production/RecipesList
  * A row is a FAMILY and its figures come from its MASTER version, which is the
  * one costing reads and the one the PDF prints by default.
  */
-export default async function RecipesPage() {
+export default async function RecipesPage({
+  searchParams,
+}: {
+  // The search box, the tier and the sort ride in the URL, so the view survives
+  // a trip into a recipe and back.
+  searchParams: Promise<RawSearchParams>;
+}) {
+  const params = await searchParams;
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canWriteCatalog(session.membership.role);
@@ -90,7 +98,12 @@ export default async function RecipesPage() {
       <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
         Recipes
       </h1>
-      <RecipesList rows={rows} editable={editable} />
+      <RecipesList
+        rows={rows}
+        editable={editable}
+        initialFilters={params}
+        initialSearch={parseFilterSearch(params)}
+      />
     </div>
   );
 }

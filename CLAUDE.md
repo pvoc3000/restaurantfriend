@@ -4525,15 +4525,32 @@ weekday column, and 003 then silently made it per-vendor-item.
   through **`sortRows`** (`lib/tableSort`, the one implementation — `DataTable`
   calls it too, so a controlled and an uncontrolled table cannot disagree), then
   passes `sort`/`onSortChange` down and publishes the SORTED array.
-  **Where the sort lives depends on what else the list keeps.** The two
-  menu-driven lists (`/production-items`, `/elements`) already hold their whole
-  view in the URL, so it joins the filters there — `parseListSort` +
-  `filterQuery`'s 4th argument, `?sort=type&dir=desc`, absent when there is no
-  sort so the plain list keeps one canonical address, and restored by
-  `urlFilterParams` like everything else. `/recipes` and `/plans` keep their
-  search and tier in LOCAL state, so their sort is local too: putting only the
-  sort in the query would be half a convention. Their view still doesn't survive
-  a round trip at all — worth doing, not done.
+  It rides in the URL with the filters — `parseListSort` + `filterQuery`'s 4th
+  argument, `?sort=type&dir=desc`, absent when there is no sort so the plain
+  list keeps one canonical address, and restored by `urlFilterParams` like
+  everything else.
+  **`/recipes` AND `/plans` JOINED THE CONVENTION** (Mark, 2026-08-14: "do the
+  same for recipes and plans"). They had kept search and tier in local state,
+  which is why their sort started there too; all three are in the query now, and
+  their rows carry `withFrom` so the breadcrumb returns to the view rather than
+  to a bare list. **They keep their `TabPicker`** — one dimension, which is what
+  that control is for; what they borrow from `lib/filterMenus` is the URL
+  CONTRACT, not `ui/FilterMenus`. A dimension is just a declared filter, so
+  reusing it beat a fifth bespoke `lib/*Filters` module.
+  That needed **`FilterDimension.defaultValue`** — the RESTING value, what the
+  dimension says when the URL says nothing and therefore the value that writes
+  no parameter. Both lists open on ACTIVE, so without it a plain `/recipes`
+  would have started showing all 128. Three consequences, each fixture-pinned:
+  `clearedFilters` means back to REST rather than back to everything;
+  `activeFilterCount` counts a dimension only once it has MOVED off rest, so a
+  list doesn't open reading "Clear 1 filter"; and **a dimension with a default
+  needs a real token for "no filter"** (`?tier=all`), because an empty value
+  can't be written to a query string, so `FILTER_ALL` and "absent" would be one
+  URL and the default would win. Every menu rests at `FILTER_ALL`, so nothing
+  else moved.
+  Their tab counts now describe the SEARCHED set, `FilterMenus`' rule reaching
+  a TabPicker: searching "glaze" reads Active 23 / All 30, where the counts used
+  to claim 116 of a list showing 23.
   A `SORT_KEYS` constant per list names the sortable columns for the URL parser,
   because the URL has to be read before `columns` can be built (a cell links to
   this view, so the columns depend on the state seeded from it). **Keep it in

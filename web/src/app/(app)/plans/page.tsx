@@ -4,6 +4,7 @@ import { canWriteCatalog } from "@/lib/roles";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { PlansList, type PlanRow } from "@/components/production/PlansList";
 import { NewPlan } from "@/components/production/NewPlan";
+import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
 
 /**
  * The plans — production brief decision 9.
@@ -12,7 +13,14 @@ import { NewPlan } from "@/components/production/NewPlan";
  * for a day. Nothing migrated: FileMaker's 150 plans stay on disk and the first
  * plan here is built in this app's own editor.
  */
-export default async function PlansPage() {
+export default async function PlansPage({
+  searchParams,
+}: {
+  // The search box, the tier and the sort ride in the URL, so the view survives
+  // a trip into a plan and back.
+  searchParams: Promise<RawSearchParams>;
+}) {
+  const params = await searchParams;
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canWriteCatalog(session.membership.role);
@@ -91,7 +99,13 @@ export default async function PlansPage() {
           once, and their union is that shop&rsquo;s menu.
         </p>
       ) : (
-        <PlansList rows={rows} orgId={session.membership.org_id} editable={editable} />
+        <PlansList
+          rows={rows}
+          orgId={session.membership.org_id}
+          editable={editable}
+          initialFilters={params}
+          initialSearch={parseFilterSearch(params)}
+        />
       )}
     </div>
   );

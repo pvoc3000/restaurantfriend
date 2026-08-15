@@ -10,7 +10,21 @@ import { TextInput } from "@/components/ui/TextInput";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { createClient } from "@/lib/supabase/client";
 import { usePublishRecordSet } from "@/lib/recordSet";
-import { sortRows, type SortDir } from "@/lib/tableSort";
+import { withFrom } from "@/lib/breadcrumbs";
+import { sortRows } from "@/lib/tableSort";
+import {
+  applyListFilters,
+  filterCounts,
+  filterHref,
+  parseFilterSearch,
+  parseFilterValues,
+  parseListSort,
+  urlFilterParams,
+  type FilterDimension,
+  type FilterValues,
+  type ListSort,
+  type RawSearchParams,
+} from "@/lib/filterMenus";
 import {
   overlappingPlans,
   planRange,
@@ -28,7 +42,22 @@ export type PlanRow = PlanSummary & {
   slotCount: number;
 };
 
-type Tier = "active" | "all";
+/** This list's own address — its URL, its record-set key, its crumb. */
+const PATH = "/plans";
+
+/**
+ * Every column you can sort by — `columns` below, minus the ones with no
+ * `sortValue`. KEEP THE TWO IN STEP; see the production items list for why.
+ */
+const SORT_KEYS = [
+  "active",
+  "title",
+  "sells",
+  "kitchen",
+  "dates",
+  "trays",
+  "slots",
+] as const;
 
 /**
  * The plans.
@@ -46,17 +75,85 @@ export function PlansList({
   rows,
   orgId,
   editable,
+  initialFilters,
+  initialSearch = "",
 }: {
   rows: PlanRow[];
   orgId: string;
   editable: boolean;
+  /** The URL's query, raw. */
+  initialFilters?: RawSearchParams;
+  initialSearch?: string;
 }) {
   const router = useRouter();
-  const [tier, setTier] = useState<Tier>("active");
-  const [search, setSearch] = useState("");
+
+  /**
+   * ONE DIMENSION, so it stays a `TabPicker` — see the recipes list, which
+   * borrows `lib/filterMenus`' URL contract the same way and for the same
+   * reason. `defaultValue` is what keeps a plain `/plans` on ACTIVE.
+   */
+  const dimensions = useMemo<FilterDimension<PlanRow>[]>(
+    () => [
+      {
+        key: "tier",
+        label: "Which plans",
+        defaultValue: "active",
+        options: [
+          { value: "active", label: "Active" },
+          { value: "all", label: "All" },
+        ],
+        matches: (r, v) => (v === "active" ? r.is_active : true),
+      },
+    ],
+    []
+  );
+
+  // Seeded from the ADDRESS BAR where it can be read, and only from the props
+  // otherwise — see `urlFilterParams`. A back or forward restore hands this
+  // component the props of whatever query the history entry was created with,
+  // which after a `replaceState` is not the query it now shows.
+  const [search, setSearch] = useState(() => {
+    const live = urlFilterParams(PATH);
+    return live ? parseFilterSearch(live) : initialSearch;
+  });
+  const [filters, setFilters] = useState<FilterValues>(() =>
+    parseFilterValues(dimensions, urlFilterParams(PATH) ?? initialFilters ?? {})
+  );
+  const [sort, setSort] = useState<ListSort | null>(() =>
+    parseListSort(urlFilterParams(PATH) ?? initialFilters ?? {}, SORT_KEYS)
+  );
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
-  const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(null);
+
+  // `history.replaceState`, never `router.replace`: the filtering is all
+  // client-side over rows the server already sent.
+  function writeUrl(
+    nextFilters: FilterValues,
+    nextSearch: string,
+    nextSort: ListSort | null
+  ) {
+    window.history.replaceState(
+      null,
+      "",
+      filterHref(PATH, dimensions, nextFilters, nextSearch, nextSort)
+    );
+  }
+
+  function changeTier(next: string) {
+    const nextFilters = { ...filters, tier: next };
+    setFilters(nextFilters);
+    writeUrl(nextFilters, search, sort);
+  }
+
+  function changeSearch(next: string) {
+    setSearch(next);
+    writeUrl(filters, next, sort);
+  }
+
+  function changeSort(next: ListSort) {
+    setSort(next);
+    writeUrl(filters, search, next);
+  }
 
   // This list had no search box at all, alone among the module's five (audit,
   // 2026-08-09). It was defensible while a shop had two plans and indefensible
@@ -68,12 +165,13 @@ export function PlansList({
   // them (`planRange`, the same function that renders it) as well as the stored
   // ISO — the schedules list's lesson, where searching what was on screen found
   // nothing because the row stored the other spelling.
-  const visible = useMemo(() => {
+  // Search first, so the tab counts describe the list you are looking at —
+  // `FilterMenus`' rule, applied to a TabPicker.
+  const searched = useMemo(() => {
     const q = search.trim().toLowerCase();
-    return rows.filter((r) => {
-      if (tier === "active" && !r.is_active) return false;
-      if (!q) return true;
-      return [
+    if (!q) return rows;
+    return rows.filter((r) =>
+      [
         r.title,
         r.sellsCode,
         r.kitchenCode ?? "",
@@ -84,10 +182,24 @@ export function PlansList({
       ]
         .join(" ")
         .toLowerCase()
-        .includes(q);
-    });
-  }, [rows, tier, search]);
+        .includes(q)
+    );
+  }, [rows, search]);
+
+  const visible = useMemo(
+    () => applyListFilters(searched, dimensions, filters),
+    [searched, dimensions, filters]
+  );
+  const counts = filterCounts(searched, dimensions, filters).tier;
   const overlaps = useMemo(() => overlappingPlans(rows), [rows]);
+
+  /** This view's own address — where a link back from a plan returns to. */
+  const listHref = filterHref(PATH, dimensions, filters, search, sort);
+
+  /** Every plan link carries the filtered view, so the breadcrumb lands back
+   *  on it; `crumbPath` drops the query, so the record-set key stays bare. */
+  const detailHref = (id: string) =>
+    withFrom(`/plans/${id}`, { href: listHref, label: "Plans" });
 
   /**
    * Copy a plan and everything under it — trays, and the slots on them with
@@ -256,7 +368,7 @@ export function PlansList({
       sortValue: (r) => r.title,
       render: (r) => (
         <span className="block">
-          <Link href={`/plans/${r.id}`} className="font-medium hover:underline">
+          <Link href={detailHref(r.id)} className="font-medium hover:underline">
             {r.title}
           </Link>
           {overlaps.has(r.id) ? (
@@ -358,14 +470,16 @@ export function PlansList({
       : []),
   ];
 
-  // THE SORT IS THIS LIST'S, not `DataTable`'s, so the found set can be
-  // published in the order the table shows — see the recipes list for why it is
-  // local state here rather than the URL.
+  // The rows in the order the table shows them — `DataTable` is told the sort
+  // rather than finding one, so these two can never disagree. Not memoized:
+  // `columns` is rebuilt every render (its cells close over `detailHref`).
   const sorted = sortRows(visible, columns, sort);
 
+  // The list publishes what it is showing, IN THAT ORDER, so a detail screen
+  // walks the found set the way you are reading it.
   usePublishRecordSet(
-    "/plans",
-    sorted.map((r) => ({ id: r.id, href: `/plans/${r.id}` }))
+    PATH,
+    sorted.map((r) => ({ id: r.id, href: detailHref(r.id) }))
   );
 
   return (
@@ -374,7 +488,7 @@ export function PlansList({
     <DataTable
       rows={sorted}
       sort={sort}
-      onSortChange={setSort}
+      onSortChange={changeSort}
       columns={columns}
       rowKey={(r) => r.id}
       storageKey="production-plans"
@@ -385,7 +499,7 @@ export function PlansList({
         <div className="flex flex-wrap items-end gap-3">
           <TextInput
             value={search}
-            onValueChange={setSearch}
+            onValueChange={changeSearch}
             placeholder="Search plans"
             aria-label="Search plans"
             clearLabel="Clear the search"
@@ -393,12 +507,13 @@ export function PlansList({
           />
           <TabPicker
             ariaLabel="Which plans"
-            value={tier}
-            onChange={setTier}
-            options={[
-              { key: "active" as Tier, label: "Active", count: rows.filter((r) => r.is_active).length },
-              { key: "all" as Tier, label: "All", count: rows.length },
-            ]}
+            value={filters.tier ?? "active"}
+            onChange={changeTier}
+            options={dimensions[0].options.map((o) => ({
+              key: o.value,
+              label: o.label,
+              count: counts[o.value],
+            }))}
           />
         </div>
       }

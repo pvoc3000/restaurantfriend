@@ -16,6 +16,7 @@ import {
   activeFilterCount,
   applyListFilters,
   clearedFilters,
+  dimensionDefault,
   filterCounts,
   filterHref,
   filterQuery,
@@ -352,4 +353,74 @@ test("the sort survives a back/forward restore, which is the whole point", () =>
   );
   eq(parseListSort(live ?? {}, SORTABLE), { key: "cost", dir: "desc" });
   eq(parseFilterValues(DIMS, live ?? {}), { kind: "made" });
+});
+
+/* -------------------------------------------------------------------------
+ * A DIMENSION THAT RESTS SOMEWHERE OTHER THAN "ALL".
+ *
+ * Recipes and plans open on ACTIVE, as the catalog lists always have, so ACTIVE
+ * is what the plain `/recipes` must show AND the value that writes no
+ * parameter. Every case here is one a menu (resting at "All") already passes
+ * unchanged — the point is that adding a resting value did not move it.
+ * ------------------------------------------------------------------------- */
+
+type Recipe = { name: string; active: boolean; master: string | null };
+
+const TIER: FilterDimension<Recipe> = {
+  key: "tier",
+  label: "Which recipes",
+  defaultValue: "active",
+  options: [
+    { value: "active", label: "Active" },
+    { value: "all", label: "All" },
+    { value: "no-master", label: "No master" },
+  ],
+  matches: (r, v) => (v === "active" ? r.active : v === "no-master" ? !r.master : true),
+};
+
+const TIERS = [TIER];
+
+const recipes: Recipe[] = [
+  { name: "Apple Fritter", active: true, master: "01" },
+  { name: "Old Glaze", active: false, master: "03" },
+  { name: "Orphan", active: true, master: null },
+];
+
+test("an empty query RESTS at the default rather than showing everything", () => {
+  const values = parseFilterValues(TIERS, {});
+  eq(values, { tier: "active" });
+  eq(applyListFilters(recipes, TIERS, values).map((r) => r.name), ["Apple Fritter", "Orphan"]);
+});
+
+test("THE RESTING VALUE WRITES NO PARAMETER — one address for the plain list", () => {
+  eq(filterQuery(TIERS, { tier: "active" }), "");
+  eq(filterHref("/recipes", TIERS, { tier: "active" }), "/recipes");
+  eq(filterHref("/recipes", TIERS, { tier: "all" }), "/recipes?tier=all");
+});
+
+test('"All" needs a real token, because an empty value cannot be written', () => {
+  // FILTER_ALL and "absent" would be the same URL, and absent means the
+  // default — so a dimension with a default must spell its no-filter option.
+  eq(filterQuery(TIERS, { tier: FILTER_ALL }), "tier=");
+  eq(parseFilterValues(TIERS, { tier: "" }), { tier: "active" });
+  eq(parseFilterValues(TIERS, { tier: "all" }), { tier: "all" });
+});
+
+test("a list does not open reading 'Clear 1 filter'", () => {
+  eq(activeFilterCount(TIERS, parseFilterValues(TIERS, {})), 0);
+  eq(activeFilterCount(TIERS, { tier: "all" }), 1);
+});
+
+test("CLEAR MEANS BACK TO REST, and leaves nothing counted", () => {
+  const cleared = clearedFilters(TIERS);
+  eq(cleared, { tier: "active" });
+  eq(activeFilterCount(TIERS, cleared), 0);
+  eq(filterQuery(TIERS, cleared), "");
+});
+
+test("a menu still rests at All, so none of the above moved it", () => {
+  eq(dimensionDefault(KIND), FILTER_ALL);
+  eq(parseFilterValues(DIMS, {}), {});
+  eq(clearedFilters(DIMS), { active: "", kind: "", schedule: "" });
+  eq(activeFilterCount(DIMS, {}), 0);
 });
