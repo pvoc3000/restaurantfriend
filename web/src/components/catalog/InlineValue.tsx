@@ -116,9 +116,61 @@ function setArraySlot(
  */
 const INLINE_BOX = "px-1 py-0.5";
 
-/** The editing frame. `-outline-offset-1` keeps it inside the cell's own
- *  padding rather than bleeding into the column beside it. */
-const INLINE_EDITING = `${INLINE_BOX} outline outline-2 -outline-offset-1 outline-ink`;
+/** The resting cue — a dotted underline, the quietest possible "editable". The
+ *  SIZER wears it too, or the two states differ by the underline's offset. */
+const INLINE_REST_LOOK =
+  "underline decoration-neutral-300 decoration-dotted underline-offset-4";
+
+/**
+ * The editing frame. `-outline-offset-1` keeps it inside the cell's own padding
+ * rather than bleeding into the column beside it, and `absolute inset-0` takes
+ * the input OUT OF FLOW — see `Sizer`.
+ */
+const INLINE_EDITING = `absolute inset-0 w-full bg-transparent ${INLINE_BOX} outline outline-2 -outline-offset-1 outline-ink`;
+
+/**
+ * WHY AN INVISIBLE COPY OF THE TEXT, AND NOT JUST MATCHING PADDING.
+ *
+ * Matching the padding fixed the HEIGHT and left the width alone, and the width
+ * was the part that hurt (Mark, 2026-08-13, after the first attempt: "still
+ * moving"). Measured with the app's own CSS on a real cell: at rest 37.6px,
+ * editing 194.9px.
+ *
+ * The cause is that these cells sit in SHRINK-TO-FIT parents — an `inline-flex`
+ * wrapper holding a quantity beside its unit. A percentage width cannot be
+ * resolved while the parent is being sized by its content, so `w-full` on the
+ * input is ignored for that purpose and the input falls back to its INTRINSIC
+ * width: the `size` attribute, which defaults to about twenty characters. The
+ * resting button contributes the width of "1".
+ *
+ * So the input is taken out of flow and an invisible copy of the value is left
+ * behind to hold the box open. Nothing else sizes reliably: `size={1}` still
+ * imposes a floor (42.9px against the button's 37.6), and a `size` computed
+ * from the text is in "0" widths rather than pixels, so it only ever
+ * approximates.
+ *
+ * TWO DETAILS ARE LOad-BEARING and each was worth 4px:
+ *  - the sizer is `block`, because vertical padding on an INLINE box does not
+ *    affect the line box, so an inline sizer came out 4px short;
+ *  - it carries the resting underline, whose `underline-offset-4` is part of
+ *    the button's line height.
+ *
+ * Verified against every shape a cell holds — "1", "0.3333", "12.5", "1000",
+ * "x", "0.02" — all identical to a tenth of a pixel in both axes.
+ */
+function Sizer({ text, align }: { text: string; align?: "left" | "right" }) {
+  return (
+    <span
+      aria-hidden
+      className={`invisible block whitespace-pre ${INLINE_BOX} ${INLINE_REST_LOOK} ${
+        align === "right" ? "text-right tabular-nums" : "text-left"
+      }`}
+    >
+      {/* A space, never "", or an empty cell collapses to no height at all. */}
+      {text === "" ? " " : text}
+    </span>
+  );
+}
 
 export const READ_ONLY_VALUE = `inline-block ${INLINE_BOX}`;
 
@@ -489,6 +541,15 @@ export function InlineValue({
   if (editing && multiline) {
     return (
       <span className="flex flex-col">
+        {/* `w-full` on the WRAPPER is what makes this work in both kinds of
+            parent, and it is the whole reason the sizer can be safe. Where the
+            column has a definite width — a `table-fixed` cell, a `dl` track —
+            it fills it, exactly as the resting button's own `w-full` does.
+            Where the parent is shrink-to-fit, a percentage cannot resolve, so
+            it falls back to the sizer's content width, which is the resting
+            button's width. One rule, both cases. */}
+        <span className="relative block w-full">
+          <Sizer text={draft} align={align} />
         <textarea
           autoFocus
           rows={4}
@@ -507,16 +568,31 @@ export function InlineValue({
               setEditing(false);
             }
           }}
-          className={`w-full resize-y ${INLINE_EDITING}`}
+          className={`resize-y ${INLINE_EDITING}`}
         />
+        </span>
         {error && <span className="text-xs text-accent">{error}</span>}
       </span>
     );
   }
 
   if (editing) {
+    // `flex w-full`, not `inline-flex`: the RESTING button is returned bare, so
+    // its own `w-full` resolves against the table cell. An `inline-flex` wrapper
+    // here is shrink-to-fit, so everything inside it resolved against the
+    // wrapper instead and the field came out at the text's width in a fixed
+    // column.
     return (
-      <span className="inline-flex flex-col">
+      <span className="flex w-full flex-col">
+        {/* `w-full` on the WRAPPER is what makes this work in both kinds of
+            parent, and it is the whole reason the sizer can be safe. Where the
+            column has a definite width — a `table-fixed` cell, a `dl` track —
+            it fills it, exactly as the resting button's own `w-full` does.
+            Where the parent is shrink-to-fit, a percentage cannot resolve, so
+            it falls back to the sizer's content width, which is the resting
+            button's width. One rule, both cases. */}
+        <span className="relative block w-full">
+          <Sizer text={draft} align={align} />
         <input
           autoFocus
           value={draft}
@@ -538,13 +614,13 @@ export function InlineValue({
               setEditing(false);
             }
           }}
-          // NO `min-w-16`. It was the other half of the resize: in a column
-          // narrower than 4rem — the plan matrix's par cells, a quantity beside
-          // its unit — the input grew past the cell it was sitting in.
-          className={`w-full ${INLINE_EDITING} ${
+          // NO `w-full` or `min-w-16` of its own — the box is the Sizer's, and
+          // this fills it.
+          className={`${INLINE_EDITING} ${
             align === "right" ? "text-right tabular-nums" : ""
           }`}
         />
+        </span>
         {error ? (
           <span className="text-xs text-accent">{error}</span>
         ) : (
@@ -563,14 +639,20 @@ export function InlineValue({
       title="Click to edit"
       aria-label={ariaLabel ?? column}
       // Dotted underline at rest — the quietest possible "this is editable".
-      className={`w-full ${INLINE_BOX} underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 ${
+      className={`w-full ${INLINE_BOX} ${INLINE_REST_LOOK} hover:bg-neutral-100 ${
         align === "right" ? "text-right tabular-nums" : "text-left"
       } ${multiline ? "whitespace-pre-wrap" : ""} ${
         shown === null || shown === "" ? emptyClassName : ""
       } ${className}`}
     >
+      {/* A NON-BREAKING SPACE when there is nothing to show and no placeholder
+          to show instead. A caller that passes `placeholder=""` — the recipe
+          sheet's note column — otherwise rendered a button with no line box at
+          all: 4px tall, which is both a hard thing to click and the last cell
+          that still jumped, from 4px to a full line, the moment you did.
+          Invisible either way, so nothing looks different at rest. */}
       {shown === null || shown === ""
-        ? placeholder
+        ? placeholder === "" ? "\u00A0" : placeholder
         : format
           ? format(shown)
           : String(shown)}
