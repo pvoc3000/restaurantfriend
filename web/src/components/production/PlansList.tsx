@@ -10,6 +10,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { createClient } from "@/lib/supabase/client";
 import { usePublishRecordSet } from "@/lib/recordSet";
+import { sortRows, type SortDir } from "@/lib/tableSort";
 import {
   overlappingPlans,
   planRange,
@@ -55,6 +56,7 @@ export function PlansList({
   const [search, setSearch] = useState("");
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
+  const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(null);
 
   // This list had no search box at all, alone among the module's five (audit,
   // 2026-08-09). It was defensible while a shop had two plans and indefensible
@@ -86,11 +88,6 @@ export function PlansList({
     });
   }, [rows, tier, search]);
   const overlaps = useMemo(() => overlappingPlans(rows), [rows]);
-
-  usePublishRecordSet(
-    "/plans",
-    visible.map((r) => ({ id: r.id, href: `/plans/${r.id}` }))
-  );
 
   /**
    * Copy a plan and everything under it — trays, and the slots on them with
@@ -361,11 +358,23 @@ export function PlansList({
       : []),
   ];
 
+  // THE SORT IS THIS LIST'S, not `DataTable`'s, so the found set can be
+  // published in the order the table shows — see the recipes list for why it is
+  // local state here rather than the URL.
+  const sorted = sortRows(visible, columns, sort);
+
+  usePublishRecordSet(
+    "/plans",
+    sorted.map((r) => ({ id: r.id, href: `/plans/${r.id}` }))
+  );
+
   return (
     <>
       {failed ? <p className="mb-3 text-[13px] text-accent">{failed}</p> : null}
     <DataTable
-      rows={visible}
+      rows={sorted}
+      sort={sort}
+      onSortChange={setSort}
       columns={columns}
       rowKey={(r) => r.id}
       storageKey="production-plans"

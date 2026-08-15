@@ -5,8 +5,8 @@ import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import {
   activeGrouping,
-  makeComparator,
   nextSortDir,
+  sortRows,
   type SortDir,
   type SortValue,
 } from "@/lib/tableSort";
@@ -423,16 +423,12 @@ export function DataTable<T>({
   }
 
   // When the caller owns the sort it has already ordered `rows`; re-sorting
-  // here would fight it (and lose its tiebreaks).
-  const sorted = useMemo(() => {
-    if (controlled || !sort) return rows;
-    const column = columns.find((c) => c.key === sort.key);
-    if (!column?.sortValue) return rows;
-    const value = column.sortValue;
-    return [...rows].sort(
-      makeComparator<T>({ value, dir: sort.dir, tiebreaks: column.sortTiebreaks })
-    );
-  }, [rows, columns, sort, controlled]);
+  // here would fight it (and lose its tiebreaks). `sortRows` is the same
+  // function those callers use, so the two orders cannot drift.
+  const sorted = useMemo(
+    () => (controlled ? rows : sortRows(rows, columns, sort)),
+    [rows, columns, sort, controlled]
+  );
 
   // How many rows sit under each band. Recomputed whenever the order changes,
   // which is cheap even on Inventory's 790 rows and keeps the count honest when

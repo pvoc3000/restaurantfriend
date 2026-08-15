@@ -22,6 +22,7 @@ import {
   matchesDimension,
   parseFilterSearch,
   parseFilterValues,
+  parseListSort,
   urlFilterParams,
   type FilterDimension,
 } from "../../src/lib/filterMenus";
@@ -307,4 +308,48 @@ test("a repeated parameter takes the FIRST, matching Next's own arrays", () => {
     atUrl("/elements?kind=made&kind=purchased", () => urlFilterParams("/elements")),
     { kind: "made" }
   );
+});
+
+/* -------------------------------------------------------------------------
+ * THE SORT, in the URL beside the filters — because the sort IS part of the
+ * view, and a list that left it to `DataTable`'s local state forgot it on every
+ * return trip (Mark, 2026-08-14).
+ * ------------------------------------------------------------------------- */
+
+const SORTABLE = ["name", "type", "cost"];
+
+test("a sort round-trips through the query", () => {
+  const query = filterQuery(DIMS, { kind: "made" }, "cocoa", { key: "cost", dir: "desc" });
+  const params = Object.fromEntries(new URLSearchParams(query));
+  eq(parseListSort(params, SORTABLE), { key: "cost", dir: "desc" });
+  eq(parseFilterValues(DIMS, params), { kind: "made" });
+  eq(parseFilterSearch(params), "cocoa");
+});
+
+test("NO SORT WRITES NO PARAMETER, so the plain list keeps one address", () => {
+  eq(filterQuery(DIMS, {}, "", null), "");
+  eq(filterHref("/elements", DIMS, {}, "", null), "/elements");
+  eq(filterHref("/elements", DIMS, {}, "", { key: "name", dir: "asc" }),
+     "/elements?sort=name&dir=asc");
+});
+
+test("A COLUMN THAT CANNOT BE SORTED IS DROPPED, not obeyed", () => {
+  // ?sort=cheese would otherwise leave the header arrow pointing at a column
+  // that isn't there — `parseFilterValues`' rule, for the same reason.
+  eq(parseListSort({ sort: "cheese", dir: "desc" }, SORTABLE), null);
+  eq(parseListSort({}, SORTABLE), null);
+  eq(parseListSort({ dir: "desc" }, SORTABLE), null, "a direction alone says nothing");
+});
+
+test("a missing or junk direction reads as ascending", () => {
+  eq(parseListSort({ sort: "name" }, SORTABLE), { key: "name", dir: "asc" });
+  eq(parseListSort({ sort: "name", dir: "sideways" }, SORTABLE), { key: "name", dir: "asc" });
+});
+
+test("the sort survives a back/forward restore, which is the whole point", () => {
+  const live = atUrl("/elements?kind=made&sort=cost&dir=desc", () =>
+    urlFilterParams("/elements")
+  );
+  eq(parseListSort(live ?? {}, SORTABLE), { key: "cost", dir: "desc" });
+  eq(parseFilterValues(DIMS, live ?? {}), { kind: "made" });
 });

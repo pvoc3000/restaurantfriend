@@ -7,6 +7,7 @@ import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
 import { usePublishRecordSet } from "@/lib/recordSet";
+import { sortRows, type SortDir } from "@/lib/tableSort";
 import { formatCost, unresolvedSummary, type Cost } from "@/lib/productionCost";
 
 export type RecipeRow = {
@@ -70,11 +71,6 @@ export function RecipesList({ rows, editable }: { rows: RecipeRow[]; editable: b
       );
     });
   }, [rows, search, tier]);
-
-  usePublishRecordSet(
-    "/recipes",
-    visible.map((r) => ({ id: r.id, href: `/recipes/${r.id}` }))
-  );
 
   const columns: DataColumn<RecipeRow>[] = [
     {
@@ -168,6 +164,19 @@ export function RecipesList({ rows, editable }: { rows: RecipeRow[]; editable: b
     },
   ];
 
+  // THE SORT IS THIS LIST'S, not `DataTable`'s, so the found set below can be
+  // published in the order the table shows. Local state rather than the URL:
+  // this list keeps its search and tier local too, and putting only the sort in
+  // the query would be half a convention. What it fixes is the record book —
+  // sort by Recipe, open the first row, and be told you are on the 67th.
+  const [sort, setSort] = useState<{ key: string; dir: SortDir } | null>(null);
+  const sorted = sortRows(visible, columns, sort);
+
+  usePublishRecordSet(
+    "/recipes",
+    sorted.map((r) => ({ id: r.id, href: `/recipes/${r.id}` }))
+  );
+
   const group: DataGroup<RecipeRow> = {
     sortKey: "type",
     label: (r) => r.recipe_type ?? "No type",
@@ -175,7 +184,9 @@ export function RecipesList({ rows, editable }: { rows: RecipeRow[]; editable: b
 
   return (
     <DataTable
-      rows={visible}
+      rows={sorted}
+      sort={sort}
+      onSortChange={setSort}
       columns={columns}
       rowKey={(r) => r.id}
       storageKey="production-recipes"

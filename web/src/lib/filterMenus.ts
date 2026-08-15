@@ -20,6 +20,8 @@
  * anything about elements, employees or purchase orders.
  */
 
+import type { SortDir } from "./tableSort";
+
 /**
  * "No opinion" — this dimension isn't filtering. The empty string rather than
  * "all" so it matches what `PickList` already treats as the unset option (the
@@ -190,21 +192,68 @@ export function parseFilterValues<T>(
   return values;
 }
 
+/* -------------------------------------------------------------------------
+ * THE SORT
+ *
+ * It rides in the URL beside the filters, because it is the same kind of fact:
+ * the sort IS part of the view, which is why `/items` and the PO list have
+ * always kept theirs there. The two menu-driven lists left it to `DataTable`'s
+ * own local state, so it was forgotten on every return trip (Mark, 2026-08-14:
+ * "the chosen column to sort by also isn't restored").
+ *
+ * Owning it costs the caller a comparator (`lib/tableSort`'s `sortRows`) and
+ * buys a second fix: the found set is published in the order the table is
+ * actually showing, so the record book on a detail screen stops calling the
+ * FIRST row "67 of 190".
+ * ------------------------------------------------------------------------- */
+
+export const SORT_PARAM = "sort";
+export const DIR_PARAM = "dir";
+
+export type ListSort = { key: string; dir: SortDir };
+
 /**
- * The query string for a view: the search term and any menu that is saying
- * something. A menu on "All" writes NO parameter, so the unfiltered list keeps
- * one canonical address — the same rule the recipe tabs follow.
+ * The sort a URL is asking for, or null for the list's natural order.
+ *
+ * `keys` is the set of columns that can be sorted, so `?sort=cheese` is dropped
+ * rather than leaving the header arrow pointing at a column that isn't there —
+ * `parseFilterValues`' rule, for the same reason.
+ */
+export function parseListSort(
+  params: RawSearchParams,
+  keys: readonly string[]
+): ListSort | null {
+  const key = one(params[SORT_PARAM]);
+  if (!key || !keys.includes(key)) return null;
+  const dir = one(params[DIR_PARAM]);
+  return { key, dir: dir === "desc" ? "desc" : "asc" };
+}
+
+/**
+ * The query string for a view: the search term, any menu that is saying
+ * something, and the sort. A menu on "All" writes NO parameter, so the
+ * unfiltered list keeps one canonical address — the same rule the recipe tabs
+ * follow, and the reason a null sort writes nothing either.
+ *
+ * A dimension keyed `sort` or `dir` would collide with the sort's own
+ * parameters. None does, and the two names are declared above so a new one
+ * can be checked against them.
  */
 export function filterQuery<T>(
   dimensions: FilterDimension<T>[],
   values: FilterValues,
-  search = ""
+  search = "",
+  sort: ListSort | null = null
 ): string {
   const params = new URLSearchParams();
   if (search.trim()) params.set(SEARCH_PARAM, search.trim());
   for (const dimension of dimensions) {
     const chosen = values[dimension.key] ?? FILTER_ALL;
     if (chosen !== FILTER_ALL) params.set(dimension.key, chosen);
+  }
+  if (sort) {
+    params.set(SORT_PARAM, sort.key);
+    params.set(DIR_PARAM, sort.dir);
   }
   return params.toString();
 }
@@ -252,8 +301,9 @@ export function filterHref<T>(
   path: string,
   dimensions: FilterDimension<T>[],
   values: FilterValues,
-  search = ""
+  search = "",
+  sort: ListSort | null = null
 ): string {
-  const query = filterQuery(dimensions, values, search);
+  const query = filterQuery(dimensions, values, search, sort);
   return query ? `${path}?${query}` : path;
 }

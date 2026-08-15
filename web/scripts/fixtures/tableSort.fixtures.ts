@@ -4,7 +4,7 @@
 // tiebreak that misbehaves looks like the list being randomly ordered rather
 // than like a bug in a shared function.
 
-import { makeComparator, activeGrouping } from "../../src/lib/tableSort";
+import { makeComparator, activeGrouping, sortRows } from "../../src/lib/tableSort";
 import { eq, test } from "./harness";
 
 type Po = { date: string | null; vendor: string; number: string };
@@ -155,4 +155,66 @@ test("FIRST match wins, so a catch-all entry swallows everything after it", () =
   eq(activeGrouping([always, byType], "type"), always);
   eq(activeGrouping([byType, always], "type"), byType);
   eq(activeGrouping([byType, always], "name"), always);
+});
+
+/* -------------------------------------------------------------------------
+ * sortRows — the order a table shows, which is also the FOUND SET it publishes.
+ *
+ * A list that left sorting to `DataTable` published its rows in whatever order
+ * the server sent, so opening the first row of a sorted list landed on "67 of
+ * 190" (Mark, 2026-08-14). These pin the three no-op paths especially: each one
+ * must return the array UNTOUCHED rather than a sorted copy, because that is
+ * what makes it safe to call on every render.
+ * ------------------------------------------------------------------------- */
+
+type Item = { name: string; type: string | null };
+
+const items: Item[] = [
+  { name: "Saves the Danish", type: "Raised" },
+  { name: "Angry Samoa", type: "Cake" },
+  { name: "Fudgegazi", type: "Raised" },
+];
+
+const itemColumns = [
+  { key: "name", sortValue: (r: Item) => r.name },
+  { key: "type", sortValue: (r: Item) => r.type, sortTiebreaks: [(r: Item) => r.name] },
+  { key: "actions" }, // a control column — nothing to sort on
+];
+
+test("SORTED BY THE CHOSEN COLUMN, both ways", () => {
+  eq(
+    sortRows(items, itemColumns, { key: "name", dir: "asc" }).map((r) => r.name),
+    ["Angry Samoa", "Fudgegazi", "Saves the Danish"]
+  );
+  eq(
+    sortRows(items, itemColumns, { key: "name", dir: "desc" }).map((r) => r.name),
+    ["Saves the Danish", "Fudgegazi", "Angry Samoa"]
+  );
+});
+
+test("the column's own tiebreak still applies", () => {
+  eq(
+    sortRows(items, itemColumns, { key: "type", dir: "asc" }).map((r) => r.name),
+    ["Angry Samoa", "Fudgegazi", "Saves the Danish"]
+  );
+});
+
+test("NO SORT RETURNS THE SAME ARRAY, not a copy", () => {
+  // The natural order the server sent. Identity, not just equality: this is
+  // called on every render of a list that can be 790 rows long.
+  eq(sortRows(items, itemColumns, null) === items, true);
+  eq(sortRows(items, itemColumns, undefined) === items, true);
+});
+
+test("an unknown column, or one with nothing to sort on, is a no-op", () => {
+  // ?sort=cheese survives a hand-typed URL; a control column can be clicked by
+  // nothing at all. Either way the rows must not be reordered arbitrarily.
+  eq(sortRows(items, itemColumns, { key: "cheese", dir: "asc" }) === items, true);
+  eq(sortRows(items, itemColumns, { key: "actions", dir: "asc" }) === items, true);
+});
+
+test("it does not mutate the rows it was given", () => {
+  const before = items.map((r) => r.name);
+  sortRows(items, itemColumns, { key: "name", dir: "desc" });
+  eq(items.map((r) => r.name), before);
 });

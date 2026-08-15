@@ -4513,6 +4513,32 @@ weekday column, and 003 then silently made it per-vendor-item.
   `router.replace` would keep the router's cache honest by itself and is still
   refused for the reason it always was: it re-runs the server component — both
   cost graphs on `/production-items` — on every keystroke.
+  **THE SORT IS PART OF THE VIEW, AND A LIST THAT PUBLISHES A FOUND SET MUST OWN
+  IT** (Mark, 2026-08-14, two reports in one: "the chosen column to sort by also
+  isn't restored", and — sorting `/production-items` by Item — "angry samoa is
+  the first record… it becomes the 67th record"). One cause: four lists left
+  sorting to `DataTable`'s own local state. So it was forgotten on every return
+  trip, AND `usePublishRecordSet` was handed the FILTERED rows in the order the
+  server sent them, which is not the order on screen — `lib/recordSet`'s
+  contract says "in the order it is showing it" and they could not honour it.
+  The fix is the same both ways: the list holds the sort and orders its own rows
+  through **`sortRows`** (`lib/tableSort`, the one implementation — `DataTable`
+  calls it too, so a controlled and an uncontrolled table cannot disagree), then
+  passes `sort`/`onSortChange` down and publishes the SORTED array.
+  **Where the sort lives depends on what else the list keeps.** The two
+  menu-driven lists (`/production-items`, `/elements`) already hold their whole
+  view in the URL, so it joins the filters there — `parseListSort` +
+  `filterQuery`'s 4th argument, `?sort=type&dir=desc`, absent when there is no
+  sort so the plain list keeps one canonical address, and restored by
+  `urlFilterParams` like everything else. `/recipes` and `/plans` keep their
+  search and tier in LOCAL state, so their sort is local too: putting only the
+  sort in the query would be half a convention. Their view still doesn't survive
+  a round trip at all — worth doing, not done.
+  A `SORT_KEYS` constant per list names the sortable columns for the URL parser,
+  because the URL has to be read before `columns` can be built (a cell links to
+  this view, so the columns depend on the state seeded from it). **Keep it in
+  step with `columns`**: a key missing from it sorts fine and is silently
+  forgotten, which is the original complaint again.
 - **Scroll restoration is UNIVERSAL and nothing opts in** (`lib/scrollMemory.ts`
   + `components/ScrollMemory.tsx`, Mark, 2026-07-30: "any list view now and in
   the future"). This is what pays for detail views going back to full screen.

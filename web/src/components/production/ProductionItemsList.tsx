@@ -13,11 +13,14 @@ import {
   filterHref,
   parseFilterSearch,
   parseFilterValues,
+  parseListSort,
   urlFilterParams,
   type FilterDimension,
   type FilterValues,
+  type ListSort,
   type RawSearchParams,
 } from "@/lib/filterMenus";
+import { sortRows } from "@/lib/tableSort";
 import { formatCost, unresolvedSummary, type Cost } from "@/lib/productionCost";
 import { formatMargin, type PriceSource } from "@/lib/productionPrice";
 
@@ -43,6 +46,27 @@ const NONE = "none";
 
 /** This list's own address — its URL, its record-set key, its crumb. */
 const PATH = "/production-items";
+
+/**
+ * Every column you can sort by — the `columns` array below, minus the ones with
+ * no `sortValue`. KEEP THE TWO IN STEP: a key missing here is a column whose
+ * sort still works and is silently forgotten on the way back, which is the
+ * whole complaint this list is answering. It exists as a constant because the
+ * URL has to be parsed before `columns` can be built (a cell links to this
+ * view, so the columns depend on the state seeded from it).
+ */
+const SORT_KEYS = [
+  "active",
+  "name",
+  "type",
+  "size",
+  "cut",
+  "finish",
+  "components",
+  "cost",
+  "price",
+  "margin",
+] as const;
 
 /** Whatever a column actually holds, A–Z, with a "None" option after it. */
 function vocabulary(
@@ -180,26 +204,43 @@ export function ProductionItemsList({
   const [filters, setFilters] = useState<FilterValues>(() =>
     parseFilterValues(dimensions, urlFilterParams(PATH) ?? initialFilters ?? {})
   );
+  // THE SORT IS THIS LIST'S, not `DataTable`'s. Two things follow: it survives
+  // the trip to an item and back like every other part of the view, and the
+  // found set below can be published IN THE ORDER THE TABLE SHOWS, which is
+  // what `lib/recordSet` has always claimed and this screen could not deliver.
+  // Null is the natural order the server sent, and writes no parameter.
+  const [sort, setSort] = useState<ListSort | null>(() =>
+    parseListSort(urlFilterParams(PATH) ?? initialFilters ?? {}, SORT_KEYS)
+  );
 
   // `history.replaceState`, never `router.replace`: the filtering is all
   // client-side over rows the server already sent, and a replace would re-run
   // the page — both cost graphs and the price grid — on every keystroke.
-  function writeUrl(nextFilters: FilterValues, nextSearch: string) {
+  function writeUrl(
+    nextFilters: FilterValues,
+    nextSearch: string,
+    nextSort: ListSort | null
+  ) {
     window.history.replaceState(
       null,
       "",
-      filterHref(PATH, dimensions, nextFilters, nextSearch)
+      filterHref(PATH, dimensions, nextFilters, nextSearch, nextSort)
     );
   }
 
   function changeFilters(next: FilterValues) {
     setFilters(next);
-    writeUrl(next, search);
+    writeUrl(next, search, sort);
   }
 
   function changeSearch(next: string) {
     setSearch(next);
-    writeUrl(filters, next);
+    writeUrl(filters, next, sort);
+  }
+
+  function changeSort(next: ListSort) {
+    setSort(next);
+    writeUrl(filters, search, next);
   }
 
   // Search first, so the menus' counts describe the list you are looking at.
@@ -221,7 +262,7 @@ export function ProductionItemsList({
   );
 
   /** This view's own address — where a link back from an item returns to. */
-  const listHref = filterHref(PATH, dimensions, filters, search);
+  const listHref = filterHref(PATH, dimensions, filters, search, sort);
 
   /**
    * Every item link carries the FILTERED view, which lands you back where you
@@ -232,13 +273,6 @@ export function ProductionItemsList({
    */
   const detailHref = (id: string) =>
     withFrom(`/production-items/${id}`, { href: listHref, label: "Items" });
-
-  // The list publishes what it is showing, so a detail screen walks the found
-  // set rather than sending you back here for the next one.
-  usePublishRecordSet(
-    PATH,
-    visible.map((r) => ({ id: r.id, href: detailHref(r.id) }))
-  );
 
   const columns: DataColumn<ProductionItemRow>[] = [
     {
@@ -396,6 +430,21 @@ export function ProductionItemsList({
    * So are Cost, Price, Margin and On it — a number bands nothing, and the
    * count beside each label would read as a tally of a value nobody grouped by.
    */
+  // The rows in the order the table shows them — `DataTable` is told the sort
+  // rather than finding one, so these two can never disagree.
+  // Not wrapped in `useMemo`: `columns` is rebuilt every render (its cells close
+  // over `detailHref`), so a manual memo would recompute anyway AND stop the
+  // React Compiler optimising this component at all. Sorting a few hundred rows
+  // is nothing; `sortRows` returns the array untouched when there is no sort.
+  const sorted = sortRows(visible, columns, sort);
+
+  // The list publishes what it is showing, IN THAT ORDER, so a detail screen
+  // walks the found set rather than sending you back here for the next one.
+  usePublishRecordSet(
+    PATH,
+    sorted.map((r) => ({ id: r.id, href: detailHref(r.id) }))
+  );
+
   const groups: DataGroup<ProductionItemRow>[] = [
     { sortKey: "type", label: (r) => r.item_type ?? "No type" },
     { sortKey: "size", label: (r) => r.size ?? "No size" },
@@ -405,7 +454,9 @@ export function ProductionItemsList({
 
   return (
     <DataTable
-      rows={visible}
+      rows={sorted}
+      sort={sort}
+      onSortChange={changeSort}
       columns={columns}
       rowKey={(r) => r.id}
       // v2 because Dough and Finish swapped places. A STORED COLUMN ORDER

@@ -20,11 +20,14 @@ import {
   filterHref,
   parseFilterSearch,
   parseFilterValues,
+  parseListSort,
   urlFilterParams,
   type FilterDimension,
   type FilterValues,
+  type ListSort,
   type RawSearchParams,
 } from "@/lib/filterMenus";
+import { sortRows } from "@/lib/tableSort";
 import { formatCost, unresolvedSummary, type Cost } from "@/lib/productionCost";
 
 export type ElementRow = {
@@ -63,6 +66,13 @@ function scheduleLabel(value: string): string {
 
 /** This list's own address — its URL, its record-set key, its crumb. */
 const PATH = "/elements";
+
+/**
+ * Every column you can sort by — `columns` below, minus the ones with no
+ * `sortValue`. KEEP THE TWO IN STEP; see the production items list for why it
+ * has to be a constant rather than derived.
+ */
+const SORT_KEYS = ["active", "name", "kind", "type", "source", "schedule", "cost"] as const;
 
 /** The unset option can't be "", so "none" is the word for carrying no schedule. */
 const NO_SCHEDULE = "none";
@@ -204,6 +214,12 @@ export function ElementsList({
   const [filters, setFilters] = useState<FilterValues>(() =>
     parseFilterValues(dimensions, urlFilterParams(PATH) ?? initialFilters ?? {})
   );
+  // THE SORT IS THIS LIST'S, not `DataTable`'s — it is part of the view, so it
+  // rides in the URL with the rest of it, and owning it is what lets the found
+  // set below be published in the order the table actually shows.
+  const [sort, setSort] = useState<ListSort | null>(() =>
+    parseListSort(urlFilterParams(PATH) ?? initialFilters ?? {}, SORT_KEYS)
+  );
 
   /**
    * Every change rewrites the URL — `history.replaceState`, not `router.replace`.
@@ -219,26 +235,35 @@ export function ElementsList({
    * history, so Back leaves the list rather than un-typing it a character at a
    * time.
    */
-  function writeUrl(nextFilters: FilterValues, nextSearch: string) {
+  function writeUrl(
+    nextFilters: FilterValues,
+    nextSearch: string,
+    nextSort: ListSort | null
+  ) {
     window.history.replaceState(
       null,
       "",
-      filterHref(PATH, dimensions, nextFilters, nextSearch)
+      filterHref(PATH, dimensions, nextFilters, nextSearch, nextSort)
     );
   }
 
   function changeFilters(next: FilterValues) {
     setFilters(next);
-    writeUrl(next, search);
+    writeUrl(next, search, sort);
   }
 
   function changeSearch(next: string) {
     setSearch(next);
-    writeUrl(filters, next);
+    writeUrl(filters, next, sort);
+  }
+
+  function changeSort(next: ListSort) {
+    setSort(next);
+    writeUrl(filters, search, next);
   }
 
   /** This view's own address — what a link back from an element returns to. */
-  const listHref = filterHref(PATH, dimensions, filters, search);
+  const listHref = filterHref(PATH, dimensions, filters, search, sort);
 
   // SEARCH FIRST, THEN THE MENUS — so the menus' counts describe the list you
   // are looking at rather than the whole catalog. The other order would have a
@@ -276,12 +301,6 @@ export function ElementsList({
    */
   const detailHref = (id: string) =>
     withFrom(`/elements/${id}`, { href: listHref, label: "Elements" });
-
-  // The list publishes what it is showing, so a detail screen can walk it.
-  usePublishRecordSet(
-    PATH,
-    visible.map((r) => ({ id: r.id, href: detailHref(r.id) }))
-  );
 
   const columns: DataColumn<ElementRow>[] = [
     {
@@ -387,6 +406,21 @@ export function ElementsList({
       : []),
   ];
 
+  // The rows in the order the table shows them — `DataTable` is told the sort
+  // rather than finding one, so these two can never disagree.
+  // Not wrapped in `useMemo`: `columns` is rebuilt every render (its cells close
+  // over `detailHref`), so a manual memo would recompute anyway AND stop the
+  // React Compiler optimising this component at all. Sorting a few hundred rows
+  // is nothing; `sortRows` returns the array untouched when there is no sort.
+  const sorted = sortRows(visible, columns, sort);
+
+  // The list publishes what it is showing, IN THAT ORDER, so a detail screen
+  // can walk it — and walk it the way you are reading it.
+  usePublishRecordSet(
+    PATH,
+    sorted.map((r) => ({ id: r.id, href: detailHref(r.id) }))
+  );
+
   const group: DataGroup<ElementRow> = {
     sortKey: "type",
     label: (r) => r.element_type ?? "No type",
@@ -394,7 +428,9 @@ export function ElementsList({
 
   return (
     <DataTable
-      rows={visible}
+      rows={sorted}
+      sort={sort}
+      onSortChange={changeSort}
       columns={columns}
       rowKey={(r) => r.id}
       storageKey="production-elements"

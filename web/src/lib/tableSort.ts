@@ -68,6 +68,43 @@ export function makeComparator<T>({
 }
 
 /**
+ * A table's ROWS IN THE ORDER IT SHOWS THEM — the one implementation, used by
+ * `DataTable` when it sorts itself and by every list that owns its own sort.
+ *
+ * IT EXISTS BECAUSE THE ORDER IS ALSO THE FOUND SET. `lib/recordSet`'s contract
+ * is that a list publishes what it is showing "in the order it is showing it",
+ * and a list that leaves sorting to `DataTable` cannot honour that — it holds
+ * the filtered rows in whatever order the server sent them and has no idea what
+ * the reader last clicked. Mark, 2026-08-14: sort `/production-items` by Item,
+ * open the first row, and the record book calls Angry Samoa "67 of 190".
+ *
+ * Typed structurally rather than against `DataColumn` so it can live here and
+ * be fixture-tested; a `DataColumn<T>` satisfies it as it stands. A null sort,
+ * an unknown key or a column with nothing to sort on all return `rows`
+ * UNCHANGED and never a copy, which is what keeps it cheap to call on every
+ * render of a 790-row list.
+ */
+export type SortableColumn<T> = {
+  key: string;
+  sortValue?: (row: T) => SortValue;
+  sortTiebreaks?: ((row: T) => string)[];
+};
+
+export function sortRows<T>(
+  rows: T[],
+  columns: SortableColumn<T>[],
+  sort: { key: string; dir: SortDir } | null | undefined
+): T[] {
+  if (!sort) return rows;
+  const column = columns.find((c) => c.key === sort.key);
+  if (!column?.sortValue) return rows;
+  const value = column.sortValue;
+  return [...rows].sort(
+    makeComparator<T>({ value, dir: sort.dir, tiebreaks: column.sortTiebreaks })
+  );
+}
+
+/**
  * WHICH GROUPING A TABLE IS BANDING BY, given what it is sorted by.
  *
  * A band can only band what the ORDER already groups, so a grouping declares
