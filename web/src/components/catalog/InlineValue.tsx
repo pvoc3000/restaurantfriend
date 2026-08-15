@@ -97,7 +97,30 @@ function setArraySlot(
  * component's own resting padding: change `px-1 py-0.5` below and this is what
  * has to change with it.
  */
-export const READ_ONLY_VALUE = "inline-block px-1 py-0.5";
+/**
+ * THE BOX EVERY STATE OF AN INLINE VALUE OCCUPIES, and the reason it is one
+ * constant: clicking a cell must not move it (Mark, 2026-08-13: "when I click
+ * into a field it moves/resizes and this really slows me down").
+ *
+ * It used to. At rest a value was `px-1 py-0.5` with no border; editing it
+ * became `border-2 px-2 py-1`, so the box grew 12px wider and 8px taller and
+ * the text jumped 6px right and 4px down — on every cell, on every click, in a
+ * list you are typing down.
+ *
+ * THE EDIT STATE IS AN OUTLINE, NOT A BORDER. That is the whole trick: an
+ * outline is painted outside the layout box and occupies no space, so the
+ * editing frame can be as heavy as the old border while the text stays exactly
+ * where it was sitting. A border can only be matched by reserving its width at
+ * rest with a transparent one, which works but pushes every value — editable
+ * and read-only alike — 2px further from its label across the whole app.
+ */
+const INLINE_BOX = "px-1 py-0.5";
+
+/** The editing frame. `-outline-offset-1` keeps it inside the cell's own
+ *  padding rather than bleeding into the column beside it. */
+const INLINE_EDITING = `${INLINE_BOX} outline outline-2 -outline-offset-1 outline-ink`;
+
+export const READ_ONLY_VALUE = `inline-block ${INLINE_BOX}`;
 
 export function InlineValue({
   table,
@@ -484,7 +507,7 @@ export function InlineValue({
               setEditing(false);
             }
           }}
-          className="w-full resize-y border-2 border-ink px-2 py-1 outline-none"
+          className={`w-full resize-y ${INLINE_EDITING}`}
         />
         {error && <span className="text-xs text-accent">{error}</span>}
       </span>
@@ -515,7 +538,10 @@ export function InlineValue({
               setEditing(false);
             }
           }}
-          className={`w-full min-w-16 border-2 border-ink px-2 py-1 outline-none ${
+          // NO `min-w-16`. It was the other half of the resize: in a column
+          // narrower than 4rem — the plan matrix's par cells, a quantity beside
+          // its unit — the input grew past the cell it was sitting in.
+          className={`w-full ${INLINE_EDITING} ${
             align === "right" ? "text-right tabular-nums" : ""
           }`}
         />
@@ -537,7 +563,7 @@ export function InlineValue({
       title="Click to edit"
       aria-label={ariaLabel ?? column}
       // Dotted underline at rest — the quietest possible "this is editable".
-      className={`w-full px-1 py-0.5 underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 ${
+      className={`w-full ${INLINE_BOX} underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 ${
         align === "right" ? "text-right tabular-nums" : "text-left"
       } ${multiline ? "whitespace-pre-wrap" : ""} ${
         shown === null || shown === "" ? emptyClassName : ""
