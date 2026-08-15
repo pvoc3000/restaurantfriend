@@ -11,7 +11,9 @@ import { withFrom } from "@/lib/breadcrumbs";
 import {
   applyListFilters,
   filterHref,
+  parseFilterSearch,
   parseFilterValues,
+  urlFilterParams,
   type FilterDimension,
   type FilterValues,
   type RawSearchParams,
@@ -38,6 +40,9 @@ export type ProductionItemRow = {
 
 /** No option's value may be "", which is what FILTER_ALL already means. */
 const NONE = "none";
+
+/** This list's own address — its URL, its record-set key, its crumb. */
+const PATH = "/production-items";
 
 /** Whatever a column actually holds, A–Z, with a "None" option after it. */
 function vocabulary(
@@ -164,9 +169,16 @@ export function ProductionItemsList({
     [rows]
   );
 
-  const [search, setSearch] = useState(initialSearch);
+  // Seeded from the ADDRESS BAR where it can be read, and only from the props
+  // otherwise — see `urlFilterParams`. A back or forward restore hands this
+  // component the props of whatever query the history entry was created with,
+  // which after a `replaceState` is not the query it now shows.
+  const [search, setSearch] = useState(() => {
+    const live = urlFilterParams(PATH);
+    return live ? parseFilterSearch(live) : initialSearch;
+  });
   const [filters, setFilters] = useState<FilterValues>(() =>
-    parseFilterValues(dimensions, initialFilters ?? {})
+    parseFilterValues(dimensions, urlFilterParams(PATH) ?? initialFilters ?? {})
   );
 
   // `history.replaceState`, never `router.replace`: the filtering is all
@@ -176,7 +188,7 @@ export function ProductionItemsList({
     window.history.replaceState(
       null,
       "",
-      filterHref("/production-items", dimensions, nextFilters, nextSearch)
+      filterHref(PATH, dimensions, nextFilters, nextSearch)
     );
   }
 
@@ -209,7 +221,7 @@ export function ProductionItemsList({
   );
 
   /** This view's own address — where a link back from an item returns to. */
-  const listHref = filterHref("/production-items", dimensions, filters, search);
+  const listHref = filterHref(PATH, dimensions, filters, search);
 
   /**
    * Every item link carries the FILTERED view, which lands you back where you
@@ -224,7 +236,7 @@ export function ProductionItemsList({
   // The list publishes what it is showing, so a detail screen walks the found
   // set rather than sending you back here for the next one.
   usePublishRecordSet(
-    "/production-items",
+    PATH,
     visible.map((r) => ({ id: r.id, href: detailHref(r.id) }))
   );
 

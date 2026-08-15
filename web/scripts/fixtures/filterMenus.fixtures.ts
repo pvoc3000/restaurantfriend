@@ -22,6 +22,7 @@ import {
   matchesDimension,
   parseFilterSearch,
   parseFilterValues,
+  urlFilterParams,
   type FilterDimension,
 } from "../../src/lib/filterMenus";
 import { eq, test } from "./harness";
@@ -238,4 +239,72 @@ test("an empty query parses to no filters at all", () => {
   eq(parseFilterValues(DIMS, {}), {});
   eq(parseFilterSearch({}), "");
   eq(activeFilterCount(DIMS, parseFilterValues(DIMS, {})), 0);
+});
+
+/* -------------------------------------------------------------------------
+ * urlFilterParams — the cure for a back button that loses the filters.
+ *
+ * `history.replaceState` moves the address bar but does NOT rewrite the RSC
+ * payload cached against that history entry, so a restore hands a list the
+ * props of the query it FIRST arrived with. The list therefore reads the live
+ * URL — but only when the browser is already showing this list's own path,
+ * because a Link navigation applies its `pushState` AFTER the incoming tree
+ * renders, so mid-breadcrumb `window.location` is still the detail screen's.
+ * Every case below fails if that guard is dropped.
+ * ------------------------------------------------------------------------- */
+
+/** Stand in for the browser for one call; restores whatever was there. */
+function atUrl<T>(href: string | null, run: () => T): T {
+  const g = globalThis as { window?: unknown };
+  const had = "window" in g;
+  const before = g.window;
+  if (href === null) delete g.window;
+  else g.window = { location: new URL(href, "http://localhost") };
+  try {
+    return run();
+  } finally {
+    if (had) g.window = before;
+    else delete g.window;
+  }
+}
+
+test("on the server there is no URL to read, so the props stand", () => {
+  eq(atUrl(null, () => urlFilterParams("/elements")), null);
+});
+
+test("THE LIVE QUERY WINS on the list's own path — the restore case", () => {
+  // Arrive bare, pick a filter (replaceState), open an element, press Back:
+  // the address bar reads ?kind=made while the cached payload says nothing.
+  eq(
+    atUrl("/elements?kind=made&q=cocoa", () => urlFilterParams("/elements")),
+    { kind: "made", q: "cocoa" }
+  );
+  eq(atUrl("/elements", () => urlFilterParams("/elements")), {});
+});
+
+test("A DIFFERENT PATH IS REFUSED — the breadcrumb case", () => {
+  // Next pushes the new URL in an effect AFTER this renders, so on the first
+  // render of the list `location` is still the DETAIL screen. Reading it there
+  // would parse ?from=…&fromLabel=… , find no filter keys, and clear the very
+  // filters the breadcrumb exists to restore.
+  const detail = "/elements/abc?from=%2Felements%3Fkind%3Dmade&fromLabel=Elements";
+  eq(atUrl(detail, () => urlFilterParams("/elements")), null);
+  // A prefix is not a match either — /elements must not answer for /elements/abc.
+  eq(atUrl("/elements/abc", () => urlFilterParams("/elements")), null);
+  eq(atUrl("/production-items?type=Raised", () => urlFilterParams("/elements")), null);
+});
+
+test("what it returns parses like any other searchParams", () => {
+  const live = atUrl("/elements?kind=made&q=cocoa&colour=green", () =>
+    urlFilterParams("/elements")
+  );
+  eq(parseFilterValues(DIMS, live ?? {}), { kind: "made" });
+  eq(parseFilterSearch(live ?? {}), "cocoa");
+});
+
+test("a repeated parameter takes the FIRST, matching Next's own arrays", () => {
+  eq(
+    atUrl("/elements?kind=made&kind=purchased", () => urlFilterParams("/elements")),
+    { kind: "made" }
+  );
 });

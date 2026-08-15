@@ -209,6 +209,44 @@ export function filterQuery<T>(
   return params.toString();
 }
 
+/**
+ * THE QUERY THE BROWSER IS ACTUALLY SHOWING — or null when it can't be trusted.
+ *
+ * `history.replaceState` moves the address bar and tells Next's router its new
+ * canonical URL, but it does NOT rewrite the RSC payload cached against that
+ * history entry: that tree was rendered for the URL the entry was CREATED with.
+ * Back and forward restore the cached tree, so a list seeded purely from its
+ * server props comes back with the filters it had when you first arrived, while
+ * the address bar reads the ones you set (Mark, 2026-08-14 — "the production
+ * item page doesn't seem to be remembering filter settings when I return").
+ * Reproduced: arrive at a bare `/production-items`, pick Type = Raised, open an
+ * item, press Back — URL `?type=Raised`, screen "307 items", every menu on All.
+ *
+ * Every list writing filters with `replaceState` has it; it is not a bug in any
+ * one screen, which is why the cure lives here. The URL is the view's one true
+ * statement, so a list reads it directly at mount rather than trusting a prop
+ * that may have been rendered for a different query.
+ *
+ * THE PATH GUARD IS LOAD-BEARING, not defensive tidying. Next applies a Link
+ * navigation's `pushState` in an effect AFTER the incoming tree renders, so
+ * during a breadcrumb's first render `window.location` is still the DETAIL
+ * screen's URL — reading it there would parse `?from=…&fromLabel=…`, find no
+ * filter keys, and clear the very filters the breadcrumb exists to restore.
+ * A restore is the opposite: the browser updates the URL before it fires
+ * `popstate`, so by the time the tree renders the address bar is already right.
+ * Matching the path is what tells the two apart. Falling back to the prop is
+ * always safe — it is exactly today's behaviour.
+ */
+export function urlFilterParams(path: string): RawSearchParams | null {
+  if (typeof window === "undefined") return null;
+  if (window.location.pathname !== path) return null;
+  const params: RawSearchParams = {};
+  for (const [key, value] of new URLSearchParams(window.location.search)) {
+    if (!(key in params)) params[key] = value;
+  }
+  return params;
+}
+
 /** That query on a path: `/elements?kind=made&schedule=WEEKLY`. */
 export function filterHref<T>(
   path: string,

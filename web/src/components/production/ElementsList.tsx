@@ -18,7 +18,9 @@ import {
 import {
   applyListFilters,
   filterHref,
+  parseFilterSearch,
   parseFilterValues,
+  urlFilterParams,
   type FilterDimension,
   type FilterValues,
   type RawSearchParams,
@@ -58,6 +60,9 @@ function scheduleLabel(value: string): string {
     ? value.toUpperCase()
     : value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
+
+/** This list's own address — its URL, its record-set key, its crumb. */
+const PATH = "/elements";
 
 /** The unset option can't be "", so "none" is the word for carrying no schedule. */
 const NO_SCHEDULE = "none";
@@ -188,9 +193,16 @@ export function ElementsList({
     ];
   }, [rows]);
 
-  const [search, setSearch] = useState(initialSearch);
+  // Seeded from the ADDRESS BAR where it can be read, and only from the props
+  // otherwise — see `urlFilterParams`. A back or forward restore hands this
+  // component the props of whatever query the history entry was created with,
+  // which after a `replaceState` is not the query it now shows.
+  const [search, setSearch] = useState(() => {
+    const live = urlFilterParams(PATH);
+    return live ? parseFilterSearch(live) : initialSearch;
+  });
   const [filters, setFilters] = useState<FilterValues>(() =>
-    parseFilterValues(dimensions, initialFilters ?? {})
+    parseFilterValues(dimensions, urlFilterParams(PATH) ?? initialFilters ?? {})
   );
 
   /**
@@ -211,7 +223,7 @@ export function ElementsList({
     window.history.replaceState(
       null,
       "",
-      filterHref("/elements", dimensions, nextFilters, nextSearch)
+      filterHref(PATH, dimensions, nextFilters, nextSearch)
     );
   }
 
@@ -226,7 +238,7 @@ export function ElementsList({
   }
 
   /** This view's own address — what a link back from an element returns to. */
-  const listHref = filterHref("/elements", dimensions, filters, search);
+  const listHref = filterHref(PATH, dimensions, filters, search);
 
   // SEARCH FIRST, THEN THE MENUS — so the menus' counts describe the list you
   // are looking at rather than the whole catalog. The other order would have a
@@ -267,7 +279,7 @@ export function ElementsList({
 
   // The list publishes what it is showing, so a detail screen can walk it.
   usePublishRecordSet(
-    "/elements",
+    PATH,
     visible.map((r) => ({ id: r.id, href: detailHref(r.id) }))
   );
 

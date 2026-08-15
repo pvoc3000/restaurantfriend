@@ -6,9 +6,11 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { STALE_ORDER, STALE_LABEL } from "@/lib/lastOrdered";
 import { qty } from "@/lib/catalog";
+import { urlFilterParams } from "@/lib/filterMenus";
 import {
   itemDetailHref,
   itemFiltersToQuery,
+  parseItemFilters,
   type ActiveFilter,
   type ItemFilters,
   type SortKey,
@@ -94,7 +96,14 @@ export function ItemsList({
   const router = useRouter();
   const supabase = createClient();
 
-  const [filters, setFilters] = useState<ItemFilters>(initialFilters);
+  // Seeded from the ADDRESS BAR where it can be read, and only from the props
+  // otherwise — see `urlFilterParams`. A back or forward restore hands this
+  // component the props of whatever query the history entry was created with,
+  // which after a `replaceState` is not the query it now shows.
+  const [filters, setFilters] = useState<ItemFilters>(() => {
+    const live = urlFilterParams("/items");
+    return live ? parseItemFilters(live) : initialFilters;
+  });
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

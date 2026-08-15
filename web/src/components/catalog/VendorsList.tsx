@@ -5,9 +5,11 @@ import Link from "next/link";
 import { money } from "@/lib/catalog";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { makeComparator, type SortDir, type SortValue } from "@/lib/tableSort";
+import { urlFilterParams } from "@/lib/filterMenus";
 import {
   vendorDetailHref,
   vendorFiltersToQuery,
+  parseVendorFilters,
   type ActiveFilter,
   type VendorFilters,
   type VendorSortKey,
@@ -105,7 +107,14 @@ export function VendorsList({
   activeLocationCode: string | null;
   initialFilters: VendorFilters;
 }) {
-  const [filters, setFilters] = useState<VendorFilters>(initialFilters);
+  // Seeded from the ADDRESS BAR where it can be read, and only from the props
+  // otherwise — see `urlFilterParams`. A back or forward restore hands this
+  // component the props of whatever query the history entry was created with,
+  // which after a `replaceState` is not the query it now shows.
+  const [filters, setFilters] = useState<VendorFilters>(() => {
+    const live = urlFilterParams("/vendors");
+    return live ? parseVendorFilters(live) : initialFilters;
+  });
 
   function update(patch: Partial<VendorFilters>) {
     const next = { ...filters, ...patch };

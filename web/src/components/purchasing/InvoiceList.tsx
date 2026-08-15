@@ -22,6 +22,7 @@ import {
   invoiceDetailHref,
   invoiceFiltersToQuery,
   invoiceListHref,
+  parseInvoiceFilters,
   serializeInvoiceView,
   INVOICE_VIEW_COOKIE,
   RANGES,
@@ -31,6 +32,7 @@ import {
   type InvoiceStatusFilter,
   type RangeKey,
 } from "@/lib/invoiceFilters";
+import { urlFilterParams } from "@/lib/filterMenus";
 import { makeComparator, type SortValue } from "@/lib/tableSort";
 import { withFrom } from "@/lib/breadcrumbs";
 import { usePublishRecordSet } from "@/lib/recordSet";
@@ -123,7 +125,15 @@ export function InvoiceList({
   canEdit: boolean;
 }) {
   const router = useRouter();
-  const [filters, setFilters] = useState<InvoiceFilters>(initialFilters);
+  // Seeded from the ADDRESS BAR where it can be read, and only from the props
+  // otherwise — see `urlFilterParams`. A back or forward restore hands this
+  // component the props of whatever query the history entry was created with,
+  // which after a `replaceState` is not the query it now shows.
+  // The props are the fallback PER FIELD — see the PO list for the argument.
+  const [filters, setFilters] = useState<InvoiceFilters>(() => {
+    const live = urlFilterParams("/invoices");
+    return live ? parseInvoiceFilters(live, initialFilters) : initialFilters;
+  });
   const [checked, setChecked] = useState<Set<string>>(new Set());
 
   useEffect(() => {

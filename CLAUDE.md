@@ -4487,6 +4487,32 @@ weekday column, and 003 then silently made it per-vendor-item.
   the filters down with it.
   A list that persists sort in the URL must pass `sort`/`onSortChange` to
   `DataTable`, or the header arrow and the URL disagree.
+  **A LIST SEEDS ITS STATE FROM THE ADDRESS BAR, NOT FROM ITS PROPS**
+  (`urlFilterParams` in `lib/filterMenus`, 2026-08-14). `history.replaceState`
+  moves the URL and tells Next its new canonical address, but it does NOT
+  rewrite the RSC payload CACHED AGAINST THAT HISTORY ENTRY — that tree was
+  rendered for the URL the entry was created with. Back and forward restore the
+  cached tree, so a list seeded from `initialFilters` came back with the filters
+  it had when you FIRST arrived while the address bar read the ones you set
+  (Mark, 2026-08-14, on `/production-items`). Reproduced and then fixed on the
+  real screen: arrive at a bare `/production-items`, pick Type = Raised, type
+  "samoa", open an item, press Back — URL `?q=samoa&type=Raised`, screen
+  "307 items", every menu on All. **All six URL-filtered lists had it** —
+  measured on `/items` too by reverting the fix (`?q=flour` restoring as
+  "401 of 790") — so the cure is one shared helper, not six patches.
+  **THE PATH GUARD IS THE WHOLE OF THE CARE.** Next applies a Link navigation's
+  `pushState` in an effect AFTER the incoming tree renders, so during a
+  BREADCRUMB's first render `window.location` is still the detail screen's URL;
+  reading it there would parse `?from=…&fromLabel=…`, find no filter keys, and
+  clear the very filters the breadcrumb exists to restore — breaking the one
+  path that already worked. A restore is the opposite: the browser updates the
+  URL before it fires `popstate`, so the address bar is already right. Matching
+  the pathname is what tells the two apart, and falling back to the prop is
+  always safe. Pinned by fixtures (breaking the guard turns the breadcrumb case
+  red).
+  `router.replace` would keep the router's cache honest by itself and is still
+  refused for the reason it always was: it re-runs the server component — both
+  cost graphs on `/production-items` — on every keystroke.
 - **Scroll restoration is UNIVERSAL and nothing opts in** (`lib/scrollMemory.ts`
   + `components/ScrollMemory.tsx`, Mark, 2026-07-30: "any list view now and in
   the future"). This is what pays for detail views going back to full screen.
