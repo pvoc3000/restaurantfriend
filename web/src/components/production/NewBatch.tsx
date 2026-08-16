@@ -53,7 +53,9 @@ export function NewBatch({
   const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
 
-  const [elements, setElements] = useState<{ id: string; name: string; kind: string }[]>([]);
+  const [elements, setElements] = useState<
+    { id: string; name: string; kind: string; is_active: boolean }[]
+  >([]);
   const [elementId, setElementId] = useState<string | null>(null);
   const [label, setLabel] = useState<string | null>(null);
 
@@ -65,10 +67,14 @@ export function NewBatch({
     void (async () => {
       const { data } = await supabase
         .from("production_elements")
-        .select("id, name, kind")
-        .eq("is_active", true)
+        // Inactive ones come too — `PickList` sinks them under their own
+        // heading rather than pretending they do not exist.
+        .select("id, name, kind, is_active")
         .order("name");
-      if (!cancelled) setElements((data ?? []) as { id: string; name: string; kind: string }[]);
+      if (!cancelled)
+        setElements(
+          (data ?? []) as { id: string; name: string; kind: string; is_active: boolean }[]
+        );
     })();
     return () => {
       cancelled = true;
@@ -185,11 +191,13 @@ export function NewBatch({
                 onPick={(next) => setElementId(next || null)}
                 variant="field"
                 ariaLabel="Which element"
+                activateTable="production_elements"
                 placeholder={elements.length ? "Pick one" : "Loading…"}
                 options={elements.map((e) => ({
                   value: e.id,
                   label: e.name,
                   hint: e.kind,
+                  inactive: e.is_active === false,
                 }))}
               />
             </label>

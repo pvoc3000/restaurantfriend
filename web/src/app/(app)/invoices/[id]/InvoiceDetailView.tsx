@@ -68,11 +68,13 @@ export async function InvoiceDetailView({
   // Every active vendor, for the vendor picker — an invoice filed against the
   // wrong vendor is a likely mistake on a hand-created one, and the PO links
   // are per-line so changing it disturbs nothing.
+  // NO ACTIVE FILTER (Mark, 2026-08-15): a retired vendor is listed under
+  // `PickList`'s own Inactive heading rather than being unfindable. A bill
+  // from a vendor you have stopped ordering from still arrives.
   const { data: vendors } = await supabase
     .from("vendors")
-    .select("id, name")
+    .select("id, name, is_active")
     .eq("org_id", invoice.org_id)
-    .eq("is_active", true)
     .order("name");
 
   return (
@@ -114,7 +116,11 @@ export async function InvoiceDetailView({
           }))}
           locationCode={locationCode}
           orgId={invoice.org_id}
-          vendors={(vendors ?? []) as { id: string; name: string }[]}
+          vendors={(vendors ?? []).map((v) => ({
+        id: v.id as string,
+        name: v.name as string,
+        inactive: v.is_active === false,
+      }))}
           locations={session.activeLocations.map((l) => ({
             id: l.id,
             code: l.code,

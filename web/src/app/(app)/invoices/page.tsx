@@ -151,11 +151,13 @@ export default async function InvoicesPage({
 
   // Every active vendor, order_type 'none' included — the landlord and the
   // plumber are precisely why this screen can create an invoice at all.
+  // NO ACTIVE FILTER (Mark, 2026-08-15): a retired vendor is listed under
+  // `PickList`'s own Inactive heading rather than being unfindable. A bill
+  // from a vendor you have stopped ordering from still arrives.
   const { data: vendors } = await supabase
     .from("vendors")
-    .select("id, name")
+    .select("id, name, is_active")
     .eq("org_id", session.membership.org_id)
-    .eq("is_active", true)
     .order("name");
 
   return (
@@ -167,7 +169,11 @@ export default async function InvoicesPage({
       capped={rows.length === 500}
       orgId={session.membership.org_id}
       locationId={session.activeLocation.id}
-      vendors={(vendors ?? []) as { id: string; name: string }[]}
+      vendors={(vendors ?? []).map((v) => ({
+        id: v.id as string,
+        name: v.name as string,
+        inactive: v.is_active === false,
+      }))}
       canEdit={canWriteCatalog(session.membership.role)}
     />
   );

@@ -14,6 +14,8 @@ export type BenefitOption = {
   name: string;
   unit: BenefitUnit;
   default_amount: number | null;
+  /** Retired: still offered, under `PickList`'s own heading. */
+  inactive?: boolean;
 };
 
 /**
@@ -152,9 +154,11 @@ export function AddEmployeeBenefit({
                     hint: `${BENEFIT_UNIT_LABEL[b.unit].toLowerCase()}${
                       b.default_amount === null ? "" : ` · $${b.default_amount.toFixed(2)}`
                     }`,
+                    inactive: b.inactive,
                   }))}
                   variant="field"
                   ariaLabel="Benefit"
+                  activateTable="payroll_benefits"
                   onPick={setBenefitId}
                   className="w-64"
                 />

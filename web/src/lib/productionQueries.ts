@@ -372,7 +372,10 @@ export async function loadItemGraph(
  */
 export async function loadElementOptions(
   supabase: SupabaseClient
-): Promise<{ options: { value: string; label: string }[]; error: string | null }> {
+): Promise<{
+  options: { value: string; label: string; inactive?: boolean }[];
+  error: string | null;
+}> {
   const { data, error } = await fetchAll(
     supabase,
     "production_elements",
@@ -380,10 +383,21 @@ export async function loadElementOptions(
     "name"
   );
   if (error) return { options: [], error: error.message };
+  // A RETIRED ELEMENT IS LISTED, NOT DROPPED (Mark, 2026-08-15). `PickList`
+  // sinks these under their own heading, so the live catalog reads exactly as
+  // it did and a search still answers "does this exist?" — which for elements
+  // is the common question: measured the day this shipped, 171 of 467 are
+  // inactive, and 127 item components already point at one of them.
+  //
+  // Note both element pickers are CREATE pickers — "Add component", "Add
+  // ingredient" — so neither ever held an element id as its current value.
+  // Nothing here was rendering a uuid; this is a search change, not a fix.
   return {
-    options: data
-      .filter((e) => e.is_active !== false)
-      .map((e) => ({ value: e.id as string, label: e.name as string })),
+    options: data.map((e) => ({
+      value: e.id as string,
+      label: e.name as string,
+      inactive: e.is_active === false,
+    })),
     error: null,
   };
 }

@@ -472,6 +472,7 @@ export function RecipeVersionSheet({
             what="ingredient"
             placeholder="Choose an element…"
             options={elementOptions}
+            activateTable="production_elements"
           />
         ) : null}
       </section>
@@ -808,6 +809,7 @@ function LinkIngredient({ line, options }: { line: SheetLine; options: PickOptio
       <PickList
         value={line.label}
         options={options}
+        activateTable="production_elements"
         allowNew
         clearable
         disabled={pending}

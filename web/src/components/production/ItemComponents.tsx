@@ -393,6 +393,7 @@ export function ItemComponents({
               defaultOpen
               onClose={() => setAdding(false)}
               onPick={(v) => add(v)}
+              activateTable="production_elements"
               ariaLabel="Element to add as a component"
               placeholder="Choose an element…"
               className="w-72"

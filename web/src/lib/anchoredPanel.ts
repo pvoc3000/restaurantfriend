@@ -75,6 +75,37 @@ export const MENU_SEARCH_CLASS =
   "sticky top-0 z-10 w-full border-b border-hairline bg-white px-3 py-2 text-sm outline-none";
 
 /**
+ * Sink every retired option below the live ones, under a single heading.
+ *
+ * Mark, 2026-08-15: "sometimes I'd like to be able to at least know an item
+ * exists." Six vocabularies now pass their inactive entries through instead of
+ * filtering them out — elements, production items, vendors, payroll benefits —
+ * and this is the one place that decides what happens to them, for two reasons
+ * a per-caller solution gets wrong.
+ *
+ * A HEADING ONLY RENDERS WHERE THE GROUP CHANGES, so an unsorted list repeats
+ * it down the panel. Sorting has to happen before the rows are built, and doing
+ * it at six call sites means six chances to forget.
+ *
+ * `inactive` OVERRIDES `group`. A retired entry from a grouped vocabulary would
+ * otherwise carry its old group's heading down here with it, and the panel would
+ * show "Weight" twice — once where it belongs and once under the rule.
+ *
+ * Untouched when nothing is inactive, so every list that has never heard of this
+ * keeps exactly the order its caller gave — including its own groups.
+ */
+export function sinkInactive<T extends { inactive?: boolean; group?: string }>(
+  options: readonly T[],
+  heading: string
+): T[] {
+  if (!options.some((o) => o.inactive)) return [...options];
+  return [
+    ...options.filter((o) => !o.inactive),
+    ...options.filter((o) => o.inactive).map((o) => ({ ...o, group: heading })),
+  ];
+}
+
+/**
  * Position a small panel directly below the control that opened it, and take it
  * away again at the right moments.
  *

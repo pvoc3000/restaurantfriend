@@ -16,6 +16,7 @@
     "../../src/lib/fileTypes.ts",
     "../../src/lib/columnOrder.ts",
     "../../src/lib/rowDrag.ts",
+    "../../src/lib/anchoredPanel.ts",
     "../../src/lib/employees.ts",
     "../../src/lib/employeeEvents.ts",
     "../../src/lib/columnVisibility.ts",

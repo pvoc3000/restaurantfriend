@@ -64,7 +64,7 @@ export function NewInvoice({
 }: {
   orgId: string;
   locationId: string;
-  vendors: { id: string; name: string }[];
+  vendors: { id: string; name: string; inactive?: boolean }[];
   today: string;
   existing: DuplicateCandidate[];
 }) {
@@ -235,7 +235,8 @@ export function NewInvoice({
                 onPick={setVendorId}
                 ariaLabel="Vendor"
                 placeholder="Who billed you?"
-                options={vendors.map((v) => ({ value: v.id, label: v.name }))}
+                options={vendors.map((v) => ({ value: v.id, label: v.name, inactive: v.inactive }))}
+                activateTable="vendors"
               />
             </Field>
 

@@ -2,12 +2,15 @@
 
 import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { confirmDialog } from "@/lib/confirm";
+import { createClient } from "@/lib/supabase/client";
 import {
   MENU_HEADER_CLASS,
   MENU_ITEM_CLASS,
   MENU_PANEL_CLASS,
   MENU_SEARCH_CLASS,
   menuItemState,
+  sinkInactive,
   useAnchoredPanel,
 } from "@/lib/anchoredPanel";
 
@@ -18,6 +21,21 @@ export type PickOption = {
   hint?: string;
   /** Options carrying the same group name are listed under it. */
   group?: string;
+  /**
+   * Retired, but still worth knowing about (Mark, 2026-08-15: "sometimes I'd
+   * like to be able to at least know an item exists").
+   *
+   * A caller passing these does NOT have to sort or label them — this control
+   * sinks every one of them below the live vocabulary, rules them off, heads
+   * them and greys them, so a search answers "does this exist?" without an
+   * inactive entry ever being mistaken for a current one. Doing it here rather
+   * than at each call site is what stops six vocabularies inventing six
+   * different headings.
+   *
+   * Pair it with `activateTable`: choosing one of these asks to REVIVE it
+   * first, so being inactive still means something (Mark, 2026-08-15).
+   */
+  inactive?: boolean;
 };
 
 /**
@@ -58,6 +76,8 @@ export function PickList({
   allowNew = false,
   clearable = false,
   clearLabel = "None",
+  inactiveLabel = "Inactive",
+  activateTable,
   ariaLabel,
   align = "left",
   variant = "inline",
@@ -102,6 +122,38 @@ export function PickList({
   clearable?: boolean;
   /** The clear row's word, when "None" isn't the right one. */
   clearLabel?: string;
+  /**
+   * The heading over the sunken `inactive` options.
+   *
+   * "Inactive" rather than "Inactive items", because ONE control lists
+   * elements, production items, vendors, vendor items and payroll benefits, and
+   * a heading reading "items" over a list of vendors is wrong five times to be
+   * right once. A caller with a better word for its own vocabulary passes it.
+   */
+  inactiveLabel?: string;
+  /**
+   * The table an `inactive` option lives in, so choosing one can REVIVE it.
+   *
+   * Mark, 2026-08-15: "if the user chooses an inactive item ask them if they
+   * want it to be made active. If they do, proceed. If not, then do not add the
+   * item (inactive needs to mean something, right?)" — which is the whole
+   * argument. Listing retired entries so they can be found is one thing;
+   * letting one be silently dropped into a live recipe or a live plan would
+   * make the flag decorative.
+   *
+   * So: confirm → flip `is_active` → and only then does `onPick` fire. Cancel
+   * picks NOTHING, deliberately. The three steps live here rather than at each
+   * call site because the middle one is the easy one to skip, and a caller that
+   * skipped it would look identical to one that didn't until an inactive row
+   * turned up on a purchase order.
+   *
+   * The write is a plain update through RLS, so a reader without catalog rights
+   * gets zero rows and the message rather than a silent success.
+   *
+   * Requires `is_active` on the table — that spelling, the one
+   * `catalog/ActiveToggle` already hardcodes.
+   */
+  activateTable?: string;
   ariaLabel?: string;
   align?: "left" | "right";
   /**
@@ -132,6 +184,10 @@ export function PickList({
   const [open, setOpen] = useState(defaultOpen);
   const [term, setTerm] = useState("");
   const [active, setActive] = useState(0);
+  // Only ever set by a failed revival. There is nowhere else in this control an
+  // error can come from — a pick is not a write.
+  const [reviveError, setReviveError] = useState<string | null>(null);
+  const supabase = createClient();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   // The DISMISS path — Escape, or a click away. `choose` closes without coming
@@ -164,18 +220,74 @@ export function PickList({
     ...options,
   ];
 
+  // Retired entries sink below the live vocabulary under one heading — the rule
+  // and its reasons live in `sinkInactive`, beside the heading it produces.
+  const ordered: PickOption[] = sinkInactive(listed, inactiveLabel);
+
   const q = term.trim().toLowerCase();
   const shown = q
-    ? listed.filter((o) =>
+    ? ordered.filter((o) =>
         `${o.label} ${o.hint ?? ""} ${o.value}`.toLowerCase().includes(q)
       )
-    : listed;
+    : ordered;
   const exact = shown.some((o) => o.label.toLowerCase() === q);
   const offerNew = allowNew && q !== "" && !exact;
 
-  function choose(next: string) {
+  /**
+   * Take a value: close, and — for a retired one — ask to revive it first.
+   *
+   * The ORDER is the point. Confirm, then the write, then `onPick`; a cancel or
+   * a failed write picks nothing at all, so "inactive" still means something
+   * even though the entry is now findable. The panel closes before the confirm
+   * so there are never two floating layers arguing over Escape.
+   */
+  async function choose(next: string) {
+    const picked = ordered.find((o) => o.value === next);
     setOpen(false);
     setTerm("");
+    setReviveError(null);
+
+    if (picked?.inactive && activateTable) {
+      const ok = await confirmDialog({
+        title: `Make “${picked.label}” active again?`,
+        // "everywhere" is the one word doing real work here: reviving from a
+        // recipe row also revives it for the plan matrix and the order guide,
+        // and that should not be a surprise.
+        body:
+          "It is currently inactive and unavailable for use. " +
+          "Choosing it here makes it active everywhere.",
+        confirmLabel: "Make active",
+      });
+      if (!ok) {
+        // A cancel is an ABANDONMENT, so it goes through `close` — which is
+        // what puts a revealed picker's own button back ("+ add", "Add
+        // component"). Leaving it revealed-but-closed would sit there as an
+        // empty field, which reads as a half-finished choice rather than as the
+        // "nothing was chosen" it is.
+        close();
+        triggerRef.current?.focus();
+        return;
+      }
+      const { data, error } = await supabase
+        .from(activateTable)
+        .update({ is_active: true })
+        .eq("id", next)
+        // An update matching no policy changes nothing and returns NO error, so
+        // a bare call would report success and then hand a still-inactive row
+        // to `onPick` — the exact silence this whole confirm exists to break.
+        .select("id");
+      if (error || !data?.length) {
+        // Deliberately NOT `close()`, unlike the cancel above: a revealed picker
+        // unmounts on close, and it would take this message with it — leaving a
+        // refusal that never got to say anything.
+        setReviveError(
+          error?.message ?? "Not allowed — it is still inactive, so nothing was chosen."
+        );
+        triggerRef.current?.focus();
+        return;
+      }
+    }
+
     if (next !== (value ?? "")) onPick(next);
     triggerRef.current?.focus();
   }
@@ -198,8 +310,8 @@ export function PickList({
       setActive((i) => Math.max(0, i - 1));
     } else if (e.key === "Enter") {
       e.preventDefault();
-      if (offerNew && active === shown.length) choose(term.trim());
-      else if (shown[active]) choose(shown[active].value);
+      if (offerNew && active === shown.length) void choose(term.trim());
+      else if (shown[active]) void choose(shown[active].value);
     }
   }
 
@@ -216,6 +328,10 @@ export function PickList({
   const rows = shown.map((o, i) => ({
     option: o,
     header: o.group && o.group !== shown[i - 1]?.group ? o.group : null,
+    // A rule ABOVE the heading, so a group reads as a break rather than as a
+    // caption on the row beneath it. Not on the first row: the search box (or
+    // the panel's own edge) is already the line above it.
+    headerRule: i > 0,
     // The clear row is an action, not a value, so it is ruled off from the
     // vocabulary underneath it — the same treatment `Add "…"` gets at the
     // other end of the list.
@@ -233,7 +349,9 @@ export function PickList({
         aria-label={ariaLabel}
         onClick={() => {
           setTerm("");
-          setActive(Math.max(0, listed.findIndex((o) => o.value === selected)));
+          // `ordered`, not `listed` — the keyboard index walks what is on
+          // SCREEN, and the inactive partition moves rows.
+          setActive(Math.max(0, ordered.findIndex((o) => o.value === selected)));
           // Closing by pressing the trigger again is an abandonment like any
           // other, so it goes through `close` rather than flipping the flag.
           if (open) close();
@@ -267,6 +385,14 @@ export function PickList({
           ▼
         </span>
       </button>
+
+      {/* Only ever a refused or failed revival — see `choose`. It sits under the
+          trigger rather than in the panel because by the time it exists the
+          panel has closed, and the reader needs to know that NOTHING was
+          chosen. */}
+      {reviveError && (
+        <span className="mt-0.5 block text-xs text-accent">{reviveError}</span>
+      )}
 
       {open &&
         box &&
@@ -307,21 +433,39 @@ export function PickList({
             {shown.length === 0 && !offerNew && (
               <p className="px-3 py-2 text-sm text-muted">Nothing matches.</p>
             )}
-            {rows.map(({ option: o, header, divider }, i) => {
+            {rows.map(({ option: o, header, headerRule, divider }, i) => {
               return (
                 <div key={`${o.group ?? ""}:${o.value}`}>
-                  {header && <p className={MENU_HEADER_CLASS}>{header}</p>}
+                  {header && (
+                    <p
+                      className={`${MENU_HEADER_CLASS} ${
+                        headerRule ? "border-t border-hairline" : ""
+                      }`}
+                    >
+                      {header}
+                    </p>
+                  )}
                   <button
                     type="button"
                     role="option"
                     aria-selected={o.value === selected}
                     onMouseEnter={() => setActive(i)}
-                    onClick={() => choose(o.value)}
+                    onClick={() => void choose(o.value)}
                     className={`${MENU_ITEM_CLASS} flex items-baseline gap-2 ${
                       divider ? "border-b border-hairline" : ""
                     } ${menuItemState(i === active)}`}
                   >
-                    <span className={o.value === selected ? "font-semibold" : ""}>
+                    <span
+                      className={`${o.value === selected ? "font-semibold" : ""} ${
+                        // Grey says "retired" at a glance, so the heading is not
+                        // the only thing carrying it — a panel scrolled past its
+                        // rule would otherwise look like an ordinary list. Not
+                        // when the row is under the cursor: that bar is solid
+                        // black, and muted grey on it is unreadable. Same
+                        // either/or the hint below already uses.
+                        o.inactive && i !== active ? "text-muted" : ""
+                      }`}
+                    >
                       {o.label}
                     </span>
                     {o.hint && (
@@ -346,7 +490,7 @@ export function PickList({
                 role="option"
                 aria-selected={false}
                 onMouseEnter={() => setActive(shown.length)}
-                onClick={() => choose(term.trim())}
+                onClick={() => void choose(term.trim())}
                 className={`${MENU_ITEM_CLASS} flex items-baseline gap-2 border-t border-hairline ${menuItemState(
                   active === shown.length
                 )}`}

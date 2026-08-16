@@ -110,7 +110,7 @@ export function InvoiceDetail({
   linkCandidates: LinkCandidate[];
   locationCode: string;
   orgId: string;
-  vendors: { id: string; name: string }[];
+  vendors: { id: string; name: string; inactive?: boolean }[];
   locations: { id: string; code: string; name: string }[];
   canEdit: boolean;
   canApprove: boolean;
@@ -645,7 +645,8 @@ export function InvoiceDetail({
                     value={invoice.vendor_id}
                     kind="pick"
                     nullable={false}
-                    options={vendors.map((v) => ({ value: v.id, label: v.name }))}
+                    options={vendors.map((v) => ({ value: v.id, label: v.name, inactive: v.inactive }))}
+                    activateTable="vendors"
                   />
                 </Cell>
               </Field>

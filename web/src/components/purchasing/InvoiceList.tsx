@@ -121,7 +121,7 @@ export function InvoiceList({
   locationId: string;
   /** Every ACTIVE vendor, order_type 'none' included — the landlord and the
    *  plumber are the whole reason this screen can create anything. */
-  vendors: { id: string; name: string }[];
+  vendors: { id: string; name: string; inactive?: boolean }[];
   canEdit: boolean;
 }) {
   const router = useRouter();

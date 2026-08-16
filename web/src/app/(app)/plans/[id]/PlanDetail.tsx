@@ -52,8 +52,10 @@ export async function PlanDetail({
         // `tally_box_size` is what the par steppers step BY (037) — a box of
         // this item, so an item that trays in twelves steps by twelve. The
         // taxonomy is what the `type` grouping sorts and bands by.
-        .select("id, name, item_type, subtype, finish, size, tally_box_size")
-        .eq("is_active", true)
+        // NO ACTIVE FILTER (Mark, 2026-08-15). A retired donut still belongs on
+        // screen when you are looking for it — `PickList` sinks it under its own
+        // heading, so what you reach for first is unchanged.
+        .select("id, name, item_type, subtype, finish, size, tally_box_size, is_active")
         .order("name"),
     ]);
 
@@ -304,6 +306,7 @@ export async function PlanDetail({
             // The taxonomy as a hint, because the name alone is ambiguous by
             // design (038) — four donuts are called "Angry Samoa".
             taxonomy: [i.size, i.item_type, i.subtype].filter(Boolean).join(" · "),
+            inactive: i.is_active === false,
             tally_box_size: Number(i.tally_box_size ?? 6),
             item_type: (i.item_type ?? null) as string | null,
             subtype: (i.subtype ?? null) as string | null,

@@ -200,6 +200,7 @@ export function InlineValue({
   arrayWidth,
   match,
   onWrite,
+  activateTable,
   scale,
   multiline = false,
   collapseWhenEmpty = false,
@@ -326,6 +327,12 @@ export function InlineValue({
    * gives a sentence, where a zero-row update gives silence.
    */
   onWrite?: (next: string | number | null) => Promise<{ error: string | null }>;
+  /**
+   * kind="pick" only — passed straight to `PickList`. The table an `inactive`
+   * option lives in, so choosing a retired one offers to revive it first rather
+   * than quietly writing it into this column. See `PickList.activateTable`.
+   */
+  activateTable?: string;
   /**
    * A column STORED in one unit and read in another.
    *
@@ -493,6 +500,7 @@ export function InlineValue({
           placeholder={placeholder}
           ariaLabel={ariaLabel ?? column}
           align={align}
+          activateTable={activateTable}
           onPick={(next) => void write(next === "" ? null : next, false)}
           className={className}
         />

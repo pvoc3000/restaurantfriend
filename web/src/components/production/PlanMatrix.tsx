@@ -40,6 +40,8 @@ export type MatrixItem = {
   id: string;
   name: string;
   taxonomy: string;
+  /** Retired: still offered, under `PickList`'s own heading. */
+  inactive?: boolean;
   tally_box_size: number;
   item_type: string | null;
   subtype: string | null;
@@ -951,9 +953,11 @@ export function PlanMatrix({
                                     label: it.name,
                                     hint:
                                       seed === null ? it.taxonomy : `${it.taxonomy} · par ${seed}`,
+                                    inactive: it.inactive,
                                   };
                                 })}
                                 placeholder="Which item…"
+                                activateTable="production_items"
                               />
                             ) : (
                               <button

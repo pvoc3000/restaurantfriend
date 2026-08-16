@@ -134,8 +134,9 @@ export async function EmployeeDetail({
     wantsEmployment
       ? supabase
           .from("payroll_benefits")
-          .select("id, name, unit, default_amount")
-          .eq("is_active", true)
+          // No active filter (Mark, 2026-08-15) — a retired benefit sinks under
+          // `PickList`'s own heading rather than being unfindable.
+          .select("id, name, unit, default_amount, is_active")
           .order("sort_order")
           .order("name")
       : SKIP,
@@ -206,6 +207,7 @@ export async function EmployeeDetail({
     name: b.name as string,
     unit: b.unit as BenefitOption["unit"],
     default_amount: b.default_amount === null ? null : Number(b.default_amount),
+    inactive: b.is_active === false,
   }));
   const benefitById = new Map(benefitOptions.map((b) => [b.id, b]));
   // The FULL location list, not activeLocations — an entitlement at a shop that

@@ -51,6 +51,7 @@ export function AddRecipeRow({
   what,
   placeholder,
   options,
+  activateTable,
 }: {
   table: "production_recipe_lines" | "production_recipe_steps";
   versionId: string;
@@ -64,6 +65,9 @@ export function AddRecipeRow({
    * ingredient list passes it — a step has nothing to choose from.
    */
   options?: PickOption[];
+  /** Passed to `PickList`: the table a retired option lives in, so choosing one
+   *  offers to revive it rather than quietly adding an inactive row. */
+  activateTable?: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -128,6 +132,7 @@ export function AddRecipeRow({
             defaultOpen
             onClose={() => setPicking(false)}
             onPick={addChosen}
+            activateTable={activateTable}
             ariaLabel={`Element to add as an ${what}`}
             placeholder={placeholder}
             className="w-full max-w-[26rem]"
