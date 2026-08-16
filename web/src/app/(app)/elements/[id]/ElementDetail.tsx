@@ -10,6 +10,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { ElementFields } from "@/components/production/ElementFields";
+import { ElementNameCell } from "@/components/production/ElementNameCell";
 import { ElementLocationRows } from "@/components/production/ElementLocationRows";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { BATCH_STATUS_LABEL, batchDate, describeAmount } from "@/lib/productionBatches";
@@ -123,8 +124,16 @@ export async function ElementDetail({
         />
 
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            {element.name as string}
+          {/* The name is the record's own, so it is edited where you read it —
+              `PlanDetail`'s title. The cell writes through its own statement so
+              that renaming onto an existing element says so in words; see
+              `ElementNameCell` for why that is not `InlineValue`'s own update. */}
+          <h1 className="min-w-0 text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            {editable ? (
+              <ElementNameCell id={id} name={element.name as string} />
+            ) : (
+              (element.name as string)
+            )}
           </h1>
           {!element.is_active ? (
             <span className="text-[12px] uppercase tracking-[0.12em] text-muted">Inactive</span>

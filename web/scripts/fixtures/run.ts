@@ -9,6 +9,7 @@ import "./batchLogFilters.fixtures";
 import "./breakRules.fixtures";
 import "./columnOrder.fixtures";
 import "./columnVisibility.fixtures";
+import "./rowDrag.fixtures";
 import "./documentLines.fixtures";
 import "./employeeDocuments.fixtures";
 import "./employeeEvents.fixtures";
