@@ -654,7 +654,21 @@ export async function SpecialOrderDetail({
           quadrant height accounts for it through `spaceBelow`. */}
       {canWrite ? (
         <StickyFooter spacerClassName="-mt-8">
-          <div className="px-4 xl:px-12">
+          {/* INDENTED TO THE CONTENT COLUMN, not to the page (Mark,
+              2026-08-17). Without this the buttons start under the SIDEBAR — a
+              command row lined up with the section nav rather than with the
+              record it acts on.
+
+              `lg:ml-48` is the sidebar's `lg:w-40` plus the row's `lg:gap-8`
+              (10rem + 2rem), which is the identity block's own indent and THE
+              SAME COUPLED TRIO: change the sidebar's width and both move with
+              it. Below `lg` there is no sidebar to clear, so the buttons sit on
+              the page margin like everything else.
+
+              AND NO PADDING OF ITS OWN: `ui/StickyFooter`'s band already
+              carries `px-4 xl:px-12`, so repeating it here pushed the row 48px
+              PAST the content instead of onto it. */}
+          <div className="lg:ml-48">
             <OrderActions
               id={id}
               number={row.number as string}
