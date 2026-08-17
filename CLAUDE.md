@@ -3154,6 +3154,22 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    And a measuring trap: **check the label SPAN, not the button around it** —
    a button sizes to its own content and can never report an overflow, which is
    how two clipped column headers survived a check that said everything fit.
+   **(i) "ALSO THAT DAY" IS SCOPED TO THE KITCHEN** (Mark, 2026-08-17: "I
+   assume you're only displaying orders for the same kitchen" — it wasn't).
+   The block exists to stop a supervisor double-booking a KITCHEN, so another
+   shop's night is not context, it is noise that inflates the count. Measured
+   on 2026-08-16: order 9885 is DF01 and two of the four it listed were DF02,
+   so half the block was somebody else's work.
+   **Unassigned orders come too, and are marked**: 1,403 of the 8,329 real
+   orders carry no kitchen, and they are load that will land somewhere —
+   hiding 17% of the history would understate the day while looking complete,
+   which is the failure this block exists to prevent. An order with no kitchen
+   of its own has nothing to scope by, so it sees every kitchen and says so.
+   Each row also carries its STATUS, in WEIGHT rather than colour — a
+   committed `order` in full ink, a lead or quote muted. Colour is reserved
+   for a state that is wrong or wants an eye and a lead is neither; dimming the
+   whole ROW is refused for the Locations list's reason, that greying text you
+   can still click reads as disabled and lies.
    **(h) THE INFO TAB IS FOUR QUADRANTS, ONE SECTION EACH** (Mark, 2026-08-17:
    the stacked column "just looks like a wall of text"), with FileMaker's own
    EVENT INFO tab as the reference:

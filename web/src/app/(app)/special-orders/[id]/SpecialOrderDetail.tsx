@@ -484,6 +484,8 @@ export async function SpecialOrderDetail({
                   orgId={session.membership.org_id}
                   orderId={id}
                   eventDate={row.event_date as string | null}
+                  kitchenId={row.kitchen_location_id as string | null}
+                  kitchens={session.locations.map((l) => ({ id: l.id, code: l.code }))}
                   listHref={orderTabHref(id, "info", rawParams)}
                 />
               }
@@ -776,29 +778,68 @@ async function OtherOrdersThatDay({
   orgId,
   orderId,
   eventDate,
+  kitchenId,
+  kitchens,
   listHref,
 }: {
   orgId: string;
   orderId: string;
   eventDate: string | null;
+  kitchenId: string | null;
+  /** Every shop, for the labels — `session.locations`, so a closed one still
+   *  renders its code rather than an em dash. */
+  kitchens: { id: string; code: string }[];
   listHref: string;
 }) {
   if (!eventDate) return null;
   const supabase = await createClient();
-  const { data } = await supabase
+
+  let query = supabase
     .from("special_orders")
-    .select("id, number, kind, title, event_time, kitchen_location_id, status, customers ( first_name, last_name, company )")
+    .select(
+      "id, number, kind, title, event_time, kitchen_location_id, status, customers ( first_name, last_name, company )"
+    )
     .eq("org_id", orgId)
     .eq("event_date", eventDate)
     .neq("id", orderId)
-    .neq("status", "cancelled")
+    .neq("status", "cancelled");
+
+  /**
+   * SCOPED TO THIS KITCHEN (Mark, 2026-08-17: "I assume you're only displaying
+   * orders for the same kitchen" — it wasn't). The block exists to stop a
+   * supervisor double-booking a KITCHEN, so another shop's work is not context,
+   * it is noise that inflates the count. Measured on 2026-08-16: order 9885 is
+   * DF01 and two of the four it listed were DF02, so half the block was about
+   * somebody else's night.
+   *
+   * UNASSIGNED ORDERS COME TOO, and are marked. 1,403 of the 8,329 real orders
+   * carry no kitchen — that is 17% of the history, and they are load that will
+   * land SOMEWHERE. Hiding them would understate the day while looking
+   * complete, which is the failure this block is meant to prevent.
+   *
+   * An order with no kitchen of its own has nothing to scope BY, so it sees
+   * every kitchen and the heading says so.
+   */
+  if (kitchenId) {
+    query = query.or(`kitchen_location_id.eq.${kitchenId},kitchen_location_id.is.null`);
+  }
+
+  const { data } = await query
     .order("event_time", { ascending: true, nullsFirst: false })
     .limit(25);
 
   const rows = data ?? [];
+  const kitchenCode = kitchenId ? kitchens.find((k) => k.id === kitchenId)?.code ?? null : null;
+  const codeOf = (id: unknown) =>
+    id ? kitchens.find((k) => k.id === id)?.code ?? null : null;
   return (
     <section className="space-y-3">
       <SectionHeading count={rows.length}>Also that day</SectionHeading>
+      <p className="text-[12px] text-muted">
+        {kitchenCode
+          ? `At ${kitchenCode}, plus anything not yet assigned a kitchen.`
+          : "Every kitchen — this order has none set."}
+      </p>
       {rows.length === 0 ? (
         <p className="text-sm text-muted">Nothing else is booked for {eventDate}.</p>
       ) : (
@@ -837,6 +878,15 @@ async function OtherOrdersThatDay({
                 >
                   {st ? STATUS_LABEL[st] : KIND_LABEL[o.kind as SpecialOrderKind]}
                 </span>
+                {/* Only when it ISN'T simply this kitchen's: an unassigned
+                    order says so, and with no kitchen to scope by every row
+                    names its own. Repeating "DF01" down a list already
+                    headed "At DF01" would be noise. */}
+                {o.kitchen_location_id !== kitchenId || !kitchenId ? (
+                  <span className="ml-1.5 text-[12px] text-mark">
+                    {codeOf(o.kitchen_location_id) ?? "no kitchen"}
+                  </span>
+                ) : null}
               </li>
             );
           })}
