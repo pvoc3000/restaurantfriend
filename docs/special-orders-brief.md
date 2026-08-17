@@ -341,6 +341,46 @@ chronological, 5,890+ orders carry one. The app appends on every meaningful
 act (status change, send, payment, schedule, duplicate, flag) and offers Add
 entry for freehand notes. Display newest-first on the Info tab.
 
+### 17. The customer approves the quote on a PUBLIC TOKENIZED PAGE
+    (Mark, 2026-08-16: print/sign/scan/return "is difficult for a lot of
+    people and I'd like to implement something slicker/easier.")
+
+The quote email carries a link — `/q/{token}` — where the customer reviews
+the quote on their phone (the PDF's content: lines, totals, the terms
+paragraph), types their name, checks "I agree to the terms above", and taps
+Approve. The app stamps `quote_returned`, files a **signed-quote PDF** (the
+quote plus an approval block: name as typed, timestamp, token identity) as a
+`signed_quote` attachment — the same artifact the scan flow produced — writes
+the log entry, and emails confirmation both ways. Typed-name clickwrap, not a
+drawn signature: legally equivalent under ESIGN/UETA for this class of
+agreement and far easier on a phone; a signature pad is later theater if
+customers expect it.
+
+The rules that make it sound:
+
+- **Approval binds to a SNAPSHOT, not the live order.** Money is derived
+  live (decision 6), so the order can change after a quote goes out. The
+  token is minted at SEND time, bound to the exact rendered document (the
+  compose card already holds the blob — file it in the bucket, reference it
+  from the token row). Approving signs THAT. Re-sending after edits mints a
+  new token and SUPERSEDES the old, whose link then says "this quote has
+  been revised — check your email." A token is spent by approval.
+- **A public route in an auth-gated app is a deliberate act.** `proxy.ts`
+  exempts `/q` the way it exempts `/welcome`. Data flows through two definer
+  RPCs — `quote_by_token`, `approve_quote_by_token` — DELIBERATELY granted
+  to `anon` (inverting 002's revoke rule, on purpose, in exactly two
+  places), whose bodies check nothing but the token: a 128-bit capability
+  URL, the same trust class as a signed storage URL. The page shows only
+  what the paper quote shows, and nothing else in the schema is reachable
+  from it.
+- **The manual path survives.** A customer who still prints and signs, or
+  replies "approved" by email, is handled exactly as today: file the
+  attachment, hand-stamp `quote_returned`. The link is the fast lane, not
+  the only lane.
+- **No payment chaining in v1** — the approval page ends at "your invoice
+  will follow by email"; Square invoicing stays decision 2's manual flow.
+  No customer accounts, no portal beyond this one page.
+
 ---
 
 ## The data model (sketch — migrations get designed at build time)
@@ -399,6 +439,13 @@ special_order_payments
 special_order_events
   id, org_id, order_id FK cascade
   happened_at timestamptz, author text, message text, source
+
+special_order_quote_tokens                       -- decision 17
+  id, org_id, order_id FK cascade
+  token text unique          -- 128-bit random, the whole capability
+  document_path text         -- the exact PDF sent, filed in the bucket
+  created_at/by, superseded_at
+  approved_at, approved_name, approved_meta jsonb (ip, user_agent)
 ```
 
 RLS: supervisor+ on every verb, every table (decision 7). Every insert passes
@@ -542,7 +589,11 @@ check `max(OrderID)` against the live layout before trusting it.**
    payments card; log. Derived money helpers, fixture-tested.
 3. **Documents + email.** The four renderers verified against the 9885
    reference PDFs in Node; compose card; specialorders@ provider config +
-   threading headers; stage-date stamping + log writes.
+   threading headers; stage-date stamping + log writes. Then the **approval
+   page** (decision 17): token mint on send, `/q/{token}` mobile-first, the
+   two anon RPCs (verified on the harness: a bogus token gets nothing, a
+   superseded one says so, approving twice is refused, and `anon` can reach
+   NOTHING else), the signed-quote artifact, the proxy exemption.
 4. **Inquiry → lead.** `parse-inquiry` edge function, paste dialog, customer
    matching. Fixtures from the three real emails.
 5. **Production + recurrence.** Schedule/unschedule against 040's seam
@@ -562,8 +613,9 @@ Each phase ships usable; nothing later blocks earlier.
   records dates. Seam only.
 - **QBO sync** — future; the `external_ref` columns and rows-not-blobs money
   are the preparation.
-- **Customer-facing anything** — no portal, no online quote acceptance, no
-  digital signature. The signed quote is a filed attachment.
+- **A customer portal** — no accounts, no order history, no payment page.
+  The quote-approval page (decision 17) is the ONE customer-facing surface,
+  and it is a single capability URL, not a portal.
 - **Delivery-carrier integration** — DeliverLA request/schedule stay links or
   manual; distance stays a hand-entered pair (FMP's Google link can survive
   as a plain href).

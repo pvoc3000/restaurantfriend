@@ -3074,7 +3074,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    event_date)` where a CANCELLED day still blocks re-creation (cancel,
    never delete, or the donuts get ordered again), and the migration
    materializes NOTHING; pics + documents merge into one attachments
-   card on a new `special-order-attachments` bucket; numbering seeds at
+   card on a new `special-order-attachments` bucket; **the customer approves
+   a quote on a public tokenized page** (`/q/{token}`, proxy-exempt like
+   `/welcome`; typed-name clickwrap; the token is minted at SEND time bound
+   to the exact PDF sent, spent by approval, superseded by a re-send; two
+   definer RPCs deliberately granted `anon` and nothing else reachable —
+   print/sign/scan survives as the manual lane); numbering seeds at
    10000 (FMP max 9887; `legacy_id` is NOT unique — 5 duplicated OrderIDs);
    customers migrate WITHOUT the plain-text CC fields, ever.
 5. SwiftUI floor app (only after 4 is proven in real use)
