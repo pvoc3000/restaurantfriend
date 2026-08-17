@@ -3065,8 +3065,15 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    edge function as a PROPOSAL; outbound mail sends as specialorders@ through
    a second org-level provider config and threads by
    `In-Reply-To`/`References` (the stored `Email_Token` was the inbound
-   SUBJECT — a threading kludge, retired); standing orders instantiate
-   manually over a date range; pics + documents merge into one attachments
+   SUBJECT — a threading kludge, retired); **standing orders (= wholesale,
+   e.g. Cafe Knotted 370 M–Th / 700 F–Su, billed weekly in arrears)
+   MATERIALIZE THEMSELVES on a 14-day rolling horizon** — no cron and no
+   manual Instantiate (Mark forgot it in FMP): a definer
+   `ensure_standing_orders_materialized` is called from the list AND from
+   production generation, idempotent on `unique (standing_order_id,
+   event_date)` where a CANCELLED day still blocks re-creation (cancel,
+   never delete, or the donuts get ordered again), and the migration
+   materializes NOTHING; pics + documents merge into one attachments
    card on a new `special-order-attachments` bucket; numbering seeds at
    10000 (FMP max 9887; `legacy_id` is NOT unique — 5 duplicated OrderIDs);
    customers migrate WITHOUT the plain-text CC fields, ever.

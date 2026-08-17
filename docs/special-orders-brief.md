@@ -253,18 +253,66 @@ specialorders@ Sent folder via the Gmail API, so the mailbox stays the
 paper trail. Stage dates stamp on send (quote_sent etc.), log entries write
 themselves.
 
-### 13. Standing orders instantiate MANUALLY over a date range
+### 13. Standing orders MATERIALIZE THEMSELVES on a rolling horizon
+    (Mark, 2026-08-16 — replacing FMP's manual Instantiate, which he forgets:
+    "Sometimes I forget. I've often wondered if there was a better way.")
 
-A standing order (kind `standing_order`) carries `standing_days smallint[]`
-(ISO weekdays — FMP's MON…SUN checkboxes, `\v`-separated in the export) and
-its own items. **Instantiate** asks for a start and end date, walks the range,
-and for each date whose weekday is in the set creates a real order (kind
-`order`, status `order`, todo Print Order, the standing order's items copied,
-a log entry naming the source) — FMP's flow exactly, kept manual on purpose.
-The 10 live standing orders (Yeastie Boys ×7 one-per-weekday, LA Cafe, Cafe
-Knotted M-Th and F-Su) migrate as-is. Templates are just kind `template`;
-Duplicate (any order → a new one, log entry "Duplicated from Order N") covers
-starting from one.
+Standing orders are WHOLESALE production — Cafe Knotted takes 370 donuts M–Th
+and 700 F–Su, expressed as two standing orders. A standing order (kind
+`standing_order`) carries `standing_days smallint[]` (ISO weekdays — FMP's
+MON…SUN checkboxes, `\v`-separated in the export), its own items, and three
+new columns FMP never had: `starts_on`, `ends_on` (nullable — open-ended is
+the normal case) and `paused`.
+
+**Nobody instantiates, and there is no cron either.** A definer function
+`ensure_standing_orders_materialized(p_through date)` tops up real orders for
+every active, unpaused standing order through the horizon (14 days;
+`orgs.settings.special_orders.horizon_days`, design rule 2), and it is called
+from the two moments that need the orders to exist: **opening the special
+orders list**, and **production schedule generation** (generating tomorrow
+night's schedules first guarantees tomorrow's standing orders are real). The
+moment anyone works, the horizon is full — there is no one whose job is
+remembering, and no scheduled job to monitor.
+
+Two rules keep it honest, both this app's own lessons:
+
+- **Idempotent on `unique (standing_order_id, event_date)`, and an existing
+  row — INCLUDING A CANCELLED ONE — blocks re-creation.** Cancelling
+  Thanksgiving is a decision that sticks, not a row that resurrects on the
+  next page load. Decision 6 of the production brief (never silently
+  replace), in recurrence form. Consequence: a materialized day is CANCELLED,
+  never deleted — deleting it would order the donuts again.
+- **A materialized order is indistinguishable from a hand-made one**: kind
+  `order`, status `order`, todo Print Order, items copied from the standing
+  order, `standing_order_id` set, a log entry naming the source. Freely
+  editable — "add 100 this Friday" is an edit to that Friday's order, never
+  to the standing order. Editing the STANDING order changes only days not yet
+  materialized, and the record says so.
+
+**Instantiate survives only as a "materialize now…" escape hatch** (pick a
+range — e.g. covering a one-off far beyond the horizon), running the same
+function. The 10 live standing orders (Yeastie Boys ×7 one-per-weekday, LA
+Cafe, Cafe Knotted M-Th and F-Su) migrate with `starts_on` null; **the
+migration must materialize NOTHING** — the first horizon top-up happens in
+the app, after Mark confirms the standing orders came over right, or cutover
+day creates a week of wholesale orders before anyone has checked them.
+
+Production's generation receipt names special orders for that night that
+exist but are NOT yet scheduled — the closing supervisor's routine catches
+the last manual step, which stays deliberately manual (scheduling production
+is an explicit act, as everywhere else).
+
+**Wholesale billing context** (Mark, 2026-08-16): Cafe Knotted is billed
+WEEKLY for the previous week's orders — the per-day orders are production
+and record-keeping, not each its own invoice. v1 changes nothing about that
+workflow, but it is exactly what the QBO seam (decision 2) should anticipate:
+a future "wholesale statement" is a rendering over one customer's orders for
+a period, which the rows-not-blobs money model already supports. The
+`ignore_balance` flag is how a per-day wholesale order stays out of the
+unpaid/overdue filters meanwhile.
+
+Templates are just kind `template`; Duplicate (any order → a new one, log
+entry "Duplicated from Order N") covers starting from one.
 
 ### 14. Pics and Documents merge into one attachments card
 
@@ -324,6 +372,10 @@ special_orders
   notes_general, notes_quote, notes_production, notes_invoice, notes_receipt
   standing_days smallint[]  -- ISO, 1=Mon; the 017/009 seven-slot guard idiom does
                             -- NOT apply (this is a set, not a per-weekday array)
+  starts_on date, ends_on date, paused bool     -- standing orders only
+  standing_order_id uuid FK null                -- which standing order made me
+  -- unique (standing_order_id, event_date) where standing_order_id is not null
+  -- — the materializer's idempotency key; a cancelled day still occupies it
   date_initiated, quote_sent_at, quote_returned_at, invoice_sent_at,
   invoice_paid_at, receipt_sent_at, delivery_scheduled_at, order_printed_at,
   order_scheduled_at        -- dates, hand-editable like PO detail's
@@ -358,8 +410,12 @@ payments by order; customers by (org, lower(email)), (org, phone) for match.
 Derived-money helpers live in `lib/specialOrders.ts` (pure, fixture-tested):
 line extended = qty × price; subtotal; tax = taxable subtotal × rate; total =
 subtotal − discount + delivery + rush + tax; balance = total − Σpayments;
-`suggestedTodo(order)` for the quiet hint; `standingInstantiationDates(range,
-days)` (string dates, never `new Date("…")` — the plans lesson).
+`suggestedTodo(order)` for the quiet hint; `standingMaterializationDates(
+range, days)` (string dates, never `new Date("…")` — the plans lesson). The
+materializer itself is SQL (`ensure_standing_orders_materialized`, definer,
+supervisor+-checked in its body) because both callers — the list's server
+component and production generation — need one implementation that cannot
+drift, 013's one-rule-two-callers precedent.
 
 ---
 
@@ -490,8 +546,11 @@ check `max(OrderID)` against the live layout before trusting it.**
 4. **Inquiry → lead.** `parse-inquiry` edge function, paste dialog, customer
    matching. Fixtures from the three real emails.
 5. **Production + recurrence.** Schedule/unschedule against 040's seam
-   (verify the packet picks the lines up — it should, by construction);
-   Instantiate; Duplicate; templates. Flag/resolve. Take payment.
+   (verify the packet picks the lines up — it should, by construction); the
+   standing-order materializer (verified idempotent on the harness: two
+   calls one row, a cancelled day stays cancelled, a paused order makes
+   nothing) wired into the list and into generation, with the "materialize
+   now…" escape hatch; Duplicate; templates. Flag/resolve. Take payment.
 
 Each phase ships usable; nothing later blocks earlier.
 
@@ -508,8 +567,12 @@ Each phase ships usable; nothing later blocks earlier.
 - **Delivery-carrier integration** — DeliverLA request/schedule stay links or
   manual; distance stays a hand-entered pair (FMP's Google link can survive
   as a plain href).
-- **Auto-instantiating standing orders on a cron** — instantiation is a
-  deliberate human act (decision 13).
+- **A cron for standing orders** — materialization is on-demand from the two
+  places that need it (decision 13); a scheduled job would be a third
+  implementation to monitor.
+- **Weekly wholesale statements** — Cafe Knotted's weekly bill stays a manual
+  act in v1; the statement is a QBO-era rendering the money model already
+  supports (decision 13).
 - **A MenuItems successor** — production items + the price grid are the
   catalog; special-order line prices are typed/edited per line.
 - **Customer merge tooling** — warn on create now, merge tool when the pile
