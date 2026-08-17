@@ -3044,8 +3044,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    designing or touching anything here — and read its CORRECTIONS block first,
    which is new: five measurements in the body are wrong, because the brief was
    designed from a `parseInt` reading of `OrderID`.
-   **Shipped: migration 051 (NEEDS APPLYING, and NOT YET REPLAYED ON THE
-   HARNESS — Docker Desktop was blocked on an admin-password dialog)**, the
+   **Shipped: migration 051 — NEEDS APPLYING, but HARNESS-VERIFIED
+   2026-08-17**: all 51 migrations apply on the Docker stub; as real
+   authenticated roles a supervisor reads 8,330 orders / 47,827 lines / 6,457
+   payments / 5,874 customers while **a staffer reads 0 of each and an UPDATE
+   changes 0 rows with NO error**; `anon` cannot execute
+   `next_special_order_number` and a staffer is refused by name from inside it;
+   the storage policies pass 018's own three tests. Every constraint was checked
+   by breaking it, including that **a CANCELLED wholesale day still blocks
+   re-creation**. **The whole real export was then replayed through the real
+   constraints, and that is what found the one real bug** — see (f) below.
+   Also shipped: the
    transform/load pair, `lib/specialOrders.ts` + 56 fixtures, `/special-orders`
    + its record, and `/customers` + its record. See the brief's build-phase list
    for exactly what each contains.
@@ -3099,6 +3108,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    and **`todo` is empty on 8,233 of 8,334 rows** and its real values include
    "OH HOLD" and "No need to print *page 2*", so decision 4's `allowNew` is
    load-bearing and this column must never become a check constraint.
+   **(f) THERE IS NO `check (qty >= 0)` ON A LINE, and putting one back breaks
+   the load.** It was there, and replaying the real export on the harness failed
+   partway through 47,827 inserts: three lines carry a NEGATIVE quantity and
+   they name themselves — `short s'morrisseys` (-80), `short (dropped bin)`
+   (-30), `short donuts (quality issues)` (-26). That is how this shop credits a
+   customer for what it failed to deliver, and two of the three are recent. It
+   was also incoherent with the column beside it, since `unit_price` has no
+   check and six real lines use a negative one ("Tasting Discount",
+   "Wedding Sampler Discount", -$248.50) — the same idea expressible one way and
+   refused the other. 024's lesson, found the same way: a statement true about
+   finished data is still wrong as a constraint.
    Also: `ui/FilterMenus` gained a **`trailing`** slot (right-aligned,
    `ml-auto shrink-0`) for a list's create command — `EmployeesList` had the
    same slot before the control existed. And `/special-orders` and `/customers`

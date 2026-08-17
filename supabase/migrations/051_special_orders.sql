@@ -427,7 +427,23 @@ create table special_order_items (
   item_size   text,
 
   notes      text,
-  qty        numeric(10,2) not null default 0 check (qty >= 0),
+
+  -- **NO `check (qty >= 0)`**, and this is a MEASUREMENT rather than an
+  -- oversight — 024's lesson, found the same way, by replaying the whole real
+  -- export through the real constraints on the harness rather than by reading.
+  --
+  -- Three of the 47,827 real lines carry a negative quantity, and they name
+  -- themselves: `short s'morrisseys` (-80), `short (dropped bin)` (-30),
+  -- `short donuts (quality issues)` (-26). A negative quantity is how this
+  -- shop credits a customer for what it failed to deliver, two of the three
+  -- are recent, and the constraint would have failed the production load
+  -- PARTWAY THROUGH — on row 30,000-odd of a 47,827-row insert.
+  --
+  -- It was also incoherent with the line below it: `unit_price` carries no
+  -- check, and six real lines use a negative one ("Tasting Discount",
+  -- "Wedding Sampler Discount", -$248.50). The same idea — a credit line — was
+  -- expressible one way and refused the other.
+  qty        numeric(10,2) not null default 0,
   unit_price numeric(10,2) not null default 0,
   taxable    boolean not null default true,
 
@@ -783,4 +799,39 @@ notify pgrst, 'reload schema';
 --   insert ... (kind, status) values ('order', null)       -> refused
 --     (same constraint, the other direction — a check that only fires one way
 --      would let every hand-written insert leave status null)
+--
+-- ----------------------------------------------------------------------------
+-- VERIFIED ON THE DOCKER HARNESS, 2026-08-17
+-- ----------------------------------------------------------------------------
+-- All 51 migrations apply on a Supabase stub. Then, as REAL authenticated
+-- roles (`set local role` inside a transaction, asserting `current_user` in the
+-- output — outside one it is a silent no-op that leaves you superuser and
+-- bypasses RLS):
+--
+--   · a SUPERVISOR reads 8,330 orders / 47,827 lines / 6,457 payments /
+--     5,874 customers and inserts, updates and deletes;
+--   · a STAFFER reads **0 of each**, and an UPDATE changes **0 rows and
+--     returns NO error** — the footgun every write in the app `.select()`s
+--     against — while an INSERT is refused outright;
+--   · `anon` cannot execute `next_special_order_number` at all, and a staffer
+--     is refused BY NAME from inside its body ("insufficient role to number a
+--     special order"); a supervisor gets 10000 then 10001;
+--   · a supervisor may write a storage object under their own org's folder and
+--     NOT under another's, and a junk path is refused by the POLICY rather
+--     than raising a cast error (018's wrapper doing its job).
+--
+-- Each constraint was checked by BREAKING it: the kind/status biconditional in
+-- BOTH directions, weekday 8, a second materialized day for one standing order,
+-- and — the one that matters — **a materialized day that has been CANCELLED
+-- still blocks re-creation**, which is what stops cancelled Thanksgiving from
+-- ordering the donuts again on the next page load.
+--
+-- Then THE WHOLE REAL EXPORT was replayed through the real constraints, which
+-- is what found the `qty >= 0` check documented above — it would have failed
+-- the production load partway through. After removing it everything loads:
+-- the eleven suffixed numbers survive verbatim, `6002` and `6002-2` sit side
+-- by side, the ten standing orders carry the right weekday sets, **zero
+-- wholesale days are materialized** (decision 13's requirement of the
+-- migration), and the money derives in SQL to $2,373,968.82 of revenue over
+-- 8,014 orders against $1,882,797.70 of recorded payments.
 -- ----------------------------------------------------------------------------
