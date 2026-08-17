@@ -39,6 +39,8 @@ import { OrderActions } from "@/components/specialOrders/OrderActions";
 import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
 import { TimeCell } from "@/components/specialOrders/TimeCell";
 import { StandingOrderBlock } from "@/components/specialOrders/StandingOrderBlock";
+import { OrderInfoLayout } from "@/components/specialOrders/OrderInfoLayout";
+import { StickyFooter } from "@/components/ui/StickyFooter";
 
 const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Special Orders" };
 
@@ -351,211 +353,218 @@ export async function SpecialOrderDetail({
         </div>
 
         <div className="min-w-0 flex-1 space-y-12">
-          {/* ================= INFO ================= */}
+          {/* ================= INFO — FOUR QUADRANTS ================= */}
+          {/* FileMaker's EVENT INFO tab: the facts you set up top, the two
+              panes that grow underneath. See `OrderInfoLayout`. */}
           {activeTab === "info" && (
-            <>
-              <section className="space-y-3">
-                <SectionHeading>Details</SectionHeading>
-                <div className="grid gap-x-12 gap-y-4 sm:grid-cols-2">
-                  <Row label="What it is">
-                    <Cell table="special_orders" id={id} column="title" value={row.title as string | null}
-                          canWrite={canWrite} ariaLabel="What the order is for" />
-                  </Row>
-                  <Row label="Status">
-                    {kind === "order" ? (
-                      <Cell table="special_orders" id={id} column="status" kind="pick"
-                            options={STATUS_OPTIONS} value={status} canWrite={canWrite}
-                            ariaLabel="Status" />
-                    ) : (
-                      /* Decision 3: status exists exactly when kind is `order`,
-                         and the database enforces the biconditional. Offering
-                         the picker here would be offering a write that is
-                         refused by a CHECK — the one refusal an InlineValue
-                         cannot explain. */
-                      <span className={READ_ONLY_VALUE}>{KIND_LABEL[kind]}</span>
-                    )}
-                  </Row>
-                  <Row label="Event date">
-                    <Cell table="special_orders" id={id} column="event_date" kind="date"
-                          value={row.event_date as string | null} canWrite={canWrite}
-                          ariaLabel="Event date" />
-                  </Row>
-                  <Row label="Event time">
-                    {/* `TimeCell`, not `Cell`: a `time` column reads back as
-                        `10:00:00` and the list already says "10:00 AM". It has
-                        to be a client component — `format` is a function, and
-                        one passed from here throws at runtime. */}
-                    <TimeCell id={id} column="event_time" value={row.event_time as string | null}
-                              label="Event time" canWrite={canWrite} />
-                  </Row>
-                  <Row label="Ready by">
-                    <TimeCell id={id} column="ready_by_time" value={row.ready_by_time as string | null}
-                              label="Ready by" canWrite={canWrite} placeholder="9:00 AM" />
-                  </Row>
-                  <Row label="Kitchen">
-                    {/* Decision 8: kitchen is where it is MADE. */}
-                    <Cell table="special_orders" id={id} column="kitchen_location_id" kind="pick"
-                          options={locationOptions} value={row.kitchen_location_id as string | null}
-                          canWrite={canWrite} ariaLabel="Kitchen" />
-                  </Row>
-                  <Row label="Pickup shop">
-                    {/* …and location is where it is PICKED UP. Two nullable FKs
-                        because they routinely differ. */}
-                    <Cell table="special_orders" id={id} column="location_id" kind="pick"
-                          options={locationOptions} value={row.location_id as string | null}
-                          canWrite={canWrite} ariaLabel="Pickup shop" />
-                  </Row>
-                  <Row label="Taken by">
-                    <Cell table="special_orders" id={id} column="taken_by" value={row.taken_by as string | null}
-                          canWrite={canWrite} ariaLabel="Order taken by" />
-                  </Row>
-                  <Row label="To-do">
-                    {/* Decision 4: MANUAL, with `allowNew` — the real data
-                        holds "ON HOLD", "HOLIDAY" and "Adjust time to 9am or
-                        later", so a closed vocabulary would refuse it. */}
-                    <Cell table="special_orders" id={id} column="todo" kind="pick" allowNew clearable
-                          options={TODO_OPTIONS} value={row.todo as string | null}
-                          canWrite={canWrite} ariaLabel="To-do" />
-                  </Row>
-                  <Row label="Allergies">
-                    <Cell table="special_orders" id={id} column="allergen_info"
-                          value={row.allergen_info as string | null} canWrite={canWrite}
-                          ariaLabel="Allergen information" />
-                  </Row>
-                </div>
-              </section>
+            <OrderInfoLayout
+              details={
+                <section className="space-y-3">
+                  <SectionHeading>Details</SectionHeading>
+                  <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
+                    <Row label="What it is">
+                      <Cell table="special_orders" id={id} column="title" value={row.title as string | null}
+                            canWrite={canWrite} ariaLabel="What the order is for" />
+                    </Row>
+                    <Row label="Status">
+                      {kind === "order" ? (
+                        <Cell table="special_orders" id={id} column="status" kind="pick"
+                              options={STATUS_OPTIONS} value={status} canWrite={canWrite}
+                              ariaLabel="Status" />
+                      ) : (
+                        /* Decision 3: status exists exactly when kind is
+                           `order`, and the database enforces the
+                           biconditional. Offering the picker here would offer a
+                           write a CHECK refuses — the one refusal an
+                           InlineValue cannot explain. */
+                        <span className={READ_ONLY_VALUE}>{KIND_LABEL[kind]}</span>
+                      )}
+                    </Row>
+                    <Row label="Event date">
+                      <Cell table="special_orders" id={id} column="event_date" kind="date"
+                            value={row.event_date as string | null} canWrite={canWrite}
+                            ariaLabel="Event date" />
+                    </Row>
+                    <Row label="Event time">
+                      {/* `TimeCell`, not `Cell`: a `time` column reads back as
+                          `10:00:00`. It has to be a client component — `format`
+                          is a function, and one passed from here throws. */}
+                      <TimeCell id={id} column="event_time" value={row.event_time as string | null}
+                                label="Event time" canWrite={canWrite} />
+                    </Row>
+                    <Row label="Ready by">
+                      <TimeCell id={id} column="ready_by_time" value={row.ready_by_time as string | null}
+                                label="Ready by" canWrite={canWrite} placeholder="9:00 AM" />
+                    </Row>
+                    <Row label="Taken by">
+                      <Cell table="special_orders" id={id} column="taken_by" value={row.taken_by as string | null}
+                            canWrite={canWrite} ariaLabel="Order taken by" />
+                    </Row>
+                    <Row label="Kitchen">
+                      {/* Decision 8: kitchen is where it is MADE… */}
+                      <Cell table="special_orders" id={id} column="kitchen_location_id" kind="pick"
+                            options={locationOptions} value={row.kitchen_location_id as string | null}
+                            canWrite={canWrite} ariaLabel="Kitchen" />
+                    </Row>
+                    <Row label="Pickup shop">
+                      {/* …and location is where it is PICKED UP. */}
+                      <Cell table="special_orders" id={id} column="location_id" kind="pick"
+                            options={locationOptions} value={row.location_id as string | null}
+                            canWrite={canWrite} ariaLabel="Pickup shop" />
+                    </Row>
+                    <Row label="To-do">
+                      {/* Decision 4: MANUAL, with `allowNew` — the real data
+                          holds "ON HOLD" and "Adjust time to 9am or later". */}
+                      <Cell table="special_orders" id={id} column="todo" kind="pick" allowNew clearable
+                            options={TODO_OPTIONS} value={row.todo as string | null}
+                            canWrite={canWrite} ariaLabel="To-do" />
+                    </Row>
+                    <Row label="Allergies">
+                      <Cell table="special_orders" id={id} column="allergen_info"
+                            value={row.allergen_info as string | null} canWrite={canWrite}
+                            ariaLabel="Allergen information" />
+                    </Row>
+                  </div>
+                </section>
+              }
+              customer={
+                <div>
+                  <section className="space-y-3">
+                    <SectionHeading>Customer</SectionHeading>
+                    <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
+                      <Row label="Customer">
+                        {customer ? (
+                          <Link
+                            href={withFrom(`/customers/${customer.id}`, {
+                              href: orderTabHref(id, "info", rawParams),
+                              label: `#${row.number as string}`,
+                            })}
+                            className={`${READ_ONLY_VALUE} underline underline-offset-2 hover:text-ink`}
+                          >
+                            {customerLabel(customer)}
+                          </Link>
+                        ) : (
+                          <span className={`${READ_ONLY_VALUE} text-faint`}>None linked</span>
+                        )}
+                      </Row>
+                      <Row label="Their phone">
+                        <span className={READ_ONLY_VALUE}>{customer?.phone ?? "—"}</span>
+                      </Row>
+                      {/* The DAY-OF contact, who is often not the customer —
+                          filled on 7,735 of the 8,330 real orders. */}
+                      <Row label="Day-of contact">
+                        <Cell table="special_orders" id={id} column="contact_name"
+                              value={row.contact_name as string | null} canWrite={canWrite}
+                              ariaLabel="Day-of contact name" />
+                      </Row>
+                      <Row label="Contact phone">
+                        <Cell table="special_orders" id={id} column="contact_phone"
+                              value={row.contact_phone as string | null} canWrite={canWrite}
+                              ariaLabel="Day-of contact phone" />
+                      </Row>
+                      <Row label="Contact email">
+                        <Cell table="special_orders" id={id} column="contact_email"
+                              value={row.contact_email as string | null} canWrite={canWrite}
+                              ariaLabel="Day-of contact email" />
+                      </Row>
+                    </div>
+                  </section>
 
-              <section className="space-y-3">
-                <SectionHeading>Contact</SectionHeading>
-                <div className="grid gap-x-12 gap-y-4 sm:grid-cols-2">
-                  <Row label="Customer">
-                    {customer ? (
-                      <Link
-                        href={withFrom(`/customers/${customer.id}`, {
-                          href: orderTabHref(id, "info", rawParams),
-                          label: `#${row.number as string}`,
-                        })}
-                        className={`${READ_ONLY_VALUE} underline underline-offset-2 hover:text-ink`}
-                      >
-                        {customerLabel(customer)}
-                      </Link>
-                    ) : (
-                      <span className={`${READ_ONLY_VALUE} text-faint`}>None linked</span>
-                    )}
-                  </Row>
-                  <Row label="Customer phone">
-                    <span className={READ_ONLY_VALUE}>{customer?.phone ?? "—"}</span>
-                  </Row>
-                  {/* The DAY-OF contact, who is often not the customer — filled
-                      on 7,735 of the 8,330 real orders. Editable here where the
-                      customer's own details are edited on their record. */}
-                  <Row label="Day-of contact">
-                    <Cell table="special_orders" id={id} column="contact_name"
-                          value={row.contact_name as string | null} canWrite={canWrite}
-                          ariaLabel="Day-of contact name" />
-                  </Row>
-                  <Row label="Their phone">
-                    <Cell table="special_orders" id={id} column="contact_phone"
-                          value={row.contact_phone as string | null} canWrite={canWrite}
-                          ariaLabel="Day-of contact phone" />
-                  </Row>
-                  <Row label="Their email">
-                    <Cell table="special_orders" id={id} column="contact_email"
-                          value={row.contact_email as string | null} canWrite={canWrite}
-                          ariaLabel="Day-of contact email" />
-                  </Row>
                 </div>
-              </section>
-
-              {kind === "standing_order" ? (
-                <StandingOrderBlock
-                  id={id}
-                  standingDays={(row.standing_days as number[] | null) ?? []}
-                  startsOn={row.starts_on as string | null}
-                  endsOn={row.ends_on as string | null}
-                  paused={Boolean(row.paused)}
-                  horizonDays={settings.horizonDays}
-                  today={today}
+              }
+              alsoThatDay={
+                <div className="space-y-10">
+                    {/* THE QUADRANT THAT ANSWERS "WHEN". For an order that is the
+                        stage dates; for a standing order it is the recurrence,
+                        which is the same question asked of a record that has no
+                        single date. A standing order has no status, so it can
+                        have no completion dates either. */}
+                    {kind === "standing_order" ? (
+                      <StandingOrderBlock
+                        id={id}
+                        standingDays={(row.standing_days as number[] | null) ?? []}
+                        startsOn={row.starts_on as string | null}
+                        endsOn={row.ends_on as string | null}
+                        paused={Boolean(row.paused)}
+                        horizonDays={settings.horizonDays}
+                        today={today}
+                        canWrite={canWrite}
+                      />
+                    ) : kind === "order" ? (
+                      <section className="space-y-3">
+                        <SectionHeading>Completion dates</SectionHeading>
+                        {/* INLINE LABELS, not stacked — FileMaker's own shape,
+                            and here it is load-bearing rather than cosmetic.
+                            Stacked, nine date fields ran ~400px and ate the whole
+                            measured frame, collapsing the History pane beneath
+                            them to zero height. Beside their boxes they are five
+                            rows of ~34px, and the log gets its half of the
+                            column back. */}
+                        <div className="grid gap-x-10 gap-y-1.5 sm:grid-cols-2">
+                          <FieldRow label="Initiated"><Cell table="special_orders" id={id} column="date_initiated" kind="date" value={row.date_initiated as string | null} canWrite={canWrite} ariaLabel="Date initiated" /></FieldRow>
+                          <FieldRow label="Quote sent"><Cell table="special_orders" id={id} column="quote_sent_at" kind="date" value={row.quote_sent_at as string | null} canWrite={canWrite} ariaLabel="Quote sent" /></FieldRow>
+                          <FieldRow label="Quote approved"><Cell table="special_orders" id={id} column="quote_returned_at" kind="date" value={row.quote_returned_at as string | null} canWrite={canWrite} ariaLabel="Quote approved" /></FieldRow>
+                          <FieldRow label="Invoice sent"><Cell table="special_orders" id={id} column="invoice_sent_at" kind="date" value={row.invoice_sent_at as string | null} canWrite={canWrite} ariaLabel="Invoice sent" /></FieldRow>
+                          <FieldRow label="Invoice paid"><Cell table="special_orders" id={id} column="invoice_paid_at" kind="date" value={row.invoice_paid_at as string | null} canWrite={canWrite} ariaLabel="Invoice paid" /></FieldRow>
+                          <FieldRow label="Receipt sent"><Cell table="special_orders" id={id} column="receipt_sent_at" kind="date" value={row.receipt_sent_at as string | null} canWrite={canWrite} ariaLabel="Receipt sent" /></FieldRow>
+                          <FieldRow label="Delivery scheduled"><Cell table="special_orders" id={id} column="delivery_scheduled_at" kind="date" value={row.delivery_scheduled_at as string | null} canWrite={canWrite} ariaLabel="Delivery scheduled" /></FieldRow>
+                          <FieldRow label="Order printed"><Cell table="special_orders" id={id} column="order_printed_at" kind="date" value={row.order_printed_at as string | null} canWrite={canWrite} ariaLabel="Order printed" /></FieldRow>
+                          <FieldRow label="Production scheduled"><Cell table="special_orders" id={id} column="order_scheduled_at" kind="date" value={row.order_scheduled_at as string | null} canWrite={canWrite} ariaLabel="Production scheduled" /></FieldRow>
+                        </div>
+                      </section>
+                    ) : null}
+                  <OtherOrdersThatDay
+                    orgId={session.membership.org_id}
+                    orderId={id}
+                    eventDate={row.event_date as string | null}
+                    listHref={orderTabHref(id, "info", rawParams)}
+                  />
+                </div>
+              }
+              history={
+                <OrderLog
+                  orderId={id}
+                  orgId={row.org_id as string}
+                  rows={(logRows ?? []) as unknown as OrderEventRow[]}
+                  total={logTotal ?? 0}
                   canWrite={canWrite}
+                  authorName={session.membership.display_name ?? session.email}
                 />
-              ) : null}
+              }
+            />
+          )}
 
-              <section className="space-y-3">
-                <SectionHeading>Progress</SectionHeading>
-                <p className="max-w-[80ch] text-[13px] text-muted">
-                  Each date stamps itself when the app does the thing — sending a
-                  quote, taking a payment — and every one is editable, because
-                  plenty of them happen on the phone.
-                </p>
-                <div className="grid gap-x-12 gap-y-4 sm:grid-cols-2">
-                  <Row label="Initiated"><Cell table="special_orders" id={id} column="date_initiated" kind="date" value={row.date_initiated as string | null} canWrite={canWrite} ariaLabel="Date initiated" /></Row>
-                  <Row label="Quote sent"><Cell table="special_orders" id={id} column="quote_sent_at" kind="date" value={row.quote_sent_at as string | null} canWrite={canWrite} ariaLabel="Quote sent" /></Row>
-                  <Row label="Quote approved"><Cell table="special_orders" id={id} column="quote_returned_at" kind="date" value={row.quote_returned_at as string | null} canWrite={canWrite} ariaLabel="Quote approved" /></Row>
-                  <Row label="Invoice sent"><Cell table="special_orders" id={id} column="invoice_sent_at" kind="date" value={row.invoice_sent_at as string | null} canWrite={canWrite} ariaLabel="Invoice sent" /></Row>
-                  <Row label="Invoice paid"><Cell table="special_orders" id={id} column="invoice_paid_at" kind="date" value={row.invoice_paid_at as string | null} canWrite={canWrite} ariaLabel="Invoice paid" /></Row>
-                  <Row label="Receipt sent"><Cell table="special_orders" id={id} column="receipt_sent_at" kind="date" value={row.receipt_sent_at as string | null} canWrite={canWrite} ariaLabel="Receipt sent" /></Row>
-                  <Row label="Order printed"><Cell table="special_orders" id={id} column="order_printed_at" kind="date" value={row.order_printed_at as string | null} canWrite={canWrite} ariaLabel="Order printed" /></Row>
-                  <Row label="Production scheduled"><Cell table="special_orders" id={id} column="order_scheduled_at" kind="date" value={row.order_scheduled_at as string | null} canWrite={canWrite} ariaLabel="Production scheduled" /></Row>
-                </div>
-              </section>
-
-              <section className="space-y-3">
-                <SectionHeading>Notes</SectionHeading>
-                <p className="max-w-[80ch] text-[13px] text-muted">
-                  Each of these prints on its own document. The general note
-                  prints nowhere — it is for you.
-                </p>
-                <div className="space-y-4">
-                  <Row label="General (prints nowhere)" wide>
-                    <Cell table="special_orders" id={id} column="notes_general" multiline
-                          value={row.notes_general as string | null} canWrite={canWrite} ariaLabel="General note" />
-                  </Row>
-                  <Row label="On the quote" wide>
-                    <Cell table="special_orders" id={id} column="notes_quote" multiline
-                          value={row.notes_quote as string | null} canWrite={canWrite} ariaLabel="Quote note" />
-                  </Row>
-                  <Row label="On the kitchen order" wide>
-                    <Cell table="special_orders" id={id} column="notes_production" multiline
-                          value={row.notes_production as string | null} canWrite={canWrite} ariaLabel="Production note" />
-                  </Row>
-                  <Row label="On the invoice" wide>
-                    <Cell table="special_orders" id={id} column="notes_invoice" multiline
-                          value={row.notes_invoice as string | null} canWrite={canWrite} ariaLabel="Invoice note" />
-                  </Row>
-                  <Row label="On the receipt" wide>
-                    <Cell table="special_orders" id={id} column="notes_receipt" multiline
-                          value={row.notes_receipt as string | null} canWrite={canWrite} ariaLabel="Receipt note" />
-                  </Row>
-                </div>
-              </section>
-
-              <OtherOrdersThatDay
-                orgId={session.membership.org_id}
-                orderId={id}
-                eventDate={row.event_date as string | null}
-                listHref={orderTabHref(id, "info", rawParams)}
-              />
-
-              <OrderLog
-                orderId={id}
-                orgId={row.org_id as string}
-                rows={(logRows ?? []) as unknown as OrderEventRow[]}
-                total={logTotal ?? 0}
-                canWrite={canWrite}
-                authorName={session.membership.display_name ?? session.email}
-              />
-
-              <OrderActions
-                id={id}
-                number={row.number as string}
-                kind={kind}
-                status={status}
-                flagReason={row.flag_reason as string | null}
-                lineCount={lines.length}
-                paymentCount={payments.length}
-                canWrite={canWrite}
-              />
-            </>
+          {/* ================= NOTES ================= */}
+          {activeTab === "notes" && (
+            <section className="space-y-3">
+              <SectionHeading>Notes</SectionHeading>
+              <p className="max-w-[80ch] text-[13px] text-muted">
+                Each of these prints on its own document. The general note prints
+                nowhere — it is for you.
+              </p>
+              <div className="max-w-[70ch] space-y-6">
+                <Row label="General (prints nowhere)">
+                  <Cell table="special_orders" id={id} column="notes_general" multiline
+                        value={row.notes_general as string | null} canWrite={canWrite} ariaLabel="General note" />
+                </Row>
+                <Row label="On the quote">
+                  <Cell table="special_orders" id={id} column="notes_quote" multiline
+                        value={row.notes_quote as string | null} canWrite={canWrite} ariaLabel="Quote note" />
+                </Row>
+                <Row label="On the kitchen order">
+                  <Cell table="special_orders" id={id} column="notes_production" multiline
+                        value={row.notes_production as string | null} canWrite={canWrite} ariaLabel="Production note" />
+                </Row>
+                <Row label="On the invoice">
+                  <Cell table="special_orders" id={id} column="notes_invoice" multiline
+                        value={row.notes_invoice as string | null} canWrite={canWrite} ariaLabel="Invoice note" />
+                </Row>
+                <Row label="On the receipt">
+                  <Cell table="special_orders" id={id} column="notes_receipt" multiline
+                        value={row.notes_receipt as string | null} canWrite={canWrite} ariaLabel="Receipt note" />
+                </Row>
+              </div>
+            </section>
           )}
 
           {/* ================= ITEMS ================= */}
@@ -622,11 +631,61 @@ export async function SpecialOrderDetail({
           )}
         </div>
       </div>
+
+      {/* THE COMMANDS ARE A BAR ON EVERY TAB, which is FileMaker's own bottom
+          row (NEW ORDER · DUPLICATE ORDER · UNSCHEDULE PRODUCTION · FLAG ORDER
+          · DELETE ORDER · PREVIEW/EMAIL). They used to be a "Commands" section
+          at the foot of the Info tab, which put them below the log — the one
+          block on that tab with no natural end — so Delete was two hundred
+          entries down the page.
+
+          `ui/StickyFooter` measures its own height into a spacer, so the last
+          quadrant stays clear of it with no guessed constant, and the measured
+          quadrant height accounts for it through `spaceBelow`. */}
+      {canWrite ? (
+        <StickyFooter spacerClassName="-mt-8">
+          <div className="px-4 xl:px-12">
+            <OrderActions
+              id={id}
+              number={row.number as string}
+              kind={kind}
+              status={status}
+              flagReason={row.flag_reason as string | null}
+              lineCount={lines.length}
+              paymentCount={payments.length}
+              canWrite={canWrite}
+            />
+          </div>
+        </StickyFooter>
+      ) : null}
     </div>
   );
 }
 
 /* -------------------------------------------------------------------------- */
+
+/**
+ * A LABEL BESIDE ITS VALUE — the Info tab's row, and FileMaker's own shape:
+ * every block on its EVENT INFO tab right-aligns its labels against a fixed
+ * track so the boxes share one left edge.
+ *
+ * HEIGHT IS THE REASON, not fidelity. Stacked (label over value) the three
+ * top blocks came to 337px and 494px, which in a measured 588px frame left the
+ * History pane FIFTY-FOUR PIXELS — a heading and nothing else. Inline they are
+ * roughly half that, and the two panes that grow get their share of the column
+ * back. The stacked `Row` below is still right for the Notes tab, where the
+ * value is a paragraph rather than a box.
+ */
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-baseline gap-3">
+      <dt className="w-32 shrink-0 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+        {label}
+      </dt>
+      <dd className="min-w-0">{children}</dd>
+    </div>
+  );
+}
 
 function Row({
   label,

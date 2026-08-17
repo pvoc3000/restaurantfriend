@@ -7,7 +7,6 @@ import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
-import { SectionHeading } from "@/components/ui/SectionHeading";
 import { TextInput } from "@/components/ui/TextInput";
 import { FLAG_TODO, type SpecialOrderKind, type SpecialOrderStatus } from "@/lib/specialOrders";
 
@@ -275,8 +274,11 @@ export function OrderActions({
   }
 
   return (
-    <section className="space-y-3">
-      <SectionHeading>Commands</SectionHeading>
+    /* NO HEADING AND NO SECTION: this lives in the record's sticky footer now
+       (FileMaker's own bottom row), where a "Commands" caption would label a
+       bar that is self-evidently a bar. The error sits at the end of the same
+       row so a refusal appears beside the button that caused it. */
+    <div className="flex flex-wrap items-center gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <button type="button" className={BUTTON_CLASS} onClick={duplicate} disabled={pending}>
           Duplicate
@@ -346,6 +348,6 @@ export function OrderActions({
           </div>
         </Dialog>
       )}
-    </section>
+    </div>
   );
 }

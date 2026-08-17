@@ -702,13 +702,25 @@ export function readSettings(orgSettings: Record<string, unknown>): SpecialOrder
  * The tab lives in the URL like every other piece of view state, and `info`
  * writes NO parameter so the record keeps one canonical address.
  */
-export type OrderTab = "info" | "items" | "delivery" | "documents";
+export type OrderTab = "info" | "items" | "notes" | "delivery" | "documents";
 
-export const ORDER_TABS: OrderTab[] = ["info", "items", "delivery", "documents"];
+/**
+ * FileMaker's own tabs, minus the two this module retires: EVENT INFO · ITEMS ·
+ * NOTES · DELIVERY · PICS · QUOTE · OLD. `PICS` merges into Documents
+ * (decision 14) and `QUOTE`/`OLD` were the v1 repeating-field layouts, which
+ * have no successor.
+ *
+ * NOTES IS ITS OWN TAB because FileMaker made it one and the reason still
+ * holds: five multiline fields are a screenful, they are all about which
+ * DOCUMENT a sentence prints on, and on the Info tab they pushed the log —
+ * the thing you actually read — below the fold.
+ */
+export const ORDER_TABS: OrderTab[] = ["info", "items", "notes", "delivery", "documents"];
 
 export const ORDER_TAB_LABEL: Record<OrderTab, string> = {
   info: "Info",
   items: "Items",
+  notes: "Notes",
   delivery: "Delivery",
   documents: "Documents",
 };
@@ -751,7 +763,10 @@ export function orderTabHref(
  * somebody to file this week's invoice against the recurrence itself.
  */
 export function tabsForKind(kind: SpecialOrderKind): OrderTab[] {
-  return kind === "order" ? ORDER_TABS : ["info", "items"];
+  // A template and a standing order still carry notes — a wholesale account's
+  // packing instruction is exactly the kind of thing that belongs on the
+  // recurrence, so every day it makes inherits it.
+  return kind === "order" ? ORDER_TABS : ["info", "items", "notes"];
 }
 
 /* ==========================================================================

@@ -3154,6 +3154,34 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    And a measuring trap: **check the label SPAN, not the button around it** —
    a button sizes to its own content and can never report an overflow, which is
    how two clipped column headers survived a check that said everything fit.
+   **(h) THE INFO TAB IS FOUR QUADRANTS, NOT A SCROLLING PAGE** (Mark,
+   2026-08-17: the stacked column "just looks like a wall of text"), with
+   FileMaker's own EVENT INFO tab as the reference. Details · Customer on top;
+   Completion dates + Also that day, and the History log, underneath — the two
+   panes that GROW are at the bottom where they can run as long as they like.
+   `components/specialOrders/OrderInfoLayout` measures the frame with
+   `useExactViewportHeight` (the recipe record's hook, `xl`-gated, 420px floor)
+   and each column's LAST pane takes the slack and scrolls its own rows.
+   TWO COLUMNS OF STACKED PANES rather than a literal 2x2 grid, which is
+   `RecipeInfo`'s shape and reason: a grid ties both bottom cells to one row
+   height, so a long log would stretch the empty pane beside it.
+   Three things this cost, each found by measuring rather than reading:
+   **`overflow-y-auto` on the growing pane is load-bearing** — without it
+   `xl:flex-1` gives the pane a box, the log simply overflows it, and the page
+   runs to 1402px inside a 588px frame, which is the arrangement the layout
+   exists to replace. **The top blocks decide whether the bottom ones exist**:
+   Customer + Completion dates came to 494px of a 588px frame and left History
+   FIFTY-FOUR PIXELS, a heading and nothing else — which is why the dates moved
+   to the bottom-LEFT quadrant. And **inline labels were tried everywhere and
+   kept only for the dates**: at ~272px per sub-column a 128px label track
+   leaves too little for a name or a phone, so those wrap; the dates are short
+   values and stay inline, which is what makes that block compact.
+   **NOTES IS ITS OWN TAB** (FileMaker has one) — five multiline document notes
+   are a screenful and they pushed the log below the fold. **The commands moved
+   to a `ui/StickyFooter`**, FMP's bottom row: on the Info tab they sat under
+   the log, so Delete was two hundred entries down the page.
+   Known residue: at 1440x900 the page still scrolls ~32px. Nothing is hidden
+   and every pane fits; it has not been chased down.
    Also: `ui/FilterMenus` gained a **`trailing`** slot (right-aligned,
    `ml-auto shrink-0`) for a list's create command — `EmployeesList` had the
    same slot before the control existed. And `/special-orders` and `/customers`
