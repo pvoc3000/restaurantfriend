@@ -3079,7 +3079,25 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `/welcome`; typed-name clickwrap; the token is minted at SEND time bound
    to the exact PDF sent, spent by approval, superseded by a re-send; two
    definer RPCs deliberately granted `anon` and nothing else reachable —
-   print/sign/scan survives as the manual lane); numbering seeds at
+   print/sign/scan survives as the manual lane); **the front door is OUR OWN
+   public `/inquiry` form** (Mark, 2026-08-16 — the Square web form and its
+   email layer retire; submission creates a Lead directly via a third
+   deliberate anon-granted definer that never reveals whether an email is a
+   known customer, and the confirmation email from specialorders@ becomes
+   the thread root), with an optional **build-your-box picker** over
+   production items curated by a new `show_on_inquiry_form` flag (default
+   FALSE — opt-in, the catalog holds Scrap), picked lines landing as real
+   order lines on the lead, totals labelled ESTIMATE, the free-text
+   description always beside it, email paste-and-parse kept as the fallback
+   lane; the list carries a DERIVED **needs-attention tier** (each order
+   names its reason in words; the manual todo overrides on display; nothing
+   stored); weekly **wholesale statements** are a one-tap rendering command
+   on the customer record (Cafe Knotted is billed weekly in arrears today,
+   by hand); the **rush fee suggests itself** inside the two-business-day
+   cutoff (receiving's `→` idiom, never auto-written — only 795 of 5,198 v1
+   orders ever carried one); **approve-and-pay via the Square API is the
+   named first post-v1 feature** and nothing in v1 may make it harder;
+   numbering seeds at
    10000 (FMP max 9887; `legacy_id` is NOT unique — 5 duplicated OrderIDs);
    customers migrate WITHOUT the plain-text CC fields, ever.
 5. SwiftUI floor app (only after 4 is proven in real use)

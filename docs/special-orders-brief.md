@@ -201,6 +201,8 @@ production item and keep the custom name, which is what the snapshot columns
 are for. Do NOT widen `item_id` to nullable for this.
 
 ### 10. Inquiry parsing is a Claude extraction, `extract-invoice`'s shape
+    (since decision 18, this is the FALLBACK lane — the primary door is our
+    own public form, which creates the lead with no email in the loop)
 
 The inquiry is a Square web form emailed to **specialorders@donutfriend.com**
 (from `messenger@messaging.squareup.com`, subject "New Form Entry from {name}:
@@ -379,7 +381,109 @@ The rules that make it sound:
   the only lane.
 - **No payment chaining in v1** — the approval page ends at "your invoice
   will follow by email"; Square invoicing stays decision 2's manual flow.
-  No customer accounts, no portal beyond this one page.
+  No customer accounts, no portal beyond this one page. (Decision 20 names
+  approve-and-pay as the FIRST post-v1 feature — nothing in v1 may make it
+  harder.)
+
+### 18. The inquiry form is OURS; the email layer disappears
+    (Mark, 2026-08-16: "direct the customer to our own form so that there's
+    no email layer — it's just a direct form entry that creates a special
+    order Lead record.")
+
+A public form at **`/inquiry`** (proxy-exempt, mobile-first) replaces the
+Square web form as the front door. The donutfriend.com Square site's Special
+Orders button links to it; an iframe embed is a cosmetic option if the Square
+plan allows, and the form must stand alone regardless. Fields mirror the
+Square form's (the measured list in decision 10) so customers see continuity:
+name, email, phone, occasion, pickup/delivery, address, preferred location,
+date, time, what they're interested in, description, allergies.
+
+Submitting creates a **lead directly** — no email, no parsing: a definer
+`create_inquiry(...)` granted to `anon` (the third and last deliberate anon
+grant, beside decision 17's two), whose body validates hard, inserts the
+lead with todo "Respond to Email/Call", matches-or-creates the customer by
+email then phone INTERNALLY, and returns nothing but ok — an anon caller
+must not be able to learn whether an email address is a customer. Abuse is
+handled proportionately: a honeypot field, per-IP rate limiting in the
+route, server-side validation — leads are cheap and a supervisor triages
+them anyway; no CAPTCHA.
+
+**The customer can BUILD the order, not just describe it** (Mark,
+2026-08-16: "we could allow the customer to really build an order
+themselves rather than just 'describe' it"). An OPTIONAL "build your box"
+section beside the free-text description — never instead of it, because
+custom work is the module's soul and no picker expresses "spell WERE
+PREGNANT! in letter donuts". The customer browses the offerable menu with
+prices from the grid, steppers, a note per item, and a running total
+**labelled ESTIMATE** ("your quote may differ — custom work, delivery and
+rush fees are quoted by a human"). Submission still creates a LEAD; the
+picked lines land as real `special_order_items` (log entry: "items proposed
+by customer"), so the supervisor edits a draft instead of transcribing
+prose. Two guardrails: **what is offerable is a curated flag on
+`production_items`** (`show_on_inquiry_form`, default FALSE — the catalog
+holds Scrap and test items, so opting in is the safe direction and Mark
+ticks the menu once), served through a definer RPC returning only name /
+size / price — never the taxonomy, costs or anything else; and the page
+never promises a confirmed order — the QUOTE remains the offer, decision
+17's page remains where it's accepted.
+
+The app then sends "We received your inquiry" from specialorders@ — which
+both verifies the address is real and **establishes the email thread from a
+message WE authored** (its Message-ID becomes the thread root decision 12
+replies to). The form shows decision 22's cutoff notice ("orders need two
+business days; closer dates incur a rush fee") but never blocks a date.
+
+**Decision 10's paste-and-parse survives as the fallback** — organic emails
+to specialorders@ will never stop, and the parser is how they become leads.
+The Square form is retired once this is live.
+
+### 19. The list carries a DERIVED "needs attention" queue
+
+The module knows every stalled order and now says so: a quote sent N days
+ago with no answer, an event inside X days still unpaid, a paid order for
+tomorrow nobody printed or scheduled, a delivery order with no delivery
+scheduled, yesterday's event awaiting its post-event follow-up. A tier on
+the list ("Needs attention · 12", the cleanup queue's shape) where **each
+order names its reason in words** — never a bare count. Pure derivation
+over existing columns (`needsAttention(order)` in `lib/specialOrders`,
+fixture-tested, thresholds in `orgs.settings.special_orders` per design
+rule 2); the manual todo always OVERRIDES the derived reason on display,
+decision 4's rule extended. Nothing is stored, so nothing can go stale.
+
+### 20. Approve-and-pay is the FIRST post-v1 feature, named now
+
+The two highest-friction customer steps are signing and paying; decision 17
+fixes the first, and its natural completion is the approval page ending at
+a Square payment link — collecting the money at the moment the customer is
+most willing. NOT BUILT in v1 (it needs the Square API: programmatic
+invoice/payment-link creation), but it is the reason decision 2's
+`external_ref` seam exists, and the acceptance test for v1 is that adding
+it later touches the approval page and an edge function — no schema
+surgery, no rework of the money model.
+
+### 21. Weekly wholesale statements are one command
+
+Mark bills Cafe Knotted every week for the previous week's orders, by hand.
+A **Statement…** command on the customer record: pick a date range
+(defaulting to last week), render a statement PDF over that customer's
+orders in the range — a rendering over rows, the recipe-sheet/PoPdf idiom,
+no new tables — and hand it to the compose card addressed to the customer.
+Nothing auto-sends; the command makes the weekly chore one tap. This is
+also the dry run for the QBO era: the statement's line grain is exactly
+what an accounting export will want.
+
+### 22. The rush fee suggests itself
+    (measured: the terms promise "$25 or 30%, whichever is greater" inside
+    two business days — and only 795 of 5,198 v1 orders carry ANY rush fee)
+
+`businessDaysUntil(event_date)` and `suggestedRushFee(order)` in
+`lib/specialOrders` (fixture-tested; the terms' parameters live in
+`orgs.settings.special_orders`, design rule 2). When an order is created or
+quoted inside the cutoff, the rush-fee cell offers the computed figure with
+the receiving screen's `→` idiom — **a suggestion you tap, never an
+automatic write**, and dismissible like every other offer. The public form
+(decision 18) shows the cutoff as a notice. The point is that the terms the
+quote PDF prints become true in the data.
 
 ---
 
@@ -457,8 +561,10 @@ payments by order; customers by (org, lower(email)), (org, phone) for match.
 Derived-money helpers live in `lib/specialOrders.ts` (pure, fixture-tested):
 line extended = qty × price; subtotal; tax = taxable subtotal × rate; total =
 subtotal − discount + delivery + rush + tax; balance = total − Σpayments;
-`suggestedTodo(order)` for the quiet hint; `standingMaterializationDates(
-range, days)` (string dates, never `new Date("…")` — the plans lesson). The
+`suggestedTodo(order)` for the quiet hint; `needsAttention(order)` (decision
+19); `businessDaysUntil` / `suggestedRushFee` (decision 22);
+`standingMaterializationDates(range, days)` (string dates, never
+`new Date("…")` — the plans lesson). The
 materializer itself is SQL (`ensure_standing_orders_materialized`, definer,
 supervisor+-checked in its body) because both callers — the list's server
 component and production generation — need one implementation that cannot
@@ -584,18 +690,28 @@ check `max(OrderID)` against the live layout before trusting it.**
    staffer in the harness — the 044 pattern), sequence, buckets. Transform +
    load; diff derived vs stored totals; replay the whole export on the Docker
    harness before production.
-2. **List + record.** `/special-orders` with filters/bands/stage grid;
-   `/special-orders/[id]` Info/Items/Delivery/Documents; `/customers` pair;
-   payments card; log. Derived money helpers, fixture-tested.
+2. **List + record.** `/special-orders` with filters/bands/stage grid AND
+   the needs-attention tier (decision 19); `/special-orders/[id]`
+   Info/Items/Delivery/Documents; `/customers` pair; payments card; log.
+   Derived money + attention + rush-fee helpers (decisions 19/22),
+   fixture-tested.
 3. **Documents + email.** The four renderers verified against the 9885
    reference PDFs in Node; compose card; specialorders@ provider config +
    threading headers; stage-date stamping + log writes. Then the **approval
    page** (decision 17): token mint on send, `/q/{token}` mobile-first, the
    two anon RPCs (verified on the harness: a bogus token gets nothing, a
    superseded one says so, approving twice is refused, and `anon` can reach
-   NOTHING else), the signed-quote artifact, the proxy exemption.
-4. **Inquiry → lead.** `parse-inquiry` edge function, paste dialog, customer
-   matching. Fixtures from the three real emails.
+   NOTHING else), the signed-quote artifact, the proxy exemption. Then the
+   **wholesale statement** command (decision 21) — a fifth renderer over the
+   same data, verified against a real Cafe Knotted week.
+4. **The front door.** The public `/inquiry` form (decision 18) with the
+   build-your-box picker, `create_inquiry` + the menu RPC (harness-verified:
+   anon reaches the curated menu subset and the insert, nothing else, and
+   the RPC's answer never reveals whether an email is a known customer),
+   the confirmation email as thread root, the `show_on_inquiry_form` flag +
+   its curation UI on the item record. Plus the fallback lane: the
+   `parse-inquiry` edge function and paste dialog (decision 10), fixtures
+   from the three real emails. The Square form retires when this ships.
 5. **Production + recurrence.** Schedule/unschedule against 040's seam
    (verify the packet picks the lines up — it should, by construction); the
    standing-order materializer (verified idempotent on the harness: two
@@ -610,12 +726,15 @@ Each phase ships usable; nothing later blocks earlier.
 ## What NOT to build (settled during design)
 
 - **Square API / webhooks** — the invoice is made on Square by hand, v1
-  records dates. Seam only.
+  records dates. Seam only; approve-and-pay (decision 20) is the named
+  first use of it, post-v1.
 - **QBO sync** — future; the `external_ref` columns and rows-not-blobs money
   are the preparation.
 - **A customer portal** — no accounts, no order history, no payment page.
-  The quote-approval page (decision 17) is the ONE customer-facing surface,
-  and it is a single capability URL, not a portal.
+  The customer-facing surface is exactly TWO pages, each doing one thing:
+  the inquiry form (decision 18, open) and the quote-approval page
+  (decision 17, a capability URL). Anything more is a portal, and a portal
+  is not this module.
 - **Delivery-carrier integration** — DeliverLA request/schedule stay links or
   manual; distance stays a hand-entered pair (FMP's Google link can survive
   as a plain href).
