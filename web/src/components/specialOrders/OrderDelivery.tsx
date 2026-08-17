@@ -1,89 +1,38 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-
-import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { TabPicker } from "@/components/ui/TabPicker";
 import { TimeCell } from "./TimeCell";
 
 /**
- * Decision 8's other half: pickup or delivery, and everything a delivery needs.
+ * Decision 8's other half: everything a DELIVERY needs.
+ *
+ * THE TAB ONLY EXISTS FOR A DELIVERY (Mark, 2026-08-17: "Delivery being on its
+ * own is weird"). It was weird because 6,842 of the 8,330 real orders are
+ * pickups, and for those this screen held a two-cell toggle and one sentence.
+ * The toggle moved to the Details quadrant on the Info tab, where the choice
+ * belongs, and `tabsFor` shows this tab only when that cell says delivery — so
+ * a tab that exists always leads somewhere.
  *
  * FMP's DeliverLA request and schedule buttons are deliberately NOT
  * reimplemented (the brief's kill list): the carrier integration is somebody
  * else's API, and the distance stays a hand-entered pair with the Google link
  * surviving as a plain href.
  *
- * THE FULFILLMENT PICKER IS A `TabPicker`, which is the one place on this
- * screen a black cell appears — it is a set filter's cousin, a one-of-N choice,
- * and the convention says every one of those is this control.
  */
 export function OrderDelivery({
   id,
-  fulfillment,
   row,
-  pickupCode,
   canWrite,
 }: {
   id: string;
-  fulfillment: string;
   row: Record<string, unknown>;
-  pickupCode: string;
   canWrite: boolean;
 }) {
-  const router = useRouter();
-  const supabase = createClient();
-  const [, start] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-
-  function setFulfillment(next: string) {
-    setError(null);
-    start(async () => {
-      const { data, error: e } = await supabase
-        .from("special_orders")
-        .update({ fulfillment: next })
-        .eq("id", id)
-        .select("id");
-      if (e) setError(e.message);
-      else if (!data?.length) setError("The change wasn't saved — the database refused it silently.");
-      else router.refresh();
-    });
-  }
-
   const address = (row.delivery_address as string | null) ?? "";
-  const isDelivery = fulfillment === "delivery";
 
   return (
     <div className="space-y-12">
-      <section className="space-y-3">
-        <SectionHeading>How it leaves</SectionHeading>
-        {canWrite ? (
-          <TabPicker
-            options={[
-              { key: "pickup", label: "Pickup" },
-              { key: "delivery", label: "Delivery" },
-            ]}
-            value={fulfillment}
-            onChange={setFulfillment}
-            ariaLabel="Pickup or delivery"
-          />
-        ) : (
-          <p className="text-sm">{isDelivery ? "Delivery" : "Pickup"}</p>
-        )}
-        {!isDelivery ? (
-          <p className="text-sm text-muted">
-            Picked up at <strong>{pickupCode}</strong>. Change the pickup shop on
-            the Info tab.
-          </p>
-        ) : null}
-        {error ? <p className="text-[13px] text-accent">{error}</p> : null}
-      </section>
-
-      {isDelivery ? (
-        <>
           <section className="space-y-3">
             <SectionHeading>Where</SectionHeading>
             <div className="grid gap-x-12 gap-y-4 sm:grid-cols-2">
@@ -176,8 +125,6 @@ export function OrderDelivery({
               </Row>
             </div>
           </section>
-        </>
-      ) : null}
     </div>
   );
 }

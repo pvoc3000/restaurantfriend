@@ -15,9 +15,14 @@ import { useExactViewportHeight, useViewportAtLeast } from "@/lib/tableHead";
  * is the whole page.
  *
  *   Details            │  Customer
- *                      │  Completion dates
  *   ───────────────────┼──────────────────
- *   Also that day  ⇕   │  History      ⇕
+ *   Also that day  ⇕   │  Completion dates
+ *
+ * ONE SECTION PER QUADRANT (Mark, 2026-08-17). The first cut stacked Customer
+ * and Completion dates in the top right and put the log bottom right, which
+ * made the right column 494px of a 588px frame and left the log fifty-four
+ * pixels. Moving the LOG to the Notes tab is what freed a quadrant for the
+ * dates, so each of the four now holds exactly one thing.
  *
  * IT IS TWO COLUMNS OF STACKED PANES rather than a literal 2×2 grid, which is
  * `RecipeInfo`'s shape and for its reason: a grid ties both bottom cells to one
@@ -32,16 +37,15 @@ import { useExactViewportHeight, useViewportAtLeast } from "@/lib/tableHead";
  * nothing hidden, and no pane too short to read.
  */
 export function OrderInfoLayout({
-  details,
-  customer,
-  alsoThatDay,
-  history,
+  topLeft,
+  topRight,
+  bottomLeft,
+  bottomRight,
 }: {
-  details: ReactNode;
-  /** Customer, then completion dates — or the recurrence, for a standing order. */
-  customer: ReactNode;
-  alsoThatDay: ReactNode;
-  history: ReactNode;
+  topLeft: ReactNode;
+  topRight: ReactNode;
+  bottomLeft: ReactNode;
+  bottomRight: ReactNode;
 }) {
   const frame = useRef<HTMLDivElement>(null);
   // Gated on WIDTH, at the breakpoint the two columns appear. Stacked, a
@@ -62,13 +66,13 @@ export function OrderInfoLayout({
       className="flex min-h-0 flex-col gap-10 xl:flex-row xl:gap-10"
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-10">
-        <div className="shrink-0">{details}</div>
-        <GrowingPane>{alsoThatDay}</GrowingPane>
+        <div className="shrink-0">{topLeft}</div>
+        <GrowingPane>{bottomLeft}</GrowingPane>
       </div>
 
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-10">
-        <div className="shrink-0">{customer}</div>
-        <GrowingPane>{history}</GrowingPane>
+        <div className="shrink-0">{topRight}</div>
+        <GrowingPane>{bottomRight}</GrowingPane>
       </div>
     </div>
   );
@@ -91,6 +95,38 @@ function GrowingPane({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-0 flex-initial flex-col overflow-y-auto pr-1 xl:flex-1">
       {children}
+    </div>
+  );
+}
+
+
+/**
+ * TWO PANES SIDE BY SIDE — the Notes tab: the document notes beside the log.
+ *
+ * The same measured frame as the quadrants, and the same reason for pairing
+ * these two: notes want WIDTH (they are paragraphs) and the log wants HEIGHT
+ * (a twelve-year order carries two hundred entries). Neither fits under the
+ * other, and both scroll their own rows rather than the page.
+ */
+export function OrderSplitLayout({
+  left,
+  right,
+}: {
+  left: ReactNode;
+  right: ReactNode;
+}) {
+  const frame = useRef<HTMLDivElement>(null);
+  const wide = useViewportAtLeast(1280);
+  useExactViewportHeight(frame, wide, 420);
+
+  return (
+    <div ref={frame} className="flex min-h-0 flex-col gap-10 xl:flex-row xl:gap-10">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <GrowingPane>{left}</GrowingPane>
+      </div>
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <GrowingPane>{right}</GrowingPane>
+      </div>
     </div>
   );
 }

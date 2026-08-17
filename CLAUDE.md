@@ -3154,11 +3154,26 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    And a measuring trap: **check the label SPAN, not the button around it** —
    a button sizes to its own content and can never report an overflow, which is
    how two clipped column headers survived a check that said everything fit.
-   **(h) THE INFO TAB IS FOUR QUADRANTS, NOT A SCROLLING PAGE** (Mark,
-   2026-08-17: the stacked column "just looks like a wall of text"), with
-   FileMaker's own EVENT INFO tab as the reference. Details · Customer on top;
-   Completion dates + Also that day, and the History log, underneath — the two
-   panes that GROW are at the bottom where they can run as long as they like.
+   **(h) THE INFO TAB IS FOUR QUADRANTS, ONE SECTION EACH** (Mark, 2026-08-17:
+   the stacked column "just looks like a wall of text"), with FileMaker's own
+   EVENT INFO tab as the reference:
+   **Details · Customer** on top, **Also that day · Completion dates** beneath —
+   the two panes that GROW at the bottom, where they can run as long as they
+   like. Mark set that arrangement; the first cut stacked Customer over
+   Completion dates and put the log bottom-right, which made the right column
+   494px of a 588px frame and left the log FIFTY-FOUR PIXELS.
+   **The log moved to the Notes tab**, which is what freed a quadrant — and is
+   the right home for it: notes want WIDTH (they are paragraphs), the log wants
+   HEIGHT (two hundred entries), so `OrderSplitLayout` puts them side by side
+   and neither is under the other. Info stops paying for 200 log rows too.
+   **DELIVERY IS NOT A TAB FOR A PICKUP ORDER** (Mark: "Delivery being on its
+   own is weird but not sure where it fits"). It was weird because **6,842 of
+   the 8,330 real orders are pickups**, and for those the tab held a two-cell
+   toggle and one sentence — four times out of five, a tab leading nowhere. The
+   CHOICE moved into the Details quadrant beside Pickup shop, where it is a
+   fact about the order rather than a delivery detail, and `tabsFor` shows the
+   tab only when that cell says delivery. Switching the cell makes it appear, so
+   nothing hides behind a state you cannot reach.
    `components/specialOrders/OrderInfoLayout` measures the frame with
    `useExactViewportHeight` (the recipe record's hook, `xl`-gated, 420px floor)
    and each column's LAST pane takes the slack and scrolls its own rows.

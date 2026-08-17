@@ -762,12 +762,35 @@ export function orderTabHref(
  * rather than empty. An empty Documents tab on a standing order would invite
  * somebody to file this week's invoice against the recurrence itself.
  */
-export function tabsForKind(kind: SpecialOrderKind): OrderTab[] {
-  // A template and a standing order still carry notes — a wholesale account's
-  // packing instruction is exactly the kind of thing that belongs on the
-  // recurrence, so every day it makes inherits it.
-  return kind === "order" ? ORDER_TABS : ["info", "items", "notes"];
+/**
+ * A template and a standing order still carry notes — a wholesale account's
+ * packing instruction belongs on the recurrence, so every day it makes
+ * inherits it — but they have no delivery to book and no signed quote to file.
+ *
+ * **DELIVERY ONLY EXISTS FOR A DELIVERY** (Mark, 2026-08-17: "Delivery being on
+ * its own is weird but not sure where it fits"). It is weird because for a
+ * PICKUP order the tab held a two-cell toggle and a sentence — and pickup is
+ * 6,842 of the 8,330 real orders, so four times out of five it was a tab
+ * leading to nothing.
+ *
+ * So the CHOICE moved to the Details quadrant, beside Pickup shop, where it
+ * belongs — it is a fact about the order, not a delivery detail — and the tab
+ * appears only when there is something on it. Switching the cell to Delivery
+ * makes it appear, which is how you get to it; nothing is hidden behind a
+ * state you cannot reach.
+ */
+export function tabsFor(kind: SpecialOrderKind, fulfillment: string | null): OrderTab[] {
+  if (kind !== "order") return ["info", "items", "notes"];
+  return fulfillment === "delivery"
+    ? ORDER_TABS
+    : ORDER_TABS.filter((t) => t !== "delivery");
 }
+
+/** How an order leaves the shop. A closed set, so it is a `PickList`. */
+export const FULFILLMENT_OPTIONS: PickOption[] = [
+  { value: "pickup", label: "Pickup", hint: "collected at the shop" },
+  { value: "delivery", label: "Delivery", hint: "adds the Delivery tab" },
+];
 
 /* ==========================================================================
  * 10. NAMES

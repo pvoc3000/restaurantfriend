@@ -20,7 +20,8 @@ import {
   orderTabHref,
   readSettings,
   suggestedRushFee,
-  tabsForKind,
+  tabsFor,
+  FULFILLMENT_OPTIONS,
   type SpecialOrderKind,
   type SpecialOrderStatus,
 } from "@/lib/specialOrders";
@@ -39,7 +40,7 @@ import { OrderActions } from "@/components/specialOrders/OrderActions";
 import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
 import { TimeCell } from "@/components/specialOrders/TimeCell";
 import { StandingOrderBlock } from "@/components/specialOrders/StandingOrderBlock";
-import { OrderInfoLayout } from "@/components/specialOrders/OrderInfoLayout";
+import { OrderInfoLayout, OrderSplitLayout } from "@/components/specialOrders/OrderInfoLayout";
 import { StickyFooter } from "@/components/ui/StickyFooter";
 
 const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Special Orders" };
@@ -73,7 +74,8 @@ const ORDER_COLUMNS = `
  * FOUR TABS (`ui/SectionNav`, the employee record's pattern) and the same
  * payoff: the Info tab does not pay for the lines, and only Documents signs a
  * Storage URL. A template or a standing order shows TWO of the four — see
- * `tabsForKind`, and the reason there.
+ * `tabsFor`, and the reason there — as does a pickup order, which has no
+ * Delivery tab at all.
  *
  * THE MONEY IS DERIVED (decision 6). There is no total column to read; the
  * totals card computes from the lines and the payments on every load, which is
@@ -113,7 +115,8 @@ export async function SpecialOrderDetail({
   // attention sentence and the header's balance are derived from them. Cheaper
   // than the alternative, which is a stored total.
   const wantsLines = true;
-  const wantsLog = tab === "info";
+  // The log lives on the Notes tab now, so Info stops paying for 200 rows.
+  const wantsLog = tab === "notes";
   const wantsDocuments = tab === "documents";
   const wantsMenu = tab === "items";
 
@@ -265,7 +268,7 @@ export async function SpecialOrderDetail({
 
   const canWrite = canEnterCounts(session.membership.role);
   const trail = parseTrail(rawParams, SPECIAL_ORDERS_CRUMB);
-  const tabs = tabsForKind(kind);
+  const tabs = tabsFor(kind, (row.fulfillment as string | null) ?? "pickup");
   const tabOptions = tabs.map((t) => ({
     key: t,
     label: ORDER_TAB_LABEL[t],
@@ -276,8 +279,6 @@ export async function SpecialOrderDetail({
   // does not offer, which reads as the nav being broken.
   const activeTab = tabs.includes(tab) ? tab : "info";
 
-  const locationCode = (locId: unknown) =>
-    locId ? session.locations.find((l) => l.id === locId)?.code ?? "—" : "—";
 
   /** Every shop, for the two pickers. Active only — design rule 3. */
   const locationOptions = [
@@ -358,7 +359,7 @@ export async function SpecialOrderDetail({
               panes that grow underneath. See `OrderInfoLayout`. */}
           {activeTab === "info" && (
             <OrderInfoLayout
-              details={
+              topLeft={
                 <section className="space-y-3">
                   <SectionHeading>Details</SectionHeading>
                   <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
@@ -412,6 +413,15 @@ export async function SpecialOrderDetail({
                             options={locationOptions} value={row.location_id as string | null}
                             canWrite={canWrite} ariaLabel="Pickup shop" />
                     </Row>
+                    <Row label="How it leaves">
+                      {/* The pickup/delivery CHOICE lives here, beside the
+                          pickup shop — it is a fact about the order. The
+                          Delivery TAB appears only when this says delivery;
+                          see `tabsFor`. */}
+                      <Cell table="special_orders" id={id} column="fulfillment" kind="pick"
+                            options={FULFILLMENT_OPTIONS} value={(row.fulfillment as string) ?? "pickup"}
+                            canWrite={canWrite} ariaLabel="Pickup or delivery" />
+                    </Row>
                     <Row label="To-do">
                       {/* Decision 4: MANUAL, with `allowNew` — the real data
                           holds "ON HOLD" and "Adjust time to 9am or later". */}
@@ -427,9 +437,8 @@ export async function SpecialOrderDetail({
                   </div>
                 </section>
               }
-              customer={
-                <div>
-                  <section className="space-y-3">
+              topRight={
+                <section className="space-y-3">
                     <SectionHeading>Customer</SectionHeading>
                     <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
                       <Row label="Customer">
@@ -467,61 +476,101 @@ export async function SpecialOrderDetail({
                               value={row.contact_email as string | null} canWrite={canWrite}
                               ariaLabel="Day-of contact email" />
                       </Row>
-                    </div>
-                  </section>
+                  </div>
+                </section>
+              }
+              bottomLeft={
+                <OtherOrdersThatDay
+                  orgId={session.membership.org_id}
+                  orderId={id}
+                  eventDate={row.event_date as string | null}
+                  listHref={orderTabHref(id, "info", rawParams)}
+                />
+              }
+              /* THE QUADRANT THAT ANSWERS "WHEN". For an order that is the
+                 stage dates; for a standing order it is the recurrence, which
+                 is the same question asked of a record that has no single
+                 date. A standing order has no status, so it can have no
+                 completion dates either. */
+              bottomRight={
+                kind === "standing_order" ? (
+                    <StandingOrderBlock
+                      id={id}
+                      standingDays={(row.standing_days as number[] | null) ?? []}
+                      startsOn={row.starts_on as string | null}
+                      endsOn={row.ends_on as string | null}
+                      paused={Boolean(row.paused)}
+                      horizonDays={settings.horizonDays}
+                      today={today}
+                      canWrite={canWrite}
+                    />
+                  ) : kind === "order" ? (
+                    <section className="space-y-3">
+                      <SectionHeading>Completion dates</SectionHeading>
+                      {/* INLINE LABELS, not stacked — FileMaker's own shape,
+                          and load-bearing rather than cosmetic: stacked, nine
+                          date fields run ~400px and swallow a quadrant. Beside
+                          their boxes they are five rows of ~34px. They stay
+                          inline where Details and Customer went back to
+                          stacked, because a date is a short value and a name
+                          or a phone is not — those wrapped. */}
+                      <div className="grid gap-x-10 gap-y-1.5 sm:grid-cols-2">
+                        <FieldRow label="Initiated"><Cell table="special_orders" id={id} column="date_initiated" kind="date" value={row.date_initiated as string | null} canWrite={canWrite} ariaLabel="Date initiated" /></FieldRow>
+                        <FieldRow label="Quote sent"><Cell table="special_orders" id={id} column="quote_sent_at" kind="date" value={row.quote_sent_at as string | null} canWrite={canWrite} ariaLabel="Quote sent" /></FieldRow>
+                        <FieldRow label="Quote approved"><Cell table="special_orders" id={id} column="quote_returned_at" kind="date" value={row.quote_returned_at as string | null} canWrite={canWrite} ariaLabel="Quote approved" /></FieldRow>
+                        <FieldRow label="Invoice sent"><Cell table="special_orders" id={id} column="invoice_sent_at" kind="date" value={row.invoice_sent_at as string | null} canWrite={canWrite} ariaLabel="Invoice sent" /></FieldRow>
+                        <FieldRow label="Invoice paid"><Cell table="special_orders" id={id} column="invoice_paid_at" kind="date" value={row.invoice_paid_at as string | null} canWrite={canWrite} ariaLabel="Invoice paid" /></FieldRow>
+                        <FieldRow label="Receipt sent"><Cell table="special_orders" id={id} column="receipt_sent_at" kind="date" value={row.receipt_sent_at as string | null} canWrite={canWrite} ariaLabel="Receipt sent" /></FieldRow>
+                        <FieldRow label="Delivery scheduled"><Cell table="special_orders" id={id} column="delivery_scheduled_at" kind="date" value={row.delivery_scheduled_at as string | null} canWrite={canWrite} ariaLabel="Delivery scheduled" /></FieldRow>
+                        <FieldRow label="Order printed"><Cell table="special_orders" id={id} column="order_printed_at" kind="date" value={row.order_printed_at as string | null} canWrite={canWrite} ariaLabel="Order printed" /></FieldRow>
+                        <FieldRow label="Production scheduled"><Cell table="special_orders" id={id} column="order_scheduled_at" kind="date" value={row.order_scheduled_at as string | null} canWrite={canWrite} ariaLabel="Production scheduled" /></FieldRow>
+                      </div>
+                    </section>
+                  ) : null
+              }
+            />
+          )}
 
-                </div>
+          {/* ================= NOTES ================= */}
+          {/* NOTES AND THE LOG, SIDE BY SIDE (Mark, 2026-08-17). The log left
+              the Info tab so each of its four quadrants could hold one section,
+              and this is where it belongs: notes want WIDTH — they are
+              paragraphs — and the log wants HEIGHT, so neither fits under the
+              other and both scroll their own rows. */}
+          {activeTab === "notes" && (
+            <OrderSplitLayout
+              left={
+                <section className="space-y-3">
+                  <SectionHeading>Notes</SectionHeading>
+                  <p className="text-[13px] text-muted">
+                    Each of these prints on its own document. The general note
+                    prints nowhere — it is for you.
+                  </p>
+                  <div className="space-y-6 pr-2">
+                    <Row label="General (prints nowhere)">
+                      <Cell table="special_orders" id={id} column="notes_general" multiline
+                            value={row.notes_general as string | null} canWrite={canWrite} ariaLabel="General note" />
+                    </Row>
+                    <Row label="On the quote">
+                      <Cell table="special_orders" id={id} column="notes_quote" multiline
+                            value={row.notes_quote as string | null} canWrite={canWrite} ariaLabel="Quote note" />
+                    </Row>
+                    <Row label="On the kitchen order">
+                      <Cell table="special_orders" id={id} column="notes_production" multiline
+                            value={row.notes_production as string | null} canWrite={canWrite} ariaLabel="Production note" />
+                    </Row>
+                    <Row label="On the invoice">
+                      <Cell table="special_orders" id={id} column="notes_invoice" multiline
+                            value={row.notes_invoice as string | null} canWrite={canWrite} ariaLabel="Invoice note" />
+                    </Row>
+                    <Row label="On the receipt">
+                      <Cell table="special_orders" id={id} column="notes_receipt" multiline
+                            value={row.notes_receipt as string | null} canWrite={canWrite} ariaLabel="Receipt note" />
+                    </Row>
+                  </div>
+                </section>
               }
-              alsoThatDay={
-                <div className="space-y-10">
-                    {/* THE QUADRANT THAT ANSWERS "WHEN". For an order that is the
-                        stage dates; for a standing order it is the recurrence,
-                        which is the same question asked of a record that has no
-                        single date. A standing order has no status, so it can
-                        have no completion dates either. */}
-                    {kind === "standing_order" ? (
-                      <StandingOrderBlock
-                        id={id}
-                        standingDays={(row.standing_days as number[] | null) ?? []}
-                        startsOn={row.starts_on as string | null}
-                        endsOn={row.ends_on as string | null}
-                        paused={Boolean(row.paused)}
-                        horizonDays={settings.horizonDays}
-                        today={today}
-                        canWrite={canWrite}
-                      />
-                    ) : kind === "order" ? (
-                      <section className="space-y-3">
-                        <SectionHeading>Completion dates</SectionHeading>
-                        {/* INLINE LABELS, not stacked — FileMaker's own shape,
-                            and here it is load-bearing rather than cosmetic.
-                            Stacked, nine date fields ran ~400px and ate the whole
-                            measured frame, collapsing the History pane beneath
-                            them to zero height. Beside their boxes they are five
-                            rows of ~34px, and the log gets its half of the
-                            column back. */}
-                        <div className="grid gap-x-10 gap-y-1.5 sm:grid-cols-2">
-                          <FieldRow label="Initiated"><Cell table="special_orders" id={id} column="date_initiated" kind="date" value={row.date_initiated as string | null} canWrite={canWrite} ariaLabel="Date initiated" /></FieldRow>
-                          <FieldRow label="Quote sent"><Cell table="special_orders" id={id} column="quote_sent_at" kind="date" value={row.quote_sent_at as string | null} canWrite={canWrite} ariaLabel="Quote sent" /></FieldRow>
-                          <FieldRow label="Quote approved"><Cell table="special_orders" id={id} column="quote_returned_at" kind="date" value={row.quote_returned_at as string | null} canWrite={canWrite} ariaLabel="Quote approved" /></FieldRow>
-                          <FieldRow label="Invoice sent"><Cell table="special_orders" id={id} column="invoice_sent_at" kind="date" value={row.invoice_sent_at as string | null} canWrite={canWrite} ariaLabel="Invoice sent" /></FieldRow>
-                          <FieldRow label="Invoice paid"><Cell table="special_orders" id={id} column="invoice_paid_at" kind="date" value={row.invoice_paid_at as string | null} canWrite={canWrite} ariaLabel="Invoice paid" /></FieldRow>
-                          <FieldRow label="Receipt sent"><Cell table="special_orders" id={id} column="receipt_sent_at" kind="date" value={row.receipt_sent_at as string | null} canWrite={canWrite} ariaLabel="Receipt sent" /></FieldRow>
-                          <FieldRow label="Delivery scheduled"><Cell table="special_orders" id={id} column="delivery_scheduled_at" kind="date" value={row.delivery_scheduled_at as string | null} canWrite={canWrite} ariaLabel="Delivery scheduled" /></FieldRow>
-                          <FieldRow label="Order printed"><Cell table="special_orders" id={id} column="order_printed_at" kind="date" value={row.order_printed_at as string | null} canWrite={canWrite} ariaLabel="Order printed" /></FieldRow>
-                          <FieldRow label="Production scheduled"><Cell table="special_orders" id={id} column="order_scheduled_at" kind="date" value={row.order_scheduled_at as string | null} canWrite={canWrite} ariaLabel="Production scheduled" /></FieldRow>
-                        </div>
-                      </section>
-                    ) : null}
-                  <OtherOrdersThatDay
-                    orgId={session.membership.org_id}
-                    orderId={id}
-                    eventDate={row.event_date as string | null}
-                    listHref={orderTabHref(id, "info", rawParams)}
-                  />
-                </div>
-              }
-              history={
+              right={
                 <OrderLog
                   orderId={id}
                   orgId={row.org_id as string}
@@ -532,39 +581,6 @@ export async function SpecialOrderDetail({
                 />
               }
             />
-          )}
-
-          {/* ================= NOTES ================= */}
-          {activeTab === "notes" && (
-            <section className="space-y-3">
-              <SectionHeading>Notes</SectionHeading>
-              <p className="max-w-[80ch] text-[13px] text-muted">
-                Each of these prints on its own document. The general note prints
-                nowhere — it is for you.
-              </p>
-              <div className="max-w-[70ch] space-y-6">
-                <Row label="General (prints nowhere)">
-                  <Cell table="special_orders" id={id} column="notes_general" multiline
-                        value={row.notes_general as string | null} canWrite={canWrite} ariaLabel="General note" />
-                </Row>
-                <Row label="On the quote">
-                  <Cell table="special_orders" id={id} column="notes_quote" multiline
-                        value={row.notes_quote as string | null} canWrite={canWrite} ariaLabel="Quote note" />
-                </Row>
-                <Row label="On the kitchen order">
-                  <Cell table="special_orders" id={id} column="notes_production" multiline
-                        value={row.notes_production as string | null} canWrite={canWrite} ariaLabel="Production note" />
-                </Row>
-                <Row label="On the invoice">
-                  <Cell table="special_orders" id={id} column="notes_invoice" multiline
-                        value={row.notes_invoice as string | null} canWrite={canWrite} ariaLabel="Invoice note" />
-                </Row>
-                <Row label="On the receipt">
-                  <Cell table="special_orders" id={id} column="notes_receipt" multiline
-                        value={row.notes_receipt as string | null} canWrite={canWrite} ariaLabel="Receipt note" />
-                </Row>
-              </div>
-            </section>
           )}
 
           {/* ================= ITEMS ================= */}
@@ -603,13 +619,7 @@ export async function SpecialOrderDetail({
 
           {/* ================= DELIVERY ================= */}
           {activeTab === "delivery" && (
-            <OrderDelivery
-              id={id}
-              fulfillment={(row.fulfillment as string) ?? "pickup"}
-              row={row}
-              pickupCode={locationCode(row.location_id)}
-              canWrite={canWrite}
-            />
+            <OrderDelivery id={id} row={row} canWrite={canWrite} />
           )}
 
           {/* ================= DOCUMENTS ================= */}
