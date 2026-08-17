@@ -3039,9 +3039,73 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    real tables (its census caught all of this). Ships vestigial:
    `locations.kitchen_by_weekday` / `shops_for` retire when kitchen-on-plan
    lands.
-4g. 🚧 **Special Orders** — specced 2026-08-16, NOT yet built. Read
-   **`docs/special-orders-brief.md`** before designing or touching anything
-   here; it was settled in conversation with Mark against the fresh exports
+4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1 and 2 BUILT
+   2026-08-17, phases 3–5 not.** Read **`docs/special-orders-brief.md`** before
+   designing or touching anything here — and read its CORRECTIONS block first,
+   which is new: five measurements in the body are wrong, because the brief was
+   designed from a `parseInt` reading of `OrderID`.
+   **Shipped: migration 051 (NEEDS APPLYING, and NOT YET REPLAYED ON THE
+   HARNESS — Docker Desktop was blocked on an admin-password dialog)**, the
+   transform/load pair, `lib/specialOrders.ts` + 56 fixtures, `/special-orders`
+   + its record, and `/customers` + its record. See the brief's build-phase list
+   for exactly what each contains.
+   **THE FIVE THINGS TO KNOW BEFORE TOUCHING ANY OF IT:**
+   **(a) `special_orders.number` IS TEXT.** `2899-01`, `3932 cont.`, `5689a`,
+   `5542b`, `7220a` are real FileMaker order numbers a human suffixed to split a
+   job; an integer column rounds every one into a collision with its unsuffixed
+   sibling. Over the raw strings exactly ONE number repeats — `6002`, twice, and
+   they are DIFFERENT ORDERS — so both migrate and `legacy_seq` records the
+   collision (028's `source_row_key` lesson, on the one row that needs it).
+   **(b) THE MONEY HAS NO COLUMN AND MUST NEVER GET ONE.** There is no subtotal,
+   tax, total or balance on `special_orders`; `orderTotals` derives all of them
+   from the lines, the payments and six stored INPUTS on every read. FileMaker
+   stored them TWICE, by era (`Order_Subtotal` and `Order_Subtotal2`), which is
+   how they drifted — and yet **only 50 of its 8,330 orders now fail to
+   reproduce their own stored subtotal from their own lines**, which is the
+   measurement that says the model is right. Two arithmetic decisions inside it
+   a rewrite could plausibly flip, both fixture-pinned: **the discount comes off
+   BEFORE tax, proportionally across the taxable and non-taxable parts** (taxing
+   the undiscounted amount charges sales tax on money nobody paid), and
+   **delivery and rush are NOT taxed** (the real 9885 invoice computes tax on
+   the item subtotal alone). The immutable copy of a quote is the PDF that was
+   sent, filed as an attachment — decision 17's whole mechanism.
+   **(c) `status` IS NULL EXACTLY WHEN `kind` IS NOT `order`** — the brief's
+   open question 2, answered as a BICONDITIONAL check rather than a default. So
+   "does this record have a status" and "is this record an order" are the SAME
+   question and the app cannot get two answers. A template with status `lead`
+   would be a claim about a workflow it is not in, and every list filter would
+   have to know to ignore it. Consequence: the record screen shows the status
+   picker only for `kind = 'order'` — offering it otherwise offers a write a
+   CHECK refuses, which is the one refusal `InlineValue` cannot explain.
+   **(d) A `Misc*` LINE IS MONEY, NOT PRODUCTION, and an UNTYPED line is
+   PRODUCTION.** `isProductionLine` is prefix-insensitive (the data holds `Misc`
+   495 times and `Misc- Cupcake liners` once) and the fallback direction is
+   load-bearing: 569 real lines carry no type, they are ordinary donuts, and
+   treating an unclassified line as money would silently drop it off the kitchen
+   sheet. `unschedulableLines` names decision 9's blockers — a production line
+   with no `production_item_id` — because `production_schedule_items.item_id` is
+   NOT NULL and must stay so.
+   **(e) `menuItemKey_n` IS A PRODUCTION ITEM ID, checked rather than assumed.**
+   The brief expected FMP's retired MenuItems catalog; instead 20,518 of 20,561
+   keyed lines resolve, and over those the line's donut name agrees with the
+   item's on 19,482 while the SIZE agrees on 19,497 of 19,520. The 1,015
+   name disagreements are the feature working — "DIY", "Custom", and a product
+   renamed from "(x9)" to "(x12)" — which is decision 5's customized copy. So
+   **twelve years of history carries `production_item_id` and is schedulable**,
+   which decision 9 assumed only new lines would be.
+   Two smaller things worth not rediscovering: **`Notes_Invoice` is boilerplate**
+   ("We appreciate your business!" on 8,052 of 8,060 rows) and lives in
+   `orgs.settings.special_orders.invoice_footer`, not on eight thousand orders;
+   and **`todo` is empty on 8,233 of 8,334 rows** and its real values include
+   "OH HOLD" and "No need to print *page 2*", so decision 4's `allowNew` is
+   load-bearing and this column must never become a check constraint.
+   Also: `ui/FilterMenus` gained a **`trailing`** slot (right-aligned,
+   `ml-auto shrink-0`) for a list's create command — `EmployeesList` had the
+   same slot before the control existed. And `/special-orders` and `/customers`
+   join `/employees` in `InactiveLocationGate`'s exempt list, because decision 8
+   makes them deliberately ORG-WIDE.
+   The rest of this entry is the design as specced; it was settled in
+   conversation with Mark against the fresh exports
    (`FMP Export/Special Orders/`, re-exported the same day after the first
    export proved to be an 18-month-stale copy — check `max(OrderID)` ≈ 9887+
    before trusting any future re-export), fifteen screenshots, four real

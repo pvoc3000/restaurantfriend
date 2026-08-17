@@ -17,8 +17,15 @@ const LOCATIONS_ROUTE = "/locations";
  * `/employees`, because it isn't location-scoped at all: a person belongs to
  * the ORG. Gating it would say "there is nothing here to show" about a screen
  * that would have shown the whole roster.
+ *
+ * `/special-orders` and `/customers` for the same reason, and one of their own
+ * (special-orders brief, decision 8): the screens are deliberately ORG-WIDE,
+ * because the phone rings wherever it rings and an order is routinely MADE at
+ * one shop for PICKUP at another. Location and kitchen are filter dimensions
+ * on the list rather than a scope around it, so there is nothing here for a
+ * closed working location to empty.
  */
-const UNSCOPED_ROUTES = [LOCATIONS_ROUTE, "/employees"];
+const UNSCOPED_ROUTES = [LOCATIONS_ROUTE, "/employees", "/special-orders", "/customers"];
 
 function isUnscopedRoute(pathname: string): boolean {
   return UNSCOPED_ROUTES.some(

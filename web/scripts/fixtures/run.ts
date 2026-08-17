@@ -43,6 +43,7 @@ import "./productionSchedule.fixtures";
 import "./recipeCosts.fixtures";
 import "./receiving.fixtures";
 import "./roles.fixtures";
+import "./specialOrders.fixtures";
 import "./tableSort.fixtures";
 import "./tipPool.fixtures";
 import "./timeZone.fixtures";

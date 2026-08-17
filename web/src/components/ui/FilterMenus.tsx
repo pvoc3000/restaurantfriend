@@ -52,6 +52,7 @@ export function FilterMenus<T>({
   total,
   noun = "rows",
   leading,
+  trailing,
 }: {
   /**
    * The rows BEFORE these menus, but after anything else that narrows the list
@@ -76,6 +77,21 @@ export function FilterMenus<T>({
    * what lets a caller wrap the whole filter bar in one thing.
    */
   leading?: ReactNode;
+  /**
+   * RIGHT-ALIGNED at the end of the menu row — the list's create command, in
+   * practice ("New special order").
+   *
+   * The same slot and the same reasoning as `EmployeesList`, which had it
+   * before this control existed: a list's create command belongs in its filter
+   * row (CLAUDE.md's create template), and it is `ml-auto shrink-0` so it hugs
+   * the right edge and, when the row wraps, goes with the last line rather
+   * than being crushed between two menus.
+   *
+   * Deliberately NOT the place for a view control — those are menus, and a
+   * menu goes in `dimensions` where its count can be conditioned like every
+   * other one.
+   */
+  trailing?: ReactNode;
 }) {
   const counts = filterCounts(rows, dimensions, values);
   const active = activeFilterCount(dimensions, values);
@@ -133,6 +149,7 @@ export function FilterMenus<T>({
             </div>
           );
         })}
+        {trailing ? <div className="ml-auto shrink-0">{trailing}</div> : null}
       </div>
 
       {/* Always stated, never only when filtered: "470 of 470" is a fact worth

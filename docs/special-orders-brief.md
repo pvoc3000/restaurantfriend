@@ -1,6 +1,54 @@
 # Special Orders module — build brief
 
-**Status: SPECCED 2026-08-16, not yet built.** Read `CLAUDE.md` first, then this.
+**Status: phases 1 and 2 BUILT 2026-08-17; 3, 4 and 5 not yet.** Read
+`CLAUDE.md` first, then this — and read the corrections directly below before
+trusting any measurement in the body, because five of them are wrong.
+
+---
+
+## CORRECTIONS, measured against the real export at build time (2026-08-17)
+
+Every figure in the body came from a reading of `SpecialOrders.mer` that used
+`parseInt` on `OrderID`. That one mistake produced three of these five.
+
+1. **`OrderID` IS TEXT, so `number` is a text column** — not `int` as the data
+   model sketch says. The export carries `2899-01`, `2899-02`, `2899-03`,
+   `3932 cont.`, `5689a`, `5691a`, `5697a`, `5542b`, `5753a`, `5915a` and
+   `7220a`: eleven real order numbers somebody suffixed to split a job into
+   parts. `purchase_orders.po_number` is text for the same kind of reason.
+
+2. **There is ONE duplicated number, not five.** The brief names "2899 ×3,
+   3932/5542/6002 ×2"; over the raw strings only **`6002`** repeats, and the
+   two rows are DIFFERENT ORDERS (customer 4916, 9/9/2021, $253.88, paid;
+   customer 4917, 9/24/2021, $188.89, unpaid). Both migrate — the later one as
+   `6002-2`, with `legacy_seq` recording the collision.
+
+3. **`menuItemKey_n` IS a production item id**, which the brief did not expect
+   ("MenuItems retired… our source is production_items"). Checked rather than
+   assumed: **20,518 of 20,561 keyed lines** resolve, and over those the line's
+   own donut name agrees with the production item's on 19,482 and the SIZE
+   agrees on 19,497 of 19,520. So migrated lines carry `production_item_id` and
+   **history is schedulable**, which decision 9 assumed only new lines would be.
+
+4. **`Notes_Invoice` is boilerplate, not a note.** Filled on 8,060 rows, of
+   which 8,052 read "We appreciate your business!" — it is the invoice
+   document's FOOTER. It lives in `orgs.settings.special_orders.invoice_footer`
+   and only the eight rows that say something else keep a `notes_invoice`.
+
+5. **`Order_ToDo` is empty on 8,233 of 8,334 rows.** The brief's ten-value list
+   is FileMaker's VALUE LIST, not its data, and the data also holds "OH HOLD",
+   "\*", "HOLIDAY" and "No need to print \*page 2\*". Decision 4's `allowNew` is
+   therefore load-bearing; never turn `todo` into a check constraint.
+
+Smaller ones, all reported by the transform: the malformed row the brief
+mentions parses cleanly (0 malformed); 4 rows carry no OrderID at all and are
+skipped as empty stubs; 9 OrderItems order numbers have no parent (61 lines);
+`Event_Time` is a real TIME (8,166 of 8,185 parse; the 19 that don't are the
+literal `?`); and only **50 of 8,330 orders** fail to reproduce FileMaker's
+stored subtotal from their own lines, which is a strong result for decision 6.
+
+---
+
 Designed in conversation with Mark against the fresh FMP exports
 (`FMP Export/Special Orders/` — re-exported 2026-08-16 from the live file after
 the first export turned out to be an 18-month-stale copy), fifteen screenshots
@@ -686,15 +734,27 @@ check `max(OrderID)` against the live layout before trusting it.**
 
 ## Build phases (suggested, in dependency order)
 
-1. **Schema + migration.** Tables, RLS (verify as a real supervisor AND a
-   staffer in the harness — the 044 pattern), sequence, buckets. Transform +
-   load; diff derived vs stored totals; replay the whole export on the Docker
-   harness before production.
-2. **List + record.** `/special-orders` with filters/bands/stage grid AND
-   the needs-attention tier (decision 19); `/special-orders/[id]`
-   Info/Items/Delivery/Documents; `/customers` pair; payments card; log.
-   Derived money + attention + rush-fee helpers (decisions 19/22),
-   fixture-tested.
+1. ✅ **Schema + migration** — migration `051_special_orders.sql` (six tables +
+   attachments + the quote-token table, the number sequence seeded at 10000,
+   supervisor+ RLS on all four verbs of every table, the private
+   `special-order-attachments` bucket with 018's four-policy pattern,
+   `production_items.show_on_inquiry_form`, and the module's settings).
+   `migration/transform-special-orders.mjs` → `load-special-orders.mjs`, dry-run
+   clean: **8,330 orders · 47,827 lines · 6,457 payments (5,267 synthesized) ·
+   106,471 log entries · 5,874 customers**.
+   **NOT YET APPLIED, and NOT YET REPLAYED ON THE HARNESS** — Docker Desktop was
+   waiting on an admin-password dialog that a non-interactive session cannot
+   answer. Do the harness replay (as a real supervisor AND a staffer, the 044
+   pattern) before this goes near production.
+2. ✅ **List + record.** `lib/specialOrders.ts` (derived money, needs-attention,
+   business days, rush fee, recurrence, the stage grid, the tabs) with **56
+   fixtures, each rule checked by breaking it**; `/special-orders` with six
+   combining `FilterMenus`, event-date bands, the stage grid and the
+   needs-attention tier; `/special-orders/[id]` with `ui/SectionNav` tabs
+   Info/Items/Delivery/Documents, drag-sortable lines, the priced donut chooser,
+   the derived totals card, payments, the log, and Duplicate/Flag/Cancel/Delete;
+   `/customers` + `/customers/[id]` with the unpaid-first split.
+   The Documents tab is a placeholder until phase 3 gives it something to file.
 3. **Documents + email.** The four renderers verified against the 9885
    reference PDFs in Node; compose card; specialorders@ provider config +
    threading headers; stage-date stamping + log writes. Then the **approval

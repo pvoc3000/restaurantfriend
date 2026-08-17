@@ -217,9 +217,31 @@ export const SECTIONS: NavSection[] = [
   {
     slug: "special-orders",
     label: "Special Orders",
+    // The section already existed as two stubs, which answers the brief's own
+    // open question about placement: a tier-1 section, not a pair of subs under
+    // Operations. `resolveRoute` prefix-matches, so /special-orders/[id],
+    // /customers/[id] and the receive-style child routes light these without an
+    // `also`.
+    //
+    // Both are supervisor+ (decision 7) — a TIDINESS rule, never a security
+    // one: RLS is the gate and each screen says so in a sentence. Staff have no
+    // screen that needs a customer's phone number, so a menu item leading to a
+    // refusal is worse than no menu item.
     subs: [
-      stub("special-orders", "special-orders", "Special Orders"),
-      stub("special-orders", "customers", "Customers"),
+      {
+        slug: "special-orders",
+        label: "Special Orders",
+        href: "/special-orders",
+        built: true,
+        roles: ["owner", "admin", "purchaser", "supervisor"],
+      },
+      {
+        slug: "customers",
+        label: "Customers",
+        href: "/customers",
+        built: true,
+        roles: ["owner", "admin", "purchaser", "supervisor"],
+      },
     ],
   },
 ];
