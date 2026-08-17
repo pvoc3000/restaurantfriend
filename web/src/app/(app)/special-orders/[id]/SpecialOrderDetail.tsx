@@ -787,7 +787,7 @@ async function OtherOrdersThatDay({
   const supabase = await createClient();
   const { data } = await supabase
     .from("special_orders")
-    .select("id, number, title, event_time, kitchen_location_id, status, customers ( first_name, last_name, company )")
+    .select("id, number, kind, title, event_time, kitchen_location_id, status, customers ( first_name, last_name, company )")
     .eq("org_id", orgId)
     .eq("event_date", eventDate)
     .neq("id", orderId)
@@ -802,21 +802,44 @@ async function OtherOrdersThatDay({
       {rows.length === 0 ? (
         <p className="text-sm text-muted">Nothing else is booked for {eventDate}.</p>
       ) : (
-        <ul className="space-y-1 text-sm">
-          {rows.map((o) => (
-            <li key={o.id as string}>
-              <Link
-                href={withFrom(`/special-orders/${o.id as string}`, {
-                  href: listHref,
-                  label: "Back",
-                })}
-                className="hover:underline"
-              >
-                <span className="tabular-nums text-muted">#{o.number as string}</span>{" "}
-                {(o.title as string) || customerLabel(o.customers as never)}
-              </Link>
-            </li>
-          ))}
+        <ul className="space-y-1.5 text-sm">
+          {rows.map((o) => {
+            const st = o.status as SpecialOrderStatus | null;
+            return (
+              <li key={o.id as string}>
+                <Link
+                  href={withFrom(`/special-orders/${o.id as string}`, {
+                    href: listHref,
+                    label: "Back",
+                  })}
+                  className="hover:underline"
+                >
+                  <span className="tabular-nums text-muted">#{o.number as string}</span>{" "}
+                  {(o.title as string) || customerLabel(o.customers as never)}
+                </Link>
+                {/* THE STATUS, so a day's list distinguishes work from
+                    possibility (Mark, 2026-08-17: "so we know if it's an order
+                    we should be concerned about or just a lead"). The query has
+                    always selected it and nothing read it.
+
+                    WEIGHT, NOT COLOUR. A committed `order` is real kitchen load
+                    and reads in full ink; a lead or a quote may never happen and
+                    stays muted. Colour is reserved for record STATE meaning
+                    something is WRONG or worth an eye, and a lead is neither —
+                    it is simply less firm. Dimming the whole ROW was the other
+                    option and is refused for the reason the Locations list
+                    refuses it: greying text you can still click reads as
+                    disabled and lies. */}
+                <span
+                  className={`ml-1.5 text-[12px] ${
+                    st === "order" ? "font-semibold text-ink" : "text-subtle"
+                  }`}
+                >
+                  {st ? STATUS_LABEL[st] : KIND_LABEL[o.kind as SpecialOrderKind]}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
