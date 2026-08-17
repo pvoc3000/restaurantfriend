@@ -3039,6 +3039,37 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    real tables (its census caught all of this). Ships vestigial:
    `locations.kitchen_by_weekday` / `shops_for` retire when kitchen-on-plan
    lands.
+4g. 🚧 **Special Orders** — specced 2026-08-16, NOT yet built. Read
+   **`docs/special-orders-brief.md`** before designing or touching anything
+   here; it was settled in conversation with Mark against the fresh exports
+   (`FMP Export/Special Orders/`, re-exported the same day after the first
+   export proved to be an 18-month-stale copy — check `max(OrderID)` ≈ 9887+
+   before trusting any future re-export), fifteen screenshots, four real
+   generated PDFs for order 9885, and three real inquiry emails.
+   The decisions in one line each: full migration (two ERAS — items in
+   ␝-separated 20-slot repeating fields before Aug 2021, real OrderItems rows
+   after; payments as rows only since Mar 2022, `Spent_c` synthesized into one
+   legacy payment where no rows exist); FMP's one `Order_Type` field splits
+   into **`kind`** (order | template | standing_order) × **`status`**
+   (lead → quote → invoice → order, + cancelled); money DERIVED from lines +
+   stored inputs, never stored totals; Square invoicing stays MANUAL in v1
+   with `external_ref` seams for Square/QBO later (Mark, 2026-08-16); to-do is
+   a manual field the app may hint at but never writes; items are editable
+   COPIES of production items and **`Misc*` lines never reach the kitchen**;
+   scheduling production inserts a real `production_schedules` row through
+   040's `source='special_order'` seam (schedule line `item_id` stays NOT
+   NULL — a schedulable line must link a production item, the custom name
+   riding the snapshot columns); RLS is **supervisor+ on every verb including
+   SELECT, customers too** (PII, 020's reasoning); inquiry emails (Square web
+   form → specialorders@donutfriend.com) parse via a `parse-inquiry` Claude
+   edge function as a PROPOSAL; outbound mail sends as specialorders@ through
+   a second org-level provider config and threads by
+   `In-Reply-To`/`References` (the stored `Email_Token` was the inbound
+   SUBJECT — a threading kludge, retired); standing orders instantiate
+   manually over a date range; pics + documents merge into one attachments
+   card on a new `special-order-attachments` bucket; numbering seeds at
+   10000 (FMP max 9887; `legacy_id` is NOT unique — 5 duplicated OrderIDs);
+   customers migrate WITHOUT the plain-text CC fields, ever.
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
