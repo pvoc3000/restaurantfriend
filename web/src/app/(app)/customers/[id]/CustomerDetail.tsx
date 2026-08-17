@@ -120,11 +120,28 @@ export async function CustomerDetail({
     totals: orderTotals(o as never, lines.get(o.id as string) ?? [], payments.get(o.id as string) ?? []),
   }));
 
+  /**
+   * `kind === "order"` IS LOAD-BEARING, and leaving it out was a real bug
+   * caught by looking at Cafe Knotted: a standing order carries lines and no
+   * payments, so it always derives a balance — and the record claimed $1,738.50
+   * outstanding from two RECURRENCES while the list, which does check the kind,
+   * said nothing was owed. Two screens disagreeing about one customer's money.
+   *
+   * A standing order is the SHAPE of a recurring order, never a bill. The days
+   * it materializes are the orders, and those are in the list below.
+   * `needsAttention` guards the same way for the same reason.
+   */
   const unpaid = withMoney.filter(
-    (o) => o.status !== "cancelled" && !o.ignore_balance && o.totals.balance > 0 && o.totals.total > 0
+    (o) =>
+      o.kind === "order" &&
+      o.status !== "cancelled" &&
+      !o.ignore_balance &&
+      o.totals.balance > 0 &&
+      o.totals.total > 0
   );
   const rest = withMoney.filter((o) => !unpaid.includes(o));
   const owed = unpaid.reduce((a, o) => a + o.totals.balance, 0);
+  // Payments are payments whatever the record's kind — a template has none.
   const spent = withMoney.reduce((a, o) => a + o.totals.paid, 0);
 
   const trail = parseTrail(rawParams, CUSTOMERS_CRUMB);

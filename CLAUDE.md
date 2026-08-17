@@ -3044,8 +3044,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    designing or touching anything here — and read its CORRECTIONS block first,
    which is new: five measurements in the body are wrong, because the brief was
    designed from a `parseInt` reading of `OrderID`.
-   **Shipped: migration 051 — NEEDS APPLYING, but HARNESS-VERIFIED
-   2026-08-17**: all 51 migrations apply on the Docker stub; as real
+   **Migration 051 is APPLIED and LOADED (Mark, 2026-08-17)** — 5,874
+   customers · 8,330 orders · 47,827 lines · 6,457 payments · 106,471 log
+   entries. *Probe, don't read this line.* Sanity: `select count(*) from
+   special_orders` (8,330), `… where standing_order_id is not null` (**0** —
+   the migration materializes nothing, decision 13), and `select
+   settings->'special_orders'->>'horizon_days' from orgs` (14).
+   **VERIFIED IN THE BROWSER against the real data the same day**, which is
+   where four bugs were found that typecheck, lint and 943 fixtures all
+   passed: see (g). The headline result is that **order 9885 derives
+   $147.40 / $14.37 / $161.77 — matching FileMaker's own sent quote PDF to the
+   cent**, with no stored total anywhere. That is decision 6 proved against a
+   document a customer received.
+   It was also HARNESS-VERIFIED before it was applied: all 51 migrations apply on the Docker stub; as real
    authenticated roles a supervisor reads 8,330 orders / 47,827 lines / 6,457
    payments / 5,874 customers while **a staffer reads 0 of each and an UPDATE
    changes 0 rows with NO error**; `anon` cannot execute
@@ -3119,6 +3130,30 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    "Wedding Sampler Discount", -$248.50) — the same idea expressible one way and
    refused the other. 024's lesson, found the same way: a statement true about
    finished data is still wrong as a constraint.
+   **(g) FOUR BUGS THAT ONLY RENDERING FOUND**, all fixed, and each one a
+   class worth knowing:
+   · **A controlled `DataTable` IGNORES `defaultSort`** (`sort = controlled ?
+   controlledSort ?? null : …`), and a null controlled sort renders rows as
+   given — so the work queue opened on the server's `event_date DESC` with
+   December at the top and TODAY at the bottom. A list that owns its sort needs
+   a `NATURAL_SORT` it passes down; the `sort` STATE stays null so the URL
+   keeps one canonical address.
+   · **A `FilterMenus` dimension with a `defaultValue` needs a real token for
+   "no filter"** — `lib/filterMenus` says so and `/recipes` writes `?tier=all`.
+   Without it "All orders" wrote no parameter, so a round trip silently put you
+   back on Upcoming. Known cost: the menu now shows two entries reading "All
+   orders", the bar's own and the real token.
+   · **A `time` column reads back as `10:00:00`**, and the list formatted it
+   while the record didn't. `format` is a FUNCTION, so a server component
+   cannot pass it — hence `specialOrders/TimeCell`, a client cell.
+   · **The customer record counted STANDING ORDERS as unpaid.** A recurrence
+   carries lines and no payments, so it always derives a balance: the record
+   claimed Cafe Knotted owed $1,738.50 while the list, which does check
+   `kind`, said nothing was owed. Two screens disagreeing about one customer's
+   money is the tell.
+   And a measuring trap: **check the label SPAN, not the button around it** —
+   a button sizes to its own content and can never report an overflow, which is
+   how two clipped column headers survived a check that said everything fit.
    Also: `ui/FilterMenus` gained a **`trailing`** slot (right-aligned,
    `ml-auto shrink-0`) for a list's create command — `EmployeesList` had the
    same slot before the control existed. And `/special-orders` and `/customers`

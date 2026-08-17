@@ -37,6 +37,7 @@ import { OrderTotals } from "@/components/specialOrders/OrderTotals";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
 import { OrderActions } from "@/components/specialOrders/OrderActions";
 import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
+import { TimeCell } from "@/components/specialOrders/TimeCell";
 import { StandingOrderBlock } from "@/components/specialOrders/StandingOrderBlock";
 
 const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Special Orders" };
@@ -380,14 +381,16 @@ export async function SpecialOrderDetail({
                           ariaLabel="Event date" />
                   </Row>
                   <Row label="Event time">
-                    <Cell table="special_orders" id={id} column="event_time"
-                          value={row.event_time as string | null} canWrite={canWrite}
-                          placeholder="10:30 AM" ariaLabel="Event time" />
+                    {/* `TimeCell`, not `Cell`: a `time` column reads back as
+                        `10:00:00` and the list already says "10:00 AM". It has
+                        to be a client component — `format` is a function, and
+                        one passed from here throws at runtime. */}
+                    <TimeCell id={id} column="event_time" value={row.event_time as string | null}
+                              label="Event time" canWrite={canWrite} />
                   </Row>
                   <Row label="Ready by">
-                    <Cell table="special_orders" id={id} column="ready_by_time"
-                          value={row.ready_by_time as string | null} canWrite={canWrite}
-                          placeholder="9:00 AM" ariaLabel="Ready by" />
+                    <TimeCell id={id} column="ready_by_time" value={row.ready_by_time as string | null}
+                              label="Ready by" canWrite={canWrite} placeholder="9:00 AM" />
                   </Row>
                   <Row label="Kitchen">
                     {/* Decision 8: kitchen is where it is MADE. */}

@@ -74,12 +74,49 @@ export type SpecialOrderRow = {
 const PATH = "/special-orders";
 const NONE = "none";
 
+/**
+ * THE WIDTHS ARE SOLVED, NOT CHOSEN — fifteen columns is a lot for one screen
+ * and the arithmetic has to be done once for all of them together.
+ *
+ * A `width` is a WEIGHT: the rendered pixels are `width / total × table`, so
+ * widening one column narrows every other. Bumping the seven stage columns on
+ * their own pushed Kitchen, Number and Status into clipping instead — the
+ * problem moved rather than went away.
+ *
+ * What each header needs is its label plus the cell's 24px of padding, and the
+ * weights below give every one of them that at a 1440 window (a 1344px table).
+ * Measured after, not before: nothing clips and the page does not scroll
+ * sideways. Below `compactBelow` the stage columns and Event drop out, which is
+ * what makes a narrower screen fit at all.
+ *
+ * A trap worth naming: measure the label SPAN, not the button around it. A
+ * button sizes to its own content and can never report an overflow, which is
+ * how two clipped headers survived a first check that said everything was fine.
+ */
 const SORT_KEYS = [
   "todo", "kitchen", "number", "status", "date", "customer", "title", "total",
   ...STAGES.map((s) => s.key),
 ] as const;
 
 const WEEKDAY_SHORT = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+
+/**
+ * THE ORDER THIS LIST IS IN WHEN NOBODY HAS ASKED FOR ONE — soonest first.
+ *
+ * A work queue opens on the work. The server fetches event_date DESCENDING
+ * (it is taking the most recent 500 of twelve years), and shipping that
+ * straight to the screen put December at the top and TODAY'S order at the
+ * bottom of the page — caught by looking at the real data, not by review.
+ *
+ * It cannot be `DataTable`'s `defaultSort`, which is ignored the moment a list
+ * controls its own sort (`sort = controlled ? controlledSort ?? null : …`), and
+ * a null controlled sort means "render them as given".
+ *
+ * The `sort` STATE stays null, so the plain list still keeps one canonical
+ * address — this is the natural order, not a departure from it, and only a
+ * departure belongs in the URL.
+ */
+const NATURAL_SORT: ListSort = { key: "date", dir: "asc" };
 
 /** "SUN, AUG 16" — the band over each day's run, FileMaker's own heading. */
 function dayBand(date: string | null): string {
@@ -173,6 +210,8 @@ export function SpecialOrdersList({
          */
         key: "view",
         label: "Show",
+        // The bar prepends its own FILTER_ALL option, and it is labelled the
+        // same as the explicit `all` below ON PURPOSE — see that option.
         allLabel: "All orders",
         options: [
           { value: "attention", label: "Needs attention" },
@@ -180,10 +219,29 @@ export function SpecialOrdersList({
           { value: "tomorrow", label: "Tomorrow" },
           { value: "unpaid", label: "Unpaid" },
           { value: "past", label: "Past" },
+          /**
+           * A REAL TOKEN FOR "NO FILTER", which a dimension with a
+           * `defaultValue` cannot do without — `lib/filterMenus` says so
+           * outright and `/recipes` writes `?tier=all` for the same reason.
+           *
+           * `FILTER_ALL` is the empty string, and an empty value cannot be
+           * written to a query string, so "absent" and "all" would be the same
+           * URL and the DEFAULT would win: picking All orders, opening a
+           * record and coming back would silently put you on Upcoming. Caught
+           * against the real 8,330 rows, not by review.
+           *
+           * The cost is that the menu carries two entries reading "All orders"
+           * — the bar's own and this one. They do the same thing; only this one
+           * survives a reload. Suppressing the bar's would mean changing a
+           * control six lists share, to remove an option that is correct
+           * everywhere else.
+           */
+          { value: "all", label: "All orders" },
         ],
         // Upcoming: the working view, and the list's resting state.
         defaultValue: "upcoming",
         matches: (r, v) => {
+          if (v === "all") return true;
           if (v === "attention") return attention.has(r.id);
           // Templates and standing orders have no event date, so every
           // date-based view would hide them. They are reached through the KIND
@@ -341,7 +399,7 @@ export function SpecialOrdersList({
     {
       key: "kitchen",
       label: "Kitchen",
-      width: 80,
+      width: 128,
       sortValue: (r) => r.kitchen_code ?? "",
       sortTiebreaks: [(r) => r.number],
       render: (r) => <span className="text-muted">{r.kitchen_code ?? "—"}</span>,
@@ -349,7 +407,7 @@ export function SpecialOrdersList({
     {
       key: "number",
       label: "Number",
-      width: 100,
+      width: 125,
       pinned: true,
       sortValue: (r) => r.number,
       render: (r) => (
@@ -361,7 +419,7 @@ export function SpecialOrdersList({
     {
       key: "status",
       label: "Status",
-      width: 100,
+      width: 116,
       sortValue: (r) => r.status ?? r.kind,
       sortTiebreaks: [(r) => r.number],
       render: (r) =>
@@ -373,7 +431,10 @@ export function SpecialOrdersList({
     },
     {
       key: "date",
-      label: "Event",
+      // "Date", not "Event" — the TITLE column is the event (FileMaker calls
+      // that field Event_Description), and two columns reading EVENT three
+      // apart is a header you have to decode.
+      label: "Date",
       width: 150,
       sortValue: (r) => r.event_date ?? "",
       sortTiebreaks: [(r) => r.event_time ?? "", (r) => r.number],
@@ -400,7 +461,7 @@ export function SpecialOrdersList({
     {
       key: "customer",
       label: "Customer",
-      width: 200,
+      width: 180,
       wrap: true,
       sortValue: (r) => customerLabel(r.customer).toLowerCase(),
       sortTiebreaks: [(r) => r.number],
@@ -419,7 +480,7 @@ export function SpecialOrdersList({
     {
       key: "title",
       label: "Event",
-      width: 240,
+      width: 170,
       wrap: true,
       hideWhenCompact: true,
       sortValue: (r) => r.title ?? "",
@@ -450,7 +511,7 @@ export function SpecialOrdersList({
     ...STAGES.map<DataColumn<SpecialOrderRow>>((stage) => ({
       key: stage.key,
       label: stage.label,
-      width: 72,
+      width: 124,
       align: "right",
       hideWhenCompact: true,
       sortValue: (r) => (r[stage.field as keyof SpecialOrderRow] as string | null) ?? "",
@@ -459,7 +520,7 @@ export function SpecialOrdersList({
     })),
   ];
 
-  const sorted = sortRows(visible, columns, sort);
+  const sorted = sortRows(visible, columns, sort ?? NATURAL_SORT);
 
   usePublishRecordSet(PATH, sorted.map((r) => ({ id: r.id, href: detailHref(r.id) })));
 
@@ -478,12 +539,13 @@ export function SpecialOrdersList({
   return (
     <DataTable
       rows={sorted}
-      sort={sort}
+      // `sort ?? NATURAL_SORT` so the header arrow agrees with the rows. The
+      // URL is written from `sort` itself, which stays null until you move it.
+      sort={sort ?? NATURAL_SORT}
       onSortChange={changeSort}
-      defaultSort={{ key: "date", dir: "asc" }}
       columns={columns}
       rowKey={(r) => r.id}
-      storageKey="special-orders.v1"
+      storageKey="special-orders.v2"
       compactBelow={1280}
       columnChooser
       group={groups}

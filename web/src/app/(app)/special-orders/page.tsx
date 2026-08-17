@@ -47,8 +47,12 @@ export default async function SpecialOrdersPage({
    * — which is what the `upcoming` view shows anyway. `?range=all` is the
    * escape hatch the `past` view needs, and the list says when it is capped.
    */
-  const showAll = (Array.isArray(params.view) ? params.view[0] : params.view) === "past"
-    || (Array.isArray(params.view) ? params.view[0] : params.view) === "";
+  // `past` and `all` are the two views that ask to look backwards. They must
+  // match the `view` dimension's option values in `SpecialOrdersList` — a
+  // window that disagrees with the filter shows an empty list and blames the
+  // filter for it.
+  const view = Array.isArray(params.view) ? params.view[0] : params.view;
+  const showAll = view === "past" || view === "all";
   const since = new Date(`${today}T00:00:00Z`);
   since.setUTCDate(since.getUTCDate() - 30);
 

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { TimeCell } from "./TimeCell";
 
 /**
  * Decision 8's other half: pickup or delivery, and everything a delivery needs.
@@ -114,12 +115,16 @@ export function OrderDelivery({
                       kind="number" label="Distance in miles" />
               </Row>
               <Row label="Window opens">
-                <Cell id={id} canWrite={canWrite} column="delivery_window_start" value={row.delivery_window_start as string | null}
-                      label="Delivery window start" placeholder="10:00 AM" />
+                {/* `TimeCell`, not `Cell`: these are `time` columns and read
+                    back as `10:00:00`. Same reason as the record's event time. */}
+                <TimeCell id={id} canWrite={canWrite} column="delivery_window_start"
+                          value={row.delivery_window_start as string | null}
+                          label="Delivery window start" placeholder="10:00 AM" />
               </Row>
               <Row label="Window closes">
-                <Cell id={id} canWrite={canWrite} column="delivery_window_end" value={row.delivery_window_end as string | null}
-                      label="Delivery window end" placeholder="11:00 AM" />
+                <TimeCell id={id} canWrite={canWrite} column="delivery_window_end"
+                          value={row.delivery_window_end as string | null}
+                          label="Delivery window end" placeholder="11:00 AM" />
               </Row>
             </div>
           </section>

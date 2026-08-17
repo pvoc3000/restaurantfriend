@@ -579,14 +579,25 @@ export type Stage = {
   field: keyof AttentionOrder & string;
 };
 
+/**
+ * SEVEN COLUMNS IN A NARROW GRID, so the labels are SHORT ONES — measured, not
+ * chosen: at the width seven stage columns can have beside the to-do, customer
+ * and event columns, "Invoiced", "Delivery" and "Scheduled" clipped to
+ * "INV…", "DE…" and "SC…", which CLAUDE.md's column rule says reads as a
+ * rendering fault rather than as "there's more".
+ *
+ * They are real words rather than abbreviations with full stops. "Billed" and
+ * "Booked" are arguably clearer than the FileMaker phrases they replace: the
+ * pair "Invoiced / Paid" made you read twice to see which was which.
+ */
 export const STAGES: Stage[] = [
   { key: "quote_sent", label: "Quote", field: "quote_sent_at" },
   { key: "quote_returned", label: "Signed", field: "quote_returned_at" },
-  { key: "invoice_sent", label: "Invoiced", field: "invoice_sent_at" },
+  { key: "invoice_sent", label: "Billed", field: "invoice_sent_at" },
   { key: "invoice_paid", label: "Paid", field: "invoice_paid_at" },
-  { key: "delivery_scheduled", label: "Delivery", field: "delivery_scheduled_at" },
-  { key: "order_scheduled", label: "Scheduled", field: "order_scheduled_at" },
-  { key: "order_printed", label: "Printed", field: "order_printed_at" },
+  { key: "delivery_scheduled", label: "Booked", field: "delivery_scheduled_at" },
+  { key: "order_scheduled", label: "Sched", field: "order_scheduled_at" },
+  { key: "order_printed", label: "Print", field: "order_printed_at" },
 ];
 
 export function stageState(
