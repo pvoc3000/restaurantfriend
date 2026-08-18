@@ -128,57 +128,232 @@ Deploy: `supabase functions deploy invite-member`.
 
 ---
 
-## Special orders send as a DIFFERENT mailbox
+# Special orders: sending as specialorders@ — a walkthrough
 
-Decision 12 of `docs/special-orders-brief.md`: a quote, invoice or receipt goes
-out **as specialorders@donutfriend.com**, not as info@. That needs its own
-credential, because **a Gmail refresh token can only send as its own mailbox
-or one of that mailbox's configured "Send mail as" aliases** — the info@ token
-cannot send as specialorders@, and Gmail does not refuse the attempt, it
-silently REWRITES the From. That failure looks exactly like success until a
-customer replies to the wrong address.
+Everything in special orders is deployed and working **except this**: right now
+a quote sends as **info@donutfriend.com**, because no module-level provider is
+configured and it falls through to the org's. Nothing is broken; the From is
+just wrong, and the customer's reply lands in the wrong inbox.
 
-Two ways round it, and the second is less work if it fits:
+This is the whole job. Fifteen minutes if you need the OAuth dance, two if you
+don't.
 
-1. **A second credential set.** Repeat the Gmail dance above signed in as
-   specialorders@, then
+---
 
-   ```bash
-   npx supabase secrets set EMAIL_CREDS_SPECIALORDERS='{"client_id":"…","client_secret":"…","refresh_token":"…"}'
+## Step 1 — which kind of thing is specialorders@?
+
+Open the Google Admin console (admin.google.com) → **Directory → Users**, and
+search for `specialorders`.
+
+- **It appears as a USER** → you have a real mailbox. Either path works;
+  **Path A** is better (sent mail lands in that mailbox's own Sent folder).
+- **It does NOT appear** → check **Directory → Groups**, or open info@'s Gmail
+  → Settings → **Accounts** → "Send mail as". If specialorders@ is listed
+  there, take **Path B** — you are done in two minutes.
+- **Neither** → specialorders@ does not exist yet. Create it as an alias of
+  info@ (Admin → Users → info@ → "Add alternate email"), wait a few minutes,
+  then take **Path B**.
+
+If you are not sure, take Path B first. It is quick, it is reversible, and if
+it turns out to be wrong the send fails loudly rather than quietly.
+
+---
+
+## Path A — specialorders@ has its own mailbox (~15 min)
+
+You are producing one thing: a **refresh token** that belongs to
+specialorders@. The Google Cloud project from the info@ setup is reused, so
+there is nothing to create there.
+
+### A1. Get the OAuth client id and secret you already have
+
+console.cloud.google.com → make sure the project selector at the top says
+**project 765339329273** (the one the info@ credential was made in) → **APIs &
+Services → Credentials** → under "OAuth 2.0 Client IDs", open the Web
+application client → copy the **Client ID** and **Client secret**.
+
+If the client's **Authorised redirect URIs** does not already list
+
+```
+https://developers.google.com/oauthplayground
+```
+
+add it and press Save. (It will be there from the info@ setup.)
+
+### A2. Mint the refresh token AS specialorders@
+
+**Sign out of every Google account first, or sign in to specialorders@ in a
+private window.** This is the step that goes wrong: the playground authorises
+whichever account is signed in, and if that is info@ you get a second info@
+token that looks perfectly valid and sends as the wrong address.
+
+1. Open <https://developers.google.com/oauthplayground>
+2. Gear icon (top right) → tick **Use your own OAuth credentials** → paste the
+   Client ID and Client secret from A1.
+3. In the left-hand list, ignore the categories and paste this into the box
+   labelled "Input your own scopes":
+
+   ```
+   https://www.googleapis.com/auth/gmail.send
    ```
 
-   and set `orgs.settings.special_orders.email_provider`:
+4. Click **Authorize APIs**. Sign in **as specialorders@donutfriend.com** and
+   accept. Check the account shown on the consent screen before you accept.
+5. Back in the playground, click **Exchange authorization code for tokens**.
+6. Copy the **Refresh token** — the long string starting `1//`. This is the
+   only thing you need from this page, and it does not expire.
 
-   ```json
-   { "kind": "gmail",
-     "secret_ref": "SPECIALORDERS",
-     "from": "Donut Friend <specialorders@donutfriend.com>",
-     "reply_to": "specialorders@donutfriend.com" }
-   ```
+### A3. Store it as a Supabase secret
 
-2. **An alias on info@.** If specialorders@ is already a "Send mail as" address
-   on the info@ mailbox (Gmail → Settings → Accounts), the EXISTING
-   `EMAIL_CREDS_DONUTFRIEND` credential can send as it. Then the config above
-   is the same but `"secret_ref": "DONUTFRIEND"` and no new secret is needed.
-   Sent mail lands in info@'s Sent folder rather than specialorders@'s, which
-   is the trade.
+In a terminal, from the repo root. Substitute the three values; keep the single
+quotes so the shell does not eat anything.
 
-**Resolution order for a special order is org-module → org → app default.**
-There is deliberately NO location tier: a purchase order belongs to a shop and
-may reasonably come from that shop's mailbox, but a customer's quote is the
-ORG's letter and which shop they collect from does not change who wrote to
-them.
+```bash
+npx supabase secrets set --project-ref kltxioacvneshbyhxtaj EMAIL_CREDS_SPECIALORDERS='{"client_id":"PASTE_CLIENT_ID","client_secret":"PASTE_CLIENT_SECRET","refresh_token":"PASTE_REFRESH_TOKEN"}'
+```
 
-### The rest of `orgs.settings.special_orders`
+Check it landed (this lists names and digests, never values):
 
-Beyond migration 051's numbers and terms, phase 3 reads:
+```bash
+npx supabase secrets list --project-ref kltxioacvneshbyhxtaj
+```
 
-| key | what it is |
+### A4. Point the app at it
+
+Supabase dashboard → **SQL Editor** → run:
+
+```sql
+update orgs
+   set settings = jsonb_set(
+         settings,
+         '{special_orders,email_provider}',
+         '{"kind":"gmail",
+           "secret_ref":"SPECIALORDERS",
+           "from":"Donut Friend <specialorders@donutfriend.com>",
+           "reply_to":"specialorders@donutfriend.com"}'::jsonb,
+         true
+       )
+ where id = '5803adf6-0afa-4a54-b049-91411f36c79f';
+```
+
+`jsonb_set` with the path `{special_orders,email_provider}` adds ONE key inside
+the settings that are already there — it does not replace the terms, the rush
+fee or the thresholds. Skip to **Step 2**.
+
+---
+
+## Path B — specialorders@ is an alias on info@ (~2 min)
+
+No new secret and no OAuth: the existing `EMAIL_CREDS_DONUTFRIEND` credential
+can send as any address configured under info@'s "Send mail as".
+
+Supabase dashboard → **SQL Editor** → run:
+
+```sql
+update orgs
+   set settings = jsonb_set(
+         settings,
+         '{special_orders,email_provider}',
+         '{"kind":"gmail",
+           "secret_ref":"DONUTFRIEND",
+           "from":"Donut Friend <specialorders@donutfriend.com>",
+           "reply_to":"specialorders@donutfriend.com"}'::jsonb,
+         true
+       )
+ where id = '5803adf6-0afa-4a54-b049-91411f36c79f';
+```
+
+**The one difference from Path A**, and it is worth knowing before you choose:
+sent quotes land in **info@'s** Sent folder, not specialorders@'s. Replies
+still go to specialorders@ because Reply-To says so. If you want the paper
+trail in specialorders@ itself, use Path A.
+
+---
+
+## Step 2 — the documents' contact line (optional, 1 min)
+
+The masthead on every quote, invoice and receipt prints a phone and an email.
+It currently prints the BILLING pair — `(213) 908-2743 / info@donutfriend.com`
+— where FileMaker's own quotes print the special-orders line. `reply_to` from
+Step 1 already fixes the email half. For the phone:
+
+```sql
+update orgs
+   set settings = jsonb_set(settings, '{special_orders,document_phone}',
+                            '"213 995 6191"'::jsonb, true)
+ where id = '5803adf6-0afa-4a54-b049-91411f36c79f';
+```
+
+(Note the doubled quotes: a bare JSON string still needs to be valid JSON.)
+
+---
+
+## Step 3 — prove it, with a real send to yourself
+
+Nothing about email can be trusted until a message actually arrives, because
+**Gmail does not refuse a `From` it is not authorised for — it silently
+rewrites it.** A misconfigured send looks exactly like a working one from
+inside the app. So:
+
+1. Open any special order in the app → the command bar at the bottom →
+   leave the picker on **Quote** → **Email…**
+2. Replace **To** with your own address. Leave everything else.
+3. **Send.**
+
+Then check four things, in this order:
+
+| Check | Where | What it means if it's wrong |
+| --- | --- | --- |
+| The From reads `specialorders@donutfriend.com` | the received mail | Gmail rewrote it — the credential does not own that address. Path A, or add the alias. |
+| It landed in specialorders@'s **Sent** folder | Gmail | You are on Path B. Expected. |
+| The quote PDF is attached and reads correctly | the received mail | — |
+| The approval link opens the quote | tap it on your phone | See below if it says the link isn't valid |
+
+Then, still on that order:
+
+- the **Quote sent** date on the Info tab has filled itself in;
+- the **Documents** tab now holds a `Quote sent` PDF — the exact file that went
+  out;
+- the **History** on the Notes tab has a line naming the recipient and the
+  provider message id.
+
+Tap the link, type a name, tick the box, approve. The order's **Quote
+approved** date fills in, a `Signed quote` PDF appears on the Documents tab,
+and a confirmation arrives. That is the whole loop.
+
+**Afterwards:** the test send stamped a real order. Clear `quote_sent_at` and
+`quote_returned_at` on the Info tab and delete the two documents from the
+Documents tab, or do the test on a throwaway order you delete after.
+
+---
+
+## When it goes wrong
+
+| What you see | What it is |
 | --- | --- |
-| `email_provider` | the transport above |
-| `reply_to` | the address printed on every document, and where replies go |
-| `document_phone` | the phone on the documents' masthead — the real quote prints the special-orders line, not the billing one |
-| `document_name` | overrides the masthead name; defaults to the ORG name (a customer document carries the trade name, where a PO's Bill-to carries the legal entity) |
+| `secret EMAIL_CREDS_SPECIALORDERS is not set` | A3 didn't run, or the name is misspelled. `supabase secrets list` shows the real name. |
+| `Gmail auth failed: invalid_grant` | The refresh token is wrong, or it was minted against a different client id than the one in the same secret. Redo A2 — the two must come from the same OAuth client. |
+| `Gmail refused the send: Precondition check failed` | The Gmail API is not enabled **in project 765339329273**. Enable it there; the error is about the project, not the account. |
+| `email_provider config is incomplete` | The JSON in A4/Path B is missing `kind`, `secret_ref` or `from`. |
+| Mail arrives, but from info@ | Gmail rewrote the From. The credential does not own specialorders@ — Path A, or add the "Send mail as" alias. |
+| The approval link says "this link isn't valid" | The token has no document behind it, which is what a compose card that was **cancelled** leaves. Send the quote properly and use the link from that email. |
+| The approval link says "this quote has been revised" | You sent the quote again. Only the newest link works, by design. |
+
+---
+
+## Reference: everything under `orgs.settings.special_orders`
+
+Set by migration 051: `horizon_days`, `rush_cutoff_business_days`,
+`rush_minimum`, `rush_rate`, `attention_*`, `invoice_footer`, `terms`.
+
+Read by phase 3:
+
+| key | what it does |
+| --- | --- |
+| `email_provider` | the transport — Step 1 |
+| `reply_to` | printed on every document, and where replies go |
+| `document_phone` | the phone on the masthead — Step 2 |
+| `document_name` | overrides the masthead name; defaults to the ORG name, because a customer document carries the trade name where a PO's Bill-to carries the legal entity |
 | `email_cc` | Cc on every document email — the shop's own copy |
 | `approval_cc` | who is Cc'd on an approval confirmation; falls back to `reply_to` |
 | `email` | per-document `{subject, body}` overrides, keyed `quote` / `invoice` / `receipt` / `order` / `statement` |
@@ -189,7 +364,14 @@ Template placeholders: `{number}` `{title}` `{title_suffix}` `{first_name}`
 An unknown placeholder is **left in the text rather than blanked**, so a typo
 shows up in the compose card where somebody can fix it.
 
-### Deploy
+**Resolution order for a special order is module → org → app default.** There
+is deliberately no location tier: a purchase order belongs to a shop and may
+reasonably come from that shop's mailbox, but a customer's quote is the ORG's
+letter, and which shop they collect from does not change who wrote to them.
+
+---
+
+## Reference: redeploying
 
 ```bash
 npx supabase functions deploy send-special-order-email --project-ref kltxioacvneshbyhxtaj
@@ -197,14 +379,11 @@ npx supabase functions deploy approve-quote --project-ref kltxioacvneshbyhxtaj
 npx supabase functions deploy send-po-email --project-ref kltxioacvneshbyhxtaj
 ```
 
-**All three, and `send-po-email` is not a typo.** The provider layer moved into
-`supabase/functions/_shared/email.ts` so the two senders share one MIME builder
-and one OAuth refresh; `_shared` is compiled into each function at deploy time,
-so an edit there reaches a function only when that function is redeployed. The
-deployed copy keeps running until then — nothing breaks, it just does not get
-the change (including the threading headers).
+All three were deployed 2026-08-17 and **none of them needs redeploying for
+anything in this document** — secrets and settings are read at call time, so
+Step 1 takes effect on the next send.
 
-`approve-quote` is called by an anonymous customer, so it runs with the ANON
-key like any public call. It needs no new secret: it reads
-`SUPABASE_SERVICE_ROLE_KEY`, which Supabase injects, and its authority is the
-token, checked in SQL before it touches anything.
+`send-po-email` is in that list and it is not a typo: the provider layer lives
+in `supabase/functions/_shared/email.ts`, which is compiled into each function
+when THAT function is deployed. Edit the shared file and all three need
+redeploying, or the ones you skipped keep running the old copy.

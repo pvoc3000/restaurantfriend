@@ -688,131 +688,145 @@ export function PurchaseOrderDetail({
         </div>
       </div>
 
-      <dl className="grid max-w-2xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-          Ordered
-        </dt>
-        <dd className="tabular-nums">
-          {canEditLines ? (
-            <InlineValue
-              table="purchase_orders"
-              id={order.id}
-              column="order_date"
-              value={order.order_date}
-              kind="date"
-              nullable={false}
-            />
-          ) : (
-            <span className={READ_ONLY_VALUE}>{order.order_date}</span>
-          )}
-        </dd>
+      {/* The fields and the Process box sit SIDE BY SIDE (Mark,
+          2026-08-17). Both are about the order as a whole and neither
+          fills a 1440 window on its own — the dl is four short rows and
+          the box is one band of controls — so stacking them spent ~200px
+          of height pushing the line table down for two half-empty rows.
 
-        {/* Delivery sits back under Ordered (Mark, 2026-08-02) — the two dates
-            read as a pair, which is the argument that beat putting it up in the
-            bar beside Status.
+          Stacked again below `xl`: the box's second row is three groups of
+          buttons, which needs the width more than the pairing does. */}
+      <div className="grid items-start gap-x-8 gap-y-6 xl:grid-cols-[26rem_minmax(0,1fr)]">
+        <div className="space-y-6">
+          <dl className="grid max-w-2xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
+            <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+              Ordered
+            </dt>
+            <dd className="tabular-nums">
+              {canEditLines ? (
+                <InlineValue
+                  table="purchase_orders"
+                  id={order.id}
+                  column="order_date"
+                  value={order.order_date}
+                  kind="date"
+                  nullable={false}
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>{order.order_date}</span>
+              )}
+            </dd>
 
-            The field is always there and blank until the date is actually set,
-            with the expectation beside it (Mark, 2026-08-02: "a blank field +
-            the 'arriving on…' text to the right of it").
+            {/* Delivery sits back under Ordered (Mark, 2026-08-02) — the two dates
+                read as a pair, which is the argument that beat putting it up in the
+                bar beside Status.
 
-            IT SHOWS THE COLUMN, not a version of the column. The previous cut
-            withheld the value until the order was received, and that's what
-            produced the 08/02/2026 on 132-181132-02: a control whose prop is
-            pinned to null can never be corrected by React, because a controlled
-            input only touches the DOM when the rendered value CHANGES. Every
-            guard against that had to special-case a field whose prop never
-            moves — including, once written, one that could never clear itself.
-            A field that shows what the row holds has none of those cases.
+                The field is always there and blank until the date is actually set,
+                with the expectation beside it (Mark, 2026-08-02: "a blank field +
+                the 'arriving on…' text to the right of it").
 
-            Consequence worth knowing: a PO generated since migration 016 has
-            `delivery_date` pre-filled from the vendor's delivery days, so it
-            shows that date here rather than a blank. Making it blank until the
-            delivery actually happens means generation should stop pre-filling
-            the column and the vendor PDF should derive the date instead — a
-            change to what the vendor document says, so it's Mark's call. */}
-        <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-          Delivery
-        </dt>
-        <dd className="flex flex-wrap items-center gap-2 tabular-nums">
-          {canEditLines ? (
-            <InlineValue
-              table="purchase_orders"
-              id={order.id}
-              column="delivery_date"
-              value={order.delivery_date}
-              kind="date"
-            />
-          ) : (
-            <span className={READ_ONLY_VALUE}>{order.delivery_date ?? "—"}</span>
-          )}
-          {expectedDelivery && (
-            <span className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink">
-              arrives {expectedDelivery}
-            </span>
-          )}
-        </dd>
+                IT SHOWS THE COLUMN, not a version of the column. The previous cut
+                withheld the value until the order was received, and that's what
+                produced the 08/02/2026 on 132-181132-02: a control whose prop is
+                pinned to null can never be corrected by React, because a controlled
+                input only touches the DOM when the rendered value CHANGES. Every
+                guard against that had to special-case a field whose prop never
+                moves — including, once written, one that could never clear itself.
+                A field that shows what the row holds has none of those cases.
 
-        <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-          Sent via
-        </dt>
-        {/* The same padding the editable cells wear. Without it a read-only
-            value starts 4px left of every value above and below it, which is
-            what Mark saw on an email order: "'email' isn't aligned with the
-            ordered date and note". */}
-        <dd>
-          <span className={READ_ONLY_VALUE}>{order.sent_via ?? "—"}</span>
-        </dd>
-        <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-          Notes
-        </dt>
-        <dd>
-          {canEditLines ? (
-            <InlineValue
-              table="purchase_orders"
-              id={order.id}
-              column="notes"
-              value={order.notes}
-              placeholder="none"
-            />
-          ) : (
-            <span className={READ_ONLY_VALUE}>{order.notes ?? "—"}</span>
-          )}
-        </dd>
-      </dl>
-
-      {error && <p className="text-sm text-accent">{error}</p>}
-
-      {/* ONE box above the lines (Mark, 2026-08-02). The Process card and the
-          line bar were two stacked frames saying things about the same order;
-          `OrderBar` is the shared layout and these three are its slots. When
-          there's no `processing` — i.e. below purchaser+ — the bar renders here
-          instead, without the Delivery editor or any of the send buttons. */}
-      {processing ? (
-        <ProcessPo
-          order={order}
-          context={processing}
-          statement={statement}
-          status={statusControl}
-          actionsBefore={addItemAction}
-          actionsAfter={closingActions}
-        />
-      ) : (
-        <OrderBar
-          statement={statement}
-          trailing={
-            <>
-              <span className="flex items-center gap-2 text-muted">
-                <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-                  Delivery
+                Consequence worth knowing: a PO generated since migration 016 has
+                `delivery_date` pre-filled from the vendor's delivery days, so it
+                shows that date here rather than a blank. Making it blank until the
+                delivery actually happens means generation should stop pre-filling
+                the column and the vendor PDF should derive the date instead — a
+                change to what the vendor document says, so it's Mark's call. */}
+            <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+              Delivery
+            </dt>
+            <dd className="flex flex-wrap items-center gap-2 tabular-nums">
+              {canEditLines ? (
+                <InlineValue
+                  table="purchase_orders"
+                  id={order.id}
+                  column="delivery_date"
+                  value={order.delivery_date}
+                  kind="date"
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>{order.delivery_date ?? "—"}</span>
+              )}
+              {expectedDelivery && (
+                <span className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink">
+                  arrives {expectedDelivery}
                 </span>
-                <span className="tabular-nums">{order.delivery_date ?? "—"}</span>
-              </span>
-              {statusControl}
-            </>
-          }
-          actionGroups={[addItemAction, closingActions]}
-        />
-      )}
+              )}
+            </dd>
+
+            <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+              Sent via
+            </dt>
+            {/* The same padding the editable cells wear. Without it a read-only
+                value starts 4px left of every value above and below it, which is
+                what Mark saw on an email order: "'email' isn't aligned with the
+                ordered date and note". */}
+            <dd>
+              <span className={READ_ONLY_VALUE}>{order.sent_via ?? "—"}</span>
+            </dd>
+            <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+              Notes
+            </dt>
+            <dd>
+              {canEditLines ? (
+                <InlineValue
+                  table="purchase_orders"
+                  id={order.id}
+                  column="notes"
+                  value={order.notes}
+                  placeholder="none"
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>{order.notes ?? "—"}</span>
+              )}
+            </dd>
+          </dl>
+
+          {error && <p className="text-sm text-accent">{error}</p>}
+        </div>
+
+        <div>
+          {/* ONE box above the lines (Mark, 2026-08-02). The Process card and the
+              line bar were two stacked frames saying things about the same order;
+              `OrderBar` is the shared layout and these three are its slots. When
+              there's no `processing` — i.e. below purchaser+ — the bar renders here
+              instead, without the Delivery editor or any of the send buttons. */}
+          {processing ? (
+            <ProcessPo
+              order={order}
+              context={processing}
+              statement={statement}
+              status={statusControl}
+              actionsBefore={addItemAction}
+              actionsAfter={closingActions}
+            />
+          ) : (
+            <OrderBar
+              statement={statement}
+              trailing={
+                <>
+                  <span className="flex items-center gap-2 text-muted">
+                    <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+                      Delivery
+                    </span>
+                    <span className="tabular-nums">{order.delivery_date ?? "—"}</span>
+                  </span>
+                  {statusControl}
+                </>
+              }
+              actionGroups={[addItemAction, closingActions]}
+            />
+          )}
+        </div>
+      </div>
 
       {checkedLines.size > 0 && (
         <div className="flex flex-wrap items-center gap-4 border border-ink px-4 py-3 text-sm">

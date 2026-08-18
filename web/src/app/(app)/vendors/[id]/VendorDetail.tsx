@@ -16,7 +16,9 @@ import {
 import { AddVendorReminder } from "@/components/purchasing/Reminders";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { SectionNav } from "@/components/ui/SectionNav";
 import { VendorFields } from "@/components/catalog/VendorFields";
+import { VENDOR_TABS, VENDOR_TAB_LABEL, parseVendorTab, vendorTabHref } from "@/lib/vendors";
 
 type VendorLocationRow = {
   id: string;
@@ -61,6 +63,17 @@ export async function VendorDetail({
   const session = await getAppSession();
   const supabase = await createClient();
 
+  // WHICH TAB, and therefore WHAT TO FETCH. That is half the point of splitting
+  // the record: Info stops paying for a vendor's whole item catalog and the two
+  // last-ordered round trips that hang off it (Chefs Warehouse has 227 vendor
+  // items), and Items stops paying for the type list only the Type picker reads.
+  //
+  // `SKIP` stands in for a query that isn't wanted, so the destructuring keeps
+  // its shape. Promise.all takes plain values happily — EmployeeDetail's idiom.
+  const tab = parseVendorTab(rawParams.tab);
+  const SKIP = { data: null, error: null, count: null };
+  const wantsItems = tab === "items";
+
   // Every location's config is listed (not just the active one) — the vendor's
   // account number and minimum differ per shop, and seeing them together is the
   // point of the detail screen.
@@ -76,16 +89,18 @@ export async function VendorDetail({
         )
         .eq("id", id)
         .maybeSingle(),
-      supabase
-        .from("vendor_items")
-        .select(`${VENDOR_ITEM_SELECT}, inventory_items ( id, name, base_unit, category )`)
-        .eq("vendor_id", id)
-        .order("is_active", { ascending: false })
-        .order("description"),
+      wantsItems
+        ? supabase
+            .from("vendor_items")
+            .select(`${VENDOR_ITEM_SELECT}, inventory_items ( id, name, base_unit, category )`)
+            .eq("vendor_id", id)
+            .order("is_active", { ascending: false })
+            .order("description")
+        : SKIP,
       // What the Type picker offers — every vendor_type already in use, fired
       // alongside the other two so it costs no extra round trip (the same
       // move ItemDetail makes for the item category picker).
-      supabase.from("vendors").select("vendor_type"),
+      wantsItems ? SKIP : supabase.from("vendors").select("vendor_type"),
     ]);
 
   if (error) {
@@ -112,7 +127,7 @@ export async function VendorDetail({
   ];
   const lastOrderedByItem = new Map<string, string | null>();
 
-  if (session.activeLocation && itemIds.length > 0) {
+  if (wantsItems && session.activeLocation && itemIds.length > 0) {
     const { data: locationRows } = await supabase
       .from("inventory_item_locations")
       .select("id, inventory_item_id")
@@ -149,78 +164,128 @@ export async function VendorDetail({
   // Links out of this page come back here, with the trail so far intact.
   const here = { href: `/vendors/${id}${queryString}`, label: v.name };
 
+  // Built once and rendered twice — see the two navs below.
+  const tabOptions = VENDOR_TABS.map((t) => ({
+    key: t,
+    label: VENDOR_TAB_LABEL[t],
+    href: vendorTabHref(id, t, rawParams),
+  }));
+
   return (
-    // space-y-16, not 6 (Mark, 2026-08-01, twice — 10 wasn't enough): with each
-    // table's heading and filters now sitting ON the table, 4px from its column
-    // headers, the gap BETWEEN the blocks is the only thing left saying where
-    // one ends and the next begins. It has to beat the gaps inside them by a
-    // wide margin or the two tables read as one run.
-    <div className="space-y-16">
+    <div className="space-y-8">
       <Breadcrumbs
         trail={trail}
         current={v.name}
         trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
       />
 
-      {/* space-y-3, matching ItemFields' own rhythm: the name row and the
-          field block below it both describe what this record IS, so they sit
-          closer to each other than to the two tables that follow. */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-baseline gap-3">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">{v.name}</h1>
-          {!v.is_active && <span className="text-sm text-subtle">Inactive</span>}
+      {/* ---- who this vendor is, ABOVE the split ----------------------- */}
+      {/* The name is the record's identity, so it stays put while the sections
+          change under it — the employee record's shape, which is what this is
+          copied from rather than re-derived.
 
-          {/* "Next time we order from these people…" — recorded where the
-              thought happens rather than remembered until Monday. It surfaces
-              on the ACTIVE location's guide, which is the one you'd be
-              walking. */}
-          {session.activeLocation &&
-            canWriteCatalog(session.membership.role) && (
-              <span className="ml-auto">
-                <AddVendorReminder
-                  vendorId={v.id}
-                  vendorName={v.name}
-                  locationId={session.activeLocation.id}
-                  orgId={session.membership.org_id}
-                  today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
-                />
-              </span>
-            )}
-        </div>
+          INDENTED TO THE CONTENT COLUMN, not to the page margin: `lg:ml-48` is
+          exactly the sidebar's `lg:w-40` plus the row's `lg:gap-8` (10rem +
+          2rem), so the name starts on the same left edge as everything under
+          it. THOSE THREE VALUES ARE COUPLED — change the sidebar's width and
+          this has to move with it. Below `lg` there is no sidebar to clear. */}
+      <div className="flex flex-wrap items-baseline gap-3 lg:ml-48">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">{v.name}</h1>
+        {!v.is_active && <span className="text-sm text-subtle">Inactive</span>}
 
-        <VendorFields vendor={v} vendorTypes={vendorTypes} />
+        {/* "Next time we order from these people…" — recorded where the
+            thought happens rather than remembered until Monday. It surfaces
+            on the ACTIVE location's guide, which is the one you'd be
+            walking. Above the split with the name, because it is about the
+            vendor rather than about either section. */}
+        {session.activeLocation &&
+          canWriteCatalog(session.membership.role) && (
+            <span className="ml-auto">
+              <AddVendorReminder
+                vendorId={v.id}
+                vendorName={v.name}
+                locationId={session.activeLocation.id}
+                orgId={session.membership.org_id}
+                today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
+              />
+            </span>
+          )}
       </div>
 
-      {/* The heading rides in the table's own strip, opposite the columns eye
-          (Mark, 2026-08-01: it "could come closer to the table") — the strip
-          was an empty 32px band otherwise, which is what held the two apart. */}
-      <section>
-        <VendorLocationsTable
-          rows={v.vendor_locations}
-          codeById={Object.fromEntries(codeById)}
-          activeLocationId={session.activeLocation?.id ?? null}
-          leading={<SectionHeading>Per-location config</SectionHeading>}
-        />
-      </section>
-
-      <section className="space-y-2">
-        <SectionHeading count={vendorItems?.length ?? 0}>Vendor items</SectionHeading>
-        {viError ? (
-          <p className="text-sm text-accent">
-            Could not load vendor items: {viError.message}
-          </p>
-        ) : (
-          <VendorItemsTable
-            vendorItems={itemsWithAge}
-            showItem
-            scroll
-            from={here}
-            filters
-            showLastOrdered={session.activeLocation !== null}
-            canEdit={canWriteCatalog(session.membership.role)}
+      {/* ---- the record's two sections --------------------------------- */}
+      {/* Below `lg` it STACKS, bar above content: a 160px column beside a table
+          at iPad-portrait width leaves neither enough room, and a horizontal bar
+          is what this control is anyway. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+        {/* TWO renderings of one control, wrapped rather than switched with a
+            responsive `display` utility on the control itself: Tailwind resolves
+            competing utilities by STYLESHEET order, not class-string order, so a
+            `hidden` passed in `className` would not reliably beat the component's
+            own `flex`. A wrapper div has no such argument to lose. */}
+        <div
+          className="hidden lg:sticky lg:block lg:w-40 lg:shrink-0"
+          // Under the masthead, which MEASURES itself — it wraps to two or three
+          // rows at iPad widths, so any constant here would be wrong at some width.
+          style={{ top: "calc(var(--rf-header-h) + 1.5rem)" }}
+        >
+          <SectionNav ariaLabel="Which part of this record" value={tab} items={tabOptions} />
+        </div>
+        <div className="lg:hidden">
+          <SectionNav
+            orientation="horizontal"
+            ariaLabel="Which part of this record"
+            value={tab}
+            items={tabOptions}
           />
-        )}
-      </section>
+        </div>
+
+        {/* space-y-16, not 6 (Mark, 2026-08-01, twice — 10 wasn't enough): with
+            each table's heading and filters now sitting ON the table, 4px from
+            its column headers, the gap BETWEEN the blocks is the only thing left
+            saying where one ends and the next begins. It has to beat the gaps
+            inside them by a wide margin or the blocks read as one run. */}
+        <div className="min-w-0 flex-1 space-y-16">
+          {tab === "info" && (
+            <>
+              <VendorFields vendor={v} vendorTypes={vendorTypes} />
+
+              {/* The heading rides in the table's own strip, opposite the columns
+                  eye (Mark, 2026-08-01: it "could come closer to the table") — the
+                  strip was an empty 32px band otherwise, which is what held the
+                  two apart. */}
+              <section>
+                <VendorLocationsTable
+                  rows={v.vendor_locations}
+                  codeById={Object.fromEntries(codeById)}
+                  activeLocationId={session.activeLocation?.id ?? null}
+                  leading={<SectionHeading>Per-location config</SectionHeading>}
+                />
+              </section>
+            </>
+          )}
+
+          {tab === "items" && (
+            <section className="space-y-2">
+              <SectionHeading count={vendorItems?.length ?? 0}>Vendor items</SectionHeading>
+              {viError ? (
+                <p className="text-sm text-accent">
+                  Could not load vendor items: {viError.message}
+                </p>
+              ) : (
+                <VendorItemsTable
+                  vendorItems={itemsWithAge}
+                  showItem
+                  scroll
+                  from={here}
+                  filters
+                  showLastOrdered={session.activeLocation !== null}
+                  canEdit={canWriteCatalog(session.membership.role)}
+                />
+              )}
+            </section>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
