@@ -3044,12 +3044,30 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    designing or touching anything here — and read its CORRECTIONS block first,
    which is new: five measurements in the body are wrong, because the brief was
    designed from a `parseInt` reading of `OrderID`.
-   **Migration 052 (the quote-approval RPCs) is WRITTEN and NOT APPLIED**, and
-   the three edge functions are written and NOT DEPLOYED. *Probe, don't read
-   this line.* For 052: `select column_name from information_schema.columns
-   where table_name = 'special_order_quote_tokens' and column_name =
-   'document_snapshot'` (1 row), and `select public.quote_by_token('nope')`,
-   which must answer `{"state": "unknown"}` rather than raising.
+   **Migration 052 is APPLIED and all three edge functions are DEPLOYED**
+   (Mark applied 052, 2026-08-17; the deploy was verified the same day).
+   *Probe, don't read this line.* For 052:
+   `select column_name from information_schema.columns where table_name =
+   'special_order_quote_tokens' and column_name = 'document_snapshot'` (1 row),
+   and `select public.quote_by_token('nope-nope-nope-nope1')`, which must
+   answer `{"state": "unknown"}` rather than raising.
+   For the functions, POST an EMPTY body with the anon key — each refuses by
+   name from its first statement, which proves the code ran AND that the
+   `_shared/email.ts` import resolved:
+   `send-special-order-email` → 400 "missing order_id, kind, to, subject,
+   pdf_base64 or filename"; `approve-quote` → 400 "missing token or name";
+   `send-po-email` → 400 "missing po_id, …".
+   Verified deeper the same day: `approve-quote` with a bogus token returns
+   **`{"state":"unknown"}`** and with an empty name **`{"state":"name_required"}`**
+   — so the gate really is the SQL, reached through the anon key, live; and
+   `send-special-order-email` answers **401 "not signed in"** to an anon
+   caller and names an unknown document kind at 400.
+   **STILL OWED: the specialorders@ credential.** Until
+   `orgs.settings.special_orders.email_provider` is set, a quote SENDS — and
+   goes out as **info@**, through the org tier. That is working and wrong
+   rather than broken, which is the state most likely to be missed. See
+   `docs/po-email-setup.md`; the cheap route is a "Send mail as" alias on
+   info@ pointing at the existing `EMAIL_CREDS_DONUTFRIEND`.
    **Migration 051 is APPLIED and LOADED (Mark, 2026-08-17)** — 5,874
    customers · 8,330 orders · 47,827 lines · 6,457 payments · 106,471 log
    entries. *Probe, don't read this line.* Sanity: `select count(*) from
@@ -3161,7 +3179,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    a button sizes to its own content and can never report an overflow, which is
    how two clipped column headers survived a check that said everything fit.
    **PHASE 3 SHIPPED THE SAME DAY — the documents, the email and the public
-   approval page. NEEDS MIGRATION 052 APPLIED and THREE FUNCTIONS DEPLOYED.**
+   approval page. 052 IS APPLIED AND ALL THREE FUNCTIONS ARE DEPLOYED; what is
+   still owed is the specialorders@ credential (see the migrations section).**
    Five documents from three renderers
    (`components/specialOrders/pdf/SpecialOrderPdfs.tsx`): quote · invoice ·
    receipt are ONE layout at three moments, the kitchen order is its own

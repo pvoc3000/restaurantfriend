@@ -795,13 +795,17 @@ check `max(OrderID)` against the live layout before trusting it.**
    quote — that is the stored-total drift decision 6 exists to end, and ours
    derives $161.77.
 
-   **Not yet done, and both need Mark:** migration 052 is written and NOT
-   APPLIED; the three edge functions are written and NOT DEPLOYED, which needs
-   the specialorders@ credential (open question 3 — see
-   `docs/po-email-setup.md`'s new section, which offers an alias on info@ as
-   the cheaper route). Until 052 is applied `/q/{token}` renders and says the
-   link isn't valid, which is the right sentence for a customer and the wrong
-   reason; the cause is logged to the console.
+   **052 IS APPLIED and all three functions are DEPLOYED** (2026-08-17), and
+   each was smoke-tested against the live project: an empty body is refused by
+   name from every one of them (which also proves the shared provider layer
+   bundled into all three), `approve-quote` reaches the SQL gate through the
+   anon key — `unknown` for a bogus token, `name_required` for an empty name —
+   and `send-special-order-email` answers 401 to an anonymous caller.
+   **What is still owed is the specialorders@ credential** (open question 3).
+   Until `orgs.settings.special_orders.email_provider` is set a quote SENDS and
+   goes out as **info@**, through the org tier — working and wrong rather than
+   broken, which is the state most likely to go unnoticed. The next step is
+   that config plus a self-addressed send, the way the PO sender was proved.
 4. **The front door.** The public `/inquiry` form (decision 18) with the
    build-your-box picker, `create_inquiry` + the menu RPC (harness-verified:
    anon reaches the curated menu subset and the insert, nothing else, and
