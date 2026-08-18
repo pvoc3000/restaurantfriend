@@ -3039,11 +3039,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    real tables (its census caught all of this). Ships vestigial:
    `locations.kitchen_by_weekday` / `shops_for` retire when kitchen-on-plan
    lands.
-4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1 and 2 BUILT
-   2026-08-17, phases 3–5 not.** Read **`docs/special-orders-brief.md`** before
+4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1, 2 and 3 BUILT
+   2026-08-17, phases 4–5 not.** Read **`docs/special-orders-brief.md`** before
    designing or touching anything here — and read its CORRECTIONS block first,
    which is new: five measurements in the body are wrong, because the brief was
    designed from a `parseInt` reading of `OrderID`.
+   **Migration 052 (the quote-approval RPCs) is WRITTEN and NOT APPLIED**, and
+   the three edge functions are written and NOT DEPLOYED. *Probe, don't read
+   this line.* For 052: `select column_name from information_schema.columns
+   where table_name = 'special_order_quote_tokens' and column_name =
+   'document_snapshot'` (1 row), and `select public.quote_by_token('nope')`,
+   which must answer `{"state": "unknown"}` rather than raising.
    **Migration 051 is APPLIED and LOADED (Mark, 2026-08-17)** — 5,874
    customers · 8,330 orders · 47,827 lines · 6,457 payments · 106,471 log
    entries. *Probe, don't read this line.* Sanity: `select count(*) from
@@ -3154,6 +3160,97 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    And a measuring trap: **check the label SPAN, not the button around it** —
    a button sizes to its own content and can never report an overflow, which is
    how two clipped column headers survived a check that said everything fit.
+   **PHASE 3 SHIPPED THE SAME DAY — the documents, the email and the public
+   approval page. NEEDS MIGRATION 052 APPLIED and THREE FUNCTIONS DEPLOYED.**
+   Five documents from three renderers
+   (`components/specialOrders/pdf/SpecialOrderPdfs.tsx`): quote · invoice ·
+   receipt are ONE layout at three moments, the kitchen order is its own
+   (no money at all, grouped by SIZE CLASS, the customized name over the full
+   taxonomy), and the statement is decision 21's. `SignedQuotePdf` is an
+   ADAPTER over the first, not a fourth renderer — the artifact a customer
+   signed has to BE the paper they read.
+   **VERIFIED BY RENDERING against FileMaker's own four PDFs for order 9885**,
+   in Node over the live rows (the recipe-sheet pattern, which the brief made
+   this phase's acceptance test). The money reproduces to the cent — $147.40 /
+   $14.37 / $161.77 — and the render found FOUR bugs a code review would not
+   have:
+   the transform was **eating the letter-cake notes** (`text()` stripped a
+   wrapping pair of quotes, written for `"DeliverLA"`; the note on a letter
+   order IS `"W"`) — fixed, and `migration/backfill-special-order-notes.mjs`
+   HAS RUN, restoring **4,617 line notes and 384 orders**, idempotent;
+   the masthead **printed the date twice**, because Mark's titles routinely end
+   with it, which is why FileMaker prints the title alone there;
+   **@react-pdf hyphenates by default**, breaking a customer's address into
+   `alexlan-dayan@gmail.com` (a no-op callback is registered at module scope —
+   it is GLOBAL to the renderer, so per-document would be a second place to
+   forget); and a **`fixed` table header repeats onto a page holding only the
+   totals**, so the financial documents' header is not fixed while the kitchen
+   sheet's is.
+   Two departures from the reference, both deliberate: the quote's terms and
+   signature print AFTER the totals rather than at the foot of page one
+   (nobody signs a figure they have not reached), and the reference invoice's
+   **TOTAL DUE $0.00 on an unpaid $161.77 quote is wrong** — that is the
+   stored-total drift decision 6 exists to end, and ours derives $161.77.
+   **THE PROVIDER LAYER MOVED TO `supabase/functions/_shared/email.ts`**, which
+   is the change most likely to bite: `_shared` is compiled into each function
+   at DEPLOY time, so **`send-po-email` must be redeployed too** or it keeps
+   running the old copy (harmless, but it never gets the threading headers).
+   `send-special-order-email` sends **as specialorders@** — decision 12, and
+   the reason it needs its own credential is that **Gmail does not refuse a
+   `From` it is not authorized for, it silently REWRITES it**, so the send
+   looks like it worked and the reply goes to info@. Resolution is
+   org-module → org → app default with **no location tier**: a PO belongs to a
+   shop, a customer's quote is the org's letter.
+   The send does FOUR bookkeeping writes after the mail is out — stage date,
+   log entry, a filed copy of what was sent, and binding decision 17's token —
+   and **none of them may turn a sent email into a failure**; they come back as
+   warnings on a 200, or somebody sends the quote twice.
+   **DECISION 17'S TOKEN IS MINTED WHEN THE COMPOSE CARD OPENS, WITHOUT A
+   SNAPSHOT**, so the link in the draft body is a real URL the human can read
+   and edit — and a compose that is CANCELLED leaves a token that shows
+   nothing, because `quote_by_token` reads a snapshot-less row as `unknown`.
+   The snapshot is written BEFORE the send, not after: a live link nobody has
+   been given is harmless, where a link the customer HAS that says the quote
+   does not exist is not.
+   **Migration 052 adds `document_snapshot` and the two anon RPCs.** The
+   snapshot is a COLUMN because money is derived live, so the order can change
+   after a quote goes out — and because a definer function cannot mint a
+   signed URL for the PDF in the private bucket. What makes the public route
+   sound is not the entropy, it is what the token can REACH: `quote_by_token`
+   reads ONE row of ONE table and touches neither `special_orders` nor
+   `customers`; `approve_quote_by_token` writes the approval, one date and one
+   log row. Both are granted to `anon` DELIBERATELY, inverting 002's revoke
+   rule in exactly two places. Neither ever RAISES on a bad token — an error
+   where an empty answer belongs is how you let somebody probe which tokens
+   exist.
+   `/q/{token}` is exempt in `proxy.ts` (verified signed out: 200, where
+   `/special-orders` 307s to /login). **Reading is safe and APPROVING is the
+   act** — the opposite of `/welcome`, whose token is spent by verification and
+   must therefore never be touched on load. The signed PDF is rendered in the
+   CUSTOMER's browser and posted to `approve-quote`, which is the only place it
+   can be: @react-pdf needs a DOM and the customer cannot write to a private
+   bucket. A render failure does NOT block the approval.
+   `approve-quote` is the one function here with no signed-in caller. Its gate
+   is the RPC, called with the ANON key so the check lives in SQL and it can
+   approve nothing the page could not; only then does it use `service_role`,
+   and every write is scoped to an `order_id` that came back FROM the check
+   rather than from the request body.
+   The compose card is a PICKER PLUS TWO VERBS (Document ▾ · Preview ·
+   Download · Email…), not FileMaker's nine cells — the question is "which
+   document", then "look at it" or "send it".
+   Also shipped: the **attachments card** (decision 14 — pics and documents
+   merged, `signed_quote`/`picture`/`document` pickable while
+   `quote_document`/`invoice_document` are only ever produced by the app, so
+   nobody can file a document as having been sent when it wasn't), which
+   OFFERS the `quote_returned` stamp rather than forcing it; and the
+   **statement** (decision 21) on the customer record, defaulting to LAST WEEK
+   Monday–Sunday — "last week", not "the last seven days", because two
+   consecutive statements must neither overlap nor leave a day out.
+   **967 fixtures pass**, 24 new, each rule checked by breaking it — and the
+   break-check earned its keep: `usDate` written through `new Date()` really
+   does print **8/15** for 8/16 west of Greenwich, which on a quote is
+   somebody's wedding on the wrong day.
+
    **(i) "ALSO THAT DAY" IS SCOPED TO THE KITCHEN** (Mark, 2026-08-17: "I
    assume you're only displaying orders for the same kitchen" — it wasn't).
    The block exists to stop a supervisor double-booking a KITCHEN, so another

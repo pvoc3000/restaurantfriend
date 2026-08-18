@@ -114,13 +114,27 @@ function table(name, label) {
 /* Field readers                                                              */
 /* ========================================================================== */
 
-/** Trimmed text, or null. Strips the wrapping double quotes FileMaker leaves
- *  on some values ("DeliverLA" on 357 rows) and treats a VT-only cell as empty
- *  — one customer's Company is a bare vertical tab. */
+/**
+ * Trimmed text, or null. A VT-only cell is empty — one customer's Company is a
+ * bare vertical tab.
+ *
+ * IT NO LONGER STRIPS WRAPPING DOUBLE QUOTES, and that rule was a real data
+ * loss found by rendering the documents (2026-08-17). It was written for
+ * `Delivery_Company`, which genuinely reads `"DeliverLA"` on 357 rows — and it
+ * also ate the quotes off **4,631 line notes**, where they are the whole
+ * content: a letter-cake order's note IS `"W"`, and FileMaker's own quote for
+ * order 9885 prints it with them. Stripped, that line reads `W`, which looks
+ * like a stray character rather than the letter being iced onto the donut.
+ *
+ * The .mer parser above already un-escapes CSV quoting correctly, so anything
+ * still wrapped at this point is a quote somebody TYPED. Removing real
+ * characters to tidy up 357 company names was never a trade worth making.
+ *
+ * `migration/backfill-special-order-notes.mjs` restores what the old rule
+ * removed, for data already loaded.
+ */
 function text(v) {
-  let s = (v ?? '').replace(//g, '\n').trim();
-  if (!s) return null;
-  if (s.length > 1 && s.startsWith('"') && s.endsWith('"')) s = s.slice(1, -1).trim();
+  const s = (v ?? '').replace(//g, '\n').trim();
   return s || null;
 }
 

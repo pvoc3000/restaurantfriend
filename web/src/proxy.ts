@@ -37,8 +37,17 @@ export default async function proxy(request: NextRequest) {
   // they'd be bounced to /login, which is a password page for an account whose
   // password doesn't exist yet: the invite link would simply never work.
   const isWelcomePage = request.nextUrl.pathname.startsWith("/welcome");
+  // Decision 17: the quote-approval page is PUBLIC on purpose. A customer
+  // holding the link has no account and never will — bouncing them to /login
+  // would make the approval flow impossible rather than merely awkward.
+  //
+  // What makes a public route in an auth-gated app safe is not this line, it is
+  // what the page can REACH: two definer RPCs (migration 052) that read one
+  // token row and write one approval, and nothing else in the schema. See that
+  // migration's header for the full argument.
+  const isQuotePage = request.nextUrl.pathname.startsWith("/q/");
 
-  if (!user && !isLoginPage && !isWelcomePage) {
+  if (!user && !isLoginPage && !isWelcomePage && !isQuotePage) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";

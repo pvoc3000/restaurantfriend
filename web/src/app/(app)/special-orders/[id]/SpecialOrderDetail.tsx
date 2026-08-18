@@ -41,6 +41,14 @@ import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
 import { TimeCell } from "@/components/specialOrders/TimeCell";
 import { StandingOrderBlock } from "@/components/specialOrders/StandingOrderBlock";
 import { OrderInfoLayout, OrderSplitLayout } from "@/components/specialOrders/OrderInfoLayout";
+import { OrderDocuments } from "@/components/specialOrders/OrderDocuments";
+import { SendDocument } from "@/components/specialOrders/SendDocument";
+import {
+  SO_ATTACHMENT_BUCKET,
+  SO_SIGNED_URL_TTL_SECONDS,
+  type SignedSoAttachment,
+  type SoAttachment,
+} from "@/lib/specialOrderAttachments";
 import { StickyFooter } from "@/components/ui/StickyFooter";
 
 const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Special Orders" };
@@ -157,7 +165,7 @@ export async function SpecialOrderDetail({
     wantsDocuments
       ? supabase
           .from("special_order_attachments")
-          .select("id, kind, storage_path, file_name, content_type, byte_size, created_at")
+          .select("id, order_id, kind, storage_path, file_name, content_type, byte_size, created_at")
           .eq("order_id", id)
           .order("created_at", { ascending: false })
       : SKIP,
@@ -208,6 +216,27 @@ export async function SpecialOrderDetail({
     id: string; first_name: string | null; last_name: string | null;
     company: string | null; phone: string | null; email: string | null;
   } | null;
+
+  /**
+   * The filed documents, each with somewhere to look at it.
+   *
+   * Signed HERE, on the server, in ONE batch call — one round trip instead of
+   * one per chip, and a URL built to expire does not sit in the browser any
+   * longer than the page does. `createSignedUrls` answers in request order and
+   * reports per-object failures rather than throwing, so a missing object
+   * costs that one thumbnail and not the tab.
+   */
+  const documentRowList = (documentRows ?? []) as unknown as SoAttachment[];
+  let documents: SignedSoAttachment[] = documentRowList.map((a) => ({ ...a, url: null }));
+  if (documentRowList.length > 0) {
+    const { data: signed } = await supabase.storage
+      .from(SO_ATTACHMENT_BUCKET)
+      .createSignedUrls(
+        documentRowList.map((a) => a.storage_path),
+        SO_SIGNED_URL_TTL_SECONDS
+      );
+    documents = documentRowList.map((a, i) => ({ ...a, url: signed?.[i]?.signedUrl ?? null }));
+  }
 
   const lines: OrderLineRow[] = ((lineRows ?? []) as unknown as OrderLineRow[]);
   const payments: PaymentRow[] = ((paymentRows ?? []) as unknown as PaymentRow[]);
@@ -626,20 +655,23 @@ export async function SpecialOrderDetail({
 
           {/* ================= DOCUMENTS ================= */}
           {activeTab === "documents" && (
-            <section className="space-y-3">
-              <SectionHeading count={documentRows?.length ?? 0}>Documents</SectionHeading>
-              {documentError ? (
+            documentError ? (
+              <section className="space-y-3">
+                <SectionHeading>Documents</SectionHeading>
                 <p className="text-sm text-accent">
                   Could not load the paperwork: {documentError.message}
                 </p>
-              ) : (
-                <p className="max-w-[80ch] text-sm text-muted">
-                  Signed quotes, photographs and anything else this order needs
-                  on file. The upload surface arrives with phase 3, alongside the
-                  documents the app itself produces.
-                </p>
-              )}
-            </section>
+              </section>
+            ) : (
+              <OrderDocuments
+                orderId={id}
+                orgId={row.org_id as string}
+                attachments={documents}
+                canWrite={canWrite}
+                quoteReturnedAt={row.quote_returned_at as string | null}
+                authorName={session.membership.display_name ?? session.email}
+              />
+            )
           )}
         </div>
       </div>
@@ -670,7 +702,22 @@ export async function SpecialOrderDetail({
               AND NO PADDING OF ITS OWN: `ui/StickyFooter`'s band already
               carries `px-4 xl:px-12`, so repeating it here pushed the row 48px
               PAST the content instead of onto it. */}
-          <div className="lg:ml-48">
+          <div className="space-y-3 lg:ml-48">
+            {/* PRODUCE AND SEND leads the bar, because on a live order it is
+                the thing you came to do — Duplicate and Delete are what you do
+                to an order, this is what you do WITH one. Templates and
+                standing orders show nothing here: neither has an event, a
+                customer expecting a quote, or a kitchen to print for. */}
+            {kind === "order" ? (
+              <SendDocument
+                orderId={id}
+                orgId={row.org_id as string}
+                number={row.number as string}
+                canWrite={canWrite}
+                orgSettings={session.orgSettings}
+                today={today}
+              />
+            ) : null}
             <OrderActions
               id={id}
               number={row.number as string}

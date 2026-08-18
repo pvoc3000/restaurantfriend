@@ -6,33 +6,26 @@
 // the org's (or location's) CONFIGURED provider, and stamps the PO sent with
 // an audit note.
 //
-// Provider generalization (Mark, 2026-07-24: "every org, or even every
-// location, should have its own way to send emails"):
-//   - WHAT to use lives in settings jsonb (design rule 2), resolved
-//     location-over-org:
-//       locations.settings.email_provider ?? orgs.settings.email_provider
-//       { "kind": "gmail" | "resend",
-//         "secret_ref": "DONUTFRIEND",           // names the credential set
-//         "from": "Donut Friend <info@donutfriend.com>",
-//         "reply_to": "optional@..." }
-//   - CREDENTIALS live in edge-function secrets (never in the DB — settings
-//     are readable by every org member): one env var per credential set,
-//       EMAIL_CREDS_<secret_ref> = JSON
-//         gmail:  {"client_id":"…","client_secret":"…","refresh_token":"…"}
-//         resend: {"api_key":"re_…"}
-//   Setup click-by-click: docs/po-email-setup.md.
-//
-// Gmail sends via the Gmail HTTP API (users.messages.send) — raw SMTP is
-// unreliable on this edge runtime. Bonus over any SMTP relay: the sent PO
-// lands in that mailbox's Sent folder and threads with the rep's replies.
-// NB the From must be the authorized mailbox or one of its configured
-// "Send mail as" aliases, or Gmail rewrites it.
+// THE PROVIDER LAYER MOVED TO `_shared/email.ts` (2026-08-17), when special
+// orders needed to send as a DIFFERENT MAILBOX and a second copy of the MIME
+// builder would have been the `ui/Dialog` story in Deno. Nothing about this
+// function's behaviour changed — the resolution order is still
+// `locations.settings.email_provider` → `orgs.settings.email_provider` → the
+// app's own default sender — but **`_shared` is compiled into each function at
+// deploy time, so editing it means redeploying BOTH.**
 //
 // Design rule 1: the Supabase client here carries the CALLER's JWT, so every
 // query and the final status update flow through RLS exactly as they would
 // from the browser. The explicit role check just gives a readable error.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+
+import {
+  resolveTransport,
+  sendMail,
+  TransportError,
+  type ProviderConfig,
+} from "../_shared/email.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -46,183 +39,6 @@ function json(status: number, body: unknown): Response {
     headers: { ...CORS, "Content-Type": "application/json" },
   });
 }
-
-// ---------------------------------------------------------------------------
-// Providers. Each takes its own credential shape and a fully-resolved mail,
-// returns a provider message id for the audit note.
-// ---------------------------------------------------------------------------
-
-type Mail = {
-  from: string;
-  to: string;
-  cc?: string;
-  replyTo?: string;
-  subject: string;
-  text: string;
-  attachment: { filename: string; base64: string };
-};
-
-type ProviderConfig = {
-  kind?: string;
-  secret_ref?: string;
-  from?: string;
-  reply_to?: string;
-};
-
-async function sendViaResend(
-  creds: { api_key?: string },
-  mail: Mail
-): Promise<string> {
-  if (!creds.api_key) throw new Error("resend credentials are missing api_key");
-  const res = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${creds.api_key}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      from: mail.from,
-      to: [mail.to],
-      cc: mail.cc ? [mail.cc] : undefined,
-      reply_to: mail.replyTo ?? undefined,
-      subject: mail.subject,
-      text: mail.text,
-      attachments: [
-        { filename: mail.attachment.filename, content: mail.attachment.base64 },
-      ],
-    }),
-  });
-  const result = await res.json();
-  if (!res.ok) {
-    throw new Error(`Resend refused the send: ${result?.message ?? res.statusText}`);
-  }
-  return `resend ${result.id}`;
-}
-
-// --- Gmail ---
-
-function base64FromUtf8(text: string): string {
-  const bytes = new TextEncoder().encode(text);
-  let binary = "";
-  for (const b of bytes) binary += String.fromCharCode(b);
-  return btoa(binary);
-}
-
-/** RFC 2045 wants base64 bodies folded to ≤76-char lines. */
-function fold(b64: string): string {
-  return b64.replace(/(.{76})/g, "$1\r\n");
-}
-
-/**
- * Non-ASCII headers (vendor names, item names in subjects) need RFC 2047 —
- * and each encoded-word maxes at 75 chars, so long subjects are chunked into
- * adjacent words folded across lines (decoders join them, dropping the fold).
- * Chunks split on CODE POINTS so a multi-byte character never tears.
- */
-function encodeHeader(value: string): string {
-  // deno-lint-ignore no-control-regex
-  if (/^[\x00-\x7F]*$/.test(value)) return value;
-  const points = Array.from(value);
-  const words: string[] = [];
-  for (let i = 0; i < points.length; i += 10) {
-    words.push(`=?UTF-8?B?${base64FromUtf8(points.slice(i, i + 10).join(""))}?=`);
-  }
-  return words.join("\r\n ");
-}
-
-/** One multipart/mixed message: plain-text body + the PDF. */
-function buildMime(mail: Mail): string {
-  const boundary = "rf-po-boundary";
-  const headers = [
-    `From: ${mail.from}`,
-    `To: ${mail.to}`,
-    mail.cc ? `Cc: ${mail.cc}` : null,
-    mail.replyTo ? `Reply-To: ${mail.replyTo}` : null,
-    `Subject: ${encodeHeader(mail.subject)}`,
-    "MIME-Version: 1.0",
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-  ].filter(Boolean);
-
-  return [
-    ...headers,
-    "",
-    `--${boundary}`,
-    'Content-Type: text/plain; charset="UTF-8"',
-    "Content-Transfer-Encoding: base64",
-    "",
-    fold(base64FromUtf8(mail.text)),
-    `--${boundary}`,
-    `Content-Type: application/pdf; name="${mail.attachment.filename}"`,
-    "Content-Transfer-Encoding: base64",
-    `Content-Disposition: attachment; filename="${mail.attachment.filename}"`,
-    "",
-    fold(mail.attachment.base64),
-    `--${boundary}--`,
-    "",
-  ].join("\r\n");
-}
-
-async function sendViaGmail(
-  creds: { client_id?: string; client_secret?: string; refresh_token?: string },
-  mail: Mail
-): Promise<string> {
-  if (!creds.client_id || !creds.client_secret || !creds.refresh_token) {
-    throw new Error(
-      "gmail credentials need client_id, client_secret and refresh_token"
-    );
-  }
-
-  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({
-      client_id: creds.client_id,
-      client_secret: creds.client_secret,
-      refresh_token: creds.refresh_token,
-      grant_type: "refresh_token",
-    }),
-  });
-  const token = await tokenRes.json();
-  if (!tokenRes.ok || !token.access_token) {
-    throw new Error(
-      `Gmail auth failed: ${token?.error_description ?? token?.error ?? tokenRes.statusText}`
-    );
-  }
-
-  // The API wants the whole RFC822 message base64url-encoded.
-  const raw = base64FromUtf8(buildMime(mail))
-    .replaceAll("+", "-")
-    .replaceAll("/", "_")
-    .replace(/=+$/, "");
-
-  const res = await fetch(
-    "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
-    {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token.access_token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ raw }),
-    }
-  );
-  const result = await res.json();
-  if (!res.ok) {
-    throw new Error(
-      `Gmail refused the send: ${result?.error?.message ?? res.statusText}`
-    );
-  }
-  return `gmail ${result.id}`;
-}
-
-const SENDERS: Record<
-  string,
-  // deno-lint-ignore no-explicit-any
-  (creds: any, mail: Mail) => Promise<string>
-> = {
-  resend: sendViaResend,
-  gmail: sendViaGmail,
-};
 
 // ---------------------------------------------------------------------------
 
@@ -266,13 +82,11 @@ Deno.serve(async (req) => {
       return json(403, { error: "purchaser role required to send purchase orders" });
     }
 
-    // Transport: location override → org config → the APP'S OWN sender (the
-    // Bill.com model, Mark 2026-07-24: "sending emails is something the app
-    // provides" — orgs supply nothing but addresses). The app default is one
-    // self-contained secret, EMAIL_CREDS_DEFAULT:
-    //   {"kind":"resend","api_key":"re_…","from":"{org} <po@ourdomain>"}
-    // "{org}" in its from becomes the org's name, and Reply-To falls back to
-    // the org's own addresses so vendor replies land with the org, not us.
+    // Transport: location override → org config → the APP'S OWN sender. The
+    // three tiers and their reasons live in `_shared/email.ts`; the only thing
+    // this function decides is that a LOCATION may override, which is true of
+    // a purchase order (a shop can have its own mailbox) and not of a special
+    // order (a customer quote is the org's letter).
     const [{ data: org }, { data: location }] = await Promise.all([
       supabase
         .from("orgs")
@@ -290,68 +104,23 @@ Deno.serve(async (req) => {
       po_email?: { cc?: string; reply_to?: string };
       billing?: { email?: string };
     };
-    const explicit: ProviderConfig | undefined =
-      (location?.settings as { email_provider?: ProviderConfig } | null)
-        ?.email_provider ?? orgSettings.email_provider;
 
-    let cfg: ProviderConfig;
-    let creds: unknown;
-    if (explicit) {
-      if (!explicit.kind || !explicit.from || !explicit.secret_ref) {
-        return json(400, {
-          error:
-            'email_provider config is incomplete — needs {"kind","secret_ref","from"}. ' +
-            "See docs/po-email-setup.md",
-        });
-      }
-      const rawCreds = Deno.env.get(`EMAIL_CREDS_${explicit.secret_ref}`);
-      if (!rawCreds) {
-        return json(500, {
-          error: `secret EMAIL_CREDS_${explicit.secret_ref} is not set (Edge Functions → Secrets)`,
-        });
-      }
-      cfg = explicit;
-      creds = JSON.parse(rawCreds);
-    } else {
-      const rawDefault = Deno.env.get("EMAIL_CREDS_DEFAULT");
-      if (!rawDefault) {
-        return json(500, {
-          error:
-            "no email_provider configured for this org/location, and the app's " +
-            "default sender (secret EMAIL_CREDS_DEFAULT) is not set. " +
-            "See docs/po-email-setup.md",
-        });
-      }
-      const dflt = JSON.parse(rawDefault) as ProviderConfig & { from?: string };
-      if (!dflt.from) {
-        return json(500, {
-          error: 'EMAIL_CREDS_DEFAULT is missing "from" (e.g. "{org} <po@yourdomain>")',
-        });
-      }
-      cfg = {
-        kind: dflt.kind ?? "resend",
-        from: dflt.from.replace("{org}", org?.name ?? "Purchasing"),
-        // Replies must reach the ORG — the platform address is send-only.
-        reply_to:
-          orgSettings.po_email?.reply_to ??
-          orgSettings.po_email?.cc ??
-          orgSettings.billing?.email,
-      };
-      creds = dflt;
-    }
+    const transport = resolveTransport({
+      explicit: (location?.settings as { email_provider?: ProviderConfig } | null)
+        ?.email_provider,
+      orgProvider: orgSettings.email_provider,
+      orgName: org?.name ?? "Purchasing",
+      // Replies must reach the ORG — the platform address is send-only.
+      replyToFallbacks: [
+        orgSettings.po_email?.reply_to,
+        orgSettings.po_email?.cc,
+        orgSettings.billing?.email,
+      ],
+    });
 
-    const sender = SENDERS[cfg.kind!];
-    if (!sender) {
-      return json(400, {
-        error: `unknown email_provider.kind "${cfg.kind}" — expected one of: ${Object.keys(SENDERS).join(", ")}`,
-      });
-    }
-
-    const providerId = await sender(creds, {
-      from: cfg.from!,
+    const providerId = await sendMail(transport, {
       to,
       cc: cc || undefined,
-      replyTo: cfg.reply_to || undefined,
       subject,
       text: body ?? "",
       attachment: { filename, base64: pdf_base64 },
@@ -375,6 +144,9 @@ Deno.serve(async (req) => {
         : undefined,
     });
   } catch (e) {
+    // A misconfiguration names itself with its own status — 400 for a bad
+    // config, 500 for a missing secret — rather than every failure reading 500.
+    if (e instanceof TransportError) return json(e.status, { error: e.message });
     return json(500, { error: e instanceof Error ? e.message : String(e) });
   }
 });

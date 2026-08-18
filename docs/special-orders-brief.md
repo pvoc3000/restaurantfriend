@@ -1,6 +1,6 @@
 # Special Orders module — build brief
 
-**Status: phases 1 and 2 BUILT 2026-08-17; 3, 4 and 5 not yet.** Read
+**Status: phases 1, 2 and 3 BUILT 2026-08-17; 4 and 5 not yet.** Read
 `CLAUDE.md` first, then this — and read the corrections directly below before
 trusting any measurement in the body, because five of them are wrong.
 
@@ -755,15 +755,53 @@ check `max(OrderID)` against the live layout before trusting it.**
    the derived totals card, payments, the log, and Duplicate/Flag/Cancel/Delete;
    `/customers` + `/customers/[id]` with the unpaid-first split.
    The Documents tab is a placeholder until phase 3 gives it something to file.
-3. **Documents + email.** The four renderers verified against the 9885
-   reference PDFs in Node; compose card; specialorders@ provider config +
-   threading headers; stage-date stamping + log writes. Then the **approval
-   page** (decision 17): token mint on send, `/q/{token}` mobile-first, the
-   two anon RPCs (verified on the harness: a bogus token gets nothing, a
-   superseded one says so, approving twice is refused, and `anon` can reach
-   NOTHING else), the signed-quote artifact, the proxy exemption. Then the
-   **wholesale statement** command (decision 21) — a fifth renderer over the
-   same data, verified against a real Cafe Knotted week.
+3. ✅ **Documents + email.** `lib/specialOrderDocs.ts` (the document data, the
+   dates, the size-class grouping, the email templates) +
+   `lib/specialOrderSend.ts` (the token, the snapshot, the send) with **24
+   fixtures, each rule checked by breaking it**;
+   `components/specialOrders/pdf/SpecialOrderPdfs.tsx` — quote · invoice ·
+   receipt from ONE renderer, the kitchen order from a second, the statement
+   from a third; the compose card (`SendDocument`); the attachments card
+   (`OrderDocuments`, decision 14); `send-special-order-email` +
+   `approve-quote` edge functions over a shared provider layer;
+   migration **052** and `/q/{token}`; the statement command on the customer
+   record.
+
+   **VERIFIED BY RENDERING, over the real 9885 rows, against FileMaker's own
+   four PDFs** — the recipe-sheet pattern, and the acceptance test this phase
+   was given. It reproduces the money to the cent ($147.40 / $14.37 /
+   $161.77), and it found four things reading could not:
+
+   · **the transform was eating the letter-cake notes.** `text()` stripped a
+     wrapping pair of double quotes, written for `Delivery_Company`
+     (`"DeliverLA"`, 357 rows) — and the note on a letter order IS `"W"`, the
+     letter being iced onto the donut. FileMaker prints `"W"`; ours printed
+     `W`. Fixed in the transform and restored by
+     `migration/backfill-special-order-notes.mjs`, which **has run**: 4,617
+     line notes and 384 orders, idempotent (a second run wrote 0).
+   · **the masthead printed the date twice** — Mark's titles routinely END
+     with the date ("Pregnanacy Revela 8/16/2026"), which is why FileMaker
+     prints the title alone there.
+   · **@react-pdf hyphenates by default**, breaking a real customer's address
+     into `alexlan-dayan@gmail.com`.
+   · **a `fixed` table header repeats onto a page holding only the totals**,
+     printing an empty ITEM/QTY/PRICE row above the TOTALS band.
+
+   **One deliberate deviation from the reference and one disagreement with
+   it.** FileMaker prints the quote's terms and signature lines at the foot of
+   page ONE, above two dozen items and two pages before the total; ours prints
+   them after the totals, because nobody signs a figure they have not reached.
+   And the reference invoice says TOTAL DUE **$0.00** on an unpaid $161.77
+   quote — that is the stored-total drift decision 6 exists to end, and ours
+   derives $161.77.
+
+   **Not yet done, and both need Mark:** migration 052 is written and NOT
+   APPLIED; the three edge functions are written and NOT DEPLOYED, which needs
+   the specialorders@ credential (open question 3 — see
+   `docs/po-email-setup.md`'s new section, which offers an alias on info@ as
+   the cheaper route). Until 052 is applied `/q/{token}` renders and says the
+   link isn't valid, which is the right sentence for a customer and the wrong
+   reason; the cause is logged to the console.
 4. **The front door.** The public `/inquiry` form (decision 18) with the
    build-your-box picker, `create_inquiry` + the menu RPC (harness-verified:
    anon reaches the curated menu subset and the insert, nothing else, and
@@ -822,7 +860,16 @@ Each phase ships usable; nothing later blocks earlier.
 2. **The `status` column on templates/standing orders** — NOT NULL with a
    default, or nullable? Decide at migration design; the check constraint
    should make kind/status combinations legal-by-construction either way.
-3. **specialorders@ Gmail OAuth** — needs Mark at a browser during phase 3
-   setup (same dance as info@, documented in docs/po-email-setup.md).
-4. **Receipt rendering** — RECEIPT#9885 PDF is in the folder; confirm at
-   build time it's the invoice layout with payments shown (it appears to be).
+3. **specialorders@ Gmail OAuth** — STILL OPEN, and phase 3 is built around
+   it rather than blocked on it: everything works the moment the credential
+   exists. Two routes, both in `docs/po-email-setup.md`: a second OAuth dance
+   signed in as specialorders@, or — cheaper if it fits — adding
+   specialorders@ as a "Send mail as" alias on info@ and pointing the config
+   at the credential that already exists. **The failure to avoid is doing
+   neither and setting the `from` anyway**: Gmail does not refuse a From it is
+   not authorized for, it silently rewrites it, so the send looks like it
+   worked and the customer replies to info@.
+4. ~~**Receipt rendering**~~ — ANSWERED by reading the reference: the receipt
+   is the invoice layout, word for word, with only the masthead title
+   different. So it is the same renderer at a third moment, which is what
+   decision 11 assumed.

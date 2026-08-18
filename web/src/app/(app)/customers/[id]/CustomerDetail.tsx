@@ -18,6 +18,7 @@ import { RecordNav } from "@/components/ui/RecordNav";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { CustomerActions } from "@/components/specialOrders/CustomerActions";
+import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 
 const CUSTOMERS_CRUMB = { href: "/customers", label: "Customers" };
 
@@ -232,7 +233,9 @@ export async function CustomerDetail({
         id={id}
         orgId={customer.org_id as string}
         name={customerLabel(customer)}
+        email={(customer.email as string) ?? null}
         orderCount={withMoney.length}
+        today={todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone())}
         canWrite={canWrite}
       />
     </div>

@@ -125,3 +125,86 @@ same shape as `po_email`), with placeholders `{first_name}` `{org}`
 this is optional.
 
 Deploy: `supabase functions deploy invite-member`.
+
+---
+
+## Special orders send as a DIFFERENT mailbox
+
+Decision 12 of `docs/special-orders-brief.md`: a quote, invoice or receipt goes
+out **as specialorders@donutfriend.com**, not as info@. That needs its own
+credential, because **a Gmail refresh token can only send as its own mailbox
+or one of that mailbox's configured "Send mail as" aliases** — the info@ token
+cannot send as specialorders@, and Gmail does not refuse the attempt, it
+silently REWRITES the From. That failure looks exactly like success until a
+customer replies to the wrong address.
+
+Two ways round it, and the second is less work if it fits:
+
+1. **A second credential set.** Repeat the Gmail dance above signed in as
+   specialorders@, then
+
+   ```bash
+   npx supabase secrets set EMAIL_CREDS_SPECIALORDERS='{"client_id":"…","client_secret":"…","refresh_token":"…"}'
+   ```
+
+   and set `orgs.settings.special_orders.email_provider`:
+
+   ```json
+   { "kind": "gmail",
+     "secret_ref": "SPECIALORDERS",
+     "from": "Donut Friend <specialorders@donutfriend.com>",
+     "reply_to": "specialorders@donutfriend.com" }
+   ```
+
+2. **An alias on info@.** If specialorders@ is already a "Send mail as" address
+   on the info@ mailbox (Gmail → Settings → Accounts), the EXISTING
+   `EMAIL_CREDS_DONUTFRIEND` credential can send as it. Then the config above
+   is the same but `"secret_ref": "DONUTFRIEND"` and no new secret is needed.
+   Sent mail lands in info@'s Sent folder rather than specialorders@'s, which
+   is the trade.
+
+**Resolution order for a special order is org-module → org → app default.**
+There is deliberately NO location tier: a purchase order belongs to a shop and
+may reasonably come from that shop's mailbox, but a customer's quote is the
+ORG's letter and which shop they collect from does not change who wrote to
+them.
+
+### The rest of `orgs.settings.special_orders`
+
+Beyond migration 051's numbers and terms, phase 3 reads:
+
+| key | what it is |
+| --- | --- |
+| `email_provider` | the transport above |
+| `reply_to` | the address printed on every document, and where replies go |
+| `document_phone` | the phone on the documents' masthead — the real quote prints the special-orders line, not the billing one |
+| `document_name` | overrides the masthead name; defaults to the ORG name (a customer document carries the trade name, where a PO's Bill-to carries the legal entity) |
+| `email_cc` | Cc on every document email — the shop's own copy |
+| `approval_cc` | who is Cc'd on an approval confirmation; falls back to `reply_to` |
+| `email` | per-document `{subject, body}` overrides, keyed `quote` / `invoice` / `receipt` / `order` / `statement` |
+
+Template placeholders: `{number}` `{title}` `{title_suffix}` `{first_name}`
+`{full_name}` `{event_date}` `{event_time}` `{event_time_clause}` `{location}`
+`{total}` `{balance}` `{paid}` `{subtotal}` `{approve_url}` `{approve_line}`.
+An unknown placeholder is **left in the text rather than blanked**, so a typo
+shows up in the compose card where somebody can fix it.
+
+### Deploy
+
+```bash
+npx supabase functions deploy send-special-order-email --project-ref kltxioacvneshbyhxtaj
+npx supabase functions deploy approve-quote --project-ref kltxioacvneshbyhxtaj
+npx supabase functions deploy send-po-email --project-ref kltxioacvneshbyhxtaj
+```
+
+**All three, and `send-po-email` is not a typo.** The provider layer moved into
+`supabase/functions/_shared/email.ts` so the two senders share one MIME builder
+and one OAuth refresh; `_shared` is compiled into each function at deploy time,
+so an edit there reaches a function only when that function is redeployed. The
+deployed copy keeps running until then — nothing breaks, it just does not get
+the change (including the threading headers).
+
+`approve-quote` is called by an anonymous customer, so it runs with the ANON
+key like any public call. It needs no new secret: it reads
+`SUPABASE_SERVICE_ROLE_KEY`, which Supabase injects, and its authority is the
+token, checked in SQL before it touches anything.
