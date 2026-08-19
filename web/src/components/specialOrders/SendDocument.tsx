@@ -23,6 +23,7 @@ import {
   bindQuoteSnapshot,
   mintQuoteToken,
   quoteSnapshot,
+  resolveAppBase,
   sendSpecialOrderEmail,
 } from "@/lib/specialOrderSend";
 import { downloadBlob, openWindowNow, showBlob } from "@/lib/poProcessing";
@@ -143,8 +144,20 @@ export function SendDocument({
   const openCompose = () =>
     run("compose", async () => {
       const { blob, order, org } = await render(kind);
-      const token = kind === "quote" ? await mintQuoteToken(supabase, { orderId, orgId }) : null;
-      const link = token ? approvalUrl(token, window.location.origin) : "";
+
+      // THE LINK IS RESOLVED BEFORE THE TOKEN IS MINTED. If the deployment's
+      // address is unknown there is no usable link, and refusing here costs
+      // nothing — where refusing after the mint would leave an orphan token
+      // behind every attempt, and refusing at SEND would waste an email
+      // somebody had already written.
+      let token: string | null = null;
+      let link = "";
+      if (kind === "quote") {
+        const resolved = resolveAppBase(window.location.origin);
+        if ("error" in resolved) throw new Error(resolved.error);
+        token = await mintQuoteToken(supabase, { orderId, orgId });
+        link = approvalUrl(token, resolved.base);
+      }
       setSentNote(null);
       setCompose(
         buildDocumentEmail(kind, order, orgSettings, {

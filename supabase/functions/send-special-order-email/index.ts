@@ -75,6 +75,58 @@ const FILED_KIND: Record<string, string | null> = {
   order: null,
 };
 
+/**
+ * REFUSE TO MAIL AN APPROVAL LINK THE CUSTOMER CANNOT OPEN.
+ *
+ * The compose card builds the link from `NEXT_PUBLIC_APP_URL`, and before
+ * 2026-08-17 it built it from `window.location.origin` — which on a laptop is
+ * `http://localhost:3000`, so a real quote went out carrying a link that works
+ * for nobody but the person who sent it (Mark, 2026-08-17). The client is
+ * fixed; this is the guard that does not depend on which client is calling,
+ * because a browser tab open since before a deploy is still the old one.
+ *
+ * `APP_URL` is the authority — the same secret `invite-member` points
+ * `/welcome` at, so the two customer-facing links in this app cannot drift to
+ * different hosts. Only the ORIGIN is compared: the path carries the token, and
+ * a trailing slash or a port written one way in the secret and another in the
+ * body is not a mistake worth refusing a quote over.
+ *
+ * A body with NO approval link passes untouched. An invoice has none, and a
+ * human is free to delete the paragraph.
+ */
+function checkApprovalLink(body: string): string | null {
+  const found = body.match(/https?:\/\/[^\s<>"')]+\/q\/[A-Za-z0-9_-]{16,}/);
+  if (!found) return null;
+
+  const appUrl = Deno.env.get("APP_URL");
+  if (!appUrl) {
+    return (
+      "secret APP_URL is not set (Edge Functions → Secrets), so there is no way " +
+      "to tell whether this quote's approval link is one a customer could open. " +
+      "See docs/po-email-setup.md."
+    );
+  }
+
+  let expected: string;
+  let actual: string;
+  try {
+    expected = new URL(appUrl).origin;
+    actual = new URL(found[0]).origin;
+  } catch {
+    return `APP_URL (${appUrl}) is not a valid URL.`;
+  }
+  if (expected !== actual) {
+    return (
+      `this quote's approval link points at ${actual}, which is not this app ` +
+      `(${expected}) — the customer would not be able to open it. Set ` +
+      "NEXT_PUBLIC_APP_URL in the web app to " +
+      expected +
+      " and reload the page. Nothing was sent."
+    );
+  }
+  return null;
+}
+
 const ROLES = ["owner", "admin", "purchaser", "supervisor"];
 
 Deno.serve(async (req) => {
@@ -139,6 +191,11 @@ Deno.serve(async (req) => {
         error: "supervisor role required to send special order documents",
       });
     }
+
+    // BEFORE the transport is resolved and long before anything is sent: a
+    // link nobody can open is not a thing to discover from the recipient.
+    const linkProblem = checkApprovalLink(body ?? "");
+    if (linkProblem) return json(400, { error: linkProblem });
 
     const { data: org } = await supabase
       .from("orgs")

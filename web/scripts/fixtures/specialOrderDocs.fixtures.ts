@@ -42,6 +42,7 @@ import {
   approvalUrl,
   mintTokenValue,
   quoteStateMessage,
+  resolveAppBase,
 } from "../../src/lib/specialOrderSend";
 import { orderTotals } from "../../src/lib/specialOrders";
 
@@ -443,4 +444,44 @@ test("each token state gets its OWN sentence", () => {
   eq(quoteStateMessage("already_approved"), approved, "the two approved states agree");
   // `open` is the page itself, so it has nothing to say.
   eq(quoteStateMessage("open"), { title: "", body: "" });
+});
+
+
+test("an approval link is NEVER built on a developer's own machine", () => {
+  // The bug this exists for (Mark, 2026-08-17): a real quote went out carrying
+  // `http://localhost:3000/q/…`, which works for nobody but the laptop that
+  // sent it — and it is the one thing on the page the customer is asked to tap.
+  for (const origin of [
+    "http://localhost:3000",
+    "https://localhost:8443",
+    "http://127.0.0.1:3000",
+    "http://0.0.0.0:3000",
+    "http://[::1]:3000",
+    "http://marks-mac.local:3000",
+  ]) {
+    const r = resolveAppBase(origin);
+    ok("error" in r, `${origin} must be refused`);
+    ok(
+      "error" in r && r.error.includes("NEXT_PUBLIC_APP_URL"),
+      "the refusal names the thing to set"
+    );
+  }
+});
+
+test("a real deployment origin is used as-is", () => {
+  // In production the browser's own origin IS the deployment, so nothing has
+  // to be configured for the ordinary case to be right.
+  const r = resolveAppBase("https://restaurantfriend.vercel.app");
+  eq(r, { base: "https://restaurantfriend.vercel.app" });
+});
+
+test("approvalUrl survives a trailing slash on either source", () => {
+  eq(
+    approvalUrl("abc", "https://restaurantfriend.vercel.app"),
+    "https://restaurantfriend.vercel.app/q/abc"
+  );
+  eq(
+    approvalUrl("abc", "https://restaurantfriend.vercel.app/"),
+    "https://restaurantfriend.vercel.app/q/abc"
+  );
 });

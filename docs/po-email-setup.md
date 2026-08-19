@@ -291,6 +291,45 @@ update orgs
 
 ---
 
+## Step 2b — where the approval link points (required once)
+
+The quote carries a link to `/q/{token}`, and it has to be an address the
+CUSTOMER can open. Two things make that true, and both are needed:
+
+**1. The web app knows its own public address.** `web/.env.local`:
+
+```
+NEXT_PUBLIC_APP_URL=https://restaurantfriend.vercel.app
+```
+
+Restart the dev server after adding it — Next inlines `NEXT_PUBLIC_*` at build
+time, so an already-running server keeps the old value. Set the same variable
+in Vercel (Project → Settings → Environment Variables, all environments) so a
+preview deployment does not mint preview-host links.
+
+In production the browser's origin is already the deployment, so this is
+belt-and-braces there. **In development it is required**: without it the compose
+card refuses to open a quote rather than producing a draft whose link works
+only on your laptop. That refusal is the fix for a real one that went out
+(2026-08-17).
+
+Keep it equal to the `APP_URL` edge-function secret. The send compares them and
+refuses a mismatch, naming the address it expected — so a wrong value costs you
+one refused send, not one dead link in a customer's inbox.
+
+**2. `/q/` is actually deployed.** The public route and its `proxy.ts` exemption
+ship with the special-orders branch. Until that is merged and deployed,
+`https://restaurantfriend.vercel.app/q/anything` answers **307 → /login**, which
+is a different broken link. Check it with:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://restaurantfriend.vercel.app/q/probeprobeprobe
+```
+
+**200** means the route is live. **307** means the deployment predates it.
+
+---
+
 ## Step 3 — prove it, with a real send to yourself
 
 Nothing about email can be trusted until a message actually arrives, because
@@ -342,6 +381,9 @@ Documents tab, or do the test on a throwaway order you delete after.
 | `Bad control character in string literal in JSON at position …` | The same thing, from a function deployed before 2026-08-17. Redeploy the three functions. |
 | Mail arrives, but from info@ | Gmail rewrote the From. The credential does not own specialorders@ — Path A, or add the "Send mail as" alias. |
 | The approval link says "this link isn't valid" | The token has no document behind it, which is what a compose card that was **cancelled** leaves. Send the quote properly and use the link from that email. |
+| The approval link goes to a sign-in page | `/q/` is not deployed yet — see Step 2b's `curl`. |
+| `this quote's approval link points at http://localhost:3000` | `NEXT_PUBLIC_APP_URL` is unset or the dev server was not restarted. Nothing was sent. |
+| The compose card refuses to open a quote | Same cause, caught earlier. The message names the variable. |
 | The approval link says "this quote has been revised" | You sent the quote again. Only the newest link works, by design. |
 
 ---

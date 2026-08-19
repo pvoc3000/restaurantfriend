@@ -33,11 +33,72 @@ export function mintTokenValue(): string {
   return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-/** Where the customer goes. Built from the browser's own origin rather than a
- *  configured base URL: the app has exactly one, and a stale `APP_URL` secret
- *  would put a dead link in front of a customer. */
-export function approvalUrl(token: string, origin: string): string {
-  return `${origin.replace(/\/$/, "")}/q/${token}`;
+/**
+ * Where the customer goes.
+ *
+ * THIS USED TO READ `window.location.origin` AND THAT WAS WRONG (Mark,
+ * 2026-08-17: the link "is the localhost server instead of the vercel
+ * server"). The comment justifying it said the app has exactly one origin. It
+ * has two — the dev server somebody composes from and the deployment customers
+ * can reach — and the failure is not cosmetic: a quote emailed from a laptop
+ * carries `http://localhost:3000/q/…`, which is a dead link for everyone who
+ * is not that laptop, and it is the ONE thing on the page the customer is
+ * asked to click.
+ *
+ * `invite-member` had already settled this for `/welcome`: the deployment's
+ * address is PLATFORM config (a deploy URL is not business terminology, so it
+ * is not `orgs.settings`), and that function refuses to send rather than mail a
+ * link to nowhere. Same rule here.
+ */
+export function approvalUrl(token: string, base: string): string {
+  return `${base.replace(/\/$/, "")}/q/${token}`;
+}
+
+/** Hosts a customer can never reach. Not a blocklist for safety — a list of
+ *  the addresses a DEVELOPER's browser reports, which is where this goes
+ *  wrong. */
+function isLocalHost(origin: string): boolean {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0|[^/]*\.local)(:|\/|$)/i.test(
+    origin
+  );
+}
+
+/**
+ * The base every approval link is built on, or the reason there isn't one.
+ *
+ * `NEXT_PUBLIC_APP_URL` first — Next inlines it at build time, so the compose
+ * card can show a real link without a round trip. The browser's origin is the
+ * fallback, which is CORRECT in production (it is the deployment) and refused
+ * in development, where it is the thing that caused this.
+ *
+ * Returning a reason rather than throwing lets the compose card refuse to open
+ * with something a person can act on, instead of producing a draft whose link
+ * fails only for the recipient.
+ */
+export function resolveAppBase(origin: string): { base: string } | { error: string } {
+  const configured = (process.env.NEXT_PUBLIC_APP_URL ?? "").trim();
+  if (configured) {
+    if (isLocalHost(configured)) {
+      return {
+        error:
+          `NEXT_PUBLIC_APP_URL is set to ${configured}, which no customer can ` +
+          "open. Point it at the deployment (the same address as the APP_URL " +
+          "edge-function secret) and restart the dev server.",
+      };
+    }
+    return { base: configured };
+  }
+  if (isLocalHost(origin)) {
+    return {
+      error:
+        "This app is running on " +
+        origin +
+        ", so an approval link would point at your own machine. Set " +
+        "NEXT_PUBLIC_APP_URL in web/.env.local to the deployment's address " +
+        "and restart the dev server. See docs/po-email-setup.md.",
+    };
+  }
+  return { base: origin };
 }
 
 /**
