@@ -274,8 +274,11 @@ trail in specialorders@ itself, use Path A.
 
 The masthead on every quote, invoice and receipt prints a phone and an email.
 It currently prints the BILLING pair — `(213) 908-2743 / info@donutfriend.com`
-— where FileMaker's own quotes print the special-orders line. `reply_to` from
-Step 1 already fixes the email half. For the phone:
+— where FileMaker's own quotes print the special-orders line.
+
+The EMAIL half is already fixed by Step 1: the documents read the `reply_to`
+out of `email_provider`, so a configured mailbox names itself. The PHONE has no
+such source, because nothing about sending mail knows a phone number:
 
 ```sql
 update orgs
@@ -335,6 +338,8 @@ Documents tab, or do the test on a throwaway order you delete after.
 | `Gmail auth failed: invalid_grant` | The refresh token is wrong, or it was minted against a different client id than the one in the same secret. Redo A2 — the two must come from the same OAuth client. |
 | `Gmail refused the send: Precondition check failed` | The Gmail API is not enabled **in project 765339329273**. Enable it there; the error is about the project, not the account. |
 | `email_provider config is incomplete` | The JSON in A4/Path B is missing `kind`, `secret_ref` or `from`. |
+| `secret EMAIL_CREDS_… is not valid JSON` | A stray line break got into the value — pasting a ~100-character refresh token does this. Re-run A3 (the send now strips control characters, so this should be rare). |
+| `Bad control character in string literal in JSON at position …` | The same thing, from a function deployed before 2026-08-17. Redeploy the three functions. |
 | Mail arrives, but from info@ | Gmail rewrote the From. The credential does not own specialorders@ — Path A, or add the "Send mail as" alias. |
 | The approval link says "this link isn't valid" | The token has no document behind it, which is what a compose card that was **cancelled** leaves. Send the quote properly and use the link from that email. |
 | The approval link says "this quote has been revised" | You sent the quote again. Only the newest link works, by design. |
@@ -351,7 +356,7 @@ Read by phase 3:
 | key | what it does |
 | --- | --- |
 | `email_provider` | the transport — Step 1 |
-| `reply_to` | printed on every document, and where replies go |
+| `reply_to` | the address printed on documents. **Optional**: with it unset the documents read `email_provider.reply_to`, so a configured mailbox already names itself. Set this only to publish an address you do NOT send from |
 | `document_phone` | the phone on the masthead — Step 2 |
 | `document_name` | overrides the masthead name; defaults to the ORG name, because a customer document carries the trade name where a PO's Bill-to carries the legal entity |
 | `email_cc` | Cc on every document email — the shop's own copy |

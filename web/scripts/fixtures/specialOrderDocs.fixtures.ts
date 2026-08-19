@@ -356,6 +356,44 @@ test("the document masthead is the TRADE name, not the billing entity", () => {
   eq(header.contactLine, "(213) 908-2743 / info@donutfriend.com");
 });
 
+test("the module's provider reply_to reaches the masthead on its own", () => {
+  // Configuring the mailbox sets `reply_to` INSIDE `email_provider`, and that
+  // is the whole of a correct setup — so the documents must print it without
+  // anybody also writing the same address at the top level. Reading only the
+  // top-level key left every document printing the BILLING address after a
+  // setup that was right.
+  const header = orgDocHeader("Donut Friend", {
+    billing: { phone: "(213) 908-2743", email: "info@donutfriend.com" },
+    special_orders: {
+      email_provider: {
+        kind: "gmail",
+        secret_ref: "SPECIALORDERS",
+        from: "Donut Friend <specialorders@donutfriend.com>",
+        reply_to: "specialorders@donutfriend.com",
+      },
+    },
+  });
+  eq(header.contactLine, "(213) 908-2743 / specialorders@donutfriend.com");
+  eq(header.replyTo, "specialorders@donutfriend.com");
+
+  // An EXPLICIT top-level reply_to still wins over the provider's, so an org
+  // that publishes a different address than it sends from can say so.
+  const explicit = orgDocHeader("Donut Friend", {
+    billing: { email: "info@donutfriend.com" },
+    special_orders: {
+      reply_to: "events@donutfriend.com",
+      email_provider: { reply_to: "specialorders@donutfriend.com" },
+    },
+  });
+  eq(explicit.replyTo, "events@donutfriend.com");
+
+  // And with neither, the billing address is still the honest fallback.
+  eq(
+    orgDocHeader("Donut Friend", { billing: { email: "info@donutfriend.com" } }).replyTo,
+    "info@donutfriend.com"
+  );
+});
+
 test("special-orders settings override the billing phone and address", () => {
   const header = orgDocHeader("Donut Friend", {
     billing: { phone: "(213) 908-2743", email: "info@donutfriend.com" },

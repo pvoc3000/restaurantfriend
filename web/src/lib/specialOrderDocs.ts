@@ -317,7 +317,22 @@ export function orgDocHeader(
     .toUpperCase();
 
   const phone = str(so.document_phone) ?? billing.phone ?? null;
-  const email = str(so.reply_to) ?? billing.email ?? null;
+
+  /**
+   * THE PUBLIC ADDRESS IS STATED ONCE, and it may be stated in either of two
+   * places — so this reads both rather than making somebody write it twice.
+   *
+   * `special_orders.reply_to` is the explicit one. But configuring the module's
+   * mailbox (docs/po-email-setup.md) already sets a `reply_to` INSIDE
+   * `email_provider`, and an org that has said "replies to this quote go to
+   * specialorders@" has thereby said what address the quote should print.
+   * Reading only the top-level key left every document printing the BILLING
+   * address after a correct setup, which is two facts about one address
+   * disagreeing — caught by Mark's on 2026-08-17.
+   */
+  const provider = (so.email_provider ?? {}) as Record<string, unknown>;
+  const email =
+    str(so.reply_to) ?? str(provider.reply_to) ?? billing.email ?? null;
 
   return {
     /**

@@ -281,6 +281,52 @@ export class TransportError extends Error {
   }
 }
 
+/**
+ * Read a credential secret.
+ *
+ * **IT STRIPS CONTROL CHARACTERS BEFORE PARSING, and that is a repair rather
+ * than a guess.** Setting one of these means pasting a ~100-character OAuth
+ * refresh token into a shell or a dashboard field, and a token that arrives
+ * with a newline stuck to its end produces
+ *
+ *   Bad control character in string literal in JSON at position 262
+ *
+ * which names neither the secret nor the cause, and reaches whoever pressed
+ * Send as the whole explanation of why the email did not go. (Real, Mark
+ * 2026-08-17, on the specialorders@ credential; position 262 is the tail of
+ * the refresh token in a Google credential set, which is how it was found.)
+ *
+ * Nothing in these secrets can legitimately contain a control character — they
+ * hold OAuth tokens, an API key and a display name — so removing them cannot
+ * destroy a real value. And it cannot hide a genuinely broken one either: a
+ * token that was TRUNCATED rather than merely wrapped still fails, at the
+ * provider, with `invalid_grant`, which says what is wrong.
+ */
+function readCreds(name: string): unknown {
+  const raw = Deno.env.get(name);
+  if (!raw) {
+    throw new TransportError(
+      `secret ${name} is not set (Edge Functions → Secrets)`,
+      500
+    );
+  }
+  // C0 controls only: a literal newline, tab or carriage return that got into
+  // the value. An escaped `\n` is two ordinary characters and survives.
+  // deno-lint-ignore no-control-regex
+  const cleaned = raw.replace(/[\u0000-\u001F]/g, "");
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    throw new TransportError(
+      `secret ${name} is not valid JSON (${e instanceof Error ? e.message : String(e)}). ` +
+        'It should read {"client_id":"…","client_secret":"…","refresh_token":"…"} for ' +
+        'gmail, or {"api_key":"re_…"} for resend, on ONE line. ' +
+        "See docs/po-email-setup.md.",
+      500
+    );
+  }
+}
+
 export function resolveTransport(args: {
   /** The tier-1 config, already read out of wherever this caller looks. */
   explicit?: ProviderConfig | null;
@@ -302,25 +348,20 @@ export function resolveTransport(args: {
         400
       );
     }
-    const rawCreds = Deno.env.get(`EMAIL_CREDS_${explicit.secret_ref}`);
-    if (!rawCreds) {
-      throw new TransportError(
-        `secret EMAIL_CREDS_${explicit.secret_ref} is not set (Edge Functions → Secrets)`,
-        500
-      );
-    }
-    return { cfg: explicit, creds: JSON.parse(rawCreds) };
+    return {
+      cfg: explicit,
+      creds: readCreds(`EMAIL_CREDS_${explicit.secret_ref}`),
+    };
   }
 
-  const rawDefault = Deno.env.get("EMAIL_CREDS_DEFAULT");
-  if (!rawDefault) {
+  if (!Deno.env.get("EMAIL_CREDS_DEFAULT")) {
     throw new TransportError(
       "no email_provider configured for this org, and the app's default sender " +
         "(secret EMAIL_CREDS_DEFAULT) is not set. See docs/po-email-setup.md",
       500
     );
   }
-  const dflt = JSON.parse(rawDefault) as ProviderConfig & { from?: string };
+  const dflt = readCreds("EMAIL_CREDS_DEFAULT") as ProviderConfig & { from?: string };
   if (!dflt.from) {
     throw new TransportError(
       'EMAIL_CREDS_DEFAULT is missing "from" (e.g. "{org} <po@yourdomain>")',
