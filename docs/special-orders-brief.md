@@ -1,6 +1,6 @@
 # Special Orders module — build brief
 
-**Status: phases 1, 2 and 3 BUILT 2026-08-17; 4 and 5 not yet.** Read
+**Status: phases 1–3 DONE and live (2026-08-20); 4 and 5 not yet.** Read
 `CLAUDE.md` first, then this — and read the corrections directly below before
 trusting any measurement in the body, because five of them are wrong.
 
@@ -801,11 +801,29 @@ check `max(OrderID)` against the live layout before trusting it.**
    bundled into all three), `approve-quote` reaches the SQL gate through the
    anon key — `unknown` for a bogus token, `name_required` for an empty name —
    and `send-special-order-email` answers 401 to an anonymous caller.
-   **What is still owed is the specialorders@ credential** (open question 3).
-   Until `orgs.settings.special_orders.email_provider` is set a quote SENDS and
-   goes out as **info@**, through the org tier — working and wrong rather than
-   broken, which is the state most likely to go unnoticed. The next step is
-   that config plus a self-addressed send, the way the PO sender was proved.
+   **The specialorders@ credential is SET UP** (Mark, 2026-08-19, Path A) and
+   **the whole loop has been walked on real customers** — see the residue on
+   order #9877 recorded in CLAUDE.md. Phase 3 is CLOSED.
+
+   Five things this phase learned the hard way, all fixed, all worth not
+   rediscovering:
+   · a Google refresh token pasted with a trailing newline made the whole
+     credential unparseable and reported it as `Bad control character in string
+     literal in JSON at position 262` — position 262 is the tail of the refresh
+     token in a Google credential set, which is how it was found. `readCreds`
+     in `_shared/email.ts` strips control characters now.
+   · the approval link was built from `window.location.origin`, so a quote
+     composed on a dev server carried a **localhost** link. It reads
+     `NEXT_PUBLIC_APP_URL` now, the compose card refuses to open without a
+     usable one, and the send re-checks the origin against the `APP_URL` secret.
+   · `/q/` needs the app DEPLOYED, not just the env var — the route and its
+     `proxy.ts` exemption ship together, and a link pointing at a deployment
+     that predates them just 307s to /login.
+   · the documents printed the BILLING address after a correct mailbox setup,
+     because they read `special_orders.reply_to` while the setup writes
+     `email_provider.reply_to`. They read both now, explicit first.
+   · **`_shared/email.ts` is compiled into each function at DEPLOY time**, so
+     editing it means redeploying all three — `send-po-email` included.
 4. **The front door.** The public `/inquiry` form (decision 18) with the
    build-your-box picker, `create_inquiry` + the menu RPC (harness-verified:
    anon reaches the curated menu subset and the insert, nothing else, and
@@ -822,6 +840,48 @@ check `max(OrderID)` against the live layout before trusting it.**
    now…" escape hatch; Duplicate; templates. Flag/resolve. Take payment.
 
 Each phase ships usable; nothing later blocks earlier.
+
+---
+
+## Where a next session picks up (2026-08-20)
+
+**Work on `main`.** The `special-orders` branch is fully merged and Mark has
+asked for no more forking — commit and push to `main`, which is what Vercel
+deploys.
+
+**What is live and should not be re-derived:** migrations 051 and 052; the
+three edge functions; the specialorders@ mailbox; `/q/{token}`;
+`NEXT_PUBLIC_APP_URL` in `web/.env.local` and in Vercel. Phase 3's own
+acceptance test — rendering the documents in Node against FileMaker's PDFs for
+order 9885 — is worth repeating if the renderers change, and the recipe is the
+`PoPdf` idiom: a tsc slice, a service_role read, and a `node_modules/@` symlink
+at `.verify-build/src` so `@/` resolves. That harness is deliberately NOT
+committed.
+
+**Phase 4 starts from a real gap, not a blank page.** `special_orders.source`
+already accepts `'inquiry'`, `inbound_message_id` / `inbound_subject` are
+columns the send already threads on, and `production_items.show_on_inquiry_form`
+exists and is FALSE on all 307 items — so the curation UI has to come with the
+form, or the picker offers nothing.
+
+**Two things phase 4 should reuse rather than rebuild:**
+· `lib/customerSearch` + `CustomerPicker` — the inquiry form creates a lead
+  with a customer, and `create_inquiry`'s "never reveal whether an email is a
+  known customer" rule is about the ANON path only; the staff-facing paste
+  dialog can use the picker as it stands.
+· `lib/createSpecialOrder` — one creator, and it already handles a customer
+  that does not exist yet. A third door (the inquiry) should go through it
+  rather than write its own insert, which is exactly how the first two drifted.
+
+**Known and deliberately not done:**
+· `orgs.settings.special_orders.document_phone` is unset, so documents print
+  the billing phone `(213) 908-2743` where FileMaker's print `213 995 6191`.
+  One line of SQL in `docs/po-email-setup.md`; Mark has not asked for it.
+· The statement command is built and has never been run against a real Cafe
+  Knotted week — decision 21's own acceptance test is still owed, and needs
+  wholesale orders to exist, which is phase 5's materializer.
+· Order #9877 carries three quote tokens and #10000 is a test order. Both are
+  Mark's, both are evidence, and neither should be tidied away.
 
 ---
 
@@ -864,15 +924,12 @@ Each phase ships usable; nothing later blocks earlier.
 2. **The `status` column on templates/standing orders** — NOT NULL with a
    default, or nullable? Decide at migration design; the check constraint
    should make kind/status combinations legal-by-construction either way.
-3. **specialorders@ Gmail OAuth** — STILL OPEN, and phase 3 is built around
-   it rather than blocked on it: everything works the moment the credential
-   exists. Two routes, both in `docs/po-email-setup.md`: a second OAuth dance
-   signed in as specialorders@, or — cheaper if it fits — adding
-   specialorders@ as a "Send mail as" alias on info@ and pointing the config
-   at the credential that already exists. **The failure to avoid is doing
-   neither and setting the `from` anyway**: Gmail does not refuse a From it is
-   not authorized for, it silently rewrites it, so the send looks like it
-   worked and the customer replies to info@.
+3. ~~**specialorders@ Gmail OAuth**~~ — DONE (Mark, 2026-08-19, Path A of
+   `docs/po-email-setup.md`: its own OAuth refresh token in
+   `EMAIL_CREDS_SPECIALORDERS`). Quotes go out as specialorders@ and land in
+   that mailbox's Sent folder. The trap it was worth naming stayed true and
+   was never hit: Gmail does not refuse a `From` it is not authorized for, it
+   silently REWRITES it, so a wrong credential looks like a working send.
 4. ~~**Receipt rendering**~~ — ANSWERED by reading the reference: the receipt
    is the invoice layout, word for word, with only the masthead title
    different. So it is the same renderer at a third moment, which is what

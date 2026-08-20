@@ -589,6 +589,7 @@ export function SpecialOrdersList({
                   orgId={orgId}
                   kitchens={kitchens}
                   defaultLocationId={defaultLocationId}
+                  today={today}
                 />
               ) : undefined
             }

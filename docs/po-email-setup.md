@@ -130,13 +130,18 @@ Deploy: `supabase functions deploy invite-member`.
 
 # Special orders: sending as specialorders@ — a walkthrough
 
-Everything in special orders is deployed and working **except this**: right now
-a quote sends as **info@donutfriend.com**, because no module-level provider is
-configured and it falls through to the org's. Nothing is broken; the From is
-just wrong, and the customer's reply lands in the wrong inbox.
+> **DONE for Donut Friend** (Mark, 2026-08-19, Path A). specialorders@ has its
+> own OAuth refresh token in `EMAIL_CREDS_SPECIALORDERS`, the org points at it,
+> and quotes have gone out and been approved. **Nothing below needs doing
+> again** — it is kept as the recipe for the next mailbox or the next org, and
+> as the place to look when something stops working.
 
-This is the whole job. Fifteen minutes if you need the OAuth dance, two if you
-don't.
+The problem this solves: with no module-level provider configured, a quote
+sends as **info@donutfriend.com** — it falls through to the org's. Nothing is
+broken; the From is just wrong, and the customer's reply lands in the wrong
+inbox.
+
+Fifteen minutes if you need the OAuth dance, two if you don't.
 
 ---
 
@@ -291,7 +296,7 @@ update orgs
 
 ---
 
-## Step 2b — where the approval link points (required once)
+## Step 2b — where the approval link points (required once; DONE)
 
 The quote carries a link to `/q/{token}`, and it has to be an address the
 CUSTOMER can open. Two things make that true, and both are needed:
@@ -318,9 +323,10 @@ refuses a mismatch, naming the address it expected — so a wrong value costs yo
 one refused send, not one dead link in a customer's inbox.
 
 **2. `/q/` is actually deployed.** The public route and its `proxy.ts` exemption
-ship with the special-orders branch. Until that is merged and deployed,
-`https://restaurantfriend.vercel.app/q/anything` answers **307 → /login**, which
-is a different broken link. Check it with:
+ship together, so a deployment that predates them answers **307 → /login**,
+which is a different broken link. (That is now merged to `main` and live —
+kept here because it is the check to run after any deploy that touches
+`proxy.ts`.) Check it with:
 
 ```bash
 curl -s -o /dev/null -w '%{http_code}\n' https://restaurantfriend.vercel.app/q/probeprobeprobe

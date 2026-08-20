@@ -40,7 +40,8 @@ export function CustomerActions({
    *  meant to go without leaving the record to find out. */
   email: string | null;
   orderCount: number;
-  /** Today in the ORG's timezone — what "last week" is measured from. */
+  /** Today in the ORG's timezone — what "last week" is measured from on the
+   *  statement, and a new order's `date_initiated`. */
   today: string;
   /** The shop you are standing in — a new order's pickup shop, and therefore
    *  its tax rate. */
@@ -66,6 +67,10 @@ export function CustomerActions({
         title: `New order for ${name}`,
         customerId: id,
         locationId: defaultLocationId,
+        // Their name, phone and email become the order's day-of contact —
+        // `createSpecialOrder` reads the row, so this door and the list's
+        // dialog seed it identically.
+        today,
       });
       if ("error" in result) {
         setError(result.error);

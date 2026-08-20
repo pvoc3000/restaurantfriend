@@ -111,6 +111,24 @@ export function draftIsUsable(d: CustomerDraft): boolean {
   return d.name.trim() !== "" || d.company.trim() !== "";
 }
 
+/**
+ * WHO TO RING ABOUT THIS ORDER, from a customer.
+ *
+ * The PERSON, falling back to the company — the opposite emphasis to
+ * `customerLabel`, which leads with the company because it is naming a
+ * customer in a list. This names a contact, and "Cafe Knotted (Jane Doe)" is
+ * not a person you ask for on the phone.
+ */
+export function contactNameFor(c: {
+  first_name?: string | null;
+  last_name?: string | null;
+  company?: string | null;
+}): string | null {
+  const person = [c.first_name, c.last_name].filter(Boolean).join(" ").trim();
+  const company = (c.company ?? "").trim();
+  return person || company || null;
+}
+
 /** The row `customers` wants, from a draft. */
 export function draftToRow(d: CustomerDraft, orgId: string): Record<string, unknown> {
   const { first, last } = splitName(d.name);

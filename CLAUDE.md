@@ -3039,11 +3039,15 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    real tables (its census caught all of this). Ships vestigial:
    `locations.kitchen_by_weekday` / `shops_for` retire when kitchen-on-plan
    lands.
-4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1, 2 and 3 BUILT
-   2026-08-17, phases 4–5 not.** Read **`docs/special-orders-brief.md`** before
-   designing or touching anything here — and read its CORRECTIONS block first,
-   which is new: five measurements in the body are wrong, because the brief was
-   designed from a `parseInt` reading of `OrderID`.
+4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3 DONE AND LIVE
+   (2026-08-20), phases 4–5 not.** The module records, quotes, invoices,
+   prints, emails as specialorders@ and takes a customer's approval on a public
+   page; what remains is the public inquiry form (4) and production/recurrence
+   (5). Read **`docs/special-orders-brief.md`** before designing or touching
+   anything here — its **"Where a next session picks up"** section is the
+   handoff, and its CORRECTIONS block comes first: five measurements in the
+   body are wrong, because the brief was designed from a `parseInt` reading of
+   `OrderID`.
    **Migration 052 is APPLIED and all three edge functions are DEPLOYED**
    (Mark applied 052, 2026-08-17; the deploy was verified the same day).
    *Probe, don't read this line.* For 052:
@@ -3062,12 +3066,27 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    — so the gate really is the SQL, reached through the anon key, live; and
    `send-special-order-email` answers **401 "not signed in"** to an anon
    caller and names an unknown document kind at 400.
-   **STILL OWED: the specialorders@ credential.** Until
-   `orgs.settings.special_orders.email_provider` is set, a quote SENDS — and
-   goes out as **info@**, through the org tier. That is working and wrong
-   rather than broken, which is the state most likely to be missed. See
-   `docs/po-email-setup.md`; the cheap route is a "Send mail as" alias on
-   info@ pointing at the existing `EMAIL_CREDS_DONUTFRIEND`.
+   **THE specialorders@ CREDENTIAL IS SET UP** (Mark, 2026-08-19, Path A of
+   `docs/po-email-setup.md` — its own OAuth refresh token, secret
+   `EMAIL_CREDS_SPECIALORDERS`, `orgs.settings.special_orders.email_provider`
+   pointing at it). Probe with
+   `select settings->'special_orders'->'email_provider' from orgs` — expect
+   `kind: gmail`, `secret_ref: SPECIALORDERS`, and a `from` naming
+   specialorders@.
+   **`special_orders.reply_to` and `document_phone` are deliberately UNSET.**
+   The masthead falls back to `email_provider.reply_to` for the address (so a
+   configured mailbox names itself — see the 2026-08-18 fix), and to
+   `billing.phone` for the number. That means the documents print
+   `(213) 908-2743` where FileMaker's print `213 995 6191`. Setting
+   `document_phone` is a one-line SQL in the setup doc and Mark has not asked
+   for it; do not "fix" it unprompted.
+   **`NEXT_PUBLIC_APP_URL` is what the approval link is built on**
+   (`https://restaurantfriend.vercel.app`, in `web/.env.local` and in Vercel).
+   Without it a quote composed on a dev server carries a `localhost` link that
+   works for nobody — the compose card refuses to open rather than let that
+   happen, and the send re-checks the link's origin against the `APP_URL`
+   secret. **Next inlines it at BUILD time, so a new value needs a dev-server
+   restart and a redeploy**, not just a page reload.
    **Migration 051 is APPLIED and LOADED (Mark, 2026-08-17)** — 5,874
    customers · 8,330 orders · 47,827 lines · 6,457 payments · 106,471 log
    entries. *Probe, don't read this line.* Sanity: `select count(*) from
@@ -3178,9 +3197,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    And a measuring trap: **check the label SPAN, not the button around it** —
    a button sizes to its own content and can never report an overflow, which is
    how two clipped column headers survived a check that said everything fit.
-   **PHASE 3 SHIPPED THE SAME DAY — the documents, the email and the public
-   approval page. 052 IS APPLIED AND ALL THREE FUNCTIONS ARE DEPLOYED; what is
-   still owed is the specialorders@ credential (see the migrations section).**
+   **PHASE 3 IS DONE — the documents, the email and the public approval page,
+   LIVE AND WALKED END TO END** (2026-08-19/20). 052 applied, all three
+   functions deployed, the specialorders@ credential set up, and the whole loop
+   exercised against real customers by Mark. Nothing here is outstanding.
    Five documents from three renderers
    (`components/specialOrders/pdf/SpecialOrderPdfs.tsx`): quote · invoice ·
    receipt are ONE layout at three moments, the kitchen order is its own
@@ -3300,6 +3320,31 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    from the PICKUP shop because sales tax is charged where the goods change
    hands, and a null rate stays NULL rather than being defaulted to a number
    invented in code — the record's own Tax rate cell is right there.
+
+   **WALKED ON REAL DATA, 2026-08-19/20, and the residue is the proof.** Order
+   **#9877** carries three quote tokens and the whole of decision 17's design
+   showing through:
+   · **two sends succeeded** and the log names both by provider id
+     ("Quote emailed to trombino@mac.com · gmail 1a01…"), each filing its own
+     `quote_document`;
+   · **the earlier tokens are SUPERSEDED** and only the newest was approvable —
+     which is the rule that stops a customer signing a price you have revised;
+   · **the approval came through the public page**: `approved_name`
+     "mark trombino", `quote_returned_at` stamped by the RPC, and a
+     `signed_quote` PDF filed — rendered in the CUSTOMER's browser and uploaded
+     by `approve-quote`, which is the one path that cannot be tested any other
+     way.
+   · **And the FIRST token has a snapshot but no PDF and no log entry** — that
+     is the failed send from the credential bug, behaving exactly as designed:
+     the snapshot is written BEFORE the send, so a send that throws leaves a
+     live link NOBODY HAS BEEN GIVEN (no email went out), and the next send
+     superseded it. If that ordering is ever "tidied up" to write the snapshot
+     after the send, the same failure instead leaves a link the customer HOLDS
+     saying the quote does not exist.
+   **Deliberately left in place**: those 4 tokens, 3 attachments and order
+   #9877's stage dates are Mark's real test and the evidence above. The only
+   app-created order is **#10000** ("test order"). Everything Claude created
+   while verifying was deleted.
 
    **(m) THE CREATE DIALOG ASKS WHO IS ORDERING, not who to call** (Mark,
    2026-08-18: "we should be able to set the customer when creating a special

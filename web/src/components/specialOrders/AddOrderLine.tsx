@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
 import { money } from "@/lib/specialOrders";
 import type { OrderLineRow } from "./OrderLines";
@@ -197,10 +198,22 @@ export function AddOrderLine({
             autoFocus
           />
         </div>
+        {/* BLACK, which is the panel-commit exception rather than a breach of
+            "every button is white" (Mark, 2026-08-19: "the 'done' button
+            should be a real black button").
+
+            This chooser is a panel in everything but its frame: it produces
+            ONE outcome — lines added — and Done is the only way out of it, so
+            the row is a commit standing beside no peers, which is exactly the
+            distinction `DIALOG_COMMIT_CLASS` turns on. The receiving screen's
+            Complete makes the same argument on a whole screen. It was an
+            underlined phrase, which read as one more quiet link in a panel of
+            them and gave the one control that closes the thing less weight
+            than the Add button on every row. */}
         <button
           type="button"
           onClick={() => setOpen(false)}
-          className="ml-auto text-[13px] text-muted underline underline-offset-2 hover:text-ink"
+          className={`ml-auto ${DIALOG_COMMIT_CLASS}`}
         >
           Done
         </button>
