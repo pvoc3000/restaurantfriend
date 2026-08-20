@@ -237,6 +237,7 @@ export async function CustomerDetail({
         orderCount={withMoney.length}
         today={todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone())}
         defaultLocationId={session.activeLocation?.id ?? null}
+        takenBy={session.membership.display_name ?? session.email}
         canWrite={canWrite}
       />
     </div>

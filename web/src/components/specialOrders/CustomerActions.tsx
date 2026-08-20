@@ -31,6 +31,7 @@ export function CustomerActions({
   orderCount,
   today,
   defaultLocationId,
+  takenBy,
   canWrite,
 }: {
   id: string;
@@ -46,6 +47,8 @@ export function CustomerActions({
   /** The shop you are standing in — a new order's pickup shop, and therefore
    *  its tax rate. */
   defaultLocationId: string | null;
+  /** The signed-in member's display name — a new order's `taken_by`. */
+  takenBy: string;
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -67,6 +70,7 @@ export function CustomerActions({
         title: `New order for ${name}`,
         customerId: id,
         locationId: defaultLocationId,
+        takenBy,
         // Their name, phone and email become the order's day-of contact —
         // `createSpecialOrder` reads the row, so this door and the list's
         // dialog seed it identically.

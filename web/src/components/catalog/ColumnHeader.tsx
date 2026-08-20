@@ -133,14 +133,22 @@ export function ColumnHeader({
             still holds its place whether or not the column is the sorted one,
             so nothing jumps when the sort moves. On the LEADING edge for a
             right-aligned column, where its figures don't reach. */}
-        <span
-          aria-hidden
-          className={`pointer-events-none absolute inset-y-0 flex items-center text-[8px] ${
-            align === "right" ? "left-1" : "right-1"
-          } ${sorted ? "text-ink" : "text-neutral-300"}`}
-        >
-          {arrow || "↕"}
-        </span>
+        {/* AND ONLY ON A COLUMN YOU CAN ACTUALLY SORT BY. The resting `↕` is a
+            promise, and on a column with no `onSort` it is one nothing keeps —
+            noticed when the special-order lines table took these headers for
+            their resize grips (its order IS the document, so none of its
+            columns sorts). It was equally wrong on every control column, which
+            has never had an `onSort` either. */}
+        {onSort ? (
+          <span
+            aria-hidden
+            className={`pointer-events-none absolute inset-y-0 flex items-center text-[8px] ${
+              align === "right" ? "left-1" : "right-1"
+            } ${sorted ? "text-ink" : "text-neutral-300"}`}
+          >
+            {arrow || "↕"}
+          </span>
+        ) : null}
 
         {/* Resize grip: a visible divider on every column boundary so it's
             discoverable at rest, with a hit area wider than the line itself and

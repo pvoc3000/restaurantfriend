@@ -70,6 +70,19 @@ export type NewSpecialOrderInput = {
   contactPhone?: string | null;
   contactEmail?: string | null;
   /**
+   * Who took the order — the signed-in member's display name (Mark,
+   * 2026-08-19: "'taken by' should default to the name of the employee who
+   * started/initiated the order").
+   *
+   * IT IS A SNAPSHOT OF A NAME, not a link to a user, and that is the column
+   * this schema already has: FileMaker's `taken_by` holds "Traci", and 8,330
+   * migrated orders carry names of people who mostly no longer work here.
+   * Seeding it from the person creating the order is what makes it true
+   * without anybody typing it, and it stays free text because the order taken
+   * over the phone by somebody who then hands it to you is a real thing.
+   */
+  takenBy?: string | null;
+  /**
    * Today's date in the ORG's timezone, for `date_initiated`.
    *
    * Passed in rather than computed here, because "today" is the org's calendar
@@ -258,6 +271,7 @@ export async function createSpecialOrder(
       // a blank where all 8,330 migrated ones carry FileMaker's `Date_Created`.
       // Editable afterwards, for an order taken on the phone yesterday.
       date_initiated: input.today ?? null,
+      taken_by: orNull(input.takenBy),
       // Decision 4: the app suggests and never writes the to-do. This is the
       // exception that proves it — a brand-new lead's to-do is not a guess
       // about a workflow, it is what the button just created.

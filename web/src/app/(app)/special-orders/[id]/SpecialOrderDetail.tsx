@@ -454,7 +454,7 @@ export async function SpecialOrderDetail({
                 <section className="space-y-3">
                   <SectionHeading>Details</SectionHeading>
                   <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
-                    <Row label="What it is">
+                    <Row label="Order name">
                       <Cell table="special_orders" id={id} column="title" value={row.title as string | null}
                             canWrite={canWrite} ariaLabel="What the order is for" />
                     </Row>
@@ -504,7 +504,7 @@ export async function SpecialOrderDetail({
                             options={locationOptions} value={row.location_id as string | null}
                             canWrite={canWrite} ariaLabel="Pickup shop" />
                     </Row>
-                    <Row label="How it leaves">
+                    <Row label="Pickup / delivery">
                       {/* The pickup/delivery CHOICE lives here, beside the
                           pickup shop — it is a fact about the order. The
                           Delivery TAB appears only when this says delivery;

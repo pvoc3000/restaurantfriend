@@ -3401,6 +3401,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    each rule checked by breaking it. Verified against real order **#7769**,
    which spells HAPPY BIRTHDAY VINNY: 21 lines, every character ticked in its
    own picker, and the order left as found.
+   **(p) TWO LABELS AND A DEFAULT** (Mark, 2026-08-19). "What it is" is
+   **Order name** and "How it leaves" is **Pickup / delivery** — both were
+   descriptions of a field rather than names for one, which reads fine once and
+   badly every day after. And **`taken_by` seeds from whoever creates the
+   order** ("the name of the employee who started/initiated the order"), through
+   `createSpecialOrder` so both doors agree. It is a SNAPSHOT OF A NAME and not
+   a link to a user, which is the column this schema already has: FileMaker's
+   holds "Traci", and 8,330 migrated orders name people who mostly no longer
+   work here. It stays free text and editable — the order taken over the phone
+   by somebody who then hands it to you is a real thing. Verified live: a real
+   create wrote `taken_by: "Mark"` where the order made an hour earlier carries
+   null.
+
    Not done, and worth asking about: **`LinkCustomer` does not seed the
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.
@@ -3497,6 +3510,26 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    tab order the same thing. Measured at 1440: Payments starts at 240 and Money
    ends at 1392, which are exactly the lines table's own two edges; at 1024,
    stacked, Payments first; no horizontal overflow at either.
+   **THE LINES TABLE'S COLUMNS DRAG TO RESIZE, AND IT IS STILL NOT A
+   `DataTable`.** Worth stating, because the convention says every list is one.
+   Two things this table does that the component cannot: a line is DRAGGED TO
+   REORDER (`useRowDrag`, the ⠿ grip — a special order's line order is
+   meaningful, and FileMaker's slots are where it comes from), and the last row
+   is a SUBTOTAL spanning most of the width. Teaching `DataTable` row-drag would
+   touch fifteen screens to serve one, which is the same reasoning that leaves
+   `/order-guide` and `/cleanup` hand-rolled.
+   What it does NOT hand-roll is the resizing: `useResizableColumns` and
+   `catalog/ColumnHeader` are the shared primitives UNDERNEATH `DataTable`, so
+   the grip, its Safari fixes, the persistence and the "Reset column widths"
+   footer behave here exactly as on every list. Widths are WEIGHTS turned into
+   percentages of the visible total (the fluid-column rule), the table is
+   `table-fixed` — without which a `<col>` width is a suggestion the browser
+   ignores — and **no column sorts**, because the ORDER IS THE DOCUMENT and a
+   click that reordered it would fight the drag handle beside it.
+   That last part surfaced a bug in the shared header: **`ColumnHeader` drew its
+   resting `↕` on every column, sortable or not.** The marker is a promise, and
+   on a column with no `onSort` it is one nothing keeps — equally wrong on every
+   CONTROL column, which has never had an `onSort` either. It is now conditional.
    **AND THE LINES TABLE'S NOTE IS ITS SECOND COLUMN**, where it used to sit
    between Tax and Total. It belongs beside the thing it is about — `"H".
    Chocolate glaze with rainbow sprinkles` is a sentence about the item on its

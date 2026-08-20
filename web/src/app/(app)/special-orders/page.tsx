@@ -173,6 +173,7 @@ export default async function SpecialOrdersPage({
       orgId={session.membership.org_id}
       kitchens={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
       defaultLocationId={session.activeLocation?.id ?? null}
+      takenBy={session.membership.display_name ?? session.email}
       initialFilters={params}
       initialSearch={parseFilterSearch(params)}
       capped={rows.length === 500}

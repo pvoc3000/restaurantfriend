@@ -166,6 +166,7 @@ export function SpecialOrdersList({
   orgId,
   kitchens,
   defaultLocationId,
+  takenBy,
   initialFilters,
   initialSearch = "",
   capped = false,
@@ -178,6 +179,8 @@ export function SpecialOrdersList({
   kitchens: { id: string; code: string }[];
   /** The shop you are standing in — a new order's pickup shop by default. */
   defaultLocationId: string | null;
+  /** The signed-in member's display name — a new order's `taken_by`. */
+  takenBy: string;
   initialFilters?: RawSearchParams;
   initialSearch?: string;
   capped?: boolean;
@@ -590,6 +593,7 @@ export function SpecialOrdersList({
                   kitchens={kitchens}
                   defaultLocationId={defaultLocationId}
                   today={today}
+                  takenBy={takenBy}
                 />
               ) : undefined
             }

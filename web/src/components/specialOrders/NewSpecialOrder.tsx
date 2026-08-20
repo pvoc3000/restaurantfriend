@@ -37,6 +37,7 @@ export function NewSpecialOrder({
   kitchens,
   defaultLocationId,
   today,
+  takenBy,
 }: {
   /** Passed down rather than looked up. The old code read `org_members`
    *  UNFILTERED and took `.maybeSingle()`, which is correct for exactly one
@@ -50,6 +51,8 @@ export function NewSpecialOrder({
   /** Today in the ORG's timezone — the order's `date_initiated`. Computed on
    *  the server (`lib/today`), never from the browser's clock. */
   today: string;
+  /** The signed-in member's display name — the order's `taken_by`. */
+  takenBy: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -129,6 +132,7 @@ export function NewSpecialOrder({
         eventDate,
         eventTime,
         today,
+        takenBy,
         locationId,
         kitchenLocationId: kitchenId,
         customerId: customer?.kind === "existing" ? customer.id : null,

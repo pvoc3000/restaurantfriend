@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { moveInOrder, renumber, useRowDrag, type DropTarget } from "@/lib/rowDrag";
 import { InlineValue } from "@/components/catalog/InlineValue";
+import { ColumnHeader } from "@/components/catalog/ColumnHeader";
+import { useResizableColumns } from "@/lib/columnWidths";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { AddOrderLine, type MenuItem } from "./AddOrderLine";
@@ -35,6 +37,42 @@ export type OrderLineRow = {
   qty: number | null;
   unit_price: number | null;
   taxable: boolean;
+};
+
+/**
+ * THE COLUMNS ARE DRAG-RESIZABLE, THROUGH THE SAME BRAIN EVERY LIST USES
+ * (Mark, 2026-08-19: "I'd like to be able to drag to resize the columns").
+ *
+ * This table is NOT a `catalog/DataTable` and deliberately stays one, which is
+ * worth stating because the convention says every list is. Two things it does
+ * that the component cannot: a line is DRAGGED TO REORDER (`useRowDrag`, the ⠿
+ * grip — a special order's line order is meaningful, and FileMaker's slots are
+ * where it comes from), and the last row is a SUBTOTAL spanning most of the
+ * width. `DataTable` has neither, and teaching it row-drag would touch fifteen
+ * screens to serve one — the same reasoning that leaves `/order-guide` and
+ * `/cleanup` hand-rolled.
+ *
+ * What it does NOT have to hand-roll is the resizing. `useResizableColumns` and
+ * `catalog/ColumnHeader` are the shared primitives underneath `DataTable`, so
+ * the grip, its Safari fixes, the persistence and the reset all behave here
+ * exactly as they do on every list — which is the whole point of them living in
+ * `lib/`.
+ *
+ * The widths are WEIGHTS, not pixels — `colWidth` turns them into percentages
+ * of the visible total, which is the app's fluid-column rule: a wide screen
+ * gets wider columns rather than dead space, and the table can never exceed its
+ * box. NO SORTING, so the headers take no `onSort`: the order IS the document,
+ * and a click that reordered it would fight the drag handle beside it.
+ */
+const LINE_WIDTHS: Record<string, number> = {
+  grip: 28,
+  item: 300,
+  note: 260,
+  qty: 88,
+  price: 104,
+  tax: 64,
+  total: 112,
+  remove: 36,
 };
 
 /**
@@ -140,6 +178,29 @@ export function OrderLines({
     onDrop: dropRow,
   });
 
+  const { widths, startResize, setWidth, reset, customized } = useResizableColumns(
+    "rf.specialOrderLines.columnWidths.v1",
+    LINE_WIDTHS
+  );
+
+  /** The columns actually on screen — the two control ones only when writable. */
+  const columnKeys = [
+    ...(canWrite ? ["grip"] : []),
+    "item",
+    "note",
+    "qty",
+    "price",
+    "tax",
+    "total",
+    ...(canWrite ? ["remove"] : []),
+  ];
+  // `DataTable`'s own arithmetic: a weight over the visible total, as a
+  // percentage. Never mixed with a px length in the same value — a `<col>` width
+  // of `calc(100% - 95px)` is silently DISCARDED (measured, 2026-07-31).
+  const naturalTotal = columnKeys.reduce((sum, k) => sum + (widths[k] ?? LINE_WIDTHS[k]), 0);
+  const colWidth = (key: string) =>
+    `${(((widths[key] ?? LINE_WIDTHS[key]) / naturalTotal) * 100).toFixed(4)}%`;
+
   async function remove(row: OrderLineRow) {
     if (
       !(await confirmDialog({
@@ -192,24 +253,45 @@ export function OrderLines({
       <SectionHeading count={ordered.length}>Items</SectionHeading>
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[54rem] border-collapse text-[14px]">
+        {/* `table-fixed`, which is what makes a `<col>` width mean anything at
+            all — in auto layout the browser sizes columns from their content
+            and a dragged width is a suggestion it ignores. */}
+        <table className="w-full min-w-[54rem] table-fixed border-collapse text-[14px]">
+          <colgroup>
+            {columnKeys.map((key) => (
+              <col key={key} style={{ width: colWidth(key) }} />
+            ))}
+          </colgroup>
           <thead>
-            <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
-              {canWrite ? <th className="w-6 px-0 py-2" /> : null}
+            <tr className="border-b-2 border-ink text-left">
+              {canWrite ? <th className="p-0" /> : null}
               {/* NOTE IS THE SECOND COLUMN (Mark, 2026-08-19), where it used
                   to sit between Tax and Total. It belongs beside the thing it
                   is about — "\"H\". Chocolate glaze with rainbow sprinkles" is a
                   sentence about the item on its left — and moving it out of the
                   middle lets Qty · Price · Tax · Total run as one unbroken band
-                  of figures against the right margin. Both Item and Note are
-                  unsized, so they share whatever the four fixed columns leave. */}
-              <th className="px-3 py-2 text-left">Item</th>
-              <th className="px-3 py-2 text-left">Note</th>
-              <th className="w-24 px-3 py-2 text-right">Qty</th>
-              <th className="w-28 px-3 py-2 text-right">Price</th>
-              <th className="w-16 px-3 py-2 text-center">Tax</th>
-              <th className="w-28 px-3 py-2 text-right">Total</th>
-              {canWrite ? <th className="w-8 px-1 py-2" /> : null}
+                  of figures against the right margin. */}
+              {(
+                [
+                  ["item", "Item", "left"],
+                  ["note", "Note", "left"],
+                  ["qty", "Qty", "right"],
+                  ["price", "Price", "right"],
+                  ["tax", "Tax", "left"],
+                  ["total", "Total", "right"],
+                ] as const
+              ).map(([key, label, align]) => (
+                <ColumnHeader
+                  key={key}
+                  label={label}
+                  align={align}
+                  // No sort: the ORDER IS THE DOCUMENT (see LINE_WIDTHS).
+                  sorted={false}
+                  onResizeStart={(e) => startResize(e, key)}
+                  onResizeReset={() => setWidth(key, LINE_WIDTHS[key])}
+                />
+              ))}
+              {canWrite ? <th className="p-0" /> : null}
             </tr>
           </thead>
           <tbody ref={bodyRef}>
@@ -373,6 +455,21 @@ export function OrderLines({
           </tbody>
         </table>
       </div>
+
+      {/* The same footer `DataTable` puts under every list, and it appears the
+          same way — only once a width has actually been dragged. */}
+      {customized ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={reset}
+            title="Restore the default column widths"
+            className="text-[12px] uppercase tracking-[0.12em] text-subtle hover:underline"
+          >
+            Reset column widths
+          </button>
+        </div>
+      ) : null}
 
       {canWrite ? (
         <AddOrderLine orderId={orderId} orgId={orgId} existing={ordered} menu={menu} />
