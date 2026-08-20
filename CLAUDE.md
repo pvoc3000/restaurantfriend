@@ -3471,6 +3471,25 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    said nothing about it. So the text column stays, the link is null on every
    migrated row, and the cell renders whichever it has — a link where we know,
    plain text where we only roughly do.
+   **053 AND 054 ARE APPLIED** (Mark, 2026-08-20). *Probe, don't read this
+   line*: `select taken_by_employee_id from special_orders limit 1` (present),
+   and `select public.special_order_takers('00000000-0000-0000-0000-000000000000')`,
+   which answers **"Not your organisation"** to a service_role script — that is
+   migration 014's footgun and is what proves the function exists AND that its
+   guard runs. The triggers only show themselves by FIRING, so look for an entry
+   no app code writes: any message beginning "Order started" or containing
+   "changed from".
+   **055 (NEEDS APPLYING) adds the entry for the order EXISTING.** 054 watched
+   UPDATE only, so a brand-new order had an empty history until somebody edited
+   it — which reads as the logging not working rather than as nothing having
+   happened yet. FMP wrote one ("Order started by tracit", 3,482 times).
+   **It is a separate migration rather than an edit to 054, and that is the rule
+   worth keeping**: 054 is applied, and once a migration has run it is history —
+   a file that no longer describes what was run is how the harness and
+   production quietly stop being the same database. 054 IS rerunnable, so
+   re-pasting it would have worked; the ledger is the reason not to.
+   The trigger has to be RECREATED, not just the function: `create or replace`
+   on a function does not widen the events its trigger fires on.
    Known gap: **the CREATE still seeds only the text.** Resolving the signed-in
    member to their employee row needs `employees.user_id`, which a supervisor
    cannot read — a third definer, not built. Pick the person on the record.
