@@ -3270,6 +3270,37 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    does print **8/15** for 8/16 west of Greenwich, which on a quote is
    somebody's wedding on the wrong day.
 
+   **(j) THE CREATE PATH HAD THREE HOLES, and the one that surfaced was the
+   one a second COLLEAGUE opened** (Mark, 2026-08-18). `NewSpecialOrder`
+   resolved the org with `from("org_members").select("org_id").maybeSingle()`
+   and NO filter — but 001's `members_read` policy shows you every member of
+   your org, so that returns one row per member. Correct with one member,
+   "JSON object requested, multiple (or no) rows returned" with three. **A
+   create that only ever ran while the org had one person is a create nobody
+   has tested**, which is design rule 1's lesson in a second costume. Swept:
+   this was the only unfiltered `.maybeSingle()` on that table; every other
+   caller either filters by `user_id` or wants the whole list.
+   Fixing it surfaced two more, both invisible until then because the crash
+   came first:
+   **the pickup shop was never asked for** — the form offered only the KITCHEN,
+   so decision 8's other half was null and the quote printed no LOCATION while
+   the Items tab priced at the org grid rather than the selling shop;
+   and **`tax_rate` was never written by anything**. 051 calls it "snapshotted
+   from the pickup shop, editable" and every reference in `web/src` was a
+   SELECT, so an order created in the app derived ZERO TAX on a document a
+   customer pays from. Measured before fixing: **0 app-created orders exist**,
+   so nothing was corrupted — the crash had been preventing the very rows that
+   would have carried the bug.
+   All three are fixed in ONE place, `lib/createSpecialOrder.ts`, because there
+   are TWO doors — the list's New special order and the customer record's New
+   order for them — and each had a different subset of the truth, which is how
+   this survived. **Pickup defaults to the shop you are standing in and the
+   kitchen deliberately does not**: an order taken at DF01 is usually collected
+   there, while which kitchen bakes it is decided later. The tax rate comes
+   from the PICKUP shop because sales tax is charged where the goods change
+   hands, and a null rate stays NULL rather than being defaulted to a number
+   invented in code — the record's own Tax rate cell is right there.
+
    **(i) "ALSO THAT DAY" IS SCOPED TO THE KITCHEN** (Mark, 2026-08-17: "I
    assume you're only displaying orders for the same kitchen" — it wasn't).
    The block exists to stop a supervisor double-booking a KITCHEN, so another

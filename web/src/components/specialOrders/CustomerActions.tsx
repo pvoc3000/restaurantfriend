@@ -8,6 +8,7 @@ import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { CustomerStatement } from "./CustomerStatement";
+import { createSpecialOrder } from "@/lib/createSpecialOrder";
 
 /**
  * What you can do to a customer.
@@ -29,6 +30,7 @@ export function CustomerActions({
   email,
   orderCount,
   today,
+  defaultLocationId,
   canWrite,
 }: {
   id: string;
@@ -40,6 +42,9 @@ export function CustomerActions({
   orderCount: number;
   /** Today in the ORG's timezone — what "last week" is measured from. */
   today: string;
+  /** The shop you are standing in — a new order's pickup shop, and therefore
+   *  its tax rate. */
+  defaultLocationId: string | null;
   canWrite: boolean;
 }) {
   const router = useRouter();
@@ -52,34 +57,22 @@ export function CustomerActions({
   function newOrder() {
     setError(null);
     start(async () => {
-      const { data: number, error: numberError } = await supabase.rpc(
-        "next_special_order_number",
-        { p_org_id: orgId }
-      );
-      if (numberError || !number) {
-        setError(numberError?.message ?? "Could not allocate an order number.");
-        return;
-      }
-      const { data, error: e } = await supabase
-        .from("special_orders")
-        .insert({
-          org_id: orgId, // Explicit — design rule 1.
-          number,
-          kind: "order",
-          status: "lead",
-          customer_id: id,
-          title: `New order for ${name}`,
-          todo: "Respond to Email/Call",
-          source: "app",
-        })
-        .select("id")
-        .single();
-      if (e || !data) {
-        setError(e?.message ?? "The order could not be created.");
+      // The SAME creator the list's New special order uses, which is how this
+      // door gets the pickup shop and the tax snapshot it was missing. The
+      // pickup default is the shop you are standing in.
+      const result = await createSpecialOrder(supabase, {
+        orgId,
+        kind: "order",
+        title: `New order for ${name}`,
+        customerId: id,
+        locationId: defaultLocationId,
+      });
+      if ("error" in result) {
+        setError(result.error);
         return;
       }
       router.refresh();
-      router.push(`/special-orders/${data.id as string}`);
+      router.push(`/special-orders/${result.id}`);
     });
   }
 

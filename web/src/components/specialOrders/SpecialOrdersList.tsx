@@ -163,7 +163,9 @@ export function SpecialOrdersList({
   today,
   thresholds,
   canWrite,
+  orgId,
   kitchens,
+  defaultLocationId,
   initialFilters,
   initialSearch = "",
   capped = false,
@@ -172,7 +174,10 @@ export function SpecialOrdersList({
   today: string;
   thresholds: AttentionThresholds;
   canWrite: boolean;
+  orgId: string;
   kitchens: { id: string; code: string }[];
+  /** The shop you are standing in — a new order's pickup shop by default. */
+  defaultLocationId: string | null;
   initialFilters?: RawSearchParams;
   initialSearch?: string;
   capped?: boolean;
@@ -578,7 +583,15 @@ export function SpecialOrdersList({
                 />
               </div>
             }
-            trailing={canWrite ? <NewSpecialOrder kitchens={kitchens} /> : undefined}
+            trailing={
+              canWrite ? (
+                <NewSpecialOrder
+                  orgId={orgId}
+                  kitchens={kitchens}
+                  defaultLocationId={defaultLocationId}
+                />
+              ) : undefined
+            }
           />
           {capped ? (
             <p className="text-[13px] text-mark">

@@ -236,6 +236,7 @@ export async function CustomerDetail({
         email={(customer.email as string) ?? null}
         orderCount={withMoney.length}
         today={todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone())}
+        defaultLocationId={session.activeLocation?.id ?? null}
         canWrite={canWrite}
       />
     </div>

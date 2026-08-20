@@ -10,6 +10,7 @@ import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
 import { DateField } from "@/components/ui/DateField";
 import { KIND_LABEL, type SpecialOrderKind } from "@/lib/specialOrders";
+import { createSpecialOrder } from "@/lib/createSpecialOrder";
 
 /**
  * Start an order — `NewEmployee`'s template, which CLAUDE.md names as the one
@@ -29,10 +30,19 @@ import { KIND_LABEL, type SpecialOrderKind } from "@/lib/specialOrders";
  *     orders and "same as last year".
  */
 export function NewSpecialOrder({
+  orgId,
   kitchens,
+  defaultLocationId,
 }: {
+  /** Passed down rather than looked up. The old code read `org_members`
+   *  UNFILTERED and took `.maybeSingle()`, which is correct for exactly one
+   *  member and an error for two — the select policy shows you every member of
+   *  your org. It broke the moment this org had colleagues. */
+  orgId: string;
   /** Active shops — design rule 3: you cannot plan work at a closed one. */
   kitchens: { id: string; code: string }[];
+  /** The shop you are standing in, as the pickup default. */
+  defaultLocationId: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -45,6 +55,7 @@ export function NewSpecialOrder({
   const [title, setTitle] = useState("");
   const [eventDate, setEventDate] = useState<string | null>(null);
   const [kitchenId, setKitchenId] = useState("");
+  const [locationId, setLocationId] = useState(defaultLocationId ?? "");
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
@@ -58,6 +69,7 @@ export function NewSpecialOrder({
     setTitle("");
     setEventDate(null);
     setKitchenId("");
+    setLocationId(defaultLocationId ?? "");
     setContactName("");
     setContactPhone("");
     setContactEmail("");
@@ -70,70 +82,29 @@ export function NewSpecialOrder({
     reset();
   }
 
-  const orNull = (s: string) => (s.trim() === "" ? null : s.trim());
-
   function add() {
     if (!ready) return;
     setFailed(null);
     startTransition(async () => {
-      // The org comes from the number function's own answer being scoped to
-      // it, so ask for the number first: `next_special_order_number` is a
-      // definer that re-checks supervisor+ membership, which means a refusal
-      // here is a role problem stated plainly rather than an RLS insert
-      // failure reading "new row violates row-level security policy".
-      const { data: org, error: orgError } = await supabase
-        .from("org_members")
-        .select("org_id")
-        .maybeSingle();
-      if (orgError || !org) {
-        setFailed(orgError?.message ?? "Could not resolve your organisation.");
+      // One creator, shared with "New order for them" on the customer record —
+      // which is where the pickup shop and the tax snapshot were being missed.
+      const result = await createSpecialOrder(supabase, {
+        orgId,
+        kind,
+        title,
+        eventDate,
+        locationId,
+        kitchenLocationId: kitchenId,
+        contactName,
+        contactPhone,
+        contactEmail,
+      });
+      if ("error" in result) {
+        setFailed(result.error);
         return;
       }
-
-      const { data: number, error: numberError } = await supabase.rpc(
-        "next_special_order_number",
-        { p_org_id: org.org_id }
-      );
-      if (numberError || !number) {
-        setFailed(numberError?.message ?? "Could not allocate an order number.");
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from("special_orders")
-        .insert({
-          // EXPLICIT, always — no table in this schema defaults it, and a
-          // WITH CHECK is evaluated before the NOT NULL, so omitting it
-          // reports an RLS violation and sends you looking at roles
-          // (design rule 1's hard-won lesson).
-          org_id: org.org_id,
-          number,
-          kind,
-          // Decision 3's biconditional: status exists exactly when kind is
-          // `order`. The database enforces it; this is the app agreeing.
-          status: kind === "order" ? "lead" : null,
-          title: title.trim(),
-          event_date: eventDate,
-          kitchen_location_id: orNull(kitchenId),
-          contact_name: orNull(contactName),
-          contact_phone: orNull(contactPhone),
-          contact_email: orNull(contactEmail),
-          // Decision 4: the app suggests and never writes the to-do. This one
-          // is the exception that proves it — a brand-new lead's to-do is not
-          // a guess about a workflow, it is what the button just created.
-          todo: kind === "order" ? "Respond to Email/Call" : null,
-          source: "app",
-        })
-        .select("id")
-        .single();
-
-      if (error || !data) {
-        setFailed(error?.message ?? "The order could not be created.");
-        return;
-      }
-
       router.refresh();
-      router.push(`/special-orders/${data.id as string}`);
+      router.push(`/special-orders/${result.id}`);
     });
   }
 
@@ -214,7 +185,32 @@ export function NewSpecialOrder({
               </Field>
             </div>
 
+            {/* DECISION 8's PAIR, side by side, because they are two different
+                questions that look like one: the PICKUP shop is where the
+                customer collects — it decides the tax rate, the menu's prices
+                and the LOCATION line on the quote — and the KITCHEN is where
+                it gets made.
+
+                Pickup DEFAULTS to the shop you are standing in and the kitchen
+                does not, and that asymmetry is deliberate: an order taken at
+                DF01 is usually collected at DF01, while which kitchen bakes it
+                is a decision somebody makes later. Leaving pickup empty was
+                not neutral — it meant no tax and org-grid prices. */}
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <Field label="Pickup shop">
+                <PickList
+                  value={locationId}
+                  onPick={setLocationId}
+                  variant="field"
+                  placeholder="Not set"
+                  ariaLabel="Pickup shop"
+                  options={[
+                    { value: "", label: "Not set" },
+                    ...kitchens.map((k) => ({ value: k.id, label: k.code })),
+                  ]}
+                  className="w-full"
+                />
+              </Field>
               <Field label="Kitchen">
                 <PickList
                   value={kitchenId}
@@ -229,6 +225,9 @@ export function NewSpecialOrder({
                   className="w-full"
                 />
               </Field>
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
               <Field label="Contact">
                 <TextInput
                   value={contactName}

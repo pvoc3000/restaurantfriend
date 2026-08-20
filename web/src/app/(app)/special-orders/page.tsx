@@ -170,7 +170,9 @@ export default async function SpecialOrdersPage({
       today={today}
       thresholds={settings.attention}
       canWrite={canEnterCounts(session.membership.role)}
+      orgId={session.membership.org_id}
       kitchens={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
+      defaultLocationId={session.activeLocation?.id ?? null}
       initialFilters={params}
       initialSearch={parseFilterSearch(params)}
       capped={rows.length === 500}
