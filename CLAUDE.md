@@ -4361,6 +4361,19 @@ weekday column, and 003 then silently made it per-vendor-item.
   `web/src/lib/nav.ts`** — a screen ships by getting a real `href` there and
   nothing else moves. Home and Settings are utility ICONS, not tabs, so they
   light no tab and the second band hides entirely on those routes.
+  **`/` LANDS ON `/locations`** (Mark, 2026-08-20). It had been a leftover from
+  the skeleton — a heading, the signed-in email, a sentence pointing at
+  Locations and a lone "Vendors →" link — and landing on the shop list makes the
+  first question the app asks the first question of the day: which shop are you
+  working at (design rule 3, and `/locations` is where you answer it).
+  A REDIRECT, not a copy of the list — `/location`'s and `/pay-periods`'
+  pattern — so `/` stays the canonical landing address that three things point
+  at without knowing where home is: the masthead's Home icon, `proxy.ts`
+  (signed-in user hitting /login → `/`), and the login form's own
+  `router.replace("/")`. No `loading.tsx` beside it: a redirect thrown during
+  render never paints. Consequence, and it is fine: Home and the nav's location
+  tab now go to the same place, so pressing Home lights that tab where it used
+  to light none.
   Per-section memory (first visit → first sub, later → last sub used) lives in
   the session cookie `rf.nav` (`lib/navMemory.ts`), **seeded by the server and
   then owned by the client** (`lib/navMemoryStore.ts`): a server layout does not
