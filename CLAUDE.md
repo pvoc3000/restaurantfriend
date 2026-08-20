@@ -3479,7 +3479,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    guard runs. The triggers only show themselves by FIRING, so look for an entry
    no app code writes: any message beginning "Order started" or containing
    "changed from".
-   **055 (NEEDS APPLYING) adds the entry for the order EXISTING.** 054 watched
+   **055 IS APPLIED** (Mark, 2026-08-20) and the whole chain was walked live the
+   same day: a real create through "New order for them" logged **"Order started
+   as a lead"**, picking from the roster set the link, cleared the text and
+   logged it as one entry, and the Notes tab's History rendered both with author
+   and date. The order was then deleted, leaving 8,330.
+   **055 adds the entry for the order EXISTING.** 054 watched
    UPDATE only, so a brand-new order had an empty history until somebody edited
    it — which reads as the logging not working rather than as nothing having
    happened yet. FMP wrote one ("Order started by tracit", 3,482 times).
@@ -3490,6 +3495,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    re-pasting it would have worked; the ledger is the reason not to.
    The trigger has to be RECREATED, not just the function: `create or replace`
    on a function does not widen the events its trigger fires on.
+   **056 (NEEDS APPLYING) makes "Taken by" report as ONE field.** Found by using
+   it minutes after 055 went in: picking somebody from the roster writes both
+   halves in one statement — the link set, the superseded text cleared — and
+   both carry the label "Taken by", so the entry came out **"Taken by cleared
+   (was Mark); Taken by set to Mark Trombino"**. Every word true, and it reads
+   like a glitch on the commonest edit this field will ever see. The text half
+   is suppressed WHEN THE LINK MOVED IN THE SAME STATEMENT and only then —
+   editing the legacy text on one of the 7,944 orders that has no link still
+   logs "Taken by changed from Traci to Levi", which is the case where that text
+   IS the answer. Both pinned on the harness. Nothing but the function changes;
+   055's trigger already fires on insert and update.
    Known gap: **the CREATE still seeds only the text.** Resolving the signed-in
    member to their employee row needs `employees.user_id`, which a supervisor
    cannot read — a third definer, not built. Pick the person on the record.
