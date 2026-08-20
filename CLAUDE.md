@@ -3463,18 +3463,28 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    It is **opt-in, and `RowMenu` does not take it**: `⋯` already means "there is
    more here", and a caret beside it is the same claim twice inside a 36px
    square.
-   **MONEY AND PAYMENTS ARE SIDE BY SIDE ON THE ITEMS TAB.** Stacked, the
-   payments table sat a screen below the balance it settles. **Money is sized to
-   its CONTENT (416px) and Payments takes the rest**, rather than an even split
-   — the recipe record's Costs-pane call and its reason: Money is label/value
-   pairs set `justify-between`, so half of a 1150px column becomes 500px of
-   white space between "Delivery charge" and "$49.50", where a four-column table
-   with a free-text Note uses every pixel. `OrderTotals` stopped laying its two
-   `dl`s side by side when this made its column narrow — stacked reads better
-   anyway, since the inputs are what you SET and the figures are what they COME
-   TO. Below `xl` the pair stacks in the order it was in before. Measured at
-   1440: 416 + 688, same row, no horizontal overflow; at 1024, stacked, none
-   either.
+   **PAYMENTS LEFT, MONEY RIGHT ON THE ITEMS TAB.** Stacked, the payments table
+   sat a screen below the balance it settles. They shipped Money-left first and
+   were swapped the same day ("move the 'money' section… all the way to the
+   right of the page, and the payment… all the way to the left"), which is
+   better than it was: the lines table above ENDS in a money column against the
+   right margin, and Money's own figures are a column of amounts against a right
+   margin too, so on that side they continue the page's one vertical rule of
+   numbers instead of starting a second one 400px to its left.
+   **Money is sized to its CONTENT (416px) and Payments takes the rest**, rather
+   than an even split — the recipe record's Costs-pane call and its reason:
+   Money is label/value pairs set `justify-between`, so half of a 1150px column
+   becomes 500px of white space between "Delivery charge" and "$49.50", where a
+   four-column table with a free-text Note uses every pixel. Payments being the
+   FLEXIBLE one is also what holds Money on the right margin when that table
+   stops at its own `max-w`. `OrderTotals` stopped laying its two `dl`s side by
+   side when this made its column narrow — stacked reads better anyway, since
+   the inputs are what you SET and the figures are what they COME TO.
+   **ONE DOM ORDER AT EVERY WIDTH, no `order-*` classes**: below `xl` you read
+   Payments then Money, which is the price of keeping the visual order and the
+   tab order the same thing. Measured at 1440: Payments starts at 240 and Money
+   ends at 1392, which are exactly the lines table's own two edges; at 1024,
+   stacked, Payments first; no horizontal overflow at either.
 
    **(m) THE CREATE DIALOG ASKS WHO IS ORDERING, not who to call** (Mark,
    2026-08-18: "we should be able to set the customer when creating a special
