@@ -50,7 +50,6 @@ import {
   type SignedSoAttachment,
   type SoAttachment,
 } from "@/lib/specialOrderAttachments";
-import { StickyFooter } from "@/components/ui/StickyFooter";
 
 const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Special Orders" };
 
@@ -468,7 +467,62 @@ export async function SpecialOrderDetail({
                 </section>
               }
               topRight={
-                <section className="space-y-3">
+                <div className="space-y-10">
+                  {/* THE COMMANDS SIT ABOVE THE CUSTOMER (Mark, 2026-08-19:
+                      "move the buttons pinned to the bottom to above the
+                      customer quadrant").
+
+                      They were a `ui/StickyFooter` on every tab — FileMaker's
+                      own bottom row — which cost every tab a pinned band and
+                      the spacer under it whether or not you were going to press
+                      anything. Up here they are read where the rest of the
+                      record is read, and the Info tab gets its foot back.
+
+                      KNOWN CONSEQUENCE, and it is the trade: they are now on
+                      the INFO TAB ONLY. Emailing a quote or deleting an order
+                      from the Items tab is one click on Info first. That is
+                      what "above the customer quadrant" means — the quadrants
+                      are this tab's arrangement — and it is why the block is
+                      not repeated anywhere else: two homes for one command row
+                      is how they drift.
+
+                      Nothing about the buttons themselves changed; only where
+                      they live. */}
+                  {canWrite ? (
+                    <section className="space-y-3">
+                      <SectionHeading>Commands</SectionHeading>
+                      {/* PRODUCE AND SEND leads, because on a live order it is
+                          the thing you came to do — Duplicate and Delete are
+                          what you do TO an order, this is what you do WITH one.
+                          Templates and standing orders show nothing here:
+                          neither has an event, a customer expecting a quote, or
+                          a kitchen to print for. */}
+                      <div className="space-y-3">
+                        {kind === "order" ? (
+                          <SendDocument
+                            orderId={id}
+                            orgId={row.org_id as string}
+                            number={row.number as string}
+                            canWrite={canWrite}
+                            orgSettings={session.orgSettings}
+                            today={today}
+                          />
+                        ) : null}
+                        <OrderActions
+                          id={id}
+                          number={row.number as string}
+                          kind={kind}
+                          status={status}
+                          flagReason={row.flag_reason as string | null}
+                          lineCount={lines.length}
+                          paymentCount={payments.length}
+                          canWrite={canWrite}
+                        />
+                      </div>
+                    </section>
+                  ) : null}
+
+                  <section className="space-y-3">
                     <SectionHeading>Customer</SectionHeading>
                     <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
                       {/* THE LINK GOES BOTH WAYS NOW. Until 2026-08-18 the
@@ -525,8 +579,9 @@ export async function SpecialOrderDetail({
                               value={row.contact_email as string | null} canWrite={canWrite}
                               ariaLabel="Day-of contact email" />
                       </Row>
-                  </div>
-                </section>
+                    </div>
+                  </section>
+                </div>
               }
               bottomLeft={
                 <OtherOrdersThatDay
@@ -649,22 +704,44 @@ export async function SpecialOrderDetail({
                 />
               )}
 
-              <OrderTotals
-                id={id}
-                totals={totals}
-                inputs={moneyInputs}
-                rushSuggestion={rushSuggestion}
-                canWrite={canWrite}
-              />
+              {/* MONEY AND PAYMENTS SIDE BY SIDE (Mark, 2026-08-19). Stacked,
+                  the payments table sat a screen below the balance it settles,
+                  which is the one figure you read it against.
 
-              <OrderPayments
-                orderId={id}
-                orgId={row.org_id as string}
-                rows={payments}
-                balance={totals.balance}
-                canWrite={canWrite}
-                today={today}
-              />
+                  MONEY IS SIZED TO ITS CONTENT AND PAYMENTS TAKES THE REST,
+                  rather than an even split — the recipe record's Costs pane and
+                  its reason. Money is label/value pairs set `justify-between`,
+                  so given half of a 1150px column it becomes 500px of white
+                  space between "Delivery charge" and "$49.50"; Payments is a
+                  four-column table with a free-text Note, which uses every
+                  pixel it is given.
+
+                  `min-w-0` on the payments track and NOT behind a breakpoint: a
+                  flex item's min-width defaults to min-content, so a long note
+                  would push the PAGE sideways instead of the cell wrapping.
+                  Below `xl` they stack, in the order they were in before. */}
+              <div className="flex flex-col gap-12 xl:flex-row xl:items-start xl:gap-12">
+                <div className="shrink-0">
+                  <OrderTotals
+                    id={id}
+                    totals={totals}
+                    inputs={moneyInputs}
+                    rushSuggestion={rushSuggestion}
+                    canWrite={canWrite}
+                  />
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <OrderPayments
+                    orderId={id}
+                    orgId={row.org_id as string}
+                    rows={payments}
+                    balance={totals.balance}
+                    canWrite={canWrite}
+                    today={today}
+                  />
+                </div>
+              </div>
             </>
           )}
 
@@ -696,61 +773,6 @@ export async function SpecialOrderDetail({
         </div>
       </div>
 
-      {/* THE COMMANDS ARE A BAR ON EVERY TAB, which is FileMaker's own bottom
-          row (NEW ORDER · DUPLICATE ORDER · UNSCHEDULE PRODUCTION · FLAG ORDER
-          · DELETE ORDER · PREVIEW/EMAIL). They used to be a "Commands" section
-          at the foot of the Info tab, which put them below the log — the one
-          block on that tab with no natural end — so Delete was two hundred
-          entries down the page.
-
-          `ui/StickyFooter` measures its own height into a spacer, so the last
-          quadrant stays clear of it with no guessed constant, and the measured
-          quadrant height accounts for it through `spaceBelow`. */}
-      {canWrite ? (
-        <StickyFooter spacerClassName="-mt-8">
-          {/* INDENTED TO THE CONTENT COLUMN, not to the page (Mark,
-              2026-08-17). Without this the buttons start under the SIDEBAR — a
-              command row lined up with the section nav rather than with the
-              record it acts on.
-
-              `lg:ml-48` is the sidebar's `lg:w-40` plus the row's `lg:gap-8`
-              (10rem + 2rem), which is the identity block's own indent and THE
-              SAME COUPLED TRIO: change the sidebar's width and both move with
-              it. Below `lg` there is no sidebar to clear, so the buttons sit on
-              the page margin like everything else.
-
-              AND NO PADDING OF ITS OWN: `ui/StickyFooter`'s band already
-              carries `px-4 xl:px-12`, so repeating it here pushed the row 48px
-              PAST the content instead of onto it. */}
-          <div className="space-y-3 lg:ml-48">
-            {/* PRODUCE AND SEND leads the bar, because on a live order it is
-                the thing you came to do — Duplicate and Delete are what you do
-                to an order, this is what you do WITH one. Templates and
-                standing orders show nothing here: neither has an event, a
-                customer expecting a quote, or a kitchen to print for. */}
-            {kind === "order" ? (
-              <SendDocument
-                orderId={id}
-                orgId={row.org_id as string}
-                number={row.number as string}
-                canWrite={canWrite}
-                orgSettings={session.orgSettings}
-                today={today}
-              />
-            ) : null}
-            <OrderActions
-              id={id}
-              number={row.number as string}
-              kind={kind}
-              status={status}
-              flagReason={row.flag_reason as string | null}
-              lineCount={lines.length}
-              paymentCount={payments.length}
-              canWrite={canWrite}
-            />
-          </div>
-        </StickyFooter>
-      ) : null}
     </div>
   );
 }

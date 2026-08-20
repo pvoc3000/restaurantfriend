@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
-import { PickList } from "@/components/ui/PickList";
+import { MenuButton } from "@/components/ui/MenuButton";
 import { TextInput } from "@/components/ui/TextInput";
 import {
   DOCUMENT_LABEL,
@@ -32,10 +32,27 @@ import { downloadBlob, openWindowNow, showBlob } from "@/lib/poProcessing";
  * PRODUCE AND SEND — decision 11's four documents and decision 12's compose
  * card, as one control on the order's command bar.
  *
- * A PICKER PLUS TWO VERBS, not eight buttons. FileMaker's bottom row carried a
- * separate Preview and Email for each document and it was nine cells wide; the
- * question a person actually has is "which document", and then "look at it" or
- * "send it". So: Document ▾ · Preview · Email…
+ * THREE VERBS, EACH ONE A MENU OF THE FOUR DOCUMENTS (Mark, 2026-08-19:
+ * "Delete the document selection picklist, then make Preview, Download, and
+ * Email… picklist buttons… Same functionality, one less button").
+ *
+ * FileMaker's bottom row carried a separate Preview and Email for each document
+ * and it was nine cells wide. The first cut here was a `PickList` of documents
+ * beside the three verbs — four cells — and it had the thing wrong that a menu
+ * gets right: the picker held STATE. You chose Invoice, pressed Preview, came
+ * back a minute later and the bar still said Invoice, so the next Email went to
+ * whatever you had been looking at rather than to what you meant. Two steps,
+ * and a wrong one is silent.
+ *
+ * Folding the documents INTO each verb makes the whole act one gesture and
+ * leaves nothing selected afterwards: press Preview, pick Quote, and that is
+ * the sentence. `ui/MenuButton` and not a `PickList` for exactly that reason —
+ * a PickList chooses a value that STAYS chosen and shows which; these are verbs
+ * that happen once.
+ *
+ * `kind` survives as state because the compose DIALOG needs to know which
+ * document it is sending — its title, its templates, its filename — but it is
+ * now set by the act that opens the dialog rather than by a separate control.
  *
  * The renderer and the document components load on FIRST CLICK, not with the
  * page — @react-pdf is heavy and most visits to an order never produce
@@ -115,13 +132,15 @@ export function SendDocument({
     return { blob, order, org: data.org };
   }
 
-  const preview = () => {
-    // Before any await, while the click gesture still counts.
+  const preview = (k: DocumentKind) => {
+    // Before any await, while the click gesture still counts. The menu closes
+    // synchronously in `MenuButton`'s own handler, so this is still inside the
+    // gesture that opened the document — see the popup gotcha above.
     const win = openWindowNow();
     return run("preview", async () => {
       try {
-        const { blob, order } = await render(kind);
-        showBlob(win, blob, documentFileName(kind, order.number, order.event_date ?? today));
+        const { blob, order } = await render(k);
+        showBlob(win, blob, documentFileName(k, order.number, order.event_date ?? today));
       } catch (e) {
         win?.close();
         throw e;
@@ -129,10 +148,10 @@ export function SendDocument({
     });
   };
 
-  const download = () =>
+  const download = (k: DocumentKind) =>
     run("download", async () => {
-      const { blob, order } = await render(kind);
-      downloadBlob(blob, documentFileName(kind, order.number, order.event_date ?? today));
+      const { blob, order } = await render(k);
+      downloadBlob(blob, documentFileName(k, order.number, order.event_date ?? today));
     });
 
   /**
@@ -141,9 +160,13 @@ export function SendDocument({
    * approval token FIRST, so the link is a real URL in a body the human can
    * read and edit before it goes anywhere.
    */
-  const openCompose = () =>
+  const openCompose = (k: DocumentKind) =>
     run("compose", async () => {
-      const { blob, order, org } = await render(kind);
+      // Recorded FIRST, because everything the dialog renders reads it — the
+      // title, the templates, the sent note — and it is no longer set by a
+      // control the reader can see.
+      setKind(k);
+      const { blob, order, org } = await render(k);
 
       // THE LINK IS RESOLVED BEFORE THE TOKEN IS MINTED. If the deployment's
       // address is unknown there is no usable link, and refusing here costs
@@ -152,7 +175,7 @@ export function SendDocument({
       // somebody had already written.
       let token: string | null = null;
       let link = "";
-      if (kind === "quote") {
+      if (k === "quote") {
         const resolved = resolveAppBase(window.location.origin);
         if ("error" in resolved) throw new Error(resolved.error);
         token = await mintQuoteToken(supabase, { orderId, orgId });
@@ -160,7 +183,7 @@ export function SendDocument({
       }
       setSentNote(null);
       setCompose(
-        buildDocumentEmail(kind, order, orgSettings, {
+        buildDocumentEmail(k, order, orgSettings, {
           approve_url: link,
           // The whole paragraph, so a template that omits `{approve_line}`
           // simply doesn't offer the link rather than printing a bare URL in
@@ -175,7 +198,7 @@ export function SendDocument({
         org,
         blob,
         url: URL.createObjectURL(blob),
-        filename: documentFileName(kind, order.number, order.event_date ?? today),
+        filename: documentFileName(k, order.number, order.event_date ?? today),
         token,
       });
     });
@@ -212,39 +235,60 @@ export function SendDocument({
       router.refresh();
     });
 
-  const DOCUMENT_OPTIONS = [
-    { value: "quote", label: "Quote", hint: "with the terms and the approval link" },
-    { value: "invoice", label: "Invoice", hint: "payments and the balance due" },
-    { value: "receipt", label: "Receipt", hint: "the invoice, settled" },
-    { value: "order", label: "Kitchen order", hint: "no prices; grouped by size" },
+  /**
+   * The four documents, in the order the workflow produces them — quote before
+   * invoice before receipt, and the kitchen order last because it is the one
+   * that never leaves the building.
+   *
+   * The hints are what tell them apart at the moment of choosing. Without them
+   * "Invoice" and "Receipt" are two words for the same page, which is nearly
+   * true: they ARE one layout at two moments, and the hint is the moment.
+   */
+  const DOCUMENTS: { kind: DocumentKind; hint: string }[] = [
+    { kind: "quote", hint: "with the terms and the approval link" },
+    { kind: "invoice", hint: "payments and the balance due" },
+    { kind: "receipt", hint: "the invoice, settled" },
+    { kind: "order", hint: "no prices; grouped by size" },
   ];
+
+  /** One verb's menu: the same four documents, each doing that verb. */
+  const menu = (act: (k: DocumentKind) => void) =>
+    DOCUMENTS.map((d) => ({
+      label: DOCUMENT_LABEL[d.kind],
+      hint: d.hint,
+      onSelect: () => act(d.kind),
+    }));
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
-        <span className="w-44">
-          <PickList
-            variant="field"
-            value={kind}
-            options={DOCUMENT_OPTIONS}
-            onPick={(next) => setKind(next as DocumentKind)}
-            ariaLabel="Which document"
-          />
-        </span>
-        <button type="button" className={BUTTON_CLASS} disabled={busy !== null} onClick={preview}>
-          {busy === "preview" ? "Rendering…" : "Preview"}
-        </button>
-        <button type="button" className={BUTTON_CLASS} disabled={busy !== null} onClick={download}>
-          {busy === "download" ? "Rendering…" : "Download"}
-        </button>
-        <button
-          type="button"
-          className={BUTTON_CLASS}
+        {/* THE VERB IS THE LABEL AND IT NEVER CHANGES. A menu button is not a
+            picker: nothing stays selected, so the bar reads the same before and
+            after, and a document chosen an hour ago cannot be sent by mistake.
+            Busy states are per verb, so rendering a preview does not make the
+            other two look broken — but all three disable, because they share
+            one renderer and one `busy`. */}
+        <MenuButton
+          label="Preview which document"
+          trigger={busy === "preview" ? "Rendering…" : "Preview"}
+          triggerClassName={BUTTON_CLASS}
           disabled={busy !== null}
-          onClick={openCompose}
-        >
-          {busy === "compose" ? "Loading…" : "Email…"}
-        </button>
+          items={menu(preview)}
+        />
+        <MenuButton
+          label="Download which document"
+          trigger={busy === "download" ? "Rendering…" : "Download"}
+          triggerClassName={BUTTON_CLASS}
+          disabled={busy !== null}
+          items={menu(download)}
+        />
+        <MenuButton
+          label="Email which document"
+          trigger={busy === "compose" ? "Loading…" : "Email…"}
+          triggerClassName={BUTTON_CLASS}
+          disabled={busy !== null}
+          items={menu(openCompose)}
+        />
 
         {sentNote && <p className="text-[13px] text-[var(--rf-green-600)]">{sentNote}</p>}
         {error && !compose && <p className="text-[13px] text-accent">{error}</p>}

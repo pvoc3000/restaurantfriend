@@ -3405,6 +3405,47 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.
 
+   **(o) THE RECORD LOST ITS PINNED BAR, THE DOCUMENT PICKER, AND THE COLUMN
+   UNDER THE MONEY** (Mark, 2026-08-19, three layout notes in one).
+   **THE COMMANDS MOVED ABOVE THE CUSTOMER QUADRANT** ("move the buttons pinned
+   to the bottom to above the customer quadrant"), so `ui/StickyFooter` is gone
+   from this screen and with it the spacer every tab was paying for whether or
+   not you were going to press anything. **KNOWN CONSEQUENCE, ACCEPTED: they are
+   now on the INFO TAB ONLY** — the quadrants are that tab's arrangement, so
+   emailing a quote from Items is one click on Info first. The block is
+   deliberately not repeated elsewhere; two homes for one command row is how
+   they drift. Nothing about the buttons themselves changed. The Info tab
+   measures at exactly one viewport with the row in it (1440×900, verified).
+   **THE DOCUMENT PICKER IS GONE AND EACH VERB IS A MENU OF THE FOUR
+   DOCUMENTS** ("Delete the document selection picklist, then make Preview,
+   Download, and Email… picklist buttons… Same functionality, one less
+   button"). The picker held STATE, which is the thing this fixes rather than
+   the button count: you chose Invoice, pressed Preview, came back a minute
+   later and the bar still said Invoice, so the next Email went to whatever you
+   had been looking at. Folded into the verb it is one gesture and leaves
+   nothing selected — press Preview, pick Quote, and that is the sentence. It is
+   **`ui/MenuButton`, NOT a `PickList`**, and the distinction is what the choice
+   MEANS: a PickList chooses a value that stays chosen and shows which one is
+   current; these are verbs. That control is `ui/RowMenu` lifted out rather than
+   a second anchored panel — the two-pass placement, the flip near the window's
+   foot, the close-on-scroll and the `z-[70]` are not worth learning twice.
+   `kind` survives as state only because the compose DIALOG needs to know what
+   it is sending; it is set by the act that opens it. **The popup gotcha still
+   holds and still works**: `MenuButton` closes synchronously inside the click,
+   so `openWindowNow()` is still inside the gesture.
+   **MONEY AND PAYMENTS ARE SIDE BY SIDE ON THE ITEMS TAB.** Stacked, the
+   payments table sat a screen below the balance it settles. **Money is sized to
+   its CONTENT (416px) and Payments takes the rest**, rather than an even split
+   — the recipe record's Costs-pane call and its reason: Money is label/value
+   pairs set `justify-between`, so half of a 1150px column becomes 500px of
+   white space between "Delivery charge" and "$49.50", where a four-column table
+   with a free-text Note uses every pixel. `OrderTotals` stopped laying its two
+   `dl`s side by side when this made its column narrow — stacked reads better
+   anyway, since the inputs are what you SET and the figures are what they COME
+   TO. Below `xl` the pair stacks in the order it was in before. Measured at
+   1440: 416 + 688, same row, no horizontal overflow; at 1024, stacked, none
+   either.
+
    **(m) THE CREATE DIALOG ASKS WHO IS ORDERING, not who to call** (Mark,
    2026-08-18: "we should be able to set the customer when creating a special
    order. Remove the contact, phone and email and add the ability to link or
@@ -3991,7 +4032,8 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary — a VALUE or a filter's VIEW; `variant="inline"` in a cell, `variant="field"` as a standalone box. Opens below the field, portals so panes can't clip it |
   | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons; `onSubmit` makes Enter commit (opt-in — see the Enter bullet below) |
   | `confirmDialog()` from `lib/confirm` | `window.confirm` | EVERY confirm (Mark, 2026-08-10: the browser's dialog "takes me out of the app experience"). A promise — `if (!(await confirmDialog({ title, body, tone: "danger" }))) return;` — so the handler becomes async; `splitConfirmMessage(msg)` spreads a one-string message into title + body. `ui/ConfirmDialog` is the panel and only the (app) layout touches it. Enter does NOT commit a `danger` confirm (it focuses Cancel), which is `ui/Dialog`'s rule applied |
-  | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands; shares `lib/anchoredPanel` with PickList, so it escapes scroll panes the same way |
+  | `ui/MenuButton` | a button you wire to your own popup | a button that opens a short list of COMMANDS — the anchored menu with the trigger left to the caller. A menu, not a `PickList`: every row is a verb that happens once and leaves nothing selected, so the trigger's label never changes. `ui/RowMenu` is the `⋯` dress over it; a command bar passes words and `BUTTON_CLASS` |
+  | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands — `ui/MenuButton` wearing `⋯`, so it escapes scroll panes and flips near the window's foot exactly like `PickList` |
   | `catalog/InlineValue` | a hand-wired edit-in-place, or a bare `<input type="date">` | any editable cell — `kind` text / number / date / **pick**; `multiline` for prose (textarea, ⌘↵ saves); `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column; `arrayColumn` + `arrayIndex` + `arrayStrip` + `arrayWidth` to edit ONE SLOT of a Postgres array (the `par_by_weekday` idiom, which had no editor until the recipe sheet). An array column CONSTRAINED against a sibling array must write both in one statement — that is what `alsoUpdate` is for. `emptyClassName` styles the cell when it holds NOTHING (faint by default; the plan matrix wants a yellow "—", and a caller CAN'T do this through `className`, because Tailwind resolves competing utilities by stylesheet order); `ariaLabel` names the cell where no `<dt>` does — a grid of identical cells otherwise all announce as "—, click to edit". **`onWrite` replaces the UPDATE and nothing else** — for a column whose rule is COLUMN-scoped and so lives behind a definer function (044's `made`/`leftover`); without it the cell issues a plain update that matches zero rows, returns NO error, and silently loses what was typed |
   | `useCalcField()` spread on the input (`ui/CalcPad` is already mounted) | `inputMode="decimal"` plus your own operator affordance | letting a numeric field take a `lib/calc` expression ON A TOUCH DEVICE. iOS renders `inputMode="decimal"` as the number pad, which has no operators, and on iPadOS `*`/`+`/`×`/`÷` are two keyboard layers deep — so on touch the field asks for NO system keyboard (`inputMode="none"`) and CalcPad supplies one that has them, with a live readout of what the expression comes to. The spread is the whole wiring; it writes through the native value setter, so a controlled React input needs no code. **Half a keyboard bolted to Apple's was tried first and Mark's verdict on hardware was "clumsy and awkward"** — don't reach back for it. Spread it ONLY on fields `evaluateNumeric` reads: several others carry `inputMode="decimal"` and parse with a plain `Number()`, where an inserted `×` is a value that can't save |
   | `ui/SectionHeading` | a hand-styled `<h2>` | the heading over a block on a detail screen (16px bold black, optional `count`) |

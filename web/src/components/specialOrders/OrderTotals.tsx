@@ -81,7 +81,17 @@ export function OrderTotals({
     <section className="space-y-2">
       <SectionHeading>Money</SectionHeading>
 
-      <div className="grid max-w-[52rem] gap-x-12 gap-y-6 md:grid-cols-2">
+      {/* ONE COLUMN, since 2026-08-19 — this block is now half of a row rather
+          than the full width of the page (Mark: "put Payments and Money
+          sections in two separate columns side by side"), and the two `dl`s
+          were laid out for the width it used to have.
+
+          It reads better stacked anyway: the inputs are what you SET and the
+          figures are what they COME TO, so one under the other is the sentence.
+          Side by side inside a 384px column they were two 168px tracks, which
+          puts "Delivery charge" on two lines. `max-w` caps it below `xl`, where
+          the row stacks and this would otherwise run the width of the page. */}
+      <div className="max-w-[26rem] space-y-6">
         {/* --------- the inputs --------- */}
         <dl className="space-y-3 text-[14px]">
           <Line label="Tax rate">
