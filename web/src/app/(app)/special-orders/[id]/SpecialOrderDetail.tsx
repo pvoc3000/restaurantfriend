@@ -44,6 +44,7 @@ import { LinkCustomer } from "@/components/specialOrders/LinkCustomer";
 import { OrderInfoLayout, OrderSplitLayout } from "@/components/specialOrders/OrderInfoLayout";
 import { OrderDocuments } from "@/components/specialOrders/OrderDocuments";
 import { SendDocument } from "@/components/specialOrders/SendDocument";
+import { TakenBy } from "@/components/specialOrders/TakenBy";
 import {
   SO_ATTACHMENT_BUCKET,
   SO_SIGNED_URL_TTL_SECONDS,
@@ -66,7 +67,7 @@ const ORDER_COLUMNS = `
   delivery_company_phone, delivery_tracking, delivery_window_start,
   delivery_window_end, delivery_boxes, delivery_weight_lbs,
   tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee,
-  ignore_balance, taken_by,
+  ignore_balance, taken_by, taken_by_employee_id,
   notes_general, notes_quote, notes_production, notes_invoice, notes_receipt,
   standing_days, starts_on, ends_on, paused, standing_order_id,
   date_initiated, quote_sent_at, quote_returned_at, invoice_sent_at,
@@ -196,7 +197,15 @@ export async function SpecialOrderDetail({
     return (
       <p className="text-sm text-accent">
         Could not load this order: {error.message}
-        {error.message.includes("special_order") ? (
+        {/* NAME THE MIGRATION, not "something is missing" — the record is one
+            select, so an unapplied column takes the whole screen down and the
+            raw Postgres text is the only clue anybody gets. 043's rule. */}
+        {error.message.includes("taken_by_employee_id") ? (
+          <span className="mt-2 block text-muted">
+            Migration 053 has not been applied yet — it is what makes “Taken by”
+            a link to an employee.
+          </span>
+        ) : error.message.includes("special_order") ? (
           <span className="mt-2 block text-muted">
             If this names a missing relation or column, migration 051 has not
             been applied yet.
@@ -489,8 +498,17 @@ export async function SpecialOrderDetail({
                                 label="Ready by" canWrite={canWrite} placeholder="9:00 AM" />
                     </Row>
                     <Row label="Taken by">
-                      <Cell table="special_orders" id={id} column="taken_by" value={row.taken_by as string | null}
-                            canWrite={canWrite} ariaLabel="Order taken by" />
+                      {/* A LINK TO AN EMPLOYEE since migration 053, with
+                          FileMaker's text as the fallback on the 7,944
+                          migrated orders whose first names are too ambiguous to
+                          resolve. See `TakenBy`. */}
+                      <TakenBy
+                        orderId={id}
+                        orgId={row.org_id as string}
+                        employeeId={(row.taken_by_employee_id as string | null) ?? null}
+                        legacyName={(row.taken_by as string | null) ?? null}
+                        canWrite={canWrite}
+                      />
                     </Row>
                     <Row label="Kitchen">
                       {/* Decision 8: kitchen is where it is MADE… */}

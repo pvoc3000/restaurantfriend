@@ -3414,6 +3414,67 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    create wrote `taken_by: "Mark"` where the order made an hour earlier carries
    null.
 
+   **(q) THE ORDER'S HISTORY WRITES ITSELF, AND "TAKEN BY" IS A LINK
+   (migrations 053 + 054, BOTH NEED APPLYING).** Mark, 2026-08-19: "no edits I
+   make to my test order are getting logged as events in the history section. Is
+   that still to come?" — and it was never built. `special_order_events` had
+   four writers and all four were ACTS on a screen (a document emailed,
+   paperwork filed, an order flagged, a note); nothing watched the RECORD, so
+   changing an event date, a price or a quantity left no trace.
+   **FILEMAKER LOGGED FIELD EDITS AND WE DID NOT** — measured over its own
+   106,465 entries, more than half the top shapes are column changes: "Order
+   Type set to Quote" 8,045 · "Order To Do cleared" 4,792 · "Order Taken By
+   changed to Traci" 3,457 · "Changed Event Date to …" 1,434 · "Delivery Charge
+   changed to …" 1,262. So this is a missing half rather than a new idea. What
+   IS new is **the lines and the payments**, which FMP never logged and Mark
+   asked for ("adding/editing/removing items was absent from FMP and would be
+   nice to have").
+   **IT IS A TRIGGER**, which is design rule 6's own words for the catalog
+   ("logged automatically by DB triggers — don't log in app code") and is here
+   because there are already four ways an order changes — inline cells, two edge
+   functions, `approve_quote_by_token` — so app-side logging has to be
+   remembered in each, and the day it is forgotten looks exactly like the bug
+   reported.
+   Four decisions inside it, each of which the obvious version gets wrong.
+   **ONE ENTRY PER STATEMENT, not per column**, so a three-column edit is one
+   sentence — which also settles double-entry by construction. **`sort` IS NOT
+   WATCHED**, and that is the omission that would flood the log: one drag
+   renumbers the WHOLE list, 21 rows on a real order. **NOR ARE THE STAGE
+   DATES**, which are set by acts that already write their own entry, so
+   watching them would print each send twice. And **A UUID IS RESOLVED** —
+   locations to their code, the customer and the employee to a name.
+   **IT IS `security definer`, WHICH IS 001's ANSWER TOO** (`log_price_change`
+   and its three siblings). Written plain first, and the harness said no twice:
+   the writer calls `auth.uid()`, and the renderer reads `employees`, which 020
+   gates to owner/admin — so a SUPERVISOR's edit would have logged "a record
+   that no longer exists" where the taker's name belongs. What a definer opens
+   is a DIRECT call, so **execute is revoked from `authenticated` rather than
+   granted**; a trigger's permission is checked when it is created, not when it
+   fires. Verified: `anon` AND `authenticated` are both refused the writer.
+   Consequence that landed in the same commit: `OrderActions` stopped writing
+   "Order cancelled", "Flagged: …" and "Issue resolved", each of which the
+   trigger now says with more in it. Its `log()` helper is gone entirely — the
+   one entry left is `Duplicated from order N`, a fact with no column anywhere.
+   **AND `taken_by` IS A LINK (053).** `taken_by_employee_id` references
+   `employees`, `on delete set null` (023 lets an owner delete a typo, and an
+   order must not go with them). The roster comes from
+   **`special_order_takers`**, a definer returning id and name only — 044's
+   `production_operators` applied a second time, and a SECOND narrow function
+   rather than a general one because 044 says why in as many words. It differs
+   in being scoped by ORG, not location: whoever answered the phone is not a
+   fact about a shop.
+   **HISTORY IS DELIBERATELY NOT BACKFILLED, and the check is why.** A first
+   pass said 98.7% of the 7,944 legacy names "resolve to an employee"; that was
+   first-match-wins over 445 people. Checked properly, **2,386 (30%) match MORE
+   THAN ONE** — mark → two, adam → three, amanda → five, sarah → four. A
+   backfill would have attributed 558 orders to whichever Adam sorted first and
+   said nothing about it. So the text column stays, the link is null on every
+   migrated row, and the cell renders whichever it has — a link where we know,
+   plain text where we only roughly do.
+   Known gap: **the CREATE still seeds only the text.** Resolving the signed-in
+   member to their employee row needs `employees.user_id`, which a supervisor
+   cannot read — a third definer, not built. Pick the person on the record.
+
    Not done, and worth asking about: **`LinkCustomer` does not seed the
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.

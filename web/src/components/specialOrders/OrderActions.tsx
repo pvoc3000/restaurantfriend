@@ -65,7 +65,10 @@ export function OrderActions({
       if (e) setError(e.message);
       else if (!data?.length) setError("The flag wasn't saved — the database refused it silently.");
       else {
-        await log(`Flagged: ${text}`);
+        // NO `log()` HERE ANY MORE — migration 054's trigger watches
+        // `flag_reason` and `todo` and writes "Flag set to …; To-do set to
+        // Resolve Issue" from the update itself. Keeping this would print the
+        // same act twice, once in the app's words and once in the database's.
         setFlagging(false);
         setReason("");
         router.refresh();
@@ -85,27 +88,20 @@ export function OrderActions({
       if (e) setError(e.message);
       else if (!data?.length) setError("The change wasn't saved — the database refused it silently.");
       else {
-        await log("Issue resolved");
+        // Likewise: the trigger says "Flag cleared (was …); To-do cleared".
         router.refresh();
       }
     });
   }
 
-  /** The log writes itself on every meaningful act (decision 16). */
-  async function log(message: string) {
-    const { data: order } = await supabase
-      .from("special_orders")
-      .select("org_id")
-      .eq("id", id)
-      .maybeSingle();
-    if (!order) return;
-    await supabase.from("special_order_events").insert({
-      org_id: order.org_id,
-      order_id: id,
-      message,
-      source: "app",
-    });
-  }
+  /* THERE IS NO `log()` HELPER HERE ANY MORE. Migration 054's triggers write
+     the order's history from the columns themselves, so flag, resolve and
+     cancel each stopped writing an entry that said less than the trigger's
+     does — "Order cancelled" against "Status changed from Order to Cancelled".
+     The ONE entry this file still writes is `Duplicated from order N`, three
+     hundred lines down, and it writes it directly: a duplicate is a fact about
+     a row that has no column anywhere, since nothing on the new order records
+     where it came from. */
 
   async function cancel() {
     if (
@@ -129,7 +125,8 @@ export function OrderActions({
       if (e) setError(e.message);
       else if (!data?.length) setError("The change wasn't saved — the database refused it silently.");
       else {
-        await log("Order cancelled");
+        // The trigger's "Status changed from Order to Cancelled" is strictly
+        // more than "Order cancelled" was.
         router.refresh();
       }
     });
