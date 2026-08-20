@@ -12,6 +12,7 @@ import {
   menuItemState,
   sinkInactive,
   useAnchoredPanel,
+  MENU_CARET,
 } from "@/lib/anchoredPanel";
 
 export type PickOption = {
@@ -382,7 +383,7 @@ export function PickList({
           aria-hidden
           className={`shrink-0 text-[9px] text-muted ${variant === "field" ? "ml-auto" : ""}`}
         >
-          ▼
+          {MENU_CARET}
         </span>
       </button>
 

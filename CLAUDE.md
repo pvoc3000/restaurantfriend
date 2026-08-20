@@ -3407,15 +3407,35 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 
    **(o) THE RECORD LOST ITS PINNED BAR, THE DOCUMENT PICKER, AND THE COLUMN
    UNDER THE MONEY** (Mark, 2026-08-19, three layout notes in one).
-   **THE COMMANDS MOVED ABOVE THE CUSTOMER QUADRANT** ("move the buttons pinned
-   to the bottom to above the customer quadrant"), so `ui/StickyFooter` is gone
-   from this screen and with it the spacer every tab was paying for whether or
-   not you were going to press anything. **KNOWN CONSEQUENCE, ACCEPTED: they are
-   now on the INFO TAB ONLY** — the quadrants are that tab's arrangement, so
-   emailing a quote from Items is one click on Info first. The block is
-   deliberately not repeated elsewhere; two homes for one command row is how
-   they drift. Nothing about the buttons themselves changed. The Info tab
-   measures at exactly one viewport with the row in it (1440×900, verified).
+   **THE COMMANDS ARE LEVEL WITH THE TITLE** — right-aligned in the identity
+   block's own row, and the "Commands" heading is gone with the move. They went
+   there in two steps the same day: first out of `ui/StickyFooter` and into the
+   Info tab's top-right quadrant ("move the buttons pinned to the bottom to
+   above the customer quadrant"), then up one more level ("remove the title
+   'commands' and move the buttons up a level so they're even with the title
+   area"). Only the final arrangement is in the code; the intermediate one is
+   recorded because its cost is what the second step bought back.
+   Three things this settles.
+   `ui/StickyFooter` is gone from this screen, and with it the spacer every tab
+   was paying for whether or not you were going to press anything.
+   **The heading went because a row of seven buttons is self-evidently a row of
+   buttons** — `OrderActions` made that argument when it lost its own — and a
+   caption over it spends exactly the vertical space the move was meant to give
+   back.
+   **And they are on EVERY TAB again**, because the identity block sits above
+   the tab switch. The quadrant version was Info-only, which meant emailing a
+   quote from Items took a click on Info first; that consequence is retired.
+   The row is `items-start`, so the buttons line up with the TOP of the title
+   rather than centring against a block whose height changes with the attention
+   sentence — measured, the Preview button's top and the `h1`'s top are the same
+   pixel. The two button rows **right-align beside the title and left-align once
+   they wrap under it** (`items-start xl:items-end`): right is what makes a
+   cluster read as one block when both rows end on the page margin, and wrong
+   under the heading, where it indents the shorter row from the heading's own
+   margin for no reason. The wrap happens between 1024 and 1280, which is where
+   the breakpoint is. Measured: 1440 and 1280 level and unwrapped with both rows
+   ending on the margin; 1024 wrapped with both rows starting on it; no
+   horizontal overflow at any of the three.
    **THE DOCUMENT PICKER IS GONE AND EACH VERB IS A MENU OF THE FOUR
    DOCUMENTS** ("Delete the document selection picklist, then make Preview,
    Download, and Email… picklist buttons… Same functionality, one less
@@ -3433,6 +3453,16 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    it is sending; it is set by the act that opens it. **The popup gotcha still
    holds and still works**: `MenuButton` closes synchronously inside the click,
    so `openWindowNow()` is still inside the gesture.
+   **Each of the three wears the caret** (Mark: "the new document picklist
+   buttons should have the arrow glyph to indicate it's a picklist"), and the
+   glyph itself moved to `lib/anchoredPanel` as `MENU_CARET` so `PickList` and
+   `MenuButton` cannot draw the same affordance two ways. Its SIZE and COLOUR
+   deliberately stay at each call site: a PickList trigger hovers to a pale wash
+   where `text-muted` reads fine, and a command button fills BLACK, where a
+   fixed grey would go dark-on-dark — so this one is `currentColor` at 60%.
+   It is **opt-in, and `RowMenu` does not take it**: `⋯` already means "there is
+   more here", and a caret beside it is the same claim twice inside a 36px
+   square.
    **MONEY AND PAYMENTS ARE SIDE BY SIDE ON THE ITEMS TAB.** Stacked, the
    payments table sat a screen below the balance it settles. **Money is sized to
    its CONTENT (416px) and Payments takes the rest**, rather than an even split

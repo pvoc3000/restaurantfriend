@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
+  MENU_CARET,
   MENU_ITEM_CLASS,
   MENU_PANEL_CLASS,
   menuItemState,
@@ -45,6 +46,7 @@ export function MenuButton({
   label,
   trigger,
   triggerClassName,
+  caret = false,
   disabled = false,
   align = "left",
   minWidth = 200,
@@ -57,6 +59,21 @@ export function MenuButton({
   /** The button's dress. Required in practice — there is no sensible default
    *  shared by a 36px glyph square and a 36px labelled cell. */
   triggerClassName: string;
+  /**
+   * Wear the caret — the mark that says "this opens a list" (Mark, 2026-08-19:
+   * "the new document picklist buttons should have the arrow glyph to indicate
+   * it's a picklist").
+   *
+   * Opt-in rather than always, because `RowMenu`'s trigger IS a marker: `⋯`
+   * already means "there is more here", and a caret beside it would be the same
+   * claim made twice inside a 36px square. A button that reads as an ordinary
+   * command is the case that needs telling.
+   *
+   * It is `currentColor` at reduced opacity, NOT `text-muted` like PickList's —
+   * a command button fills black on hover, where a fixed grey would go
+   * dark-on-dark.
+   */
+  caret?: boolean;
   disabled?: boolean;
   align?: "left" | "right";
   /** Wide enough for a command and its hint, and no wider — this is a short
@@ -82,6 +99,11 @@ export function MenuButton({
         className={triggerClassName}
       >
         {trigger}
+        {caret ? (
+          <span aria-hidden className="ml-2 shrink-0 text-[9px] opacity-60">
+            {MENU_CARET}
+          </span>
+        ) : null}
       </button>
 
       {open &&

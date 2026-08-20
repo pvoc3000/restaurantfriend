@@ -54,6 +54,23 @@ export const MENU_PANEL_CLASS =
  * command's hint beside its label (caught in the browser, 2026-08-01). Each
  * caller states its own `flex`/`block`.
  */
+/**
+ * THE MARK THAT MEANS "THIS OPENS A LIST", and it is one character in one place.
+ *
+ * `PickList` has worn it since it shipped; `MenuButton` needed it the moment
+ * three command buttons started opening menus (Mark, 2026-08-19: "the new
+ * document picklist buttons should have the arrow glyph to indicate it's a
+ * picklist"). Two controls drawing the same affordance is exactly where a
+ * different glyph or a different size creeps in, so the glyph lives here beside
+ * the panel they already share.
+ *
+ * The SIZE and COLOUR deliberately do NOT live here. A PickList trigger hovers
+ * to a pale wash, so a `text-muted` caret stays readable on it; a command button
+ * fills BLACK on hover, where a fixed grey would go dark-on-dark. Each control
+ * states its own, and the shape is what cannot drift.
+ */
+export const MENU_CARET = "▼";
+
 export const MENU_ITEM_CLASS =
   "w-full px-3 py-2 text-left text-sm disabled:opacity-35 disabled:hover:bg-white";
 

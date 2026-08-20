@@ -272,6 +272,7 @@ export function SendDocument({
           label="Preview which document"
           trigger={busy === "preview" ? "Rendering…" : "Preview"}
           triggerClassName={BUTTON_CLASS}
+          caret
           disabled={busy !== null}
           items={menu(preview)}
         />
@@ -279,6 +280,7 @@ export function SendDocument({
           label="Download which document"
           trigger={busy === "download" ? "Rendering…" : "Download"}
           triggerClassName={BUTTON_CLASS}
+          caret
           disabled={busy !== null}
           items={menu(download)}
         />
@@ -286,6 +288,7 @@ export function SendDocument({
           label="Email which document"
           trigger={busy === "compose" ? "Loading…" : "Email…"}
           triggerClassName={BUTTON_CLASS}
+          caret
           disabled={busy !== null}
           items={menu(openCompose)}
         />

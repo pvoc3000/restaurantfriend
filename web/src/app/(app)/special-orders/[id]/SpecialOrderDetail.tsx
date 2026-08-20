@@ -326,43 +326,105 @@ export async function SpecialOrderDetail({
       {/* `lg:ml-48` is the sidebar's `lg:w-40` plus the row's `lg:gap-8`. THOSE
           THREE VALUES ARE COUPLED — change one and the heading drifts off the
           content it belongs to. */}
-      <div className="space-y-2 lg:ml-48">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          {(row.title as string) || `Order ${row.number as string}`}
-        </h1>
-        <p className="text-sm text-muted">
-          <span className="tabular-nums">#{row.number as string}</span>
-          {" · "}
-          {kind === "order" ? (status ? STATUS_LABEL[status] : "—") : KIND_LABEL[kind]}
-          {row.event_date ? ` · ${row.event_date as string}` : ""}
-          {" · "}
-          {customer ? (
-            <Link
-              href={withFrom(`/customers/${customer.id}`, {
-                href: orderTabHref(id, activeTab, rawParams),
-                label: `#${row.number as string}`,
-              })}
-              className="hover:underline"
-            >
-              {customerLabel(customer)}
-            </Link>
-          ) : (
-            <span className="text-faint">no customer</span>
-          )}
-          {" · "}
-          <span className="tabular-nums">{money(totals.total)}</span>
-          {totals.balance > 0 && !moneyInputs.ignore_balance ? (
-            <span className="text-accent"> · {money(totals.balance)} due</span>
-          ) : null}
-        </p>
-
-        {/* Decision 19's sentence, on the record as well as in the list.
-            RED when a human flagged it, YELLOW when the app worked it out —
-            the same split the list's to-do column makes. */}
-        {attention ? (
-          <p className={`text-[13px] ${row.flag_reason ? "text-accent" : "text-mark"}`}>
-            {attention}
+      <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4 lg:ml-48">
+        <div className="min-w-0 space-y-2">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            {(row.title as string) || `Order ${row.number as string}`}
+          </h1>
+          <p className="text-sm text-muted">
+            <span className="tabular-nums">#{row.number as string}</span>
+            {" · "}
+            {kind === "order" ? (status ? STATUS_LABEL[status] : "—") : KIND_LABEL[kind]}
+            {row.event_date ? ` · ${row.event_date as string}` : ""}
+            {" · "}
+            {customer ? (
+              <Link
+                href={withFrom(`/customers/${customer.id}`, {
+                  href: orderTabHref(id, activeTab, rawParams),
+                  label: `#${row.number as string}`,
+                })}
+                className="hover:underline"
+              >
+                {customerLabel(customer)}
+              </Link>
+            ) : (
+              <span className="text-faint">no customer</span>
+            )}
+            {" · "}
+            <span className="tabular-nums">{money(totals.total)}</span>
+            {totals.balance > 0 && !moneyInputs.ignore_balance ? (
+              <span className="text-accent"> · {money(totals.balance)} due</span>
+            ) : null}
           </p>
+
+          {/* Decision 19's sentence, on the record as well as in the list.
+              RED when a human flagged it, YELLOW when the app worked it out —
+              the same split the list's to-do column makes. */}
+          {attention ? (
+            <p className={`text-[13px] ${row.flag_reason ? "text-accent" : "text-mark"}`}>
+              {attention}
+            </p>
+          ) : null}
+        </div>
+
+        {/* THE COMMANDS SIT LEVEL WITH THE TITLE (Mark, 2026-08-19: "remove the
+            title 'commands' and move the buttons up a level so they're even
+            with the title area").
+
+            They have been three places in two days: a `ui/StickyFooter` pinned
+            to every tab, then a "Commands" section inside the Info tab's
+            top-right quadrant, and now here — a band shared with the record's
+            own heading. THE HEADING IS GONE WITH THE MOVE, and that is the
+            same argument `OrderActions` made when it lost its own: a row of
+            seven buttons is self-evidently a row of buttons, and a caption over
+            it only takes the vertical space the move was meant to give back.
+
+            Two things this buys beyond the space. They are ON EVERY TAB again,
+            because the identity block sits ABOVE the tab switch — so the Info-
+            only consequence of the last move is gone. And a command row beside
+            the thing it acts on reads as belonging to it, where at the foot of
+            the window it belonged to the app.
+
+            `items-start` on the row so the buttons line up with the TOP of the
+            title rather than centring against a block whose height changes with
+            the attention sentence.
+
+            And the two button rows RIGHT-ALIGN beside the title but LEFT-ALIGN
+            once they wrap under it (`items-start xl:items-end`). Right is
+            correct beside the title — both rows end on the page margin, which
+            is what makes a command cluster read as one block — and wrong under
+            it, where right-aligning the shorter row indents it from the
+            heading's own margin for no reason anybody could name. Measured: the
+            wrap happens between 1024 and 1280, which is where the breakpoint
+            is. */}
+        {canWrite ? (
+          <div className="flex shrink-0 flex-col items-start gap-3 xl:items-end">
+            {/* PRODUCE AND SEND leads, because on a live order it is the thing
+                you came to do — Duplicate and Delete are what you do TO an
+                order, this is what you do WITH one. Templates and standing
+                orders show nothing here: neither has an event, a customer
+                expecting a quote, or a kitchen to print for. */}
+            {kind === "order" ? (
+              <SendDocument
+                orderId={id}
+                orgId={row.org_id as string}
+                number={row.number as string}
+                canWrite={canWrite}
+                orgSettings={session.orgSettings}
+                today={today}
+              />
+            ) : null}
+            <OrderActions
+              id={id}
+              number={row.number as string}
+              kind={kind}
+              status={status}
+              flagReason={row.flag_reason as string | null}
+              lineCount={lines.length}
+              paymentCount={payments.length}
+              canWrite={canWrite}
+            />
+          </div>
         ) : null}
       </div>
 
@@ -467,121 +529,65 @@ export async function SpecialOrderDetail({
                 </section>
               }
               topRight={
-                <div className="space-y-10">
-                  {/* THE COMMANDS SIT ABOVE THE CUSTOMER (Mark, 2026-08-19:
-                      "move the buttons pinned to the bottom to above the
-                      customer quadrant").
-
-                      They were a `ui/StickyFooter` on every tab — FileMaker's
-                      own bottom row — which cost every tab a pinned band and
-                      the spacer under it whether or not you were going to press
-                      anything. Up here they are read where the rest of the
-                      record is read, and the Info tab gets its foot back.
-
-                      KNOWN CONSEQUENCE, and it is the trade: they are now on
-                      the INFO TAB ONLY. Emailing a quote or deleting an order
-                      from the Items tab is one click on Info first. That is
-                      what "above the customer quadrant" means — the quadrants
-                      are this tab's arrangement — and it is why the block is
-                      not repeated anywhere else: two homes for one command row
-                      is how they drift.
-
-                      Nothing about the buttons themselves changed; only where
-                      they live. */}
-                  {canWrite ? (
-                    <section className="space-y-3">
-                      <SectionHeading>Commands</SectionHeading>
-                      {/* PRODUCE AND SEND leads, because on a live order it is
-                          the thing you came to do — Duplicate and Delete are
-                          what you do TO an order, this is what you do WITH one.
-                          Templates and standing orders show nothing here:
-                          neither has an event, a customer expecting a quote, or
-                          a kitchen to print for. */}
-                      <div className="space-y-3">
-                        {kind === "order" ? (
-                          <SendDocument
-                            orderId={id}
-                            orgId={row.org_id as string}
-                            number={row.number as string}
-                            canWrite={canWrite}
-                            orgSettings={session.orgSettings}
-                            today={today}
-                          />
-                        ) : null}
-                        <OrderActions
-                          id={id}
-                          number={row.number as string}
-                          kind={kind}
-                          status={status}
-                          flagReason={row.flag_reason as string | null}
-                          lineCount={lines.length}
-                          paymentCount={payments.length}
+                <section className="space-y-3">
+                  <SectionHeading>Customer</SectionHeading>
+                  <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
+                    {/* THE LINK GOES BOTH WAYS NOW. Until 2026-08-18 the
+                        only writer of `customer_id` was "New order for them"
+                        on the customer record, so an order that started as a
+                        lead — every phone order, and everything the inquiry
+                        form will create — said "None linked" forever with
+                        nothing to press. */}
+                    <Row label="Customer">
+                      <span className="flex flex-wrap items-center gap-3">
+                        {customer ? (
+                          <Link
+                            href={withFrom(`/customers/${customer.id}`, {
+                              href: orderTabHref(id, "info", rawParams),
+                              label: `#${row.number as string}`,
+                            })}
+                            className={`${READ_ONLY_VALUE} underline underline-offset-2 hover:text-ink`}
+                          >
+                            {customerLabel(customer)}
+                          </Link>
+                        ) : (
+                          <span className={`${READ_ONLY_VALUE} text-faint`}>None linked</span>
+                        )}
+                        <LinkCustomer
+                          orderId={id}
+                          orgId={row.org_id as string}
+                          currentCustomerId={(row.customer_id as string | null) ?? null}
+                          contact={{
+                            name: row.contact_name as string | null,
+                            phone: row.contact_phone as string | null,
+                            email: row.contact_email as string | null,
+                          }}
                           canWrite={canWrite}
                         />
-                      </div>
-                    </section>
-                  ) : null}
-
-                  <section className="space-y-3">
-                    <SectionHeading>Customer</SectionHeading>
-                    <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
-                      {/* THE LINK GOES BOTH WAYS NOW. Until 2026-08-18 the
-                          only writer of `customer_id` was "New order for them"
-                          on the customer record, so an order that started as a
-                          lead — every phone order, and everything the inquiry
-                          form will create — said "None linked" forever with
-                          nothing to press. */}
-                      <Row label="Customer">
-                        <span className="flex flex-wrap items-center gap-3">
-                          {customer ? (
-                            <Link
-                              href={withFrom(`/customers/${customer.id}`, {
-                                href: orderTabHref(id, "info", rawParams),
-                                label: `#${row.number as string}`,
-                              })}
-                              className={`${READ_ONLY_VALUE} underline underline-offset-2 hover:text-ink`}
-                            >
-                              {customerLabel(customer)}
-                            </Link>
-                          ) : (
-                            <span className={`${READ_ONLY_VALUE} text-faint`}>None linked</span>
-                          )}
-                          <LinkCustomer
-                            orderId={id}
-                            orgId={row.org_id as string}
-                            currentCustomerId={(row.customer_id as string | null) ?? null}
-                            contact={{
-                              name: row.contact_name as string | null,
-                              phone: row.contact_phone as string | null,
-                              email: row.contact_email as string | null,
-                            }}
-                            canWrite={canWrite}
-                          />
-                        </span>
-                      </Row>
-                      <Row label="Their phone">
-                        <span className={READ_ONLY_VALUE}>{customer?.phone ?? "—"}</span>
-                      </Row>
-                      {/* The DAY-OF contact, who is often not the customer —
-                          filled on 7,735 of the 8,330 real orders. */}
-                      <Row label="Day-of contact">
-                        <Cell table="special_orders" id={id} column="contact_name"
-                              value={row.contact_name as string | null} canWrite={canWrite}
-                              ariaLabel="Day-of contact name" />
-                      </Row>
-                      <Row label="Contact phone">
-                        <Cell table="special_orders" id={id} column="contact_phone"
-                              value={row.contact_phone as string | null} canWrite={canWrite}
-                              ariaLabel="Day-of contact phone" />
-                      </Row>
-                      <Row label="Contact email">
-                        <Cell table="special_orders" id={id} column="contact_email"
-                              value={row.contact_email as string | null} canWrite={canWrite}
-                              ariaLabel="Day-of contact email" />
-                      </Row>
-                    </div>
-                  </section>
-                </div>
+                      </span>
+                    </Row>
+                    <Row label="Their phone">
+                      <span className={READ_ONLY_VALUE}>{customer?.phone ?? "—"}</span>
+                    </Row>
+                    {/* The DAY-OF contact, who is often not the customer —
+                        filled on 7,735 of the 8,330 real orders. */}
+                    <Row label="Day-of contact">
+                      <Cell table="special_orders" id={id} column="contact_name"
+                            value={row.contact_name as string | null} canWrite={canWrite}
+                            ariaLabel="Day-of contact name" />
+                    </Row>
+                    <Row label="Contact phone">
+                      <Cell table="special_orders" id={id} column="contact_phone"
+                            value={row.contact_phone as string | null} canWrite={canWrite}
+                            ariaLabel="Day-of contact phone" />
+                    </Row>
+                    <Row label="Contact email">
+                      <Cell table="special_orders" id={id} column="contact_email"
+                            value={row.contact_email as string | null} canWrite={canWrite}
+                            ariaLabel="Day-of contact email" />
+                    </Row>
+                  </div>
+                </section>
               }
               bottomLeft={
                 <OtherOrdersThatDay
