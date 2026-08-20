@@ -38,6 +38,8 @@ export type NewSpecialOrderInput = {
   kind: SpecialOrderKind;
   title: string;
   eventDate?: string | null;
+  /** `HH:MM`. Required of a real order by the create form — see its `ready`. */
+  eventTime?: string | null;
   /** Decision 8: where the customer COLLECTS. Drives the tax rate, the menu's
    *  prices and the LOCATION line on the quote. */
   locationId?: string | null;
@@ -116,6 +118,7 @@ export async function createSpecialOrder(
       status: input.kind === "order" ? "lead" : null,
       title: input.title.trim(),
       event_date: input.eventDate ?? null,
+      event_time: input.eventTime ?? null,
       location_id: locationId,
       kitchen_location_id: orNull(input.kitchenLocationId),
       tax_rate: taxRate,

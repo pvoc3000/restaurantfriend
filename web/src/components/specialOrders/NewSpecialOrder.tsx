@@ -9,6 +9,7 @@ import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
 import { DateField } from "@/components/ui/DateField";
+import { TimeField } from "@/components/ui/TimeField";
 import { KIND_LABEL, type SpecialOrderKind } from "@/lib/specialOrders";
 import { createSpecialOrder } from "@/lib/createSpecialOrder";
 
@@ -54,20 +55,42 @@ export function NewSpecialOrder({
   const [kind, setKind] = useState<SpecialOrderKind>("order");
   const [title, setTitle] = useState("");
   const [eventDate, setEventDate] = useState<string | null>(null);
+  const [eventTime, setEventTime] = useState<string | null>(null);
   const [kitchenId, setKitchenId] = useState("");
   const [locationId, setLocationId] = useState(defaultLocationId ?? "");
   const [contactName, setContactName] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [contactEmail, setContactEmail] = useState("");
 
-  // A title is the only thing asked for, because it is the only thing that
-  // makes the row findable before anything else is known.
-  const ready = title.trim() !== "";
+  /**
+   * WHEN IT IS WANTED IS REQUIRED ON A REAL ORDER (Mark, 2026-08-18: "Event
+   * Time should be mandatory").
+   *
+   * The form used to ask for a title and nothing else, on the reasoning that a
+   * lead acquires everything else as the conversation happens. That is true of
+   * the customer, the lines and the money, and it is NOT true of when: the
+   * kitchen sheet prints the pickup time as its most prominent field, the
+   * attention queue measures every threshold in days before the event, and an
+   * order nobody can date cannot be scheduled, chased or made ready.
+   *
+   * THE DATE IS REQUIRED TOO, and that is forced rather than chosen: a time
+   * with no date says nothing at all, so making one mandatory without the other
+   * would be incoherent.
+   *
+   * BOTH ARE ASKED ONLY OF A REAL ORDER. A template is a shape with no event,
+   * and a standing order recurs by WEEKDAY over a date range — neither has a
+   * single date to give, and demanding one would make those two kinds
+   * uncreatable.
+   */
+  const needsWhen = kind === "order";
+  const ready =
+    title.trim() !== "" && (!needsWhen || (eventDate !== null && eventTime !== null));
 
   function reset() {
     setKind("order");
     setTitle("");
     setEventDate(null);
+    setEventTime(null);
     setKitchenId("");
     setLocationId(defaultLocationId ?? "");
     setContactName("");
@@ -93,6 +116,7 @@ export function NewSpecialOrder({
         kind,
         title,
         eventDate,
+        eventTime,
         locationId,
         kitchenLocationId: kitchenId,
         contactName,
@@ -151,6 +175,11 @@ export function NewSpecialOrder({
               />
             </Field>
 
+            {/* KIND LEADS AND SITS ALONE, because it is the switch: it decides
+                whether the two fields under it are required at all. Everything
+                below it is a real PAIR — the two halves of "when", decision 8's
+                two shops, and the two ways to reach somebody — so no row is
+                three fields wide with a hole in it. */}
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
               <Field label="Kind">
                 <PickList
@@ -171,15 +200,25 @@ export function NewSpecialOrder({
                   className="w-full"
                 />
               </Field>
-              <Field label="Event date">
-                {/* A lead routinely has no date yet — that is often the first
-                    question. `ui/DateField`, never a bare date input: it
-                    carries the Safari empty-date apparatus, and this box
-                    starts EMPTY, which is exactly where that bug bites. */}
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+              <Field label="Event date" required={needsWhen}>
+                {/* `ui/DateField`, never a bare date input: it carries the
+                    Safari empty-date apparatus, and this box starts EMPTY,
+                    which is exactly where that bug bites. */}
                 <DateField
                   value={eventDate}
                   onChange={setEventDate}
                   ariaLabel="Event date"
+                  className="w-full"
+                />
+              </Field>
+              <Field label="Event time" required={needsWhen}>
+                <TimeField
+                  value={eventTime}
+                  onChange={setEventTime}
+                  ariaLabel="Event time"
                   className="w-full"
                 />
               </Field>
@@ -227,17 +266,15 @@ export function NewSpecialOrder({
               </Field>
             </div>
 
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-              <Field label="Contact">
-                <TextInput
-                  value={contactName}
-                  onValueChange={setContactName}
-                  placeholder="Who to call"
-                  aria-label="Contact name"
-                  className="w-full"
-                />
-              </Field>
-            </div>
+            <Field label="Contact">
+              <TextInput
+                value={contactName}
+                onValueChange={setContactName}
+                placeholder="Who to call"
+                aria-label="Contact name"
+                className="w-full"
+              />
+            </Field>
 
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
               <Field label="Phone">

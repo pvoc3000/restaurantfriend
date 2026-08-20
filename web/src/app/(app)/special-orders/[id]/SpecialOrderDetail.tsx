@@ -40,6 +40,7 @@ import { OrderActions } from "@/components/specialOrders/OrderActions";
 import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
 import { TimeCell } from "@/components/specialOrders/TimeCell";
 import { StandingOrderBlock } from "@/components/specialOrders/StandingOrderBlock";
+import { LinkCustomer } from "@/components/specialOrders/LinkCustomer";
 import { OrderInfoLayout, OrderSplitLayout } from "@/components/specialOrders/OrderInfoLayout";
 import { OrderDocuments } from "@/components/specialOrders/OrderDocuments";
 import { SendDocument } from "@/components/specialOrders/SendDocument";
@@ -470,20 +471,39 @@ export async function SpecialOrderDetail({
                 <section className="space-y-3">
                     <SectionHeading>Customer</SectionHeading>
                     <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
+                      {/* THE LINK GOES BOTH WAYS NOW. Until 2026-08-18 the
+                          only writer of `customer_id` was "New order for them"
+                          on the customer record, so an order that started as a
+                          lead — every phone order, and everything the inquiry
+                          form will create — said "None linked" forever with
+                          nothing to press. */}
                       <Row label="Customer">
-                        {customer ? (
-                          <Link
-                            href={withFrom(`/customers/${customer.id}`, {
-                              href: orderTabHref(id, "info", rawParams),
-                              label: `#${row.number as string}`,
-                            })}
-                            className={`${READ_ONLY_VALUE} underline underline-offset-2 hover:text-ink`}
-                          >
-                            {customerLabel(customer)}
-                          </Link>
-                        ) : (
-                          <span className={`${READ_ONLY_VALUE} text-faint`}>None linked</span>
-                        )}
+                        <span className="flex flex-wrap items-center gap-3">
+                          {customer ? (
+                            <Link
+                              href={withFrom(`/customers/${customer.id}`, {
+                                href: orderTabHref(id, "info", rawParams),
+                                label: `#${row.number as string}`,
+                              })}
+                              className={`${READ_ONLY_VALUE} underline underline-offset-2 hover:text-ink`}
+                            >
+                              {customerLabel(customer)}
+                            </Link>
+                          ) : (
+                            <span className={`${READ_ONLY_VALUE} text-faint`}>None linked</span>
+                          )}
+                          <LinkCustomer
+                            orderId={id}
+                            orgId={row.org_id as string}
+                            currentCustomerId={(row.customer_id as string | null) ?? null}
+                            contact={{
+                              name: row.contact_name as string | null,
+                              phone: row.contact_phone as string | null,
+                              email: row.contact_email as string | null,
+                            }}
+                            canWrite={canWrite}
+                          />
+                        </span>
                       </Row>
                       <Row label="Their phone">
                         <span className={READ_ONLY_VALUE}>{customer?.phone ?? "—"}</span>

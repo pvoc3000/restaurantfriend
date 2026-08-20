@@ -3301,6 +3301,38 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    hands, and a null rate stays NULL rather than being defaulted to a number
    invented in code — the record's own Tax rate cell is right there.
 
+   **(k) AN ORDER COULD NOT BE GIVEN A CUSTOMER** (Mark, 2026-08-18: "how am I
+   supposed to link a customer to the order?"). The only writer of
+   `customer_id` in the whole app was "New order for them" on the customer
+   record, which sets it at CREATION — so the link existed in one direction
+   only, and an order that began as a lead (every phone order, and everything
+   decision 18's inquiry form will create) said "None linked" forever with
+   nothing to press. `LinkCustomer` is `InventoryItemPicker`'s shape, built for
+   the same reason that one was.
+   A SEARCH BOX, not a `PickList`: there are 5,874 customers and a picker loads
+   its options up front. It searches five columns in one `or()` — and **the
+   phone is matched on its DIGIT RUNS rather than as text**, which is not
+   fussiness: stored `(323) 337-7966`, pasted `(323) 337`, and a plain `ilike`
+   finds NOTHING, because the parentheses have to be stripped to keep them out
+   of PostgREST's `or` list and stripping them leaves spaces the record does not
+   have. `*323*337*` is indifferent to punctuation, which the real data needs —
+   it holds `3233833742`, `310.721.5994` and `323) 485-2621`.
+   It also offers **New customer from this order's contact**, because the common
+   case is somebody ringing who turns out to be new and whose name and number
+   are already typed into the order; sending them to `/customers` to type it a
+   second time is the transcription the customer record exists to avoid.
+   **(l) WHEN IT IS WANTED IS REQUIRED ON A REAL ORDER** (Mark, 2026-08-18).
+   The create form asked for a title and nothing else, on the reasoning that a
+   lead acquires the rest as the conversation happens. True of the customer, the
+   lines and the money; false of WHEN — the kitchen sheet prints the pickup time
+   as its most prominent field, the attention queue measures every threshold in
+   days before the event, and an order nobody can date cannot be scheduled or
+   chased. **The date is required with it**, which is forced rather than chosen:
+   a time with no date says nothing. **Both are asked only of `kind = order`** —
+   a template is a shape with no event and a standing order recurs by weekday,
+   so demanding a date would make those two kinds uncreatable. The form had no
+   time field at all before this; `ui/TimeField` is new and in the parts table.
+
    **(i) "ALSO THAT DAY" IS SCOPED TO THE KITCHEN** (Mark, 2026-08-17: "I
    assume you're only displaying orders for the same kitchen" — it wasn't).
    The block exists to stop a supervisor double-booking a KITCHEN, so another
@@ -3846,6 +3878,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | **`ui/FilterMenus`** + `lib/filterMenus` | several `TabPicker`s stacked, or a row of hand-wired `PickList`s | a list filtering on THREE OR MORE dimensions AT ONCE — a row of labelled popup menus that AND together ("FilterMenus" is the name to call it by; NOT `catalog/ListFilters`, which is the older fixed search+category+active row). A dimension declares `matches`, never a pre-filtered list, which is what makes the option counts CONDITIONED ON THE OTHER MENUS (and never on their own, or every option but the chosen one reads 0). "All" is supplied, not declared; the bar owns the result count and a Clear, because four collapsed menus can hide a list while the screen looks unfiltered. Values live in the URL via `parseFilterValues`/`filterHref` + `history.replaceState`, and a value no option offers is DROPPED rather than obeyed. ONE dimension stays a `TabPicker` — this is not a replacement for it |
   | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
   | `ui/DateField` | `<input type="date">` | EVERY date box. Carries the Safari empty-date apparatus (see the date bullet); `InlineValue kind="date"` wraps it, and a create form uses it directly |
+  | `ui/TimeField` | `<input type="time">`, or a `TextInput` you parse | a time of day in a CREATE form, where the box starts empty and the value is required — `type="time"` yields `HH:MM` or nothing, so a half-typed value can never reach a `time` column as a cast error. It carries NO empty-state apparatus, deliberately: DateField needs one because WebKit paints TODAY into an empty date, and an empty time renders as placeholder segments. An edit-in-place cell on a value already set stays `TimeCell`, which takes free text and lets Postgres parse it |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
   | `ui/Switch` | a rounded div you style yourself | every switch. Black on, and off is the EXACT inverse; `size="sm"` for a dense grid row. Presentational only — the write, the optimism and the error state belong to the caller, because `ActiveToggle` and the recipe sheet's AUTO switch disagree about all three |
   | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory |
