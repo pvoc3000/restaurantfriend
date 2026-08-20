@@ -3495,7 +3495,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    re-pasting it would have worked; the ledger is the reason not to.
    The trigger has to be RECREATED, not just the function: `create or replace`
    on a function does not widen the events its trigger fires on.
-   **056 (NEEDS APPLYING) makes "Taken by" report as ONE field.** Found by using
+   **056 IS APPLIED** (Mark, 2026-08-20) and the whole log was walked live
+   afterwards on a throwaway order, one path at a time: create → "Order started
+   as a lead"; pick from the roster → **"Taken by set to Mark Trombino"**, one
+   line, which is 056 working; a title edit → "Order name changed from … to …";
+   add a line → "Added 12 × Angry Samoa"; edit its quantity → "Angry Samoa —
+   quantity changed from 12.00 to 24.00"; remove it → "Removed 24 × Angry
+   Samoa". Order deleted afterwards, leaving 8,330 and 47,819 lines.
+   Known cosmetic residue, NOT fixed: a numeric column renders through
+   `to_jsonb`, so a quantity reads **"12.00"** rather than "12". Trimming
+   trailing zeros generally would turn money into "5.1", which is worse, so the
+   fix is per-column in `special_order_value_label` and is a migration nobody
+   needs today.
+   **056 makes "Taken by" report as ONE field.** Found by using
    it minutes after 055 went in: picking somebody from the roster writes both
    halves in one statement — the link set, the superseded text cleared — and
    both carry the label "Taken by", so the entry came out **"Taken by cleared
