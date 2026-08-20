@@ -12,6 +12,8 @@ import { DateField } from "@/components/ui/DateField";
 import { TimeField } from "@/components/ui/TimeField";
 import { KIND_LABEL, type SpecialOrderKind } from "@/lib/specialOrders";
 import { createSpecialOrder } from "@/lib/createSpecialOrder";
+import { CustomerPicker, type CustomerChoice } from "./CustomerPicker";
+import { draftIsUsable } from "@/lib/customerSearch";
 
 /**
  * Start an order — `NewEmployee`'s template, which CLAUDE.md names as the one
@@ -58,9 +60,7 @@ export function NewSpecialOrder({
   const [eventTime, setEventTime] = useState<string | null>(null);
   const [kitchenId, setKitchenId] = useState("");
   const [locationId, setLocationId] = useState(defaultLocationId ?? "");
-  const [contactName, setContactName] = useState("");
-  const [contactPhone, setContactPhone] = useState("");
-  const [contactEmail, setContactEmail] = useState("");
+  const [customer, setCustomer] = useState<CustomerChoice>(null);
 
   /**
    * WHEN IT IS WANTED IS REQUIRED ON A REAL ORDER (Mark, 2026-08-18: "Event
@@ -83,8 +83,17 @@ export function NewSpecialOrder({
    * uncreatable.
    */
   const needsWhen = kind === "order";
+  /**
+   * A customer is OPTIONAL — a lead often is just "somebody rang about a
+   * wedding" — but a customer being DESCRIBED has to be describable: a draft
+   * with neither a name nor a company would be written as an empty row nobody
+   * could ever find again.
+   */
+  const customerOk = customer?.kind !== "new" || draftIsUsable(customer.draft);
   const ready =
-    title.trim() !== "" && (!needsWhen || (eventDate !== null && eventTime !== null));
+    title.trim() !== "" &&
+    customerOk &&
+    (!needsWhen || (eventDate !== null && eventTime !== null));
 
   function reset() {
     setKind("order");
@@ -93,9 +102,7 @@ export function NewSpecialOrder({
     setEventTime(null);
     setKitchenId("");
     setLocationId(defaultLocationId ?? "");
-    setContactName("");
-    setContactPhone("");
-    setContactEmail("");
+    setCustomer(null);
     setFailed(null);
   }
 
@@ -119,9 +126,8 @@ export function NewSpecialOrder({
         eventTime,
         locationId,
         kitchenLocationId: kitchenId,
-        contactName,
-        contactPhone,
-        contactEmail,
+        customerId: customer?.kind === "existing" ? customer.id : null,
+        newCustomer: customer?.kind === "new" ? customer.draft : null,
       });
       if ("error" in result) {
         setFailed(result.error);
@@ -180,6 +186,14 @@ export function NewSpecialOrder({
                 below it is a real PAIR — the two halves of "when", decision 8's
                 two shops, and the two ways to reach somebody — so no row is
                 three fields wide with a hole in it. */}
+            {/* WHO IS ORDERING, which is what you know when the phone rings.
+                This replaced Contact / Phone / Email, and those wrote the
+                DAY-OF contact — a different person on a corporate order, and
+                genuinely a later detail. The record still has all three. */}
+            <Field label="Customer">
+              <CustomerPicker value={customer} onChange={setCustomer} disabled={pending} />
+            </Field>
+
             <div className="grid grid-cols-2 gap-x-6 gap-y-4">
               <Field label="Kind">
                 <PickList
@@ -266,28 +280,9 @@ export function NewSpecialOrder({
               </Field>
             </div>
 
-            <Field label="Contact">
-              <TextInput
-                value={contactName}
-                onValueChange={setContactName}
-                placeholder="Who to call"
-                aria-label="Contact name"
-                className="w-full"
-              />
-            </Field>
-
-            <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-              <Field label="Phone">
-                <TextInput value={contactPhone} onValueChange={setContactPhone} aria-label="Contact phone" className="w-full" />
-              </Field>
-              <Field label="Email">
-                <TextInput value={contactEmail} onValueChange={setContactEmail} aria-label="Contact email" className="w-full" />
-              </Field>
-            </div>
-
             <p className="text-[13px] text-muted">
-              The customer, the lines and the money are set on the record. An
-              order starts as a <strong>lead</strong>.
+              The lines, the money and the day-of contact are set on the
+              record. An order starts as a <strong>lead</strong>.
             </p>
 
             {failed && <p className="text-sm text-accent">{failed}</p>}

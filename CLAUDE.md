@@ -3301,6 +3301,23 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    hands, and a null rate stays NULL rather than being defaulted to a number
    invented in code — the record's own Tax rate cell is right there.
 
+   **(m) THE CREATE DIALOG ASKS WHO IS ORDERING, not who to call** (Mark,
+   2026-08-18: "we should be able to set the customer when creating a special
+   order. Remove the contact, phone and email and add the ability to link or
+   create a new contact"). Those three boxes wrote `contact_*` — the DAY-OF
+   contact, which on a corporate order is whoever is running the party and is
+   genuinely a later detail. WHO IS ORDERING is what you know when the phone
+   rings, and it was the one thing the form could not record. All three survive
+   on the record.
+   **`CustomerPicker` WRITES NOTHING.** A create dialog that has already made a
+   customer by the time you press Cancel is a dialog that lies about what Cancel
+   means, so a new customer is held as a DRAFT and `createSpecialOrder` writes
+   it in the same act as the order — which also makes it impossible for an order
+   to end up pointing at a customer that failed to save. Verified: typing a name
+   into the form leaves `customers` at 5,874, and only Create moves it.
+   The QUERY lives in `lib/customerSearch` because two screens ask it — this and
+   the record's `LinkCustomer` — and it is the half with a rule in it. The UI
+   differs legitimately; the search must not.
    **(k) AN ORDER COULD NOT BE GIVEN A CUSTOMER** (Mark, 2026-08-18: "how am I
    supposed to link a customer to the order?"). The only writer of
    `customer_id` in the whole app was "New order for them" on the customer

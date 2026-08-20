@@ -29,6 +29,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 import type { SpecialOrderKind } from "./specialOrders";
+import { draftIsUsable, draftToRow, type CustomerDraft } from "./customerSearch";
 
 export type NewSpecialOrderInput = {
   /** EXPLICIT, always. No table in this schema defaults `org_id`, and a WITH
@@ -46,6 +47,15 @@ export type NewSpecialOrderInput = {
   /** Decision 8: where it is MADE. Genuinely undecided on most new leads. */
   kitchenLocationId?: string | null;
   customerId?: string | null;
+  /**
+   * A customer described in the create dialog but not yet written.
+   *
+   * IT IS WRITTEN HERE, in the same act as the order, so that a dialog which
+   * can be cancelled leaves nothing behind — and so no order can end up
+   * pointing at a customer that failed to save. Ignored when `customerId` is
+   * set; the picker only ever produces one of the two.
+   */
+  newCustomer?: CustomerDraft | null;
   contactName?: string | null;
   contactPhone?: string | null;
   contactEmail?: string | null;
@@ -107,6 +117,24 @@ export async function createSpecialOrder(
   const locationId = orNull(input.locationId);
   const taxRate = await pickupTaxRate(supabase, locationId);
 
+  // The customer FIRST, because the order carries its id. A failure here stops
+  // the whole thing rather than quietly producing an order with nobody on it,
+  // which is the state this argument exists to prevent.
+  let customerId = input.customerId ?? null;
+  if (!customerId && input.newCustomer && draftIsUsable(input.newCustomer)) {
+    const { data: made, error: customerError } = await supabase
+      .from("customers")
+      .insert(draftToRow(input.newCustomer, input.orgId))
+      .select("id")
+      .single();
+    if (customerError || !made) {
+      return {
+        error: customerError?.message ?? "The customer could not be created.",
+      };
+    }
+    customerId = made.id as string;
+  }
+
   const { data, error } = await supabase
     .from("special_orders")
     .insert({
@@ -122,7 +150,7 @@ export async function createSpecialOrder(
       location_id: locationId,
       kitchen_location_id: orNull(input.kitchenLocationId),
       tax_rate: taxRate,
-      customer_id: input.customerId ?? null,
+      customer_id: customerId,
       contact_name: orNull(input.contactName),
       contact_phone: orNull(input.contactPhone),
       contact_email: orNull(input.contactEmail),

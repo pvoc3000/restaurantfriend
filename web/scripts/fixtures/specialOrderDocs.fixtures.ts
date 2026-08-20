@@ -45,6 +45,12 @@ import {
   resolveAppBase,
 } from "../../src/lib/specialOrderSend";
 import { orderTotals } from "../../src/lib/specialOrders";
+import {
+  customerSearchClauses,
+  draftIsUsable,
+  draftToRow,
+  splitName,
+} from "../../src/lib/customerSearch";
 
 /* -------------------------------------------------------------------------- */
 /* Factories                                                                   */
@@ -484,4 +490,78 @@ test("approvalUrl survives a trailing slash on either source", () => {
     approvalUrl("abc", "https://restaurantfriend.vercel.app/"),
     "https://restaurantfriend.vercel.app/q/abc"
   );
+});
+
+/* -------------------------------------------------------------------------- */
+/* Finding a customer                                                          */
+/* -------------------------------------------------------------------------- */
+
+test("a phone number is matched on its DIGIT RUNS, not as text", () => {
+  // The bug (measured 2026-08-18): stored `(323) 337-7966`, pasted
+  // `(323) 337` — a plain ilike found NOTHING, because the parentheses have to
+  // come out to keep them from breaking PostgREST's comma-separated `or` list,
+  // and taking them out leaves spaces the record does not have.
+  const phoneClause = (t: string) =>
+    customerSearchClauses(t).find((c) => c.startsWith("phone."));
+
+  eq(phoneClause("(323) 337-7966"), "phone.ilike.*323*337*7966*");
+  eq(phoneClause("(323) 337"), "phone.ilike.*323*337*");
+  eq(phoneClause("323 337"), "phone.ilike.*323*337*");
+  eq(phoneClause("337-7966"), "phone.ilike.*337*7966*");
+  // All four are the SAME pattern shape, which is the point: whatever
+  // punctuation either side used, the digits line up.
+  eq(phoneClause("(323) 337"), phoneClause("323 337"));
+});
+
+test("a name is not treated as a phone, and two digits are not either", () => {
+  no(customerSearchClauses("David").some((c) => c.startsWith("phone.")));
+  // Under three digits a "phone match" is every customer whose number
+  // contains a 7.
+  no(customerSearchClauses("77").some((c) => c.startsWith("phone.")));
+  ok(customerSearchClauses("777").some((c) => c.startsWith("phone.")));
+});
+
+test("commas and parentheses can never break out of the or() list", () => {
+  // Each clause is one `column.op.value` — a stray comma would split it into
+  // two filters and change what the query means.
+  for (const clause of customerSearchClauses("a,b)c( 999")) {
+    const value = clause.slice(clause.indexOf(".ilike.") + 7);
+    no(value.includes(","), `no comma in ${clause}`);
+    no(value.includes("("), `no paren in ${clause}`);
+    no(value.includes(")"), `no paren in ${clause}`);
+  }
+});
+
+test("a name splits on the LAST space, and a lone word is a SURNAME", () => {
+  eq(splitName("Alexandra David"), { first: "Alexandra", last: "David" });
+  // Not "Mary" + "Jo Alvarez" — the middle name stays with the first.
+  eq(splitName("Mary Jo Alvarez"), { first: "Mary Jo", last: "Alvarez" });
+  // The roster sorts and searches on `last_name`, so a one-word name put in
+  // `first_name` would be invisible in the place people look for it.
+  eq(splitName("Cher"), { first: null, last: "Cher" });
+  eq(splitName("   "), { first: null, last: null });
+});
+
+test("a customer needs a name OR a company — either will do", () => {
+  // `NewCustomer`'s own rule, kept identical so the two doors agree: Cafe
+  // Knotted is a customer whose contact nobody has asked for yet.
+  ok(draftIsUsable({ name: "Alexandra David", company: "", phone: "", email: "" }));
+  ok(draftIsUsable({ name: "", company: "Cafe Knotted", phone: "", email: "" }));
+  no(draftIsUsable({ name: "", company: "", phone: "(323) 337-7966", email: "x@y.z" }));
+  no(draftIsUsable({ name: "  ", company: " ", phone: "", email: "" }));
+});
+
+test("a draft becomes a row with the email folded and blanks nulled", () => {
+  const row = draftToRow(
+    { name: "Alexandra David", company: "", phone: " (323) 337-7966 ", email: " Alex@Example.COM " },
+    "org-1"
+  );
+  eq(row.org_id, "org-1", "explicit — design rule 1");
+  eq(row.first_name, "Alexandra");
+  eq(row.last_name, "David");
+  eq(row.company, null, "an empty box is null, not an empty string");
+  eq(row.phone, "(323) 337-7966");
+  // Folded, so the same address typed two ways is one customer to a search.
+  eq(row.email, "alex@example.com");
+  eq(row.source, "app");
 });
