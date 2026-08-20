@@ -3346,6 +3346,65 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    app-created order is **#10000** ("test order"). Everything Claude created
    while verifying was deleted.
 
+   **(n) THE ORDER STARTS KNOWING FOUR THINGS IT USED TO HAVE TO BE TOLD, and
+   the ITEM stopped being read-only** (Mark, 2026-08-19, four notes in one).
+   **A CUSTOMER'S DETAILS BECOME THE ORDER'S DAY-OF CONTACT.** They are two
+   different facts — `customers` is who the order BELONGS TO, `contact_*` is
+   who to ring on the day, which on a corporate order is whoever is running the
+   party and is why (m) stopped asking for it — and they are the same fact nine
+   times out of ten. Seeded once in `createSpecialOrder`, per FIELD ("if it
+   exists"), never slaved: editing the customer next month must not rewrite who
+   to call about an order already quoted. Both doors get it because the read
+   lives in the shared creator, which is what that module exists for — the
+   customer record has the row on screen and the list's picker has only a
+   label. `contactNameFor` leads with the PERSON where `customerLabel` leads
+   with the company: "Cafe Knotted (Jane Doe)" is not somebody you ask for on
+   the phone. **`date_initiated` IS WRITTEN AT LAST** — the date the quote's
+   signature band prints and the head of the completion dates, and nothing had
+   ever set it, so every app-made order carried a blank where all 8,330
+   migrated ones carry FileMaker's `Date_Created`. It takes the ORG's calendar
+   day (`lib/today`, passed in — both callers already held it), and the live
+   test proves why: a real create at 04:16 UTC wrote **2026-08-19** while
+   `created_at` says 2026-08-20, so a browser clock or a UTC host would have
+   dated it tomorrow.
+   **THE ADD-ITEM PANEL'S `Done` IS BLACK** ("a real black button") — the
+   panel-commit exception rather than a breach of it, the receiving screen's
+   `Complete` argument: the chooser produces ONE outcome and Done is the only
+   way out of it, so it is a commit standing beside no peers. It had been an
+   underlined phrase, which gave the control that closes the thing less weight
+   than the Add button on every row.
+   **THE FIVE TAXONOMY FIELDS ARE EDITABLE** ("We need to be able to edit the
+   fields of an item after it has been added"). Donut · type · cut · finish ·
+   size were plain text, so the fields that decide what the KITCHEN DOCUMENT
+   says were the only ones on the row nobody could correct — and they are the
+   likeliest to need it, arriving as a snapshot of a menu item that is only
+   approximately the thing being ordered. Same line, same `·` separators, each
+   a `PickList` over the live menu's own distinct values with `allowNew`.
+   **THE LETTER IS THE CUT** ("If the item is a letter donut, the app should
+   allow the user to select the cut that represents the actual letter"), and
+   that is a measurement: FileMaker put the character IN the cut, so of the
+   9,926 migrated letter lines 8,991 read `Letter - "A"` — the canonical
+   spelling `letterCut` writes, against `Letter "A"` and `Letter. "A"`, which
+   `cutLetter` reads but never writes. So an option's VALUE is the composed cut
+   and choosing the letter IS choosing the cut; nothing is composed at write
+   time. The character set is the real one — all 26 letters, all 10 digits, and
+   `<3` (277 lines), `!` (160), `+`, `&`, `?`, `-`; rarer ones (`OP`, `AB`, one
+   line each) are why `allowNew` stays. **The letter group appears ONLY on a
+   letter line**, where it LEADS (it is what you opened the list for) and the
+   letter-family subtypes come out of the cuts beneath it, or the same donut is
+   offered twice under two spellings. A BARE `Letter` IS A REAL STATE, never
+   inferred — 935 lines are an order for letters whose word nobody has settled
+   — so it stays pickable and the row says "(no letter yet)" in the mark
+   colour. A chosen letter renders as the character alone under a static
+   "Letter", because `Letter - "D"` in a row of five values is four words of
+   packaging around the one that matters. `lib/specialOrderLines`, 21 fixtures,
+   each rule checked by breaking it. Verified against real order **#7769**,
+   which spells HAPPY BIRTHDAY VINNY: 21 lines, every character ticked in its
+   own picker, and the order left as found.
+   Not done, and worth asking about: **`LinkCustomer` does not seed the
+   contact.** Linking a customer to an EXISTING order is the same idea, and
+   overwriting a day-of contact somebody has already typed is not.
+
    **(m) THE CREATE DIALOG ASKS WHO IS ORDERING, not who to call** (Mark,
    2026-08-18: "we should be able to set the customer when creating a special
    order. Remove the contact, phone and email and add the ability to link or

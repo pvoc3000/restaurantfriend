@@ -121,6 +121,16 @@ async function pickupTaxRate(
 /** The three `contact_*` values, as they are stored. */
 type Contact = { name: string | null; phone: string | null; email: string | null };
 
+/** The columns of a customer this reads. Named so the existing-customer branch
+ *  can type its select without casting through the function's own signature. */
+type ContactSource = {
+  first_name?: string | null;
+  last_name?: string | null;
+  company?: string | null;
+  phone?: string | null;
+  email?: string | null;
+};
+
 /**
  * THE CUSTOMER'S DETAILS BECOME THE ORDER'S CONTACT (Mark, 2026-08-19: "The
  * customer contact info should be copied to the contact name, phone, and email
@@ -147,13 +157,7 @@ type Contact = { name: string | null; phone: string | null; email: string | null
  */
 function contactFrom(
   given: { name?: string | null; phone?: string | null; email?: string | null },
-  customer: {
-    first_name?: string | null;
-    last_name?: string | null;
-    company?: string | null;
-    phone?: string | null;
-    email?: string | null;
-  } | null
+  customer: ContactSource | null
 ): Contact {
   return {
     name: orNull(given.name) ?? (customer ? contactNameFor(customer) : null),
@@ -224,7 +228,7 @@ export async function createSpecialOrder(
       .maybeSingle();
     contact = contactFrom(
       { name: input.contactName, phone: input.contactPhone, email: input.contactEmail },
-      found as Parameters<typeof contactFrom>[1]
+      (found as ContactSource | null) ?? null
     );
   }
 

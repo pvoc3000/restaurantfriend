@@ -128,35 +128,44 @@ export function cutLetter(cut: string | null | undefined): string | null {
 /**
  * The cut options for one line.
  *
- * Two groups, and the second appears ONLY for a letter donut:
+ * Two groups, and the first appears ONLY for a letter donut:
  *
- *   · **Cut** — every distinct subtype the live menu carries, which is what a
- *     cut is elsewhere in the app (`production_items.subtype`).
  *   · **Letter** — one option per character, whose VALUE is the composed cut.
  *     So choosing the letter IS choosing the cut, which is Mark's sentence
  *     exactly, and no composition happens at write time: the cell writes the
  *     option's value into `item_cut` like any other pick cell.
+ *   · **Cut** — every distinct subtype the live menu carries, which is what a
+ *     cut is everywhere else in the app (`production_items.subtype`).
  *
- * Hiding the letters on a non-letter line is the whole of the care. A donut
+ * HIDING THE LETTERS ON A NON-LETTER LINE IS THE WHOLE OF THE CARE. A donut
  * that is not cut into a character has no letter to choose, and forty-two
- * options that mean nothing to it would bury the eight that do. You get there
- * by choosing `Letter` from the first group, which the menu carries (56 of the
+ * options that mean nothing to it would bury the twenty-two that do. You get
+ * there by choosing `Letter` from the cuts, which the menu carries (56 of the
  * 307 items) — one extra step, taken only when you are deliberately turning a
  * ring into a letter.
+ *
+ * WHEN THEY DO APPEAR THEY LEAD, because on a letter line the character is the
+ * only thing you opened the list to change; behind twenty-two cuts it is a
+ * scroll or a search away. The cuts stay listed under them, which is how you
+ * leave.
+ *
+ * And the letter-family SUBTYPES come out of the cuts while the group is
+ * showing — `Letter` and `Letter "<3"` are what the Letter group is made of,
+ * so listing them twice would offer the same donut under two spellings, one of
+ * them not the canonical one.
  */
 export function cutOptions(
   menu: readonly TaxonomySource[],
   current: string | null | undefined
 ): PickOption[] {
-  const cuts = distinct(menu.map((m) => m.subtype)).map((value) => ({
-    value,
-    label: value,
-    group: "Cut",
-  }));
-  if (!isLetterCut(current)) return cuts;
+  const subtypes = distinct(menu.map((m) => m.subtype));
+  const letters = isLetterCut(current);
+  const cuts = subtypes
+    .filter((value) => !letters || !isLetterCut(value))
+    .map((value) => ({ value, label: value, group: "Cut" }));
+  if (!letters) return cuts;
 
   return [
-    ...cuts,
     // The bare family, kept reachable: 935 real lines are a letter order whose
     // character has not been decided, and that is a state you must be able to
     // return a line to.
@@ -169,6 +178,7 @@ export function cutOptions(
       hint: LETTER_HINT[c],
       group: "Letter",
     })),
+    ...cuts,
   ];
 }
 

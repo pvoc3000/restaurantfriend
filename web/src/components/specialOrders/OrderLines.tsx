@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useRef, useState, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -13,6 +13,13 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { AddOrderLine, type MenuItem } from "./AddOrderLine";
 import { isProductionLine, lineTotal, money } from "@/lib/specialOrders";
+import {
+  cutLetter,
+  cutOptions,
+  donutOptions,
+  isLetterCut,
+  taxonomyOptions,
+} from "@/lib/specialOrderLines";
 
 export type OrderLineRow = {
   id: string;
@@ -38,6 +45,22 @@ export type OrderLineRow = {
  * and a customized name is what a special order IS. `production_item_id` stays
  * on the row as the link back — it is provenance and the route to the kitchen
  * (decision 9), never the source of what prints.
+ *
+ * THE TAXONOMY UNDER THE NAME IS EDITABLE TOO (Mark, 2026-08-19: "We need to
+ * be able to edit the fields of an item after it has been added"). Donut, type,
+ * cut, finish and size were rendered as plain text, so the five fields that
+ * decide what the KITCHEN DOCUMENT says were the only ones on the row nobody
+ * could correct — and they are the ones most likely to need it, because they
+ * arrive as a snapshot of a menu item that is only ever approximately the thing
+ * being ordered. Each is a `PickList` over the live menu's own distinct values
+ * with `allowNew`, which is the app's rule for a vocabulary that legitimately
+ * grows: the catalog is the vocabulary, and a customized line may say something
+ * the catalog does not.
+ *
+ * THE CUT IS WHERE A LETTER DONUT'S LETTER LIVES — `lib/specialOrderLines`
+ * carries the measurement and the rule; the cell here just offers what that
+ * module returns, so a letter donut's cut list grows a Letter group and every
+ * other line's does not.
  *
  * A `Misc*` LINE IS MONEY, NOT PRODUCTION. It counts toward every figure on the
  * totals card and is excluded from the kitchen document and the production
@@ -225,12 +248,17 @@ export function OrderLines({
                     )}
                     {/* The taxonomy under the customized name — what the
                         kitchen document prints beneath it, and the only way to
-                        tell four "Angry Samoa" lines apart. */}
-                    <span className="block text-[12px] text-subtle">
-                      {[row.item_donut, row.item_type, row.item_cut, row.item_finish, row.item_size]
-                        .filter(Boolean)
-                        .join(" · ") || "—"}
-                    </span>
+                        tell four "Angry Samoa" lines apart. Editable in place
+                        since 2026-08-19; see the header. */}
+                    {canWrite ? (
+                      <LineTaxonomy row={row} menu={menu} />
+                    ) : (
+                      <span className="block text-[12px] text-subtle">
+                        {[row.item_donut, row.item_type, row.item_cut, row.item_finish, row.item_size]
+                          .filter(Boolean)
+                          .join(" · ") || "—"}
+                      </span>
+                    )}
                     {!production ? (
                       <span className="block text-[12px] text-mark">
                         Money only — this never reaches the kitchen
@@ -376,3 +404,103 @@ export function OrderLines({
     </section>
   );
 }
+
+/**
+ * The five snapshot fields, on one line, each a pick cell.
+ *
+ * ONE LINE AND THE SAME SEPARATORS, because it is the same sentence it always
+ * was — "Bananaversary · Raised · Letter D · Plain · Regular" is how this row
+ * has read since the module shipped and how the kitchen sheet prints it. Every
+ * slot shows even when empty, so the fields do not shuffle about as they are
+ * filled in; an empty one is a faint em dash you can click.
+ *
+ * ALL FIVE CARRY `allowNew`. The vocabulary is whatever the live menu says,
+ * which is honest and is not exhaustive: decision 5 makes a line a customized
+ * COPY, so "Raised, but baked" has to be typeable. Clearing is offered because
+ * the columns are nullable and empty is a real value — 27,808 migrated lines
+ * carry no taxonomy at all.
+ *
+ * THE CUT IS THE ONE WITH A RULE IN IT. Its options come from `cutOptions`,
+ * which adds the characters ONLY when this line is already a letter donut — so
+ * choosing the letter IS choosing the cut, and a Promise Ring is not offered
+ * forty-two characters that mean nothing to it.
+ *
+ * A CHOSEN LETTER SHOWS AS THE CHARACTER, under a static "Letter" beside it.
+ * `Letter - "D"` set in a row of five values is four words of packaging around
+ * the one that matters, and the packaging is the same on every letter line —
+ * so the word is written once, plainly, and the cell holds the D. The stored
+ * value is unchanged and the picker still says it in full. On a line whose
+ * character is still open the cell reads "Letter" itself and there is no
+ * prefix, or it would say the word twice.
+ */
+function LineTaxonomy({ row, menu }: { row: OrderLineRow; menu: MenuItem[] }) {
+  const cell = "text-[12px] text-subtle";
+  const isLetter = isLetterCut(row.item_cut);
+  const letter = cutLetter(row.item_cut);
+
+  return (
+    <span className="flex flex-wrap items-baseline gap-x-1 text-[12px] text-subtle">
+      <Slot>
+        <InlineValue
+          table="special_order_items" id={row.id} column="item_donut" kind="pick"
+          value={row.item_donut} options={donutOptions(menu)} allowNew
+          ariaLabel={`Donut on ${row.name}`} className={cell}
+        />
+      </Slot>
+      <Sep />
+      <Slot>
+        <InlineValue
+          table="special_order_items" id={row.id} column="item_type" kind="pick"
+          value={row.item_type} options={taxonomyOptions(menu, "item_type")} allowNew
+          ariaLabel={`Type of ${row.name}`} className={cell}
+        />
+      </Slot>
+      <Sep />
+      {/* The static half of a letter cut — see the header. */}
+      {isLetter && letter ? <span>Letter</span> : null}
+      <Slot>
+        <InlineValue
+          table="special_order_items" id={row.id} column="item_cut" kind="pick"
+          value={row.item_cut} options={cutOptions(menu, row.item_cut)} allowNew
+          ariaLabel={
+            isLetter
+              ? letter
+                ? `Letter on ${row.name} — currently ${letter}`
+                : `Letter on ${row.name} — none chosen yet`
+              : `Cut of ${row.name}`
+          }
+          className={cell}
+        />
+      </Slot>
+      {/* Said in words on a letter line whose character is still open. A bare
+          "Letter" is a legitimate state — 935 real lines are exactly that, an
+          order for letters whose word nobody has settled — so this is a note in
+          the mark colour rather than a red one. */}
+      {isLetter && !letter ? <span className="text-mark">(no letter yet)</span> : null}
+      <Sep />
+      <Slot>
+        <InlineValue
+          table="special_order_items" id={row.id} column="item_finish" kind="pick"
+          value={row.item_finish} options={taxonomyOptions(menu, "finish")} allowNew
+          ariaLabel={`Finish on ${row.name}`} className={cell}
+        />
+      </Slot>
+      <Sep />
+      <Slot>
+        <InlineValue
+          table="special_order_items" id={row.id} column="item_size" kind="pick"
+          value={row.item_size} options={taxonomyOptions(menu, "size")} allowNew
+          ariaLabel={`Size of ${row.name}`} className={cell}
+        />
+      </Slot>
+    </span>
+  );
+}
+
+/** One field's box. `min-w-0` so a long donut name wraps rather than pushing
+ *  the money columns sideways. */
+function Slot({ children }: { children: ReactNode }) {
+  return <span className="min-w-0">{children}</span>;
+}
+
+const Sep = () => <span className="text-faint">·</span>;
