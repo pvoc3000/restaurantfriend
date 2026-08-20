@@ -81,17 +81,30 @@ export function OrderTotals({
     <section className="space-y-2">
       <SectionHeading>Money</SectionHeading>
 
-      {/* ONE COLUMN, since 2026-08-19 — this block is now half of a row rather
-          than the full width of the page (Mark: "put Payments and Money
-          sections in two separate columns side by side"), and the two `dl`s
-          were laid out for the width it used to have.
+      {/* TWO COLUMNS AGAIN, AND STILL HARD RIGHT (Mark, 2026-08-19: "split it
+          into two columns. The first column includes tax rate through 'ignore
+          the balance', the second column 'items' through 'Balance'. Both
+          columns still all the way to the right").
 
-          It reads better stacked anyway: the inputs are what you SET and the
-          figures are what they COME TO, so one under the other is the sentence.
-          Side by side inside a 384px column they were two 168px tracks, which
-          puts "Delivery charge" on two lines. `max-w` caps it below `xl`, where
-          the row stacks and this would otherwise run the width of the page. */}
-      <div className="max-w-[26rem] space-y-6">
+          That split is the two `dl`s exactly as they were written: what you SET
+          on the left, what it COMES TO on the right. It was stacked earlier the
+          same day because the block had just become half of a row and the pair
+          would not fit; a DEFINITE WIDTH is what buys it back — 512px, so each
+          track is 240 and neither label wraps, and the block still sizes itself
+          rather than taking a share of the row, which is what keeps its right
+          edge on the page margin beside a flexible Payments.
+
+          `max-w` and not a fixed `w`: below `xl` this block is stacked under
+          Payments at the full width of the page, where two 400px tracks would
+          put half a foot of white space between "Delivery charge" and its
+          figure — the same complaint that started all of this. Capped, the pair
+          reads the same at every width.
+
+          `gap-x-8` rather than the 48px it used to carry: at 240px tracks that
+          gap was a fifth of a column, and the two `justify-between` rows
+          already separate themselves — a value ending and a label starting is
+          its own boundary. */}
+      <div className="grid max-w-[32rem] gap-x-8 gap-y-6 md:grid-cols-2">
         {/* --------- the inputs --------- */}
         <dl className="space-y-3 text-[14px]">
           <Line label="Tax rate">
@@ -144,19 +157,21 @@ export function OrderTotals({
               ) : null}
             </span>
           </Line>
+          {/* NO EXPLANATORY SENTENCE BESIDE THE SWITCH (Mark, 2026-08-19:
+              "remove the note"). It read "Wholesale days are billed weekly, not
+              per order", which is one REASON you might reach for this switch
+              and not what it does — so on every other order it was a sentence
+              about somebody else's order. The switch's own accessible name still
+              says what it does; it is the label that names the control, and the
+              control is named. */}
           <Line label="Ignore the balance">
-            <span className="inline-flex items-center gap-2">
-              <Switch
-                on={Boolean(inputs.ignore_balance)}
-                disabled={!canWrite || pending}
-                onToggle={() => setIgnoreBalance(!inputs.ignore_balance)}
-                size="sm"
-                ariaLabel="Keep this order out of the unpaid queue"
-              />
-              <span className="text-[12px] text-muted">
-                Wholesale days are billed weekly, not per order
-              </span>
-            </span>
+            <Switch
+              on={Boolean(inputs.ignore_balance)}
+              disabled={!canWrite || pending}
+              onToggle={() => setIgnoreBalance(!inputs.ignore_balance)}
+              size="sm"
+              ariaLabel="Keep this order out of the unpaid queue"
+            />
           </Line>
         </dl>
 

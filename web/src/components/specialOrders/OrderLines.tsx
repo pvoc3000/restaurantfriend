@@ -196,11 +196,18 @@ export function OrderLines({
           <thead>
             <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
               {canWrite ? <th className="w-6 px-0 py-2" /> : null}
+              {/* NOTE IS THE SECOND COLUMN (Mark, 2026-08-19), where it used
+                  to sit between Tax and Total. It belongs beside the thing it
+                  is about — "\"H\". Chocolate glaze with rainbow sprinkles" is a
+                  sentence about the item on its left — and moving it out of the
+                  middle lets Qty · Price · Tax · Total run as one unbroken band
+                  of figures against the right margin. Both Item and Note are
+                  unsized, so they share whatever the four fixed columns leave. */}
               <th className="px-3 py-2 text-left">Item</th>
+              <th className="px-3 py-2 text-left">Note</th>
               <th className="w-24 px-3 py-2 text-right">Qty</th>
               <th className="w-28 px-3 py-2 text-right">Price</th>
               <th className="w-16 px-3 py-2 text-center">Tax</th>
-              <th className="px-3 py-2 text-left">Note</th>
               <th className="w-28 px-3 py-2 text-right">Total</th>
               {canWrite ? <th className="w-8 px-1 py-2" /> : null}
             </tr>
@@ -280,6 +287,17 @@ export function OrderLines({
                     )}
                   </td>
 
+                  <td className="px-3 py-2">
+                    {canWrite ? (
+                      <InlineValue
+                        table="special_order_items" id={row.id} column="notes" value={row.notes}
+                        ariaLabel={`Note on ${row.name}`} placeholder="—"
+                      />
+                    ) : (
+                      <span className="text-muted">{row.notes ?? "—"}</span>
+                    )}
+                  </td>
+
                   <td className="px-3 py-2 text-right tabular-nums">
                     {canWrite ? (
                       <InlineValue
@@ -314,17 +332,6 @@ export function OrderLines({
                       onChange={(next) => setTaxable(row, next)}
                       label={`${row.name} is taxable`}
                     />
-                  </td>
-
-                  <td className="px-3 py-2">
-                    {canWrite ? (
-                      <InlineValue
-                        table="special_order_items" id={row.id} column="notes" value={row.notes}
-                        ariaLabel={`Note on ${row.name}`} placeholder="—"
-                      />
-                    ) : (
-                      <span className="text-muted">{row.notes ?? "—"}</span>
-                    )}
                   </td>
 
                   <td className="px-3 py-2 text-right tabular-nums">{money(lineTotal(row))}</td>

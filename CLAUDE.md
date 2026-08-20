@@ -3471,20 +3471,38 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    right margin, and Money's own figures are a column of amounts against a right
    margin too, so on that side they continue the page's one vertical rule of
    numbers instead of starting a second one 400px to its left.
-   **Money is sized to its CONTENT (416px) and Payments takes the rest**, rather
-   than an even split — the recipe record's Costs-pane call and its reason:
-   Money is label/value pairs set `justify-between`, so half of a 1150px column
-   becomes 500px of white space between "Delivery charge" and "$49.50", where a
-   four-column table with a free-text Note uses every pixel. Payments being the
-   FLEXIBLE one is also what holds Money on the right margin when that table
-   stops at its own `max-w`. `OrderTotals` stopped laying its two `dl`s side by
-   side when this made its column narrow — stacked reads better anyway, since
-   the inputs are what you SET and the figures are what they COME TO.
+   **Money is sized to its CONTENT and Payments takes the rest**, rather than an
+   even split — the recipe record's Costs-pane call and its reason: Money is
+   label/value pairs set `justify-between`, so half of a 1150px column becomes
+   500px of white space between "Delivery charge" and "$49.50", where a table
+   with a free-text Note uses every pixel. Payments being the FLEXIBLE one is
+   also what holds Money on the right margin when that table stops at its own
+   `max-w`.
+   **MONEY IS TWO COLUMNS INSIDE ITS OWN BLOCK** — tax rate through ignore-the-
+   balance on the left, Items through Balance on the right, which is the two
+   `dl`s exactly as they were written: what you SET beside what it COMES TO. It
+   was briefly stacked, on the day the block became half a row and the pair
+   would not fit; a `max-w-[32rem]` is what buys it back, and the block still
+   sizes ITSELF rather than taking a share of the row, which is what keeps its
+   right edge on the page margin. `max-w` and not a fixed `w`, because below
+   `xl` it is stacked at the full width of the page where two 400px tracks would
+   reintroduce the white space this is avoiding. Measured with real figures: two
+   201px tracks, no label wrapping.
+   **THE SWITCH HAS NO SENTENCE BESIDE IT.** "Wholesale days are billed weekly,
+   not per order" was one REASON somebody might reach for Ignore the balance,
+   not what it does — so on every other order it was a sentence about somebody
+   else's order. Its accessible name still says what it does.
    **ONE DOM ORDER AT EVERY WIDTH, no `order-*` classes**: below `xl` you read
    Payments then Money, which is the price of keeping the visual order and the
    tab order the same thing. Measured at 1440: Payments starts at 240 and Money
    ends at 1392, which are exactly the lines table's own two edges; at 1024,
    stacked, Payments first; no horizontal overflow at either.
+   **AND THE LINES TABLE'S NOTE IS ITS SECOND COLUMN**, where it used to sit
+   between Tax and Total. It belongs beside the thing it is about — `"H".
+   Chocolate glaze with rainbow sprinkles` is a sentence about the item on its
+   left — and moving it out of the middle lets Qty · Price · Tax · Total run as
+   one unbroken band of figures against the right margin. Item and Note are both
+   unsized, so they share whatever the four fixed columns leave.
 
    **(m) THE CREATE DIALOG ASKS WHO IS ORDERING, not who to call** (Mark,
    2026-08-18: "we should be able to set the customer when creating a special
