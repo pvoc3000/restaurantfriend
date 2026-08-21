@@ -20,6 +20,7 @@ type LocationRecord = {
   id: string;
   code: string;
   name: string;
+  public_name: string | null;
   kind: "physical" | "virtual";
   is_active: boolean;
   address: Record<string, unknown> | null;
@@ -77,7 +78,7 @@ export async function LocationDetail({
     supabase
       .from("locations")
       .select(
-        `id, code, name, kind, is_active, address, settings,
+        `id, code, name, public_name, kind, is_active, address, settings,
          tax_rate, labor_rate, register_count, open_days,
          open_time_by_weekday, close_time_by_weekday,
          kitchen_by_weekday, shops_for`
@@ -187,6 +188,31 @@ export async function LocationDetail({
               />
             ) : (
               location.code
+            )}
+          </dd>
+          <dt className="py-0.5 text-subtle">Public name</dt>
+          <dd>
+            {/* WHAT A CUSTOMER SEES — the inquiry form's shop list, and
+                whatever else ever faces outward. `name` is internal and says
+                so: the real ones read "DONUT FRIEND 01 HIGHLAND PARK", a
+                numbering scheme that means nothing to somebody choosing where
+                to collect a box of donuts.
+
+                Empty is a real state, not a gap to fill: it FALLS BACK to
+                `name`, which is why the placeholder shows the name rather than
+                an em dash — the cell tells you what the public would see right
+                now, whether or not anybody has set it. */}
+            {editable ? (
+              <InlineValue
+                table="locations"
+                id={location.id}
+                column="public_name"
+                value={location.public_name}
+                placeholder={location.name}
+                ariaLabel="Public name"
+              />
+            ) : (
+              location.public_name ?? location.name
             )}
           </dd>
           <dt className="py-0.5 text-subtle">Kind</dt>

@@ -64,13 +64,38 @@ function json(status: number, body: unknown): Response {
 
 /** The PO sender's idiom: a template out of settings, a generic fallback in
  *  code, and `{placeholders}` filled from the order. */
+/**
+ * Fill a template. An unknown `{placeholder}` is left ALONE rather than blanked,
+ * which is `fillTemplate`'s rule in `lib/specialOrderDocs` and is here for the
+ * same reason: a typo in a template should be visible to whoever can fix it,
+ * not silently swallowed into a gap in a sentence a customer reads.
+ */
 function fill(template: string, values: Record<string, string>): string {
-  return template.replace(/\{(\w+)\}/g, (_, key) => values[key] ?? "");
+  return template.replace(/\{(\w+)\}/g, (m, key) => (key in values ? values[key] : m));
 }
 
+/**
+ * THE CONFIRMATION LIVES WITH THE OTHER FIVE TEMPLATES, at
+ * `orgs.settings.special_orders.email.inquiry`, beside `.quote`, `.invoice`,
+ * `.receipt`, `.order` and `.statement`.
+ *
+ * It briefly had a key of its own (`inquiry_email`) and that was a mistake worth
+ * not repeating: one editor should cover every message this module sends, and a
+ * special case is a message somebody has to be told about separately. The
+ * settings screen walks `email.*`, so this is reachable by being ordinary.
+ *
+ * The placeholder names match `lib/specialOrderDocs`'s `templateVars` where they
+ * overlap — `{number}`, `{first_name}`, `{full_name}` — so a person editing six
+ * templates learns one vocabulary rather than six. The Deno runtime cannot
+ * import from `web/`, so this is the second copy of those names; they are the
+ * whole overlap and they are listed on the settings screen.
+ *
+ * The fallbacks are deliberately generic: no business identity, no signature
+ * naming anybody. FileMaker hardcoded "The Donut Friend Team" into a script.
+ */
 const DEFAULT_SUBJECT = "We got your special order inquiry — #{number}";
 const DEFAULT_BODY = [
-  "Hi {name},",
+  "Hi {first_name},",
   "",
   "Thanks for getting in touch — we have your inquiry and a real person is",
   "reading it. We'll come back to you with a quote.",
@@ -189,7 +214,7 @@ Deno.serve(async (req) => {
         email_provider?: ProviderConfig;
         reply_to?: string;
         inquiry_cc?: string;
-        inquiry_email?: { subject?: string; body?: string };
+        email?: Record<string, { subject?: string; body?: string }>;
       };
       billing?: { email?: string };
     };
@@ -205,15 +230,15 @@ Deno.serve(async (req) => {
         replyToFallbacks: [orgSettings.special_orders?.reply_to, orgSettings.billing?.email],
       });
 
+      const full = (state.contact_name ?? "").trim();
       const values = {
         number: state.number ?? "",
-        name: state.contact_name ?? "there",
+        first_name: full.split(/\s+/)[0] || "there",
+        full_name: full,
         org: org?.name ?? "",
       };
-      const subject = fill(
-        orgSettings.special_orders?.inquiry_email?.subject ?? DEFAULT_SUBJECT,
-        values
-      );
+      const configured = orgSettings.special_orders?.email?.inquiry ?? {};
+      const subject = fill(configured.subject ?? DEFAULT_SUBJECT, values);
 
       // Generated BEFORE the send and stored AFTER it, and it is the same
       // string both times — which is the entire point. Reading a Message-ID
@@ -225,10 +250,7 @@ Deno.serve(async (req) => {
         to: state.contact_email,
         cc: orgSettings.special_orders?.inquiry_cc || undefined,
         subject,
-        text: fill(
-          orgSettings.special_orders?.inquiry_email?.body ?? DEFAULT_BODY,
-          values
-        ),
+        text: fill(configured.body ?? DEFAULT_BODY, values),
         messageId,
       });
 

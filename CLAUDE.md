@@ -3169,6 +3169,58 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    read-only branch keeps the box, or the tab looks broken for anyone below
    purchaser+.
    **(d) The interest vocabulary lost "Donut Cake" and "Vegan / Gluten-free".**
+   **Shipped 2026-08-21 — THE SETTINGS ARE REACHABLE AT LAST** (Mark: "the
+   display names for the shops should be editable on the locations detail page.
+   Same with all the email stuff for special orders like what the confirmation
+   email says. The user needs a way to set these things"). Design rule 2 had
+   always said the business's own words live in `orgs.settings` and never in
+   code, and every key did — but the only way to change one was a hand-written
+   UPDATE in the SQL editor. **A settings key nobody can reach is a literal with
+   extra steps**, which is the rule being honoured rather than merely stated.
+   **`/settings` is a real screen now**, replacing the placeholder that had said
+   since the skeleton "this is the slot for the screen that will edit them
+   properly". It edits `orgs.settings` through `InlineValue`'s `jsonColumn` /
+   `jsonPath` — the `locations.address` idiom — in five blocks: the six email
+   templates, what the inquiry form says, what the documents say (terms,
+   invoice footer, `document_phone`), the timing numbers (rush terms, attention
+   thresholds, horizon, inquiry caps), and a READ-ONLY statement of the mailbox.
+   **EMPTY MEANS "USE THE DEFAULT", which is why each box's PLACEHOLDER IS the
+   default** — `setJsonPath` DELETES the key when a cell is cleared, so clearing
+   a template restores the built-in wording rather than sending an empty subject
+   line, and the placeholder is also how somebody reads what a message currently
+   says before deciding to replace it.
+   **THE MAILBOX IS STATED, NEVER OFFERED.** `email_provider` is plumbing: its
+   `secret_ref` names an edge secret holding an OAuth refresh token, and its
+   `from` must be an address that credential may send as. **Gmail does not
+   refuse a `From` it is not authorised for — it silently REWRITES it** — so an
+   editable field here would not fail on a typo, it would quietly start signing
+   the shop's quotes as somebody else. The block says what is in force and
+   points at `docs/po-email-setup.md`.
+   **Owner/admin only**, because 001's `org_update` names that pair; below it
+   the screen renders READ-ONLY rather than offering a write RLS would accept,
+   change zero rows and return no error. Every value is still SHOWN — knowing
+   what the shop's quote says is not manager-only, changing it is.
+   **THE CONFIRMATION TEMPLATE MOVED TO `special_orders.email.inquiry`**, beside
+   the other five, from a key of its own (`inquiry_email`). One editor should
+   cover every message the module sends, and a special case is a message
+   somebody has to be told about separately. Its default is now MIRRORED in
+   `DEFAULT_TEMPLATES` so the screen can show it — the Deno function still holds
+   the copy that is actually sent, the same `web/`-boundary duplication
+   `send-special-order-email` makes for `STAGE_COLUMN`, flagged at both ends.
+   **`submit-inquiry` MUST BE REDEPLOYED** for the new key to be read; until
+   then it looks for the old one, which nobody ever set, so both paths fall back
+   to the same built-in text and nothing breaks meanwhile.
+   **`locations.public_name` is editable on the location record**, in the
+   identity `dl` between Code and Kind, with the location's own `name` as the
+   PLACEHOLDER — so the cell always says what a customer would see right now,
+   whether or not anybody has set it. Mark filled DF01 and DF02 the same day
+   ("Highland Park", "DTLA"), and the inquiry form's shop list reads them.
+   Verified against the live database and **left byte-identical**: a template
+   written through the screen landed at exactly
+   `special_orders.email.inquiry.subject`, creating both intermediate objects,
+   with **zero drift** in payroll, po_email, billing, timezone or
+   email_provider — which is the thing to check whenever a cell writes a whole
+   jsonb document, since `setJsonPath` is a read-modify-write over all of it.
    **All 57 migrations replay on the Docker harness and every rule was checked
    by BREAKING it** (see 057's own tail block): as a real `anon`, nine different
    malformed submissions all return states and none raises; the real Victoria Fay

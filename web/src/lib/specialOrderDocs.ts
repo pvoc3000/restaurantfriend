@@ -669,8 +669,8 @@ export type EmailParts = { to: string; cc: string; subject: string; body: string
  *
  * FileMaker hardcoded "The Donut Friend Team" into a script. We don't.
  */
-const DEFAULT_TEMPLATES: Record<
-  DocumentKind | "statement",
+export const DEFAULT_TEMPLATES: Record<
+  DocumentKind | "statement" | "inquiry",
   { subject: string; body: string }
 > = {
   quote: {
@@ -705,6 +705,31 @@ const DEFAULT_TEMPLATES: Record<
   order: {
     subject: "Order #{number} — {event_date}",
     body: "The kitchen order for #{number} is attached.\n",
+  },
+  /**
+   * THE INQUIRY CONFIRMATION IS SENT BY THE EDGE FUNCTION, NOT BY THIS APP, so
+   * this entry is a MIRROR of `supabase/functions/submit-inquiry/index.ts` and
+   * the two must be kept in step by hand. The Deno runtime cannot import from
+   * `web/` — the same boundary that makes `send-special-order-email` keep its
+   * own copy of `STAGE_COLUMN` — and both ends carry a comment saying so.
+   *
+   * Nothing here is what gets SENT; the function's own copy is. This exists so
+   * the settings screen can show a person what the default says before they
+   * decide to replace it. Drift costs a slightly wrong placeholder, which is
+   * why the duplication is acceptable and why it is not load-bearing.
+   *
+   * `buildDocumentEmail` can never be called with this kind — its parameter is
+   * `DocumentKind | "statement"` — which is the type saying the same thing.
+   */
+  inquiry: {
+    subject: "We got your special order inquiry — #{number}",
+    body:
+      "Hi {first_name},\n\n" +
+      "Thanks for getting in touch — we have your inquiry and a real person is\n" +
+      "reading it. We'll come back to you with a quote.\n\n" +
+      "Your reference is #{number}. Just reply to this message if you want to add\n" +
+      "anything or change a detail.\n\n" +
+      "— {org}\n",
   },
   statement: {
     subject: "Statement {period}",

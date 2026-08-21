@@ -858,7 +858,20 @@ Each phase ships usable; nothing later blocks earlier.
 
 ## Where a next session picks up (2026-08-20, after 4a)
 
-**057 IS APPLIED AND `submit-inquiry` IS DEPLOYED** (Mark, 2026-08-21).
+**057 AND 058 ARE APPLIED AND `submit-inquiry` IS DEPLOYED** (Mark, 2026-08-21).
+
+**REDEPLOY `submit-inquiry`** — the confirmation template moved from
+`special_orders.inquiry_email` to `special_orders.email.inquiry`, beside the
+other five, so one settings screen covers every message the module sends. Until
+it is redeployed the function reads the old key, which nobody ever set, so both
+paths fall back to the same built-in text and nothing breaks meanwhile — but
+editing that template on `/settings` will appear to do nothing.
+
+**The settings have a screen**: `/settings` edits the six email templates, the
+inquiry form's two paragraphs, the terms and invoice footer, the timing numbers,
+and states the mailbox read-only. Owner/admin. Clearing a box restores the
+built-in default, which is why each placeholder IS the default.
+`locations.public_name` is on the location record.
 
 **Still to run: migration 058**, the auto-flag. Its tail block carries the
 probes; the one that matters is `select count(*) from pg_proc where proname =
