@@ -368,6 +368,30 @@ export function SpecialOrdersList({
   }
 
   const columns: DataColumn<SpecialOrderRow>[] = [
+    // THE ORDER NUMBER LEADS (Mark, 2026-08-20). It is the row's identity — the
+    // thing a customer says on the phone and the thing every document prints —
+    // so it is what `pinned` means here, and a pinned column belongs at the
+    // margin the eye starts from rather than three columns in.
+    //
+    // NO `storageKey` BUMP, and that is the whole point of `pinned`:
+    // `applyColumnOrder` gives pinned columns their DECLARED index and lets the
+    // movable ones fill what is left in stored order, so moving this
+    // declaration to the front moves the column for everybody without
+    // discarding anybody's dragged widths. A bump would have been the reflex —
+    // it is what the timesheets table needed — and it is only needed when a
+    // MOVABLE column's position changes.
+    {
+      key: "number",
+      label: "Number",
+      width: 125,
+      pinned: true,
+      sortValue: (r) => r.number,
+      render: (r) => (
+        <Link href={detailHref(r.id)} className="font-medium tabular-nums hover:underline">
+          {r.number}
+        </Link>
+      ),
+    },
     {
       key: "todo",
       label: "To-do",
@@ -377,12 +401,23 @@ export function SpecialOrdersList({
       sortTiebreaks: [(r) => r.number],
       /**
        * Decision 4: the MANUAL to-do always overrides the derived hint on
-       * display. Below it, the reason this row is in the attention queue — in
-       * words, never a bare mark, because "12 orders need attention" with no
-       * reasons is a number you cannot act on.
+       * display.
+       *
+       * THE DERIVED ATTENTION SENTENCE IS NOT PRINTED HERE (Mark, 2026-08-20:
+       * "remove the yellow hint text in the first column. It's not needed").
+       * It used to sit under the to-do in the mark colour — "Event has passed
+       * and $49.50 is unpaid" — on a large share of the rows, which doubled
+       * their height down the whole list to repeat something the list can
+       * already be FILTERED by and the record states in full. `needsAttention`
+       * is unchanged and still feeds the Attention menu and its count; only
+       * this column stopped restating it.
+       *
+       * A HUMAN FLAG STILL SHOWS, and that is the line between the two: the
+       * derived sentence is the app's inference, where `flag_reason` is a
+       * sentence somebody typed for the next person to read. It is red, not
+       * yellow, which is why it is not what was asked to go.
        */
       render: (r) => {
-        const why = attention.get(r.id);
         const hint = r.todo ? null : suggestedTodo(r as never);
         return (
           <span className="block">
@@ -395,10 +430,8 @@ export function SpecialOrdersList({
             ) : (
               <span className="text-faint">—</span>
             )}
-            {why ? (
-              <span className={`block text-[12px] ${r.flag_reason ? "text-accent" : "text-mark"}`}>
-                {why}
-              </span>
+            {r.flag_reason ? (
+              <span className="block text-[12px] text-accent">{r.flag_reason}</span>
             ) : null}
           </span>
         );
@@ -411,18 +444,6 @@ export function SpecialOrdersList({
       sortValue: (r) => r.kitchen_code ?? "",
       sortTiebreaks: [(r) => r.number],
       render: (r) => <span className="text-muted">{r.kitchen_code ?? "—"}</span>,
-    },
-    {
-      key: "number",
-      label: "Number",
-      width: 125,
-      pinned: true,
-      sortValue: (r) => r.number,
-      render: (r) => (
-        <Link href={detailHref(r.id)} className="font-medium tabular-nums hover:underline">
-          {r.number}
-        </Link>
-      ),
     },
     {
       key: "status",
