@@ -197,6 +197,57 @@ export function progressColor(fraction: number): [number, number, number] {
 const rgba = ([r, g, b]: [number, number, number], a: number) => `rgba(${r}, ${g}, ${b}, ${a})`;
 
 /**
+ * WHERE EACH RUNG'S BAR STOPS, snapped to a column rule (Mark, 2026-08-20: "can
+ * the length of the progress bar always land on a border between columns? …It
+ * looks a bit off when a column is partially colored").
+ *
+ * A bar ending mid-cell reads as a rendering fault rather than as a
+ * measurement — the eye takes a vertical rule as the edge of a thing, and a
+ * wash that stops just short of one looks like it failed to reach it.
+ *
+ * THE SNAP IS NEAREST-BOUNDARY, FORCED STRICTLY INCREASING, and the second half
+ * is what makes it safe. Nearest alone can send two adjacent rungs to the same
+ * rule whenever a column is wide — the customer column is the widest here — and
+ * then 2 of 6 and 3 of 6 draw identically, which is worse than landing
+ * mid-cell: the bar stops distinguishing the thing it exists to show. Walking
+ * the rungs in order and refusing a stop that is not past the last one costs
+ * nothing and cannot collapse.
+ *
+ * IT RETURNS null WHEN IT CANNOT, rather than snapping badly. With fewer rules
+ * than rungs — a reader who has hidden the table down to five columns —
+ * "strictly increasing" is unsatisfiable, and the honest answer is the
+ * unsnapped fraction.
+ *
+ * The last rung always takes the last boundary, which is the table's own right
+ * edge, so a finished order fills the row exactly.
+ */
+export function snapStops(total: number, boundaries: number[]): number[] | null {
+  const rules = boundaries.filter((b) => b > 0 && b <= 1);
+  if (rules.length < total) return null;
+
+  const stops: number[] = [];
+  let from = 0; // the index of the first rule still available
+  for (let rung = 1; rung <= total; rung++) {
+    // The last rung is the table's right edge, always.
+    if (rung === total) {
+      stops.push(rules[rules.length - 1]);
+      break;
+    }
+    const want = rung / total;
+    // Leave enough rules behind for the rungs that follow, or the tail has
+    // nowhere to go and the run stops being increasing.
+    const last = rules.length - (total - rung);
+    let best = from;
+    for (let i = from; i <= last; i++) {
+      if (Math.abs(rules[i] - want) < Math.abs(rules[best] - want)) best = i;
+    }
+    stops.push(rules[best]);
+    from = best + 1;
+  }
+  return stops;
+}
+
+/**
  * The row's background, as TWO layers on one element: the 3px edge rule at the
  * bottom and the wash above it. Both are painted on the ROW, so both span its
  * full width — anchoring either to a cell makes it as wide as that column,
@@ -205,7 +256,12 @@ const rgba = ([r, g, b]: [number, number, number], a: number) => `rgba(${r}, ${g
  * Returns null when there should be no bar at all, so the caller can hand
  * `undefined` to the table and leave the row untouched.
  */
-export function progressRowStyle(p: OrderProgress): {
+export function progressRowStyle(
+  p: OrderProgress,
+  /** The column rules, from `DataTable`'s `rowStyle` layout. Omit to fill to
+   *  the raw fraction — which is what happens when there are too few rules. */
+  boundaries: number[] = []
+): {
   backgroundImage: string;
   backgroundSize: string;
   backgroundPosition: string;
@@ -214,7 +270,11 @@ export function progressRowStyle(p: OrderProgress): {
   if (p.tone === "none") return null;
 
   const solid = p.tone === "flagged" ? RED : progressColor(p.fraction);
-  const stop = p.tone === "flagged" ? "100%" : `${(p.fraction * 100).toFixed(3)}%`;
+  const snapped = snapStops(p.total, boundaries);
+  // The COLOUR still runs off the true fraction — only the LENGTH snaps, so
+  // the ramp stays even across the six rungs however the columns are dragged.
+  const width = snapped ? snapped[p.done - 1] : p.fraction;
+  const stop = p.tone === "flagged" ? "100%" : `${(width * 100).toFixed(3)}%`;
   const wash = rgba(solid, p.tone === "flagged" ? 0.15 : WASH_ALPHA);
 
   return {

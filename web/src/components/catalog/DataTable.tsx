@@ -38,6 +38,9 @@ import {
 import { ColumnHeader } from "./ColumnHeader";
 import { ColumnsMenu } from "./ColumnsMenu";
 
+/** What a row knows about the table it is in. See `rowStyle`. */
+export type RowLayout = { boundaries: number[] };
+
 export type DataColumn<T> = {
   key: string;
   label: string;
@@ -204,8 +207,15 @@ export function DataTable<T>({
    *
    * Return `undefined` for a row that wants nothing — a cancelled order gets no
    * bar at all rather than an empty track.
+   *
+   * `layout.boundaries` is where the column rules fall, as fractions of the
+   * table's width — cumulative, one per visible column, ending at 1. Only this
+   * component knows them (they come from the weights, the reader's dragged
+   * widths and whatever is currently hidden), and a bar that stops mid-column
+   * reads as a mistake, so a caller that wants to SNAP to a rule needs them
+   * handed over rather than guessed.
    */
-  rowStyle?: (row: T) => CSSProperties | undefined;
+  rowStyle?: (row: T, layout: RowLayout) => CSSProperties | undefined;
   /**
    * Clicking anywhere on a row.
    *
@@ -613,6 +623,20 @@ export function DataTable<T>({
     0
   );
 
+  /**
+   * Where the column rules fall, as cumulative fractions of the table. Computed
+   * from the same weights `colWidth` uses, so the two can never disagree about
+   * where a boundary is. Handed to `rowStyle`; nothing else reads it.
+   */
+  const boundaries: number[] = [];
+  if (naturalTotal > 0) {
+    let run = 0;
+    for (const col of visibleColumns) {
+      run += widths[col.key] ?? col.width;
+      boundaries.push(run / naturalTotal);
+    }
+  }
+
   const colWidth = (col: DataColumn<T>) => {
     const w = widths[col.key] ?? col.width;
     if (naturalTotal <= 0) return `${w}px`;
@@ -755,7 +779,7 @@ export function DataTable<T>({
                       carries the eye across the width instead. */}
                   <tr
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
-                    style={rowStyle?.(row)}
+                    style={rowStyle?.(row, { boundaries })}
                     className={`hover:bg-neutral-50 ${onRowClick ? "cursor-pointer" : ""} ${
                       rowClassName?.(row) ?? ""
                     }`}

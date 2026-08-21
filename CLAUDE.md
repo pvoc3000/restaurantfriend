@@ -3562,6 +3562,21 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    row greys out; **flagged is full-width red** whatever the stages say. Cancelled
    BEATS flagged — 705 orders are cancelled and a flag is cleared as soon as it
    is dealt with, so an order called off is not an open problem.
+   **THE BAR SNAPS TO A COLUMN RULE** (Mark, 2026-08-20: "it looks a bit off
+   when a column is partially colored"). The eye takes a vertical rule as the
+   edge of a thing, so a wash stopping just short of one reads as having failed
+   to reach it rather than as a measurement. `snapStops` takes the NEAREST rule
+   and forces the run STRICTLY INCREASING — the second half is what makes it
+   safe, because nearest alone sends two adjacent rungs to the same rule
+   whenever a column is wide, and then 2 of 6 and 3 of 6 draw identically, which
+   is worse than landing mid-cell. With fewer rules than rungs (a reader who has
+   hidden the table down to five columns) it returns null and the raw fraction
+   is used: snapping badly is worse than not snapping. **Only the LENGTH
+   snaps** — the colour still runs off the true fraction, so the ramp stays even
+   however the columns are dragged.
+   That is what `rowStyle`'s second argument is for: only `DataTable` knows
+   where the rules fall (weights, the reader's dragged widths, whatever is
+   hidden), so it hands them over rather than the caller guessing.
    **The wash is 20% alpha and the fraction is inline**, which is why
    `DataTable` gained **`rowStyle`**: a computed width is not something a set of
    utilities can cover. It goes on the `<tr>` so the background spans the row —

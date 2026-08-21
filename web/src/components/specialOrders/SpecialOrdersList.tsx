@@ -674,9 +674,12 @@ export function SpecialOrdersList({
        */
       rowStyle={
         SHOW_ROW_PROGRESS_WASH
-          ? (r) => {
+          ? (r, layout) => {
               const p = progress.get(r.id);
-              return p ? (progressRowStyle(p) ?? undefined) : undefined;
+              // The bar SNAPS to a column rule — see `snapStops`. The table
+              // hands over where the rules currently fall, because they move
+              // with the reader's dragged widths and with whatever is hidden.
+              return p ? (progressRowStyle(p, layout.boundaries) ?? undefined) : undefined;
             }
           : undefined
       }

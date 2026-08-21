@@ -11,6 +11,7 @@ import {
   orderProgress,
   progressColor,
   progressRowStyle,
+  snapStops,
 } from "../../src/lib/specialOrderProgress";
 
 const TODAY = "2026-08-20";
@@ -199,4 +200,64 @@ test("an event that has passed makes the undone rungs overdue", () => {
   );
   eq(p.ticks[1].state, "overdue", "quote sent");
   no(p.ticks.some((t) => t.state === "waiting"), "nothing is merely waiting once it is late");
+});
+
+/* -- snapping the bar to a column rule ------------------------------------ */
+
+/** The real list at a 1440 window: nine columns, cumulative fractions. */
+const NINE = [0.093, 0.186, 0.265, 0.351, 0.503, 0.629, 0.723, 0.792, 1];
+
+test("every stop lands exactly on a column rule", () => {
+  const stops = snapStops(6, NINE)!;
+  eq(stops.length, 6);
+  for (const stop of stops) ok(NINE.includes(stop), `${stop} is a rule`);
+});
+
+test("the stops strictly increase, so no two rungs draw alike", () => {
+  // Nearest-boundary ALONE can send two rungs to the same wide column's rule —
+  // and then 2 of 6 and 3 of 6 are indistinguishable, which is worse than
+  // landing mid-cell.
+  const stops = snapStops(6, NINE)!;
+  for (let i = 1; i < stops.length; i++) ok(stops[i] > stops[i - 1], `${stops[i]} > ${stops[i - 1]}`);
+});
+
+test("a wide column cannot swallow two rungs", () => {
+  // One column occupying half the table: nearest would put rungs 2, 3 and 4 on
+  // the same rule.
+  const lopsided = [0.08, 0.16, 0.66, 0.74, 0.82, 0.9, 1];
+  const stops = snapStops(6, lopsided)!;
+  for (let i = 1; i < stops.length; i++) ok(stops[i] > stops[i - 1], "still increasing");
+});
+
+test("the last rung is the table's right edge, so a finished order fills the row", () => {
+  eq(snapStops(6, NINE)![5], 1);
+});
+
+test("too few rules to be increasing → null, and the raw fraction is used", () => {
+  // A reader who has hidden the table down to five columns. Snapping badly is
+  // worse than not snapping.
+  eq(snapStops(6, [0.2, 0.4, 0.6, 0.8, 1]), null);
+  const p = order({ quote_sent_at: "a", quote_returned_at: "a" }); // 3 of 6
+  const style = progressRowStyle(p, [0.2, 0.4, 0.6, 0.8, 1])!;
+  ok(style.backgroundImage.includes("50.000%"), "falls back to the fraction");
+});
+
+test("exactly as many rules as rungs is enough", () => {
+  eq(snapStops(6, [0.2, 0.35, 0.5, 0.65, 0.8, 1])!.length, 6);
+});
+
+test("the LENGTH snaps but the COLOUR does not", () => {
+  // The ramp stays even across the six rungs however the columns are dragged —
+  // otherwise a wide column would also skew the hue.
+  const p = order({ quote_sent_at: "a" }); // 2 of 6
+  const snappedStyle = progressRowStyle(p, NINE)!;
+  const rawStyle = progressRowStyle(p, [])!;
+  const hue = (css: string) => css.slice(css.indexOf("rgba("), css.indexOf(")") + 1);
+  eq(hue(snappedStyle.backgroundImage), hue(rawStyle.backgroundImage));
+});
+
+test("a flagged row is the full width whether or not it can snap", () => {
+  const p = order({ flag_reason: "x" });
+  ok(progressRowStyle(p, NINE)!.backgroundImage.includes("100%"));
+  ok(progressRowStyle(p, [])!.backgroundImage.includes("100%"));
 });
