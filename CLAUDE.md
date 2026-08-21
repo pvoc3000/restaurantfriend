@@ -3591,6 +3591,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    already hides it, which is why the two are separate.
    The legend is pinned in a `ui/StickyFooter` and draws its OWN top rule (that
    component contributes position and a white backdrop and nothing else).
+   **The strip's tooltip is a CHECKLIST** (Mark, 2026-08-20, who drew it) —
+   `☑ Lead / ☐ Quote returned — waiting on them` rather than `Lead: done /
+   Quote returned: waiting`. A column of boxes is scanned rather than read, and
+   the eye lands on the first empty one, which is the next thing to do and the
+   only reason to open it. The box is TWO-state and the strip is four, so
+   overdue and waiting are said in words after the label while a rung merely not
+   due yet says nothing — otherwise most rows carry four "not yet"s, which is
+   the noise this replaced. **Both glyphs carry U+FE0E**: `☑` has an emoji
+   presentation and `☐` does not, so without it Apple renders a colour box
+   beside a plain outline one — the order guide's ♥/★ pair carries the same
+   selector for the same reason. It is a native `title` like every tooltip here
+   and inherits that there is NO HOVER ON AN IPAD; acceptable because the
+   strip's colours already say done, overdue and waiting without it.
    **ALL SEVEN STAGE COLUMNS ARE GONE** (Mark, same day, in two steps — the six,
    then "the print column can go too"), and the strip moved to the END where
    they used to be. 868px of dates replaced by 92px of ticks: they were the

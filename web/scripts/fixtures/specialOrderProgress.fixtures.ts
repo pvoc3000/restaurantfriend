@@ -9,6 +9,7 @@ import {
   PROGRESS_LABELS,
   WASH_ALPHA,
   orderProgress,
+  progressChecklist,
   progressColor,
   progressRowStyle,
   snapStops,
@@ -260,4 +261,44 @@ test("a flagged row is the full width whether or not it can snap", () => {
   const p = order({ flag_reason: "x" });
   ok(progressRowStyle(p, NINE)!.backgroundImage.includes("100%"));
   ok(progressRowStyle(p, [])!.backgroundImage.includes("100%"));
+});
+
+/* -- the tooltip ---------------------------------------------------------- */
+
+const CHECKED = "\u2611\uFE0E";
+const EMPTY = "\u2610\uFE0E";
+
+test("the tooltip is a checklist, one line per rung", () => {
+  const lines = progressChecklist(order({ status: "order" })).split("\n");
+  eq(lines.length, 6);
+  eq(lines[0], `${CHECKED} Lead`);
+  eq(lines[4], `${CHECKED} Invoice paid`);
+  eq(lines[5], `${EMPTY} Printed & scheduled`);
+});
+
+test("a rung that is merely not due yet says nothing after its label", () => {
+  // Six rungs would otherwise carry four "not yet"s, which is the noise this
+  // replaced.
+  const lines = progressChecklist(order({})).split("\n");
+  eq(lines[1], `${EMPTY} Quote sent`);
+  no(lines.some((l) => l.includes("—")), "no dashes on a quiet row");
+});
+
+test("the two states a box cannot carry are said in words", () => {
+  const waiting = progressChecklist(order({ quote_sent_at: "a" })).split("\n");
+  eq(waiting[2], `${EMPTY} Quote returned — waiting on them`);
+
+  const late = progressChecklist(
+    orderProgress({ ...(base as object), event_date: "2026-08-01" } as never, TODAY)
+  ).split("\n");
+  eq(late[1], `${EMPTY} Quote sent — overdue`);
+});
+
+test("both boxes carry the text variation selector", () => {
+  // `☑` has an emoji presentation and `☐` does not, so without U+FE0E Apple
+  // renders a colour box beside a plain outline one — mismatched down the
+  // column. The order guide's ♥/★ pair carries the same selector.
+  const all = progressChecklist(order({ quote_sent_at: "a" }));
+  ok(all.includes("\u2611\uFE0E"), "checked");
+  ok(all.includes("\u2610\uFE0E"), "empty");
 });

@@ -10,6 +10,7 @@ import { StickyFooter } from "@/components/ui/StickyFooter";
 import {
   PROGRESS_LABELS,
   orderProgress,
+  progressChecklist,
   progressRowStyle,
   type OrderProgress,
 } from "@/lib/specialOrderProgress";
@@ -547,9 +548,7 @@ export function SpecialOrdersList({
         return (
           <span
             className="inline-flex gap-[2px]"
-            title={p.ticks
-              .map((t) => `${t.label}: ${t.state ?? "not yet"}`)
-              .join("\n")}
+            title={progressChecklist(p)}
           >
             {p.ticks.map((t) => (
               <span

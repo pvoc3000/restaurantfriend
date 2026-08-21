@@ -166,6 +166,49 @@ export function orderProgress(
   return { done, total, fraction: done / total, ticks, tone };
 }
 
+/**
+ * THE STRIP'S TOOLTIP, AS A CHECKLIST (Mark, 2026-08-20 — he drew it as
+ * "<box with checkmark> Lead / <empty box> Quote Sent").
+ *
+ *     ☑ Lead
+ *     ☑ Quote sent
+ *     ☐ Quote returned — waiting on them
+ *     ☐ Invoice sent — overdue
+ *     ☐ Invoice paid
+ *     ☐ Printed & scheduled
+ *
+ * It replaces `Lead: done / Quote sent: not yet`, which made you read the state
+ * of every rung to find the ones that matter. A column of boxes is scanned, not
+ * read, and the eye lands on the first empty one — which is the next thing to
+ * do, and the only reason to open this tooltip.
+ *
+ * THE BOX IS TWO-STATE AND THE STRIP IS FOUR, so the two states a box cannot
+ * carry are said in words after the label. A rung that is simply not due yet
+ * says nothing at all: on a six-rung ladder most rows would otherwise carry
+ * four "not yet"s, which is the noise this is replacing.
+ *
+ * BOTH GLYPHS CARRY U+FE0E. `☑` has an emoji presentation and `☐` does not, so
+ * without the text selector Apple platforms render the checked box as a colour
+ * emoji beside a plain outline one — mismatched sizes down the column. The
+ * app's ♥/★ pair on the order guide carries the same selector for the same
+ * reason.
+ *
+ * It is a native `title`, like every other tooltip in this app, and inherits
+ * that: THERE IS NO HOVER ON AN IPAD, so this never shows there. That is
+ * acceptable here and would not be if the tooltip were load-bearing — the
+ * strip's own colours say done, overdue and waiting without it.
+ */
+export function progressChecklist(p: OrderProgress): string {
+  return p.ticks
+    .map((t) => {
+      const box = t.state === "done" ? "\u2611\uFE0E" : "\u2610\uFE0E";
+      const note =
+        t.state === "overdue" ? " — overdue" : t.state === "waiting" ? " — waiting on them" : "";
+      return `${box} ${t.label}${note}`;
+    })
+    .join("\n");
+}
+
 /* ==========================================================================
  * THE COLOUR
  * ========================================================================== */
