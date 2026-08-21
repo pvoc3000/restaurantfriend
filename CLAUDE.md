@@ -3583,6 +3583,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    record, which is where you go when you want it. The list went 16 columns to
    9. `STAGES` is NOT trimmed: `stageState` and `orderProgress` read the whole
    ladder and the record still prints every stamp.
+   Final order: **Number · Kitchen · Status · Date · Customer · Event · Total ·
+   Progress · To-do**. To-do led the list until this pass, which put a
+   mostly-empty column — set on 101 of 8,330 orders — at the margin the eye
+   starts from; last, it reads as what it is, a note left on an order.
    No `storageKey` bump for any of it — a stored key whose column is gone drops
    out, and a column added since the last drag appears at its declared position;
    both are already `columnOrder` fixtures.

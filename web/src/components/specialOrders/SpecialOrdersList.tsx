@@ -426,51 +426,6 @@ export function SpecialOrdersList({
       ),
     },
     {
-      key: "todo",
-      label: "To-do",
-      width: 150,
-      wrap: true,
-      sortValue: (r) => r.todo ?? "",
-      sortTiebreaks: [(r) => r.number],
-      /**
-       * Decision 4: the MANUAL to-do always overrides the derived hint on
-       * display.
-       *
-       * THE DERIVED ATTENTION SENTENCE IS NOT PRINTED HERE (Mark, 2026-08-20:
-       * "remove the yellow hint text in the first column. It's not needed").
-       * It used to sit under the to-do in the mark colour — "Event has passed
-       * and $49.50 is unpaid" — on a large share of the rows, which doubled
-       * their height down the whole list to repeat something the list can
-       * already be FILTERED by and the record states in full. `needsAttention`
-       * is unchanged and still feeds the Attention menu and its count; only
-       * this column stopped restating it.
-       *
-       * A HUMAN FLAG STILL SHOWS, and that is the line between the two: the
-       * derived sentence is the app's inference, where `flag_reason` is a
-       * sentence somebody typed for the next person to read. It is red, not
-       * yellow, which is why it is not what was asked to go.
-       */
-      render: (r) => {
-        const hint = r.todo ? null : suggestedTodo(r as never);
-        return (
-          <span className="block">
-            {r.todo ? (
-              <span className="font-medium">{r.todo}</span>
-            ) : hint ? (
-              <span className="text-subtle italic" title="Suggested — nothing is written until you set it">
-                {hint}?
-              </span>
-            ) : (
-              <span className="text-faint">—</span>
-            )}
-            {r.flag_reason ? (
-              <span className="block text-[12px] text-accent">{r.flag_reason}</span>
-            ) : null}
-          </span>
-        );
-      },
-    },
-    {
       key: "kitchen",
       label: "Kitchen",
       width: 128,
@@ -614,6 +569,57 @@ export function SpecialOrdersList({
             <span className="sr-only">
               {p.done} of {p.total} stages done
             </span>
+          </span>
+        );
+      },
+    },
+    {
+      /**
+       * LAST, AFTER PROGRESS (Mark, 2026-08-20). It led the list until today,
+       * which put a mostly-empty column — the to-do is set on 101 of 8,330
+       * orders — at the margin the eye starts from. At the end it reads as what
+       * it is: the note somebody left on an order, after the order.
+       */
+      key: "todo",
+      label: "To-do",
+      width: 150,
+      wrap: true,
+      sortValue: (r) => r.todo ?? "",
+      sortTiebreaks: [(r) => r.number],
+      /**
+       * Decision 4: the MANUAL to-do always overrides the derived hint on
+       * display.
+       *
+       * THE DERIVED ATTENTION SENTENCE IS NOT PRINTED HERE (Mark, 2026-08-20:
+       * "remove the yellow hint text in the first column. It's not needed").
+       * It used to sit under the to-do in the mark colour — "Event has passed
+       * and $49.50 is unpaid" — on a large share of the rows, which doubled
+       * their height down the whole list to repeat something the list can
+       * already be FILTERED by and the record states in full. `needsAttention`
+       * is unchanged and still feeds the Attention menu and its count; only
+       * this column stopped restating it.
+       *
+       * A HUMAN FLAG STILL SHOWS, and that is the line between the two: the
+       * derived sentence is the app's inference, where `flag_reason` is a
+       * sentence somebody typed for the next person to read. It is red, not
+       * yellow, which is why it is not what was asked to go.
+       */
+      render: (r) => {
+        const hint = r.todo ? null : suggestedTodo(r as never);
+        return (
+          <span className="block">
+            {r.todo ? (
+              <span className="font-medium">{r.todo}</span>
+            ) : hint ? (
+              <span className="text-subtle italic" title="Suggested — nothing is written until you set it">
+                {hint}?
+              </span>
+            ) : (
+              <span className="text-faint">—</span>
+            )}
+            {r.flag_reason ? (
+              <span className="block text-[12px] text-accent">{r.flag_reason}</span>
+            ) : null}
           </span>
         );
       },
