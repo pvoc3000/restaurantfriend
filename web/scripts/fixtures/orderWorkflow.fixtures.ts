@@ -5,7 +5,7 @@
 // a finished order dragged backwards by a backfilled date, a template given a
 // status its own check constraint refuses, and a cancelled order advanced.
 
-import { test, eq, ok } from "./harness";
+import { test, eq } from "./harness";
 import {
   afterDateSet,
   afterDocumentSent,
@@ -15,7 +15,6 @@ import {
   statusCatchUp,
   type WorkflowOrder,
 } from "../../src/lib/orderWorkflow";
-import { isNewInquiryLead } from "../../src/lib/specialOrders";
 
 const TODAY = "2026-08-21";
 
@@ -239,28 +238,3 @@ test("the summary reads as a question, however many parts", () => {
   );
 });
 
-/* -------------------------------------------------------------------------
- * The Leads band (Mark, 2026-08-21)
- * ---------------------------------------------------------------------- */
-
-test("a new inquiry lead is one that ARRIVED, not one somebody typed", () => {
-  const lead = { kind: "order", status: "lead" };
-  ok(isNewInquiryLead({ ...lead, source: "inquiry" }));
-  // Typed while a customer was on the phone — already in front of you.
-  eq(isNewInquiryLead({ ...lead, source: "app" }), false, "hand-made");
-  eq(isNewInquiryLead({ ...lead, source: "filemaker" }), false, "imported");
-  eq(isNewInquiryLead({ ...lead, source: null }), false, "unknown");
-});
-
-test("it leaves the band as soon as the status advances", () => {
-  // The loop: accept the workflow's offer after emailing a quote, and the row
-  // drops out of Leads into its own event date. The section is an inbox.
-  for (const status of ["quote", "invoice", "order", "cancelled"]) {
-    eq(isNewInquiryLead({ kind: "order", status, source: "inquiry" }), false, status);
-  }
-});
-
-test("a template or standing order is never in it, whatever its source", () => {
-  eq(isNewInquiryLead({ kind: "template", status: null, source: "inquiry" }), false);
-  eq(isNewInquiryLead({ kind: "standing_order", status: null, source: "inquiry" }), false);
-});

@@ -1676,23 +1676,30 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    list) — recording the money IS the paid event. It fires on the BALANCE, not
    the payment, so a deposit on a wedding order doesn't ask; and it reads
    `balance - value` because the server hasn't re-rendered yet.
-   **NEW INQUIRIES RIDE AT THE TOP IN A `Leads` BAND** (Mark, same day).
-   `isNewInquiryLead` is `source === "inquiry"` AND status `lead` — a lead
-   somebody typed while a customer was on the phone is already in front of them,
-   where an inquiry arrived while nobody was watching. **The real bug it fixed
-   was invisibility**: the default `upcoming` view wants `event_date >= today`,
-   so a customer who left the date blank — #10014 did — never appeared at all.
-   Now `upcoming` admits them whatever their date. They are PINNED rather than
-   sorted (an inbox that moves when you sort by Total is not one) and pulled out
-   of the body so a lead appears once; `DataTable` bands a RUN of like-labelled
-   rows, so the pin is what makes the label work. They leave the band when the
-   status advances, which the prompts above make one tap — the section is an
-   inbox and working an order empties it.
+   **A `Leads` BAND WAS BUILT THE SAME DAY AND WITHDRAWN** (Mark, 2026-08-21:
+   "I changed my mind about the leads band. lets revert that change. Flagging
+   the order is enough for now. I may want to revisit this in the future"). It
+   pinned `source === "inquiry"` leads to the top of the list under their own
+   band and exempted them from the `upcoming` date filter. **Reverted whole** —
+   no dead predicate left behind, since git has it and unreachable machinery is
+   a liability rather than a head start.
+   What made the reversal safe is that **058's flag already does the job**: a
+   new inquiry arrives with `flag_reason` "New Inquiry", which paints the row
+   FULL-WIDTH RED and puts it top of `needsAttention`. Confirmed on the live
+   list — #10015 arrived flagged and reads as a red row in the ordinary date
+   band, which is the noticing this was meant to provide.
+   **The one thing that went with it, and is worth knowing if it comes back:**
+   the default `upcoming` view wants `event_date >= today`, so an inquiry whose
+   customer left the date blank, or asked for a day that has since passed, does
+   not appear there at all — it is reached through Needs attention, the Lead
+   status filter, or All orders. Measured at the time: 1 of the 3 real inquiry
+   leads (#10014, dated yesterday and already worked). If this is revisited, the
+   VISIBILITY question is the substantive half; the band is presentation.
    Verified against the live database and the order restored afterwards: setting
    Invoice paid offered both consequences and wrote them in one statement,
    setting Order printed offered the single one as a sentence with no redundant
    checkbox, and the catch-up appeared on an order whose quote had gone out
-   while its status still read Lead. **1097 fixtures pass**, 26 new, each rule
+   while its status still read Lead. **1094 fixtures pass**, 23 new, each rule
    checked by breaking it.
 4d. 🚧 **Invoices** — the third module, and the one that finishes the purchasing
    loop (Mark, 2026-08-04, after using the receiving screen: "this reconcile PO

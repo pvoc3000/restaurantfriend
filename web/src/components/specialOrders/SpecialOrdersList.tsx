@@ -30,7 +30,6 @@ import {
 } from "@/lib/filterMenus";
 import { sortRows } from "@/lib/tableSort";
 import {
-  isNewInquiryLead,
   KIND_LABEL,
   STATUS_LABEL,
   customerLabel,
@@ -48,9 +47,6 @@ export type SpecialOrderRow = {
   number: string;
   kind: SpecialOrderKind;
   status: SpecialOrderStatus | null;
-  /** `app` | `filemaker` | `inquiry` — what made this row, and the only way to
-   *  tell a lead that arrived off the public form from one somebody typed. */
-  source: string | null;
   todo: string | null;
   flag_reason: string | null;
   title: string | null;
@@ -299,16 +295,7 @@ export function SpecialOrdersList({
           // date-based view would hide them. They are reached through the KIND
           // menu, which is FileMaker's saved finds, and `all` shows them.
           if (v === "upcoming")
-            return (
-              // A NEW INQUIRY IS ALWAYS UPCOMING, whatever its date says.
-              // Without this the default view hides exactly the rows this
-              // section exists to surface: `upcoming` wants a date in the
-              // future, and a customer who left the date blank — or asked for
-              // a day that has since passed while nobody answered them — would
-              // never appear at all. That was the bug behind the request.
-              isNewInquiryLead(r) ||
-              (r.kind === "order" && r.status !== "cancelled" && !!r.event_date && r.event_date >= today)
-            );
+            return r.kind === "order" && r.status !== "cancelled" && !!r.event_date && r.event_date >= today;
           if (v === "tomorrow") {
             const d = new Date(`${today}T00:00:00Z`);
             d.setUTCDate(d.getUTCDate() + 1);
@@ -638,20 +625,7 @@ export function SpecialOrdersList({
     },
   ];
 
-  /**
-   * NEW INQUIRIES RIDE AT THE TOP, in their own band (Mark, 2026-08-21).
-   *
-   * Pinned rather than sorted: the section is an INBOX, and an inbox that
-   * moves when you sort by Total is not one. The rest of the list still
-   * arranges itself however the reader asked, and a lead leaves the band the
-   * moment its status advances — which is what the workflow prompts make a
-   * single tap.
-   *
-   * They are pulled OUT of the body, so a lead appears once and not twice.
-   */
-  const ordered = sortRows(visible, columns, sort ?? NATURAL_SORT);
-  const fresh = ordered.filter(isNewInquiryLead);
-  const sorted = fresh.length > 0 ? [...fresh, ...ordered.filter((r) => !isNewInquiryLead(r))] : ordered;
+  const sorted = sortRows(visible, columns, sort ?? NATURAL_SORT);
 
   usePublishRecordSet(PATH, sorted.map((r) => ({ id: r.id, href: detailHref(r.id) })));
 
@@ -662,13 +636,7 @@ export function SpecialOrdersList({
    * order.
    */
   const groups: DataGroup<SpecialOrderRow>[] = [
-    {
-      sortKey: "date",
-      // The band the pinned rows sit under. `DataTable` bands a RUN of
-      // like-labelled rows, so this only works because they were moved to the
-      // front above — the label alone would scatter one band per lead.
-      label: (r) => (isNewInquiryLead(r) ? "Leads" : dayBand(r.event_date)),
-    },
+    { sortKey: "date", label: (r) => dayBand(r.event_date) },
     { sortKey: "status", label: (r) => (r.status ? STATUS_LABEL[r.status] : KIND_LABEL[r.kind]) },
     { sortKey: "kitchen", label: (r) => r.kitchen_code ?? "No kitchen" },
   ];

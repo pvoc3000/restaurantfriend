@@ -59,7 +59,7 @@ export default async function SpecialOrdersPage({
   let query = supabase
     .from("special_orders")
     .select(
-      `id, number, kind, status, source, todo, flag_reason, title, event_date, event_time,
+      `id, number, kind, status, todo, flag_reason, title, event_date, event_time,
        fulfillment, standing_days, ignore_balance,
        tax_rate, discount_amount, discount_rate, delivery_charge, rush_fee,
        quote_sent_at, quote_returned_at, invoice_sent_at, invoice_paid_at,
