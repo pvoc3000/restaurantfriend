@@ -3522,6 +3522,51 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    member to their employee row needs `employees.user_id`, which a supervisor
    cannot read — a third definer, not built. Pick the person on the record.
 
+   **(r) THE ROW IS A PROGRESS BAR** (Mark, 2026-08-20, after a mockup pass).
+   A wash fills each row of `/special-orders` to the fraction of stages done,
+   yellow at the first rung and green at the last, under a 3px rule on the row's
+   bottom edge — plus a six-tick **Progress** strip saying WHICH.
+   **THE SIX STAGES ARE MARK'S AND THEY ARE A LADDER WHERE THE SEVEN ARE NOT.**
+   Measured over the 8,321 real orders, the seven stage columns are prefix-clean
+   on **32%** — 68% carry a later stamp before an earlier one. Two of the seven
+   cause nearly all of it: `delivery_scheduled_at` is filled on 11% because 82%
+   of orders are pickups (of 6,846 pickups, NINE ever booked a delivery), and
+   `order_scheduled_at` on 23%. Mark's six — Lead · Quote sent · Quote returned
+   · Invoice sent · Invoice paid · Printed & scheduled — drops the booking and
+   folds scheduling into printing, and is **88.6% prefix-clean**. That is what
+   makes a bar honest here.
+   **Two things offered and DECLINED, recorded because they will read as
+   oversights.** Stage 6 is printed **AND** scheduled, not OR: printed is 64%,
+   scheduled 23%, both 22.7%, so 41% of printed orders sit at 5 of 6 for good —
+   deliberate, because scheduling is the real last step. And there is **no
+   Receipt rung** though `receipt_sent_at` is filled on 58.4%; the ladder ends
+   where the kitchen's work does.
+   **STAGE ONE IS ALWAYS DONE**, so the bar is never an empty track: a row with
+   nothing stamped shows a sliver, which reads as "started" where zero reads as
+   "broken".
+   **Cancelled gets NO bar** (the style is `undefined`, not a zero width) and the
+   row greys out; **flagged is full-width red** whatever the stages say. Cancelled
+   BEATS flagged — 705 orders are cancelled and a flag is cleared as soon as it
+   is dealt with, so an order called off is not an open problem.
+   **The wash is 20% alpha and the fraction is inline**, which is why
+   `DataTable` gained **`rowStyle`**: a computed width is not something a set of
+   utilities can cover. It goes on the `<tr>` so the background spans the row —
+   anchoring it to a cell makes it as wide as that column, which is exactly how
+   the first mockup came out wrong — and the hover wash is a background COLOUR
+   on the same element, so both survive.
+   **`SHOW_ROW_PROGRESS_WASH` is the seam** for Mark's "make it a preference
+   later… it might be too loud for some": one constant, not a stored preference,
+   because a preference nobody can reach is dead machinery. Turning it into one
+   is a `useSyncExternalStore` over localStorage plus a switch in the filter row.
+   **It governs the WASH only** — the strip is a column, so the Columns menu
+   already hides it, which is why the two are separate.
+   The legend is pinned in a `ui/StickyFooter` and draws its OWN top rule (that
+   component contributes position and a white backdrop and nothing else).
+   Known and accepted: the seven stage columns still print the DATES, so the
+   list now shows three grains of one fact — how far (the wash), which (the
+   strip), when (the columns). If the dates stop earning their width they are
+   the ones to hide.
+
    Not done, and worth asking about: **`LinkCustomer` does not seed the
    contact.** Linking a customer to an EXISTING order is the same idea, and
    overwriting a day-of contact somebody has already typed is not.

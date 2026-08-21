@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  Fragment,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { createPortal } from "react-dom";
 import { usePathname } from "next/navigation";
 import {
@@ -163,6 +170,7 @@ export function DataTable<T>({
   storageKey,
   defaultSort,
   rowClassName,
+  rowStyle,
   onRowClick,
   scroll = false,
   fill = false,
@@ -184,6 +192,20 @@ export function DataTable<T>({
   storageKey: string;
   defaultSort?: { key: string; dir?: SortDir };
   rowClassName?: (row: T) => string;
+  /**
+   * Inline style for the whole row — for something COMPUTED that no class can
+   * express.
+   *
+   * The special-orders list is what forced it: its progress wash is a fraction
+   * of the row's width, and there is no set of utilities covering a hundred
+   * widths. It goes on the `<tr>` rather than a cell so a background spans the
+   * row; the hover wash is a background COLOUR on the same element, so an image
+   * passed here paints over it and both survive.
+   *
+   * Return `undefined` for a row that wants nothing — a cancelled order gets no
+   * bar at all rather than an empty track.
+   */
+  rowStyle?: (row: T) => CSSProperties | undefined;
   /**
    * Clicking anywhere on a row.
    *
@@ -733,6 +755,7 @@ export function DataTable<T>({
                       carries the eye across the width instead. */}
                   <tr
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
+                    style={rowStyle?.(row)}
                     className={`hover:bg-neutral-50 ${onRowClick ? "cursor-pointer" : ""} ${
                       rowClassName?.(row) ?? ""
                     }`}

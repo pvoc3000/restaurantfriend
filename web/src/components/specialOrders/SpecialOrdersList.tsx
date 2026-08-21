@@ -6,6 +6,13 @@ import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { NewSpecialOrder } from "@/components/specialOrders/NewSpecialOrder";
+import { StickyFooter } from "@/components/ui/StickyFooter";
+import {
+  PROGRESS_LABELS,
+  orderProgress,
+  progressRowStyle,
+  type OrderProgress,
+} from "@/lib/specialOrderProgress";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
@@ -116,6 +123,24 @@ const WEEKDAY_SHORT = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
  * address — this is the natural order, not a departure from it, and only a
  * departure belongs in the URL.
  */
+/**
+ * THE FULL-WIDTH ROW WASH IS ONE SWITCH (Mark, 2026-08-20: "build it so that we
+ * can make it a preference later that the user can turn on/off — it might be
+ * too loud for some").
+ *
+ * It is a constant rather than a stored preference because there is nothing to
+ * set it WITH yet, and a preference nobody can reach is dead machinery. Turning
+ * it into one is: replace this read with a `useSyncExternalStore` over
+ * localStorage (`lib/columnVisibility`'s idiom — display preferences live
+ * there, never in the URL) and put a switch in the filter row. Every other part
+ * is already conditional on it.
+ *
+ * IT GOVERNS THE WASH ONLY. The Progress strip is a column like any other, so
+ * it is hidden from the Columns menu by whoever does not want it — which is the
+ * control this app already has, and the reason the two are separate.
+ */
+const SHOW_ROW_PROGRESS_WASH = true;
+
 const NATURAL_SORT: ListSort = { key: "date", dir: "asc" };
 
 /** "SUN, AUG 16" — the band over each day's run, FileMaker's own heading. */
@@ -346,6 +371,17 @@ export function SpecialOrdersList({
     [searched, dimensions, filters]
   );
 
+  /**
+   * Each row's progress, computed once and read twice — the wash and the strip.
+   * Deriving it in both places would let the bar and the ticks disagree about
+   * the same order, which is the class of bug this list has already had once.
+   */
+  const progress = useMemo(() => {
+    const m = new Map<string, OrderProgress>();
+    for (const r of rows) m.set(r.id, orderProgress(r as never, today, thresholds));
+    return m;
+  }, [rows, today, thresholds]);
+
   const listHref = filterHref(PATH, dimensions, filters, search, sort);
   const detailHref = (id: string) =>
     withFrom(`/special-orders/${id}`, { href: listHref, label: "Special Orders" });
@@ -391,6 +427,54 @@ export function SpecialOrdersList({
           {r.number}
         </Link>
       ),
+    },
+    {
+      /**
+       * THE SIX RUNGS AS TICKS. It says WHICH stage where the row's wash says
+       * HOW FAR, and the seven date columns further right say WHEN — three
+       * grains of one fact, which is one more than most lists need. If the
+       * dates stop earning their width, they are the ones to hide: this is the
+       * summary and they are the detail.
+       *
+       * `sortValue` is how many are done, so sorting by it is "least finished
+       * first" — the only ordering of a progress column anybody wants.
+       */
+      key: "progress",
+      label: "Progress",
+      width: 92,
+      sortValue: (r) => progress.get(r.id)?.done ?? 0,
+      sortTiebreaks: [(r) => r.number],
+      render: (r) => {
+        const p = progress.get(r.id);
+        if (!p || p.tone === "none") return <span className="text-faint">—</span>;
+        return (
+          <span
+            className="inline-flex gap-[2px]"
+            title={p.ticks
+              .map((t) => `${t.label}: ${t.state ?? "not yet"}`)
+              .join("\n")}
+          >
+            {p.ticks.map((t) => (
+              <span
+                key={t.key}
+                aria-hidden
+                className={`block h-[13px] w-[8px] ${
+                  t.state === "done"
+                    ? "bg-ink"
+                    : t.state === "overdue"
+                      ? "bg-accent"
+                      : t.state === "waiting"
+                        ? "bg-mark-fill"
+                        : "bg-neutral-200"
+                }`}
+              />
+            ))}
+            <span className="sr-only">
+              {p.done} of {p.total} stages done
+            </span>
+          </span>
+        );
+      },
     },
     {
       key: "todo",
@@ -566,6 +650,7 @@ export function SpecialOrdersList({
   ];
 
   return (
+    <>
     <DataTable
       rows={sorted}
       // `sort ?? NATURAL_SORT` so the header arrow agrees with the rows. The
@@ -582,6 +667,26 @@ export function SpecialOrdersList({
       // as work. It is not hidden: FileMaker kept 705 of them and they are
       // routinely reinstated.
       rowClassName={(r) => (r.status === "cancelled" ? "text-faint line-through" : "")}
+      /**
+       * THE ROW IS THE PROGRESS BAR — a wash filling to the fraction done,
+       * yellow at the first rung and green at the last, under a 3px rule on the
+       * row's bottom edge. Both are backgrounds on the `<tr>`, so both span its
+       * full width; anchoring either to a cell makes it as wide as that column.
+       *
+       * A CANCELLED ORDER GETS NO BAR (the style is `undefined`, not a zero
+       * width) and a FLAGGED one is full-width red whatever its stages say —
+       * Mark's two special cases, and both are right for the same reason: a
+       * flagged order is not a progress question, and a cancelled one is not
+       * partly done, it is not happening.
+       */
+      rowStyle={
+        SHOW_ROW_PROGRESS_WASH
+          ? (r) => {
+              const p = progress.get(r.id);
+              return p ? (progressRowStyle(p) ?? undefined) : undefined;
+            }
+          : undefined
+      }
       empty={<p className="text-sm text-muted">No orders match these filters.</p>}
       leading={
         <div className="space-y-3">
@@ -627,5 +732,38 @@ export function SpecialOrdersList({
         </div>
       }
     />
+
+    {/* THE KEY IS PINNED TO THE FOOT OF THE WINDOW (Mark, 2026-08-20). The
+        strip's four states and the six rungs they stand for are a legend, and a
+        legend under a 500-row table is a legend nobody has read since the first
+        screenful — where pinned it is there at the row you are actually looking
+        at. `ui/StickyFooter` measures its own height into a spacer, so the last
+        row stays clear of it with no guessed constant. */}
+    <StickyFooter spacerClassName="-mt-2">
+      {/* The CALLER draws the frame — `ui/StickyFooter` contributes position and
+          a white backdrop and nothing else. Without a top rule the rows scroll
+          up into an unmarked white band. */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 border-t border-hairline pt-2 text-[11px] text-muted">
+        <span className="flex items-center gap-1.5">
+          <Tick className="bg-ink" /> done
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Tick className="bg-accent" /> overdue
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Tick className="bg-mark-fill" /> waiting on them
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Tick className="bg-neutral-200" /> not yet
+        </span>
+        <span className="text-subtle">{PROGRESS_LABELS.join(" · ")}</span>
+      </div>
+    </StickyFooter>
+    </>
   );
+}
+
+/** One legend swatch, the same 8×13 the strip draws. */
+function Tick({ className }: { className: string }) {
+  return <span aria-hidden className={`block h-[11px] w-[8px] ${className}`} />;
 }

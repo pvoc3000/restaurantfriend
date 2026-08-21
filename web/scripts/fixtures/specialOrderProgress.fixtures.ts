@@ -1,0 +1,158 @@
+// The list's row progress bar: six rungs, and the two special cases.
+//
+// The shapes here are real ones out of the 8,321 migrated orders — including
+// the wholesale order that skips quoting entirely, which is the case that makes
+// "how many are done" and "which are done" say different things.
+
+import { test, eq, ok, no } from "./harness";
+import {
+  PROGRESS_LABELS,
+  WASH_ALPHA,
+  orderProgress,
+  progressColor,
+  progressRowStyle,
+} from "../../src/lib/specialOrderProgress";
+
+const TODAY = "2026-08-20";
+
+/** An order with nothing stamped, far enough out that nothing is overdue. */
+const base = {
+  kind: "order",
+  status: "order",
+  fulfillment: "pickup",
+  event_date: "2026-12-01",
+  flag_reason: null,
+  quote_sent_at: null,
+  quote_returned_at: null,
+  invoice_sent_at: null,
+  invoice_paid_at: null,
+  delivery_scheduled_at: null,
+  order_scheduled_at: null,
+  order_printed_at: null,
+} as never;
+
+const order = (patch: Record<string, unknown>) =>
+  orderProgress({ ...(base as object), ...patch } as never, TODAY);
+
+/* -- the ladder ----------------------------------------------------------- */
+
+test("six rungs, and Lead is the first", () => {
+  eq(PROGRESS_LABELS.length, 6);
+  eq(PROGRESS_LABELS[0], "Lead");
+  eq(PROGRESS_LABELS[5], "Printed & scheduled");
+});
+
+test("an order with nothing stamped is 1 of 6, never 0", () => {
+  // The bar never renders as an empty track: an order that EXISTS has reached
+  // stage one, and a sliver reads as "started" where zero reads as "broken".
+  const p = order({});
+  eq(p.done, 1);
+  eq(p.total, 6);
+  ok(p.fraction > 0, "a fraction to draw");
+});
+
+test("each stamp advances it by one", () => {
+  eq(order({ quote_sent_at: "2026-08-01" }).done, 2);
+  eq(order({ quote_sent_at: "2026-08-01", quote_returned_at: "2026-08-02" }).done, 3);
+  eq(
+    order({
+      quote_sent_at: "2026-08-01",
+      quote_returned_at: "2026-08-02",
+      invoice_sent_at: "2026-08-03",
+      invoice_paid_at: "2026-08-04",
+    }).done,
+    5
+  );
+});
+
+test("the last rung needs BOTH stamps — printed alone is not done", () => {
+  // Mark's call, and the consequence is deliberate: `order_printed_at` is
+  // filled on 64% of real orders and `order_scheduled_at` on 23%, so 41% of
+  // printed orders sit at 5 of 6. Production scheduling is the real last step.
+  const printed = order({
+    quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a", invoice_paid_at: "a",
+    order_printed_at: "2026-08-05",
+  });
+  eq(printed.done, 5);
+  eq(printed.ticks[5].state, null);
+
+  const both = order({
+    quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a", invoice_paid_at: "a",
+    order_printed_at: "2026-08-05", order_scheduled_at: "2026-08-05",
+  });
+  eq(both.done, 6);
+  eq(both.fraction, 1);
+});
+
+test("a wholesale order that never gets quoted still counts what IS done", () => {
+  // Cafe Knotted's real shape: billed weekly, so no quote is ever sent or
+  // returned. The bar is a COUNT and the strip is WHICH — they do not
+  // contradict each other, and about 11% of orders look like this.
+  const p = order({
+    invoice_sent_at: "a", invoice_paid_at: "a",
+    order_printed_at: "a", order_scheduled_at: "a",
+  });
+  eq(p.done, 4);
+  eq(p.ticks.map((t) => (t.state === "done" ? 1 : 0)).join(""), "100111");
+});
+
+/* -- the two special cases ------------------------------------------------ */
+
+test("a cancelled order gets NO bar, whatever it had reached", () => {
+  const p = order({ status: "cancelled", quote_sent_at: "a", invoice_sent_at: "a" });
+  eq(p.tone, "none");
+  eq(progressRowStyle(p), null, "no style at all, so the row is left untouched");
+});
+
+test("a flagged order is FULL WIDTH and red, whatever its stages say", () => {
+  const p = order({ flag_reason: "Wrong letters — remake" });
+  eq(p.tone, "flagged");
+  const style = progressRowStyle(p)!;
+  ok(style.backgroundImage.includes("210, 0, 0"), "red");
+  ok(style.backgroundImage.includes("100%"), "full width");
+  // …and it does not pretend the stages are done.
+  eq(p.done, 1);
+});
+
+test("cancelled beats flagged", () => {
+  // 705 real orders are cancelled; a flag is cleared as soon as it is dealt
+  // with. An order called off is not an open problem.
+  eq(order({ status: "cancelled", flag_reason: "something" }).tone, "none");
+});
+
+/* -- the colour ----------------------------------------------------------- */
+
+test("the ramp runs yellow to green", () => {
+  eq(progressColor(0), [255, 212, 0]);
+  eq(progressColor(1), [74, 156, 63]);
+  const mid = progressColor(0.5);
+  ok(mid[0] < 255 && mid[0] > 74, "red channel falls");
+  ok(mid[1] < 212 && mid[1] > 156, "green channel falls toward the green");
+});
+
+test("the wash is 20% and the fill stops at the fraction", () => {
+  eq(WASH_ALPHA, 0.2);
+  const p = order({ quote_sent_at: "a", quote_returned_at: "a" }); // 3 of 6
+  const style = progressRowStyle(p)!;
+  ok(style.backgroundImage.includes("0.2"), "20% alpha");
+  ok(style.backgroundImage.includes("50.000%"), "half way");
+  // Two layers: the edge rule and the wash, both on the row.
+  eq(style.backgroundSize, "100% 3px, 100% 100%");
+  eq(style.backgroundPosition, "left bottom, left top");
+});
+
+/* -- the states the strip shows ------------------------------------------- */
+
+test("a rung that is somebody else's move reads as waiting, not overdue", () => {
+  const p = order({ quote_sent_at: "2026-08-01" });
+  eq(p.ticks[2].state, "waiting", "quote returned");
+});
+
+test("an event that has passed makes the undone rungs overdue", () => {
+  const p = orderProgress(
+    { ...(base as object), event_date: "2026-08-01" } as never,
+    TODAY
+  );
+  eq(p.ticks[1].state, "overdue", "quote sent");
+  no(p.ticks.some((t) => t.state === "waiting"), "nothing is merely waiting once it is late");
+});
