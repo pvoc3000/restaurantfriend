@@ -1,8 +1,12 @@
 # Special Orders module — build brief
 
-**Status: phases 1–3 DONE and live (2026-08-20); 4 and 5 not yet.** Read
-`CLAUDE.md` first, then this — and read the corrections directly below before
-trusting any measurement in the body, because five of them are wrong.
+**Status: phases 1–3 and 4a DONE and live (2026-08-21); 4b, 4c and 5 not yet.**
+The public inquiry form is in use, migrations 051–058 are applied, and all
+three of the module's edge functions are deployed. **Start at "Where a next session picks up"** at the
+foot of this file — it carries the probes, what 4b and 4c still need, and what
+is on the live database. Read `CLAUDE.md` first, then this, and read the
+corrections directly below before trusting any measurement in the body, because
+five of them are wrong.
 
 ---
 
@@ -828,15 +832,19 @@ check `max(OrderID)` against the live layout before trusting it.**
    the form's value is complete without the picker — the Square form it
    replaces has no picker either.
 
-   **4a ✅ BUILT AND LIVE — 057 applied and `submit-inquiry` deployed by Mark
-   2026-08-21, then walked end to end** (see the walk's record below).
-   Migration **058 NEEDS APPLYING** — the auto-flag. Migration **057**
-   (`create_inquiry` + `inquiry_shops`, both granted `anon`;
+   **4a ✅ DONE AND LIVE (2026-08-21), walked end to end and in use.**
+   Migration **057** (`create_inquiry` + `inquiry_shops`, both granted `anon`;
    `customers.source` gains `'inquiry'`; `locations.public_name`; the throttle
-   index; the form's settings), the **`submit-inquiry`** edge function,
-   `lib/inquiry.ts` + **28 fixtures**, `/inquiry` + its `proxy.ts` exemption,
-   `NEXT_PUBLIC_ORG_ID`, and a `Message-ID` field on the shared mail layer.
-   See "Where a next session picks up" for exactly what Mark still has to run.
+   index; the form's settings) and **058** (a new inquiry arrives flagged), both
+   APPLIED; the **`submit-inquiry`** edge function, DEPLOYED;
+   `lib/inquiry.ts` + fixtures, `/inquiry` + its `proxy.ts` exemption,
+   `NEXT_PUBLIC_ORG_ID`, and a `Message-ID` field on the shared mail layer so
+   the confirmation can be the thread root.
+   It grew three things beyond the decision list, all from using it:
+   **`/settings`** (the six email templates and the module's own words, editable
+   at last), **`lib/orderWorkflow`** (the app proposes the next step as things
+   happen), and the auto-flag. Nothing is outstanding — see "Where a next
+   session picks up" for the probes that prove it.
 
    **4b — the build-your-box picker** and the `show_on_inquiry_form` curation
    UI. Not built.
@@ -844,7 +852,8 @@ check `max(OrderID)` against the live layout before trusting it.**
    **4c — the fallback lane**: the `parse-inquiry` edge function and paste
    dialog (decision 10), fixtures from the three real emails. Not built.
 
-   The Square form retires when 4a is live.
+   The Square form can retire now — 4a is live. 4b and 4c are additions to a
+   door that already works, not prerequisites for it.
 5. **Production + recurrence.** Schedule/unschedule against 040's seam
    (verify the packet picks the lines up — it should, by construction); the
    standing-order materializer (verified idempotent on the harness: two
@@ -856,37 +865,131 @@ Each phase ships usable; nothing later blocks earlier.
 
 ---
 
-## Where a next session picks up (2026-08-20, after 4a)
+## Where a next session picks up (2026-08-21, after 4a)
 
-**057 AND 058 ARE APPLIED AND `submit-inquiry` IS DEPLOYED** (Mark, 2026-08-21).
+**Work on `main`.** Nothing is forked and Mark has asked for no more branches.
 
-**REDEPLOY `submit-inquiry`** — the confirmation template moved from
-`special_orders.inquiry_email` to `special_orders.email.inquiry`, beside the
-other five, so one settings screen covers every message the module sends. Until
-it is redeployed the function reads the old key, which nobody ever set, so both
-paths fall back to the same built-in text and nothing breaks meanwhile — but
-editing that template on `/settings` will appear to do nothing.
+### Nothing is outstanding — 4a is applied, deployed and in use
 
-**The settings have a screen**: `/settings` edits the six email templates, the
-inquiry form's two paragraphs, the terms and invoice footer, the timing numbers,
-and states the mailbox read-only. Owner/admin. Clearing a box restores the
-built-in default, which is why each placeholder IS the default.
-`locations.public_name` is on the location record.
+**Do not take this paragraph on trust; the house rule is probe, don't read.**
 
-**Still to run: migration 058**, the auto-flag. Its tail block carries the
-probes; the one that matters is `select count(*) from pg_proc where proname =
-'create_inquiry'` returning **ONE**, because two would mean the argument list
-drifted and 057's version is still live beside it.
+| Thing | Probe |
+| --- | --- |
+| migrations 057 + 058 | `select public.inquiry_shops(null)` → `[]`, and `select public.create_inquiry(null, 'A Name')` → `{"ok": false, "state": "unknown_org"}` — an ANSWER, not an error, which is the property the whole design rests on |
+| 058 specifically | `select count(*) from pg_proc where proname = 'create_inquiry'` → **ONE**. Two means the argument list drifted and 057's version is live beside it |
+| `submit-inquiry` | POST an empty body with the anon key → 400 `missing org_id or name`, which also proves `_shared/email.ts` bundled |
+| `locations.public_name` | selects, and DF01/DF02 read "Highland Park" / "DTLA" |
 
-`NEXT_PUBLIC_ORG_ID` is in `web/.env.local` (`5803adf6-…`); **it also has to go
-into Vercel** before the form works on the deployment, and Next inlines it at
-BUILD time, so it needs a redeploy rather than a reload.
+`NEXT_PUBLIC_ORG_ID` is in `web/.env.local` and in Vercel. Next inlines it at
+BUILD time, so changing it needs a redeploy rather than a reload.
 
-Redeploying `send-po-email`, `send-special-order-email` and `approve-quote` is
-**hygiene, not a requirement**: `_shared/email.ts` gained an OPTIONAL
-`messageId` and none of them passes it. Verified by rendering both providers in
-Node — with no `messageId` the Gmail MIME carries no `Message-ID` header and
-Resend's `headers` object is `undefined`, exactly as before.
+**`send-po-email`, `send-special-order-email` and `approve-quote` still run the
+pre-`messageId` `_shared/email.ts`** (last deployed 2026-08-19; `submit-inquiry`
+is v2, 2026-08-21). That is FINE and was verified rather than assumed: the field
+is optional and none of them passes it, so with no `messageId` the Gmail MIME
+carries no `Message-ID` header and Resend's `headers` object is `undefined`,
+exactly as before. Redeploy them for hygiene whenever something else takes you
+there.
+
+### What 4a actually shipped, beyond the form
+
+Worth knowing because none of it is in the original decision list:
+
+- **`/settings` is a real screen** (owner/admin), editing `orgs.settings`
+  through `InlineValue`'s `jsonColumn`/`jsonPath`: the six email templates,
+  the inquiry form's two paragraphs, the terms and invoice footer, the timing
+  numbers, and a READ-ONLY statement of the mailbox. **Clearing a box restores
+  the built-in default**, which is why each placeholder IS the default.
+- **The workflow guides you** — `lib/orderWorkflow` holds the rules as data and
+  closes them transitively, so one act asks ONE question. Wired to the stage
+  dates, the send card, and a settling payment; plus `StatusCatchUp`, the
+  yellow `→` beside Status for orders whose dates have run ahead of it.
+- **A new inquiry arrives flagged** "New Inquiry" (058), which paints the row
+  full-width red and puts it top of `needsAttention`.
+- The row progress bar starts at Quote, not at Lead.
+- A list's create command sits ABOVE the filter row, not at the end of it.
+
+### 4b — the build-your-box picker (NOT BUILT)
+
+The larger of the two remaining pieces. Decision 18's second half.
+
+- **`production_items.show_on_inquiry_form` is FALSE on all 307 items**
+  (`select count(*) from production_items where show_on_inquiry_form` → 0), so
+  **the curation UI has to ship with the picker or it offers nothing**.
+- The menu comes from a definer RPC granted `anon`, named for its one caller
+  (`inquiry_menu`, not `production_items_public` — 044's rule that a general
+  name invites the columns to creep back). It can collapse
+  `lib/productionPrice`'s cascade into
+  `coalesce(item_override, location_override, grid.price)`.
+- **It should return the TAXONOMY as well as name/size/price**, against the
+  brief's own wording above: 038 measured that "Angry Samoa" is FOUR different
+  donuts, so a name-and-size list is ambiguous on a public page. Cost,
+  `price_class` and `price_tier` never leave the server.
+- Curation is one optional `column` prop on `catalog/ActiveToggle` **defaulting
+  to `is_active`** (so no existing caller moves), a column and a `FilterMenus`
+  dimension on `/production-items` (bump its `storageKey` to `v4` — a stored
+  column order outranks the declared one), and a switch on the item record,
+  remembering that `ProductionItemFields`' `<dl>` interleaves left/right pairs
+  so rows go in two at a time or after Notes.
+- Picked lines land as real `special_order_items` on the lead, which means
+  `create_inquiry` grows a lines argument — and the totals on the page are
+  labelled **ESTIMATE**, never a quote.
+
+### 4c — the organic-email parser (NOT BUILT)
+
+Cheaper, and less urgent now the form exists: it is only for people who email
+specialorders@ directly rather than using the form.
+
+- `parse-inquiry` follows `extract-invoice`'s shape, including its two hard API
+  traps — **`content[0]` is a thinking block**, and **`stop_reason: "refusal"`
+  arrives as HTTP 200** — and the cap of 16 union-typed parameters per schema.
+- Fixtures come from the three real emails in `FMP Export/Special Orders/*.pdf`.
+  Their labels, verbatim: Full name · Email · Phone number · Occasion · Delivery
+  or Pickup · Address · Preferred Location · Time · Date · What are you
+  interested in? · Please describe… · Any allergies?
+- **Two traps those samples already show.** `Address` is OMITTED entirely when
+  blank, so a positional parser breaks — label-driven only. And an address is
+  present on PICKUP submissions (two of the three), so **an address is not
+  evidence of delivery**. All three are pickups, so there is **no delivery
+  sample** to test against.
+- The paste dialog goes in `NewSpecialOrder`'s footer — the "importing has
+  exactly one door, and it is inside the New timesheet dialog" precedent — and
+  writes through `lib/createSpecialOrder`, which is the door the handoff note
+  always meant (the ANON path could not use it; see 057's header).
+
+### What is on the live database right now
+
+Four non-FileMaker orders, all tests, none of which should be tidied away
+without asking — two are Mark's and two are evidence:
+
+| # | Source | State | Why it is there |
+| --- | --- | --- | --- |
+| 10007 | app | lead, 2026-08-22 | an earlier hand-made test |
+| 10013 | inquiry | lead, quote sent 2026-08-21 | the end-to-end walk. Its quote went out and its status is still Lead, so it is the live demonstration of `StatusCatchUp` |
+| 10014 | inquiry | lead, flag cleared, dated 2026-08-20 | Mark's own test of the flag → resolve loop. Its date is in the PAST, so it does not appear in the default Upcoming view |
+| 10015 | inquiry | lead, flagged "New Inquiry" | Mark's test. The live demonstration of a new inquiry reading as a red row |
+
+`customers` holds 5,875, of which exactly ONE has `source = 'inquiry'` — the
+rest of the walk matched existing rows, which is the privacy rule working on
+real data. `orgs.settings.special_orders.email` is UNSET, so all six templates
+are at their code defaults.
+
+### Known and deliberately not done
+
+- **The Leads band was built and reverted** (Mark, 2026-08-21: "Flagging the
+  order is enough for now. I may want to revisit this in the future"). If it
+  comes back, the substantive half is VISIBILITY, not the band: the default
+  `upcoming` view wants `event_date >= today`, so an inquiry whose customer left
+  the date blank or picked a day since passed does not appear there at all.
+  #10014 is in exactly that state today.
+- `orgs.settings.special_orders.document_phone` is unset, so documents print the
+  billing phone `(213) 908-2743` where FileMaker's printed `213 995 6191`. It is
+  now editable on `/settings` — Mark has simply not asked for it.
+- The statement command has still never been run against a real Cafe Knotted
+  week. Decision 21's own acceptance test needs wholesale orders to exist, which
+  is phase 5's materializer.
+- Order #9877 carries three quote tokens from phase 3's walk. Still evidence,
+  still not to be tidied.
 
 ### The end-to-end walk (2026-08-21)
 

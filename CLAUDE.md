@@ -3121,19 +3121,23 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    real tables (its census caught all of this). Ships vestigial:
    `locations.kitchen_by_weekday` / `shops_for` retire when kitchen-on-plan
    lands.
-4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3 AND 4a DONE AND
-   LIVE (057 applied and `submit-inquiry` deployed 2026-08-21, then walked end
-   to end); migration 058 NEEDS APPLYING; 4b, 4c and 5 not built.** The module records, quotes, invoices,
-   prints, emails as specialorders@ and takes a customer's approval on a public
-   page; what remains is the inquiry form's own picker (4b), the organic-email
-   parser (4c) and production/recurrence (5). Read
-   **`docs/special-orders-brief.md`** before designing or touching
-   anything here — its **"Where a next session picks up"** section is the
-   handoff and names the two things Mark still has to run, and its CORRECTIONS
-   block comes first: five measurements in the body are wrong, because the
-   brief was designed from a `parseInt` reading of `OrderID`.
-   **Shipped 2026-08-20, phase 4a — THE FRONT DOOR (migration 057 APPLIED and
-   `submit-inquiry` DEPLOYED 2026-08-21).** Decision 18: a public
+4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3 AND 4a DONE, LIVE
+   AND IN USE (2026-08-21); 4b, 4c and 5 not built. NOTHING IS OUTSTANDING —
+   migrations 051–058 are applied and all three of the module's edge functions
+   are deployed.**
+   The module records, quotes, invoices, prints, emails as specialorders@, takes
+   a customer's approval on a public page, takes inquiries on a public form, and
+   proposes the next step as things happen. What remains is the inquiry form's
+   own build-your-box picker (4b), the organic-email parser (4c) and
+   production/recurrence (5).
+   **Read `docs/special-orders-brief.md` before designing or touching anything
+   here, and START AT ITS "Where a next session picks up" SECTION** — that is
+   the handoff, and it carries the probes for everything this line claims, what
+   4b and 4c each still need, and what test data is on the live database. Its
+   CORRECTIONS block comes first: five measurements in the body are wrong,
+   because the brief was designed from a `parseInt` reading of `OrderID`.
+   **Shipped 2026-08-20/21, phase 4a — THE FRONT DOOR (migrations 057 + 058
+   APPLIED, `submit-inquiry` DEPLOYED). *Probe, don't read this line.*** Decision 18: a public
    `/inquiry` form that creates a lead directly, replacing the Square web form
    whose entries a human retyped. Scoped to the form ALONE on Mark's call — the
    build-your-box picker (4b) and the paste-and-parse fallback (4c) are
@@ -3214,7 +3218,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    confirmation. The one leg no probe can settle is what the mailbox does with
    it.
    **Four tweaks the same day, all Mark's, after using it:**
-   **(a) A NEW INQUIRY ARRIVES FLAGGED** (migration **058**, NEEDS APPLYING) —
+   **(a) A NEW INQUIRY ARRIVES FLAGGED** (migration **058**, APPLIED) —
    `flag_reason = 'New Inquiry'`, because a lead that joins 8,330 others as an
    ordinary row is not "easily noticed" and `flag_reason` is what this module
    already has for "look at this one". **The to-do deliberately stays "Respond
@@ -3289,9 +3293,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `DEFAULT_TEMPLATES` so the screen can show it — the Deno function still holds
    the copy that is actually sent, the same `web/`-boundary duplication
    `send-special-order-email` makes for `STAGE_COLUMN`, flagged at both ends.
-   **`submit-inquiry` MUST BE REDEPLOYED** for the new key to be read; until
-   then it looks for the old one, which nobody ever set, so both paths fall back
-   to the same built-in text and nothing breaks meanwhile.
+   **`submit-inquiry` was REDEPLOYED for the new key** (v2, 2026-08-21) — v1
+   looked for the old one, which nobody ever set, so both paths fell back to the
+   same built-in text and nothing broke in between.
    **`locations.public_name` is editable on the location record**, in the
    identity `dl` between Code and Kind, with the location's own `name` as the
    PLACEHOLDER — so the cell always says what a customer would see right now,
@@ -3786,6 +3790,24 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Known gap: **the CREATE still seeds only the text.** Resolving the signed-in
    member to their employee row needs `employees.user_id`, which a supervisor
    cannot read — a third definer, not built. Pick the person on the record.
+   **057 AND 058 ARE APPLIED** (Mark, 2026-08-21) — the inquiry form and its
+   auto-flag. *Probe, don't read this line*, and there are two that matter.
+   `select public.create_inquiry(null, 'A Name')` must return
+   `{"ok": false, "state": "unknown_org"}` — an ANSWER, not an error, which is
+   the property the whole public surface rests on; and
+   `select count(*) from pg_proc where proname = 'create_inquiry'` must return
+   **ONE**, because two would mean 058's argument list drifted from 057's and
+   both versions are live (033's `freeze_pay_period` trap). Also
+   `select public.inquiry_shops(null)` → `[]`, and `locations.public_name`
+   selects, with DF01/DF02 reading "Highland Park" / "DTLA".
+   **`submit-inquiry` is DEPLOYED at v2** — v1 read the confirmation template
+   from `special_orders.inquiry_email`, v2 from `special_orders.email.inquiry`
+   beside the other five, which is what `/settings` edits. `send-po-email`,
+   `send-special-order-email` and `approve-quote` still run the pre-`messageId`
+   `_shared/email.ts` (last deployed 2026-08-19) and that is FINE, verified
+   rather than assumed: the field is optional and none of them passes it, so no
+   `Message-ID` header is emitted and Resend's `headers` object stays
+   `undefined`, exactly as before.
 
    **(r) THE ROW IS A PROGRESS BAR** (Mark, 2026-08-20, after a mockup pass).
    A wash fills each row of `/special-orders` to the fraction of stages done,
