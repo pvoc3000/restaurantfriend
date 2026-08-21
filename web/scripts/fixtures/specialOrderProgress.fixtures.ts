@@ -51,13 +51,38 @@ test("six rungs, and Lead is the first", () => {
   eq(PROGRESS_LABELS[5], "Printed & scheduled");
 });
 
-test("an order with nothing stamped is 1 of 6, never 0", () => {
-  // The bar never renders as an empty track: an order that EXISTS has reached
-  // stage one, and a sliver reads as "started" where zero reads as "broken".
+test("an order with nothing stamped is 1 of 6, and DRAWS NOTHING", () => {
+  // Reversed 2026-08-21 (Mark): the first cut drew a 1/6 sliver so the bar was
+  // never an empty track. Being a lead is the starting line, not progress —
+  // every order has reached it, so a mark every row carries distinguishes
+  // nothing, and on a list of leads it is a column of identical slivers.
   const p = order({});
-  eq(p.done, 1);
+  eq(p.done, 1, "the TICK is still done — the strip shows it");
   eq(p.total, 6);
-  ok(p.fraction > 0, "a fraction to draw");
+  eq(p.fraction, 0, "but there is no bar to draw");
+  eq(progressRowStyle(p), null, "and no background at all, not a zero-width one");
+});
+
+test("QUOTE SENT is the first visible bar", () => {
+  const p = order({ quote_sent_at: "2026-08-01" });
+  eq(p.done, 2);
+  ok(p.fraction > 0, "something to draw");
+  const style = progressRowStyle(p)!;
+  ok(style.backgroundImage.includes("20.000%"), "one of the five drawn steps");
+});
+
+test("the five drawn steps are evenly spaced, 0 to 1", () => {
+  // (done - 1) / (total - 1): the bar measures the rungs BEYOND the lead.
+  const stamps = [
+    {},
+    { quote_sent_at: "a" },
+    { quote_sent_at: "a", quote_returned_at: "a" },
+    { quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a" },
+    { quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a", invoice_paid_at: "a" },
+    { quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a", invoice_paid_at: "a",
+      order_printed_at: "a", order_scheduled_at: "a" },
+  ];
+  eq(stamps.map((st) => order(st).fraction), [0, 0.2, 0.4, 0.6, 0.8, 1]);
 });
 
 test("each stamp advances it by one", () => {
@@ -160,6 +185,34 @@ test("a flagged order is FULL WIDTH and red, whatever its stages say", () => {
   eq(p.done, 1);
 });
 
+test("A FLAGGED LEAD STILL DRAWS — and after 058 that is the common case", () => {
+  // Every inquiry from the public form arrives flagged AND as a bare lead, so
+  // the two rules meet on the commonest new row in the list. Flagged has to be
+  // decided FIRST: the other order gives every new inquiry no bar at all, which
+  // is the exact opposite of what flagging it is for.
+  const p = order({ flag_reason: "New Inquiry" });
+  eq(p.done, 1, "a bare lead");
+  eq(p.fraction, 0, "which on its own would draw nothing");
+  const style = progressRowStyle(p)!;
+  ok(style !== null, "but it draws");
+  ok(style.backgroundImage.includes("210, 0, 0"), "red");
+  ok(style.backgroundImage.includes("100%"), "full width");
+});
+
+test("the ramp starts YELLOW at the first visible bar and ends GREEN", () => {
+  // The bar spans the five rungs beyond the lead, so the ramp must too —
+  // otherwise the first thing you ever see is already a third of the way green.
+  const first = order({ quote_sent_at: "a" });
+  const last = order({
+    quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a", invoice_paid_at: "a",
+    order_printed_at: "a", order_scheduled_at: "a",
+  });
+  const [r, g] = progressColor(first.fraction);
+  ok(r > 200, "still essentially yellow at the first drawn step");
+  eq(progressColor(last.fraction), [74, 156, 63], "green at the last");
+  ok(g > 0);
+});
+
 test("cancelled beats flagged", () => {
   // 705 real orders are cancelled; a flag is cleared as soon as it is dealt
   // with. An order called off is not an open problem.
@@ -181,7 +234,8 @@ test("the wash is 20% and the fill stops at the fraction", () => {
   const p = order({ quote_sent_at: "a", quote_returned_at: "a" }); // 3 of 6
   const style = progressRowStyle(p)!;
   ok(style.backgroundImage.includes("0.2"), "20% alpha");
-  ok(style.backgroundImage.includes("50.000%"), "half way");
+  // 3 of 6 is the SECOND of five drawn steps, not half — the lead draws none.
+  ok(style.backgroundImage.includes("40.000%"), "two of the five steps");
   // Two layers: the edge rule and the wash, both on the row.
   eq(style.backgroundSize, "100% 3px, 100% 100%");
   eq(style.backgroundPosition, "left bottom, left top");
@@ -284,16 +338,46 @@ test("the last rung is the table's right edge, so a finished order fills the row
 });
 
 test("too few rules to be increasing → null, and the raw fraction is used", () => {
-  // A reader who has hidden the table down to five columns. Snapping badly is
-  // worse than not snapping.
-  eq(snapStops(6, [0.2, 0.4, 0.6, 0.8, 1]), null);
+  // A reader who has hidden the table down to a handful of columns. Snapping
+  // badly is worse than not snapping.
+  //
+  // NOTE the threshold moved with the change: the bar asks for FIVE stops now,
+  // not six, so five rules is enough and it takes four to fall back.
+  eq(snapStops(5, [0.25, 0.5, 0.75, 1]), null, "four rules cannot hold five stops");
+  ok(snapStops(5, [0.2, 0.4, 0.6, 0.8, 1]) !== null, "five can");
   const p = order({ quote_sent_at: "a", quote_returned_at: "a" }); // 3 of 6
-  const style = progressRowStyle(p, [0.2, 0.4, 0.6, 0.8, 1])!;
-  ok(style.backgroundImage.includes("50.000%"), "falls back to the fraction");
+  const style = progressRowStyle(p, [0.25, 0.5, 0.75, 1])!;
+  ok(style.backgroundImage.includes("40.000%"), "falls back to the fraction");
 });
 
 test("exactly as many rules as rungs is enough", () => {
   eq(snapStops(6, [0.2, 0.35, 0.5, 0.65, 0.8, 1])!.length, 6);
+});
+
+test("each rung takes ITS OWN snapped stop — the index is done-2", () => {
+  // Found by breaking it: nothing pinned WHICH stop a given rung draws to, so
+  // `snapped[done - 1]` passed the whole suite while drawing every bar one
+  // column too long — and the last rung read `undefined`, which formats as
+  // "NaN%" and paints nothing at all.
+  //
+  // Five stops over NINE rules, worked out by hand from `snapStops`:
+  const stops = snapStops(5, NINE)!;
+  eq(stops, [0.186, 0.351, 0.629, 0.792, 1]);
+
+  const widthOf = (p: ReturnType<typeof order>) => {
+    const css = progressRowStyle(p, NINE)!.backgroundImage;
+    return css.slice(css.indexOf(") ") + 2, css.indexOf("%,") + 1);
+  };
+  eq(widthOf(order({ quote_sent_at: "a" })), "18.600%", "rung 2 → the first stop");
+  eq(widthOf(order({ quote_sent_at: "a", quote_returned_at: "a" })), "35.100%", "rung 3 → the second");
+  eq(
+    widthOf(order({
+      quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a", invoice_paid_at: "a",
+      order_printed_at: "a", order_scheduled_at: "a",
+    })),
+    "100.000%",
+    "the last rung is the table's own right edge"
+  );
 });
 
 test("the LENGTH snaps but the COLOUR does not", () => {

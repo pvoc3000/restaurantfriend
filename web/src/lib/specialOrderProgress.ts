@@ -28,9 +28,35 @@
  *     58.4% of orders. The ladder ends where the kitchen's work does.
  *
  * ---------------------------------------------------------------------------
- * STAGE ONE IS "LEAD" AND IS ALWAYS DONE. An order that exists has reached it,
- * so the bar never renders as an empty track — a row with nothing stamped still
- * shows a sliver, which reads as "started" where zero reads as "broken".
+ * STAGE ONE IS "LEAD" AND IS ALWAYS DONE — an order that exists has reached it.
+ * It is a TICK on the strip and it DRAWS NO BAR (Mark, 2026-08-21: "Stage 1
+ * (leads) should have no visible progress bar. Stage 2 (quotes sent) should
+ * have the first visible display of a progress bar.")
+ *
+ * This reverses the first cut, which drew a 1/6 sliver on the reasoning that
+ * zero reads as "broken" where a sliver reads as "started". Using it settled it
+ * the other way, and the argument is better: **being a lead is the starting
+ * line, not progress**. Every order has reached it, so a mark that every row
+ * carries distinguishes nothing — and on a list whose default view is full of
+ * leads, a column of identical slivers is just noise with a colour.
+ *
+ * So the BAR measures the five rungs BEYOND the lead: nothing at rung 1, the
+ * first visible length at rung 2, full at rung 6. The strip is unchanged and
+ * still shows all six, because "which rungs are done" and "how far along" are
+ * different questions and the tick answers the first.
+ *
+ * `fraction` IS THE BAR'S OWN LENGTH, not `done / total`. It is what the width
+ * and the colour ramp are both computed from, so it means the thing it draws —
+ * a field that said 1/6 while the bar drew nothing would be a trap. `done` and
+ * `total` keep counting the whole six-rung ladder, which is what the checklist
+ * reads.
+ *
+ * A FLAGGED LEAD STILL DRAWS, and after migration 058 that is the common case
+ * rather than an edge: every inquiry from the public form arrives flagged, and
+ * most arrive as nothing but a lead. Flagged is full-width red whatever the
+ * stages say, so the "no bar at rung 1" rule is checked AFTER it — the other
+ * order would make every new inquiry invisible, which is the exact opposite of
+ * what flagging them is for.
  *
  * ---------------------------------------------------------------------------
  * THE STATUS SETS A FLOOR, AND THE DATES CAN ONLY PUSH IT FURTHER (Mark,
@@ -97,7 +123,13 @@ export type OrderProgress = {
   /** How many of the six are done, 1..6 — never 0; see the header. */
   done: number;
   total: number;
-  /** `done / total`, 0.1666…1. */
+  /**
+   * THE BAR'S OWN LENGTH, `(done - 1) / (total - 1)` — 0 at the lead rung and 1
+   * when everything is done. Deliberately NOT `done / total`: the lead draws
+   * nothing, so a fraction counting it would not describe what is on screen.
+   * Both the width and the colour ramp read this, which is what keeps the first
+   * VISIBLE bar yellow and the last green.
+   */
   fraction: number;
   ticks: ProgressTick[];
   /**
@@ -190,7 +222,7 @@ export function orderProgress(
   const tone: OrderProgress["tone"] =
     order.status === "cancelled" ? "none" : order.flag_reason ? "flagged" : "progress";
 
-  return { done, total, fraction: done / total, ticks, tone };
+  return { done, total, fraction: (done - 1) / (total - 1), ticks, tone };
 }
 
 /**
@@ -288,8 +320,13 @@ const rgba = ([r, g, b]: [number, number, number], a: number) => `rgba(${r}, ${g
  * "strictly increasing" is unsatisfiable, and the honest answer is the
  * unsnapped fraction.
  *
- * The last rung always takes the last boundary, which is the table's own right
+ * The last step always takes the last boundary, which is the table's own right
  * edge, so a finished order fills the row exactly.
+ *
+ * NOTE `total` IS THE NUMBER OF DRAWN STEPS, not the ladder's length. Since the
+ * lead rung draws nothing, the caller passes FIVE for a six-rung ladder — which
+ * also means the "too few rules" fallback bites one column later than it used
+ * to.
  */
 export function snapStops(total: number, boundaries: number[]): number[] | null {
   const rules = boundaries.filter((b) => b > 0 && b <= 1);
@@ -339,13 +376,26 @@ export function progressRowStyle(
 } | null {
   if (p.tone === "none") return null;
 
-  const solid = p.tone === "flagged" ? RED : progressColor(p.fraction);
-  const snapped = snapStops(p.total, boundaries);
+  // FLAGGED IS DECIDED FIRST, and the order matters more than it looks: after
+  // migration 058 every inquiry from the public form arrives flagged AND as a
+  // bare lead, so checking "no bar at rung 1" first would leave every new
+  // inquiry unmarked — the precise opposite of what flagging it is for.
+  const flagged = p.tone === "flagged";
+
+  // THE LEAD RUNG DRAWS NOTHING. Not a zero-width bar — no background at all,
+  // so the row is left exactly as the table painted it and the 3px edge rule
+  // does not appear either. See the header.
+  if (!flagged && p.done <= 1) return null;
+
+  const solid = flagged ? RED : progressColor(p.fraction);
+  // FIVE drawn steps over a six-rung ladder, and the index is `done - 2`
+  // because rung 2 is the first one that draws.
+  const snapped = snapStops(p.total - 1, boundaries);
   // The COLOUR still runs off the true fraction — only the LENGTH snaps, so
-  // the ramp stays even across the six rungs however the columns are dragged.
-  const width = snapped ? snapped[p.done - 1] : p.fraction;
-  const stop = p.tone === "flagged" ? "100%" : `${(width * 100).toFixed(3)}%`;
-  const wash = rgba(solid, p.tone === "flagged" ? 0.15 : WASH_ALPHA);
+  // the ramp stays even across the drawn rungs however the columns are dragged.
+  const width = snapped ? snapped[p.done - 2] : p.fraction;
+  const stop = flagged ? "100%" : `${(width * 100).toFixed(3)}%`;
+  const wash = rgba(solid, flagged ? 0.15 : WASH_ALPHA);
 
   return {
     backgroundImage: [

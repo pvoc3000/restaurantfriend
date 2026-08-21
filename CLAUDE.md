@@ -3672,9 +3672,35 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    deliberate, because scheduling is the real last step. And there is **no
    Receipt rung** though `receipt_sent_at` is filled on 58.4%; the ladder ends
    where the kitchen's work does.
-   **STAGE ONE IS ALWAYS DONE**, so the bar is never an empty track: a row with
-   nothing stamped shows a sliver, which reads as "started" where zero reads as
-   "broken".
+   **STAGE ONE IS ALWAYS DONE, AND IT DRAWS NO BAR** (Mark, 2026-08-21: "Stage 1
+   (leads) should have no visible progress bar. Stage 2 (quotes sent) should
+   have the first visible display of a progress bar."). This REVERSES the first
+   cut, which drew a 1/6 sliver so the bar was never an empty track — zero was
+   thought to read as "broken" where a sliver reads as "started". Using it
+   settled it the other way and the argument is better: **being a lead is the
+   starting line, not progress.** Every order has reached it, so a mark every
+   row carries distinguishes nothing, and on a list whose leads run to 39 rows
+   it is a column of identical slivers.
+   So the BAR measures the five rungs BEYOND the lead — nothing at rung 1, the
+   first visible length at rung 2, full at rung 6 — while the STRIP still shows
+   all six, because "which rungs are done" and "how far along" are different
+   questions and the tick answers the first. **`OrderProgress.fraction` IS THE
+   BAR'S OWN LENGTH**, `(done - 1) / (total - 1)` rather than `done / total`:
+   both the width and the colour ramp read it, which is what keeps the first
+   VISIBLE bar yellow and the last green, and a field that said 1/6 while the
+   bar drew nothing would be a trap. `snapStops` is asked for FIVE stops, not
+   six, indexed `done - 2`.
+   **A FLAGGED LEAD STILL DRAWS, and since 058 that is the common case rather
+   than an edge** — every inquiry from the public form arrives flagged and most
+   arrive as nothing but a lead. Flagged is full-width red whatever the stages
+   say, so the "no bar at rung 1" test runs AFTER it; the other order makes
+   every new inquiry invisible, which is the exact opposite of what flagging it
+   is for. Fixture-pinned in both directions.
+   **The off-by-one in the snapped index was NOT caught by the suite** and was
+   found by breaking it: nothing pinned WHICH stop a given rung draws to, so
+   `snapped[done - 1]` passed all 1072 cases while drawing every bar one column
+   too long and reading `undefined` — "NaN%" — on the last rung. There is a
+   fixture for it now.
    **THE STATUS SETS A FLOOR AND THE DATES ONLY PUSH IT FURTHER** (Mark,
    2026-08-20: "once an order is set to 'order', then it should jump to stage
    5"). That is not a new rule — it is `STATUS_HINT` believed by the bar:
