@@ -1620,6 +1620,80 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    nothing. There is **no per-hour or percentage unit and there must never be
    one** — a percentage would be a percentage of wages, which needs a rate, which
    decision 1 forbids storing.
+   **Shipped 2026-08-21 — THE WORKFLOW GUIDES YOU** (Mark: "there's a workflow
+   here and the app should help guide the user through it as various events
+   occur. Identify those events and proper responses to them").
+   **THE RULES ARE DATA, IN `lib/orderWorkflow`, AND THEY CLOSE THEMSELVES.**
+   The six behaviours Mark listed are the same rule from two directions — an ACT
+   implies a DATE ("the quote went out, so it was sent today"), a DATE implies a
+   STATE ("a quote was sent, so this is a Quote"). Wired as six handlers they
+   CHAIN: downloading a quote asks "set the sent date?", and the write answering
+   THAT asks "move to Quote?" — two dialogs for one act, the second looking like
+   the app second-guessing the answer you just gave. So `whatFollows` closes the
+   chain itself and the caller asks ONCE, with a line per consequence.
+   **A FINDING THAT CHANGED THE ASK: emailing already stamped its own date.**
+   `send-special-order-email`'s `STAGE_COLUMN` has always written
+   `quote_sent_at` / `invoice_sent_at` / `receipt_sent_at` / `order_printed_at`,
+   so two of the six were already half-built. What was missing everywhere was
+   that **nothing ever touched `status` or `todo`**.
+   **DOWNLOAD NOW STAMPS SILENTLY TOO** (Mark's call over asking): downloading
+   is how a document gets printed, so both routes out of the card record the
+   same fact the same way — and **only PREVIEW leaves no trace**, because
+   previewing is how you check the wording before committing to either. The
+   stamp is skipped when the date is already there: a second copy printed next
+   week is not a second send, and overwriting would move the date the customer's
+   own copy carries.
+   **THREE GUARDS, each a real order that would otherwise break.** *Forward
+   only* — 8,330 orders came out of FileMaker and backfilling a quote date onto
+   a finished one must not drag its status back. *Never a template or standing
+   order* — 051's `special_orders_status_iff_order` makes `status` NULL exactly
+   when `kind` isn't `order`, so proposing one proposes a write a CHECK refuses,
+   which is the one refusal `InlineValue` cannot explain. *Never a cancelled
+   order.* A fourth lives in the CALLERS: **only ask when a date goes EMPTY →
+   SET**, since only they know what was there before — correcting a typo is not
+   a workflow event, and unsetting a date is somebody undoing something.
+   **IT ASKS AFTER THE WRITE, which is why `CompletionDates` uses `onWrite` and
+   not `alsoUpdate`** — the latter composes the statement and so runs BEFORE it,
+   which would put the question on screen for something that hadn't happened and
+   leave it there if the write then failed. `onWrite` carries the `.select()`
+   discipline with it, or a silently-refused write would report success and then
+   offer to advance an order that never moved.
+   **EVERY LINE IS INDIVIDUALLY UNTICKABLE**, and that is decision 4 surviving:
+   the app may suggest a to-do and must never write one, so a pre-ticked box you
+   can clear keeps the human the author while saving the typing. All accepted
+   lines land in ONE statement, so an order can never rest half-advanced — and
+   054's trigger then narrates it as one line ("Status changed from lead to
+   order; To-do set to Print Order"), so the history reads the same whether a
+   person typed it or accepted it here, which is true: they did accept it.
+   **THE CATCH-UP OFFER IS THE QUIET HALF** — `StatusCatchUp`, the receiving
+   screen's `→` beside the Status cell, yellow, dismissible. The prompts catch
+   the moment; this catches the 8,330 imported orders, a date set from a screen
+   that doesn't ask, and anyone who declined on Tuesday and wants it on
+   Thursday. It reads the DATES ONLY and never the to-do: a stale to-do is
+   somebody's note to themselves, where a status behind its own evidence is the
+   record disagreeing with itself.
+   **A SETTLING PAYMENT OFFERS THE WHOLE STEP** (Mark's addition to his own
+   list) — recording the money IS the paid event. It fires on the BALANCE, not
+   the payment, so a deposit on a wedding order doesn't ask; and it reads
+   `balance - value` because the server hasn't re-rendered yet.
+   **NEW INQUIRIES RIDE AT THE TOP IN A `Leads` BAND** (Mark, same day).
+   `isNewInquiryLead` is `source === "inquiry"` AND status `lead` — a lead
+   somebody typed while a customer was on the phone is already in front of them,
+   where an inquiry arrived while nobody was watching. **The real bug it fixed
+   was invisibility**: the default `upcoming` view wants `event_date >= today`,
+   so a customer who left the date blank — #10014 did — never appeared at all.
+   Now `upcoming` admits them whatever their date. They are PINNED rather than
+   sorted (an inbox that moves when you sort by Total is not one) and pulled out
+   of the body so a lead appears once; `DataTable` bands a RUN of like-labelled
+   rows, so the pin is what makes the label work. They leave the band when the
+   status advances, which the prompts above make one tap — the section is an
+   inbox and working an order empties it.
+   Verified against the live database and the order restored afterwards: setting
+   Invoice paid offered both consequences and wrote them in one statement,
+   setting Order printed offered the single one as a sentence with no redundant
+   checkbox, and the catch-up appeared on an order whose quote had gone out
+   while its status still read Lead. **1097 fixtures pass**, 26 new, each rule
+   checked by breaking it.
 4d. 🚧 **Invoices** — the third module, and the one that finishes the purchasing
    loop (Mark, 2026-08-04, after using the receiving screen: "this reconcile PO
    workflow is new to me and I love it… Every time we upload an invoice to a

@@ -34,6 +34,8 @@ import { resolveItemPrice } from "@/lib/productionPrice";
 import { OrderLines, type OrderLineRow } from "@/components/specialOrders/OrderLines";
 import type { MenuItem } from "@/components/specialOrders/AddOrderLine";
 import { OrderPayments, type PaymentRow } from "@/components/specialOrders/OrderPayments";
+import { CompletionDates } from "@/components/specialOrders/CompletionDates";
+import { StatusCatchUp } from "@/components/specialOrders/StatusCatchUp";
 import { OrderTotals } from "@/components/specialOrders/OrderTotals";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
 import { OrderActions } from "@/components/specialOrders/OrderActions";
@@ -419,6 +421,7 @@ export async function SpecialOrderDetail({
                 orgId={row.org_id as string}
                 number={row.number as string}
                 canWrite={canWrite}
+                workflow={row as never}
                 orgSettings={session.orgSettings}
                 today={today}
               />
@@ -469,9 +472,15 @@ export async function SpecialOrderDetail({
                     </Row>
                     <Row label="Status">
                       {kind === "order" ? (
-                        <Cell table="special_orders" id={id} column="status" kind="pick"
-                              options={STATUS_OPTIONS} value={status} canWrite={canWrite}
-                              ariaLabel="Status" />
+                        <>
+                          <Cell table="special_orders" id={id} column="status" kind="pick"
+                                options={STATUS_OPTIONS} value={status} canWrite={canWrite}
+                                ariaLabel="Status" />
+                          {/* The catch-up: the dates have run ahead of the
+                              status, and here is the one tap that squares
+                              them. Absent when there is nothing to say. */}
+                          <StatusCatchUp id={id} order={row as never} canWrite={canWrite} />
+                        </>
                       ) : (
                         /* Decision 3: status exists exactly when kind is
                            `order`, and the database enforces the
@@ -644,17 +653,11 @@ export async function SpecialOrderDetail({
                           inline where Details and Customer went back to
                           stacked, because a date is a short value and a name
                           or a phone is not — those wrapped. */}
-                      <div className="grid gap-x-10 gap-y-1.5 sm:grid-cols-2">
-                        <FieldRow label="Initiated"><Cell table="special_orders" id={id} column="date_initiated" kind="date" value={row.date_initiated as string | null} canWrite={canWrite} ariaLabel="Date initiated" /></FieldRow>
-                        <FieldRow label="Quote sent"><Cell table="special_orders" id={id} column="quote_sent_at" kind="date" value={row.quote_sent_at as string | null} canWrite={canWrite} ariaLabel="Quote sent" /></FieldRow>
-                        <FieldRow label="Quote approved"><Cell table="special_orders" id={id} column="quote_returned_at" kind="date" value={row.quote_returned_at as string | null} canWrite={canWrite} ariaLabel="Quote approved" /></FieldRow>
-                        <FieldRow label="Invoice sent"><Cell table="special_orders" id={id} column="invoice_sent_at" kind="date" value={row.invoice_sent_at as string | null} canWrite={canWrite} ariaLabel="Invoice sent" /></FieldRow>
-                        <FieldRow label="Invoice paid"><Cell table="special_orders" id={id} column="invoice_paid_at" kind="date" value={row.invoice_paid_at as string | null} canWrite={canWrite} ariaLabel="Invoice paid" /></FieldRow>
-                        <FieldRow label="Receipt sent"><Cell table="special_orders" id={id} column="receipt_sent_at" kind="date" value={row.receipt_sent_at as string | null} canWrite={canWrite} ariaLabel="Receipt sent" /></FieldRow>
-                        <FieldRow label="Delivery scheduled"><Cell table="special_orders" id={id} column="delivery_scheduled_at" kind="date" value={row.delivery_scheduled_at as string | null} canWrite={canWrite} ariaLabel="Delivery scheduled" /></FieldRow>
-                        <FieldRow label="Order printed"><Cell table="special_orders" id={id} column="order_printed_at" kind="date" value={row.order_printed_at as string | null} canWrite={canWrite} ariaLabel="Order printed" /></FieldRow>
-                        <FieldRow label="Production scheduled"><Cell table="special_orders" id={id} column="order_scheduled_at" kind="date" value={row.order_scheduled_at as string | null} canWrite={canWrite} ariaLabel="Production scheduled" /></FieldRow>
-                      </div>
+                      <CompletionDates
+                        id={id}
+                        order={row as never}
+                        canWrite={canWrite}
+                      />
                     </section>
                   ) : null
               }
@@ -770,6 +773,7 @@ export async function SpecialOrderDetail({
                     balance={totals.balance}
                     canWrite={canWrite}
                     today={today}
+                    workflow={row as never}
                   />
                 </div>
 
@@ -832,16 +836,6 @@ export async function SpecialOrderDetail({
  * back. The stacked `Row` below is still right for the Notes tab, where the
  * value is a paragraph rather than a box.
  */
-function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-baseline gap-3">
-      <dt className="w-32 shrink-0 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-        {label}
-      </dt>
-      <dd className="min-w-0">{children}</dd>
-    </div>
-  );
-}
 
 function Row({
   label,

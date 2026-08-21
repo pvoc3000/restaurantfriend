@@ -234,6 +234,30 @@ export function money(value: number): string {
   return `${value < 0 ? "-" : ""}$${Math.abs(value).toFixed(2)}`;
 }
 
+/**
+ * A LEAD THAT CAME IN OFF THE PUBLIC FORM AND HAS NOT BEEN WORKED YET (Mark,
+ * 2026-08-21: "when new leads come in from the inquiry page, let's place them
+ * at the top of the special orders list page under a special section called
+ * Leads").
+ *
+ * WHY `source` AND NOT JUST `status`. A lead somebody typed while a customer
+ * was on the phone is already in front of them — they just made it, and the app
+ * put them on its record. An inquiry arrived while nobody was watching, which
+ * is the whole reason it needs a place to land.
+ *
+ * WHEN IT LEAVES: when the status advances. That is the loop working — email a
+ * quote, accept the workflow's offer to move it to Quote, and it drops out of
+ * the Leads band into its own event date. The section is an inbox, and working
+ * an order empties it.
+ */
+export function isNewInquiryLead(order: {
+  kind: string;
+  status: string | null;
+  source?: string | null;
+}): boolean {
+  return order.kind === "order" && order.status === "lead" && order.source === "inquiry";
+}
+
 /* ==========================================================================
  * 3. THE KITCHEN LINE (decision 5)
  * ========================================================================== */

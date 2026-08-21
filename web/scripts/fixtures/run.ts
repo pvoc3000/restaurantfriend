@@ -25,6 +25,7 @@ import "./invoices.fixtures";
 import "./filterMenus.fixtures";
 import "./nav.fixtures";
 import "./vendors.fixtures";
+import "./orderWorkflow.fixtures";
 import "./overtime.fixtures";
 import "./overtimeOrder.fixtures";
 import "./packLabel.fixtures";

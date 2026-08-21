@@ -3,6 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import {
+  afterPaymentSettled,
+  type Consequence,
+  type WorkflowOrder,
+} from "@/lib/orderWorkflow";
+import { WorkflowOffer } from "./WorkflowOffer";
+
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { InlineValue } from "@/components/catalog/InlineValue";
@@ -58,6 +65,7 @@ export function OrderPayments({
   balance,
   canWrite,
   today,
+  workflow,
 }: {
   orderId: string;
   orgId: string;
@@ -65,12 +73,15 @@ export function OrderPayments({
   balance: number;
   canWrite: boolean;
   today: string;
+  /** Enough of the order to ask whether a settling payment finishes it. */
+  workflow: WorkflowOrder;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  const [offer, setOffer] = useState<Consequence[] | null>(null);
   const [adding, setAdding] = useState(false);
   const [amount, setAmount] = useState("");
   const [paidOn, setPaidOn] = useState<string | null>(today);
@@ -112,6 +123,24 @@ export function OrderPayments({
       reset();
       setAdding(false);
       router.refresh();
+
+      /**
+       * RECORDING THE MONEY IS THE PAID EVENT (Mark, 2026-08-21).
+       *
+       * Asked only when this payment SETTLES the order, which is why it reads
+       * the balance rather than the payment: a deposit on a wedding order is
+       * not the moment an invoice is paid, and asking on every part-payment
+       * would teach somebody to dismiss the question by the time it mattered.
+       *
+       * `balance` is the figure BEFORE this payment — the server has not
+       * re-rendered yet — so the test subtracts what was just taken. A credit
+       * (a negative payment) can only move it the wrong way, which the
+       * comparison handles by being a comparison rather than a flag.
+       */
+      if (balance - value <= 0.005) {
+        const cs = afterPaymentSettled(workflow, paidOn ?? today);
+        if (cs.length > 0) setOffer(cs);
+      }
     });
   }
 
@@ -269,6 +298,15 @@ export function OrderPayments({
       ) : null}
 
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
+      {/* Asked only once the balance is clear — see `take`. */}
+      {offer && (
+        <WorkflowOffer
+          orderId={orderId}
+          consequences={offer}
+          onClose={() => setOffer(null)}
+          title="Paid in full"
+        />
+      )}
     </section>
   );
 }

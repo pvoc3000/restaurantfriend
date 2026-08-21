@@ -27,6 +27,13 @@ import {
   sendSpecialOrderEmail,
 } from "@/lib/specialOrderSend";
 import { downloadBlob, openWindowNow, showBlob } from "@/lib/poProcessing";
+import {
+  DOCUMENT_STAMPS,
+  afterDocumentSent,
+  type Consequence,
+  type WorkflowOrder,
+} from "@/lib/orderWorkflow";
+import { WorkflowOffer } from "./WorkflowOffer";
 
 /**
  * PRODUCE AND SEND — decision 11's four documents and decision 12's compose
@@ -67,12 +74,16 @@ export function SendDocument({
   orgId,
   number,
   canWrite,
+  /** Enough of the order for `lib/orderWorkflow` to reason about what a sent
+   *  document implies. */
+  workflow,
   /** `orgs.settings`, for the email templates (design rule 2). */
   orgSettings,
   /** Today in the org's timezone — the snapshot records when the quote went
    *  out, and a browser's own idea of today is the browser's timezone. */
   today,
 }: {
+  workflow: WorkflowOrder;
   orderId: string;
   orgId: string;
   number: string;
@@ -99,6 +110,7 @@ export function SendDocument({
     filename: string;
     token: string | null;
   } | null>(null);
+  const [offer, setOffer] = useState<Consequence[] | null>(null);
 
   if (!canWrite) return null;
 
@@ -148,11 +160,43 @@ export function SendDocument({
     });
   };
 
+  /**
+   * DOWNLOADING STAMPS THE DATE, silently, exactly as emailing does (Mark,
+   * 2026-08-21). Downloading is how a document gets printed, and a printed
+   * quote is a sent quote — so the two routes out of this card record the same
+   * fact the same way, and only PREVIEW leaves no trace, because previewing is
+   * how you check the wording before you commit to either.
+   *
+   * The stamp is skipped when the date is already there: a second copy printed
+   * next week is not a second send, and overwriting would move the date the
+   * customer's own copy was dated.
+   */
   const download = (k: DocumentKind) =>
     run("download", async () => {
       const { blob, order } = await render(k);
       downloadBlob(blob, documentFileName(k, order.number, order.event_date ?? today));
+
+      const column = DOCUMENT_STAMPS[k];
+      if (column && !workflow[column]) {
+        const { data } = await supabase
+          .from("special_orders")
+          .update({ [column]: today })
+          .eq("id", orderId)
+          .select("id");
+        // Silent on refusal, deliberately: the document IS downloaded and is
+        // on somebody's disk. Failing the download after the fact because a
+        // bookkeeping write did not land would be reporting the wrong thing.
+        if (data?.length) router.refresh();
+      }
+      propose(k);
     });
+
+  /** What a document going out implies for the ladder — asked once, after it
+   *  has gone. An empty answer opens nothing. */
+  function propose(k: DocumentKind) {
+    const cs = afterDocumentSent(workflow, k, today);
+    if (cs.length > 0) setOffer(cs);
+  }
 
   /**
    * Open the compose dialog: render the attachment ONCE so the preview pane
@@ -233,6 +277,9 @@ export function SendDocument({
       closeCompose();
       setSentNote(`${DOCUMENT_LABEL[kind]} sent to ${to}${warning ? ` — ${warning}` : ""}`);
       router.refresh();
+      // The edge function has already stamped the stage date (its own
+      // STAGE_COLUMN map), so what is left to ask about is the LADDER.
+      propose(kind);
     });
 
   /**
@@ -397,6 +444,17 @@ export function SendDocument({
             </div>
           </object>
         </Dialog>
+      )}
+
+      {/* Asked AFTER the document has gone, and only about the ladder — the
+          date is already recorded by then, by the edge function on the email
+          path and by `download` on the other. */}
+      {offer && (
+        <WorkflowOffer
+          orderId={orderId}
+          consequences={offer}
+          onClose={() => setOffer(null)}
+        />
       )}
     </>
   );
