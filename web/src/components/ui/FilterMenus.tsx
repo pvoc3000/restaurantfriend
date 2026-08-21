@@ -90,6 +90,9 @@ export function FilterMenus<T>({
    * Deliberately NOT the place for a view control — those are menus, and a
    * menu goes in `dimensions` where its count can be conditioned like every
    * other one.
+   *
+   * RENDERED ON ITS OWN LINE ABOVE THE MENUS, right-aligned — see the comment
+   * at the render. It is no longer part of the filter row.
    */
   trailing?: ReactNode;
 }) {
@@ -105,6 +108,26 @@ export function FilterMenus<T>({
 
   return (
     <div className="space-y-2">
+      {/* THE CREATE COMMAND SITS ABOVE THE FILTERS, ON ITS OWN LINE (Mark,
+          2026-08-21: "the search and filter fields appear above the 'New
+          special order' button on smaller screens. I would like the new order
+          button to be above the search and filter fields").
+
+          It used to ride at the END of the filter row under `ml-auto`, which
+          reads well only while the row fits. It stops fitting sooner than it
+          looks: /special-orders carries a search box and SIX menus, wanting
+          ~1439px against the 1376 a 1440 window gives — so on an ordinary
+          laptop the button had already wrapped to a line of its own BELOW the
+          filters, which puts the one control you came to press last in reading
+          order and last under a thumb.
+
+          Its own line at the top, always, rather than a breakpoint that flips
+          it: the wrap depends on how many menus a list declares and how wide
+          its search box is, so any threshold would be tuned to one caller and
+          wrong for the next. The cost is one 36px row on a screen wide enough
+          to have held it inline; the gain is that the command is in the same
+          place on every list at every width. */}
+      {trailing ? <div className="flex justify-end">{trailing}</div> : null}
       <div className="flex flex-wrap items-end gap-3">
         {leading}
         {dimensions.map((dimension) => {
@@ -149,7 +172,6 @@ export function FilterMenus<T>({
             </div>
           );
         })}
-        {trailing ? <div className="ml-auto shrink-0">{trailing}</div> : null}
       </div>
 
       {/* Always stated, never only when filtered: "470 of 470" is a fact worth
