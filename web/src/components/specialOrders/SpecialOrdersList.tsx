@@ -30,18 +30,15 @@ import {
 import { sortRows } from "@/lib/tableSort";
 import {
   KIND_LABEL,
-  STAGES,
   STATUS_LABEL,
   customerLabel,
   money,
   needsAttention,
-  stageState,
   suggestedTodo,
   type AttentionThresholds,
   type OrderTotals,
   type SpecialOrderKind,
   type SpecialOrderStatus,
-  type StageState,
 } from "@/lib/specialOrders";
 
 export type SpecialOrderRow = {
@@ -100,9 +97,26 @@ const NONE = "none";
  * button sizes to its own content and can never report an overflow, which is
  * how two clipped headers survived a first check that said everything was fine.
  */
+/**
+ * THE SEVEN STAGE COLUMNS ARE GONE (Mark, 2026-08-20: "we can remove the quote,
+ * signed, billed, paid, booked, and scheduled columns now as they are
+ * redundant" — and then "the print column can go too").
+ *
+ * The Progress strip says what all seven said, in 92px instead of 868. They
+ * were three grains of one fact — how far, which, and when — and the dates were
+ * the grain nobody was reading on a list: every stamp is still on the record,
+ * which is where you go when you want the day rather than the state.
+ *
+ * `STAGES` is NOT trimmed. `stageState` and `orderProgress` both read the whole
+ * ladder and the record screen still prints every stamp; only the LIST stopped
+ * showing them.
+ */
 const SORT_KEYS = [
   "todo", "kitchen", "number", "status", "date", "customer", "title", "total",
-  ...STAGES.map((s) => s.key),
+  // `progress` sorts by how many rungs are done — least finished first, which
+  // is the only ordering of a progress column anybody wants. It was missing
+  // when the column shipped, so a sort by it was dropped on the way to the URL.
+  "progress",
 ] as const;
 
 const WEEKDAY_SHORT = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -386,23 +400,6 @@ export function SpecialOrdersList({
   const detailHref = (id: string) =>
     withFrom(`/special-orders/${id}`, { href: listHref, label: "Special Orders" });
 
-  /** One stage cell. Done prints the date; the rest are a state, not a word. */
-  function stageCell(row: SpecialOrderRow, key: string) {
-    const stage = STAGES.find((s) => s.key === key)!;
-    const value = row[stage.field as keyof SpecialOrderRow] as string | null;
-    const state: StageState = stageState(row as never, stage, today, thresholds);
-    if (state === "done" && value) {
-      return <span className="tabular-nums text-[12px] text-muted">{value.slice(5)}</span>;
-    }
-    if (state === "overdue") {
-      return <span className="text-accent" title="Overdue">●</span>;
-    }
-    if (state === "waiting") {
-      return <span className="text-mark" title="Waiting on the customer">●</span>;
-    }
-    return <span className="text-faint">—</span>;
-  }
-
   const columns: DataColumn<SpecialOrderRow>[] = [
     // THE ORDER NUMBER LEADS (Mark, 2026-08-20). It is the row's identity — the
     // thing a customer says on the phone and the thing every document prints —
@@ -427,54 +424,6 @@ export function SpecialOrdersList({
           {r.number}
         </Link>
       ),
-    },
-    {
-      /**
-       * THE SIX RUNGS AS TICKS. It says WHICH stage where the row's wash says
-       * HOW FAR, and the seven date columns further right say WHEN — three
-       * grains of one fact, which is one more than most lists need. If the
-       * dates stop earning their width, they are the ones to hide: this is the
-       * summary and they are the detail.
-       *
-       * `sortValue` is how many are done, so sorting by it is "least finished
-       * first" — the only ordering of a progress column anybody wants.
-       */
-      key: "progress",
-      label: "Progress",
-      width: 92,
-      sortValue: (r) => progress.get(r.id)?.done ?? 0,
-      sortTiebreaks: [(r) => r.number],
-      render: (r) => {
-        const p = progress.get(r.id);
-        if (!p || p.tone === "none") return <span className="text-faint">—</span>;
-        return (
-          <span
-            className="inline-flex gap-[2px]"
-            title={p.ticks
-              .map((t) => `${t.label}: ${t.state ?? "not yet"}`)
-              .join("\n")}
-          >
-            {p.ticks.map((t) => (
-              <span
-                key={t.key}
-                aria-hidden
-                className={`block h-[13px] w-[8px] ${
-                  t.state === "done"
-                    ? "bg-ink"
-                    : t.state === "overdue"
-                      ? "bg-accent"
-                      : t.state === "waiting"
-                        ? "bg-mark-fill"
-                        : "bg-neutral-200"
-                }`}
-              />
-            ))}
-            <span className="sr-only">
-              {p.done} of {p.total} stages done
-            </span>
-          </span>
-        );
-      },
     },
     {
       key: "todo",
@@ -621,16 +570,54 @@ export function SpecialOrdersList({
         </span>
       ),
     },
-    ...STAGES.map<DataColumn<SpecialOrderRow>>((stage) => ({
-      key: stage.key,
-      label: stage.label,
-      width: 124,
-      align: "right",
-      hideWhenCompact: true,
-      sortValue: (r) => (r[stage.field as keyof SpecialOrderRow] as string | null) ?? "",
+    {
+      /**
+       * THE SIX RUNGS AS TICKS — it says WHICH stage, where the row's wash
+       * says HOW FAR. It sits LAST (Mark, 2026-08-20), which is where the seven
+       * stage columns it replaced used to end: the strip is the settled state
+       * of an order, read after its number, its customer and its money, not
+       * before them.
+       *
+       * `sortValue` is how many are done, so sorting by it is "least finished
+       * first" — the only ordering of a progress column anybody wants.
+       */
+      key: "progress",
+      label: "Progress",
+      width: 92,
+      sortValue: (r) => progress.get(r.id)?.done ?? 0,
       sortTiebreaks: [(r) => r.number],
-      render: (r) => stageCell(r, stage.key),
-    })),
+      render: (r) => {
+        const p = progress.get(r.id);
+        if (!p || p.tone === "none") return <span className="text-faint">—</span>;
+        return (
+          <span
+            className="inline-flex gap-[2px]"
+            title={p.ticks
+              .map((t) => `${t.label}: ${t.state ?? "not yet"}`)
+              .join("\n")}
+          >
+            {p.ticks.map((t) => (
+              <span
+                key={t.key}
+                aria-hidden
+                className={`block h-[13px] w-[8px] ${
+                  t.state === "done"
+                    ? "bg-ink"
+                    : t.state === "overdue"
+                      ? "bg-accent"
+                      : t.state === "waiting"
+                        ? "bg-mark-fill"
+                        : "bg-neutral-200"
+                }`}
+              />
+            ))}
+            <span className="sr-only">
+              {p.done} of {p.total} stages done
+            </span>
+          </span>
+        );
+      },
+    },
   ];
 
   const sorted = sortRows(visible, columns, sort ?? NATURAL_SORT);

@@ -15,10 +15,17 @@ import {
 
 const TODAY = "2026-08-20";
 
-/** An order with nothing stamped, far enough out that nothing is overdue. */
+/**
+ * An order with nothing stamped, far enough out that nothing is overdue.
+ *
+ * `status: "lead"` deliberately, so these cases isolate the LADDER from the
+ * status floor — a lead asserts one rung, which is the same rung the order's
+ * existence already asserts. The floor's own cases below set the status
+ * explicitly.
+ */
 const base = {
   kind: "order",
-  status: "order",
+  status: "lead",
   fulfillment: "pickup",
   event_date: "2026-12-01",
   flag_reason: null,
@@ -94,6 +101,43 @@ test("a wholesale order that never gets quoted still counts what IS done", () =>
   });
   eq(p.done, 4);
   eq(p.ticks.map((t) => (t.state === "done" ? 1 : 0)).join(""), "100111");
+});
+
+/* -- the status floor ----------------------------------------------------- */
+
+test("status `order` jumps to rung 5, stamps or no stamps", () => {
+  // `STATUS_HINT.order` is "paid — printing and scheduling remain", so the
+  // status already says this; the bar just believes it now.
+  const p = order({ status: "order" });
+  eq(p.done, 5);
+  eq(p.ticks.map((t) => (t.state === "done" ? 1 : 0)).join(""), "111110");
+});
+
+test("the floor fills the TICKS, not only the count", () => {
+  // If it raised the number alone, the strip would show gaps while the wash
+  // said five — two readings of one fact, disagreeing.
+  const p = order({ status: "order" });
+  eq(p.done, p.ticks.filter((t) => t.state === "done").length);
+});
+
+test("every rung of the status ladder sets its own floor", () => {
+  eq(order({ status: "lead" }).done, 1);
+  eq(order({ status: "quote" }).done, 2);      // sent, awaiting approval
+  eq(order({ status: "invoice" }).done, 4);    // sent, awaiting payment
+  eq(order({ status: "order" }).done, 5);      // paid
+});
+
+test("the dates can push PAST the floor but never below it", () => {
+  const past = order({
+    status: "order",
+    quote_sent_at: "a", quote_returned_at: "a", invoice_sent_at: "a", invoice_paid_at: "a",
+    order_printed_at: "a", order_scheduled_at: "a",
+  });
+  eq(past.done, 6, "the last rung is still earned by its stamps");
+
+  // A wholesale order with no quote at all — 925 real ones look like this.
+  const below = order({ status: "order", invoice_sent_at: "a" });
+  eq(below.done, 5, "the floor holds");
 });
 
 /* -- the two special cases ------------------------------------------------ */

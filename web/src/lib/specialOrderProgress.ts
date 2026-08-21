@@ -31,6 +31,31 @@
  * STAGE ONE IS "LEAD" AND IS ALWAYS DONE. An order that exists has reached it,
  * so the bar never renders as an empty track — a row with nothing stamped still
  * shows a sliver, which reads as "started" where zero reads as "broken".
+ *
+ * ---------------------------------------------------------------------------
+ * THE STATUS SETS A FLOOR, AND THE DATES CAN ONLY PUSH IT FURTHER (Mark,
+ * 2026-08-20: "once an order is set to 'order', then it should jump to stage
+ * 5").
+ *
+ * That is not a new rule — it is the app's own vocabulary, already written down
+ * in `STATUS_HINT` and now believed by the bar:
+ *
+ *     lead     "gathering information"                    → rung 1
+ *     quote    "quote prepared or sent, awaiting approval" → rung 2
+ *     invoice  "Square invoice sent, awaiting payment"     → rung 4
+ *     order    "PAID — printing and scheduling remain"     → rung 5
+ *
+ * The status is the record's own claim about where it has got to; the dates are
+ * how it got there. When they disagree the status wins, because plenty of real
+ * orders reach a rung without ever stamping it: 925 orders at status `order`
+ * have no quote date and 770 have no payment date — wholesale and standing
+ * orders, billed weekly, which never pass through a quote at all. Measured, the
+ * floor moves **1,501 of the 6,664 committed orders (23%)** off a bar that made
+ * finished work look unfinished.
+ *
+ * THE FLOOR FILLS THE TICKS TOO, not just the count. If it only raised the
+ * number, the strip would show gaps while the bar said five — and a list whose
+ * two readings of one fact disagree is worse than either alone.
  */
 
 import {
@@ -81,6 +106,17 @@ const LADDER: { key: string; label: string; stages: string[] }[] = [
 export const PROGRESS_LABELS = LADDER.map((l) => l.label);
 
 /**
+ * How many rungs a status asserts on its own, from `STATUS_HINT`. See the
+ * header. Anything unrecognised claims nothing and leaves the dates to speak.
+ */
+const STATUS_FLOOR: Record<string, number> = {
+  lead: 1,
+  quote: 2,
+  invoice: 4,
+  order: 5,
+};
+
+/**
  * The state of one rung.
  *
  * It DELEGATES to `stageState` rather than re-deciding, which is what keeps the
@@ -110,11 +146,14 @@ export function orderProgress(
   today: string,
   thresholds: AttentionThresholds = DEFAULT_ATTENTION
 ): OrderProgress {
-  const ticks = LADDER.map((rung) => ({
+  const floor = STATUS_FLOOR[order.status ?? ""] ?? 1;
+  const ticks = LADDER.map((rung, i) => ({
     key: rung.key,
     label: rung.label,
-    state: rungState(order, rung.stages, today, thresholds),
+    // The floor fills the tick, not just the count — see the header.
+    state: i < floor ? ("done" as const) : rungState(order, rung.stages, today, thresholds),
   }));
+  // Counted from the TICKS, so the strip and the wash cannot disagree.
   const done = ticks.filter((t) => t.state === "done").length;
   const total = LADDER.length;
 

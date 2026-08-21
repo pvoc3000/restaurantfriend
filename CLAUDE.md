@@ -3544,6 +3544,20 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **STAGE ONE IS ALWAYS DONE**, so the bar is never an empty track: a row with
    nothing stamped shows a sliver, which reads as "started" where zero reads as
    "broken".
+   **THE STATUS SETS A FLOOR AND THE DATES ONLY PUSH IT FURTHER** (Mark,
+   2026-08-20: "once an order is set to 'order', then it should jump to stage
+   5"). That is not a new rule — it is `STATUS_HINT` believed by the bar:
+   lead→1, quote→2 ("sent, awaiting approval"), invoice→4 ("sent, awaiting
+   payment"), order→5 ("**paid** — printing and scheduling remain"). The status
+   is the record's claim about where it got to; the dates are how. When they
+   disagree the status wins, because plenty of real orders reach a rung without
+   stamping it — **925 orders at status `order` have no quote date and 770 no
+   payment date** (wholesale and standing orders, billed weekly, which never
+   pass through a quote). Measured, the floor moves **1,501 of 6,664 committed
+   orders (23%)** off a bar that made finished work look unfinished.
+   **The floor fills the TICKS, not just the count** — raising the number alone
+   would leave the strip showing gaps while the wash said five, which is two
+   readings of one fact disagreeing.
    **Cancelled gets NO bar** (the style is `undefined`, not a zero width) and the
    row greys out; **flagged is full-width red** whatever the stages say. Cancelled
    BEATS flagged — 705 orders are cancelled and a flag is cleared as soon as it
@@ -3562,10 +3576,16 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    already hides it, which is why the two are separate.
    The legend is pinned in a `ui/StickyFooter` and draws its OWN top rule (that
    component contributes position and a white backdrop and nothing else).
-   Known and accepted: the seven stage columns still print the DATES, so the
-   list now shows three grains of one fact — how far (the wash), which (the
-   strip), when (the columns). If the dates stop earning their width they are
-   the ones to hide.
+   **ALL SEVEN STAGE COLUMNS ARE GONE** (Mark, same day, in two steps — the six,
+   then "the print column can go too"), and the strip moved to the END where
+   they used to be. 868px of dates replaced by 92px of ticks: they were the
+   third grain of one fact — how far, which, WHEN — and the day is on the
+   record, which is where you go when you want it. The list went 16 columns to
+   9. `STAGES` is NOT trimmed: `stageState` and `orderProgress` read the whole
+   ladder and the record still prints every stamp.
+   No `storageKey` bump for any of it — a stored key whose column is gone drops
+   out, and a column added since the last drag appears at its declared position;
+   both are already `columnOrder` fixtures.
 
    Not done, and worth asking about: **`LinkCustomer` does not seed the
    contact.** Linking a customer to an EXISTING order is the same idea, and
