@@ -824,14 +824,25 @@ check `max(OrderID)` against the live layout before trusting it.**
      `email_provider.reply_to`. They read both now, explicit first.
    · **`_shared/email.ts` is compiled into each function at DEPLOY time**, so
      editing it means redeploying all three — `send-po-email` included.
-4. **The front door.** The public `/inquiry` form (decision 18) with the
-   build-your-box picker, `create_inquiry` + the menu RPC (harness-verified:
-   anon reaches the curated menu subset and the insert, nothing else, and
-   the RPC's answer never reveals whether an email is a known customer),
-   the confirmation email as thread root, the `show_on_inquiry_form` flag +
-   its curation UI on the item record. Plus the fallback lane: the
-   `parse-inquiry` edge function and paste dialog (decision 10), fixtures
-   from the three real emails. The Square form retires when this ships.
+4. **The front door.** Split into three on Mark's call (2026-08-20), because
+   the form's value is complete without the picker — the Square form it
+   replaces has no picker either.
+
+   **4a ✅ BUILT, NOT YET APPLIED OR DEPLOYED.** Migration **057**
+   (`create_inquiry` + `inquiry_shops`, both granted `anon`;
+   `customers.source` gains `'inquiry'`; `locations.public_name`; the throttle
+   index; the form's settings), the **`submit-inquiry`** edge function,
+   `lib/inquiry.ts` + **28 fixtures**, `/inquiry` + its `proxy.ts` exemption,
+   `NEXT_PUBLIC_ORG_ID`, and a `Message-ID` field on the shared mail layer.
+   See "Where a next session picks up" for exactly what Mark still has to run.
+
+   **4b — the build-your-box picker** and the `show_on_inquiry_form` curation
+   UI. Not built.
+
+   **4c — the fallback lane**: the `parse-inquiry` edge function and paste
+   dialog (decision 10), fixtures from the three real emails. Not built.
+
+   The Square form retires when 4a is live.
 5. **Production + recurrence.** Schedule/unschedule against 040's seam
    (verify the packet picks the lines up — it should, by construction); the
    standing-order materializer (verified idempotent on the harness: two
@@ -843,7 +854,38 @@ Each phase ships usable; nothing later blocks earlier.
 
 ---
 
-## Where a next session picks up (2026-08-20)
+## Where a next session picks up (2026-08-20, after 4a)
+
+**MARK HAS TWO THINGS TO RUN, and 4a does nothing until both are done:**
+
+1. **Apply migration 057** in the SQL editor. Its tail block lists the probes.
+   The quick pair: `select public.inquiry_shops(null)` must answer `[]`, and
+   `select public.create_inquiry(null, 'A Name')` must answer
+   `{"ok": false, "state": "unknown_org"}` — **an answer, not an error**, which
+   is the property the whole design rests on.
+2. **Deploy the function**: `supabase functions deploy submit-inquiry`.
+   Smoke-test it the way phase 3's three were — POST an empty body with the
+   anon key and expect a 400 naming `missing org_id or name`, which also proves
+   the `_shared/email.ts` import bundled.
+
+`NEXT_PUBLIC_ORG_ID` is already in `web/.env.local`
+(`5803adf6-…`); **it also has to go into Vercel**, and Next inlines it at BUILD
+time, so it needs a redeploy rather than a reload.
+
+Redeploying `send-po-email`, `send-special-order-email` and `approve-quote` is
+**hygiene, not a requirement**: `_shared/email.ts` gained an OPTIONAL
+`messageId` and none of them passes it, so their stale copies behave
+identically. Verified by rendering both providers in Node — with no `messageId`
+the Gmail MIME carries no `Message-ID` header and Resend's `headers` object is
+`undefined`, exactly as before.
+
+**Then walk it**: submit a real inquiry to Mark's own address, confirm the lead
+appears as a lead with todo "Respond to Email/Call", confirm the confirmation
+email arrives, and then **reply to it from the app** — that last step is the
+acceptance test for the Message-ID work and the only one that proves threading,
+because the failure is silent.
+
+## Where phase 3 left things (2026-08-20)
 
 **Work on `main`.** The `special-orders` branch is fully merged and Mark has
 asked for no more forking — commit and push to `main`, which is what Vercel
@@ -884,6 +926,64 @@ form, or the picker offers nothing.
   Mark's, both are evidence, and neither should be tidied away.
 
 ---
+
+## Phase 4a — what it learned (2026-08-20)
+
+Six things, each of which the obvious implementation gets wrong.
+
+**`create_inquiry` CANNOT CALL `next_special_order_number`.** 051 revokes that
+from `anon` by name and its body demands supervisor+, so an anon caller gets
+"permission denied for function" — migration 014's footgun in a new costume: a
+definer that re-checks `user_org_ids()` is unreachable from a caller with no
+`auth.uid()`. It advances the sequence itself. **Verified as `anon` on the
+harness**, where that call is refused and `create_inquiry` still numbers an
+order.
+
+**`lib/createSpecialOrder` COULD NOT BE THE THIRD DOOR**, which this brief's own
+handoff had hoped. It takes the CALLER's Supabase client so RLS applies, and
+`anon` has no policy on `special_orders`, `customers` or `special_order_items`;
+a Deno function cannot import from `web/` either. So the lead's defaults are
+restated once in SQL, and that duplication is argued in 057's header. **4c's
+staff-facing paste dialog still goes through `createSpecialOrder`** — that is
+the door the note actually meant.
+
+**`sendMail` RETURNS A PROVIDER ID, NOT A `Message-ID`.** `gmail 19f9…` is the
+Gmail message *resource* id. Storing it as the thread root produces something no
+client will ever match, and **the failure is silent** — replies just start new
+conversations forever. So `Mail` gained an optional `messageId` the CALLER
+generates, emits and stores. Rendered in Node against both providers: the header
+carries exactly the string we generated, its domain matches the sender, and with
+the field omitted **no header is emitted at all**, which is what makes the other
+three functions' stale copies harmless.
+
+**`customers.source` HAD NO `'inquiry'` VALUE** even though `special_orders.source`
+did — 051 wrote the two checks differently. Widened in 057.
+
+**AN ADDRESS IS NOT EVIDENCE OF DELIVERY.** Measured over the three real Square
+submissions: two are PICKUPS that carry an address anyway (the form asked
+regardless) and the third omits the field entirely. Writing it to
+`delivery_address` unconditionally would print a customer's home address on a
+kitchen document for an order they are collecting themselves. **Checked by
+breaking it** on the harness, where a pickup came out carrying the address.
+Note all three samples are pickups, so **there is no delivery sample** — worth
+knowing when 4c's parser is written.
+
+**THE PRIVACY RULE HAS TO SURVIVE INTO THE UI.** 057 answers `received` for a
+throttled duplicate and for a swallowed honeypot, and `created` for a success —
+and `inquiryStateMessage` words the first two IDENTICALLY to the third. A page
+that distinguished them would undo in the UI exactly what the migration is
+careful about in SQL. Broken on purpose in both places: in SQL the two answers
+diverge visibly, and in TS a fixture goes red.
+
+Smaller, and each cost a measurement: the empty-date fix lives in
+`ui/DateField`, so the form uses it (`variant="field"`, `PickList`'s own prop
+name for the same dense-cell-vs-form-box problem) rather than a raw
+`<input type="date">` — Safari paints TODAY into an empty one, and on a form
+whose date starts empty that means submitting no date while believing you asked
+for today. `ui/TimeField` took the same variant because its own header already
+argued the pair must wear one dress. The two native `<select>`s ARE deliberate
+and are noted in the file: that rule is about the desk, and on a phone the
+platform's wheel picker beats a portalled panel.
 
 ## What NOT to build (settled during design)
 

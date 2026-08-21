@@ -61,6 +61,7 @@ export function DateField({
   ariaLabel,
   className = "",
   collapseWhenEmpty = false,
+  variant = "cell",
 }: {
   /** An ISO yyyy-mm-dd, or null for no date. */
   value: string | null;
@@ -87,9 +88,28 @@ export function DateField({
    * isn't rendered, so that distinction is the whole of the care here.
    */
   collapseWhenEmpty?: boolean;
+  /**
+   * WHICH DRESS, not which behaviour — `PickList`'s own prop and its own
+   * reasoning, because this is the same problem it already solved.
+   *
+   * `cell` (the default) is the dense edit-in-place box that lives in a detail
+   * screen's `dl`: button padding, no border, a hover wash. `field` is a
+   * standalone bordered box for a FORM — 48px tall and 16px type, which is the
+   * public inquiry page's dress and, for the type, the threshold below which
+   * iOS Safari zooms the whole page on focus.
+   *
+   * The POINT of the prop is that the customer-facing form does not get to
+   * hand-roll its own date input. Everything in this file is a bug a second
+   * implementation would reintroduce, and a public form is the worst place to
+   * reintroduce the empty-date one: its date starts empty, so Safari would
+   * paint today, and somebody would submit no date at all believing they had
+   * asked for today.
+   */
+  variant?: "cell" | "field";
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const empty = value === null || value === "";
+  const field = variant === "field";
 
   const openPicker = () => {
     const el = ref.current;
@@ -109,15 +129,25 @@ export function DateField({
        No border (Mark: "I don't like the bounding box on the date fields, but I
        like the calendar icon") — the hover wash is what says the value takes an
        edit. */
-    <span className="inline-flex items-center gap-1 px-1 py-0.5 hover:bg-neutral-100">
+    <span
+      className={
+        field
+          ? "flex h-12 w-full items-center gap-2 border border-ink px-3 focus-within:border-2"
+          : "inline-flex items-center gap-1 px-1 py-0.5 hover:bg-neutral-100"
+      }
+    >
       {/* One fixed width in both states, so the glyph doesn't move when a date
           lands and the two rows of a dl line up with each other — unless the
           caller has asked to collapse, which trades that for not stranding the
           glyph in a narrow box. */}
       <span
-        className={`relative inline-flex h-6 items-center ${
-          empty && collapseWhenEmpty ? "w-4" : "w-28"
-        }`}
+        className={
+          field
+            ? "relative flex h-full flex-1 items-center"
+            : `relative inline-flex h-6 items-center ${
+                empty && collapseWhenEmpty ? "w-4" : "w-28"
+              }`
+        }
       >
         <input
           ref={ref}
@@ -138,8 +168,14 @@ export function DateField({
           // case narrows the target without ever removing it — it stays laid
           // over its own 16px, which showPicker needs and which is a small hit
           // area beside the glyph rather than nothing at all.
-          className={`rf-date h-6 bg-transparent tabular-nums outline-none disabled:opacity-35 ${
-            empty ? "absolute inset-0 cursor-pointer opacity-0" : "w-28"
+          className={`rf-date bg-transparent tabular-nums outline-none disabled:opacity-35 ${
+            field ? "h-full text-[16px]" : "h-6"
+          } ${
+            empty
+              ? "absolute inset-0 cursor-pointer opacity-0"
+              : field
+                ? "w-full"
+                : "w-28"
           } ${className}`}
         />
       </span>

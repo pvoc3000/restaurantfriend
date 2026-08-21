@@ -61,6 +61,26 @@ export type Mail = {
    */
   inReplyTo?: string;
   references?: string;
+  /**
+   * OUR OWN RFC 822 `Message-ID`, supplied by the caller — the one field here
+   * that exists to be READ BACK LATER rather than to shape this message.
+   *
+   * `sendMail` returns a PROVIDER id (`gmail 19f9…` is the Gmail message
+   * *resource* id, `resend <uuid>` is Resend's), and neither of those is the
+   * `Message-ID` header that mail clients thread on. Storing one as if it were
+   * produces a thread root that nothing will ever match, and the failure is
+   * silent: replies simply start new conversations forever.
+   *
+   * So a caller who needs the thread root — decision 18's inquiry
+   * confirmation, whose Message-ID becomes what every later reply answers —
+   * GENERATES it, passes it here, and stores the same string. Gmail preserves
+   * a supplied Message-ID; Resend passes it through as a header.
+   *
+   * Omitted by everything else, in which case no header is emitted and the
+   * provider generates its own exactly as before. Adding this moved no
+   * existing caller.
+   */
+  messageId?: string;
 };
 
 export type ProviderConfig = {
@@ -69,6 +89,18 @@ export type ProviderConfig = {
   from?: string;
   reply_to?: string;
 };
+
+/** Resend takes extra headers as an object, and wants it absent rather than
+ *  empty when there are none. */
+function resendHeaders(mail: Mail): Record<string, string> | undefined {
+  const headers: Record<string, string> = {};
+  if (mail.messageId) headers["Message-ID"] = mail.messageId;
+  if (mail.inReplyTo) {
+    headers["In-Reply-To"] = mail.inReplyTo;
+    headers["References"] = mail.references ?? mail.inReplyTo;
+  }
+  return Object.keys(headers).length ? headers : undefined;
+}
 
 async function sendViaResend(
   creds: { api_key?: string },
@@ -88,9 +120,7 @@ async function sendViaResend(
       reply_to: mail.replyTo ?? undefined,
       subject: mail.subject,
       text: mail.text,
-      headers: mail.inReplyTo
-        ? { "In-Reply-To": mail.inReplyTo, References: mail.references ?? mail.inReplyTo }
-        : undefined,
+      headers: resendHeaders(mail),
       attachments: mail.attachment
         ? [{ filename: mail.attachment.filename, content: mail.attachment.base64 }]
         : undefined,
@@ -143,6 +173,7 @@ function buildMime(mail: Mail & { from: string }): string {
     mail.cc ? `Cc: ${mail.cc}` : null,
     mail.replyTo ? `Reply-To: ${mail.replyTo}` : null,
     `Subject: ${encodeHeader(mail.subject)}`,
+    mail.messageId ? `Message-ID: ${mail.messageId}` : null,
     mail.inReplyTo ? `In-Reply-To: ${mail.inReplyTo}` : null,
     mail.references ? `References: ${mail.references}` : null,
     "MIME-Version: 1.0",
@@ -397,4 +428,23 @@ export async function sendMail(
     from: transport.cfg.from!,
     replyTo: mail.replyTo ?? transport.cfg.reply_to ?? undefined,
   });
+}
+
+/**
+ * A fresh RFC 822 `Message-ID` for a message whose thread root we intend to
+ * keep — see `Mail.messageId`.
+ *
+ * THE DOMAIN IS TAKEN FROM THE SENDER, not invented. A Message-ID whose domain
+ * does not match the From is legal and is also one of the things spam filters
+ * score against, so it is parsed out of the resolved transport's own `from`
+ * ("Donut Friend <specialorders@donutfriend.com>" -> donutfriend.com). If that
+ * cannot be parsed the mail still sends — an unparseable sender is the
+ * transport's problem to report, not this helper's — and the fallback domain
+ * only ever affects threading.
+ */
+export function newMessageId(from: string | undefined | null): string {
+  const at = (from ?? "").lastIndexOf("@");
+  const tail = at >= 0 ? (from ?? "").slice(at + 1) : "";
+  const domain = (tail.match(/[A-Za-z0-9.-]+/)?.[0] ?? "").replace(/\.+$/, "");
+  return `<rf-${crypto.randomUUID()}@${domain || "restaurantfriend.invalid"}>`;
 }

@@ -36,6 +36,7 @@ import "./productionCost.fixtures";
 import "./productionElements.fixtures";
 import "./recipeIngredients.fixtures";
 import "./productionHistory.fixtures";
+import "./inquiry.fixtures";
 import "./inventorySearch.fixtures";
 import "./productionItems.fixtures";
 import "./productionPlans.fixtures";

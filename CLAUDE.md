@@ -3040,14 +3040,94 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `locations.kitchen_by_weekday` / `shops_for` retire when kitchen-on-plan
    lands.
 4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3 DONE AND LIVE
-   (2026-08-20), phases 4–5 not.** The module records, quotes, invoices,
+   (2026-08-20); phase 4a BUILT but NEEDS 057 APPLIED AND `submit-inquiry`
+   DEPLOYED; 4b, 4c and 5 not built.** The module records, quotes, invoices,
    prints, emails as specialorders@ and takes a customer's approval on a public
-   page; what remains is the public inquiry form (4) and production/recurrence
-   (5). Read **`docs/special-orders-brief.md`** before designing or touching
+   page; what remains is the inquiry form's own picker (4b), the organic-email
+   parser (4c) and production/recurrence (5). Read
+   **`docs/special-orders-brief.md`** before designing or touching
    anything here — its **"Where a next session picks up"** section is the
-   handoff, and its CORRECTIONS block comes first: five measurements in the
-   body are wrong, because the brief was designed from a `parseInt` reading of
-   `OrderID`.
+   handoff and names the two things Mark still has to run, and its CORRECTIONS
+   block comes first: five measurements in the body are wrong, because the
+   brief was designed from a `parseInt` reading of `OrderID`.
+   **Shipped 2026-08-20, phase 4a — THE FRONT DOOR (migration 057, NEEDS
+   APPLYING; `submit-inquiry` NEEDS DEPLOYING).** Decision 18: a public
+   `/inquiry` form that creates a lead directly, replacing the Square web form
+   whose entries a human retyped. Scoped to the form ALONE on Mark's call — the
+   build-your-box picker (4b) and the paste-and-parse fallback (4c) are
+   separate, because the Square form has no picker either and 4a already
+   retires it.
+   **THE RPC IS THE GATE AND THE FUNCTION IS THE DOOR**, which is
+   `approve_quote_by_token` + `approve-quote` a second time and for the same
+   reasons: the page posts once to `submit-inquiry`, which calls
+   `create_inquiry` THROUGH THE ANON KEY — so the gate is the same SQL a direct
+   caller hits, and the function can create nothing the page could not — and
+   only then escalates to `service_role` to read the org's mail config and
+   send. `create_inquiry` and `inquiry_shops` are the **third and fourth
+   deliberate `anon` grants**, inverting 002's revoke rule in exactly the places
+   the brief named.
+   **IT NEVER RAISES, AND THAT IS A SECURITY PROPERTY.** 052's lesson: a
+   function that errors on some inputs and answers quietly on others is a probe.
+   Every refusal is a returned jsonb state. **And the answer is the SAME whether
+   the email was already a customer, was new, or was throttled** — decision 18's
+   central rule — which `inquiryStateMessage` carries into the UI by wording
+   `received` and `created` identically. Broken on purpose in both places: in
+   SQL the two answers diverge visibly, in TS a fixture goes red.
+   **`create_inquiry` CANNOT CALL `next_special_order_number`** — 051 revokes it
+   from `anon` by name and its body demands supervisor+, so it advances the
+   sequence itself. Migration 014's footgun in a new costume, and the single
+   easiest thing here to get wrong.
+   **`lib/createSpecialOrder` COULD NOT BE THE THIRD DOOR**, which the brief's
+   handoff had hoped: it takes the CALLER's client so RLS applies, and `anon`
+   has no policy on the three tables. The lead's defaults are restated once in
+   SQL and the duplication is argued in 057's header. 4c's staff-facing paste
+   dialog still goes through it — that is the door the note meant.
+   **`sendMail` RETURNS A PROVIDER ID, NOT AN RFC `Message-ID`** (`gmail 19f9…`
+   is the message *resource* id), so storing it as decision 12's thread root
+   produces something nothing will ever match **and the failure is silent**.
+   `Mail` gained an optional **`messageId`** the caller generates, emits and
+   stores; `newMessageId` takes the domain from the resolved sender. Rendered in
+   Node against both providers: the header carries exactly our string, and with
+   the field omitted **no header is emitted at all** — which is why redeploying
+   the other three functions is hygiene rather than a requirement, even though
+   `_shared` is compiled in at deploy.
+   **AN ADDRESS IS NOT EVIDENCE OF DELIVERY** — measured over the three real
+   Square submissions, two are PICKUPS carrying an address anyway and the third
+   omits the field. Writing it to `delivery_address` unconditionally puts a
+   customer's home address on a kitchen document for an order they collect
+   themselves; checked by breaking it. All three samples are pickups, so **there
+   is no delivery sample** for 4c's parser.
+   Also: `customers.source` had no `'inquiry'` value where `special_orders.source`
+   did (051 wrote the two checks differently), widened in 057;
+   `locations.public_name` is nullable and falls back to `name`, because ours are
+   internal ("Donut Friend 01 Highland Park") where Square's form said "Highland
+   Park"; abuse is a honeypot decided IN THE GATE plus per-email and global
+   hourly caps **counted off `special_orders` itself** (one partial index, no new
+   table, no sweeper — the IP is recorded in `source_payload` as evidence, never
+   as a key). The org comes from **`NEXT_PUBLIC_ORG_ID`**, a per-deployment
+   constant exactly as `NEXT_PUBLIC_APP_URL` is, read on the SERVER so a missing
+   value is a sentence rather than a form that fails on submit.
+   **The page follows `/q/{token}`, NOT the parts table** — raw inputs, `h-12`,
+   `text-[16px]` (the threshold below which iOS Safari zooms on focus). Its two
+   `<select>`s are deliberate and noted in the file: that convention is about the
+   DESK, and on a phone the platform's wheel picker beats a portalled panel. The
+   DATE and TIME go the other way, to `ui/DateField` / `ui/TimeField` with a new
+   **`variant="field"`** (`PickList`'s own prop name for the same dense-cell-vs-
+   form-box problem), because those carry the fix for Safari painting TODAY into
+   an empty date input — on a form whose date starts empty that means somebody
+   submitting no date while believing they asked for today. **The rule is not
+   "always ours" or "always native": a control carrying a hard-won bug fix is
+   never re-implemented.**
+   **All 57 migrations replay on the Docker harness and every rule was checked
+   by BREAKING it** (see 057's own tail block): as a real `anon`, nine different
+   malformed submissions all return states and none raises; the real Victoria Fay
+   submission lands as a lead with the tax snapshotted and two log rows; a known
+   and an unknown email answer identically; the caps stop the fourth submission;
+   three punctuations of one phone number are one customer; an inactive, virtual
+   or foreign shop is dropped rather than refused; and with 14 orders really
+   present `anon` sees 0, a direct insert is refused by RLS, and
+   `next_special_order_number` is permission-denied. **1068 fixtures pass**, 28
+   new.
    **Migration 052 is APPLIED and all three edge functions are DEPLOYED**
    (Mark applied 052, 2026-08-17; the deploy was verified the same day).
    *Probe, don't read this line.* For 052:
@@ -4368,8 +4448,8 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style. Selected cell is ALWAYS black; `count` and `href` are the only options |
   | **`ui/FilterMenus`** + `lib/filterMenus` | several `TabPicker`s stacked, or a row of hand-wired `PickList`s | a list filtering on THREE OR MORE dimensions AT ONCE — a row of labelled popup menus that AND together ("FilterMenus" is the name to call it by; NOT `catalog/ListFilters`, which is the older fixed search+category+active row). A dimension declares `matches`, never a pre-filtered list, which is what makes the option counts CONDITIONED ON THE OTHER MENUS (and never on their own, or every option but the chosen one reads 0). "All" is supplied, not declared; the bar owns the result count and a Clear, because four collapsed menus can hide a list while the screen looks unfiltered. Values live in the URL via `parseFilterValues`/`filterHref` + `history.replaceState`, and a value no option offers is DROPPED rather than obeyed. ONE dimension stays a `TabPicker` — this is not a replacement for it |
   | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
-  | `ui/DateField` | `<input type="date">` | EVERY date box. Carries the Safari empty-date apparatus (see the date bullet); `InlineValue kind="date"` wraps it, and a create form uses it directly |
-  | `ui/TimeField` | `<input type="time">`, or a `TextInput` you parse | a time of day in a CREATE form, where the box starts empty and the value is required — `type="time"` yields `HH:MM` or nothing, so a half-typed value can never reach a `time` column as a cast error. It carries NO empty-state apparatus, deliberately: DateField needs one because WebKit paints TODAY into an empty date, and an empty time renders as placeholder segments. An edit-in-place cell on a value already set stays `TimeCell`, which takes free text and lets Postgres parse it |
+  | `ui/DateField` | `<input type="date">` | EVERY date box, the PUBLIC pages included. Carries the Safari empty-date apparatus (see the date bullet); `InlineValue kind="date"` wraps it, a create form uses it directly, and **`variant="field"`** (`PickList`'s prop name, same dense-cell-vs-form-box distinction) is the bordered `h-12`/16px dress the inquiry form wears |
+  | `ui/TimeField` | `<input type="time">`, or a `TextInput` you parse | a time of day in a CREATE form, where the box starts empty and the value is required — `type="time"` yields `HH:MM` or nothing, so a half-typed value can never reach a `time` column as a cast error. It carries NO empty-state apparatus, deliberately: DateField needs one because WebKit paints TODAY into an empty date, and an empty time renders as placeholder segments. An edit-in-place cell on a value already set stays `TimeCell`, which takes free text and lets Postgres parse it. It mirrors DateField's **`variant`** for that component's own stated reason — the two sit side by side, so a bordered time beside a borderless date reads as one of them being broken |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
   | `ui/Switch` | a rounded div you style yourself | every switch. Black on, and off is the EXACT inverse; `size="sm"` for a dense grid row. Presentational only — the write, the optimism and the error state belong to the caller, because `ActiveToggle` and the recipe sheet's AUTO switch disagree about all three |
   | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory |

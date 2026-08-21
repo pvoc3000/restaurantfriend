@@ -46,8 +46,16 @@ export default async function proxy(request: NextRequest) {
   // token row and write one approval, and nothing else in the schema. See that
   // migration's header for the full argument.
   const isQuotePage = request.nextUrl.pathname.startsWith("/q/");
+  // Decision 18: the inquiry form is the front door, so it is public by
+  // definition — a customer filling it in has never heard of this app. Note NO
+  // trailing slash, unlike `/q/`, so the bare `/inquiry` matches.
+  //
+  // Same argument as above about what makes this sound: the page reaches two
+  // definer RPCs from migration 057 (list the shops, create a lead) and nothing
+  // else. Every table policy still names supervisor+.
+  const isInquiryPage = request.nextUrl.pathname.startsWith("/inquiry");
 
-  if (!user && !isLoginPage && !isWelcomePage && !isQuotePage) {
+  if (!user && !isLoginPage && !isWelcomePage && !isQuotePage && !isInquiryPage) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";

@@ -33,6 +33,7 @@ export function TimeField({
   required = false,
   ariaLabel,
   className = "",
+  variant = "cell",
 }: {
   /** `HH:MM` or `HH:MM:SS` (what a Postgres `time` column reads back), or null. */
   value: string | null;
@@ -44,9 +45,23 @@ export function TimeField({
   required?: boolean;
   ariaLabel: string;
   className?: string;
+  /**
+   * `ui/DateField`'s prop, kept in step for that component's own reason: these
+   * two sit SIDE BY SIDE, so a bordered time beside a borderless date reads as
+   * one of them being broken. Whatever dress the date wears, this wears too.
+   */
+  variant?: "cell" | "field";
 }) {
+  const field = variant === "field";
+
   return (
-    <span className="inline-flex items-center px-1 py-0.5 hover:bg-neutral-100">
+    <span
+      className={
+        field
+          ? "flex h-12 w-full items-center border border-ink px-3 focus-within:border-2"
+          : "inline-flex items-center px-1 py-0.5 hover:bg-neutral-100"
+      }
+    >
       <input
         type="time"
         // `10:00:00` comes back from Postgres; the control wants `10:00`.
@@ -58,7 +73,9 @@ export function TimeField({
         aria-label={ariaLabel}
         autoComplete="off"
         onChange={(e) => onChange(e.target.value || null)}
-        className={`h-6 bg-transparent tabular-nums outline-none disabled:opacity-35 ${className}`}
+        className={`bg-transparent tabular-nums outline-none disabled:opacity-35 ${
+          field ? "h-full w-full text-[16px]" : "h-6"
+        } ${className}`}
       />
     </span>
   );
