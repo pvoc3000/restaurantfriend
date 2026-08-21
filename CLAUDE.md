@@ -3558,6 +3558,27 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **The floor fills the TICKS, not just the count** — raising the number alone
    would leave the strip showing gaps while the wash said five, which is two
    readings of one fact disagreeing.
+   **WHOSE MOVE IT IS BEATS HOW CLOSE THE EVENT IS** (Mark, 2026-08-20, with two
+   real orders). `stageState`'s two waiting rungs — `quote_returned` and
+   `invoice_paid` — were `close || past ? "overdue" : "waiting"`, and `close` is
+   `printWithinDays`, TWO days. So order 9882 (quoted the 12th for the 22nd) and
+   9863 (invoiced the 6th for the 22nd) both painted RED when we are plainly
+   waiting on somebody else. They are `past ? "overdue" : "waiting"` now: while
+   the event is ahead of you, waiting on them IS waiting; once it is behind you,
+   "waiting" is a euphemism. Known cost, accepted: no warning in the last two
+   days from the strip, which the row's event date and the attention queue both
+   still carry. **Only the two THEIR-move rungs changed** — the four we act on
+   are still `close || past`.
+   **AND `suggestedTodo` NOW ASKS WHETHER ITS OWN DOCUMENT HAS GONE OUT.** It
+   only ever looked at the NEXT stage's date, so it could not tell "not sent
+   yet" from "sent and unanswered": 9863 was told to "Send Invoice" sixteen days
+   after the invoice went out, and 9882 to "Respond to Email/Call", which is
+   what you do for a LEAD that has written in. **When the ball is in their court
+   the suggestion is NOTHING** until the event has passed, at which point an
+   unpaid invoice gets FileMaker's own "Invoice Overdue!". A to-do suggested on
+   every waiting row is the noise that teaches people to ignore the column, and
+   the strip already says "waiting on them" in yellow. It takes `today` now —
+   optional, and without it the chase simply never fires.
    **ONLY THE FIRST BLOCKED RUNG IS COLOURED** (Mark, 2026-08-20: "once we hit
    either a red or yellow one, the ones after it should just be 'not yet'").
    `stageState` judges each rung alone, so a near or past event calls EVERY

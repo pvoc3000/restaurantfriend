@@ -406,6 +406,61 @@ test("thresholds are configuration", () => {
  * THE SUGGESTED TO-DO
  * ========================================================================== */
 
+/* -- the suggestion asks whether ITS OWN document has gone out ------------ */
+
+test("a quote that is out and unanswered suggests NOTHING", () => {
+  // Order 9882 verbatim — status `quote`, quoted on the 12th for the 22nd. It
+  // used to suggest "Respond to Email/Call", which is what you do for a LEAD
+  // that has written in, not for a quote sitting with a customer. There is no
+  // action for us while the ball is in their court, and a to-do on every such
+  // row is the noise that teaches people to ignore the column.
+  eq(
+    suggestedTodo(
+      order({ status: "quote", quote_sent_at: "2026-08-12", event_date: "2026-08-22" }),
+      "2026-08-20"
+    ),
+    null
+  );
+});
+
+test("an invoice that is out and unpaid suggests NOTHING until the event passes", () => {
+  // Order 9863 verbatim — invoiced on the 6th for the 22nd, and it suggested
+  // "Send Invoice" for an invoice that had gone out sixteen days earlier.
+  const o = {
+    status: "invoice" as const,
+    quote_sent_at: "2026-08-06",
+    quote_returned_at: "2026-08-06",
+    invoice_sent_at: "2026-08-06",
+  };
+  eq(suggestedTodo(order({ ...o, event_date: "2026-08-22" }), "2026-08-20"), null);
+  // …and once it has, FileMaker's own word for it.
+  eq(suggestedTodo(order({ ...o, event_date: "2026-08-18" }), "2026-08-20"), "Invoice Overdue!");
+});
+
+test("the send is still suggested when the document has NOT gone out", () => {
+  eq(suggestedTodo(order({ status: "quote", event_date: "2026-08-22" }), "2026-08-20"), "Send Quote");
+  eq(
+    suggestedTodo(
+      order({ status: "invoice", quote_returned_at: "a", event_date: "2026-08-22" }),
+      "2026-08-20"
+    ),
+    "Send Invoice"
+  );
+});
+
+test("a lead with a quote already out is their move, not an invoice", () => {
+  // It used to answer "Send Invoice" — you do not invoice a quote nobody has
+  // agreed to.
+  eq(suggestedTodo(order({ status: "lead", quote_sent_at: "2026-08-12" }), "2026-08-20"), null);
+});
+
+test("without a date the chase never fires, which is quiet rather than wrong", () => {
+  eq(
+    suggestedTodo(order({ status: "invoice", invoice_sent_at: "a", event_date: "2020-01-01" })),
+    null
+  );
+});
+
 test("suggestedTodo walks the ladder", () => {
   eq(suggestedTodo(order({ status: "lead" })), "Send Quote");
   eq(suggestedTodo(order({ status: "quote", quote_returned_at: "2026-08-01" })), "Send Invoice");
@@ -496,11 +551,42 @@ test("waiting on the customer is YELLOW, and only after we sent something", () =
   eq(stageState(order({ event_date: "2026-12-01" }), stage("quote_returned"), "2026-08-17"), null);
 });
 
-test("close to the event, waiting becomes OVERDUE", () => {
+test("close to the event, waiting on THEM is still waiting", () => {
+  // Changed 2026-08-20 on Mark's report of order 9882 — quoted on the 12th for
+  // an event on the 22nd, and the strip painted it RED. It was `close || past`,
+  // and `close` is `printWithinDays`, two days, so every quote still out inside
+  // 48 hours read as overdue when the honest reading is that we are waiting on
+  // somebody else.
   eq(
     stageState(order({ status: "quote", quote_sent_at: "2026-08-01", event_date: "2026-08-18" }), stage("quote_returned"), "2026-08-17"),
+    "waiting"
+  );
+});
+
+test("…but once the event has PASSED, waiting is a euphemism", () => {
+  eq(
+    stageState(order({ status: "quote", quote_sent_at: "2026-08-01", event_date: "2026-08-16" }), stage("quote_returned"), "2026-08-17"),
     "overdue"
   );
+});
+
+test("an unpaid invoice reads the same way", () => {
+  // Order 9863: invoiced on the 6th for an event on the 22nd.
+  const sent = {
+    status: "invoice" as const,
+    quote_sent_at: "a",
+    quote_returned_at: "a",
+    invoice_sent_at: "2026-08-06",
+  };
+  eq(stageState(order({ ...sent, event_date: "2026-08-18" }), stage("invoice_paid"), "2026-08-17"), "waiting");
+  eq(stageState(order({ ...sent, event_date: "2026-08-16" }), stage("invoice_paid"), "2026-08-17"), "overdue");
+});
+
+test("OUR move is still overdue as the event nears — only theirs changed", () => {
+  // `quote_sent`, `invoice_sent`, `order_printed` and `order_scheduled` are all
+  // things WE do, and `close || past` is right for them.
+  eq(stageState(order({ event_date: "2026-08-18" }), stage("quote_sent"), "2026-08-17"), "overdue");
+  eq(stageState(order({ event_date: "2026-08-18" }), stage("order_printed"), "2026-08-17"), "overdue");
 });
 
 test("a pickup order's delivery cell is blank, not overdue", () => {

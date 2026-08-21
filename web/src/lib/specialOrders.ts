@@ -490,16 +490,50 @@ export function needsAttention(
  * always overrides this on display, which is why the caller shows one or the
  * other rather than both.
  */
-export function suggestedTodo(order: AttentionOrder): string | null {
+export function suggestedTodo(
+  order: AttentionOrder,
+  /** Today in the org's timezone. Optional: without it the two "chase them"
+   *  suggestions simply never fire, which is the quiet answer, not a wrong one. */
+  today?: string
+): string | null {
   if (order.kind !== "order" || order.status === "cancelled") return null;
   if (order.flag_reason) return FLAG_TODO;
+
+  /**
+   * EACH CASE ASKS WHETHER ITS OWN DOCUMENT HAS GONE OUT (Mark, 2026-08-20,
+   * with two orders that proved it). The old version only ever looked at the
+   * NEXT stage's date, so it could not tell "not sent yet" from "sent and
+   * unanswered" and suggested the send either way:
+   *
+   *   · 9863 — status `invoice`, invoiced on the 6th, unpaid. It suggested
+   *     "Send Invoice" for an invoice that had gone out sixteen days earlier.
+   *   · 9882 — status `quote`, quoted on the 12th, unreturned. It suggested
+   *     "Respond to Email/Call", which is what you do for a LEAD that has
+   *     written in, not for a quote sitting with a customer.
+   *
+   * WHEN THE BALL IS IN THEIR COURT THE SUGGESTION IS NOTHING, until it is
+   * genuinely late. There is no action for us while a fresh quote is out, and a
+   * to-do suggested on every such row is the noise that teaches people to
+   * ignore the column. The strip says "waiting on them" in yellow meanwhile,
+   * which is the honest state.
+   */
+  const late = today ? order.event_date !== null && order.event_date < today : false;
+
   switch (order.status) {
     case "lead":
-      return order.quote_sent_at ? "Send Invoice" : "Send Quote";
+      // A quote already out is their move; it is not yet an invoice.
+      return order.quote_sent_at ? null : "Send Quote";
     case "quote":
-      return order.quote_returned_at ? "Send Invoice" : "Respond to Email/Call";
+      if (order.quote_returned_at) return "Send Invoice";
+      if (!order.quote_sent_at) return "Send Quote";
+      return null; // Out, unanswered — theirs.
     case "invoice":
-      return order.invoice_paid_at ? "Print Order" : "Send Invoice";
+      if (order.invoice_paid_at) return "Print Order";
+      if (!order.invoice_sent_at) return "Send Invoice";
+      // FileMaker's own word for an invoice that has gone out and not come
+      // back. Only once the event has passed — before that it is simply
+      // outstanding.
+      return late ? "Invoice Overdue!" : null;
     case "order":
       if (!order.order_printed_at) return "Print Order";
       if (!order.order_scheduled_at) return "Schedule Production";
@@ -621,14 +655,25 @@ export function stageState(
     case "quote_sent":
       return close || past ? "overdue" : null;
     case "quote_returned":
-      // The one stage that is genuinely somebody else's move.
+      // SOMEBODY ELSE'S MOVE, and it stays yellow while the event is still
+      // ahead (Mark, 2026-08-20, on order 9882: the quote went out on the 12th
+      // for an event on the 22nd, and the strip painted it RED). It was
+      // `close || past`, and `close` is `printWithinDays` — two days — so every
+      // quote still out in the last 48 hours read as overdue when the honest
+      // reading is that we are waiting on them.
+      //
+      // PAST is a different matter and stays red: once the event is behind you,
+      // "waiting" is a euphemism. What this deliberately gives up is a warning
+      // in the last two days, which the row's own event date and the attention
+      // queue both still carry.
       if (!order.quote_sent_at) return null;
-      return close || past ? "overdue" : "waiting";
+      return past ? "overdue" : "waiting";
     case "invoice_sent":
       return close || past ? "overdue" : null;
     case "invoice_paid":
+      // The same, on order 9863: invoiced on the 6th for an event on the 22nd.
       if (!order.invoice_sent_at) return null;
-      return close || past ? "overdue" : "waiting";
+      return past ? "overdue" : "waiting";
     case "delivery_scheduled":
     case "order_scheduled":
     case "order_printed":

@@ -604,7 +604,7 @@ export function SpecialOrdersList({
        * yellow, which is why it is not what was asked to go.
        */
       render: (r) => {
-        const hint = r.todo ? null : suggestedTodo(r as never);
+        const hint = r.todo ? null : suggestedTodo(r as never, today);
         return (
           <span className="block">
             {r.todo ? (
