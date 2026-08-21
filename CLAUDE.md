@@ -3039,9 +3039,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    real tables (its census caught all of this). Ships vestigial:
    `locations.kitchen_by_weekday` / `shops_for` retire when kitchen-on-plan
    lands.
-4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3 DONE AND LIVE
-   (2026-08-20); phase 4a BUILT but NEEDS 057 APPLIED AND `submit-inquiry`
-   DEPLOYED; 4b, 4c and 5 not built.** The module records, quotes, invoices,
+4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3 AND 4a DONE AND
+   LIVE (057 applied and `submit-inquiry` deployed 2026-08-21, then walked end
+   to end); migration 058 NEEDS APPLYING; 4b, 4c and 5 not built.** The module records, quotes, invoices,
    prints, emails as specialorders@ and takes a customer's approval on a public
    page; what remains is the inquiry form's own picker (4b), the organic-email
    parser (4c) and production/recurrence (5). Read
@@ -3050,8 +3050,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    handoff and names the two things Mark still has to run, and its CORRECTIONS
    block comes first: five measurements in the body are wrong, because the
    brief was designed from a `parseInt` reading of `OrderID`.
-   **Shipped 2026-08-20, phase 4a — THE FRONT DOOR (migration 057, NEEDS
-   APPLYING; `submit-inquiry` NEEDS DEPLOYING).** Decision 18: a public
+   **Shipped 2026-08-20, phase 4a — THE FRONT DOOR (migration 057 APPLIED and
+   `submit-inquiry` DEPLOYED 2026-08-21).** Decision 18: a public
    `/inquiry` form that creates a lead directly, replacing the Square web form
    whose entries a human retyped. Scoped to the form ALONE on Mark's call — the
    build-your-box picker (4b) and the paste-and-parse fallback (4c) are
@@ -3118,6 +3118,57 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    submitting no date while believing they asked for today. **The rule is not
    "always ours" or "always native": a control carrying a hard-won bug fix is
    never re-implemented.**
+   **WALKED END TO END 2026-08-21 against the live database**, through the real
+   form. The lead is **#10013**: tax 0.09750 snapshotted from DF01,
+   `date_initiated` the org's own day, `created_by` null, and
+   **`delivery_address` null on a pickup that supplied an address** — the
+   measured rule holding on real data. **The customer MATCHED rather than
+   duplicating** (`trombino@mac.com` was already a FileMaker customer), and the
+   answer was byte-identical to a create, which is the privacy rule proved on
+   real rows. The confirmation sent and **`inbound_message_id` holds the exact
+   Message-ID we generated**; a quote emailed afterwards stamped
+   `quote_sent_at`, filed its PDF, minted a token, and **left
+   `inbound_message_id` unchanged**, so it went out `In-Reply-To` the
+   confirmation. The one leg no probe can settle is what the mailbox does with
+   it.
+   **Four tweaks the same day, all Mark's, after using it:**
+   **(a) A NEW INQUIRY ARRIVES FLAGGED** (migration **058**, NEEDS APPLYING) —
+   `flag_reason = 'New Inquiry'`, because a lead that joins 8,330 others as an
+   ordinary row is not "easily noticed" and `flag_reason` is what this module
+   already has for "look at this one". **The to-do deliberately stays "Respond
+   to Email/Call"** rather than the flag path's "Resolve Issue": the flag says
+   LOOK AT THIS, the to-do says WHAT TO DO, and "Resolve Issue" describes
+   nothing on a lead nobody has read. Known consequence and the intended arc —
+   resolving clears both, and `suggestedTodo` then returns "Send Quote", which
+   is the actual next step. **It is a separate migration rather than an edit to
+   057** (055's rule: 057 is applied, and a file that no longer describes what
+   was run is how the harness and production stop being the same database), so
+   the function is reproduced in full and changed in exactly two places. The
+   argument list is COPIED, not retyped — a changed one would create an
+   OVERLOAD and leave 057's version live beside it, which is 033's
+   `freeze_pay_period` lesson; the harness asserts `pg_proc` holds ONE row and
+   that the grants survived `create or replace`.
+   **(b) "Resolve the issue" IS BLACK WHILE FLAGGED** —
+   **`PRIMARY_BUTTON_CLASS`**, a shared class rather than an inlined string
+   (that file's own history: the red exception was shared while the rule it
+   excepts was retyped, and three commands came out three heights). It is
+   `DIALOG_COMMIT_CLASS`'s argument applied outside a dialog rather than a
+   breach of the black-fill rule: a flagged record is in an abnormal state with
+   exactly ONE way out, so this is a commit standing beside no peers. **Only
+   ever right CONDITIONALLY** — unflagged, the same slot holds "Flag an issue",
+   an ordinary command, and it stays white.
+   **(c) THE NOTE FIELDS WEAR BOUNDING BOXES** — `InlineValue`'s new `boxed`,
+   which swaps the dotted underline for a border and a `min-h`. The underline
+   is the quietest possible "editable" and that is right for a value in a dense
+   `dl`, where the LABEL beside it already bounds the field; a column of five
+   multiline notes has no such structure, an empty one is a single blank line,
+   and a dotted rule under a wrapped paragraph marks only its LAST line — so
+   five notes read as five headings with loose text under them. **The SIZER
+   wears it too**, or the field jumps the moment you click in, which is the
+   same reason the underline was on the sizer in the first place; and the
+   read-only branch keeps the box, or the tab looks broken for anyone below
+   purchaser+.
+   **(d) The interest vocabulary lost "Donut Cake" and "Vegan / Gluten-free".**
    **All 57 migrations replay on the Docker harness and every rule was checked
    by BREAKING it** (see 057's own tail block): as a real `anon`, nine different
    malformed submissions all return states and none raises; the real Victoria Fay
@@ -4465,6 +4516,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/DocumentChip` | a bordered div with a thumbnail strip | a filed document in a list — PO attachments, employee paperwork. Full-bleed preview (image, or PDF via `<object>`) with the text semi-opaque over it; the plugin is `pointer-events-none` and a transparent anchor takes the click |
   | `ui/StickyFooter` | a hand-placed `fixed bottom-0` div plus a guessed spacer | a band pinned to the foot of the window — PO paperwork, employee paperwork. MEASURES its own height into a spacer so the page's last block doesn't slide under it, minus what already follows (the layout's `py-8`), and fires a `resize` so `useFillViewportHeight` reclaims space when it SHRINKS |
   | `ui/RevealPanel` | a section that is always fully open, or a hand-rolled hover-expand | a block whose body costs more screen than it earns — both paperwork areas. Header always visible (title, count, Add as, Attach, progress, errors); the body opens on hover, on focus, or from a pinning toggle, and is ABSOLUTELY POSITIONED so it never reflows the page. **`alwaysOpen`** drops the toggle and puts the body IN FLOW, for when the panel gets a screen of its own and the crowding it was hiding from is gone |
+  | `ui/buttons` `PRIMARY_BUTTON_CLASS` | a black class string you type yourself | the ONE case where a command button on a SCREEN is filled black — a record in an abnormal state with exactly one way out (a flagged order's "Resolve the issue"). `DIALOG_COMMIT_CLASS`'s argument outside a dialog; only ever right CONDITIONALLY, never as a screen's standing "primary" |
   | `ui/buttons` `DANGER_BUTTON_CLASS` | re-typing the red class string | any destructive command out on a screen — Delete, Void, "Deactivate everywhere". Red EVEN THOUGH most only open a confirm: a reader can't tell "opens a confirm" from "destroys" by looking. Bordered, never filled. NOT the same as `DIALOG_DANGER_CLASS` (`px-5`, a dialog footer's commit) — don't merge them. Positional classes stay at the call site |
   | `ui/FileDropZone` | `onDrop` on a div | dropping files onto a region. Its OVERLAY takes the drop (a PDF `<object>` is a plugin and swallows drag events — confirmed working over a live PDF, Mark 2026-08-04), it arms off WINDOW drag events so it's up before the pointer arrives, it vets types itself (`accept` governs only the picker), and it stops a stray drop navigating the page away |
   | `ui/SectionNav` | a second sidebar, underline tabs, or a `TabPicker` turned sideways | **the sections of one detail record** — the employee screen's Info · Employment · Events · Documents · Admin. Plain text links, no box: active bold black, inactive `text-muted`. `orientation="horizontal"` is the narrow-screen form. See "A detail screen that outgrows one page" below — REUSE THIS, don't re-derive it |

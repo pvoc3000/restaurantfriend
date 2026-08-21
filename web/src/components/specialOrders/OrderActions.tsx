@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
-import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS, DANGER_BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { TextInput } from "@/components/ui/TextInput";
 import { FLAG_TODO, type SpecialOrderKind, type SpecialOrderStatus } from "@/lib/specialOrders";
 
@@ -281,7 +281,12 @@ export function OrderActions({
           Duplicate
         </button>
         {flagReason ? (
-          <button type="button" className={BUTTON_CLASS} onClick={resolve} disabled={pending}>
+          /* BLACK, and only while the order is flagged (Mark, 2026-08-21). A
+             flagged record is in an abnormal state with exactly one way out, so
+             this is a commit standing beside no peers — `PRIMARY_BUTTON_CLASS`
+             explains the exception in full. Unflagged, the same slot holds
+             "Flag an issue", which is an ordinary command and stays white. */
+          <button type="button" className={PRIMARY_BUTTON_CLASS} onClick={resolve} disabled={pending}>
             Resolve the issue
           </button>
         ) : (

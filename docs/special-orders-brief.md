@@ -828,7 +828,9 @@ check `max(OrderID)` against the live layout before trusting it.**
    the form's value is complete without the picker — the Square form it
    replaces has no picker either.
 
-   **4a ✅ BUILT, NOT YET APPLIED OR DEPLOYED.** Migration **057**
+   **4a ✅ BUILT AND LIVE — 057 applied and `submit-inquiry` deployed by Mark
+   2026-08-21, then walked end to end** (see the walk's record below).
+   Migration **058 NEEDS APPLYING** — the auto-flag. Migration **057**
    (`create_inquiry` + `inquiry_shops`, both granted `anon`;
    `customers.source` gains `'inquiry'`; `locations.public_name`; the throttle
    index; the form's settings), the **`submit-inquiry`** edge function,
@@ -856,34 +858,48 @@ Each phase ships usable; nothing later blocks earlier.
 
 ## Where a next session picks up (2026-08-20, after 4a)
 
-**MARK HAS TWO THINGS TO RUN, and 4a does nothing until both are done:**
+**057 IS APPLIED AND `submit-inquiry` IS DEPLOYED** (Mark, 2026-08-21).
 
-1. **Apply migration 057** in the SQL editor. Its tail block lists the probes.
-   The quick pair: `select public.inquiry_shops(null)` must answer `[]`, and
-   `select public.create_inquiry(null, 'A Name')` must answer
-   `{"ok": false, "state": "unknown_org"}` — **an answer, not an error**, which
-   is the property the whole design rests on.
-2. **Deploy the function**: `supabase functions deploy submit-inquiry`.
-   Smoke-test it the way phase 3's three were — POST an empty body with the
-   anon key and expect a 400 naming `missing org_id or name`, which also proves
-   the `_shared/email.ts` import bundled.
+**Still to run: migration 058**, the auto-flag. Its tail block carries the
+probes; the one that matters is `select count(*) from pg_proc where proname =
+'create_inquiry'` returning **ONE**, because two would mean the argument list
+drifted and 057's version is still live beside it.
 
-`NEXT_PUBLIC_ORG_ID` is already in `web/.env.local`
-(`5803adf6-…`); **it also has to go into Vercel**, and Next inlines it at BUILD
-time, so it needs a redeploy rather than a reload.
+`NEXT_PUBLIC_ORG_ID` is in `web/.env.local` (`5803adf6-…`); **it also has to go
+into Vercel** before the form works on the deployment, and Next inlines it at
+BUILD time, so it needs a redeploy rather than a reload.
 
 Redeploying `send-po-email`, `send-special-order-email` and `approve-quote` is
 **hygiene, not a requirement**: `_shared/email.ts` gained an OPTIONAL
-`messageId` and none of them passes it, so their stale copies behave
-identically. Verified by rendering both providers in Node — with no `messageId`
-the Gmail MIME carries no `Message-ID` header and Resend's `headers` object is
-`undefined`, exactly as before.
+`messageId` and none of them passes it. Verified by rendering both providers in
+Node — with no `messageId` the Gmail MIME carries no `Message-ID` header and
+Resend's `headers` object is `undefined`, exactly as before.
 
-**Then walk it**: submit a real inquiry to Mark's own address, confirm the lead
-appears as a lead with todo "Respond to Email/Call", confirm the confirmation
-email arrives, and then **reply to it from the app** — that last step is the
-acceptance test for the Message-ID work and the only one that proves threading,
-because the failure is silent.
+### The end-to-end walk (2026-08-21)
+
+Submitted through the real form on the real deployment's database, and every
+leg landed:
+
+· the lead is **#10013** — kind order / status lead / todo "Respond to
+  Email/Call", title from the occasion, DF01 pickup, **tax 0.09750 snapshotted
+  from the shop**, `date_initiated` the org's own 2026-08-21, `created_by` null.
+· **`delivery_address` is null on a pickup that supplied an address** — the
+  measured rule, holding on real data.
+· **the customer MATCHED rather than duplicating**: `trombino@mac.com` already
+  belonged to a FileMaker customer, so no second row was made, and the answer
+  was byte-identical to a create. `contact_name` is who typed the form while
+  the customer record is who the order belongs to — `contactFrom`'s per-field
+  seeding, visibly working.
+· the confirmation sent, and **`inbound_message_id` holds the exact Message-ID
+  we generated** — the thread root recorded.
+· then a QUOTE was emailed from the app: `gmail 1a024e939b919e00`,
+  `quote_sent_at` stamped, the PDF filed as `quote_document`, a token minted
+  with its snapshot, and **`inbound_message_id` unchanged**, so it went out
+  `In-Reply-To` the confirmation. `threadHeaders` resolves that stored value to
+  itself with no double-bracketing, checked against the real string.
+
+The one leg no probe can settle is what the mailbox does with it — that is a
+look, not an assertion.
 
 ## Where phase 3 left things (2026-08-20)
 

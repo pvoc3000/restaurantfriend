@@ -77,8 +77,6 @@ export const INQUIRY_INTEREST_OPTIONS = [
   "Miniature Donuts",
   "Giant Donuts",
   "Donut Letters",
-  "Donut Cake",
-  "Vegan / Gluten-free",
   "Something else",
 ] as const;
 

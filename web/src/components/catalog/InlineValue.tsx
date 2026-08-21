@@ -122,6 +122,28 @@ const INLINE_REST_LOOK =
   "underline decoration-neutral-300 decoration-dotted underline-offset-4";
 
 /**
+ * `boxed`'s resting cue — a real bounding box instead of the dotted underline
+ * (Mark, 2026-08-21, on the special order's five note fields: "let's put
+ * bounding boxes on the Notes fields to make them more easily differentiated").
+ *
+ * WHY THE UNDERLINE ISN'T ENOUGH THERE. It is the quietest possible "editable",
+ * which is right for a value in a dense `dl` where the LABEL beside it already
+ * says where one field ends and the next begins. A column of five multiline
+ * notes has no such structure: each is a paragraph under its own heading, an
+ * empty one is a single blank line, and a dotted rule under a wrapped paragraph
+ * marks only its LAST line — so five notes read as five headings with some text
+ * loose underneath rather than as five fields.
+ *
+ * `min-h` is half the point. Without it an empty note is a one-line box, which
+ * is a hard target and gives the reader nothing to aim a paragraph at.
+ *
+ * The underline comes OFF when this goes on: a box and a dotted rule are two
+ * cues for one fact, and the second one just looks like an artefact.
+ */
+const INLINE_REST_BOXED =
+  "min-h-16 border border-hairline hover:border-ink";
+
+/**
  * The editing frame. `-outline-offset-1` keeps it inside the cell's own padding
  * rather than bleeding into the column beside it, and `absolute inset-0` takes
  * the input OUT OF FLOW — see `Sizer`.
@@ -158,13 +180,24 @@ const INLINE_EDITING = `absolute inset-0 w-full bg-transparent ${INLINE_BOX} out
  * Verified against every shape a cell holds — "1", "0.3333", "12.5", "1000",
  * "x", "0.02" — all identical to a tenth of a pixel in both axes.
  */
-function Sizer({ text, align }: { text: string; align?: "left" | "right" }) {
+function Sizer({
+  text,
+  align,
+  boxed = false,
+}: {
+  text: string;
+  align?: "left" | "right";
+  /** Whatever the RESTING state wears, this wears — otherwise the two differ in
+   *  height and the field jumps the moment you click into it. That is why the
+   *  underline was here in the first place, and `boxed` inherits the rule. */
+  boxed?: boolean;
+}) {
   return (
     <span
       aria-hidden
-      className={`invisible block whitespace-pre ${INLINE_BOX} ${INLINE_REST_LOOK} ${
-        align === "right" ? "text-right tabular-nums" : "text-left"
-      }`}
+      className={`invisible block whitespace-pre ${INLINE_BOX} ${
+        boxed ? INLINE_REST_BOXED : INLINE_REST_LOOK
+      } ${align === "right" ? "text-right tabular-nums" : "text-left"}`}
     >
       {/* A space, never "", or an empty cell collapses to no height at all. */}
       {text === "" ? " " : text}
@@ -203,6 +236,7 @@ export function InlineValue({
   activateTable,
   scale,
   multiline = false,
+  boxed = false,
   collapseWhenEmpty = false,
 }: {
   table: string;
@@ -358,6 +392,10 @@ export function InlineValue({
    * with Enter spoken for there has to be a keyboard way out.
    */
   multiline?: boolean;
+  /** Wear a bounding box at rest instead of the dotted underline — see
+   *  `INLINE_REST_BOXED`. For a stack of multiline notes, where the quiet cue
+   *  leaves the fields indistinguishable from each other. */
+  boxed?: boolean;
   /** kind="date" only — see `DateField`. For a date cell in a narrow box, where
    *  reserving a field's width for an empty value strands the calendar glyph. */
   collapseWhenEmpty?: boolean;
@@ -557,7 +595,7 @@ export function InlineValue({
             it falls back to the sizer's content width, which is the resting
             button's width. One rule, both cases. */}
         <span className="relative block w-full">
-          <Sizer text={draft} align={align} />
+          <Sizer text={draft} align={align} boxed={boxed} />
         <textarea
           autoFocus
           rows={4}
@@ -600,7 +638,7 @@ export function InlineValue({
             it falls back to the sizer's content width, which is the resting
             button's width. One rule, both cases. */}
         <span className="relative block w-full">
-          <Sizer text={draft} align={align} />
+          <Sizer text={draft} align={align} boxed={boxed} />
         <input
           autoFocus
           value={draft}
@@ -647,7 +685,9 @@ export function InlineValue({
       title="Click to edit"
       aria-label={ariaLabel ?? column}
       // Dotted underline at rest — the quietest possible "this is editable".
-      className={`w-full ${INLINE_BOX} ${INLINE_REST_LOOK} hover:bg-neutral-100 ${
+      className={`w-full ${INLINE_BOX} ${
+        boxed ? INLINE_REST_BOXED : INLINE_REST_LOOK
+      } hover:bg-neutral-100 ${
         align === "right" ? "text-right tabular-nums" : "text-left"
       } ${multiline ? "whitespace-pre-wrap" : ""} ${
         shown === null || shown === "" ? emptyClassName : ""

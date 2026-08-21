@@ -676,25 +676,31 @@ export async function SpecialOrderDetail({
                     Each of these prints on its own document. The general note
                     prints nowhere — it is for you.
                   </p>
+                  {/* `boxed` rather than the app's usual dotted underline
+                      (Mark, 2026-08-21). Five stacked paragraphs under five
+                      headings need to read as five FIELDS, and a dotted rule
+                      marks only the last line of a wrapped paragraph — which
+                      down a column reads as loose text rather than as a box you
+                      can type in. See `INLINE_REST_BOXED`. */}
                   <div className="space-y-6 pr-2">
                     <Row label="General (prints nowhere)">
-                      <Cell table="special_orders" id={id} column="notes_general" multiline
+                      <Cell table="special_orders" id={id} column="notes_general" multiline boxed
                             value={row.notes_general as string | null} canWrite={canWrite} ariaLabel="General note" />
                     </Row>
                     <Row label="On the quote">
-                      <Cell table="special_orders" id={id} column="notes_quote" multiline
+                      <Cell table="special_orders" id={id} column="notes_quote" multiline boxed
                             value={row.notes_quote as string | null} canWrite={canWrite} ariaLabel="Quote note" />
                     </Row>
                     <Row label="On the kitchen order">
-                      <Cell table="special_orders" id={id} column="notes_production" multiline
+                      <Cell table="special_orders" id={id} column="notes_production" multiline boxed
                             value={row.notes_production as string | null} canWrite={canWrite} ariaLabel="Production note" />
                     </Row>
                     <Row label="On the invoice">
-                      <Cell table="special_orders" id={id} column="notes_invoice" multiline
+                      <Cell table="special_orders" id={id} column="notes_invoice" multiline boxed
                             value={row.notes_invoice as string | null} canWrite={canWrite} ariaLabel="Invoice note" />
                     </Row>
                     <Row label="On the receipt">
-                      <Cell table="special_orders" id={id} column="notes_receipt" multiline
+                      <Cell table="special_orders" id={id} column="notes_receipt" multiline boxed
                             value={row.notes_receipt as string | null} canWrite={canWrite} ariaLabel="Receipt note" />
                     </Row>
                   </div>
@@ -877,6 +883,7 @@ function Cell({
   allowNew?: boolean;
   clearable?: boolean;
   multiline?: boolean;
+  boxed?: boolean;
   placeholder?: string;
   ariaLabel?: string;
 }) {
@@ -885,7 +892,18 @@ function Cell({
       props.kind === "pick"
         ? props.options?.find((o) => o.value === value)?.label ?? (value as string) ?? "—"
         : (value as string) ?? "—";
-    return <span className={READ_ONLY_VALUE}>{shown || "—"}</span>;
+    // A boxed note keeps its box below purchaser+, or the Notes tab reads as
+    // five headings with loose text under them for anyone who can't write —
+    // which is the very thing the box was added to fix.
+    return (
+      <span
+        className={`${READ_ONLY_VALUE} ${
+          props.boxed ? "block min-h-16 w-full whitespace-pre-wrap border border-hairline" : ""
+        }`}
+      >
+        {shown || "—"}
+      </span>
+    );
   }
   return <InlineValue value={value} {...props} />;
 }

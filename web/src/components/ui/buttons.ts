@@ -47,5 +47,30 @@ export const DANGER_BUTTON_CLASS =
  *
  * Positional classes stay at the CALL SITE, same rule as above.
  */
+/**
+ * The ONE case where a command button on a screen is filled black (Mark,
+ * 2026-08-21, for "Resolve the issue" on a flagged order).
+ *
+ * This is `DIALOG_COMMIT_CLASS`'s argument applied outside a dialog, not a
+ * breach of the rule that only a set filter or a delimiting band is black. That
+ * exception turns on a control being a COMMIT STANDING BESIDE NO PEERS — and a
+ * flagged order is exactly that situation: the record is in an abnormal state,
+ * one command returns it to normal, and Duplicate and Delete beside it are
+ * peripheral by comparison. The receiving screen's `Complete` reached the same
+ * conclusion by the same route.
+ *
+ * IT IS ONLY EVER RIGHT CONDITIONALLY. A button that wears this all the time is
+ * claiming to be the point of its screen, which no command on a detail screen
+ * is — what you came to do there is edit the inline cells. Reach for it when
+ * the record is in a state that has ONE way out, and use `BUTTON_CLASS` the
+ * rest of the time.
+ *
+ * Dimension-for-dimension `BUTTON_CLASS`, minus the colours: these differ in
+ * what they mean, not in how big they are, and that file's own history says
+ * what happens when they drift.
+ */
+export const PRIMARY_BUTTON_CLASS =
+  "inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-ink px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-white hover:text-ink disabled:opacity-35";
+
 export const BUTTON_CLASS =
   "inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
