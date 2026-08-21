@@ -56,6 +56,26 @@
  * THE FLOOR FILLS THE TICKS TOO, not just the count. If it only raised the
  * number, the strip would show gaps while the bar said five — and a list whose
  * two readings of one fact disagree is worse than either alone.
+ *
+ * ---------------------------------------------------------------------------
+ * ONLY THE FIRST BLOCKED RUNG IS COLOURED (Mark, 2026-08-20: "once we hit
+ * either a red or yellow one, the ones after it should just be 'not yet'").
+ *
+ * `stageState` judges each rung on its own, so once an event is near or past it
+ * calls EVERY undone rung overdue. An order with nothing stamped and the event
+ * behind it came out
+ *
+ *     done · OVERDUE · — · OVERDUE · — · OVERDUE
+ *
+ * which reads as three separate things being late. They are not: the quote is
+ * the blocker and the rest have not come up yet. A strip that paints them all
+ * says nothing about WHERE the order is stuck, which is the one thing it is
+ * there to say.
+ *
+ * So the first overdue-or-waiting rung keeps its colour and every later one
+ * falls back to plain. **A `done` rung is never demoted** — it is a fact rather
+ * than a prediction, and `done` is COUNTED from these ticks, so greying one
+ * would also shorten the bar.
  */
 
 import {
@@ -147,12 +167,19 @@ export function orderProgress(
   thresholds: AttentionThresholds = DEFAULT_ATTENTION
 ): OrderProgress {
   const floor = STATUS_FLOOR[order.status ?? ""] ?? 1;
-  const ticks = LADDER.map((rung, i) => ({
-    key: rung.key,
-    label: rung.label,
+  let blocked = false;
+  const ticks = LADDER.map((rung, i) => {
     // The floor fills the tick, not just the count — see the header.
-    state: i < floor ? ("done" as const) : rungState(order, rung.stages, today, thresholds),
-  }));
+    let state: StageState =
+      i < floor ? "done" : rungState(order, rung.stages, today, thresholds);
+    // Only the FIRST blocked rung is coloured; see the header. `done` is never
+    // demoted — it is a fact, and the bar's length is counted from these.
+    if (state === "overdue" || state === "waiting") {
+      if (blocked) state = null;
+      else blocked = true;
+    }
+    return { key: rung.key, label: rung.label, state };
+  });
   // Counted from the TICKS, so the strip and the wash cannot disagree.
   const done = ticks.filter((t) => t.state === "done").length;
   const total = LADDER.length;

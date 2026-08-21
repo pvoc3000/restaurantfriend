@@ -3558,6 +3558,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **The floor fills the TICKS, not just the count** — raising the number alone
    would leave the strip showing gaps while the wash said five, which is two
    readings of one fact disagreeing.
+   **ONLY THE FIRST BLOCKED RUNG IS COLOURED** (Mark, 2026-08-20: "once we hit
+   either a red or yellow one, the ones after it should just be 'not yet'").
+   `stageState` judges each rung alone, so a near or past event calls EVERY
+   undone rung overdue — an order with nothing stamped came out
+   `done · OVERDUE · — · OVERDUE · — · OVERDUE`, which reads as three separate
+   things being late when the quote is the blocker and the rest have not come
+   up. A strip painting them all says nothing about WHERE the order is stuck,
+   which is the one thing it exists to say. **A `done` rung is never demoted**:
+   it is a fact rather than a prediction, and `done` is COUNTED from these
+   ticks, so greying one would also shorten the bar. The tooltip inherits it and
+   now carries at most one reason.
    **Cancelled gets NO bar** (the style is `undefined`, not a zero width) and the
    row greys out; **flagged is full-width red** whatever the stages say. Cancelled
    BEATS flagged — 705 orders are cancelled and a flag is cleared as soon as it

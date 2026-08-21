@@ -194,13 +194,62 @@ test("a rung that is somebody else's move reads as waiting, not overdue", () => 
   eq(p.ticks[2].state, "waiting", "quote returned");
 });
 
-test("an event that has passed makes the undone rungs overdue", () => {
+test("an event that has passed makes the FIRST undone rung overdue", () => {
   const p = orderProgress(
     { ...(base as object), event_date: "2026-08-01" } as never,
     TODAY
   );
   eq(p.ticks[1].state, "overdue", "quote sent");
   no(p.ticks.some((t) => t.state === "waiting"), "nothing is merely waiting once it is late");
+});
+
+/* -- only the first blocked rung is coloured ------------------------------ */
+
+test("one red, not a wall of them", () => {
+  // `stageState` judges each rung alone, so a past event calls every undone one
+  // overdue — the strip used to read `done · OVERDUE · — · OVERDUE · — ·
+  // OVERDUE`, which says three things are late when the quote is the blocker
+  // and the rest have not come up.
+  const p = orderProgress({ ...(base as object), event_date: "2026-08-01" } as never, TODAY);
+  eq(p.ticks.map((t) => t.state ?? "-").join(" "), "done overdue - - - -");
+});
+
+test("the colour moves along as the blocker is cleared", () => {
+  const p = orderProgress(
+    { ...(base as object), status: "quote", event_date: "2026-08-01", quote_sent_at: "a" } as never,
+    TODAY
+  );
+  eq(p.ticks.map((t) => t.state ?? "-").join(" "), "done done overdue - - -");
+});
+
+test("a DONE rung after the blocker is never demoted", () => {
+  // It is a fact rather than a prediction — and `done` is counted from these
+  // ticks, so greying one would also shorten the bar.
+  const p = orderProgress(
+    { ...(base as object), event_date: "2026-08-01", invoice_sent_at: "a" } as never,
+    TODAY
+  );
+  eq(p.ticks.map((t) => t.state ?? "-").join(" "), "done overdue - done - -");
+  eq(p.done, 2, "the bar still counts it");
+});
+
+test("waiting blocks the rest as surely as overdue does", () => {
+  const p = orderProgress(
+    { ...(base as object), quote_sent_at: "a", invoice_sent_at: "a" } as never,
+    TODAY
+  );
+  eq(p.ticks[2].state, "waiting", "quote returned");
+  no(
+    p.ticks.slice(3).some((t) => t.state === "waiting" || t.state === "overdue"),
+    "nothing downstream is coloured"
+  );
+});
+
+test("the tooltip therefore carries at most one reason", () => {
+  const lines = progressChecklist(
+    orderProgress({ ...(base as object), event_date: "2026-08-01" } as never, TODAY)
+  ).split("\n");
+  eq(lines.filter((l) => l.includes("—")).length, 1);
 });
 
 /* -- snapping the bar to a column rule ------------------------------------ */
