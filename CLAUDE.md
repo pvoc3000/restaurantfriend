@@ -1863,6 +1863,35 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the sentence beside the Import button and its `disabled` cannot drift.
    **1122 fixtures pass**, and the suite also passes under UTC+14 and UTC−11,
    which is the real property `workdayFor`'s date arithmetic needs.
+   **Shipped the same day: RECALCULATE, on the period bar** (Mark: "Is there a
+   way to re-calculate the timesheets without re-importing them?"). There is,
+   and it needs no file: the punch is stored as an INSTANT and the boundary is
+   on the employee, so `workday` can be re-derived from what is already on the
+   row. Before this, applying a boundary to shifts already imported meant
+   dropping the same CSV through the importer again — which needs the file, and
+   the file is the one thing you do not have three weeks later. It is the
+   production module's **Recost** in payroll's terms: read today's inputs,
+   restate one derived column.
+   **IT WRITES `workday` AND NOTHING ELSE.** 028's trigger then re-derives
+   `workweek_start` and 062's re-derives `pay_period_id` from `business_date`,
+   which this never touches — so **a row cannot leave the period you are looking
+   at**, and the punches, the decided hours, `ot_decision` and every note are
+   untouched. The money follows separately and on purpose: moving a workday
+   changes what `proposeOvertime` PROPOSES, and adopting stays a per-row
+   decision (decision 2).
+   **A row with NO PUNCH is skipped.** An `adjustment`'s workday was typed by
+   hand and there is nothing to derive it from; recalculating it would move
+   somebody's sick day to whatever the epoch renders as.
+   It COUNTS BEFORE IT WRITES and names every shift that would move, because
+   the answer is usually zero — and it checks the row count afterwards, since a
+   closed period matches no policy, changes nothing and returns NO error.
+   Verified against the live 08-03 → 08-16 period, all three directions: **0
+   moves as things stand** (idempotent, the fortnight is already right), **24
+   would move back if every boundary were cleared** (the undo path, and exactly
+   the 24 that moved), and giving a 6:30am starter a 14:00 boundary moves
+   **nothing** — which is the front-of-house-is-untouched property demonstrated
+   on a real person rather than argued.
+
    **The genuinely simplest fix was never a code change and is still open:**
    1,148 of the crew's 1,490 shifts already start 00:00–03:59, and only **101
    evening starts** cause every bit of this. Moving those to 00:0x would delete

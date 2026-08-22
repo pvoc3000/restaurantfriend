@@ -9,12 +9,20 @@ import {
 } from "@/components/payroll/TimesheetsList";
 import { PeriodBar } from "@/components/payroll/PeriodBar";
 import { NewPayPeriod } from "@/components/payroll/NewPayPeriod";
+import { RecalculateWorkdays } from "@/components/payroll/RecalculateWorkdays";
 import {
   ExportTimesheets,
   type PayPeriodRecord,
 } from "@/components/payroll/ExportTimesheets";
 import type { ShiftBenefitLine } from "@/components/payroll/ShiftDecisions";
-import { addDays, payrollSettings, workweekStart, type PayPeriodStatus } from "@/lib/payPeriods";
+import {
+  addDays,
+  formatPeriodRange,
+  isPayPeriodEditable,
+  payrollSettings,
+  workweekStart,
+  type PayPeriodStatus,
+} from "@/lib/payPeriods";
 import { proposeOvertime } from "@/lib/overtime";
 import { workedHours, type OtDecision } from "@/lib/timesheets";
 import { isEarningColumn } from "@/lib/gustoExport";
@@ -568,6 +576,22 @@ export default async function TimesheetsPage({
           today={today}
           settings={session.orgSettings.payroll}
           orgId={session.membership.org_id}
+        />
+        {/* Re-derive the workday from the punches, without the file. It acts
+            on the PERIOD, so it belongs in this row rather than with the shift
+            filters below. */}
+        <RecalculateWorkdays
+          rows={rows.map((r) => ({
+            id: r.id,
+            employee_name: r.employee_name,
+            clock_in: r.clock_in,
+            workday: r.workday,
+            workday_starts_at: employeeById.get(r.employee_id)?.workday_starts_at ?? null,
+          }))}
+          timeZone={timeZone}
+          editable={canWrite && isPayPeriodEditable(chosen.status)}
+          canWrite={canWrite}
+          periodLabel={formatPeriodRange(chosen)}
         />
         {record && (
           <ExportTimesheets
