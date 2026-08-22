@@ -326,7 +326,10 @@ export function TimesheetsList({
       dot += r.hours_double_ot ?? 0;
       sick += r.sick_hours ?? 0;
       const w = workedHours(r);
-      if (w === null) unfinished += 1;
+      // Only a SHIFT can be unfinished. An adjustment has no punches by
+      // definition, so counting it here put "1 with no clock-out" in the
+      // footer for a sick day that was entered correctly.
+      if (w === null) { if (r.clock_in !== null) unfinished += 1; }
       else worked += w;
       if (otDisagreements(r).length) disagreeing += 1;
     }
@@ -475,9 +478,15 @@ export function TimesheetsList({
       render: (r) => (
         <span className="flex items-center gap-2">
           <span>{r.employee_name}</span>
+          {/* NAME THE ADJUSTMENT, don't just flag it (Mark, 2026-08-22, on a
+              sick day he had entered: "there's no indication it's a sick day…
+              no indication other than the 8 sick hours reported. I need more").
+              A row with no punches is the one row whose whole meaning lives in
+              a column that is `hideWhenCompact` — so on a narrow window the
+              only thing distinguishing it was a chip reading "adj". */}
           {r.kind === "adjustment" && (
             <span className="border border-ink bg-mark-fill px-1 text-[10px] uppercase tracking-[0.06em]">
-              adj
+              {(r.sick_hours ?? 0) > 0 ? "sick" : "adj"}
             </span>
           )}
         </span>
@@ -519,13 +528,27 @@ export function TimesheetsList({
       sortValue: (r) => r.clock_in ?? "",
       render: (r) => (
         <span className="tabular-nums">
-          {clock(r.clock_in)} <span className="text-faint">→</span>{" "}
-          {r.clock_out ? (
-            clock(r.clock_out)
+          {/* A row with NO PUNCHES AT ALL is not an unfinished shift, and
+              marking it as one is a false alarm on the one row that is working
+              exactly as intended — paid time that produced no punch (028's
+              `adjustment` kind). It said "— → no clock-out" in the alarm fill.
+              The test is a clock-IN with no clock-out; without a clock-in there
+              was never a shift to finish. */}
+          {r.clock_in === null ? (
+            <span className="text-muted">
+              {(r.sick_hours ?? 0) > 0 ? "sick day" : "no punches"}
+            </span>
           ) : (
-            // An unfinished shift is a real state (184 in the history), and the
-            // honest rendering is a gap you can see rather than a zero.
-            <span className="bg-mark-fill px-1">no clock-out</span>
+            <>
+              {clock(r.clock_in)} <span className="text-faint">→</span>{" "}
+              {r.clock_out ? (
+                clock(r.clock_out)
+              ) : (
+                // An unfinished shift is a real state (184 in the history), and
+                // the honest rendering is a gap you can see rather than a zero.
+                <span className="bg-mark-fill px-1">no clock-out</span>
+              )}
+            </>
           )}
         </span>
       ),
@@ -1047,64 +1070,107 @@ function ShiftDetail({
 
   return (
     <div className="grid gap-8 md:grid-cols-3">
-      <div className="space-y-2">
-        <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">What the source said</h3>
-        <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
-          <dt className="text-subtle">Source</dt>
-          <dd>{raw("import_source") ?? row.source}</dd>
-          <dt className="text-subtle">Clock in</dt>
-          <dd className="tabular-nums">{raw("time_in") ?? "—"}</dd>
-          <dt className="text-subtle">Clock out</dt>
-          <dd className="tabular-nums">{raw("time_out") ?? "—"}</dd>
-          <dt className="text-subtle">Dates</dt>
-          <dd className="tabular-nums">
-            {raw("date_start") ?? "—"}
-            {raw("date_end") && raw("date_end") !== raw("date_start") ? ` → ${raw("date_end")}` : ""}
-          </dd>
-          {/* Migration 061. When someone's workday starts in the afternoon, the
-              punch and the day its hours count toward are different dates —
-              which the In → Out column can only show as a time. Say it here,
-              where there is room, rather than leaving the row looking wrong. */}
-          {raw("date_start") && String(raw("date_start")) !== row.workday && (
-            <>
-              <dt className="text-subtle">Counts toward</dt>
-              <dd className="tabular-nums">
-                <span className="bg-mark-fill px-1">{row.workday}</span>
-                <span className="ml-2 text-muted">
-                  their workday starts in the afternoon
-                </span>
-              </dd>
-            </>
+      {/* PAID TIME THAT PRODUCED NO PUNCH (028's `adjustment` kind) has no
+          source and no punches, so this column was a heading over four em
+          dashes — the least informative thing on screen, on the one row whose
+          meaning is NOT obvious from its numbers (Mark, 2026-08-22, on a sick
+          day he had entered: "there's no indication it's a sick day… no
+          indication other than the 8 sick hours reported. I need more"). The
+          other two columns are unchanged: the hours are still decided and the
+          note is still edited where every other row's is. */}
+      {row.kind === "adjustment" ? (
+        <div className="space-y-2">
+          <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">What this is</h3>
+          <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
+            <dt className="text-subtle">Kind</dt>
+            <dd>
+              <span className="bg-mark-fill px-1">
+                {(row.sick_hours ?? 0) > 0 ? "Sick day" : "Adjustment"}
+              </span>
+            </dd>
+            <dt className="text-subtle">Punches</dt>
+            <dd className="text-muted">none — paid time, not a worked shift</dd>
+            {(row.sick_hours ?? 0) > 0 && (
+              <>
+                <dt className="text-subtle">Sick hours</dt>
+                <dd className="tabular-nums">{(row.sick_hours ?? 0).toFixed(2)}</dd>
+              </>
+            )}
+            <dt className="text-subtle">Entered</dt>
+            <dd>{row.source === "manual" ? "by hand, on this screen" : row.source}</dd>
+          </dl>
+          {/* Decision 7, worth saying where somebody is looking at one: sick
+              hours are not worked hours, so they earn no overtime, never enter
+              the tip pool, and are DELIBERATELY absent from the Gusto file —
+              Gusto pays them already, and exporting them pays the person
+              twice. */}
+          {(row.sick_hours ?? 0) > 0 && (
+            <p className="max-w-[40ch] pt-1 text-[12px] leading-snug text-muted">
+              Sick hours earn no overtime and are kept out of the payroll export
+              — Gusto pays them already.
+            </p>
           )}
-          {raw("break_start") && (
-            <>
-              <dt className="text-subtle">Break</dt>
-              <dd className="tabular-nums">
-                {raw("break_start")} → {raw("break_end") ?? "?"}
-                {raw("break_type") ? ` · ${raw("break_type")}` : ""}
-              </dd>
-            </>
-          )}
-          <dt className="text-subtle">Hours</dt>
-          <dd className="tabular-nums">
-            {(row.source_hours_regular ?? 0).toFixed(2)} reg ·{" "}
-            {(row.source_hours_overtime ?? 0).toFixed(2)} OT ·{" "}
-            {(row.source_hours_double_ot ?? 0).toFixed(2)} dbl
-          </dd>
-          {raw("timesheet_error") && (
-            <>
-              <dt className="text-subtle">FMP flagged</dt>
-              {/* FileMaker's own derived break-violation calc, carried along
-                  unaltered. Decision 3 says a violation is DERIVED and never
-                  stored, so this is not a column — it is the reference that
-                  phase 5's breakRules.ts gets checked against. */}
-              <dd>
-                <span className="bg-mark-fill px-1">{raw("timesheet_error")}</span>
-              </dd>
-            </>
-          )}
-        </dl>
-      </div>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">What the source said</h3>
+          <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
+            <dt className="text-subtle">Source</dt>
+            <dd>{raw("import_source") ?? row.source}</dd>
+            <dt className="text-subtle">Clock in</dt>
+            <dd className="tabular-nums">{raw("time_in") ?? "—"}</dd>
+            <dt className="text-subtle">Clock out</dt>
+            <dd className="tabular-nums">{raw("time_out") ?? "—"}</dd>
+            <dt className="text-subtle">Dates</dt>
+            <dd className="tabular-nums">
+              {raw("date_start") ?? "—"}
+              {raw("date_end") && raw("date_end") !== raw("date_start") ? ` → ${raw("date_end")}` : ""}
+            </dd>
+            {/* Migration 061. When someone's workday starts in the afternoon, the
+                punch and the day its hours count toward are different dates —
+                which the In → Out column can only show as a time. Say it here,
+                where there is room, rather than leaving the row looking wrong. */}
+            {raw("date_start") && String(raw("date_start")) !== row.workday && (
+              <>
+                <dt className="text-subtle">Counts toward</dt>
+                <dd className="tabular-nums">
+                  <span className="bg-mark-fill px-1">{row.workday}</span>
+                  <span className="ml-2 text-muted">
+                    their workday starts in the afternoon
+                  </span>
+                </dd>
+              </>
+            )}
+            {raw("break_start") && (
+              <>
+                <dt className="text-subtle">Break</dt>
+                <dd className="tabular-nums">
+                  {raw("break_start")} → {raw("break_end") ?? "?"}
+                  {raw("break_type") ? ` · ${raw("break_type")}` : ""}
+                </dd>
+              </>
+            )}
+            <dt className="text-subtle">Hours</dt>
+            <dd className="tabular-nums">
+              {(row.source_hours_regular ?? 0).toFixed(2)} reg ·{" "}
+              {(row.source_hours_overtime ?? 0).toFixed(2)} OT ·{" "}
+              {(row.source_hours_double_ot ?? 0).toFixed(2)} dbl
+            </dd>
+            {raw("timesheet_error") && (
+              <>
+                <dt className="text-subtle">FMP flagged</dt>
+                {/* FileMaker's own derived break-violation calc, carried along
+                    unaltered. Decision 3 says a violation is DERIVED and never
+                    stored, so this is not a column — it is the reference that
+                    phase 5's breakRules.ts gets checked against. */}
+                <dd>
+                  <span className="bg-mark-fill px-1">{raw("timesheet_error")}</span>
+                </dd>
+              </>
+            )}
+          </dl>
+        </div>
+      )}
 
       <div className="space-y-2">
         <h3 className="text-[11px] uppercase tracking-[0.12em] text-subtle">What we decided</h3>
