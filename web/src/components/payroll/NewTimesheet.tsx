@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
@@ -298,24 +297,6 @@ export function NewTimesheet({
           width="max-w-2xl"
           footer={
             <>
-              {/* THE OTHER WAY TO GET TIMESHEETS IN (Mark, 2026-08-05: "It adds
-                  a click, but is a clear work flow New Timesheet → Import").
-                  It replaced the Import button that had been on both the
-                  timesheets list and the pay-period list, so there is now one
-                  door to importing rather than three to keep in step — and it
-                  is the right door, because "I need a timesheet that isn't
-                  here" is the question both answers.
-
-                  `mr-auto` puts it at the far left of a `justify-end` footer,
-                  away from the commit: it navigates AWAY rather than completing
-                  this form, so it must not sit where a second commit would.
-                  White, like every button that isn't a panel's own commit. */}
-              <Link
-                href="/timesheets/import"
-                className="mr-auto inline-flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
-              >
-                Import timesheets
-              </Link>
               <button type="button" onClick={close} disabled={pending} className={DIALOG_CANCEL_CLASS}>
                 Cancel
               </button>

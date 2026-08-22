@@ -25,6 +25,7 @@ import {
   type ShiftBenefitLine,
 } from "./ShiftDecisions";
 import { AdjudicateOvertime } from "./AdjudicateOvertime";
+import Link from "next/link";
 import { NewTimesheet } from "./NewTimesheet";
 import {
   OT_DECISION_LABEL,
@@ -679,7 +680,7 @@ export function TimesheetsList({
             control that vanishes can't be told from a feature that doesn't
             exist, and the filter row shouldn't change width as you page between
             periods. The reason is already in words directly below. */}
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-3">
           <NewTimesheet
             employees={employees}
             locations={locations}
@@ -688,6 +689,24 @@ export function TimesheetsList({
             period={period}
             disabled={!editable}
           />
+          {/* IMPORTING IS ITS OWN DOOR AGAIN (Mark, 2026-08-22), reversing the
+              2026-08-05 call that put it inside the New timesheet dialog as the
+              single door. That reasoning — "I need a timesheet that isn't here"
+              is the question both answer — reads well and turned out to cost a
+              click on the thing you do every fortnight, to save one on the
+              thing you do rarely. Importing IS the routine; typing a shift by
+              hand is the exception.
+
+              NOT disabled on a closed period, unlike New timesheet beside it:
+              this navigates to a screen rather than writing anything, the
+              import screen states the period problem in its own words, and it
+              is also how you reach a DIFFERENT fortnight's file. */}
+          <Link
+            href="/timesheets/import"
+            className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
+          >
+            Import timesheets
+          </Link>
         </div>
       </div>
 

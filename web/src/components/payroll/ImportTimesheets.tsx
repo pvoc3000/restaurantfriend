@@ -194,9 +194,11 @@ export function ImportTimesheets({
   // rather than letting 028's policy silently refuse every row.
   const targetPeriods = useMemo(() => {
     if (!plan) return [];
-    // The EFFECTIVE workday, not the punch date: a boundary can move a shift
-    // into the next fortnight, and that is the fortnight whose status matters.
-    const days = new Set(matched.map((m) => m.workday));
+    // THE PUNCH DATE, not the workday — since 062 the fortnight is derived from
+    // `business_date`. A workday starting in the afternoon can carry an evening
+    // past a fortnight's end for OVERTIME purposes without the hours having
+    // been worked in the next fortnight, which is a different claim.
+    const days = new Set(matched.map((m) => m.shift.punchDate));
     return periods.filter((p) => [...days].some((d) => d >= p.start_date && d <= p.end_date));
   }, [plan, matched, periods]);
 
@@ -222,24 +224,22 @@ export function ImportTimesheets({
   const settings = useMemo(() => readPayrollSettings(rawPayrollSettings), [rawPayrollSettings]);
 
   /**
-   * Workdays no pay period covers — INCLUDING days a workday boundary moved a
-   * shift into.
+   * Days no pay period covers — by the PUNCH date, which since 062 is what
+   * decides the fortnight.
    *
-   * This exists because of a hole 061 opened and nothing else would have
-   * caught. Homebase exports BY payroll period, so the file's last day is the
-   * fortnight's last day; a kitchen shift starting after 14:00 on it belongs to
-   * the NEXT fortnight, which may not have been opened yet. The old test was
-   * `targetPeriods.length > 0`, which is true as soon as ANY shift lands
-   * somewhere — so the screen offered nothing, the row wrote with a null
-   * `pay_period_id` (028's `timesheet_period_editable(null)` is deliberately
-   * TRUE), no trigger ever fills it in, and `/timesheets` fetches by
-   * `pay_period_id`. The shift would be invisible and never paid.
+   * The failure it guards is silent and total: 028's
+   * `timesheet_period_editable(null)` is deliberately TRUE, so a row with no
+   * period writes without error, no trigger ever fills the column in, and
+   * `/timesheets` fetches by `pay_period_id`. The shift would be invisible and
+   * never paid.
    *
-   * Measured on the real 2026-08-03 → 08-16 export: two shifts, Erick Mejia at
-   * 18:00 and Eddy Salazar at 21:01 on the closing Sunday.
+   * It keyed on the WORKDAY between 061 and 062, and blocked Mark's first real
+   * import over two shifts whose hours were worked inside the closing fortnight
+   * and only counted toward the next one. That was 028's derivation reading the
+   * wrong column, not a file with nowhere to land — see 062.
    */
   const uncoveredDays = useMemo(() => {
-    const days = new Set(matched.filter((m) => m.employeeId).map((m) => m.workday));
+    const days = new Set(matched.filter((m) => m.employeeId).map((m) => m.shift.punchDate));
     return [...days]
       .filter((d) => !periods.some((p) => d >= p.start_date && d <= p.end_date))
       .sort();
@@ -302,7 +302,7 @@ export function ImportTimesheets({
 
   /** The shifts that land on a day no period covers — named, not just counted. */
   const uncoveredShifts = useMemo(
-    () => matched.filter((m) => m.employeeId && uncoveredDays.includes(m.workday)),
+    () => matched.filter((m) => m.employeeId && uncoveredDays.includes(m.shift.punchDate)),
     [matched, uncoveredDays]
   );
 
@@ -639,17 +639,16 @@ export function ImportTimesheets({
                   {targetPeriods.length === 0
                     ? "No pay period covers these dates, so these shifts would have nowhere to belong."
                     : `${uncoveredShifts.length} shift${uncoveredShifts.length === 1 ? "" : "s"} ` +
-                      `belong to the workday of ${uncoveredDays.join(", ")}, which no pay period ` +
-                      "covers — a workday that starts in the afternoon carries the last evening " +
-                      "of a fortnight into the next one. Written as they are, those rows would " +
-                      "belong to no period at all and would never show on the timesheets screen."}
+                      `were punched on ${uncoveredDays.join(", ")}, which no pay period covers. ` +
+                      "Written as they are, those rows would belong to no period at all and " +
+                      "would never show on the timesheets screen."}
                 </p>
                 {uncoveredShifts.length > 0 && targetPeriods.length > 0 && (
                   <ul className="space-y-0.5 text-sm text-muted">
                     {uncoveredShifts.map((m) => (
                       <li key={m.shift.line} className="tabular-nums">
                         {employeeName(m.employeeId)} — clocked in {m.shift.punchDate} at{" "}
-                        {clockLabel(m.shift.clockInMinutes)}, counts toward {m.workday}
+                        {clockLabel(m.shift.clockInMinutes)}
                       </li>
                     ))}
                   </ul>
