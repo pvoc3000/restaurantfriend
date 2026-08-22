@@ -43,6 +43,7 @@ import "./productionItems.fixtures";
 import "./productionPlans.fixtures";
 import "./productionScale.fixtures";
 import "./productionSchedule.fixtures";
+import "./purchaseRequests.fixtures";
 import "./recipeCosts.fixtures";
 import "./receiving.fixtures";
 import "./roles.fixtures";

@@ -105,6 +105,26 @@ export default async function OrderGuidePage({
     .then((r) => r);
 
   /**
+   * HOW MANY REQUESTS ARE OPEN HERE — the count the band under the title links
+   * to. Migration 059's partial index exists for this one query and nothing
+   * else.
+   *
+   * On the wire with the others, and for the same reason. A `head` count sends
+   * and returns almost nothing, but it is still a round trip, and this is the
+   * app's heaviest route — awaiting it in sequence would add its whole latency
+   * to a walk that already takes 3.5s to paint.
+   *
+   * Safe before 059 is applied: it filters `location_id` and `status`, both of
+   * which have been on the table since 001.
+   */
+  const requestCountPromise = supabase
+    .from("purchase_requests")
+    .select("id", { count: "exact", head: true })
+    .eq("location_id", locationId)
+    .eq("status", "open")
+    .then((r) => r);
+
+  /**
    * WHEN THIS ITEM WAS LAST BOUGHT, AND AS WHAT (Mark, 2026-08-10) — migration
    * 048's view, one row per item-location at this location.
    *
@@ -173,6 +193,13 @@ export default async function OrderGuidePage({
   const { data: lastPurchaseRows, error: lastPurchaseError } =
     await lastPurchasePromise;
 
+  // A count is not worth taking the walk down for, so its error is swallowed
+  // rather than surfaced the way the last-purchase view's is: there, an absent
+  // line would assert something false about every item, where an absent count
+  // reads as nothing outstanding — which, if the query failed, is the same
+  // thing the screen would say anyway.
+  const { count: openRequestCount } = await requestCountPromise;
+
   return (
     <OrderGuide
       // Remount when the guide's identity changes. Switching location is a
@@ -198,6 +225,7 @@ export default async function OrderGuidePage({
       guideDate={guideDate}
       locationId={locationId}
       locationCode={session.activeLocation.code}
+      openRequests={openRequestCount ?? 0}
       orgId={session.membership.org_id}
       canGeneratePos={canWriteCatalog(session.membership.role)}
     />

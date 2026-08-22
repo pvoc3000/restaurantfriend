@@ -142,3 +142,20 @@ export const canApprovePayment = canManageMembers;
  * change.
  */
 export const canRunPayroll = canManageMembers;
+
+/**
+ * Resolve a purchase request — mark it ordered, dismiss it, reopen it.
+ * Migration 001's `preq_resolve`, whose role array is this set verbatim.
+ *
+ * Note what it does NOT gate: FILING a request is membership-only
+ * (`preq_insert`), so the New request command is never behind this, and 059's
+ * `preq_author_update` lets the person who filed one correct or withdraw it
+ * while it is still open. A queue that staff can read and not add to would be
+ * the feature inverted.
+ *
+ * The same set as `canWriteCatalog` today, and named separately for the reason
+ * `canReadHr` gives: "may edit the catalog" and "may say we bought this" are
+ * different questions with the same answer today, and one of them will move
+ * first — a supervisor resolving requests is the obvious candidate.
+ */
+export const canResolveRequests = canWriteCatalog;

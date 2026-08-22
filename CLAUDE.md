@@ -679,6 +679,99 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    billed but not ordered, 4 catch-weight `?`; bulk fill 9 with the invoice / 15
    without; a hand-counted 0 survived a bulk receive and Undo restored exactly
    the 14 it had filled. The order was left as found.
+   **Shipped 2026-08-21 — PURCHASE REQUESTS (migration 059, NEEDS APPLYING).**
+   `purchase_requests` was the last table 001 created that had never had a
+   writer; spec §4.7 has wanted it since the beginning ("any staff member can
+   submit a simple request… the purchaser resolves each") and the only trace of
+   it in the app was a dead nav stub. **No FMP history migrates** (Mark: "we
+   don't need any history on this… we'll roll this one from scratch") — the
+   source table is `PurchaseReq` in DF-Locations, 21 fields, 116 records, and
+   there is no export of it. Screens: `/purchase-requests` (list, no detail
+   route — `/shop-sections`' shape) plus a create dialog and a per-row `⋯`.
+   **IT LIVES UNDER PURCHASING, NOT LOCATION** (Mark chose it; the stub had been
+   under Location). The nav is organised by the WORK, not by the FileMaker FILE
+   a table happens to sit in — the Location stubs beside it (Tasks, Maintenance
+   Requests, Inspection Logs) are all about the BUILDING, where a request for
+   sprinkles is about the catalog and the order, and its only consumer is the
+   purchaser standing in front of the guide. Even FMP surfaced it in Purchasing,
+   as the guide's "N REQUESTS" badge. Between Inventory and Order Guide, in work
+   order, labelled just **Requests** (the section says Purchasing).
+   **ONE NOTE COLUMN, NOT TWO.** 059 RENAMES `dismiss_reason` → `resolution_note`
+   — both exits produce a sentence, and a column called `dismiss_reason` holding
+   "ordered from Sysco Tuesday" is a name that lies (015's Receiving relabel).
+   005 declined to rename columns on the grounds that they ripple through the
+   loader, app selects and view outputs; every clause of that is absent here —
+   the table is EMPTY, the column had zero readers in `web/src`, no view
+   depends on it, and `load.mjs` never wrote it. **The requirement rides the
+   DECISION** (032's shape, verbatim predicate spelling):
+   `purchase_requests_reason_when_dismissed` demands a non-blank note for a
+   dismissal and asks nothing of "ordered", because saying no is the only record
+   a vanished request gets and demanding a sentence for the common case is how
+   people learn to stop reading the dialog.
+   **THE TWO EXITS ARE DIALOGS, NEVER AN INLINE STATUS PICK** — dismissing must
+   write status and note in ONE statement or the CHECK bounces a raw 23514 into
+   a cell, which is the one refusal `InlineValue` cannot explain (the
+   `special_orders_status_iff_order` trap). Reopen clears status, note,
+   `resolved_at` and `resolved_by` together, or the row reads open while
+   claiming somebody resolved it on Tuesday. **`resolved_by` finally has a
+   writer**; it has been a column since 001.
+   **059 ADDS A FOURTH POLICY: `preq_author_update`** (Mark's call). 001's three
+   are right about who RESOLVES and wrong about the person who FILED: with them
+   alone, filing a request is the only irreversible act staff have anywhere in
+   this app. USING says which rows — your own, still open; **WITH CHECK says
+   what it may BECOME**, and that is where the care is, because a policy is a
+   ROW rule and without the value tests an author-scoped policy hands the author
+   every column including the verdict. `status in ('open','dismissed')` is what
+   keeps "ordered" the purchaser's word. Withdrawing IS a dismissal, so it has
+   to say why.
+   **THE TWO REFUSALS ARE NOT THE SAME SHAPE, measured on the harness rather
+   than assumed:** a USING exclusion matches ZERO ROWS and returns NO error
+   (PostgREST reports success), while a WITH CHECK refusal RAISES **42501**.
+   Every write `.select()`s its own result AND maps 42501, and the menu never
+   offers a command the person can't run — the two checks are the stale-session
+   backstop, not the gate. **There is still no delete policy and there must not
+   be one**: a delete removes 0 rows and cheerfully succeeds, so dismissal is
+   the eraser and the dialog's copy invites "duplicate" and "filed by mistake".
+   **`migration/load.mjs`'s `--wipe` list held `purchase_requests` AND
+   `purchase_reminders`**, from when both were permanently empty. Reminders have
+   had a writer since 2026-07-31, so that was a LIVE data-loss path — one
+   `--wipe` to reload the catalog would have destroyed every reminder in the
+   system with no export to restore from. Both are off the list.
+   Filters follow `/recipes`: ONE dimension (Status), so it stays a `TabPicker`
+   and borrows only `lib/filterMenus`' URL CONTRACT — which also sidesteps that
+   bar's two-entries-reading-"All" wart, much more visible on a three-value
+   vocabulary. `?status=all` is a real token beside the `open` default. Priority
+   is a sortable column rather than a filter, ranked in TypeScript because
+   **`priority` is TEXT and SQL would order it `high < low < normal`** — the
+   resting sort is priority DESC with `created_at` as a tiebreak, which reads
+   FIFO within a tier because a tiebreak always reads ascending. **No grouping**:
+   the only candidate is the resting sort, so bands would be permanent over a
+   twelve-row queue.
+   The order guide gained **an always-visible "N open requests" link** in its
+   sticky controls band (Mark's placement), fired with the other three promises
+   because that route is the app's heaviest. Shown at zero too — "nothing
+   outstanding" is the answer you came for (the PO list's `Open 0` roll-up), and
+   hiding it would remove the guide's only route to the screen. Known tension,
+   recorded: the band is otherwise view CONTROLS, and `Reminders` is the
+   precedent for an alert on that screen.
+   **`components/catalog/InventoryItemChooser`** is `InventoryItemPicker`'s pure
+   sibling — value + onPick, WRITES NOTHING — because a create dialog has no row
+   to update yet and one that had already written something by the time you
+   press Cancel lies about what Cancel means (`CustomerPicker`'s rule). The
+   shared query stays in each component rather than moving to `lib/catalog`:
+   that module is PURE and compiled into the Node fixture run, so importing the
+   browser client would drag `@supabase/ssr` in behind it.
+   Verified: all 59 migrations replay on the Docker harness, and every rule was
+   checked by exercising it as a real authenticated role — a staffer files one
+   and fixes their own words, is refused `ordered` by the WITH CHECK, cannot
+   dismiss without a reason (whitespace included), loses the row once it closes,
+   and a `delete` removes **0 rows with no error**; another staffer gets UPDATE
+   0; a purchaser marks ordered with no note, reopens clearing all four columns,
+   and is still refused a bare dismissal; `anon` with no claim sees 0 and is
+   refused an insert; the dependency guard fires when a view really does depend;
+   and a re-run of 059 fails loudly at every step. **1105 fixtures pass**, 11
+   new, each checked by breaking it. NOT yet walked in the browser — 059 has to
+   be applied first.
 4b. 🚧 **The Location module** — the first screen outside Purchasing (Mark,
    2026-07-30). `locations` was the one table with no UI at all: nothing in
    `web/src` wrote to it, and its six rows still carried raw FileMaker text in
@@ -3809,6 +3902,25 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `Message-ID` header is emitted and Resend's `headers` object stays
    `undefined`, exactly as before.
 
+   **059 IS NOT APPLIED YET** (written 2026-08-21 — purchase requests). *Probe,
+   don't read this line; it has been wrong in both directions for four different
+   migrations.* Three probes, because it does three distinguishable things:
+   `select column_name from information_schema.columns where table_name =
+   'purchase_requests' and column_name in ('priority','resolution_note',
+   'inventory_item_id','resolved_at','dismiss_reason')` — expect the first four
+   and NOT `dismiss_reason`; `select polname from pg_policy where polrelid =
+   'public.purchase_requests'::regclass` — **four** rows, the new one being
+   `preq_author_update`; and `select conname from pg_constraint where conrelid =
+   'public.purchase_requests'::regclass and contype = 'c'` — includes
+   `purchase_requests_reason_when_dismissed`.
+   **APPLY IT BEFORE DEPLOYING**, which is the opposite of 012's order: the new
+   screen SELECTS these columns, so a deploy in front of the migration 400s the
+   whole select and the list renders its "migration 059 has not been applied
+   yet" sentence rather than a queue. It is NOT rerunnable — the rename fails a
+   second time, which is the signal it already ran — and all-or-nothing, since
+   a partial run dies on that rename before it reaches the constraint, the
+   policy or the index.
+
    **(r) THE ROW IS A PROGRESS BAR** (Mark, 2026-08-20, after a mockup pass).
    A wash fills each row of `/special-orders` to the fraction of stages done,
    yellow at the first rung and green at the last, under a 3px rule on the row's
@@ -4692,6 +4804,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `catalog/ListFilters` | a filter row | search + category + active + last-ordered, together |
   | `catalog/BaseUnitEditor` | writing `base_unit` | changing a unit — it recomputes package contents and warns about pars |
   | `catalog/InventoryItemPicker` | a search box | finding and linking an inventory item |
+  | `catalog/InventoryItemChooser` | a second search box | finding an inventory item WITHOUT writing one — a create dialog has no row to update yet, and one that wrote before you pressed Cancel lies about what Cancel means (`CustomerPicker`'s rule). Value + onPick; `InventoryItemPicker` is the writing sibling |
   | `ui/ActionBar` + `ActionBarButton` | a button row | screen-level COMMANDS only (not view controls) |
   | `ui/PageLoading` | a spinner | the body of every `loading.tsx` |
   | `ui/ProgressBand` | a word in a button's label | something slow on a screen that's ALREADY painted (an invoice read is 30s+); same indeterminate bar, never a Dialog — the work behind it must stay usable |

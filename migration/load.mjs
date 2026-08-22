@@ -67,11 +67,18 @@ if (WIPE) {
   console.log('wiping previously migrated data…');
   // reverse dependency order; org-scoped only. Deletes are batched by id —
   // single-statement deletes of 100k+ rows hit Supabase's statement timeout.
+  //
+  // `purchase_reminders` and `purchase_requests` were on this list and came off
+  // it (2026-08-21). They were here because nothing loaded them and nothing
+  // wrote them, so wiping them cost nothing — but neither is migrated data any
+  // more: reminders have had a writer since 2026-07-31 and requests since
+  // migration 059. A --wipe to reload the CATALOG would have silently destroyed
+  // every reminder and every open request in the system, with no export to
+  // restore them from. Nothing else on this list is anything but FileMaker's.
   for (const t of ['purchase_order_attachments', 'purchase_order_items', 'purchase_orders',
                    'order_guide_entries', 'order_guide_plan_days', 'inventory_item_locations',
                    'shop_sections', 'vendor_item_location_prices', 'price_history', 'par_history',
-                   'vendor_items', 'inventory_items', 'vendor_locations', 'vendors',
-                   'purchase_reminders', 'purchase_requests']) {
+                   'vendor_items', 'inventory_items', 'vendor_locations', 'vendors']) {
     if (t === 'vendor_item_location_prices') {
       // composite PK, tiny table — one statement is fine
       const { error } = await db.from(t).delete().eq('org_id', ORG);

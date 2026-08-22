@@ -84,6 +84,7 @@ export function OrderGuide({
   locationCode,
   orgId,
   canGeneratePos,
+  openRequests,
 }: {
   rows: GuideRow[];
   /** Migration 048 — the most recent non-void purchase per item-location. */
@@ -105,6 +106,8 @@ export function OrderGuide({
   orgId: string;
   /** Purchaser+ only — staff walk the guide but can't create POs (RLS). */
   canGeneratePos: boolean;
+  /** How many purchase requests are open here, for the link in the band. */
+  openRequests: number;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -722,6 +725,20 @@ export function OrderGuide({
           </span>
           Ignore ordering days
         </button>
+
+        {/* WHAT THE SHOP HAS ASKED FOR (2026-08-21). Not a control — it is
+            the one thing in this band that goes somewhere else, and it is here
+            because this is where the person who answers a request is standing.
+            Rendered ALWAYS, including at zero: "nothing outstanding" is the
+            answer you came for (the PO list's `Open 0` roll-up argues exactly
+            this), and hiding it would take away the guide's only route to that
+            screen on precisely the days you want to check. */}
+        <Link
+          href="/purchase-requests"
+          className="text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+        >
+          {openRequests === 1 ? "1 open request" : `${openRequests} open requests`}
+        </Link>
 
         {/* Pushed to the right edge (Mark, 2026-07-29). Everything left of
             it narrows the list — search, the four tiers, the day gates —

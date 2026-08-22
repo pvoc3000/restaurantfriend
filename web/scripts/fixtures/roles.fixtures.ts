@@ -22,6 +22,7 @@ import {
   canReadHr,
   canApprovePayment,
   canRunPayroll,
+  canResolveRequests,
   type Role,
 } from "../../src/lib/roles";
 
@@ -80,4 +81,15 @@ test("ROLE_OPTIONS offers every role except owner", () => {
     ROLE_OPTIONS.map((o) => o.value).sort(),
     ["admin", "purchaser", "staff", "supervisor"]
   );
+});
+
+test("canResolveRequests is exactly 001's preq_resolve role array", () => {
+  // `preq_resolve` names owner/admin/purchaser — the same set as
+  // canWriteCatalog, which is why it is an alias. Filing a request is NOT
+  // gated at all (`preq_insert` is membership-only), so the assertion that
+  // matters most here is the staff one: they may add to the queue and never
+  // decide it.
+  eq(admits(canResolveRequests), ["owner", "admin", "purchaser"]);
+  no(canResolveRequests("supervisor"), "a supervisor does not resolve requests yet");
+  no(canResolveRequests("staff"), "staff file requests, purchasers resolve them");
 });

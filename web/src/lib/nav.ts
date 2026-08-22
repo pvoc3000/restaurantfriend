@@ -72,7 +72,6 @@ export const SECTIONS: NavSection[] = [
       stub("location", "tasks", "Tasks"),
       stub("location", "maintenance-requests", "Maintenance Requests"),
       stub("location", "inspection-logs", "Inspection Logs"),
-      stub("location", "purchase-requests", "Purchase Requests"),
     ],
   },
   {
@@ -198,6 +197,16 @@ export const SECTIONS: NavSection[] = [
         also: ["/vendor-items"],
       },
       { slug: "inventory", label: "Inventory", href: "/items", built: true },
+      // Between the catalog and the walk, which is where a request happens: it
+      // arrives before you set out and is answered while you are out. It sat
+      // under Location as a stub until 2026-08-21, inherited from the FileMaker
+      // FILE the table lives in (DF-Locations) rather than from the work — and
+      // even FMP surfaced it in Purchasing, as the guide's "N REQUESTS" badge.
+      // Deliberately NOT role-gated: `preq_insert` is membership-only, because
+      // the person who notices the shelf is empty is rarely the person who
+      // orders. `resolveRoute` matches on `href` or `href + "/"`, so this and
+      // /purchase-orders cannot light each other.
+      { slug: "requests", label: "Requests", href: "/purchase-requests", built: true },
       { slug: "order-guide", label: "Order Guide", href: "/order-guide", built: true },
       {
         slug: "purchase-orders",

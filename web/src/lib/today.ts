@@ -33,3 +33,20 @@ export function daysBefore(date: string, days: number): string {
   d.setUTCDate(d.getUTCDate() - days);
   return d.toISOString().slice(0, 10);
 }
+
+/**
+ * The calendar date an INSTANT fell on, in `timeZone`, as YYYY-MM-DD.
+ *
+ * The same conversion as `todayInTimeZone`, pointed at a stored timestamptz
+ * rather than at now. A list that renders `created_at.slice(0, 10)` is reading
+ * the UTC date, so a request filed at 5pm Pacific is dated tomorrow — the very
+ * drift this module exists to keep out of the order guide.
+ */
+export function dateInTimeZone(instant: string, timeZone: string): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(instant));
+}
