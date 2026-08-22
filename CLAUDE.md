@@ -5136,7 +5136,8 @@ weekday column, and 003 then silently made it per-vendor-item.
 - **The look is the `restaurantfriend-design` skill** (a user skill, outside
   this repo — read `handoff/PORT-GUIDE.md` §8 FIRST, then `readme.md`, then the
   relevant `<Name>.prompt.md`). Applied wholesale 2026-07-25: black masthead,
-  square corners, no shadows, no blue, colour only ever means record STATE.
+  square corners, no shadows, no blue, colour only ever means record STATE
+  — and yellow means it as a FILL and never as text; see the yellow bullet below.
   Tokens live in `web/src/styles/ds/` (copied from the skill) and are exposed to
   Tailwind v4 through `@theme inline` in `globals.css` — use the semantic
   utilities (`text-ink`, `text-muted`, `border-hairline`, `bg-go`, `text-accent`)
@@ -5156,6 +5157,35 @@ weekday column, and 003 then silently made it per-vendor-item.
   (Mark, 2026-07-26): `ActionBarButton` still has a `primary` white-fill
   variant, but nothing uses it, because against the bar's own black a white cell
   read as a different kind of object rather than as the important one.
+- **YELLOW IS A FILL, NEVER AN INK — do not use `text-mark` on a light
+  background** (Mark, 2026-08-22: "I find yellow text hard to read… a yellow
+  filled square works as an attention signal, but not yellow text"). This is a
+  measurement, not a preference. `--color-mark` is yellow-500 on white:
+  **1.43:1**, where WCAG AA wants 4.5 for body text. Darkening it does not
+  rescue it — yellow-600 is 1.88, yellow-700 is 3.33, and the first value that
+  passes is yellow-800 at 6.95, which is a dark olive that no longer reads as
+  yellow at all. **There is no readable yellow text on white in this palette**,
+  so the answer is the fill: `bg-mark-fill` is yellow-200 with ink on it at
+  **15.53:1**.
+  So, for anything that wants an eye on a light background:
+  a SHORT mark is a chip — `<span className="bg-mark-fill px-1">` — and a
+  SENTENCE is plain ink, because a paragraph-sized yellow block is a banner
+  rather than a mark. What a mark must never be is yellow words.
+  **The one place `text-mark` is right is on BLACK**: `AppNav`'s location tab is
+  yellow-500 on the ink masthead, which is high-contrast and is the app's mark
+  for WHICH SHOP YOU ARE AT.
+  **And check the thing isn't already marked before marking it** (Mark, same
+  day: "the yellow text seems redundant — there's also a yellow box on the same
+  sheets"). The timesheets row expansion restated three findings the row already
+  carried as fills four columns away, which added nothing and buried the marks
+  that had nowhere else to appear. A fact gets ONE mark, next to the number it
+  is about.
+  **Not swept: 44 further `text-mark` uses** across production, special orders
+  and the catalog still have the 1.43:1 problem (`DerivedDay` 5, `OrderLines` 3,
+  `PlanMatrix` 3, …). Each needs the same judgement — redundant with a fill
+  elsewhere, a short signal, or a sentence — so ask Mark before a mechanical
+  pass, and fix them as you touch those screens.
+
 - **EVERY BUTTON IS WHITE; only a SET FILTER is black** (Mark, 2026-08-02, after
   a sweep). The outlined cell — `border border-ink bg-white`, filling black on
   hover — is the only button weight the app has. There is no "primary": a filled
