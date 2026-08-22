@@ -102,17 +102,23 @@ export function GuideRequests({
       <ul className="space-y-1">
         {requests.map((r) => (
           <li key={r.id} className="flex flex-wrap items-baseline gap-2 text-sm">
-            {/* The band is plain, so what state a request has is carried by the
-                marks inside it — the same yellow the list uses, and only for
-                the priority that is worth an eye. Normal and low say nothing,
-                because a chip on every row marks nothing. */}
+            {/* HIGH IS RED, NOT YELLOW (Mark, 2026-08-22). It shipped in the
+                mark colour on the reasoning that yellow means "worth your eye"
+                and red means something is WRONG — but a high-priority request
+                is the same class of thing as a FLAGGED special order, which
+                has been full-width red since 058: not an error, a thing that
+                cannot wait. And the measurement settled it either way —
+                `--rf-yellow` on white is about 1.5:1, which is a chip you
+                cannot read at all.
+                Normal and low say nothing, because a chip on every row marks
+                nothing. */}
             {r.priority === "high" && (
-              <span className="border border-ink px-1 text-[11px] uppercase tracking-[0.12em] text-mark">
+              <span className="border border-accent px-1 text-[11px] uppercase tracking-[0.12em] text-accent">
                 {REQUEST_PRIORITY_LABEL.high}
               </span>
             )}
             <span className="text-ink">{r.request_text}</span>
-            {/* `<request> (<item>) <requestor>` — Mark's own format,
+            {/* `<request> (<item>) - <requestor>` — Mark's own format,
                 2026-08-22. The item in parentheses reads as an aside about the
                 ask, which is what it is, and the brackets earn their keep on a
                 catalog whose names carry commas: "Cherries (Cherries,
@@ -146,15 +152,21 @@ export function GuideRequests({
               </span>
             )}
             {/* Who asked, last — the ask is what you read, the item is what it
-                resolves to, and the name is who to go and check with. */}
+                resolves to, and the name is who to go and check with.
+                The dash rides INSIDE this span, so it comes and goes with the
+                name it attributes and the row's `gap-2` cannot strand it. */}
             {r.requesterName && (
-              <span className="text-muted">{r.requesterName}</span>
+              <span className="text-muted">- {r.requesterName}</span>
             )}
             {/* Said on the row you pressed rather than as a banner: it is a
                 fact about THIS request, and by the time you have read it the
                 filters have already been widened in front of you. */}
             {jumpMiss && jumpMiss === r.inventory_item_id && (
-              <span className="text-[12px] text-mark">not on today&rsquo;s guide</span>
+              // Muted rather than a state colour: nothing is WRONG — the item
+              // simply is not orderable today — and it appears on the row you
+              // just tapped, so it does not need colour to be found. Yellow
+              // would also have been the same 1.5:1 the High chip just lost.
+              <span className="text-[12px] text-muted">not on today&rsquo;s guide</span>
             )}
             {/* Answering one WHILE WALKING is the point of it being here: you
                 pass the shelf, you put it on the order, you say so. The same

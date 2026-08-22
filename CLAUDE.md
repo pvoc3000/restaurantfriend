@@ -783,8 +783,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    first and no horizontal overflow. The one-empty state came free the next
    day, when Mark cleared his reminders: "Reminders / Nothing due today." holds
    the left column beside six requests, tops still aligned.
-   **A REQUEST ROW IS `<request> (<item>) <requestor>`** — Mark's own format,
-   2026-08-22, after seeing the name and the item beside each other. The
+   **A REQUEST ROW IS `<request> (<item>) - <requestor>`** — Mark's own format,
+   2026-08-22, arrived at in two passes after seeing the name and the item
+   beside each other. The dash rides INSIDE the requester's span, so it comes
+   and goes with the name it attributes and the row's `gap-2` cannot strand it.
+   The
    parentheses earn their keep on a catalog whose names carry commas: without
    them "Cherries Cherries, Maraschino Mark" is three things running together.
    The bracket is ONE span, so the row's `gap-2` cannot get inside it and set
@@ -798,6 +801,20 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    stand-in word, unlike the LIST, which says "Someone" to stop a table column
    reading as nobody having asked: a band row is a sentence, and an unknown
    name is better left off than padded out.
+   **HIGH PRIORITY IS RED, NOT THE MARK COLOUR** (Mark, 2026-08-22), on both
+   the band's chip and the list's priority cell. It shipped yellow on the
+   reasoning that yellow means "worth your eye" where red means something is
+   WRONG — and the better reading is that a high-priority request is the same
+   class of thing as a FLAGGED special order, which 058 paints full-width red:
+   not an error, a thing that cannot wait.
+   **The measurement settles it independently, and generalises**: `text-mark`
+   on white is **1.5:1**, which is not a legibility complaint, it is text you
+   cannot read — against 5.61:1 for `text-accent`, which passes AA. The mark
+   colour is a FILL (`bg-mark-fill`) or a border; as 11–12px TEXT on white it
+   is decoration that happens to have a shape. Worth knowing before reaching
+   for `text-mark` again — several older screens use it exactly that way
+   (`/recipes`' "none", receiving's `≈` and `?` markers) and were not touched
+   here.
    **The item goes to the ROW IN THIS WALK, not to `/items/[id]`.** The
    destination that matters from the guide is fifteen feet down the same page —
    the row that lets you order the thing — where the Requests list keeps the

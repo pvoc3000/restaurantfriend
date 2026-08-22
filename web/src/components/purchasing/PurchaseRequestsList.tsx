@@ -216,14 +216,15 @@ export function PurchaseRequestsList({
               value: p,
               label: REQUEST_PRIORITY_LABEL[p],
             }))}
-            // Yellow is this app's "worth your eye", which is exactly what a
-            // high-priority request is. Not a status chip: colour means record
-            // STATE here, and priority is an attribute of one.
-            className={r.priority === "high" ? "text-mark" : undefined}
+            // RED, not the mark colour (Mark, 2026-08-22). A high-priority
+            // request is the same class of thing as a flagged special order —
+            // not an error, a thing that cannot wait — and yellow on white is
+            // about 1.5:1, which is a word you cannot read.
+            className={r.priority === "high" ? "text-accent" : undefined}
           />
         ) : (
           <span
-            className={`${READ_ONLY_VALUE} ${r.priority === "high" ? "text-mark" : "text-muted"}`}
+            className={`${READ_ONLY_VALUE} ${r.priority === "high" ? "text-accent" : "text-muted"}`}
           >
             {REQUEST_PRIORITY_LABEL[r.priority]}
           </span>
