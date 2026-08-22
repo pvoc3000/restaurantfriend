@@ -9,12 +9,24 @@ import {
 import { RequestActions } from "@/components/purchasing/RequestActions";
 import { REQUEST_PRIORITY_LABEL, type RequestPriority } from "@/lib/purchaseRequests";
 
+/**
+ * UNDERLINED AT REST, and that is the whole of what changed on 2026-08-22:
+ * this had been `text-muted hover:underline` since the band shipped, which on
+ * an iPad (no hover) and beside a muted requester's name is indistinguishable
+ * from more description. Mark asked for "a way to go to the inventory item"
+ * that was already there and simply did not look like one.
+ */
+const ITEM_LINK_CLASS =
+  "text-muted underline decoration-neutral-400 underline-offset-[3px] hover:text-ink hover:decoration-ink";
+
 export type GuideRequest = {
   id: string;
   request_text: string;
   details: string | null;
   priority: RequestPriority;
   requested_by: string | null;
+  /** Who asked — resolved from org_members, since requested_by is an auth id. */
+  requesterName: string | null;
   inventory_item_id: string | null;
   itemName: string | null;
 };
@@ -47,6 +59,8 @@ export function GuideRequests({
   userId,
   canResolve,
   showEmpty = false,
+  onJumpToItem,
+  jumpMiss = null,
 }: {
   requests: GuideRequest[];
   userId: string;
@@ -54,6 +68,15 @@ export function GuideRequests({
   canResolve: boolean;
   /** Hold the column open with a sentence when nothing is outstanding. */
   showEmpty?: boolean;
+  /**
+   * Take me to that item's row in THIS walk (Mark, 2026-08-22). Given, the
+   * item name becomes a button that scrolls the guide; withheld, it stays a
+   * link to the item record — which is what the Requests LIST wants, where
+   * there is no walk to scroll.
+   */
+  onJumpToItem?: (itemId: string) => void;
+  /** The item a jump could not reach, so this row can say why. */
+  jumpMiss?: string | null;
 }) {
   if (requests.length === 0 && !showEmpty) return null;
 
@@ -89,13 +112,39 @@ export function GuideRequests({
               </span>
             )}
             <span className="text-ink">{r.request_text}</span>
-            {r.inventory_item_id && r.itemName && (
-              <Link
-                href={`/items/${r.inventory_item_id}`}
-                className="text-muted hover:underline"
-              >
-                {r.itemName}
-              </Link>
+            {/* Who asked (Mark, 2026-08-22), right after the words they wrote —
+                a request is somebody's ask, and on a shared band the name is
+                who you go and check with. */}
+            {r.requesterName && (
+              <span className="text-muted">{r.requesterName}</span>
+            )}
+            {/* ON THE GUIDE THIS IS A JUMP, NOT A LINK (Mark, 2026-08-22:
+                "go to the inventory item on the order guide"). The useful
+                destination from here is fifteen feet down this same page —
+                the row that lets you order the thing — not a different
+                screen. The Requests list keeps the link, where there is no
+                walk to scroll to. */}
+            {r.inventory_item_id &&
+              r.itemName &&
+              (onJumpToItem ? (
+                <button
+                  type="button"
+                  onClick={() => onJumpToItem(r.inventory_item_id!)}
+                  title={`Go to ${r.itemName} in this walk`}
+                  className={ITEM_LINK_CLASS}
+                >
+                  {r.itemName}
+                </button>
+              ) : (
+                <Link href={`/items/${r.inventory_item_id}`} className={ITEM_LINK_CLASS}>
+                  {r.itemName}
+                </Link>
+              ))}
+            {/* Said on the row you pressed rather than as a banner: it is a
+                fact about THIS request, and by the time you have read it the
+                filters have already been widened in front of you. */}
+            {jumpMiss && jumpMiss === r.inventory_item_id && (
+              <span className="text-[12px] text-mark">not on today&rsquo;s guide</span>
             )}
             {/* Answering one WHILE WALKING is the point of it being here: you
                 pass the shelf, you put it on the order, you say so. The same

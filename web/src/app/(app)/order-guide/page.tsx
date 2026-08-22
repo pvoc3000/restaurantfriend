@@ -121,6 +121,21 @@ export default async function OrderGuidePage({
    * heaviest route, and awaiting a sixth query in sequence would add its whole
    * latency to a walk that already takes 3.5s to paint.
    */
+  /**
+   * WHO ASKED. `purchase_requests.requested_by` points at `auth.users`, so
+   * there is no FK to embed through and the names come from `org_members`,
+   * which any member may read (001's `members_read`).
+   *
+   * On the wire with the rest, and it is the cheapest of them — one org's
+   * membership is a handful of rows. Note it must NOT be `.maybeSingle()`d or
+   * filtered to the current user: `members_read` shows you every member of
+   * your org, and the whole point here is the OTHER people's names.
+   */
+  const membersPromise = supabase
+    .from("org_members")
+    .select("user_id, display_name")
+    .then((r) => r);
+
   const requestsPromise = supabase
     .from("purchase_requests")
     .select(
@@ -206,6 +221,13 @@ export default async function OrderGuidePage({
   // request band reads as nothing outstanding — which, if the query failed, is
   // the same thing the screen would say anyway.
   const { data: requestRows } = await requestsPromise;
+  const { data: memberRows } = await membersPromise;
+  const memberName = new Map(
+    (memberRows ?? []).map((m) => [
+      m.user_id as string,
+      (m.display_name as string | null) ?? null,
+    ])
+  );
   const requests: GuideRequest[] = (requestRows ?? []).map((r) => {
     // A to-one embed is an object; typed defensively because PostgREST hands
     // back an array the moment somebody widens the relationship, and a silent
@@ -218,6 +240,15 @@ export default async function OrderGuidePage({
       details: (r.details as string | null) ?? null,
       priority: (r.priority as GuideRequest["priority"]) ?? "normal",
       requested_by: (r.requested_by as string | null) ?? null,
+      /**
+       * Null rather than a stand-in word, unlike the Requests list, which says
+       * "Someone" to keep a table column from reading as nobody having asked.
+       * A band row is a sentence: an unknown name is better left off than
+       * padded out, and the row still says what was asked.
+       */
+      requesterName: r.requested_by
+        ? (memberName.get(r.requested_by as string) ?? null)
+        : null,
       inventory_item_id: (r.inventory_item_id as string | null) ?? null,
       itemName: named?.name ?? null,
     };

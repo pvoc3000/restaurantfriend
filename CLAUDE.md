@@ -780,9 +780,43 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    row does — answering one WHILE WALKING is most of the point of it being here.
    Verified at 1440 (two 657px columns, tops and headings aligned to the pixel,
    2px borders and 12px padding on both) and stacked below `md` with reminders
-   first and no horizontal overflow. **The one-empty state was NOT walked**: both
-   real shops carry both bands today, and manufacturing it would have meant
-   dismissing one of Mark's live reminders.
+   first and no horizontal overflow. The one-empty state came free the next
+   day, when Mark cleared his reminders: "Reminders / Nothing due today." holds
+   the left column beside six requests, tops still aligned.
+   **A REQUEST ROW NAMES WHO ASKED, AND ITS ITEM IS A JUMP** (Mark, 2026-08-22,
+   two asks — the second clarified mid-turn as "go to the inventory item ON THE
+   ORDER GUIDE"). The name goes straight after the words they wrote, resolved
+   from `org_members` (a fourth overlapped query — `requested_by` points at
+   `auth.users`, so there is no FK to embed through). It is null rather than a
+   stand-in word, unlike the LIST, which says "Someone" to stop a table column
+   reading as nobody having asked: a band row is a sentence, and an unknown
+   name is better left off than padded out.
+   **The item goes to the ROW IN THIS WALK, not to `/items/[id]`.** The
+   destination that matters from the guide is fifteen feet down the same page —
+   the row that lets you order the thing — where the Requests list keeps the
+   link, having no walk to scroll. One component, two behaviours, decided by
+   whether `onJumpToItem` is passed.
+   `jumpToItem` has three outcomes, in order: scroll to the row under the
+   measured chrome; else, if the item IS in today's `rows` but this VIEW is
+   hiding it, widen the filter to All and clear the search and scroll on the
+   next render (deliberately visible — a jump that silently rearranged the
+   screen would be worse than one that explained nothing); else say **"not on
+   today's guide"** on that row, decided SYNCHRONOUSLY off `rows` rather than by
+   hunting for a row that was never going to appear. The pending id is a REF,
+   not state, so the deferred scroll never becomes a set-state-in-effect.
+   `chromeOffset` was extracted from `scrollToNext` so the two jumps measure the
+   same three bands.
+   **And the item link was already there and simply invisible** — `text-muted
+   hover:underline`, which on an iPad has no hover and beside a muted requester
+   name reads as more description. It is underlined at rest now. Worth
+   remembering as a class: "add a way to X" can mean X exists and does not look
+   like a control.
+   Verified against the live guide: Cherries jumped 0 → 48,454px and landed at
+   exactly the sticky labels' bottom edge (218px, measured both ways); narrowing
+   to Will order (0 rows rendered) and then jumping widened to All, re-rendered
+   242 item rows and landed on CUP, ICE CREAM under the chrome. The remembered
+   view was set back to Favorites afterwards — `rf.guide.view` is a session
+   cookie and it is Mark's.
    That comment in `Reminders` about surviving "the collapsing shelf" was
    already vestigial — the collapse went on 2026-08-02 — and now says so.
    **`components/catalog/InventoryItemChooser`** is `InventoryItemPicker`'s pure

@@ -119,6 +119,8 @@ export function OrderGuide({
   // The sticky controls band publishes its own height, so the column labels
   // know where to stop. See the band itself, further down.
   const controlsRef = useRef<HTMLDivElement>(null);
+  /** The item a jump could not reach, so its request row can say why. */
+  const [jumpMiss, setJumpMiss] = useState<string | null>(null);
   usePublishedHeight(controlsRef, "--rf-guide-controls-h");
 
   // Every screen is scroll-restored by the shell (components/ScrollMemory), but
@@ -336,16 +338,26 @@ export function OrderGuide({
    * same reason the labels themselves use a live variable: the masthead is 64px
    * open, 32 collapsed, and taller again when it wraps.
    */
-  function scrollToNext(selector: string) {
+  /**
+   * Everything pinned above the list, measured rather than assumed — the
+   * masthead wraps at iPad widths and the controls band wraps at 1440, so any
+   * constant is wrong at some width. The controls band joined this stack on
+   * 2026-08-03; miss it out and every jump lands its row underneath the search
+   * box.
+   */
+  function chromeOffset() {
     const header = document.querySelector("header");
-    // The controls band joined this stack on 2026-08-03. Miss it out and every
-    // jump lands its row underneath the search box.
     const controls = document.querySelector("[data-guide-controls]");
     const labels = document.querySelector("thead th");
-    const offset =
+    return (
       (header?.getBoundingClientRect().height ?? 0) +
       (controls?.getBoundingClientRect().height ?? 0) +
-      (labels?.getBoundingClientRect().height ?? 0);
+      (labels?.getBoundingClientRect().height ?? 0)
+    );
+  }
+
+  function scrollToNext(selector: string) {
+    const offset = chromeOffset();
 
     const targets = Array.from(document.querySelectorAll<HTMLElement>(selector));
     if (targets.length === 0) return;
@@ -380,6 +392,79 @@ export function OrderGuide({
     // press-press-press keeps up with you instead of queueing 300ms each.
     window.scrollTo({ top: scrollFor(next), behavior: "auto" });
   }
+
+  /**
+   * TAKE ME TO THAT ITEM IN THE WALK (Mark, 2026-08-22 — "go to the inventory
+   * item on the order guide").
+   *
+   * The requests band names an item; this is how you get to the row that lets
+   * you order it. Not a link to `/items/[id]` — the list screen offers that,
+   * and it is the right destination there, but from the guide the useful place
+   * is fifteen feet down this page rather than a different screen.
+   *
+   * Three outcomes, in the order they are tried:
+   *
+   *   1. The row is on screen — scroll to it, under the chrome.
+   *   2. It is somewhere in today's guide but this VIEW is hiding it, which the
+   *      filter and the search box are the two ways of doing. Both are widened
+   *      and the scroll is deferred to the render that follows. The change is
+   *      deliberately visible — the tab moves to All and the search box empties
+   *      — because a jump that silently rearranged the screen would be worse
+   *      than one that explained nothing.
+   *   3. It is not on today's guide at all, which is decided SYNCHRONOUSLY off
+   *      `rows` (every orderable line for this weekday) rather than by looking
+   *      for a row that was never going to appear. Saying so beats widening
+   *      two controls to no effect.
+   */
+  const pendingJump = useRef<string | null>(null);
+
+  function scrollToItem(itemId: string): boolean {
+    const row = document.querySelector<HTMLElement>(
+      `tr[data-guide-item="${itemId}"]`
+    );
+    if (!row) return false;
+    const maxScroll = Math.max(
+      0,
+      document.documentElement.scrollHeight - window.innerHeight
+    );
+    window.scrollTo({
+      top: Math.min(
+        maxScroll,
+        Math.max(0, window.scrollY + row.getBoundingClientRect().top - chromeOffset())
+      ),
+      behavior: "auto",
+    });
+    return true;
+  }
+
+  function jumpToItem(itemId: string) {
+    setJumpMiss(null);
+    if (scrollToItem(itemId)) return;
+
+    // Not rendered. Is it even here today?
+    if (!rows.some((r) => r.inventory_item_id === itemId)) {
+      setJumpMiss(itemId);
+      return;
+    }
+
+    // It is — so something in the view is hiding it. Widen both, and scroll on
+    // the other side of the render. A ref rather than state, so this never
+    // becomes a set-state-in-effect.
+    pendingJump.current = itemId;
+    if (term) setTerm("");
+    changeFilter("all");
+  }
+
+  useEffect(() => {
+    const itemId = pendingJump.current;
+    if (!itemId) return;
+    pendingJump.current = null;
+    // One more miss here is possible in principle — an item orderable today
+    // that even the All tier will not show — and it reports rather than
+    // scrolling nowhere.
+    if (!scrollToItem(itemId)) setJumpMiss(itemId);
+    // Runs after the widened view has rendered; the deps are what widened.
+  }, [filter, term]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // What the two jumps have to aim at, so each button can say when there's
   // nowhere to go. Counted off the same data the list renders from.
@@ -564,6 +649,8 @@ export function OrderGuide({
           // which is what `canGeneratePos` already carries.
           canResolve={canGeneratePos}
           showEmpty={reminders.length > 0}
+          onJumpToItem={jumpToItem}
+          jumpMiss={jumpMiss}
         />
       </div>
 
@@ -931,7 +1018,9 @@ export function OrderGuide({
                         it's off behind SHOW_ITEM_PAR while Mark lives without
                         it, leaving only the NO PAR marker for items missing
                         one. What's on the right now is the last purchase. */}
-                    <tr>
+                    {/* `data-guide-item` is what the requests band aims at
+                        when you tap an item on a request — see jumpToItem. */}
+                    <tr data-guide-item={item.inventory_item_id}>
                       <td colSpan={7} className="px-0 pb-0 pt-12">
                         {/* items-BASELINE, not items-end (Mark, 2026-08-10: the last-purchase
                             text "appears 1 or 2 px lower than the inventory item").
