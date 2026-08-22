@@ -817,6 +817,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    are WORKING is the wrong place to hide each row's reason behind a disclosure,
    because you would open every one. Empty details render as a faint
    "Add details…", which is the only thing on screen saying the field exists.
+   **Both walked against the live database 2026-08-22, and THE FEATURE IS IN
+   REAL USE** — Mark had filed eight requests across DF01 and DF02 by then
+   (magic erasers, 18" plastic wrap, cash drop envelopes, a door stopper,
+   cherries, sugar cones, ice cream cups, toilet bowl cleaner), three already
+   linked to catalog items, and he filed three more DURING the verification.
+   Everything was checked on a row Claude filed and then deleted; his eight
+   were left untouched, details still null. Confirmed: the create dialog CLOSES
+   on File request, the row lands on the list behind it with its details
+   rendered under the request text, the tab counts move, the details box is
+   visibly the taller of the two fields, and the inline details cell saves on
+   ⌘↵. The resting order held over four rows at equal priority — oldest first.
    In the guide band: "1 open request" → "No open requests" at zero (a numeral
    zero in a sentence reads stiffly), and **the band measured 112px with the
    link and 112px without it** — it already wrapped at 1440, so the link costs
@@ -3972,13 +3983,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    a partial run dies on that rename before it reaches the constraint, the
    policy or the index.
 
-   **060 IS NOT APPLIED YET** (written 2026-08-21 — the request's details box).
+   **060 IS APPLIED** (Mark, 2026-08-22 — the request's details box).
    *Probe, don't read this line.* `select column_name, is_nullable from
    information_schema.columns where table_name = 'purchase_requests' and
    column_name = 'details'` — expect one row, `YES`. One nullable column, no
-   policy and no constraint, so nothing else moves. Same order as 059: apply it
-   BEFORE deploying, since the list selects the column; until it is applied the
-   screen says so in the same sentence. A SEPARATE FILE rather than an edit to
+   policy and no constraint, so nothing else moves. Same order as 059: it had to be applied
+   BEFORE deploying, since the list selects the column; until it was, the
+   screen said so in the same sentence. A SEPARATE FILE rather than an edit to
    059 because 059 is applied — 055's rule, that a migration which has run is
    history and a file no longer describing what was run is how the harness and
    production stop being the same database.
