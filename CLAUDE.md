@@ -789,6 +789,34 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    have dated a request that had just been filed to tomorrow. Hence
    `dateInTimeZone` in `lib/today`, beside the two functions that exist for
    exactly this drift.
+   **TWO CHANGES CAME OUT OF USING IT** the same day, both Mark's.
+   **The create dialog CLOSES on File request.** It shipped with
+   `AddShopSection`'s stay-open ending and that is the wrong ending here: that
+   one stays up because you seed a shop's whole walk order in a sitting, where
+   filing a request is noticing ONE thing is low. There is no confirmation
+   strip because there is a better one — the row is on the list behind you the
+   moment the panel goes, and the status tab's count moves with it, which is
+   also the feedback if you happened to be on the Ordered or Dismissed tab
+   where the new row itself would not show.
+   **And a request can explain itself (migration 060, NEEDS APPLYING).**
+   `request_text` was doing two jobs: "the big rainbow sprinkles" is what you
+   scan down a queue, and "the ones we use on the Bacon Maple, not the little
+   ones" is what the purchaser needs before they can buy the right thing. One
+   field means either the list becomes a wall of paragraphs or the explanation
+   never gets written. So the line stays NOT NULL and **`details` is nullable**,
+   because most requests really are one line and demanding prose for "we're out
+   of gloves" is how people stop filing them. Distinct from `resolution_note`,
+   which is the ANSWER — two people, two moments, two columns, and 059's
+   merge-into-one-note argument does not apply because that was two spellings
+   of one act.
+   **The ask and its explanation SHARE THE REQUEST COLUMN** — the line over the
+   paragraph, PO detail's Item cell in another costume. A `DataTable` expansion
+   was the first instinct and is wrong twice: the chevron rides in the FIRST
+   cell and applies `truncate` to it, so hosting it on this column would
+   silently stop a request wrapping — the one column that must — and a queue you
+   are WORKING is the wrong place to hide each row's reason behind a disclosure,
+   because you would open every one. Empty details render as a faint
+   "Add details…", which is the only thing on screen saying the field exists.
    In the guide band: "1 open request" → "No open requests" at zero (a numeral
    zero in a sentence reads stiffly), and **the band measured 112px with the
    link and 112px without it** — it already wrapped at 1440, so the link costs
@@ -3943,6 +3971,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    second time, which is the signal it already ran — and all-or-nothing, since
    a partial run dies on that rename before it reaches the constraint, the
    policy or the index.
+
+   **060 IS NOT APPLIED YET** (written 2026-08-21 — the request's details box).
+   *Probe, don't read this line.* `select column_name, is_nullable from
+   information_schema.columns where table_name = 'purchase_requests' and
+   column_name = 'details'` — expect one row, `YES`. One nullable column, no
+   policy and no constraint, so nothing else moves. Same order as 059: apply it
+   BEFORE deploying, since the list selects the column; until it is applied the
+   screen says so in the same sentence. A SEPARATE FILE rather than an edit to
+   059 because 059 is applied — 055's rule, that a migration which has run is
+   history and a file no longer describing what was run is how the harness and
+   production stop being the same database.
 
    **(r) THE ROW IS A PROGRESS BAR** (Mark, 2026-08-20, after a mockup pass).
    A wash fills each row of `/special-orders` to the fraction of stages done,

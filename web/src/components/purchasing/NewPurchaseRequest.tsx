@@ -26,9 +26,21 @@ import {
  * `NewEmployee`'s template, which is the one every create in this app follows:
  * a command right-aligned above the list, a `ui/Dialog`, an insert. What it
  * does NOT do is land you on the new record, because there isn't one — a
- * request is a row in a queue, not a record with a screen, so this takes
- * `AddShopSection`'s ending instead: clear the fields, say what was added, and
- * leave the dialog up with **Done** where Cancel was.
+ * request is a row in a queue, not a record with a screen.
+ *
+ * SO IT CLOSES ON SUCCESS (Mark, 2026-08-21). It shipped with
+ * `AddShopSection`'s ending — clear the fields, say what was added, leave the
+ * panel up with **Done** where Cancel was — and that is the wrong ending here.
+ * That one stays open because you seed a shop's whole walk order in a sitting,
+ * so the next shelf is always the reason you are still there. Filing a request
+ * is the opposite shape: you notice ONE thing is low and you say so. Leaving
+ * the panel up asks a question nobody has an answer to, and puts a second
+ * thing to press between the person and the list.
+ *
+ * There is no confirmation strip because there is a better one: the row is on
+ * the list behind you the moment the panel goes, and the status tab's count
+ * moves with it — which is also the feedback if you happened to be looking at
+ * the Ordered or Dismissed tab, where the new row itself wouldn't show.
  *
  * IT IS NEVER ROLE-GATED. 001's `preq_insert` is membership-only and that is
  * the whole point of the feature: the person who notices the shelf is empty is
@@ -53,9 +65,9 @@ export function NewPurchaseRequest({
   const [open, setOpen] = useState(false);
   const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
-  const [added, setAdded] = useState<string | null>(null);
 
   const [text, setText] = useState("");
+  const [details, setDetails] = useState("");
   const [priority, setPriority] = useState<RequestPriority>("normal");
   const [item, setItem] = useState<ChosenItem | null>(null);
 
@@ -63,10 +75,10 @@ export function NewPurchaseRequest({
 
   function reset() {
     setText("");
+    setDetails("");
     setPriority("normal");
     setItem(null);
     setFailed(null);
-    setAdded(null);
   }
 
   function close() {
@@ -78,7 +90,6 @@ export function NewPurchaseRequest({
   function add() {
     if (!ready || pending) return;
     setFailed(null);
-    setAdded(null);
     const label = text.trim();
 
     startTransition(async () => {
@@ -99,14 +110,15 @@ export function NewPurchaseRequest({
         location_id: locationId,
         requested_by: userId,
         request_text: label,
+        details: details.trim() || null,
         priority,
         inventory_item_id: item?.id ?? null,
       });
 
       if (error) {
         setFailed(
-          /priority|inventory_item_id/.test(error.message)
-            ? `${error.message} — migration 059 has not been applied yet.`
+          /priority|inventory_item_id|details/.test(error.message)
+            ? `${error.message} — migration 059 or 060 has not been applied yet.`
             : error.code === "42501"
               ? // Measured on the harness: this is what a missing `org_id`
                 // looks like, because a WITH CHECK is evaluated before the NOT
@@ -118,11 +130,12 @@ export function NewPurchaseRequest({
         return;
       }
 
-      setText("");
-      setPriority("normal");
-      setItem(null);
-      setAdded(label);
+      // Refresh BEFORE closing, so the list behind the panel already has the
+      // row when the panel is out of the way — `NewEmployee`'s order, for its
+      // reason.
       router.refresh();
+      setOpen(false);
+      reset();
     });
   }
 
@@ -152,7 +165,7 @@ export function NewPurchaseRequest({
                 disabled={pending}
                 className={DIALOG_CANCEL_CLASS}
               >
-                {added ? "Done" : "Cancel"}
+                Cancel
               </button>
               <button
                 type="button"
@@ -174,11 +187,27 @@ export function NewPurchaseRequest({
             <Field label="What do we need" required>
               <textarea
                 value={text}
-                rows={3}
+                rows={2}
                 autoFocus
                 disabled={pending}
                 onChange={(e) => setText(e.target.value)}
-                placeholder="The big rainbow sprinkles — we're down to half a tub"
+                placeholder="The big rainbow sprinkles"
+                className="w-full border border-ink bg-white px-2 py-1 text-sm outline-none focus:border-2"
+              />
+            </Field>
+
+            {/* Optional, and it has to be: most requests genuinely are one
+                line, and a form that demands a paragraph for "we're out of
+                gloves" is a form people route around. The line above is what
+                the queue shows; this is what the purchaser needs before they
+                can buy the right thing. */}
+            <Field label="Details">
+              <textarea
+                value={details}
+                rows={4}
+                disabled={pending}
+                onChange={(e) => setDetails(e.target.value)}
+                placeholder="The ones we use on the Bacon Maple, not the little ones. Saturday is busy."
                 className="w-full border border-ink bg-white px-2 py-1 text-sm outline-none focus:border-2"
               />
             </Field>
@@ -207,12 +236,6 @@ export function NewPurchaseRequest({
               <InventoryItemChooser value={item} onPick={setItem} />
             </Field>
 
-            {added && !failed && (
-              <p className="border border-ink bg-mark-fill px-3 py-2 text-sm text-ink">
-                Filed <strong>{added}</strong>. File another, or Done when
-                you&rsquo;ve finished.
-              </p>
-            )}
             {failed && <p className="text-sm text-accent">{failed}</p>}
           </div>
         </Dialog>

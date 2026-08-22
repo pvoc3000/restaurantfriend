@@ -42,7 +42,7 @@ export default async function PurchaseRequestsPage({
     supabase
       .from("purchase_requests")
       .select(
-        "id, request_text, priority, status, requested_by, inventory_item_id, resolution_note, created_at"
+        "id, request_text, details, priority, status, requested_by, inventory_item_id, resolution_note, created_at"
       )
       .eq("location_id", active.id)
       .order("created_at", { ascending: false })
@@ -56,10 +56,10 @@ export default async function PurchaseRequestsPage({
     return (
       <p className="text-sm text-accent">
         Could not load purchase requests: {error.message}
-        {/priority|inventory_item_id|resolution_note/.test(error.message) ? (
+        {/priority|inventory_item_id|resolution_note|details/.test(error.message) ? (
           <span className="mt-2 block text-muted">
-            If this names a missing column, migration 059 has not been applied
-            yet.
+            If this names a missing column, migration 059 or 060 has not been
+            applied yet.
           </span>
         ) : null}
       </p>
@@ -93,6 +93,7 @@ export default async function PurchaseRequestsPage({
     return {
       id: r.id as string,
       request_text: r.request_text as string,
+      details: (r.details as string | null) ?? null,
       priority: (r.priority as RequestPriority) ?? "normal",
       status: r.status as RequestStatus,
       requested_by: by,

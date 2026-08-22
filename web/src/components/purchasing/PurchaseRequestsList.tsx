@@ -36,6 +36,8 @@ import { RequestActions } from "@/components/purchasing/RequestActions";
 export type PurchaseRequestRow = {
   id: string;
   request_text: string;
+  /** The requester's own explanation — migration 060. Usually absent. */
+  details: string | null;
   priority: RequestPriority;
   status: RequestStatus;
   requested_by: string | null;
@@ -170,6 +172,7 @@ export function PurchaseRequestsList({
     return rows.filter(
       (r) =>
         r.request_text.toLowerCase().includes(q) ||
+        (r.details ?? "").toLowerCase().includes(q) ||
         r.requesterName.toLowerCase().includes(q) ||
         (r.itemName ?? "").toLowerCase().includes(q) ||
         (r.resolution_note ?? "").toLowerCase().includes(q)
@@ -233,20 +236,54 @@ export function PurchaseRequestsList({
       pinned: true,
       wrap: true,
       sortValue: (r) => r.request_text,
-      render: (r) =>
-        mayEdit(r) ? (
-          <InlineValue
-            table="purchase_requests"
-            id={r.id}
-            column="request_text"
-            value={r.request_text}
-            multiline
-            nullable={false}
-            ariaLabel="What was asked for"
-          />
-        ) : (
-          <span className={READ_ONLY_VALUE}>{r.request_text}</span>
-        ),
+      /**
+       * THE ASK AND ITS EXPLANATION SHARE ONE COLUMN — the line over the
+       * paragraph, PO detail's Item cell in another costume ("two columns'
+       * information in one column's width").
+       *
+       * Not a `DataTable` expansion, which was the first instinct and is wrong
+       * here for two reasons. The chevron rides in the FIRST cell and applies
+       * `truncate` to it, so putting it on this column would silently stop a
+       * request wrapping — the one column that has to. And a queue you are
+       * working is the wrong place to hide the reason for each row behind a
+       * disclosure: you would open every one.
+       */
+      render: (r) => (
+        <div className="min-w-0 space-y-0.5">
+          {mayEdit(r) ? (
+            <InlineValue
+              table="purchase_requests"
+              id={r.id}
+              column="request_text"
+              value={r.request_text}
+              multiline
+              nullable={false}
+              ariaLabel="What was asked for"
+            />
+          ) : (
+            <span className={READ_ONLY_VALUE}>{r.request_text}</span>
+          )}
+          {mayEdit(r) ? (
+            // The placeholder does double duty: it says the field is empty AND
+            // that you can fill it in, which is the only thing here that says
+            // details exist at all.
+            <InlineValue
+              table="purchase_requests"
+              id={r.id}
+              column="details"
+              value={r.details}
+              multiline
+              placeholder="Add details…"
+              ariaLabel={`Details for ${r.request_text}`}
+              className="block text-[12px] text-muted"
+            />
+          ) : r.details ? (
+            <span className={`${READ_ONLY_VALUE} block text-[12px] text-muted`}>
+              {r.details}
+            </span>
+          ) : null}
+        </div>
+      ),
     },
     {
       key: "item",
