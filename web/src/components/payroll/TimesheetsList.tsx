@@ -739,15 +739,21 @@ export function TimesheetsList({
         <span className="text-muted">
           {sorted.length === rows.length ? `${rows.length} shifts` : `${sorted.length} of ${rows.length} shifts`}
         </span>
-        <span>Regular <strong className="tabular-nums">{totals.regular.toFixed(2)}</strong></span>
-        <span>OT <strong className="tabular-nums">{totals.ot.toFixed(2)}</strong></span>
-        <span>Double <strong className="tabular-nums">{totals.dot.toFixed(2)}</strong></span>
+        {/* THE HOUR FIGURES MOVED TO THE TABLE'S FOOTER (Mark, 2026-08-22),
+            where they sit under the columns they sum. This line kept them as a
+            sentence for months and the alignment is the whole difference — a
+            total is a number you check against the column above it, and one set
+            in a band four inches away has to be re-read to be placed. It is the
+            same argument that moved the GROUP subtotals out of their band on
+            2026-08-05, arriving at the grand total a fortnight later.
+            What stays here is what is NOT a column: the count, and the three
+            flags. */}
         {totals.sick > 0 && (
-          <span className="text-muted">
-            Sick <strong className="tabular-nums">{totals.sick.toFixed(2)}</strong>
-            {/* Decision 7: recorded and reconciled, never exported — Gusto
-                already pays it, and including it pays the person twice. */}
-            <span className="ml-1 text-[12px]">(reconciliation only, not exported)</span>
+          // Decision 7, and it has to be said where the figure is not: sick
+          // hours are recorded and reconciled but never exported — Gusto pays
+          // them already, and including them pays the person twice.
+          <span className="text-muted text-[12px]">
+            Sick hours are reconciliation only, not exported
           </span>
         )}
         {totals.unfinished > 0 && (
@@ -777,7 +783,45 @@ export function TimesheetsList({
         </p>
       )}
 
+      {/* THE COLUMN TOTALS, under the columns they sum (Mark, 2026-08-22).
+          Handed the rows the table is SHOWING, so it agrees with a search or a
+          filter rather than quietly reporting the whole fortnight; `DataTable`
+          passes its own sorted set. Break is summed in HOURS because that is
+          what the column reads — the column stores minutes and `BreakCell`
+          scales it, so totalling the stored value would put "1705" under a
+          column of 0.50s. */}
       <DataTable
+        totals={(shown) => {
+          let worked = 0, regular = 0, ot = 0, dot = 0, brk = 0, sick = 0;
+          for (const r of shown) {
+            worked += workedHours(r) ?? 0;
+            regular += r.hours_regular ?? 0;
+            ot += r.hours_overtime ?? 0;
+            dot += r.hours_double_ot ?? 0;
+            brk += (r.unpaid_break_minutes ?? 0) / 60;
+            sick += r.sick_hours ?? 0;
+          }
+          const n = (v: number) => v.toFixed(2);
+          return {
+            employee: (
+              <span className="text-[11px] uppercase tracking-[0.12em] text-subtle">
+                {shown.length === rows.length
+                  ? `${rows.length} shifts`
+                  : `${shown.length} of ${rows.length}`}
+              </span>
+            ),
+            worked: n(worked),
+            regular: n(regular),
+            ot: n(ot),
+            dot: n(dot),
+            break: n(brk),
+            // ALWAYS, unlike the per-group subtotal, which shows sick only
+            // where there is any: that rule is about a 0.00 repeating down
+            // every band, and a grand total appears once. Here the zero is an
+            // answer — nobody was off sick this fortnight.
+            sick: n(sick),
+          };
+        }}
         rows={sorted}
         columns={columns}
         rowKey={(r) => r.id}

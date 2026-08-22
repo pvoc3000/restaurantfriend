@@ -169,6 +169,7 @@ export type DataGroup<T> = {
 export function DataTable<T>({
   rows,
   columns,
+  totals,
   rowKey,
   storageKey,
   defaultSort,
@@ -280,6 +281,26 @@ export function DataTable<T>({
    * A single object is the ordinary case and behaves as before.
    */
   group?: DataGroup<T> | DataGroup<T>[];
+  /**
+   * A GRAND TOTAL on a closing row beneath the whole table, under the columns
+   * it sums.
+   *
+   * Same contract as `DataGroup.summary` and for the same reason (Mark,
+   * 2026-08-05): "the values should align with their columns". A total is a
+   * number you check against the column above it, so it returns a map KEYED BY
+   * COLUMN KEY rather than a ReactNode — which keeps each figure under its own
+   * heading when the reader hides or reorders a column, and is the one thing a
+   * sentence in a band above the table can never do.
+   *
+   * It is handed the rows the table is SHOWING, filters and all, because that
+   * is what the reader is looking at.
+   *
+   * Deliberately NOT sticky, matching `summary`: a closing row sits under the
+   * run it sums, which is how every printed register in this trade sets a
+   * total. Pinning it is a separate decision and would have to negotiate with
+   * `ui/StickyFooter` and the ActionBar on the fifteen screens this serves.
+   */
+  totals?: (rows: T[]) => Record<string, ReactNode>;
   /**
    * Below this viewport width, drop every column marked `hideWhenCompact`.
    *
@@ -877,6 +898,25 @@ export function DataTable<T>({
               );
             })}
           </tbody>
+          {totals && sorted.length > 0 && (
+            <tfoot>
+              <tr className="border-t-2 border-ink">
+                {(() => {
+                  const cells = totals(sorted);
+                  return visibleColumns.map((col) => (
+                    <td
+                      key={col.key}
+                      className={`h-11 px-3 py-2 text-[13px] font-semibold ${
+                        col.align === "right" ? "text-right" : ""
+                      } ${col.key in cells ? "tabular-nums" : ""}`}
+                    >
+                      {cells[col.key] ?? null}
+                    </td>
+                  ));
+                })()}
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
 
