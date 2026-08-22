@@ -16,3 +16,6 @@ dist/
 
 # logs
 *.log
+
+# throwaway audit scripts (must sit beside migration/node_modules to run)
+_tmp-*
