@@ -10,8 +10,8 @@ import { formatCents, formatRate } from "@/lib/tipPool";
 import type { DayPool, WorkdayFinding, WorksheetEmployee } from "@/lib/payrollWorksheet";
 
 /**
- * The payroll worksheet: one fortnight, in the three views a human needs before
- * payroll runs.
+ * The payroll worksheet: one fortnight, in the four views a human needs before
+ * payroll runs — Hours, Late breaks, No breaks, Tips.
  *
  * Everything here is a PROPOSAL until somebody records a decision. The break
  * findings are derived on every render and never stored (decision 3); the tip
@@ -27,9 +27,29 @@ export function PayrollWorksheet({
   findings: WorkdayFinding[];
   pools: DayPool[];
 }) {
-  const [view, setView] = useState<"hours" | "breaks" | "tips">("hours");
+  const [view, setView] = useState<"hours" | "late" | "none" | "tips">("hours");
 
-  const openFindings = findings.filter((f) => !f.decided).length;
+  /**
+   * BREAKS SPLIT IN TWO (Mark, 2026-08-22: "can we add an issue filter, to make
+   * 4 total: Hours, Late Breaks, No Breaks, Tips"). They are different problems
+   * with different answers — a late meal was provided and taken at the wrong
+   * time, where a missing one was never provided at all — and on the real
+   * 08-03 → 08-16 period they run 51 to 4, so one list of 55 buried the four
+   * that matter under fifty that share one cause.
+   *
+   * THE OTHER TWO CODES HAVE A HOME, or splitting on the two Mark named would
+   * silently drop them off the worksheet. `no_second_meal` is a meal that never
+   * happened, so it belongs with No Breaks. `short_meal` does too, and that is a
+   * legal reading rather than a convenience: §512 wants a meal of at least
+   * thirty minutes, so one under that is not a short meal, it is no meal. The
+   * split is therefore TIMING against PROVISION, and the two counts sum to
+   * every finding — nothing is hidden by the filter.
+   */
+  const isLate = (f: WorkdayFinding) => f.finding.code === "late_meal";
+  const lateFindings = useMemo(() => findings.filter(isLate), [findings]);
+  const missingFindings = useMemo(() => findings.filter((f) => !isLate(f)), [findings]);
+  const openLate = lateFindings.filter((f) => !f.decided).length;
+  const openMissing = missingFindings.filter((f) => !f.decided).length;
   const missingPools = pools.filter((p) => p.effectiveCents === null).length;
 
   return (
@@ -42,10 +62,11 @@ export function PayrollWorksheet({
         onChange={setView}
         options={[
           { key: "hours", label: "Hours", count: employees.length },
-          // Both counts are shown even at zero — "Breaks 0" is the answer you
+          // Every count is shown even at zero — "No breaks 0" is the answer you
           // came for, where a hidden tab only says the screen forgot to offer
           // it. The PO list's roll-up convention.
-          { key: "breaks", label: "Breaks", count: openFindings },
+          { key: "late", label: "Late breaks", count: openLate },
+          { key: "none", label: "No breaks", count: openMissing },
           { key: "tips", label: "Tips", count: missingPools },
         ]}
       />
@@ -71,7 +92,8 @@ export function PayrollWorksheet({
       </p>
 
       {view === "hours" && <HoursBlock employees={employees} />}
-      {view === "breaks" && <BreaksBlock findings={findings} />}
+      {view === "late" && <BreaksBlock findings={lateFindings} kind="late" />}
+      {view === "none" && <BreaksBlock findings={missingFindings} kind="none" />}
       {/* Every value in the worksheet is a DATE or an amount — no instants, so
           no time zone is needed anywhere below. */}
       {view === "tips" && <TipsBlock pools={pools} />}
@@ -192,7 +214,14 @@ function HoursBlock({ employees }: { employees: WorksheetEmployee[] }) {
 
 /* -------------------------------------------------------------------------- */
 
-function BreaksBlock({ findings }: { findings: WorkdayFinding[] }) {
+function BreaksBlock({
+  findings,
+  kind,
+}: {
+  findings: WorkdayFinding[];
+  /** Which half of the split this is, for the sentence that explains it. */
+  kind: "late" | "none";
+}) {
   const [showDecided, setShowDecided] = useState(false);
   const shown = useMemo(
     () => (showDecided ? findings : findings.filter((f) => !f.decided)),
@@ -214,6 +243,9 @@ function BreaksBlock({ findings }: { findings: WorkdayFinding[] }) {
       </div>
 
       <p className="max-w-[80ch] text-sm text-muted">
+        {kind === "late"
+          ? "A meal was taken, and it began more than five hours into the shift. "
+          : "No meal of at least thirty minutes was taken — none recorded, one under thirty minutes, or a missing second meal on a day over ten hours. "}
         Derived from the punches every time this screen loads, never
         stored — a flag about a punch goes stale the moment the punch is
         corrected. What gets stored is your decision, and you record it on the

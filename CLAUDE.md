@@ -1676,8 +1676,21 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    you have to just take the app's word for it"). The meal-premium decision and
    the tip-pool figure moved out of the pay-period worksheet and into the row's
    own expansion (`ShiftDecisions.tsx`), beside the punches, the recorded meal
-   and the day's hours. The worksheet KEPT its three totals and lost both
+   and the day's hours. The worksheet KEPT its totals and lost both
    editors; it is now the view before you export — how many decisions are
+   **ITS VIEWS BECAME FOUR 2026-08-22** (Mark: "can we add an issue filter, to
+   make 4 total: Hours, Late Breaks, No Breaks, Tips"). Breaks split because
+   they are different problems with different answers — a late meal WAS
+   provided and taken at the wrong time, where a missing one was never provided
+   — and on the real 08-03 → 08-16 period they run **51 to 4**, so one list of
+   55 buried the four that matter under fifty sharing one cause.
+   **The other two codes have a home, or the split would silently drop them.**
+   `no_second_meal` is a meal that never happened, so it goes with No breaks;
+   `short_meal` does too, and that is a LEGAL reading rather than a
+   convenience — §512 wants a meal of at least thirty minutes, so one under
+   that is not a short meal, it is no meal. The split is TIMING against
+   PROVISION and the two counts SUM to every finding, which is the property to
+   preserve if a fifth code is ever added.
    outstanding and what they come to.
    **Shipped 2026-08-06: THE PAY-PERIOD SCREENS ARE GONE, and the export is a
    PANEL** (Mark: "since pay periods are now on the timesheet screen, there's no
