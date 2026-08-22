@@ -441,14 +441,22 @@ export default async function TimesheetsPage({
   // column. The shift and employee selects are NOT in here — they gate the whole
   // screen above, and `error` has already returned by this point.
   const problem = employeeError ?? premiumError ?? poolError ?? benefitError ?? entitlementError;
-  const worksheetError = problem
-    ? problem.message +
-      (/payroll_benefits|employee_benefits|timesheet_benefits/.test(problem.message)
-        ? " — migration 033 has not been applied yet."
-        : /^column/i.test(problem.message)
-          ? " — migration 031 has not been applied yet."
-          : " — migration 029 has not been applied yet.")
-    : null;
+  // NAME THE MIGRATION BY THE COLUMN, never by "it starts with `column`".
+  // That catch-all blamed 031 for every missing column, which was true only
+  // while 031 was the last one this screen depended on — 061 then added
+  // `workday_starts_at` and the screen confidently sent you to check the wrong
+  // migration. A message that names the wrong cause is worse than one that
+  // names none, so an unrecognised column now says only what Postgres said.
+  const blame = (message: string): string => {
+    if (/payroll_benefits|employee_benefits|timesheet_benefits/.test(message))
+      return " — migration 033 has not been applied yet.";
+    if (/workday_starts_at/.test(message)) return " — migration 061 has not been applied yet.";
+    if (/wage_type|gusto_id|tip_hours|tip_allocation/.test(message))
+      return " — migration 031 has not been applied yet.";
+    if (/^column/i.test(message)) return "";
+    return " — migration 029 has not been applied yet.";
+  };
+  const worksheetError = problem ? problem.message + blame(problem.message) : null;
 
   const findings = buildFindings(shifts, employeeById, waiverIds, decidedByKey);
   const worksheetPools = buildPools(shifts, employeeById, codeById, poolMap);
