@@ -770,8 +770,31 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    and is still refused a bare dismissal; `anon` with no claim sees 0 and is
    refused an insert; the dependency guard fires when a view really does depend;
    and a re-run of 059 fails loudly at every step. **1105 fixtures pass**, 11
-   new, each checked by breaking it. NOT yet walked in the browser — 059 has to
-   be applied first.
+   new, each checked by breaking it.
+   **059 IS APPLIED and the whole flow was WALKED against the live database
+   2026-08-21, then left exactly as found** (0 rows). What that proved beyond
+   the harness: the create dialog files a row and stays open with Cancel
+   reading **Done**; the dismiss dialog's commit is **disabled on a blank note
+   AND on whitespace**, so the check constraint never has to refuse anything,
+   while Mark-ordered's commit is enabled with no note at all; marking ordered
+   writes status, note, `resolved_at` and `resolved_by` in ONE statement and
+   Reopen clears all four; the row menu offers Mark ordered / Dismiss / Link
+   while open and **Reopen / Link once resolved**; the inline priority cell
+   writes; and the item chooser searched the real catalog (19 hits for
+   "sprinkle", active first, the inactive one last and marked) and left a live
+   link to `/items/[id]`.
+   **The org-timezone date earned itself on the first row.** `created_at` was
+   `2026-08-22T05:08Z` and the list correctly reads **2026-08-21** —
+   `created_at.slice(0, 10)`, which is what a list would ordinarily do, would
+   have dated a request that had just been filed to tomorrow. Hence
+   `dateInTimeZone` in `lib/today`, beside the two functions that exist for
+   exactly this drift.
+   In the guide band: "1 open request" → "No open requests" at zero (a numeral
+   zero in a sentence reads stiffly), and **the band measured 112px with the
+   link and 112px without it** — it already wrapped at 1440, so the link costs
+   nothing. Scrolled, the band pins at 64 and the column labels at exactly 176,
+   which is its own published height added to the masthead's: zero overlap,
+   zero gap.
 4b. 🚧 **The Location module** — the first screen outside Purchasing (Mark,
    2026-07-30). `locations` was the one table with no UI at all: nothing in
    `web/src` wrote to it, and its six rows still carried raw FileMaker text in
@@ -3902,8 +3925,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `Message-ID` header is emitted and Resend's `headers` object stays
    `undefined`, exactly as before.
 
-   **059 IS NOT APPLIED YET** (written 2026-08-21 — purchase requests). *Probe,
-   don't read this line; it has been wrong in both directions for four different
+   **059 IS APPLIED** (Mark, 2026-08-21 — purchase requests). *Probe, don't read
+   this line; it has been wrong in both directions for four different
    migrations.* Three probes, because it does three distinguishable things:
    `select column_name from information_schema.columns where table_name =
    'purchase_requests' and column_name in ('priority','resolution_note',
@@ -3913,10 +3936,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `preq_author_update`; and `select conname from pg_constraint where conrelid =
    'public.purchase_requests'::regclass and contype = 'c'` — includes
    `purchase_requests_reason_when_dismissed`.
-   **APPLY IT BEFORE DEPLOYING**, which is the opposite of 012's order: the new
-   screen SELECTS these columns, so a deploy in front of the migration 400s the
-   whole select and the list renders its "migration 059 has not been applied
-   yet" sentence rather than a queue. It is NOT rerunnable — the rename fails a
+   It had to be applied BEFORE deploying, which is the opposite of 012's order:
+   the new screen SELECTS these columns, so a deploy in front of the migration
+   400s the whole select and the list renders its "migration 059 has not been
+   applied yet" sentence rather than a queue. It is NOT rerunnable — the rename fails a
    second time, which is the signal it already ran — and all-or-nothing, since
    a partial run dies on that rename before it reaches the constraint, the
    policy or the index.

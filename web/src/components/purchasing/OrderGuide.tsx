@@ -737,7 +737,11 @@ export function OrderGuide({
           href="/purchase-requests"
           className="text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
         >
-          {openRequests === 1 ? "1 open request" : `${openRequests} open requests`}
+          {openRequests === 0
+            ? "No open requests"
+            : openRequests === 1
+              ? "1 open request"
+              : `${openRequests} open requests`}
         </Link>
 
         {/* Pushed to the right edge (Mark, 2026-07-29). Everything left of
