@@ -10,17 +10,30 @@ import {
   DIALOG_CANCEL_CLASS,
   DIALOG_COMMIT_CLASS,
 } from "@/components/ui/Dialog";
+import {
+  BAND_LINK_ON_ALERT,
+  BAND_LINK_ON_PLAIN,
+  BandEmpty,
+  GuideBand,
+} from "@/components/purchasing/GuideBand";
 
 /**
  * Reminders due at this location, at the top of the order guide (spec §2 step 1).
  *
- * **Rendered OUTSIDE the guide's collapsing shelf, deliberately.** Everything in
- * that shelf — the title, the day picker, the totals bar, the filters — is
- * something you set BEFORE you start walking, so it hides with the masthead.
- * A due reminder is not a view control, it's an alert: if it lived in the shelf
- * then walking with the chrome collapsed (which is the point of collapsing it)
- * would mean never seeing one. It's dismissable and, by design, rare, so a band
- * that stays put costs nothing.
+ * **The LEFT of the guide's two header columns** since 2026-08-22; `GuideRequests`
+ * is the right, and `GuideBand` is the frame they share so the two rules read
+ * as one line across the screen.
+ *
+ * It renders above the guide's controls rather than inside them because a due
+ * reminder is not a view control, it is an alert. (The original wording of this
+ * note argued that from the COLLAPSING shelf — hide the chrome to walk, and a
+ * reminder in the chrome is never seen. That shelf went on 2026-08-02 with the
+ * collapse button, so the mechanism is gone and only the conclusion stands.)
+ *
+ * `showEmpty` is what keeps the two columns honest: with something in the other
+ * one this band holds its half open and says it has nothing, rather than
+ * leaving a hole where a column should be. With BOTH empty the caller renders
+ * neither, and the guide's first row is the guide.
  *
  * A note on who can dismiss: `dismissed_at` is an UPDATE, and the RLS policy
  * `purchase_reminders` inherited from 001's generic loop makes writes
@@ -34,6 +47,7 @@ export function Reminders({
   locationId,
   orgId,
   canWrite,
+  showEmpty = false,
 }: {
   reminders: Reminder[];
   /** The day being walked, from the ORG's timezone — never the host's. */
@@ -41,6 +55,8 @@ export function Reminders({
   locationId: string;
   orgId: string;
   canWrite: boolean;
+  /** Hold the column open with a sentence when there is nothing due. */
+  showEmpty?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -83,28 +99,28 @@ export function Reminders({
     router.refresh();
   }
 
-  // Nothing due and nothing to offer — take up no room at all. The guide's
-  // first row should be the guide.
-  if (reminders.length === 0 && !canWrite) return null;
+  // Nothing due, nothing to offer, and no column to hold open — take up no
+  // room at all. The guide's first row should be the guide.
+  if (reminders.length === 0 && !canWrite && !showEmpty) return null;
+
+  const addReminder = canWrite ? (
+    <button
+      type="button"
+      onClick={() => setComposing(true)}
+      className={reminders.length > 0 ? BAND_LINK_ON_ALERT : BAND_LINK_ON_PLAIN}
+    >
+      Add reminder
+    </button>
+  ) : null;
 
   return (
     <>
-      {reminders.length > 0 && (
-        <div className="space-y-2 border-2 border-ink bg-[var(--rf-yellow-200)] px-4 py-3">
-          <div className="flex flex-wrap items-baseline gap-3">
-            <h2 className="text-[12px] font-semibold uppercase tracking-[0.12em] text-ink">
-              {reminders.length === 1 ? "Reminder" : `${reminders.length} reminders`}
-            </h2>
-            {canWrite && (
-              <button
-                type="button"
-                onClick={() => setComposing(true)}
-                className="ml-auto text-[12px] uppercase tracking-[0.12em] text-ink underline decoration-neutral-500 underline-offset-[3px] hover:decoration-ink"
-              >
-                Add reminder
-              </button>
-            )}
-          </div>
+      {reminders.length > 0 ? (
+        <GuideBand
+          tone="alert"
+          title={reminders.length === 1 ? "Reminder" : `${reminders.length} reminders`}
+          action={addReminder}
+        >
           <ul className="space-y-1">
             {reminders.map((r) => {
               const late = daysOverdue(r.show_on_date, guideDate);
@@ -125,7 +141,7 @@ export function Reminders({
                       type="button"
                       disabled={busy}
                       onClick={() => void dismiss(r.id)}
-                      className="ml-auto text-[12px] uppercase tracking-[0.12em] text-ink underline decoration-neutral-500 underline-offset-[3px] hover:decoration-ink disabled:opacity-35"
+                      className={`ml-auto ${BAND_LINK_ON_ALERT} disabled:opacity-35`}
                     >
                       Dismiss
                     </button>
@@ -135,21 +151,16 @@ export function Reminders({
             })}
           </ul>
           {error && <p className="text-sm text-accent">{error}</p>}
-        </div>
-      )}
-
-      {/* With nothing due the band disappears entirely, so the way to WRITE one
-          has to survive somewhere. A quiet line rather than a second box. */}
-      {reminders.length === 0 && canWrite && (
-        <p className="text-right">
-          <button
-            type="button"
-            onClick={() => setComposing(true)}
-            className="text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-          >
-            Add reminder
-          </button>
-        </p>
+        </GuideBand>
+      ) : showEmpty ? (
+        <GuideBand title="Reminders" action={addReminder}>
+          <BandEmpty>Nothing due today.</BandEmpty>
+        </GuideBand>
+      ) : (
+        /* No band at all, and nothing in the other column either — so the way
+           to WRITE one still has to survive somewhere. A quiet line rather
+           than a second box. */
+        canWrite && <p className="text-right">{addReminder}</p>
       )}
 
       {composing && (

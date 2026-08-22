@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
+import type { GuideRequest } from "@/components/purchasing/GuideRequests";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import {
   guideToday,
@@ -105,23 +106,29 @@ export default async function OrderGuidePage({
     .then((r) => r);
 
   /**
-   * HOW MANY REQUESTS ARE OPEN HERE — the count the band under the title links
-   * to. Migration 059's partial index exists for this one query and nothing
-   * else.
+   * WHAT THIS SHOP HAS ASKED FOR — the header's right-hand column (2026-08-22).
+   * It replaced a `head` count, because a band that lists the asks is worth
+   * more than one that counts them. Migration 059's partial index is exactly
+   * this query's shape.
    *
-   * On the wire with the others, and for the same reason. A `head` count sends
-   * and returns almost nothing, but it is still a round trip, and this is the
-   * app's heaviest route — awaiting it in sequence would add its whole latency
-   * to a walk that already takes 3.5s to paint.
+   * The item name comes through an EMBED rather than a second query, unlike
+   * the Requests list, which pages hundreds of rows and serves the link on a
+   * few: here it is one round trip over a handful of rows, and the FK makes it
+   * a to-ONE embed, so `inventory_items` arrives as an object rather than an
+   * array.
    *
-   * Safe before 059 is applied: it filters `location_id` and `status`, both of
-   * which have been on the table since 001.
+   * On the wire with the others, and for the same reason: this is the app's
+   * heaviest route, and awaiting a sixth query in sequence would add its whole
+   * latency to a walk that already takes 3.5s to paint.
    */
-  const requestCountPromise = supabase
+  const requestsPromise = supabase
     .from("purchase_requests")
-    .select("id", { count: "exact", head: true })
+    .select(
+      "id, request_text, details, priority, requested_by, inventory_item_id, inventory_items ( name )"
+    )
     .eq("location_id", locationId)
     .eq("status", "open")
+    .order("created_at")
     .then((r) => r);
 
   /**
@@ -193,12 +200,28 @@ export default async function OrderGuidePage({
   const { data: lastPurchaseRows, error: lastPurchaseError } =
     await lastPurchasePromise;
 
-  // A count is not worth taking the walk down for, so its error is swallowed
+  // The band is not worth taking the walk down for, so its error is swallowed
   // rather than surfaced the way the last-purchase view's is: there, an absent
-  // line would assert something false about every item, where an absent count
-  // reads as nothing outstanding — which, if the query failed, is the same
-  // thing the screen would say anyway.
-  const { count: openRequestCount } = await requestCountPromise;
+  // line would assert something false about every ITEM, where an absent
+  // request band reads as nothing outstanding — which, if the query failed, is
+  // the same thing the screen would say anyway.
+  const { data: requestRows } = await requestsPromise;
+  const requests: GuideRequest[] = (requestRows ?? []).map((r) => {
+    // A to-one embed is an object; typed defensively because PostgREST hands
+    // back an array the moment somebody widens the relationship, and a silent
+    // `undefined` here would just drop the item name.
+    const item = r.inventory_items as { name?: string } | { name?: string }[] | null;
+    const named = Array.isArray(item) ? item[0] : item;
+    return {
+      id: r.id as string,
+      request_text: r.request_text as string,
+      details: (r.details as string | null) ?? null,
+      priority: (r.priority as GuideRequest["priority"]) ?? "normal",
+      requested_by: (r.requested_by as string | null) ?? null,
+      inventory_item_id: (r.inventory_item_id as string | null) ?? null,
+      itemName: named?.name ?? null,
+    };
+  });
 
   return (
     <OrderGuide
@@ -225,7 +248,8 @@ export default async function OrderGuidePage({
       guideDate={guideDate}
       locationId={locationId}
       locationCode={session.activeLocation.code}
-      openRequests={openRequestCount ?? 0}
+      requests={requests}
+      userId={session.userId}
       orgId={session.membership.org_id}
       canGeneratePos={canWriteCatalog(session.membership.role)}
     />

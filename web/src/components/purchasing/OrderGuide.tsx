@@ -35,6 +35,7 @@ import type { Reminder } from "@/lib/reminders";
 import { GuideLine } from "./GuideLine";
 import { GeneratePos } from "./GeneratePos";
 import { Reminders } from "./Reminders";
+import { GuideRequests, type GuideRequest } from "./GuideRequests";
 import { ActionBar, ActionBarButton } from "@/components/ui/ActionBar";
 import { BackToTop } from "@/components/ui/BackToTop";
 import { usePublishedHeight } from "@/lib/tableHead";
@@ -84,7 +85,8 @@ export function OrderGuide({
   locationCode,
   orgId,
   canGeneratePos,
-  openRequests,
+  requests,
+  userId,
 }: {
   rows: GuideRow[];
   /** Migration 048 — the most recent non-void purchase per item-location. */
@@ -106,8 +108,10 @@ export function OrderGuide({
   orgId: string;
   /** Purchaser+ only — staff walk the guide but can't create POs (RLS). */
   canGeneratePos: boolean;
-  /** How many purchase requests are open here, for the link in the band. */
-  openRequests: number;
+  /** Open purchase requests at this location, for the header's right column. */
+  requests: GuideRequest[];
+  /** Who is walking — the request menu needs it to know its own author. */
+  userId: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -528,21 +532,40 @@ export function OrderGuide({
     // components/ui/ActionBar.
     <>
     <div className="space-y-4 pb-22">
-      {/* ABOVE the shelf, and outside it: a due reminder is an alert, not a view
-          control, so it must survive the collapse that hides everything else up
-          here. Walking with the chrome collapsed is the normal way to walk —
-          that's what the collapse is for — and a reminder you only see when
-          you're not working is no reminder at all. */}
-      <Reminders
-        reminders={reminders}
-        guideDate={guideDate}
-        locationId={locationId}
-        orgId={orgId}
-        // Both dismissing and writing are UPDATEs/INSERTs on purchase_reminders,
-        // which 001's generic policy makes purchaser+ — the same gate that
-        // decides whether POs can be generated.
-        canWrite={canGeneratePos}
-      />
+      {/* THE HEADER'S TWO COLUMNS (Mark, 2026-08-22): what's due on the left,
+          what the shop has asked for on the right. Both are alerts rather than
+          view controls, which is why they sit above the shelf and not in it.
+
+          `items-start`, so the taller column does not stretch the shorter one
+          into a box of white space — these are two lists that happen to be
+          side by side, not two halves of one card.
+
+          The two `showEmpty` flags are what keep it a GRID: with anything in
+          either column, both render and the empty one says so, rather than
+          leaving a hole where a column should be. With both empty neither
+          renders at all — the guide's first row should be the guide — and
+          Reminders falls back to its own quiet "Add reminder" line. */}
+      <div className="grid gap-4 md:grid-cols-2 md:items-start">
+        <Reminders
+          reminders={reminders}
+          guideDate={guideDate}
+          locationId={locationId}
+          orgId={orgId}
+          // Both dismissing and writing are UPDATEs/INSERTs on
+          // purchase_reminders, which 001's generic policy makes purchaser+ —
+          // the same gate that decides whether POs can be generated.
+          canWrite={canGeneratePos}
+          showEmpty={requests.length > 0}
+        />
+        <GuideRequests
+          requests={requests}
+          userId={userId}
+          // 001's `preq_resolve` is the same role array as `canWriteCatalog`,
+          // which is what `canGeneratePos` already carries.
+          canResolve={canGeneratePos}
+          showEmpty={reminders.length > 0}
+        />
+      </div>
 
       {/* The shelf — everything above the list: the title, the day picker,
           the vendor totals and the filters. It used to hide with the
@@ -725,24 +748,6 @@ export function OrderGuide({
           </span>
           Ignore ordering days
         </button>
-
-        {/* WHAT THE SHOP HAS ASKED FOR (2026-08-21). Not a control — it is
-            the one thing in this band that goes somewhere else, and it is here
-            because this is where the person who answers a request is standing.
-            Rendered ALWAYS, including at zero: "nothing outstanding" is the
-            answer you came for (the PO list's `Open 0` roll-up argues exactly
-            this), and hiding it would take away the guide's only route to that
-            screen on precisely the days you want to check. */}
-        <Link
-          href="/purchase-requests"
-          className="text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-        >
-          {openRequests === 0
-            ? "No open requests"
-            : openRequests === 1
-              ? "1 open request"
-              : `${openRequests} open requests`}
-        </Link>
 
         {/* Pushed to the right edge (Mark, 2026-07-29). Everything left of
             it narrows the list — search, the four tiers, the day gates —

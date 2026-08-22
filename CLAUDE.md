@@ -747,13 +747,44 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    FIFO within a tier because a tiebreak always reads ascending. **No grouping**:
    the only candidate is the resting sort, so bands would be permanent over a
    twelve-row queue.
-   The order guide gained **an always-visible "N open requests" link** in its
-   sticky controls band (Mark's placement), fired with the other three promises
-   because that route is the app's heaviest. Shown at zero too — "nothing
-   outstanding" is the answer you came for (the PO list's `Open 0` roll-up), and
-   hiding it would remove the guide's only route to the screen. Known tension,
-   recorded: the band is otherwise view CONTROLS, and `Reminders` is the
-   precedent for an alert on that screen.
+   **THE GUIDE'S HEADER IS TWO COLUMNS** (Mark, 2026-08-22: "in the header area
+   where the reminders live on the order guide, let's try splitting it into two
+   columns, one for the reminders, and the other for purchase requests") —
+   what's due on the left, what the shop has asked for on the right, both above
+   the shelf because both are alerts rather than view controls.
+   **This RETIRED the "N open requests" link** that had sat in the sticky
+   controls band since 2026-08-21. That link was defended as the guide's only
+   route to the screen; the band is now that route and says WHAT was asked
+   rather than how many, so keeping both would be one fact stated twice, three
+   inches apart, with the weaker copy surviving. Known cost, which is the thing
+   the link was good at: **this band scrolls away where the controls band
+   sticks**, so halfway down a walk there is nothing on screen about requests.
+   That is the right trade — you read this before you set off, which is when it
+   can still change what you buy — and the link is five lines if it wants to
+   come back.
+   **`GuideBand` is the frame they SHARE**, and it exists because they sit side
+   by side: two hand-rolled frames a column apart is the `ui/Dialog` story
+   again, except here the drift is visible in one glance, because the two rules
+   are meant to read as one line across the screen. **The tones are not
+   decoration** — yellow is "worth your eye" and a reminder has earned it (it is
+   dated and can be overdue), where an open request is a TO-DO that gets no
+   worse at 3pm, so its band is plain and the marks inside carry the state (a
+   high priority, in the same yellow). Painting both yellow would spend the
+   alert colour on the half of the screen that is merely a list.
+   **The two `showEmpty` flags keep it a GRID**: with anything in either
+   column, both render and the empty one says so, rather than leaving a hole
+   where a column should be; with BOTH empty neither renders and the guide's
+   first row is the guide, which is the rule `Reminders` already had.
+   `items-start`, so a tall column does not stretch the short one into a box of
+   white space. Each request row carries the same `RequestActions` menu the list
+   row does — answering one WHILE WALKING is most of the point of it being here.
+   Verified at 1440 (two 657px columns, tops and headings aligned to the pixel,
+   2px borders and 12px padding on both) and stacked below `md` with reminders
+   first and no horizontal overflow. **The one-empty state was NOT walked**: both
+   real shops carry both bands today, and manufacturing it would have meant
+   dismissing one of Mark's live reminders.
+   That comment in `Reminders` about surviving "the collapsing shelf" was
+   already vestigial — the collapse went on 2026-08-02 — and now says so.
    **`components/catalog/InventoryItemChooser`** is `InventoryItemPicker`'s pure
    sibling — value + onPick, WRITES NOTHING — because a create dialog has no row
    to update yet and one that had already written something by the time you
