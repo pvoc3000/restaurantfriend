@@ -34,6 +34,7 @@ import {
   useFillViewportHeight,
   useOverflowOnlyWhenNeeded,
   useViewportAtLeast,
+  STICKY_TOTALS_ROW,
 } from "@/lib/tableHead";
 import { ColumnHeader } from "./ColumnHeader";
 import { ColumnsMenu } from "./ColumnsMenu";
@@ -900,7 +901,7 @@ export function DataTable<T>({
           </tbody>
           {totals && sorted.length > 0 && (
             <tfoot>
-              <tr className="border-t-2 border-ink">
+              <tr className={STICKY_TOTALS_ROW}>
                 {(() => {
                   const cells = totals(sorted);
                   return visibleColumns.map((col) => (

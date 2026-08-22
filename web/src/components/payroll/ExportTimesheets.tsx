@@ -77,7 +77,10 @@ function stamp(value: string | null, timeZone: string): string {
  * and close — so it opens over the shifts instead of replacing them, and the
  * period `PickList` on the bar behind it is what the list used to be for.
  *
- * Download and Finalize are still TWO SEPARATE ACTS, deliberately. DOWNLOAD
+ * Export Timesheets and Close Pay Period are still TWO SEPARATE ACTS,
+ * deliberately — they were called Download and Finalize until Mark renamed
+ * them on 2026-08-22, which is a better fit: the file IS the export, and what
+ * the second one does to the period is close it. DOWNLOAD
  * produces the file and changes nothing — take it as many times as you like
  * while you check it against Gusto. FINALIZE is the irreversible one: it
  * snapshots every tip allocation onto its timesheet and flips the period to
@@ -272,12 +275,12 @@ export function ExportTimesheets({
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={BUTTON}>
-        Export timesheets…
+        Close pay period…
       </button>
 
       {open && (
         <Dialog
-          title={`Export timesheets · ${formatPeriodRange(period)}`}
+          title={`Close pay period · ${formatPeriodRange(period)}`}
           onClose={() => !pending && setOpen(false)}
           busy={pending}
           width="max-w-5xl"
@@ -298,7 +301,7 @@ export function ExportTimesheets({
               </button>
               {!worksheetError && (
                 <button type="button" onClick={download} className={BUTTON}>
-                  Download the file
+                  Export Timesheets
                 </button>
               )}
               {!worksheetError && canWrite && !frozen && (
@@ -308,7 +311,7 @@ export function ExportTimesheets({
                   disabled={pending}
                   className={DIALOG_COMMIT_CLASS}
                 >
-                  Finalize the period
+                  Close Pay Period
                 </button>
               )}
             </>
@@ -522,7 +525,7 @@ export function ExportTimesheets({
                     </table>
                     {rows.length > 12 && (
                       <p className="px-3 py-2 text-[13px] text-muted">
-                        …and {rows.length - 12} more. Download the file to see them all.
+                        …and {rows.length - 12} more. Export the timesheets to see them all.
                       </p>
                     )}
                   </div>
@@ -543,9 +546,9 @@ export function ExportTimesheets({
                 )}
 
                 <p className="max-w-[80ch] text-sm text-muted">
-                  Downloading changes nothing — take it as often as you like.
-                  Finalizing snapshots the tip allocations and benefit accruals,
-                  and marks the period exported.
+                  Exporting changes nothing — take the file as often as you
+                  like. Closing the period snapshots the tip allocations and
+                  benefit accruals, and marks it exported.
                 </p>
 
                 <p className="max-w-[80ch] text-[13px] text-muted">
@@ -566,7 +569,7 @@ export function ExportTimesheets({
 
       {confirming && (
         <Dialog
-          title="Finalize this pay period"
+          title="Close this pay period"
           onClose={() => !pending && setConfirming(false)}
           busy={pending}
           width="max-w-xl"
@@ -586,7 +589,7 @@ export function ExportTimesheets({
                 disabled={pending}
                 className={DIALOG_COMMIT_CLASS}
               >
-                {pending ? "Finalizing…" : "Finalize"}
+                {pending ? "Closing…" : "Close Pay Period"}
               </button>
             </>
           }
@@ -607,7 +610,7 @@ export function ExportTimesheets({
                 {caveats.map((c) => (
                   <p key={c.code}>{c.detail}</p>
                 ))}
-                <p className="text-[13px]">You can finalize anyway.</p>
+                <p className="text-[13px]">You can close it anyway.</p>
               </div>
             ) : (
               <p className="text-sm text-muted">Nothing is outstanding.</p>

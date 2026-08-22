@@ -35,7 +35,7 @@ export function PeriodBar({
   periodId: string | null;
   /** The chosen period's status, for the chip beside the picker. */
   status: PayPeriodStatus | null;
-  /** The commands, right-aligned. New pay period then Export timesheets — the
+  /** The commands, right-aligned. New pay period then Close pay period — the
    *  ActionBar's rule that the primary cell is the one against the edge. */
   children?: ReactNode;
 }) {

@@ -95,7 +95,7 @@ export const SECTIONS: NavSection[] = [
       // pay periods are now on the timesheet screen, there's no need for a pay
       // period menu item"). Both its screens folded into Timesheets — the list's
       // only job was choosing a fortnight, which that screen's picker does, and
-      // the record became its "Export timesheets…" panel. `/pay-periods*` still
+      // the record became its "Close pay period…" panel. `/pay-periods*` still
       // resolves, as redirect shims, which is what the `also` below is for.
       //
       // Known consequence: 027 makes pay_periods readable by ANY member, and

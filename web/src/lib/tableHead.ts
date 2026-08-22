@@ -95,6 +95,26 @@ export const STICKY_HEAD_ROW_IN_PANE =
   "[&>th]:sticky [&>th]:top-0 [&>th]:z-10 [&>th]:bg-white [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]";
 
 /**
+ * The GRAND TOTAL row, pinned to the foot of whatever scrolls it (Mark,
+ * 2026-08-22: "make the totals sticky at the bottom").
+ *
+ * The mirror of `STICKY_HEAD_ROW` in every respect that matters, and for the
+ * same reasons: on the TD and not the TFOOT or TR, because sticky on either is
+ * unreliable in WebKit under border-collapse and iPad Safari at the 16.4 floor
+ * is what these lists are read on; at z-20, the published ladder's rung, so it
+ * passes UNDER an ActionBar at 30 rather than fighting it; and its 2px rule is
+ * an inset shadow because a sticky cell inside border-collapse loses its border
+ * as it detaches — here on the TOP edge, so a positive Y offset.
+ *
+ * `bottom-0` pins it to the nearest scrolling ancestor, which is the pane on a
+ * paned table and the viewport on a page-scrolled one. Both are what you want:
+ * a total you have to reach the end of 163 rows to read is a total you check
+ * once and then stop checking.
+ */
+export const STICKY_TOTALS_ROW =
+  "[&>td]:sticky [&>td]:bottom-0 [&>td]:z-20 [&>td]:bg-white [&>td]:shadow-[inset_0_2px_0_var(--rf-neutral-900)]";
+
+/**
  * Publish an element's measured height as a CSS variable on `<html>`, and keep
  * it honest as the element reflows.
  *
