@@ -5141,7 +5141,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/TimeField` | `<input type="time">`, or a `TextInput` you parse | a time of day in a CREATE form, where the box starts empty and the value is required — `type="time"` yields `HH:MM` or nothing, so a half-typed value can never reach a `time` column as a cast error. It carries NO empty-state apparatus, deliberately: DateField needs one because WebKit paints TODAY into an empty date, and an empty time renders as placeholder segments. An edit-in-place cell on a value already set stays `TimeCell`, which takes free text and lets Postgres parse it. It mirrors DateField's **`variant`** for that component's own stated reason — the two sit side by side, so a bordered time beside a borderless date reads as one of them being broken |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
   | `ui/Switch` | a rounded div you style yourself | every switch. Black on, and off is the EXACT inverse; `size="sm"` for a dense grid row. Presentational only — the write, the optimism and the error state belong to the caller, because `ActiveToggle` and the recipe sheet's AUTO switch disagree about all three |
-  | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory. `group.summary` puts a SUBTOTAL under each run and **`totals` puts a GRAND TOTAL under the whole table** — both return a map KEYED BY COLUMN, never a ReactNode, so the figures stay under the headings they sum when a column is hidden or dragged (Mark, 2026-08-05: "the values should align with their columns"). `totals` is handed the rows the table is SHOWING, so it agrees with a search rather than reporting the whole set |
+  | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory. `group.summary` puts a SUBTOTAL under each run and **`totals` puts a GRAND TOTAL under the whole table** — both return a map KEYED BY COLUMN, never a ReactNode, so the figures stay under the headings they sum when a column is hidden or dragged (Mark, 2026-08-05: "the values should align with their columns"). `totals` is handed the rows the table is SHOWING, so it agrees with a search rather than reporting the whole set. **`openRowKey` opens one row from OUTSIDE** — a nudge, not control: the table keeps owning which rows are open and this only ever ADDS, applied by adjusting state DURING RENDER so the row is already open on the frame that paints. Every `<tr>` carries `data-row-key`, so a caller can find it to scroll to |
   | `catalog/ActiveToggle` | a bespoke switch | the Active column, which leads every catalog table |
   | `catalog/WeekdayPicker` | seven buttons | any day-set; its column must be `WEEKDAY_PICKER_WIDTH` |
   | `catalog/ListFilters` | a filter row | search + category + active + last-ordered, together |
@@ -5170,7 +5170,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   `--rf-header-h`). Vocabularies and conversion live in `lib/units.ts`
   (`UNIT_PICK_OPTIONS`, `PACKAGE_DESC_OPTIONS`); the other shared brains are
   `lib/breadcrumbs`, `lib/columnWidths`, `lib/tableSort`, `lib/calc`,
-  `lib/scrollMemory`.
+  `lib/scrollMemory`, `lib/shiftFocus` (one screen asking another to jump to a
+  row, when the two are SIBLINGS under a server component and no prop can
+  reach — `useSyncExternalStore` over a module value, `lib/navMemoryStore`'s
+  shape; it carries a NONCE so asking twice for the same row still notifies).
 
   If something genuinely new is needed, build it in `components/ui/` as a
   general control, use it in at least the place that prompted it, and add a row

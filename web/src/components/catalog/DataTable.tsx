@@ -171,6 +171,7 @@ export function DataTable<T>({
   rows,
   columns,
   totals,
+  openRowKey = null,
   rowKey,
   storageKey,
   defaultSort,
@@ -302,6 +303,22 @@ export function DataTable<T>({
    * `ui/StickyFooter` and the ActionBar on the fifteen screens this serves.
    */
   totals?: (rows: T[]) => Record<string, ReactNode>;
+  /**
+   * Open this row from OUTSIDE, for a deep link into one row's expansion.
+   *
+   * A nudge rather than control: the table keeps owning which rows are open,
+   * and this only ever ADDS. Lifting the whole set would make every caller
+   * responsible for a piece of state fourteen of them do not care about.
+   *
+   * Applied by adjusting state DURING RENDER when the value changes — React's
+   * own documented pattern for exactly this, and what `PlanMatrix` already does
+   * when its location prop moves. An effect would trip the `set-state-in-effect`
+   * lint and paint one frame with the row still shut.
+   *
+   * Pass a fresh value to re-open the same row (see `lib/shiftFocus`, which
+   * carries a nonce for that reason).
+   */
+  openRowKey?: string | null;
   /**
    * Below this viewport width, drop every column marked `hideWhenCompact`.
    *
@@ -466,6 +483,16 @@ export function DataTable<T>({
   const controlled = onSortChange !== undefined;
   const sort = controlled ? controlledSort ?? null : internalSort;
   const [open, setOpen] = useState<Set<string>>(new Set());
+
+  // See `openRowKey`. Adjusting state during render, not in an effect.
+  const [lastOpenRequest, setLastOpenRequest] = useState<string | null>(openRowKey);
+  if (openRowKey !== lastOpenRequest) {
+    setLastOpenRequest(openRowKey);
+    if (openRowKey) {
+      const key = openRowKey;
+      setOpen((prev) => (prev.has(key) ? prev : new Set(prev).add(key)));
+    }
+  }
 
   function toggleOpen(key: string) {
     setOpen((prev) => {
@@ -800,6 +827,7 @@ export function DataTable<T>({
                   {/* No rule between rows (Mark, 2026-07-25) — the hover wash
                       carries the eye across the width instead. */}
                   <tr
+                    data-row-key={key}
                     onClick={onRowClick ? () => onRowClick(row) : undefined}
                     style={rowStyle?.(row, { boundaries })}
                     className={`hover:bg-neutral-50 ${onRowClick ? "cursor-pointer" : ""} ${

@@ -142,7 +142,7 @@ export function ShiftPremium({
           <p className="bg-mark-fill px-1 text-sm text-ink">{MEAL_CODE_LABEL[finding.code]}</p>
           <p className="text-sm text-muted">{finding.detail}</p>
           {finding.waivable && (
-            <p className="text-[13px] text-mark">A signed meal-break waiver would cover this day.</p>
+            <p className="text-[13px]">A signed meal-break waiver would cover this day.</p>
           )}
         </div>
       ) : (

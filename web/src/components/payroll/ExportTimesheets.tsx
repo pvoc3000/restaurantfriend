@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { requestShiftFocus } from "@/lib/shiftFocus";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import {
   buildExportRows,
@@ -428,7 +429,19 @@ export function ExportTimesheets({
                 </p>
               </section>
             ) : (
-              <PayrollWorksheet employees={rollup} findings={findings} pools={pools} />
+              <PayrollWorksheet
+                employees={rollup}
+                findings={findings}
+                pools={pools}
+                // CLOSE, THEN ASK. The panel sits over the shift list, so
+                // leaving it up would hand you a row you cannot see; and the
+                // list is a sibling under a server component, which is why this
+                // goes through a store rather than a prop (see lib/shiftFocus).
+                onOpenShift={(employeeId, workday) => {
+                  setOpen(false);
+                  requestShiftFocus(employeeId, workday);
+                }}
+              />
             )}
 
             {/* ---- the file ---------------------------------------------- */}

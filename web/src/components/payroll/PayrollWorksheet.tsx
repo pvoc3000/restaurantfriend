@@ -22,10 +22,13 @@ export function PayrollWorksheet({
   employees,
   findings,
   pools,
+  onOpenShift,
 }: {
   employees: WorksheetEmployee[];
   findings: WorkdayFinding[];
   pools: DayPool[];
+  /** Given by a caller that can navigate — the panel closes and the list jumps. */
+  onOpenShift?: (employeeId: string, workday: string) => void;
 }) {
   const [view, setView] = useState<"hours" | "late" | "none" | "tips">("hours");
 
@@ -92,8 +95,12 @@ export function PayrollWorksheet({
       </p>
 
       {view === "hours" && <HoursBlock employees={employees} />}
-      {view === "late" && <BreaksBlock findings={lateFindings} kind="late" />}
-      {view === "none" && <BreaksBlock findings={missingFindings} kind="none" />}
+      {view === "late" && (
+        <BreaksBlock findings={lateFindings} kind="late" onOpenShift={onOpenShift} />
+      )}
+      {view === "none" && (
+        <BreaksBlock findings={missingFindings} kind="none" onOpenShift={onOpenShift} />
+      )}
       {/* Every value in the worksheet is a DATE or an amount — no instants, so
           no time zone is needed anywhere below. */}
       {view === "tips" && <TipsBlock pools={pools} />}
@@ -217,10 +224,12 @@ function HoursBlock({ employees }: { employees: WorksheetEmployee[] }) {
 function BreaksBlock({
   findings,
   kind,
+  onOpenShift,
 }: {
   findings: WorkdayFinding[];
   /** Which half of the split this is, for the sentence that explains it. */
   kind: "late" | "none";
+  onOpenShift?: (employeeId: string, workday: string) => void;
 }) {
   const [showDecided, setShowDecided] = useState(false);
   const shown = useMemo(
@@ -262,7 +271,7 @@ function BreaksBlock({
       ) : (
         <ul className="space-y-2">
           {shown.map((f) => (
-            <FindingRow key={`${f.employee_id}|${f.workday}|${f.finding.kind}`} finding={f} />
+            <FindingRow onOpenShift={onOpenShift} key={`${f.employee_id}|${f.workday}|${f.finding.kind}`} finding={f} />
           ))}
         </ul>
       )}
@@ -270,9 +279,26 @@ function BreaksBlock({
   );
 }
 
-function FindingRow({ finding }: { finding: WorkdayFinding }) {
-  return (
-    <li className="border border-hairline px-4 py-3 text-sm">
+/**
+ * A finding, and — where the caller can act on it — a way to reach the shift.
+ *
+ * "The worksheet SHOWS; the timesheets screen DECIDES" (Mark, 2026-08-05) is
+ * still the rule, and this does not break it: the row still holds no editor.
+ * What it removes is the gap that rule left behind — you were told a name and a
+ * date and then had to close the panel and find that shift yourself, among a
+ * hundred and sixty-three (Mark, 2026-08-22: "can we click on the issue… and be
+ * taken to the timesheet in question so we can edit it?"). Showing and deciding
+ * stay in their own places; this is the door between them.
+ */
+function FindingRow({
+  finding,
+  onOpenShift,
+}: {
+  finding: WorkdayFinding;
+  onOpenShift?: (employeeId: string, workday: string) => void;
+}) {
+  const body = (
+    <>
       <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
         <strong>{finding.employeeName}</strong>
         <span className="tabular-nums text-muted">{finding.workday}</span>
@@ -287,10 +313,29 @@ function FindingRow({ finding }: { finding: WorkdayFinding }) {
       </div>
       <p className="mt-1 text-muted">{finding.finding.detail}</p>
       {finding.finding.waivable && (
-        <p className="mt-1 text-[13px] text-mark">
+        <p className="mt-1 text-[13px]">
           A signed meal-break waiver would cover this day.
         </p>
       )}
+    </>
+  );
+
+  if (!onOpenShift) {
+    return <li className="border border-hairline px-4 py-3 text-sm">{body}</li>;
+  }
+
+  return (
+    <li className="border border-hairline text-sm">
+      <button
+        type="button"
+        onClick={() => onOpenShift(finding.employee_id, finding.workday)}
+        className="block w-full px-4 py-3 text-left transition-colors hover:bg-ink/5"
+      >
+        {body}
+        <span className="mt-1 block text-[12px] uppercase tracking-[0.08em] text-muted">
+          Open this shift →
+        </span>
+      </button>
     </li>
   );
 }

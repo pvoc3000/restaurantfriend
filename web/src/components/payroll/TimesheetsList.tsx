@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
+import {
+  readShiftFocus,
+  serverShiftFocus,
+  subscribeShiftFocus,
+} from "@/lib/shiftFocus";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
@@ -317,6 +322,60 @@ export function TimesheetsList({
     }
     return out;
   }, [rows, waiverEmployeeIds]);
+
+  /* -- "take me to that shift" ------------------------------------------- */
+
+  /**
+   * A finding on the Close-pay-period panel names an employee and a workday;
+   * this turns that into a row on screen, opened, with the page scrolled to it.
+   *
+   * THE REQUEST IS AT WORKDAY GRAIN and a workday can hold more than one shift,
+   * so it resolves to the row that actually CARRIES the finding, falling back
+   * to the day's first shift. Landing on the wrong shift of a double would be
+   * worse than not moving at all.
+   *
+   * WIDENING IS DELIBERATELY VISIBLE. If the row is filtered out — a search
+   * term, or the To-review tab — the filters are cleared rather than the jump
+   * silently failing, which is the order guide's rule (`jumpToItem`): a jump
+   * that rearranged the screen without saying so would be worse than one that
+   * explained nothing, but a jump that does nothing is worst of all.
+   *
+   * Adjusted DURING RENDER rather than in an effect, so the row is already open
+   * and already unfiltered on the frame that paints. The scroll is the only
+   * part that waits, because it needs the row to exist in the DOM first.
+   */
+  const focus = useSyncExternalStore(subscribeShiftFocus, readShiftFocus, serverShiftFocus);
+  const [jump, setJump] = useState<{ rowId: string; nonce: number } | null>(null);
+
+  if (focus && focus.nonce !== jump?.nonce) {
+    const inDay = rows.filter((r) => `${r.employee_id}|${r.workday}` === focus.key);
+    const target = inDay.find((r) => breakFindings.has(r.id)) ?? inDay[0] ?? null;
+    if (target) {
+      setJump({ rowId: target.id, nonce: focus.nonce });
+      if (!sorted.some((r) => r.id === target.id)) {
+        setSearch("");
+        setReview("all");
+      }
+    } else {
+      // Nothing to jump to — record the nonce anyway, or this retries forever.
+      setJump({ rowId: "", nonce: focus.nonce });
+    }
+  }
+
+  useEffect(() => {
+    if (!jump?.rowId) return;
+    const el = document.querySelector(`tr[data-row-key="${jump.rowId}"]`);
+    if (!el) return;
+    // MEASURED off the DOM, never from `--rf-header-h`: the masthead wraps to
+    // two and three rows at iPad widths, and the column labels are sticky under
+    // it, so a row lifted to the viewport's top lands underneath both. The
+    // order guide's `chromeOffset` measures the same two boxes for the same
+    // reason.
+    const header = document.querySelector("header")?.getBoundingClientRect().height ?? 0;
+    const labels = document.querySelector("thead th")?.getBoundingClientRect().height ?? 0;
+    const top = el.getBoundingClientRect().top + window.scrollY - header - labels - 8;
+    window.scrollTo({ top: Math.max(0, top), behavior: "smooth" });
+  }, [jump]);
 
   const totals = useMemo(() => {
     let regular = 0, ot = 0, dot = 0, sick = 0, worked = 0, unfinished = 0, disagreeing = 0;
@@ -791,6 +850,7 @@ export function TimesheetsList({
           scales it, so totalling the stored value would put "1705" under a
           column of 0.50s. */}
       <DataTable
+        openRowKey={jump?.rowId || null}
         totals={(shown) => {
           let worked = 0, regular = 0, ot = 0, dot = 0, brk = 0, sick = 0;
           for (const r of shown) {
