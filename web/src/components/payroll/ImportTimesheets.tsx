@@ -776,7 +776,19 @@ export function ImportTimesheets({
           )}
 
           <div className="flex flex-wrap items-center gap-4">
-            <button type="button" disabled={!canCommit} onClick={commit} className={BUTTON}>
+            {/* THE COMMIT, and therefore black (Mark, 2026-08-22: "the 'import
+                x sheets' button should be black and not the 'done' button,
+                shouldn't it?"). It should: this row only exists once a file is
+                loaded, and at that moment importing is the one outcome the
+                screen is for — a commit standing beside no peers, which is what
+                the panel-commit exception actually turns on. Done is the escape
+                beside it and gives the fill up while a plan is up. */}
+            <button
+              type="button"
+              disabled={!canCommit}
+              onClick={commit}
+              className={DIALOG_COMMIT_CLASS}
+            >
               {pending
                 ? "Importing…"
                 : `Import ${matched.filter((m) => m.employeeId).length} shifts`}
@@ -807,16 +819,18 @@ export function ImportTimesheets({
           It sits OUTSIDE the `plan &&` block on purpose, so it is there before
           a file is dropped and after one is committed; those are the two moments
           you might want to leave, and the middle is the one where you wouldn't.
-          BLACK, which is the panel-commit exception rather than a breach of it:
-          importing produces ONE outcome and this row is a commit, not a row of
-          peers — the same argument the receiving screen's Complete rests on, and
-          it reuses the same class. */}
+          BLACK ONLY WHILE THERE IS NO PLAN. The panel-commit exception is
+          about the one outcome a screen is for, and that outcome moves: with a
+          file loaded it is Import, so Import takes the fill and Done becomes the
+          escape beside it; before and after, Done is the only thing to press and
+          is the commit. A screen with two black buttons has said nothing about
+          which one finishes the task (Mark, 2026-08-22). */}
       <div className="flex justify-end border-t border-hairline pt-6">
         <button
           type="button"
           disabled={pending}
           onClick={() => router.push("/timesheets")}
-          className={DIALOG_COMMIT_CLASS}
+          className={plan ? BUTTON : DIALOG_COMMIT_CLASS}
         >
           Done
         </button>

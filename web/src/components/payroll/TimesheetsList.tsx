@@ -703,7 +703,7 @@ export function TimesheetsList({
               is also how you reach a DIFFERENT fortnight's file. */}
           <Link
             href="/timesheets/import"
-            className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
+            className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white"
           >
             Import timesheets
           </Link>

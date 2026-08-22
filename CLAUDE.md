@@ -1573,25 +1573,35 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    "New timesheet" on the button, "Worked shift" in its kind picker, and "163
    shifts" in the list's totals — that last one counts periods worked and is
    right as it stands.
-   Also: **importing has exactly ONE door, and it is inside the New timesheet
-   dialog** (Mark, 2026-08-05: "It adds a click, but is a clear work flow New
+   Also: importing had **exactly ONE door, inside the New timesheet dialog**
+   (Mark, 2026-08-05: "It adds a click, but is a clear work flow New
    Timesheet → Import"). It began as a link buried in a paragraph, became a
    button on the timesheets list AND the pay-period list, and ended as a single
-   control in that dialog's footer — which is the right place, because "I need a
-   timesheet that isn't here" is the question the form and the import both
-   answer. It sits at the far LEFT of the `justify-end` footer (`mr-auto`), away
-   from the commit: it navigates away rather than completing the form, so it must
-   not read as a second commit. White, being no panel's own commit, and a `Link`
-   so it stays a soft navigation; the importer OFFERS to open the period a file needs,
+   control in that dialog's footer, on the argument that "I need a timesheet
+   that isn't here" is the question the form and the import both answer.
+   **REVERSED 2026-08-22** (Mark: "move the 'import timesheets' button out from
+   the new timesheet dialogue and directly onto the timesheet screen"). It is a
+   `Link` beside New timesheet in the filter row's right-hand cluster now. The
+   2026-08-05 argument reads well and had the frequencies backwards: it costs a
+   click on the thing you do EVERY FORTNIGHT to save one on the thing you do
+   rarely. Importing is the routine; typing a shift by hand is the exception.
+   It is deliberately **NOT disabled on a closed period** where New timesheet
+   beside it is — it navigates rather than writing, the import screen states any
+   period problem in its own words, and it is also how you reach a DIFFERENT
+   fortnight's file. The importer OFFERS to open the period a file needs,
    continuing the cadence from `nextPeriodAfter` rather than wrapping the file's
    dates, where it used to state that none covered them and stop; the import screen ends with
-   a **black `Done`** at the lower right, OUTSIDE the `plan &&` block so it is
+   a **`Done`** at the lower right, OUTSIDE the `plan &&` block so it is
    there both before a file is dropped and after one is committed — committing
    clears the plan, so the screen had been leaving you on a success banner with
-   nothing to press. Black is the panel-commit exception rather than a breach of
-   it: importing produces ONE outcome and that row is a commit beside no peers,
-   which is the argument the receiving screen's Complete rests on, reusing the
-   same `DIALOG_COMMIT_CLASS`. The rows-with-no-punches list is one collapsed
+   nothing to press. **IT IS BLACK ONLY WHILE THERE IS NO PLAN** (Mark,
+   2026-08-22: "the 'import x sheets' button should be black and not the 'done'
+   button, shouldn't it?"). It should: the panel-commit exception is about the
+   ONE OUTCOME A SCREEN IS FOR, and on this screen that outcome MOVES. With a
+   file loaded it is `Import n shifts`, so that takes the fill and Done becomes
+   the escape beside it; before and after, Done is the only thing to press and
+   is the commit. Two black buttons in one row say nothing about which finishes
+   the task. Same `DIALOG_COMMIT_CLASS` either way. The rows-with-no-punches list is one collapsed
    line, because those rows are the NORMAL case
    — Homebase prints one for every scheduled day — and ten warnings in front of
    someone whose file is perfect teaches them to skim the section that also holds
@@ -1752,6 +1762,112 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    exactly like a catastrophic data-integrity problem. The data is clean —
    44,661 rows, 44,661 distinct `source_row_key`. Check `ids.size === rows.length`
    before believing any whole-table audit.
+   **Shipped 2026-08-22 — A BAKER'S DAY IS A NIGHT (migrations 061 + 062, both
+   APPLIED).** Mark: "Homebase is simply checking if the shift is on the same
+   day, and ignoring if there's enough turnaround time between shifts. It's
+   using midnight to delineate between days instead of a 24 hour period that
+   could start at 10pm."
+   **HOMEBASE IS NOT THE DISAGREEMENT, and that is the first thing to know
+   before touching any of this.** `lib/overtime` recomputes Homebase's split
+   EXACTLY — 322 shifts over two pay periods, **ZERO disagreements** — because
+   our workday was the same midnight-to-midnight default. So neither of the two
+   obvious fixes does anything: "recompute it ourselves" writes the same numbers
+   back, and "flag where we differ" is silent because there is no difference.
+   The only variable is where the workday STARTS.
+   Angelica Castellanos, 2026-08-13: 00:13→09:13 then 23:21→07:17, two shifts
+   beginning on one calendar date, summed to 15.91h and billed 8 regular / 4 OT
+   / 3.91 double with FOURTEEN HOURS of rest in the middle. 28 of these a year,
+   all hand-corrected until now — which means the hand-corrections, not the
+   overtime, were the non-compliant half. §510 is mechanical about hours over 8
+   in a workday; §500(a) is what lets an employer move the workday, and it is
+   the mechanism that makes Mark's preferred outcome lawful rather than merely
+   cheaper. (Considered and declined, 2026-08-22: a "12 hours of rest between
+   shifts" rule instead. There is no rest exception in §510, it has no statutory
+   basis, and it pays LESS than the boundary on a short-rest day — most wrong
+   exactly where the law is most right.)
+   **061: `employees.workday_starts_at`, nullable, null = midnight.**
+   PER EMPLOYEE and there is deliberately NO org default: eleven of
+   thirty-seven people need it, and an org default of midnight is only the
+   absence of a value. Front of house is untouched — their closing shifts start
+   19:00 and no single boundary clears both crews.
+   **14:00 WAS MEASURED, NOT CHOSEN.** Two error kinds scored at 15-minute
+   steps across the whole clock: a *false stack* (two shifts on one workday with
+   ≥8h rest) and a *broken double* (two back-to-back shifts split apart). Over
+   4,331 shifts in 12 months — midnight 28/8, **14:00 back-of-house 2/8**. The
+   kitchen's dead zone (no shift starts at all) runs **09:25 to 16:01**, so
+   14:00 has four hours of margin either side. Org-wide 14:00 is 3× WORSE than
+   doing nothing; the best org-wide value is 21:00 (15 total), which still
+   leaves Erick Mejia's five 18:00 starts. And **every early-morning boundary is
+   three to seven times worse than midnight** — 01:00–03:00 drags the
+   766-shift-a-year just-after-midnight cluster backwards onto a day already
+   full. Don't re-litigate the hour without re-running that sweep.
+   **THE CHECK REFUSES ANYTHING UNDER NOON**, and it is load-bearing twice: at
+   noon or later at least twelve of the workday's hours fall on the date it is
+   named for, and — the real reason — the workday can then only move FORWARD
+   from the punch date, so no shift can be pushed into a CLOSED period and no
+   backfill is needed. It also refuses `24:00` (midnight by another spelling)
+   and seconds (`lib/workday` reads whole minutes, so `14:00:30` would truncate
+   silently).
+   **`ParsedShift.workday` became `punchDate`**, and `clockInISO`/`clockOutISO`
+   became `punchDate`/`clockOutDate`. Two names for one string is how this got
+   confusing; the parser now CANNOT state a workday, which is honest, because
+   the workday depends on the employee and a CSV parser has none.
+   **THE BOUNDARY IS APPLIED IN THE `matched` MEMO, never inside `planImport`.**
+   A resolver in the parser fixes the workday at plan time, so linking an
+   unmatched person afterwards would import their shifts with the phantom
+   overtime day this whole change exists to remove. Deriving it beside the match
+   recomputes for free, because `matched` already depends on the manual links.
+   **`source_row_key` keys on the PUNCH DATE, never the workday** — it is the
+   upsert's conflict target and a workday can move, which would mint a new key
+   for a row that already exists and DUPLICATE it. Verified before the change:
+   field [1] equals `workday` on 321/321 Homebase and 1000/1000 FileMaker rows,
+   so the swap left every existing key byte-identical and needed no backfill.
+   **062 EXISTS BECAUSE 061 EXPOSED 028 READING THE WRONG COLUMN** (Mark, on the
+   first real import: "Now we have two shifts that the employees have already
+   been paid for counting towards the next pay period. I hate it."). 028 derived
+   `pay_period_id` from `workday`, harmless while workday was always the punch's
+   own date. **WHICH 24 HOURS THE OVERTIME IS COUNTED OVER AND WHICH PAYCHECK
+   THE HOURS LAND ON ARE TWO QUESTIONS**, and 028 had already split the columns
+   that answer them before reading the wrong one. `pay_period_id` now comes from
+   `business_date`; **`workweek_start` STAYS on `workday`**, because the
+   workweek exists for the weekly-over-40 and seventh-day rules and those are
+   overtime rules. Its trigger had to be RECREATED to fire on `business_date`
+   too — `create or replace` on a function does not widen its trigger's events
+   (055's lesson). Measured: exactly 2 rows moved, back where they were worked.
+   **THE MONEY DOES NOT MOVE ON IMPORT.** The importer writes `hours_*` from
+   the SOURCE with `ot_decision: 'source'`; the boundary changes only `workday`,
+   and therefore only what `proposeOvertime` PROPOSES. On the real 08-03→08-16
+   period that is 80.04h stored (exactly what Gusto paid) against 59.73h
+   proposed, flagged on **3 rows, not 24** — most moved shifts were alone on
+   their workday either way. Adopting is decision 2 working as designed.
+   **Consequence for the parallel run, which will otherwise read as a defect:
+   Homebase does not know about the boundary and never will**, so its OT column
+   disagrees with ours on the kitchen's evening shifts EVERY fortnight, forever.
+   That is the feature, not a reconciliation failure. ~3 rows a fortnight.
+   Screens: the field is on the employee record's Payroll block, and
+   **`InlineValue` gained `kind="time"`** (delegating to `ui/TimeField`, which
+   already handles Postgres's `HH:MM:SS` → `HH:MM`) — the third kind that does
+   not click-to-edit, for the same reason as `date`.
+   The import screen gained `uncoveredDays`, which blocks a commit whose punch
+   dates no period covers — 028's `timesheet_period_editable(null)` is
+   deliberately TRUE, so a periodless row writes with NO error, no trigger ever
+   fills the column in, and `/timesheets` fetches BY `pay_period_id`: the shift
+   would be invisible and never paid. It first keyed on the WORKDAY and blocked
+   Mark's first real import; 062 is why it now keys on the punch.
+   **AND THE BUTTON THAT FIXES IT WAS UNREACHABLE** — the "Open <period>" block
+   was nested inside `targetPeriods.length === 0`, which was the whole story
+   before 061 (either a period covered the file or none did). The case 061
+   introduces is neither. A refusal naming something the screen gives you no way
+   to settle is how people stop reading refusals — `closeReadiness`'s lesson,
+   learned again. `whyCommitIsBlocked` is pure, exported and fixture-pinned so
+   the sentence beside the Import button and its `disabled` cannot drift.
+   **1122 fixtures pass**, and the suite also passes under UTC+14 and UTC−11,
+   which is the real property `workdayFor`'s date arithmetic needs.
+   **The genuinely simplest fix was never a code change and is still open:**
+   1,148 of the crew's 1,490 shifts already start 00:00–03:59, and only **101
+   evening starts** cause every bit of this. Moving those to 00:0x would delete
+   the feature rather than configure it. Ops decision, not ours.
+
    **Shipped 2026-08-05 — PAYROLL BENEFITS (migration 033, NEEDS APPLYING).**
    Flat money somebody earns for working a shift: the commuter allowance, and a
    shape general enough for the overnight differential and reimbursements Mark
@@ -4083,6 +4199,29 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    history and a file no longer describing what was run is how the harness and
    production stop being the same database.
 
+   **061 AND 062 ARE APPLIED** (Mark, 2026-08-22 — the per-employee workday
+   start, and the paycheck that stopped following it). *Probe, don't read this
+   line.* For 061, three things, because it does three:
+   `select column_name, data_type, is_nullable from information_schema.columns
+   where table_name = 'employees' and column_name = 'workday_starts_at'` (one
+   row, `time without time zone`, `YES`);
+   `select conname from pg_constraint where conrelid = 'public.employees'::regclass
+   and contype = 'c'` (includes `employees_workday_start_is_afternoon`); and
+   `select count(*) from employees where workday_starts_at is not null` — **11**
+   today, the back-of-house crew, all `14:00:00`. The constraint bites through
+   PostgREST as well as in SQL, so an app write of `03:00` or `14:00:30` is
+   refused by name rather than rounded.
+   For 062 the trigger only shows itself by FIRING, so probe the invariant it
+   maintains rather than the function:
+   `select count(*) from timesheets t join pay_periods p on p.id = t.pay_period_id
+   where t.business_date not between p.start_date and p.end_date` (**0**);
+   `select count(*) from timesheets where pay_period_id is null` (**0**); and
+   `select count(*) from timesheets where workday <> business_date` (**24** —
+   the kitchen's evening shifts in the 08-03→08-16 fortnight, the first rows in
+   seven years where the two columns differ at all).
+   Note 062 is RERUNNABLE where 061 is not, and its backfill is a no-op once the
+   invariant holds — verified by running it twice on the Docker harness.
+
    **(r) THE ROW IS A PROGRESS BAR** (Mark, 2026-08-20, after a mockup pass).
    A wash fills each row of `/special-orders` to the fraction of stages done,
    yellow at the first rung and green at the last, under a 3px rule on the row's
@@ -4950,7 +5089,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `confirmDialog()` from `lib/confirm` | `window.confirm` | EVERY confirm (Mark, 2026-08-10: the browser's dialog "takes me out of the app experience"). A promise — `if (!(await confirmDialog({ title, body, tone: "danger" }))) return;` — so the handler becomes async; `splitConfirmMessage(msg)` spreads a one-string message into title + body. `ui/ConfirmDialog` is the panel and only the (app) layout touches it. Enter does NOT commit a `danger` confirm (it focuses Cancel), which is `ui/Dialog`'s rule applied |
   | `ui/MenuButton` | a button you wire to your own popup | a button that opens a short list of COMMANDS — the anchored menu with the trigger left to the caller. A menu, not a `PickList`: every row is a verb that happens once and leaves nothing selected, so the trigger's label never changes. `ui/RowMenu` is the `⋯` dress over it; a command bar passes words and `BUTTON_CLASS` |
   | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands — `ui/MenuButton` wearing `⋯`, so it escapes scroll panes and flips near the window's foot exactly like `PickList` |
-  | `catalog/InlineValue` | a hand-wired edit-in-place, or a bare `<input type="date">` | any editable cell — `kind` text / number / date / **pick**; `multiline` for prose (textarea, ⌘↵ saves); `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column; `arrayColumn` + `arrayIndex` + `arrayStrip` + `arrayWidth` to edit ONE SLOT of a Postgres array (the `par_by_weekday` idiom, which had no editor until the recipe sheet). An array column CONSTRAINED against a sibling array must write both in one statement — that is what `alsoUpdate` is for. `emptyClassName` styles the cell when it holds NOTHING (faint by default; the plan matrix wants a yellow "—", and a caller CAN'T do this through `className`, because Tailwind resolves competing utilities by stylesheet order); `ariaLabel` names the cell where no `<dt>` does — a grid of identical cells otherwise all announce as "—, click to edit". **`onWrite` replaces the UPDATE and nothing else** — for a column whose rule is COLUMN-scoped and so lives behind a definer function (044's `made`/`leftover`); without it the cell issues a plain update that matches zero rows, returns NO error, and silently loses what was typed |
+  | `catalog/InlineValue` | a hand-wired edit-in-place, or a bare `<input type="date">` / `<input type="time">` | any editable cell — `kind` text / number / date / **time** / **pick** (`time` delegates to `ui/TimeField` and, like `date`, does NOT click-to-edit — the native control is already a box you can type into and a picker on an iPad); `multiline` for prose (textarea, ⌘↵ saves); `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column; `arrayColumn` + `arrayIndex` + `arrayStrip` + `arrayWidth` to edit ONE SLOT of a Postgres array (the `par_by_weekday` idiom, which had no editor until the recipe sheet). An array column CONSTRAINED against a sibling array must write both in one statement — that is what `alsoUpdate` is for. `emptyClassName` styles the cell when it holds NOTHING (faint by default; the plan matrix wants a yellow "—", and a caller CAN'T do this through `className`, because Tailwind resolves competing utilities by stylesheet order); `ariaLabel` names the cell where no `<dt>` does — a grid of identical cells otherwise all announce as "—, click to edit". **`onWrite` replaces the UPDATE and nothing else** — for a column whose rule is COLUMN-scoped and so lives behind a definer function (044's `made`/`leftover`); without it the cell issues a plain update that matches zero rows, returns NO error, and silently loses what was typed |
   | `useCalcField()` spread on the input (`ui/CalcPad` is already mounted) | `inputMode="decimal"` plus your own operator affordance | letting a numeric field take a `lib/calc` expression ON A TOUCH DEVICE. iOS renders `inputMode="decimal"` as the number pad, which has no operators, and on iPadOS `*`/`+`/`×`/`÷` are two keyboard layers deep — so on touch the field asks for NO system keyboard (`inputMode="none"`) and CalcPad supplies one that has them, with a live readout of what the expression comes to. The spread is the whole wiring; it writes through the native value setter, so a controlled React input needs no code. **Half a keyboard bolted to Apple's was tried first and Mark's verdict on hardware was "clumsy and awkward"** — don't reach back for it. Spread it ONLY on fields `evaluateNumeric` reads: several others carry `inputMode="decimal"` and parse with a plain `Number()`, where an inserted `×` is a value that can't save |
   | `ui/SectionHeading` | a hand-styled `<h2>` | the heading over a block on a detail screen (16px bold black, optional `count`) |
   | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style. Selected cell is ALWAYS black; `count` and `href` are the only options |
@@ -6391,6 +6530,27 @@ weekday column, and 003 then silently made it per-vendor-item.
 - Vendors include non-food suppliers (landlord, plumber) — `order_type: none`.
 
 ## Open threads (pinned by Mark — don't act without asking)
+
+- **Does an overnight baker belong in the tip pool, and what happens to a
+  straddling shop-day?** Raised 2026-08-22 by 061 and NOT answered. All eleven
+  people with a workday boundary have `excludes_tips = false`, which is the
+  DEFAULT rather than a decision anyone made. Since 061 a shift can have its
+  `workday` in one fortnight and its `business_date` in the previous one, so its
+  shop-day pool is visible from two worksheets. `/timesheets` widens the
+  `tip_pools` fetch by ONE DAY to stop that pool reading as missing — provably
+  enough, since 061's noon floor means the workday moves forward by at most one
+  — but whether the same pool could then be allocated twice depends on whether
+  these people share in tips at all. Settle the `excludes_tips` question first;
+  the allocation question may not exist.
+
+- **The 101 evening starts are the whole problem, and moving them would delete
+  the feature.** 1,148 of the kitchen crew's 1,490 shifts already begin
+  00:00–03:59, which never collides with anything; only the 44 starts at
+  18:00–20:59 and 57 at 21:00–23:59 create the stacking that 061 exists for.
+  Nobody has asked whether those evening starts are deliberate (volume, a
+  wholesale order) or drift. If they could move to 00:0x there would be no
+  boundary, no per-employee field and no review queue. An operations question,
+  not a software one — worth asking before building anything further here.
 
 - **Weekday FAVORITES may belong on the vendor items table, not behind a
   location row** (Mark, 2026-08-04, on item detail: "seems to me that setting
