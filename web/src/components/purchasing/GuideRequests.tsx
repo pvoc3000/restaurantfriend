@@ -112,34 +112,44 @@ export function GuideRequests({
               </span>
             )}
             <span className="text-ink">{r.request_text}</span>
-            {/* Who asked (Mark, 2026-08-22), right after the words they wrote —
-                a request is somebody's ask, and on a shared band the name is
-                who you go and check with. */}
+            {/* `<request> (<item>) <requestor>` — Mark's own format,
+                2026-08-22. The item in parentheses reads as an aside about the
+                ask, which is what it is, and the brackets earn their keep on a
+                catalog whose names carry commas: "Cherries (Cherries,
+                Maraschino) Mark" would be three things running together
+                without them.
+                ON THE GUIDE THE ITEM IS A JUMP, NOT A LINK (Mark, same day:
+                "go to the inventory item on the order guide") — the useful
+                destination from here is fifteen feet down this same page, the
+                row that lets you order the thing. The Requests list keeps the
+                link, where there is no walk to scroll to.
+                One span around the whole bracket, so the row's `gap-2` cannot
+                get inside it and set "( Cherries, Maraschino )". */}
+            {r.inventory_item_id && r.itemName && (
+              <span className="text-muted">
+                {"("}
+                {onJumpToItem ? (
+                  <button
+                    type="button"
+                    onClick={() => onJumpToItem(r.inventory_item_id!)}
+                    title={`Go to ${r.itemName} in this walk`}
+                    className={ITEM_LINK_CLASS}
+                  >
+                    {r.itemName}
+                  </button>
+                ) : (
+                  <Link href={`/items/${r.inventory_item_id}`} className={ITEM_LINK_CLASS}>
+                    {r.itemName}
+                  </Link>
+                )}
+                {")"}
+              </span>
+            )}
+            {/* Who asked, last — the ask is what you read, the item is what it
+                resolves to, and the name is who to go and check with. */}
             {r.requesterName && (
               <span className="text-muted">{r.requesterName}</span>
             )}
-            {/* ON THE GUIDE THIS IS A JUMP, NOT A LINK (Mark, 2026-08-22:
-                "go to the inventory item on the order guide"). The useful
-                destination from here is fifteen feet down this same page —
-                the row that lets you order the thing — not a different
-                screen. The Requests list keeps the link, where there is no
-                walk to scroll to. */}
-            {r.inventory_item_id &&
-              r.itemName &&
-              (onJumpToItem ? (
-                <button
-                  type="button"
-                  onClick={() => onJumpToItem(r.inventory_item_id!)}
-                  title={`Go to ${r.itemName} in this walk`}
-                  className={ITEM_LINK_CLASS}
-                >
-                  {r.itemName}
-                </button>
-              ) : (
-                <Link href={`/items/${r.inventory_item_id}`} className={ITEM_LINK_CLASS}>
-                  {r.itemName}
-                </Link>
-              ))}
             {/* Said on the row you pressed rather than as a banner: it is a
                 fact about THIS request, and by the time you have read it the
                 filters have already been widened in front of you. */}

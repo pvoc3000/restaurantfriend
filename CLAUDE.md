@@ -783,9 +783,16 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    first and no horizontal overflow. The one-empty state came free the next
    day, when Mark cleared his reminders: "Reminders / Nothing due today." holds
    the left column beside six requests, tops still aligned.
-   **A REQUEST ROW NAMES WHO ASKED, AND ITS ITEM IS A JUMP** (Mark, 2026-08-22,
-   two asks — the second clarified mid-turn as "go to the inventory item ON THE
-   ORDER GUIDE"). The name goes straight after the words they wrote, resolved
+   **A REQUEST ROW IS `<request> (<item>) <requestor>`** — Mark's own format,
+   2026-08-22, after seeing the name and the item beside each other. The
+   parentheses earn their keep on a catalog whose names carry commas: without
+   them "Cherries Cherries, Maraschino Mark" is three things running together.
+   The bracket is ONE span, so the row's `gap-2` cannot get inside it and set
+   "( Cherries, Maraschino )", and only the NAME is underlined — the brackets
+   are punctuation, not part of the control.
+   **It names who asked, and its item is a JUMP** (same day, two asks — the
+   second clarified mid-turn as "go to the inventory item ON THE
+   ORDER GUIDE"). The name is resolved
    from `org_members` (a fourth overlapped query — `requested_by` points at
    `auth.users`, so there is no FK to embed through). It is null rather than a
    stand-in word, unlike the LIST, which says "Someone" to stop a table column
