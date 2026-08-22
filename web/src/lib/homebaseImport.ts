@@ -532,3 +532,48 @@ function stitchMidnightSplits(shifts: ParsedShift[]): {
 
   return { shifts: shifts.filter((s) => !merged.has(s)), refused, count };
 }
+
+/* -------------------------------------------------------------------------- */
+/* Why a commit is refused                                                     */
+/* -------------------------------------------------------------------------- */
+
+export type CommitState = {
+  shiftCount: number;
+  /** False when the file names a shop code this org does not have. */
+  hasLocation: boolean;
+  /** Periods this file touches that are closed or exported. */
+  blockedPeriodCount: number;
+  /** Periods that DO cover some of these workdays. */
+  targetPeriodCount: number;
+  /** Workdays no pay period covers — see `uncoveredDays` on the import screen. */
+  uncoveredDays: readonly string[];
+  uncoveredShiftCount: number;
+};
+
+/**
+ * The sentence a refused Import button owes the reader, or null when it can run.
+ *
+ * PURE AND EXPORTED so the reason and the `disabled` cannot drift: the screen
+ * derives both from this, and a fixture can hold it to the case that made it
+ * necessary. Until 2026-08-22 the button was bare `disabled`, which explains
+ * itself only on hover — and there is no hover on the iPad this app is used on.
+ * Mark dropped a real export, could not press Import, and reasonably read the
+ * unchanged data as the feature not working at all.
+ *
+ * The ORDER is the order a reader can act on: something wrong with the file,
+ * then something wrong with the calendar, then the one 061 introduced.
+ */
+export function whyCommitIsBlocked(s: CommitState): string | null {
+  if (s.shiftCount === 0) return "This file holds no shifts to import.";
+  if (!s.hasLocation)
+    return "No location in this org has that code, so there is nowhere to file these shifts.";
+  if (s.blockedPeriodCount > 0)
+    return "One of the pay periods this file covers is no longer open.";
+  if (s.uncoveredDays.length > 0)
+    return (
+      `${s.uncoveredShiftCount} shift${s.uncoveredShiftCount === 1 ? "" : "s"} belong to ` +
+      `${s.uncoveredDays.join(", ")}, which no pay period covers — open it above first.`
+    );
+  if (s.targetPeriodCount === 0) return "No pay period covers these dates.";
+  return null;
+}

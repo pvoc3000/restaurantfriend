@@ -14,8 +14,7 @@ import {
   parseHomebaseDate,
   parseHomebaseTime,
   parseLocationCode,
-  parsePeriod,
-} from "../../src/lib/homebaseImport";
+  parsePeriod, whyCommitIsBlocked } from "../../src/lib/homebaseImport";
 
 // Resolved from THIS file's location so the suite runs from any cwd. The
 // compiled harness lives under .fixtures-build, so walk back to the source dir.
@@ -225,4 +224,73 @@ test("an unreadable TIME is still a refusal — the two are told apart", () => {
   eq(plan.skipped, [], "not merely empty");
   eq(plan.refused.length, 1);
   ok(/Unreadable clock-in time/.test(plan.refused[0].why));
+});
+
+/* -- why a commit is refused ---------------------------------------------- */
+
+const RUNNABLE = {
+  shiftCount: 100,
+  hasLocation: true,
+  blockedPeriodCount: 0,
+  targetPeriodCount: 1,
+  uncoveredDays: [] as string[],
+  uncoveredShiftCount: 0,
+};
+
+test("a file with somewhere to land can be committed", () => {
+  eq(whyCommitIsBlocked(RUNNABLE), null, "nothing in the way");
+});
+
+test("THE CASE THAT MADE THIS NECESSARY: a partly-covered file", () => {
+  // Mark's real 2026-08-03 → 08-16 export, 2026-08-22. Most shifts land in the
+  // open fortnight, so `targetPeriodCount` is 1 and every older test for "no
+  // period" passes — while two evenings carried past the fortnight's end by a
+  // 14:00 workday belong to 08-17, which no period covers. The commit is
+  // rightly blocked; what was missing was saying so.
+  eq(
+    whyCommitIsBlocked({
+      ...RUNNABLE,
+      uncoveredDays: ["2026-08-17"],
+      uncoveredShiftCount: 1,
+    }),
+    "1 shift belong to 2026-08-17, which no pay period covers — open it above first.",
+    "singular"
+  );
+  eq(
+    whyCommitIsBlocked({
+      ...RUNNABLE,
+      uncoveredDays: ["2026-08-17"],
+      uncoveredShiftCount: 2,
+    }),
+    "2 shifts belong to 2026-08-17, which no pay period covers — open it above first.",
+    "plural"
+  );
+});
+
+test("the reasons come in the order a reader can act on them", () => {
+  // An empty file first, then the shop, then the calendar. A file with several
+  // things wrong should name the one you would fix first.
+  eq(
+    whyCommitIsBlocked({ ...RUNNABLE, shiftCount: 0, hasLocation: false, uncoveredDays: ["x"] }),
+    "This file holds no shifts to import.",
+    "empty beats everything"
+  );
+  eq(
+    whyCommitIsBlocked({ ...RUNNABLE, hasLocation: false, uncoveredDays: ["x"] }),
+    "No location in this org has that code, so there is nowhere to file these shifts.",
+    "no shop beats the calendar"
+  );
+  eq(
+    whyCommitIsBlocked({ ...RUNNABLE, blockedPeriodCount: 1, uncoveredDays: ["x"] }),
+    "One of the pay periods this file covers is no longer open.",
+    "a closed period beats an unopened one"
+  );
+});
+
+test("no period at all is still its own sentence", () => {
+  eq(
+    whyCommitIsBlocked({ ...RUNNABLE, targetPeriodCount: 0 }),
+    "No pay period covers these dates.",
+    "the pre-061 case, unchanged"
+  );
 });

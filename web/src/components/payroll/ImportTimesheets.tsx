@@ -8,7 +8,12 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 import { DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { PickList } from "@/components/ui/PickList";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { planImport, type ImportPlan, type ParsedShift } from "@/lib/homebaseImport";
+import {
+  planImport,
+  whyCommitIsBlocked,
+  type ImportPlan,
+  type ParsedShift,
+} from "@/lib/homebaseImport";
 import { resolveLocal } from "@/lib/timeZone";
 import { parseWorkdayStart, workdayFor } from "@/lib/workday";
 import {
@@ -295,6 +300,30 @@ export function ImportTimesheets({
     [matched]
   );
 
+  /** The shifts that land on a day no period covers — named, not just counted. */
+  const uncoveredShifts = useMemo(
+    () => matched.filter((m) => m.employeeId && uncoveredDays.includes(m.workday)),
+    [matched, uncoveredDays]
+  );
+
+  const employeeName = (id: string | null) =>
+    (id ? byId.get(id)?.name : null) ?? "(unmatched)";
+  const clockLabel = (minutes: number) =>
+    `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+
+  /** The sentence the Import button owes when it cannot run. See `lib/homebaseImport`. */
+  const commitBlockedBecause =
+    plan === null || file === null
+      ? null
+      : whyCommitIsBlocked({
+          shiftCount: plan.shifts.length,
+          hasLocation: location !== null,
+          blockedPeriodCount: blockedPeriods.length,
+          targetPeriodCount: targetPeriods.length,
+          uncoveredDays,
+          uncoveredShiftCount: uncoveredShifts.length,
+        });
+
   const canCommit =
     plan !== null &&
     file !== null &&
@@ -575,12 +604,56 @@ export function ImportTimesheets({
 
           <section className="space-y-3">
             <SectionHeading>Where it lands</SectionHeading>
-            {targetPeriods.length === 0 ? (
+            {targetPeriods.length > 0 && (
+              <ul className="space-y-1 text-sm">
+                {targetPeriods.map((p) => (
+                  <li key={p.id}>
+                    {formatPeriodRange(p)} —{" "}
+                    {p.status === "open" || p.status === "review" ? (
+                      <span className="text-muted">{p.status}</span>
+                    ) : (
+                      <span className="bg-mark-fill px-1">
+                        {p.status}, so shifts cannot be written into it
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* THE PERIOD THIS FILE STILL NEEDS.
+
+                Gated on `uncoveredDays`, NOT on `targetPeriods.length === 0`,
+                which is what it was until 2026-08-22 and which made this whole
+                block unreachable in the case 061 introduced: a file whose shifts
+                mostly land in an open fortnight, with two evenings carried past
+                its end by a workday that starts in the afternoon. The commit was
+                blocked, the reason was stated, and the button that fixes it was
+                inside a branch that never ran — a refusal naming something the
+                screen gives you no way to settle, which is exactly how people
+                learn to stop reading refusals (Mark hit this on the real
+                2026-08-03 export). */}
+            {uncoveredDays.length > 0 && (
               <div className="space-y-3 border border-accent px-4 py-3">
                 <p className="max-w-[72ch] text-sm text-accent">
-                  No pay period covers these dates, so these shifts would have
-                  nowhere to belong.
+                  {targetPeriods.length === 0
+                    ? "No pay period covers these dates, so these shifts would have nowhere to belong."
+                    : `${uncoveredShifts.length} shift${uncoveredShifts.length === 1 ? "" : "s"} ` +
+                      `belong to the workday of ${uncoveredDays.join(", ")}, which no pay period ` +
+                      "covers — a workday that starts in the afternoon carries the last evening " +
+                      "of a fortnight into the next one. Written as they are, those rows would " +
+                      "belong to no period at all and would never show on the timesheets screen."}
                 </p>
+                {uncoveredShifts.length > 0 && targetPeriods.length > 0 && (
+                  <ul className="space-y-0.5 text-sm text-muted">
+                    {uncoveredShifts.map((m) => (
+                      <li key={m.shift.line} className="tabular-nums">
+                        {employeeName(m.employeeId)} — clocked in {m.shift.punchDate} at{" "}
+                        {clockLabel(m.shift.clockInMinutes)}, counts toward {m.workday}
+                      </li>
+                    ))}
+                  </ul>
+                )}
                 {proposedPeriod ? (
                   <div className="flex flex-wrap items-center gap-4">
                     <button
@@ -605,21 +678,6 @@ export function ImportTimesheets({
                   </p>
                 )}
               </div>
-            ) : (
-              <ul className="space-y-1 text-sm">
-                {targetPeriods.map((p) => (
-                  <li key={p.id}>
-                    {formatPeriodRange(p)} —{" "}
-                    {p.status === "open" || p.status === "review" ? (
-                      <span className="text-muted">{p.status}</span>
-                    ) : (
-                      <span className="bg-mark-fill px-1">
-                        {p.status}, so shifts cannot be written into it
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
             )}
             {blockedPeriods.length > 0 && (
               <p className="max-w-[72ch] border border-accent px-4 py-3 text-sm text-accent">
@@ -637,18 +695,6 @@ export function ImportTimesheets({
                 NEXT day — which is the point of a workday that starts in the
                 afternoon. The punch itself, and the day its tips and shift report
                 belong to, are unchanged.
-              </p>
-            )}
-            {uncoveredDays.length > 0 && targetPeriods.length > 0 && (
-              <p className="max-w-[72ch] border border-accent px-4 py-3 text-sm text-accent">
-                {uncoveredDays.length === 1
-                  ? `A shift belongs to the workday of ${uncoveredDays[0]}, which no pay period covers.`
-                  : `Some shifts belong to the workdays of ${uncoveredDays[0]} – ${uncoveredDays[uncoveredDays.length - 1]}, which no pay period covers.`}{" "}
-                That happens when a workday starting in the afternoon carries the
-                last evening of a fortnight into the next one. Open the period they
-                need before committing — written as they are, those rows would
-                belong to no period at all and would never appear on the
-                timesheets screen again.
               </p>
             )}
           </section>
@@ -749,7 +795,7 @@ export function ImportTimesheets({
               Discard
             </button>
             <span className="text-sm text-muted">
-              Nothing has been written yet.
+              {commitBlockedBecause ?? "Nothing has been written yet."}
             </span>
           </div>
         </div>
