@@ -31,6 +31,7 @@ import {
 } from "./ShiftDecisions";
 import { AdjudicateOvertime } from "./AdjudicateOvertime";
 import Link from "next/link";
+import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { NewTimesheet } from "./NewTimesheet";
 import {
   OT_DECISION_LABEL,
@@ -783,9 +784,15 @@ export function TimesheetsList({
               this navigates to a screen rather than writing anything, the
               import screen states the period problem in its own words, and it
               is also how you reach a DIFFERENT fortnight's file. */}
+          {/* BLACK WHILE THE PERIOD IS EMPTY (Mark, 2026-08-22). An empty
+              fortnight has exactly one thing worth doing, and it is this; once
+              there are shifts the weight moves to Close pay period on the bar
+              above. `PRIMARY_BUTTON_CLASS` is for precisely this — a commit
+              standing beside no peers, decided by state rather than a standing
+              primary the app does not have. */}
           <Link
             href="/timesheets/import"
-            className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white"
+            className={`${rows.length === 0 ? PRIMARY_BUTTON_CLASS : BUTTON_CLASS} shrink-0 no-underline`}
           >
             Import timesheets
           </Link>

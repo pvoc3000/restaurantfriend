@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { requestShiftFocus } from "@/lib/shiftFocus";
+import { PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import {
   buildExportRows,
@@ -275,7 +276,17 @@ export function ExportTimesheets({
 
   return (
     <>
-      <button type="button" onClick={() => setOpen(true)} className={BUTTON}>
+      {/* BLACK ONCE THERE ARE SHIFTS TO CLOSE (Mark, 2026-08-22). The screen
+          has one obvious next act and which one it is depends on the period: an
+          empty fortnight wants Import timesheets, a full one wants this. That
+          is exactly what `PRIMARY_BUTTON_CLASS` is for — "only ever right
+          CONDITIONALLY" — rather than a standing primary, which this app does
+          not have. The two never both fill, so the row still says one thing. */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className={shifts.length > 0 ? PRIMARY_BUTTON_CLASS : BUTTON}
+      >
         Close pay period…
       </button>
 
