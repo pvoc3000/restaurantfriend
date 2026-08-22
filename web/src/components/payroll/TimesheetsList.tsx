@@ -765,17 +765,26 @@ export function TimesheetsList({
         sort={sort}
         onSortChange={(next) => setSort({ key: next.key as SortKey, dir: next.dir })}
         expand={{
+          // ONLY WHAT THE ROW DOES NOT ALREADY SAY (Mark, 2026-08-22: "the
+          // yellow text seems redundant — there's also a yellow box on the same
+          // sheets"). It did, three times over: "differs from source" and
+          // "overtime differs from ours" are the `≠` chip and the filled cell
+          // in the hours columns, and the meal finding is the `meal` chip in
+          // the Break column. Restating a mark four columns away from the
+          // number it is about adds nothing and buries the three marks that
+          // genuinely have nowhere else to appear.
+          //
+          // AND NOT IN YELLOW. `text-mark` is yellow-500 on white, which
+          // measures 1.43:1 — WCAG AA wants 4.5 for body text, so it was barely
+          // legible. Anything that deserves an alarm already has a FILL in the
+          // row itself (15.53:1); what is left here is "there is more inside",
+          // which is what muted text is for.
           summary: (r) => {
             const marks: string[] = [];
-            const d = otDisagreements(r);
-            if (d.length) marks.push(`${d.length} differ${d.length === 1 ? "s" : ""} from source`);
             if (r.stitched) marks.push("stitched");
-            if (needsReview.has(r.id)) marks.push("overtime differs from ours");
-            const meal = breakFindings.get(r.id);
-            if (meal) marks.push(MEAL_CODE_LABEL[meal.code].toLowerCase());
             if (r.source_payload?.local_time_ambiguity) marks.push("ambiguous clock time");
             if (r.employee_note || r.manager_note) marks.push("note");
-            return marks.length ? <span className="text-mark">{marks.join(" · ")}</span> : null;
+            return marks.length ? <span className="text-muted">{marks.join(" · ")}</span> : null;
           },
           render: (r) => (
             <ShiftDetail
@@ -1089,7 +1098,9 @@ function ShiftDetail({
                   unaltered. Decision 3 says a violation is DERIVED and never
                   stored, so this is not a column — it is the reference that
                   phase 5's breakRules.ts gets checked against. */}
-              <dd className="text-mark">{raw("timesheet_error")}</dd>
+              <dd>
+                <span className="bg-mark-fill px-1">{raw("timesheet_error")}</span>
+              </dd>
             </>
           )}
         </dl>
@@ -1153,12 +1164,12 @@ function ShiftDetail({
             block below states it AND decides it, and saying the same thing
             twice in one expansion is how a reader learns to skim one of them. */}
         {row.stitched && (
-          <p className="text-sm text-mark">
+          <p className="text-sm">
             Reassembled from segments a source split at midnight.
           </p>
         )}
         {typeof payload.local_time_ambiguity === "string" && (
-          <p className="text-sm text-mark">
+          <p className="text-sm">
             This punch&rsquo;s local time is {String(payload.local_time_ambiguity)} — the clock
             {payload.local_time_ambiguity === "ambiguous"
               ? " read the same hour twice that night, so the shift is an hour longer or shorter depending which is meant."
