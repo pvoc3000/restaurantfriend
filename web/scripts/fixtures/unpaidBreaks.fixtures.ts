@@ -90,7 +90,7 @@ test("every punched row in the real export reconciles with Homebase's Actual hou
     // A cent-scale tolerance: Homebase rounds its own column to two places.
     ok(
       Math.abs(worked - actual) < 0.02,
-      `${s.name} ${s.workday}: ours ${worked.toFixed(2)} vs Homebase ${actual}`
+      `${s.name} ${s.punchDate}: ours ${worked.toFixed(2)} vs Homebase ${actual}`
     );
     checked += 1;
   }

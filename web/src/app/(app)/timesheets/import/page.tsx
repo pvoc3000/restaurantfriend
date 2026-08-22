@@ -39,7 +39,7 @@ export default async function ImportTimesheetsPage() {
   const [{ data: employeeRows }, { data: periodRows }] = await Promise.all([
     supabase
       .from("employees")
-      .select("id, first_name, last_name, legacy_id, homebase_id")
+      .select("id, first_name, last_name, legacy_id, homebase_id, workday_starts_at")
       .order("last_name"),
     supabase.from("pay_periods").select("id, start_date, end_date, status"),
   ]);
@@ -49,6 +49,7 @@ export default async function ImportTimesheetsPage() {
     name: `${e.last_name}, ${e.first_name}`,
     legacy_id: e.legacy_id === null || e.legacy_id === undefined ? null : String(e.legacy_id),
     homebase_id: (e.homebase_id ?? null) as string | null,
+    workday_starts_at: (e.workday_starts_at ?? null) as string | null,
   }));
 
   const periods: ImportPeriod[] = (periodRows ?? []).map((p) => ({

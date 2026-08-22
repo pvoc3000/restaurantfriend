@@ -115,7 +115,7 @@ export async function EmployeeDetail({
     supabase
       .from("employees")
       .select(
-        "id, org_id, user_id, legacy_id, status, last_name, first_name, nickname, phone, email, address, date_of_birth, main_location_id, schedule, employment_type, start_date, end_date, position, notes, food_handler_expires, gusto_id, homebase_id, primary_wage_type, excludes_tips"
+        "id, org_id, user_id, legacy_id, status, last_name, first_name, nickname, phone, email, address, date_of_birth, main_location_id, schedule, employment_type, start_date, end_date, position, notes, food_handler_expires, gusto_id, homebase_id, primary_wage_type, excludes_tips, workday_starts_at"
       )
       .eq("id", id)
       .maybeSingle(),
@@ -687,6 +687,7 @@ export async function EmployeeDetail({
           homebaseId={person.homebase_id}
           primaryWageType={person.primary_wage_type}
           excludesTips={person.excludes_tips}
+          workdayStartsAt={person.workday_starts_at}
           wageTypes={wageTypes}
           editable
         />

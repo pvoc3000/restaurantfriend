@@ -11,6 +11,7 @@ import { PickList } from "@/components/ui/PickList";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { resolveLocal } from "@/lib/timeZone";
+import { parseWorkdayStart, punchDateFor, formatWorkdayStart } from "@/lib/workday";
 import { formatPeriodRange, type PayPeriodStatus } from "@/lib/payPeriods";
 
 /**
@@ -46,7 +47,7 @@ export function NewTimesheet({
   period,
   disabled = false,
 }: {
-  employees: { id: string; name: string }[];
+  employees: { id: string; name: string; workday_starts_at: string | null }[];
   locations: { id: string; code: string }[];
   orgId: string;
   timeZone: string;
@@ -125,6 +126,23 @@ export function NewTimesheet({
   const breakNum = breakHours.trim() === "" ? 0 : Number(breakHours);
   const hoursNum = hours.trim() === "" ? null : Number(hours);
 
+  /**
+   * This person's workday boundary (061), and the date their punch therefore
+   * falls on. Null for everyone but the kitchen, where it is the identity.
+   *
+   * `punchDate` is what `business_date` is written from, and it is only ever a
+   * day before `workday` — never after, which is what the migration's noon
+   * floor guarantees.
+   */
+  const workdayStart = useMemo(
+    () => parseWorkdayStart(employees.find((e) => e.id === employeeId)?.workday_starts_at ?? null),
+    [employees, employeeId]
+  );
+  const punchDate =
+    workday === null || kind !== "shift" || inMin === null
+      ? workday
+      : punchDateFor(workday, inMin, workdayStart);
+
   const outsidePeriod =
     period !== null && workday !== null && (workday < period.start_date || workday > period.end_date);
 
@@ -158,7 +176,10 @@ export function NewTimesheet({
         employee_id: employeeId,
         location_id: kind === "shift" ? locationId : locationId || null,
         workday,
-        business_date: workday,
+        // The date the punch fell on, which is the workday itself unless a
+        // boundary moved it. `business_date` answers which day's tip pool and
+        // shift report this belongs to and must not follow the overtime day.
+        business_date: punchDate,
         kind,
         source: "manual",
         // No `source_row_key`: that key exists so a re-import can find its own
@@ -193,8 +214,17 @@ export function NewTimesheet({
           };
         };
         const overnight = (outMin as number) < (inMin as number);
-        const start = resolveLocal(timeZone, wall(inMin as number, 0));
-        const end = resolveLocal(timeZone, wall(outMin as number, overnight ? 1 : 0));
+        // WHICH DAY THE PUNCH IS ON is not always the workday. With a boundary
+        // (migration 061) a Thursday workday runs from 14:00 WEDNESDAY, so a
+        // 22:00 clock-in on it happened the day before. Zero without one, which
+        // is every front-of-house shift and every row that predates 061.
+        const inOffset =
+          workdayStart !== null && (inMin as number) >= workdayStart ? -1 : 0;
+        const start = resolveLocal(timeZone, wall(inMin as number, inOffset));
+        const end = resolveLocal(
+          timeZone,
+          wall(outMin as number, inOffset + (overnight ? 1 : 0))
+        );
         clockIn = new Date(start.instant).toISOString();
         clockOut = new Date(end.instant).toISOString();
         breakMinutes = Math.round(breakNum * 60);
@@ -409,6 +439,17 @@ export function NewTimesheet({
                     </>
                   )}
                 </p>
+                {/* Say it, or the punch silently lands on a day nobody typed. */}
+                {punchDate !== null && workday !== null && punchDate !== workday && (
+                  <p className="pb-1.5 text-sm">
+                    <span className="bg-mark-fill px-1">Clocks in on {punchDate}</span>{" "}
+                    — this person&rsquo;s workday starts at{" "}
+                    {formatWorkdayStart(
+                      employees.find((e) => e.id === employeeId)?.workday_starts_at ?? null
+                    )}
+                    , so the hours count toward {workday}.
+                  </p>
+                )}
               </div>
             ) : (
               <div className="flex flex-wrap items-end gap-6">

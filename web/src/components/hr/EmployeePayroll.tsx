@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { formatWorkdayStart } from "@/lib/workday";
 
 /**
  * The payroll settings that live on the person.
@@ -36,6 +37,7 @@ export function EmployeePayroll({
   homebaseId,
   primaryWageType,
   excludesTips,
+  workdayStartsAt,
   wageTypes,
   editable,
 }: {
@@ -46,6 +48,8 @@ export function EmployeePayroll({
   homebaseId: string | null;
   primaryWageType: string | null;
   excludesTips: boolean;
+  /** Migration 061 — null means midnight, which is most people. */
+  workdayStartsAt: string | null;
   /** Every job title already in use, so the picker offers rather than invents. */
   wageTypes: string[];
   editable: boolean;
@@ -125,6 +129,39 @@ export function EmployeePayroll({
         ) : (
           <span className={READ_ONLY_VALUE}>{homebaseId ?? "—"}</span>
         )}
+      </dd>
+
+      {/* WHEN THIS PERSON'S OVERTIME DAY BEGINS (migration 061).
+
+          The only field on this block whose ABSENCE means something, which is
+          why the placeholder says "midnight" rather than sitting empty — an
+          empty box reads as something nobody got round to filling in, and this
+          one is a real answer and the right one for almost everybody.
+
+          It is on the payroll block rather than with Position because it is not
+          a description of the job: it is the 24-hour window California daily
+          overtime is counted over, and it changes what this person is paid. */}
+      <dt className="py-0.5 text-subtle">Workday starts</dt>
+      <dd>
+        {editable ? (
+          <InlineValue
+            table="employees"
+            id={employeeId}
+            column="workday_starts_at"
+            kind="time"
+            value={workdayStartsAt}
+            ariaLabel="Workday starts"
+          />
+        ) : (
+          <span className={READ_ONLY_VALUE}>
+            {formatWorkdayStart(workdayStartsAt) ?? "midnight"}
+          </span>
+        )}
+        <p className="max-w-[52ch] pt-0.5 text-[12px] leading-snug text-muted">
+          {workdayStartsAt
+            ? `Their day runs ${formatWorkdayStart(workdayStartsAt)} to ${formatWorkdayStart(workdayStartsAt)}, so one overnight is one workday instead of two dates. Applies to shifts imported from now on.`
+            : "Midnight. Set an afternoon time for someone whose shift crosses midnight — an overnight baker — so a night's work counts as one day rather than stacking onto the calendar date."}
+        </p>
       </dd>
 
       <dt className="py-0.5 text-subtle">Tips</dt>

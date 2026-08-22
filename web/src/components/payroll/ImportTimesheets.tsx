@@ -10,6 +10,7 @@ import { PickList } from "@/components/ui/PickList";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { planImport, type ImportPlan, type ParsedShift } from "@/lib/homebaseImport";
 import { resolveLocal } from "@/lib/timeZone";
+import { parseWorkdayStart, workdayFor } from "@/lib/workday";
 import {
   formatPeriodRange,
   nextPeriodAfter,
@@ -30,6 +31,8 @@ export type ImportEmployee = {
   name: string;
   legacy_id: string | null;
   homebase_id: string | null;
+  /** Migration 061. Null means midnight, which is everyone but the kitchen. */
+  workday_starts_at: string | null;
 };
 
 export type ImportPeriod = {
@@ -44,6 +47,20 @@ type Matched = {
   employeeId: string | null;
   /** Which id got the match — for the report, and for the screen. */
   via: "homebase_id" | "legacy_id" | null;
+  /**
+   * The California workday these hours belong to.
+   *
+   * DECIDED HERE, not in `planImport`, and that placement is the whole design:
+   * the workday depends on the EMPLOYEE (migration 061), and the parser has no
+   * employees — it reads a CSV. Deciding it alongside the match also means the
+   * manual links below recompute it for free; a resolver passed into the parser
+   * would leave the workday fixed at plan time, so linking an unmatched person
+   * afterwards would import their shifts with the phantom-overtime day this
+   * whole change exists to remove.
+   */
+  workday: string;
+  /** The boundary that produced it, in minutes; null = midnight. For the screen. */
+  workdayStart: number | null;
 };
 
 /**
@@ -91,6 +108,9 @@ export function ImportTimesheets({
 
   /* -- matching ---------------------------------------------------------- */
 
+  /** For reading a matched person's workday boundary back out. */
+  const byId = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
+
   const byLegacy = useMemo(
     () => new Map(employees.filter((e) => e.legacy_id).map((e) => [String(e.legacy_id).trim(), e])),
     [employees]
@@ -113,15 +133,29 @@ export function ImportTimesheets({
    */
   function matchOne(s: ParsedShift): Matched {
     const key = s.payrollId ?? "";
+    const settle = (employeeId: string | null, via: Matched["via"]): Matched => {
+      const start = parseWorkdayStart(
+        employeeId ? (byId.get(employeeId)?.workday_starts_at ?? null) : null
+      );
+      return {
+        shift: s,
+        employeeId,
+        via,
+        workday: workdayFor(s.punchDate, s.clockInMinutes, start),
+        workdayStart: start,
+      };
+    };
+
     const manual = links[key || s.name];
-    if (manual) return { shift: s, employeeId: manual, via: "homebase_id" };
+    if (manual) return settle(manual, "homebase_id");
     if (key) {
       const hb = byHomebase.get(key);
-      if (hb) return { shift: s, employeeId: hb.id, via: "homebase_id" };
+      if (hb) return settle(hb.id, "homebase_id");
       const lg = byLegacy.get(key);
-      if (lg) return { shift: s, employeeId: lg.id, via: "legacy_id" };
+      if (lg) return settle(lg.id, "legacy_id");
     }
-    return { shift: s, employeeId: null, via: null };
+    // An unmatched shift keeps the punch date; it cannot be committed anyway.
+    return settle(null, null);
   }
 
   const matched = useMemo(
@@ -155,9 +189,11 @@ export function ImportTimesheets({
   // rather than letting 028's policy silently refuse every row.
   const targetPeriods = useMemo(() => {
     if (!plan) return [];
-    const days = new Set(plan.shifts.map((s) => s.workday));
+    // The EFFECTIVE workday, not the punch date: a boundary can move a shift
+    // into the next fortnight, and that is the fortnight whose status matters.
+    const days = new Set(matched.map((m) => m.workday));
     return periods.filter((p) => [...days].some((d) => d >= p.start_date && d <= p.end_date));
-  }, [plan, periods]);
+  }, [plan, matched, periods]);
 
   const blockedPeriods = targetPeriods.filter(
     (p) => p.status !== "open" && p.status !== "review"
@@ -180,9 +216,33 @@ export function ImportTimesheets({
    */
   const settings = useMemo(() => readPayrollSettings(rawPayrollSettings), [rawPayrollSettings]);
 
+  /**
+   * Workdays no pay period covers — INCLUDING days a workday boundary moved a
+   * shift into.
+   *
+   * This exists because of a hole 061 opened and nothing else would have
+   * caught. Homebase exports BY payroll period, so the file's last day is the
+   * fortnight's last day; a kitchen shift starting after 14:00 on it belongs to
+   * the NEXT fortnight, which may not have been opened yet. The old test was
+   * `targetPeriods.length > 0`, which is true as soon as ANY shift lands
+   * somewhere — so the screen offered nothing, the row wrote with a null
+   * `pay_period_id` (028's `timesheet_period_editable(null)` is deliberately
+   * TRUE), no trigger ever fills it in, and `/timesheets` fetches by
+   * `pay_period_id`. The shift would be invisible and never paid.
+   *
+   * Measured on the real 2026-08-03 → 08-16 export: two shifts, Erick Mejia at
+   * 18:00 and Eddy Salazar at 21:01 on the closing Sunday.
+   */
+  const uncoveredDays = useMemo(() => {
+    const days = new Set(matched.filter((m) => m.employeeId).map((m) => m.workday));
+    return [...days]
+      .filter((d) => !periods.some((p) => d >= p.start_date && d <= p.end_date))
+      .sort();
+  }, [matched, periods]);
+
   const proposedPeriod: PeriodRange | null = useMemo(() => {
-    if (!plan || plan.shifts.length === 0 || targetPeriods.length > 0) return null;
-    const earliest = plan.shifts.map((s) => s.workday).sort()[0];
+    if (!plan || plan.shifts.length === 0 || uncoveredDays.length === 0) return null;
+    const earliest = uncoveredDays[0];
     if (!earliest) return null;
 
     const last = periods.reduce<ImportPeriod | null>(
@@ -198,7 +258,7 @@ export function ImportTimesheets({
     }
     if (earliest < range.start_date || earliest > range.end_date) return null;
     return overlapsAny(range, periods) ? null : range;
-  }, [plan, targetPeriods, periods, settings]);
+  }, [plan, uncoveredDays, periods, settings]);
 
   const [openingPeriod, setOpeningPeriod] = useState(false);
 
@@ -229,6 +289,12 @@ export function ImportTimesheets({
     });
   }
 
+  /** Shifts a workday boundary moved off their punch date, for the screen. */
+  const shiftedWorkdays = useMemo(
+    () => matched.filter((m) => m.employeeId && m.workday !== m.shift.punchDate),
+    [matched]
+  );
+
   const canCommit =
     plan !== null &&
     file !== null &&
@@ -236,6 +302,10 @@ export function ImportTimesheets({
     location !== null &&
     blockedPeriods.length === 0 &&
     targetPeriods.length > 0 &&
+    // Every workday must land in a period that EXISTS. Without this a shift a
+    // boundary pushed past the fortnight's end writes with a null
+    // `pay_period_id` and is never seen again — see `uncoveredDays`.
+    uncoveredDays.length === 0 &&
     !pending;
 
   /* -- commit -------------------------------------------------------------- */
@@ -287,15 +357,22 @@ export function ImportTimesheets({
         .filter((m) => m.employeeId)
         .map((m) => {
           const s = m.shift;
-          const inAt = resolveLocal(timeZone, wall(s.clockInISO, s.clockInMinutes));
+          const inAt = resolveLocal(timeZone, wall(s.punchDate, s.clockInMinutes));
           const outAt =
-            s.clockOutISO === null || s.clockOutMinutes === null
+            s.clockOutDate === null || s.clockOutMinutes === null
               ? null
-              : resolveLocal(timeZone, wall(s.clockOutISO, s.clockOutMinutes));
+              : resolveLocal(timeZone, wall(s.clockOutDate, s.clockOutMinutes));
 
+          // THE PUNCH DATE, never the workday. This is the upsert's conflict
+          // target, and a workday can MOVE when somebody's boundary changes —
+          // which would mint a new key for a row that already exists and
+          // duplicate it instead of updating it. Verified against the live
+          // database before 061: field [1] equals `workday` on 321 of 321
+          // Homebase rows and 1000 of 1000 FileMaker rows, so keying on the
+          // punch date leaves every existing key byte-identical.
           const natural = [
             s.payrollId ?? s.name,
-            s.workday,
+            s.punchDate,
             s.source.clockInTime ?? "-",
             s.source.clockOutTime ?? "-",
             location.code,
@@ -305,8 +382,12 @@ export function ImportTimesheets({
             org_id: orgId,
             employee_id: m.employeeId as string,
             location_id: location.id,
-            workday: s.workday,
-            business_date: s.workday,
+            // The two diverge for the first time here. `workday` owns the
+            // California overtime day and follows the person's boundary;
+            // `business_date` stays the date the punch fell on, so tip pools
+            // and shift reports are untouched. 028 split them for exactly this.
+            workday: m.workday,
+            business_date: s.punchDate,
             clock_in: new Date(inAt.instant).toISOString(),
             clock_out: outAt ? new Date(outAt.instant).toISOString() : null,
             source_hours_regular: s.source.regularHours,
@@ -358,6 +439,9 @@ export function ImportTimesheets({
               date_end: s.source.clockOutDate,
               import_source: "homebase",
               matched_via: m.via,
+              // Which boundary produced this row's workday, so a shift can
+              // explain itself later. Absent means midnight.
+              ...(m.workdayStart !== null ? { workday_start: m.workdayStart } : {}),
               ...(inAt.ambiguity !== "none" ? { local_time_ambiguity: inAt.ambiguity } : {}),
             },
             stitched: s.stitched,
@@ -544,6 +628,29 @@ export function ImportTimesheets({
                 reports no error — so the commit is blocked instead.
               </p>
             )}
+            {shiftedWorkdays.length > 0 && (
+              <p className="max-w-[72ch] text-sm">
+                <span className="bg-mark-fill px-1">
+                  {shiftedWorkdays.length} shift{shiftedWorkdays.length === 1 ? "" : "s"}
+                </span>{" "}
+                start after their own workday begins, so the hours count toward the
+                NEXT day — which is the point of a workday that starts in the
+                afternoon. The punch itself, and the day its tips and shift report
+                belong to, are unchanged.
+              </p>
+            )}
+            {uncoveredDays.length > 0 && targetPeriods.length > 0 && (
+              <p className="max-w-[72ch] border border-accent px-4 py-3 text-sm text-accent">
+                {uncoveredDays.length === 1
+                  ? `A shift belongs to the workday of ${uncoveredDays[0]}, which no pay period covers.`
+                  : `Some shifts belong to the workdays of ${uncoveredDays[0]} – ${uncoveredDays[uncoveredDays.length - 1]}, which no pay period covers.`}{" "}
+                That happens when a workday starting in the afternoon carries the
+                last evening of a fortnight into the next one. Open the period they
+                need before committing — written as they are, those rows would
+                belong to no period at all and would never appear on the
+                timesheets screen again.
+              </p>
+            )}
           </section>
 
           {unmatchedPeople.length > 0 && (
@@ -603,7 +710,7 @@ export function ImportTimesheets({
                 {plan.skipped.map((r) => (
                   <li key={`${r.line}-${r.name}`}>
                     <span className="tabular-nums">line {r.line}</span> · {r.name}
-                    {r.workday ? ` · ${r.workday}` : ""} — {r.why}
+                    {r.punchDate ? ` · ${r.punchDate}` : ""} — {r.why}
                   </li>
                 ))}
               </ul>

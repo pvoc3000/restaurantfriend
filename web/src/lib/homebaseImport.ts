@@ -84,11 +84,26 @@ export type ParsedShift = {
   line: number;
   name: string;
   payrollId: string | null;
+  /**
+   * The calendar date the clock-in fell on — Homebase's own "Clock in date".
+   *
+   * NOT the workday. Until 2026-08-22 this field was called `workday` and the
+   * two were the same thing, because the workday was always midnight to
+   * midnight. Migration 061 lets an employee's workday start at another hour,
+   * so the workday is now derived from this plus the person's boundary — and
+   * that derivation belongs to the CALLER, since this module parses a CSV and
+   * has no idea who anyone is. See `lib/workday`.
+   *
+   * Two things must keep reading this rather than the workday: the INSTANTS
+   * (a shift happened when it happened, whatever day it is attributed to), and
+   * `source_row_key`, which is the upsert's conflict target — keying it on a
+   * value that can move would silently duplicate rows on re-import instead of
+   * updating them.
+   */
+  punchDate: string;
   /** Local wall times, resolved to instants by the caller with the org's zone. */
-  workday: string;
-  clockInISO: string;
   clockInMinutes: number;
-  clockOutISO: string | null;
+  clockOutDate: string | null;
   clockOutMinutes: number | null;
   breakStartMinutes: number | null;
   breakMinutes: number | null;
@@ -111,7 +126,7 @@ export type Refusal = { line: number; name: string; why: string };
  * false accusation about the file, and it buries the rows that genuinely are
  * unreadable among rows that are fine.
  */
-export type Skipped = { line: number; name: string; workday: string | null; why: string };
+export type Skipped = { line: number; name: string; punchDate: string | null; why: string };
 
 export type ImportPlan = {
   /** From line 1 — "DF01 HP" yields "DF01". */
@@ -345,9 +360,9 @@ export function planImport(text: string): ImportPlan {
       managerNote: cell(r[cols.mgrNote]),
     };
 
-    const workday = parseHomebaseDate(row.clockInDate);
+    const punchDate = parseHomebaseDate(row.clockInDate);
     const inMin = parseHomebaseTime(row.clockInTime);
-    if (!workday) {
+    if (!punchDate) {
       refused.push({ line, name: row.name, why: `Unreadable clock-in date ${JSON.stringify(row.clockInDate)}` });
       continue;
     }
@@ -355,7 +370,7 @@ export function planImport(text: string): ImportPlan {
       if (row.clockInTime === null) {
         // A date with no time at all: nothing happened, so there is nothing to
         // import. Not a failure.
-        skipped.push({ line, name: row.name, workday, why: "No punches on this row" });
+        skipped.push({ line, name: row.name, punchDate, why: "No punches on this row" });
       } else {
         refused.push({ line, name: row.name, why: `Unreadable clock-in time ${JSON.stringify(row.clockInTime)}` });
       }
@@ -382,14 +397,13 @@ export function planImport(text: string): ImportPlan {
       line,
       name: row.name,
       payrollId: row.payrollId,
-      workday,
-      clockInISO: workday,
+      punchDate,
       clockInMinutes: inMin,
       // The clock-out DATE is Homebase's own, not inferred. Where it is absent
       // and the times wrap, the day is inferred — the same rule the FileMaker
       // transform settled on after trusting a date column produced a
       // 30.58-hour shift.
-      clockOutISO: outMin === null ? null : (outDate ?? (outMin < inMin ? addDay(workday) : workday)),
+      clockOutDate: outMin === null ? null : (outDate ?? (outMin < inMin ? addDay(punchDate) : punchDate)),
       clockOutMinutes: outMin,
       breakStartMinutes:
         breakStartMin === null ? null : (breakStartMin - inMin + 1440) % 1440,
@@ -414,7 +428,7 @@ export function planImport(text: string): ImportPlan {
   }
 
   const crossingCount = stitched.shifts.filter(
-    (s) => s.clockOutISO !== null && s.clockOutISO !== s.clockInISO
+    (s) => s.clockOutDate !== null && s.clockOutDate !== s.punchDate
   ).length;
 
   return {
@@ -472,20 +486,20 @@ function stitchMidnightSplits(shifts: ParsedShift[]): {
     for (const a of list) {
       if (merged.has(a)) continue;
       // `a` must END at local midnight.
-      if (a.clockOutISO === null || a.clockOutMinutes !== 0) continue;
+      if (a.clockOutDate === null || a.clockOutMinutes !== 0) continue;
       const b = list.find(
         (x) =>
           x !== a &&
           !merged.has(x) &&
           // `b` must BEGIN at that same instant: midnight of a's clock-out day.
           x.clockInMinutes === 0 &&
-          x.clockInISO === a.clockOutISO
+          x.punchDate === a.clockOutDate
       );
       if (!b) continue;
 
       // A third segment continuing the chain means >24 hours.
       const c = list.find(
-        (x) => x !== a && x !== b && !merged.has(x) && x.clockInMinutes === 0 && x.clockInISO === b.clockOutISO
+        (x) => x !== a && x !== b && !merged.has(x) && x.clockInMinutes === 0 && x.punchDate === b.clockOutDate
       );
       if (c) {
         refused.push({
@@ -496,7 +510,7 @@ function stitchMidnightSplits(shifts: ParsedShift[]): {
         continue;
       }
 
-      a.clockOutISO = b.clockOutISO;
+      a.clockOutDate = b.clockOutDate;
       a.clockOutMinutes = b.clockOutMinutes;
       a.stitched = true;
       // The second segment's meal is the shift's meal if the first had none.

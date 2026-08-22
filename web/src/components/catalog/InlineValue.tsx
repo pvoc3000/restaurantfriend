@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { evaluateNumeric, looksLikeExpression } from "@/lib/calc";
 import { DateField } from "@/components/ui/DateField";
+import { TimeField } from "@/components/ui/TimeField";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { useCalcField } from "@/components/ui/CalcPad";
 
@@ -249,7 +250,7 @@ export function InlineValue({
   value: string | number | null;
   /** "date" edits with a real date picker and stores an ISO yyyy-mm-dd;
    *  "pick" chooses from `options` instead of accepting typing. */
-  kind?: "text" | "number" | "date" | "pick";
+  kind?: "text" | "number" | "date" | "time" | "pick";
   placeholder?: string;
   align?: "left" | "right";
   className?: string;
@@ -555,6 +556,37 @@ export function InlineValue({
   //
   // The box itself is `ui/DateField`, which carries the Safari empty-date
   // apparatus and the reasons for it. All that's left here is the write.
+  // A `time` column, and the third kind that does NOT click-to-edit — the
+  // native control is already a box you can type into, and on an iPad it is a
+  // wheel picker where a text cell is a keyboard. Same reasoning as `date`.
+  //
+  // It writes ON CHANGE for the same reason too: `<input type="time">` emits
+  // "" until the whole value is valid, so a change event IS a finished value
+  // and there is no half-typed state to protect.
+  if (kind === "time") {
+    return (
+      <span className="inline-flex flex-col items-start">
+        <TimeField
+          value={value === null ? null : String(value)}
+          disabled={saving}
+          required={!nullable}
+          ariaLabel={ariaLabel ?? column}
+          className={className}
+          onChange={(next) => {
+            if (next === null && !nullable) {
+              setError("required");
+              return;
+            }
+            if (next === (value ?? null)) return;
+            setError(null);
+            void write(next, false);
+          }}
+        />
+        {error && <span className="text-xs text-accent">{error}</span>}
+      </span>
+    );
+  }
+
   if (kind === "date") {
     return (
       <span className="inline-flex flex-col items-start">

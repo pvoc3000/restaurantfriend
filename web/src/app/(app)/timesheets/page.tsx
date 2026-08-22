@@ -14,7 +14,7 @@ import {
   type PayPeriodRecord,
 } from "@/components/payroll/ExportTimesheets";
 import type { ShiftBenefitLine } from "@/components/payroll/ShiftDecisions";
-import { payrollSettings, workweekStart, type PayPeriodStatus } from "@/lib/payPeriods";
+import { addDays, payrollSettings, workweekStart, type PayPeriodStatus } from "@/lib/payPeriods";
 import { proposeOvertime } from "@/lib/overtime";
 import { workedHours, type OtDecision } from "@/lib/timesheets";
 import { isEarningColumn } from "@/lib/gustoExport";
@@ -189,7 +189,7 @@ export default async function TimesheetsPage({
     // ~20 shifts a fortnight, and embedding would send their row twenty times.
     supabase
       .from("employees")
-      .select("id, first_name, last_name, excludes_tips, primary_wage_type, gusto_id"),
+      .select("id, first_name, last_name, excludes_tips, primary_wage_type, gusto_id, workday_starts_at"),
     // The signed meal-break waivers. They change the ANSWER the break rules
     // give, not just how it's presented — a waived meal on a six-hour day owes
     // nothing at all. Returns zero rows today: FMP keeps its 51 waivers in the
@@ -207,10 +207,18 @@ export default async function TimesheetsPage({
       .lte("workday", periodEnd),
     // `id` is here for the FREEZE: `freeze_pay_period`'s pool payload names each
     // tip_pool row, so the panel cannot snapshot a rate without it.
+    //
+    // ONE DAY EARLIER than the period starts, since 061. A shift whose employee
+    // has a workday boundary can have `workday` on the period's first day and
+    // `business_date` on the day before — the punch really did happen the
+    // previous evening. Its shop-day pool would then sit outside this range and
+    // read as missing, which `exportReadiness` reports as a caveat about a pool
+    // that exists. One day is provably enough: 061's noon floor means the
+    // workday moves forward by at most one.
     supabase
       .from("tip_pools")
       .select("id, location_id, business_date, reported_cents, corrected_cents")
-      .gte("business_date", periodStart)
+      .gte("business_date", addDays(periodStart, -1))
       .lte("business_date", periodEnd),
     // 033. Both small enough not to filter — an entitlement's own date range is
     // what decides which days it covers.
@@ -235,6 +243,7 @@ export default async function TimesheetsPage({
       {
         name: `${e.last_name}, ${e.first_name}`,
         excludes_tips: (e.excludes_tips ?? false) as boolean,
+        workday_starts_at: (e.workday_starts_at ?? null) as string | null,
       },
     ])
   );
@@ -589,7 +598,7 @@ export default async function TimesheetsPage({
         timeZone={timeZone}
         waiverEmployeeIds={(waiverRows ?? []).map((w) => w.employee_id as string)}
         employees={[...employeeById.entries()]
-          .map(([id, e]) => ({ id, name: e.name }))
+          .map(([id, e]) => ({ id, name: e.name, workday_starts_at: e.workday_starts_at }))
           .sort((a, b) => (a.name < b.name ? -1 : 1))}
         // ACTIVE locations only: this enumerates somewhere to put a new shift,
         // and a closed shop is not one (design rule 3).

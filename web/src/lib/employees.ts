@@ -158,6 +158,8 @@ export type Employee = {
   /** The bare job title. The export appends `(Primary)`; it is never stored. */
   primary_wage_type: string | null;
   excludes_tips: boolean;
+  /** Migration 061. Null = midnight; an afternoon time for the overnight crew. */
+  workday_starts_at: string | null;
 };
 
 /** "Prentice, Ada" — the sort order and the way a roster reads. */

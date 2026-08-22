@@ -44,7 +44,7 @@ test("totals rows and hyphen separators are NOT people", () => {
 test("the real rows parse into instants-in-waiting, with the meal", () => {
   const plan = planImport(REAL);
   const s = plan.shifts[0];
-  ok(/^\d{4}-\d{2}-\d{2}$/.test(s.workday), "workday is ISO");
+  ok(/^\d{4}-\d{2}-\d{2}$/.test(s.punchDate), "punch date is ISO");
   ok(s.clockInMinutes >= 0 && s.clockInMinutes < 1440, "clock-in is minutes of day");
   ok(s.payrollId !== null, "and the Payroll ID came through — it is employees.legacy_id");
   // Angelica's first shift is 12:15am → 8:28am with a 6:09–6:39am meal.
@@ -127,9 +127,9 @@ test("a shift a source DID split at midnight is stitched back into one", () => {
   eq(plan.stitchedCount, 1);
   const s = plan.shifts[0];
   ok(s.stitched, "and it says so");
-  eq(s.clockInISO, "2026-07-20");
+  eq(s.punchDate, "2026-07-20");
   eq(s.clockInMinutes, 1320, "10pm");
-  eq(s.clockOutISO, "2026-07-21");
+  eq(s.clockOutDate, "2026-07-21");
   eq(s.clockOutMinutes, 360, "6am — an eight-hour shift, which owes daily OT");
 });
 
@@ -217,7 +217,7 @@ test("a row with a date and NO punches is skipped, not refused", () => {
   eq(plan.refused, [], "not a failure");
   eq(plan.skipped.length, 1);
   eq(plan.skipped[0].name, "Traci Trombino");
-  eq(plan.skipped[0].workday, "2026-07-20");
+  eq(plan.skipped[0].punchDate, "2026-07-20");
 });
 
 test("an unreadable TIME is still a refusal — the two are told apart", () => {

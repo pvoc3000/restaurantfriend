@@ -166,7 +166,7 @@ export function TimesheetsList({
    *  presentation: a waived meal on a six-hour day owes nothing at all. */
   waiverEmployeeIds: string[];
   /** The roster, for adding a shift by hand. */
-  employees: { id: string; name: string }[];
+  employees: { id: string; name: string; workday_starts_at: string | null }[];
   locations: { id: string; code: string }[];
   orgId: string;
   /** Premium decisions already on file, keyed `employee|workday|kind`. */
@@ -1033,6 +1033,21 @@ function ShiftDetail({
             {raw("date_start") ?? "—"}
             {raw("date_end") && raw("date_end") !== raw("date_start") ? ` → ${raw("date_end")}` : ""}
           </dd>
+          {/* Migration 061. When someone's workday starts in the afternoon, the
+              punch and the day its hours count toward are different dates —
+              which the In → Out column can only show as a time. Say it here,
+              where there is room, rather than leaving the row looking wrong. */}
+          {raw("date_start") && String(raw("date_start")) !== row.workday && (
+            <>
+              <dt className="text-subtle">Counts toward</dt>
+              <dd className="tabular-nums">
+                <span className="bg-mark-fill px-1">{row.workday}</span>
+                <span className="ml-2 text-muted">
+                  their workday starts in the afternoon
+                </span>
+              </dd>
+            </>
+          )}
           {raw("break_start") && (
             <>
               <dt className="text-subtle">Break</dt>
