@@ -53,6 +53,33 @@ export function SalesSummary({ summary }: { summary: SalesSummaryData }) {
         </Figure>
       </div>
 
+      {/* WHAT IS BEING COMPARED, in dates (Mark, 2026-08-23: "so we know what we
+          are comparing to").
+          
+          Stated ONCE under the grid rather than inside each delta line: both
+          bases apply to all three figures, so putting them in the cards would
+          repeat two date ranges six times and push the figures apart. This is
+          the same place the partial and gap notes already speak from.
+          
+          It earns its keep twice over. On a period still running these are
+          OPENING SLICES rather than whole periods — the line below says that in
+          words and this says it in dates. And the year-ago basis starts 2 Jan,
+          not 1 Jan, which looks like an off-by-one until you know it is 52
+          whole weeks; the tooltip says so rather than leaving a reader to
+          wonder. */}
+      <p className="text-xs text-muted">
+        Compared with{" "}
+        <span className="tabular-nums text-ink">{rangeText(vsPrevious.basisRange)}</span>{" "}
+        (last period) and{" "}
+        <span
+          className="tabular-nums text-ink"
+          title="52 weeks back, so every date lands on the same weekday — a bakery's Saturday and its Friday are not the same shop."
+        >
+          {rangeText(vsLastYear.basisRange)}
+        </span>{" "}
+        (a year ago).
+      </p>
+
       {summary.partial ? (
         // The one thing a reader must know before trusting a comparison on a
         // period that has not finished: BOTH sides are the same number of days.
@@ -96,6 +123,11 @@ export function SalesSummary({ summary }: { summary: SalesSummaryData }) {
       ) : null}
     </section>
   );
+}
+
+/** A window as the summary states it — ISO, matching the heading above. */
+function rangeText(r: { from: string; to: string }): string {
+  return r.from === r.to ? r.from : `${r.from} – ${r.to}`;
 }
 
 function Figure({
