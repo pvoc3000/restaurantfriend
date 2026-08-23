@@ -33,6 +33,7 @@ import { AdjudicateOvertime } from "./AdjudicateOvertime";
 import Link from "next/link";
 import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { NewTimesheet } from "./NewTimesheet";
+import { formatCents } from "@/lib/tipPool";
 import {
   OT_DECISION_LABEL,
   effectiveExclusion,
@@ -478,6 +479,11 @@ export function TimesheetsList({
           label: GROUP_LABEL[grouping],
           summary: (run) => {
             let regular = 0, ot = 0, dot = 0, worked = 0, brk = 0, sick = 0;
+            // Tips SUM now the column holds money (Mark, 2026-08-23). Excluded
+            // shifts contribute nothing rather than zero, which is the same
+            // thing arithmetically and a different thing to mean.
+            let tips = 0;
+            let anyTips = false;
             for (const r of run) {
               regular += r.hours_regular ?? 0;
               ot += r.hours_overtime ?? 0;
@@ -485,6 +491,8 @@ export function TimesheetsList({
               worked += workedHours(r) ?? 0;
               brk += (r.unpaid_break_minutes ?? 0) / 60;
               sick += r.sick_hours ?? 0;
+              const share = tipShare(r).cents;
+              if (share !== null) { tips += share; anyTips = true; }
             }
             const n = (v: number) => v.toFixed(2);
             return {
@@ -496,6 +504,9 @@ export function TimesheetsList({
               ot: n(ot),
               dot: n(dot),
               break: n(brk),
+              // Absent, not "$0.00", when this run has no divided pool at all —
+              // the same distinction the cells make one row up.
+              ...(anyTips ? { tips: <span className="tabular-nums">{formatCents(tips)}</span> } : {}),
               // Only when there is any — a column of 0.00 down every group
               // reads as a figure someone should check.
               ...(sick > 0 ? { sick: n(sick) } : {}),
@@ -527,6 +538,16 @@ export function TimesheetsList({
           minute: "2-digit",
           timeZone,
         });
+
+  /** This shift's share of its shop-day pool, and whether it takes one at all. */
+  const tipShare = (r: TimesheetRow) => ({
+    excluded: effectiveExclusion(r.exclude_tips, r.employee_excludes_tips),
+    cents:
+      (r.location_id
+        ? dayPools.get(`${r.location_id}|${r.business_date}`)
+        : undefined
+      )?.result?.allocations.find((a) => a.id === r.id)?.cents ?? null,
+  });
 
   const columns: DataColumn<TimesheetRow>[] = [
     {
@@ -701,12 +722,32 @@ export function TimesheetsList({
       render: (r) => <HoursCell row={r} column="sick_hours" value={r.sick_hours} editable={editable} />,
     },
     {
+      // WHAT THIS SHIFT EARNED, not whether it was eligible (Mark, 2026-08-23).
+      // Until tips came from Square there was nothing to put here — the pool
+      // was usually empty, so the only tip fact a row HAD was its tri-state.
+      // Now every shop-day in an open period carries a real figure, and the
+      // question you ask scanning a fortnight is what somebody made, not
+      // whether they were in the pool. The tri-state moved to the row's Tips
+      // block, under the share it governs.
       key: "tips",
       label: "Tips",
       width: 100,
+      align: "right",
       hideWhenCompact: true,
-      sortValue: (r) => String(r.exclude_tips),
-      render: (r) => <TipsCell row={r} editable={editable} />,
+      // Excluded and not-yet-divided both sort BELOW every real share, and
+      // below zero too — an excluded shift is not "the smallest tip", it is
+      // not a tip at all. -1 keeps them out of the money's ordering.
+      sortValue: (r) => tipShare(r).cents ?? -1,
+      render: (r) => {
+        const { excluded, cents } = tipShare(r);
+        // Three states, three readings — the distinction this schema keeps
+        // making. "Excluded" is WHY there is no money; "—" is that nobody has
+        // divided the day yet. Collapsing them would make a deliberate
+        // exclusion look like missing data.
+        if (excluded) return <span className="text-muted">excluded</span>;
+        if (cents === null) return <span className="text-faint">—</span>;
+        return <span className="tabular-nums">{formatCents(cents)}</span>;
+      },
     },
   ];
 
@@ -860,6 +901,8 @@ export function TimesheetsList({
         openRowKey={jump?.rowId || null}
         totals={(shown) => {
           let worked = 0, regular = 0, ot = 0, dot = 0, brk = 0, sick = 0;
+          let tips = 0;
+          let anyTips = false;
           for (const r of shown) {
             worked += workedHours(r) ?? 0;
             regular += r.hours_regular ?? 0;
@@ -867,6 +910,8 @@ export function TimesheetsList({
             dot += r.hours_double_ot ?? 0;
             brk += (r.unpaid_break_minutes ?? 0) / 60;
             sick += r.sick_hours ?? 0;
+            const share = tipShare(r).cents;
+            if (share !== null) { tips += share; anyTips = true; }
           }
           const n = (v: number) => v.toFixed(2);
           return {
@@ -882,6 +927,7 @@ export function TimesheetsList({
             ot: n(ot),
             dot: n(dot),
             break: n(brk),
+            ...(anyTips ? { tips: <span className="tabular-nums">{formatCents(tips)}</span> } : {}),
             // ALWAYS, unlike the per-group subtotal, which shows sick only
             // where there is any: that rule is about a 0.00 repeating down
             // every band, and a grand total appears once. Here the zero is an
@@ -1103,40 +1149,6 @@ function BreakCell({
         </span>
       )}
     </span>
-  );
-}
-
-/**
- * The tri-state (decision 4). A PickList with three options, never a checkbox —
- * a checkbox cannot say the third thing, and the third thing ("included despite
- * the default") is the whole reason the column is nullable.
- */
-function TipsCell({ row, editable }: { row: TimesheetRow; editable: boolean }) {
-  const effective = effectiveExclusion(row.exclude_tips, row.employee_excludes_tips);
-  const label =
-    row.exclude_tips === null
-      ? effective
-        ? "Excluded (person)"
-        : "In pool"
-      : row.exclude_tips
-        ? "Excluded"
-        : "In pool (override)";
-
-  if (!editable) return <span className={`${READ_ONLY_VALUE} text-muted`}>{label}</span>;
-
-  return (
-    <InlineValue
-      table="timesheets"
-      id={row.id}
-      column="exclude_tips"
-      kind="pick"
-      value={row.exclude_tips === null ? "" : String(row.exclude_tips)}
-      options={[
-        { value: "", label: row.employee_excludes_tips ? "Inherit — excluded" : "Inherit — in pool" },
-        { value: "true", label: "Excluded from this shift" },
-        { value: "false", label: "In the pool despite the default" },
-      ]}
-    />
   );
 }
 
@@ -1405,6 +1417,7 @@ function ShiftDetail({
       />
 
       <ShiftTips
+        timesheetId={row.id}
         locationId={row.location_id}
         locationCode={row.location_code}
         businessDate={row.business_date}
@@ -1414,6 +1427,8 @@ function ShiftDetail({
         tipHours={pool?.result?.allocations.find((a) => a.id === row.id)?.tipHours ?? 0}
         allocationCents={pool?.result?.allocations.find((a) => a.id === row.id)?.cents ?? null}
         excluded={effectiveExclusion(row.exclude_tips, row.employee_excludes_tips)}
+        excludeTips={row.exclude_tips}
+        employeeExcludesTips={row.employee_excludes_tips}
         editable={editable}
       />
 

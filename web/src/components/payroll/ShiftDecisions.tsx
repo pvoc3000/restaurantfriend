@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { PickList } from "@/components/ui/PickList";
+import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { TextInput } from "@/components/ui/TextInput";
 import { MEAL_CODE_LABEL, type BreakFinding } from "@/lib/breakRules";
+import { effectiveExclusion } from "@/lib/timesheets";
 import { formatCents, formatRate, parseDollarsToCents, type PoolResult } from "@/lib/tipPool";
 
 /**
@@ -228,6 +230,7 @@ export function ShiftPremium({
  * so this is the same call the worksheet made, from a better place.
  */
 export function ShiftTips({
+  timesheetId,
   locationId,
   locationCode,
   businessDate,
@@ -237,8 +240,11 @@ export function ShiftTips({
   tipHours,
   allocationCents,
   excluded,
+  excludeTips,
+  employeeExcludesTips,
   editable,
 }: {
+  timesheetId: string;
   locationId: string | null;
   locationCode: string | null;
   businessDate: string;
@@ -252,6 +258,10 @@ export function ShiftTips({
   allocationCents: number | null;
   /** True when this shift takes nothing — by the person's default or an override. */
   excluded: boolean;
+  /** The row's own tri-state: null inherits the person's default. */
+  excludeTips: boolean | null;
+  /** `employees.excludes_tips` — the durable flag the null inherits from. */
+  employeeExcludesTips: boolean;
   editable: boolean;
 }) {
   const router = useRouter();
@@ -332,6 +342,22 @@ export function ShiftTips({
             </>
           )}
         </dd>
+        {/* THE TRI-STATE MOVED HERE from the list's Tips column (Mark,
+            2026-08-23), which now shows what this shift actually EARNED.
+            This is its right home: it is a tip decision, and it sits directly
+            under the share it governs, where "excluded from the pool" above
+            and the control that causes it are one glance apart. On the list it
+            was a picker in a 100px cell answering a question nobody asks while
+            scanning a fortnight. */}
+        <dt className="text-subtle">In pool</dt>
+        <dd>
+          <TipExclusion
+            timesheetId={timesheetId}
+            excludeTips={excludeTips}
+            employeeExcludesTips={employeeExcludesTips}
+            editable={editable}
+          />
+        </dd>
       </dl>
 
       {editable && locationId && (
@@ -356,6 +382,53 @@ export function ShiftTips({
 
       {failed && <p className="border border-accent px-3 py-2 text-[13px] text-accent">{failed}</p>}
     </div>
+  );
+}
+
+/**
+ * The tri-state (decision 4). A PickList with three options, never a checkbox —
+ * a checkbox cannot say the third thing, and the third thing ("included despite
+ * the default") is the whole reason the column is nullable.
+ *
+ * Moved here from the list's Tips column on 2026-08-23, when that column
+ * started showing the money instead.
+ */
+function TipExclusion({
+  timesheetId,
+  excludeTips,
+  employeeExcludesTips,
+  editable,
+}: {
+  timesheetId: string;
+  excludeTips: boolean | null;
+  employeeExcludesTips: boolean;
+  editable: boolean;
+}) {
+  const effective = effectiveExclusion(excludeTips, employeeExcludesTips);
+  const label =
+    excludeTips === null
+      ? effective
+        ? "Excluded (person)"
+        : "In pool"
+      : excludeTips
+        ? "Excluded"
+        : "In pool (override)";
+
+  if (!editable) return <span className={`${READ_ONLY_VALUE} text-muted`}>{label}</span>;
+
+  return (
+    <InlineValue
+      table="timesheets"
+      id={timesheetId}
+      column="exclude_tips"
+      kind="pick"
+      value={excludeTips === null ? "" : String(excludeTips)}
+      options={[
+        { value: "", label: employeeExcludesTips ? "Inherit — excluded" : "Inherit — in pool" },
+        { value: "true", label: "Excluded from this shift" },
+        { value: "false", label: "In the pool despite the default" },
+      ]}
+    />
   );
 }
 
