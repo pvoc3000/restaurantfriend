@@ -110,6 +110,21 @@ export function canManageMembers(role: Role): boolean {
 export const canReadHr = canManageMembers;
 
 /**
+ * Pull daily sales and tips from Square — migration 063's `record_daily_sales`,
+ * which checks this same set inside the function.
+ *
+ * READING `/sales` is open to every member: what the shop took is a shop-floor
+ * fact, and 063's select policy is membership-wide. This is only the SYNC,
+ * which is an IMPORT — it rewrites the org's sales history and feeds the tip
+ * figure payroll divides — and 030 already gates imports here.
+ *
+ * Named separately from `canManageMembers` for that file's own reason: "may
+ * invite a colleague" and "may restate a year of takings" are different
+ * questions with the same answer today.
+ */
+export const canSyncSales = canManageMembers;
+
+/**
  * Approve a vendor invoice for payment — migration 025's
  * `set_vendor_invoice_approval`, which checks this same set inside the
  * function because RLS filters rows and this is a COLUMN rule.

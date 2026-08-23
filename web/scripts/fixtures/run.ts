@@ -52,6 +52,8 @@ import "./specialOrders.fixtures";
 import "./specialOrderDocs.fixtures";
 import "./specialOrderLines.fixtures";
 import "./specialOrderProgress.fixtures";
+import "./sales.fixtures";
+import "./squareSalesCsv.fixtures";
 import "./tableSort.fixtures";
 import "./tipPool.fixtures";
 import "./timeZone.fixtures";

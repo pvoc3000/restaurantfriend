@@ -7,6 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "verify:square": "node --env-file=../migration/.env scripts/verify-square.mjs",
     "fixtures": "tsc -p scripts/fixtures/tsconfig.json && node .fixtures-build/scripts/fixtures/run.js",
     "clean": "rm -rf .next .fixtures-build"
   },

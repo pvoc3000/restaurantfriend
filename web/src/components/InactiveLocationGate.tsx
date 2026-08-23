@@ -25,7 +25,16 @@ const LOCATIONS_ROUTE = "/locations";
  * on the list rather than a scope around it, so there is nothing here for a
  * closed working location to empty.
  */
-const UNSCOPED_ROUTES = [LOCATIONS_ROUTE, "/employees", "/special-orders", "/customers"];
+const UNSCOPED_ROUTES = [
+  LOCATIONS_ROUTE,
+  "/employees",
+  "/special-orders",
+  "/customers",
+  // Both shops side by side IS the screen, so location is a filter dimension
+  // here rather than a scope around it — there is nothing to empty when the
+  // working location is closed.
+  "/sales",
+];
 
 function isUnscopedRoute(pathname: string): boolean {
   return UNSCOPED_ROUTES.some(

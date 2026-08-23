@@ -1,0 +1,355 @@
+/**
+ * DAILY NET SALES AND TIPS — the arithmetic behind /sales.
+ *
+ * Pure, so it is fixture-tested and compiled into the Node fixture run. Imports
+ * nothing but `payPeriods` (date arithmetic) and `tipPool` (money formatting),
+ * both of which are pure too — no Supabase client, or the fixture build breaks.
+ *
+ * Money is INTEGER CENTS throughout, for migration 029's reason: a year of days
+ * has to sum to the figure printed on Square's dashboard, and floating point
+ * cannot promise that.
+ */
+
+import { addDays, daysBetween } from "./payPeriods";
+
+export type SalesDay = {
+  location_id: string;
+  locationCode: string;
+  /** Square's REPORTING day — see the column comment on daily_sales. */
+  business_date: string;
+  netSalesCents: number;
+  tipsCents: number;
+  syncedAt: string | null;
+};
+
+export type DateRange = { from: string; to: string };
+
+export type SalesTotals = {
+  netSalesCents: number;
+  tipsCents: number;
+  /** Shop-days summed — two shops on one date is 2, which is what makes an
+   *  average-per-day figure honest when one shop is closed. */
+  days: number;
+};
+
+export const ZERO_TOTALS: SalesTotals = { netSalesCents: 0, tipsCents: 0, days: 0 };
+
+export function sumSales(days: readonly SalesDay[]): SalesTotals {
+  let netSalesCents = 0;
+  let tipsCents = 0;
+  for (const d of days) {
+    netSalesCents += d.netSalesCents;
+    tipsCents += d.tipsCents;
+  }
+  return { netSalesCents, tipsCents, days: days.length };
+}
+
+export function inRange(day: SalesDay, range: DateRange): boolean {
+  return day.business_date >= range.from && day.business_date <= range.to;
+}
+
+export function daysIn(days: readonly SalesDay[], range: DateRange): SalesDay[] {
+  return days.filter((d) => inRange(d, range));
+}
+
+/**
+ * Tips as a FRACTION of net sales — 017's `tax_rate` convention, where 0.0975
+ * is 9.75%. The screen multiplies; this never does.
+ *
+ * NULL when net sales is zero or negative, and that is the whole care here:
+ * both 0% and Infinity are answers nobody asked for, and a day of pure refunds
+ * would otherwise print a confident percentage with no meaning. The screen
+ * renders "—".
+ */
+export function tipFraction(t: SalesTotals): number | null {
+  if (t.netSalesCents <= 0) return null;
+  return t.tipsCents / t.netSalesCents;
+}
+
+/**
+ * The window of the same length immediately before `range`, touching it but not
+ * overlapping.
+ *
+ * NB `daysBetween` is INCLUSIVE — 2026-07-20 → 2026-08-02 is 14, not 13 — so
+ * the shift is the span itself and not the span plus one. A fortnight compared
+ * against fifteen days would understate every rise by a day's takings.
+ */
+export function previousRange(range: DateRange): DateRange {
+  const span = daysBetween(range.from, range.to);
+  return { from: addDays(range.from, -span), to: addDays(range.from, -1) };
+}
+
+/**
+ * A YEAR AGO — and by default that is **364 days back, not one calendar year**.
+ *
+ * This is a real decision, not a rounding convenience. Comparing Saturday
+ * 2026-08-22 against Friday 2025-08-22 compares two different businesses: a
+ * bakery's Saturday and its Friday are not the same shop, and over a fortnight
+ * the calendar answer silently shifts every weekend by a day. 364 is 52 whole
+ * weeks, so every date lands on the same weekday it started on.
+ *
+ * `sameDates` is available for whoever wants the calendar answer, and the
+ * screen says which one it used — a comparison that will not say what it
+ * compared is worth nothing.
+ */
+export function lastYearRange(
+  range: DateRange,
+  mode: "weekAligned" | "sameDates" = "weekAligned"
+): DateRange {
+  if (mode === "weekAligned") {
+    return { from: addDays(range.from, -364), to: addDays(range.to, -364) };
+  }
+  return { from: shiftYear(range.from), to: shiftYear(range.to) };
+}
+
+/** One calendar year back, clamping 29 February to the 28th. */
+function shiftYear(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  const year = y - 1;
+  const last = new Date(Date.UTC(year, m, 0)).getUTCDate();
+  const day = Math.min(d, last);
+  return `${year}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+export type Comparison = {
+  current: SalesTotals;
+  basis: SalesTotals;
+  basisRange: DateRange;
+  netDeltaCents: number;
+  /** Null when the basis took nothing — growth from zero has no percentage. */
+  netDeltaFraction: number | null;
+  tipsDeltaCents: number;
+  tipsDeltaFraction: number | null;
+  /** Change in tips-as-a-share-of-sales, in fraction points. */
+  tipFractionDelta: number | null;
+};
+
+export function compareTotals(
+  current: SalesTotals,
+  basis: SalesTotals,
+  basisRange: DateRange
+): Comparison {
+  const curTip = tipFraction(current);
+  const basTip = tipFraction(basis);
+  return {
+    current,
+    basis,
+    basisRange,
+    netDeltaCents: current.netSalesCents - basis.netSalesCents,
+    netDeltaFraction: fractionChange(basis.netSalesCents, current.netSalesCents),
+    tipsDeltaCents: current.tipsCents - basis.tipsCents,
+    tipsDeltaFraction: fractionChange(basis.tipsCents, current.tipsCents),
+    tipFractionDelta: curTip === null || basTip === null ? null : curTip - basTip,
+  };
+}
+
+function fractionChange(from: number, to: number): number | null {
+  if (from <= 0) return null;
+  return (to - from) / from;
+}
+
+/**
+ * Shop-days in the window that have NO row — the screen's "3 days have not been
+ * pulled" line.
+ *
+ * It matters more than it looks: every comparison above is a sum, and a sum
+ * over a window with holes in it is smaller than the truth while looking
+ * exactly as authoritative. A period missing two Saturdays reads as a bad
+ * fortnight. So the screen states the holes beside the figures rather than
+ * leaving the reader to trust them.
+ *
+ * `through` exists because today is always missing — the shop has not finished
+ * trading — and a screen that reports today as a gap every single day teaches
+ * you to ignore the line.
+ */
+export function missingDays(
+  days: readonly SalesDay[],
+  locations: readonly { id: string; code: string }[],
+  range: DateRange,
+  through?: string
+): { location_id: string; locationCode: string; business_date: string }[] {
+  const have = new Set(days.map((d) => `${d.location_id}|${d.business_date}`));
+  const last = through && through < range.to ? through : range.to;
+
+  const out: { location_id: string; locationCode: string; business_date: string }[] = [];
+  for (let date = range.from; date <= last; date = addDays(date, 1)) {
+    for (const loc of locations) {
+      if (!have.has(`${loc.id}|${date}`)) {
+        out.push({ location_id: loc.id, locationCode: loc.code, business_date: date });
+      }
+    }
+  }
+  return out;
+}
+
+/** Both shops' figures folded into one row per date. */
+export function rollUpByDate(days: readonly SalesDay[]): Map<string, SalesTotals> {
+  return rollUp(days, (d) => d.business_date);
+}
+
+/** Every date folded into one row per shop. */
+export function rollUpByLocation(days: readonly SalesDay[]): Map<string, SalesTotals> {
+  return rollUp(days, (d) => d.locationCode);
+}
+
+function rollUp(
+  days: readonly SalesDay[],
+  key: (d: SalesDay) => string
+): Map<string, SalesTotals> {
+  const out = new Map<string, SalesTotals>();
+  for (const d of days) {
+    const k = key(d);
+    const cur = out.get(k) ?? { netSalesCents: 0, tipsCents: 0, days: 0 };
+    out.set(k, {
+      netSalesCents: cur.netSalesCents + d.netSalesCents,
+      tipsCents: cur.tipsCents + d.tipsCents,
+      days: cur.days + 1,
+    });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Which window the screen is looking at
+// ---------------------------------------------------------------------------
+
+/**
+ * The named windows, in the order the picker offers them.
+ *
+ * `period` leads and is the default because the PAY PERIOD is the unit Mark
+ * already thinks in — it is what payroll, tips and the Gusto export are all
+ * scoped to, so "how did this period do" is the question the screen opens on.
+ */
+export const SALES_RANGES = [
+  "period",
+  "last-period",
+  "mtd",
+  "last-30",
+  "ytd",
+  "custom",
+] as const;
+
+export type SalesRangeKey = (typeof SALES_RANGES)[number];
+
+export const SALES_RANGE_LABEL: Record<SalesRangeKey, string> = {
+  period: "This pay period",
+  "last-period": "Last pay period",
+  mtd: "Month to date",
+  "last-30": "Last 30 days",
+  ytd: "Year to date",
+  custom: "Custom",
+};
+
+export function parseSalesRange(raw: string | undefined | null): SalesRangeKey {
+  // Anything unrecognised falls back to the default rather than erroring: a
+  // stale bookmark should show you the screen, not a stack trace.
+  return SALES_RANGES.includes(raw as SalesRangeKey) ? (raw as SalesRangeKey) : "period";
+}
+
+/**
+ * Turn the picker's choice into real dates.
+ *
+ * `periods` is whatever `pay_periods` rows the page loaded, newest first; the
+ * pay-period windows fall back to the last 14 days when the calendar cannot
+ * answer — after the FileMaker load there were spells with no open period at
+ * all, and a screen that renders nothing because a period is missing is worse
+ * than one that shows a fortnight and says which.
+ */
+export function resolveSalesRange(
+  key: SalesRangeKey,
+  today: string,
+  periods: readonly { start_date: string; end_date: string }[],
+  custom?: { from?: string | null; to?: string | null }
+): { range: DateRange; label: string; fellBack: boolean } {
+  const sorted = [...periods].sort((a, b) => (a.start_date < b.start_date ? 1 : -1));
+  const containing = sorted.find((p) => p.start_date <= today && today <= p.end_date);
+
+  const fortnight = (): DateRange => ({ from: addDays(today, -13), to: today });
+
+  switch (key) {
+    case "period": {
+      if (containing) {
+        return {
+          range: { from: containing.start_date, to: containing.end_date },
+          label: `${containing.start_date} – ${containing.end_date}`,
+          fellBack: false,
+        };
+      }
+      return { range: fortnight(), label: "the last 14 days", fellBack: true };
+    }
+    case "last-period": {
+      const idx = containing ? sorted.indexOf(containing) : -1;
+      const prev = idx >= 0 ? sorted[idx + 1] : sorted.find((p) => p.end_date < today);
+      if (prev) {
+        return {
+          range: { from: prev.start_date, to: prev.end_date },
+          label: `${prev.start_date} – ${prev.end_date}`,
+          fellBack: false,
+        };
+      }
+      const back = previousRange(fortnight());
+      return { range: back, label: "the fortnight before last", fellBack: true };
+    }
+    case "mtd":
+      return {
+        range: { from: `${today.slice(0, 7)}-01`, to: today },
+        label: `${today.slice(0, 7)}`,
+        fellBack: false,
+      };
+    case "last-30":
+      return { range: { from: addDays(today, -29), to: today }, label: "last 30 days", fellBack: false };
+    case "ytd":
+      return {
+        range: { from: `${today.slice(0, 4)}-01-01`, to: today },
+        label: today.slice(0, 4),
+        fellBack: false,
+      };
+    case "custom": {
+      // A half-filled custom range is the normal state while somebody is still
+      // typing one, so each end falls back independently rather than the whole
+      // thing collapsing to a default.
+      const from = isISODate(custom?.from) ? (custom!.from as string) : addDays(today, -29);
+      const to = isISODate(custom?.to) ? (custom!.to as string) : today;
+      const range = from <= to ? { from, to } : { from: to, to: from };
+      return { range, label: `${range.from} – ${range.to}`, fellBack: false };
+    }
+  }
+}
+
+function isISODate(v: string | null | undefined): boolean {
+  if (!v || !/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  // A round trip, never the regex alone: `new Date("2026-02-31")` does not
+  // fail, it rolls over to March 2nd — `parseISODate`'s own lesson.
+  const [y, m, d] = v.split("-").map(Number);
+  const back = new Date(Date.UTC(y, m - 1, d));
+  return (
+    back.getUTCFullYear() === y && back.getUTCMonth() === m - 1 && back.getUTCDate() === d
+  );
+}
+
+/**
+ * The widest window the page must fetch to answer everything on screen: the
+ * chosen range, the one before it, and the same range a year ago.
+ *
+ * One query rather than three. At two shops a year is ~730 rows, so the whole
+ * comparison is cheaper to slice in TypeScript than to ask for three times.
+ */
+export function fetchWindow(range: DateRange): DateRange {
+  const prev = previousRange(range);
+  const year = lastYearRange(range);
+  const from = [range.from, prev.from, year.from].sort()[0];
+  const to = [range.to, prev.to, year.to].sort().slice(-1)[0];
+  return { from, to };
+}
+
+/**
+ * A fraction as a percentage string. One decimal, because a tip rate moves
+ * within a point and "12%" hides the movement this screen exists to show.
+ */
+export function formatFraction(f: number | null, opts: { sign?: boolean } = {}): string {
+  if (f === null || !Number.isFinite(f)) return "—";
+  const pct = f * 100;
+  const body = `${Math.abs(pct).toFixed(1)}%`;
+  if (!opts.sign) return pct < 0 ? `-${body}` : body;
+  return pct < 0 ? `-${body}` : pct > 0 ? `+${body}` : body;
+}
