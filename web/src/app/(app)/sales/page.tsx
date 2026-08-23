@@ -71,7 +71,7 @@ export default async function SalesPage({
 
   const { data: salesRows, error } = await supabase
     .from("daily_sales")
-    .select("location_id, business_date, net_sales_cents, tips_cents, synced_at")
+    .select("location_id, business_date, net_sales_cents, tips_cents, synced_at, source")
     .gte("business_date", window.from)
     .lte("business_date", window.to)
     .order("business_date", { ascending: false });
@@ -102,6 +102,7 @@ export default async function SalesPage({
     netSalesCents: Number(r.net_sales_cents),
     tipsCents: Number(r.tips_cents),
     syncedAt: (r.synced_at as string | null) ?? null,
+    source: (r.source as string) ?? "square",
   }));
 
   // Which shops this screen is ABOUT: the ones mapped to Square. A shop with no
@@ -174,6 +175,7 @@ export default async function SalesPage({
       </div>
 
       <SalesScreen
+        canEdit={canSyncSales(session.membership.role)}
         days={days}
         range={resolved.range}
         rangeLabel={resolved.label}

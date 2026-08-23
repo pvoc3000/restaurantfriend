@@ -20,6 +20,9 @@ export type SalesDay = {
   netSalesCents: number;
   tipsCents: number;
   syncedAt: string | null;
+  /** `daily_sales.source` — 'square', or 'manual' once somebody corrected it.
+   *  A manual row is skipped by the sync (migration 065). */
+  source?: string;
 };
 
 export type DateRange = { from: string; to: string };

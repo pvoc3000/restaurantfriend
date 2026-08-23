@@ -24,6 +24,8 @@ import {
 } from "@/lib/sales";
 import { SalesSummary } from "./SalesSummary";
 import { daysBetween } from "@/lib/payPeriods";
+import { InlineValue } from "@/components/catalog/InlineValue";
+import { createClient } from "@/lib/supabase/client";
 import type { RawSearchParams } from "@/lib/filterMenus";
 
 type Row = SalesDay & { id: string };
@@ -38,6 +40,7 @@ type Row = SalesDay & { id: string };
  * query spans a year.
  */
 export function SalesScreen({
+  canEdit,
   days,
   range,
   rangeLabel,
@@ -53,6 +56,8 @@ export function SalesScreen({
   yesterday,
   params,
 }: {
+  /** Owner/admin — migration 065 re-checks it inside the function. */
+  canEdit: boolean;
   /** The whole window, EVERY shop — the filter is applied here. */
   days: SalesDay[];
   range: DateRange;
@@ -78,6 +83,7 @@ export function SalesScreen({
   // so three shops cost 2.7s and three back-presses. `history.replaceState` is
   // what `lib/filterMenus` has always done and what this should have done.
   const [picked, setPicked] = useState<string[]>(initialPicked);
+  const [revertError, setRevertError] = useState<string | null>(null);
 
   function pick(next: string[]) {
     setPicked(next);
@@ -115,6 +121,21 @@ export function SalesScreen({
   }, [visible, shopsInScope, elapsed, elapsedDays, partial, prevRange, yearRange,
       rangeLabel, fellBack, yesterday, range]);
 
+  const supabase = createClient();
+
+  async function revert(row: Row) {
+    const { error } = await supabase.rpc("revert_daily_sales_to_square", {
+      p_location_id: row.location_id,
+      p_business_date: row.business_date,
+    });
+    if (error) {
+      setRevertError(error.message);
+      return;
+    }
+    setRevertError(null);
+    router.refresh();
+  }
+
   const rows: Row[] = useMemo(
     () =>
       visible
@@ -138,6 +159,26 @@ export function SalesScreen({
       else q.set(k, v);
     }
     router.push(`/sales${q.toString() ? `?${q}` : ""}`);
+  }
+
+  // CENTS stored, DOLLARS typed. `scale` converts BOTH ways, which is the
+  // difference from `format` — without it, clicking a cell reading $2,336.28
+  // would put 233628 in the box.
+  const CENTS = { toShown: (c: number) => c / 100, toStored: (d: number) => Math.round(d * 100) };
+
+  /** Both figures write through 065's definer function, never a direct update:
+   *  "owner/admin may set THESE TWO columns" is a column rule, and a plain
+   *  update would match no policy, change nothing and return NO error. */
+  function writeFigure(row: Row, column: "net_sales_cents" | "tips_cents") {
+    return async (next: string | number | null) => {
+      const { error } = await supabase.rpc("set_daily_sales_figure", {
+        p_location_id: row.location_id,
+        p_business_date: row.business_date,
+        p_column: column,
+        p_cents: next === null || next === "" ? null : Number(next),
+      });
+      return { error: error?.message ?? null };
+    };
   }
 
   const columns: DataColumn<Row>[] = [
@@ -164,11 +205,27 @@ export function SalesScreen({
       width: 200,
       align: "right",
       sortValue: (r) => r.netSalesCents,
-      render: (r) => (
-        <span className={`tabular-nums ${r.netSalesCents < 0 ? "text-accent" : ""}`}>
-          {formatCents(r.netSalesCents)}
-        </span>
-      ),
+      render: (r) =>
+        canEdit ? (
+          <InlineValue
+            table="daily_sales"
+            id={r.id}
+            column="net_sales_cents"
+            kind="number"
+            align="right"
+            nullable={false}
+            value={r.netSalesCents}
+            scale={CENTS}
+            format={(v) => formatCents(Math.round(Number(v) * 100))}
+            onWrite={writeFigure(r, "net_sales_cents")}
+            ariaLabel={`Net sales for ${r.locationCode} on ${r.business_date}`}
+            className={r.netSalesCents < 0 ? "text-accent" : ""}
+          />
+        ) : (
+          <span className={`tabular-nums ${r.netSalesCents < 0 ? "text-accent" : ""}`}>
+            {formatCents(r.netSalesCents)}
+          </span>
+        ),
     },
     {
       key: "tips",
@@ -176,7 +233,24 @@ export function SalesScreen({
       width: 180,
       align: "right",
       sortValue: (r) => r.tipsCents,
-      render: (r) => <span className="tabular-nums">{formatCents(r.tipsCents)}</span>,
+      render: (r) =>
+        canEdit ? (
+          <InlineValue
+            table="daily_sales"
+            id={r.id}
+            column="tips_cents"
+            kind="number"
+            align="right"
+            nullable={false}
+            value={r.tipsCents}
+            scale={CENTS}
+            format={(v) => formatCents(Math.round(Number(v) * 100))}
+            onWrite={writeFigure(r, "tips_cents")}
+            ariaLabel={`Tips for ${r.locationCode} on ${r.business_date}`}
+          />
+        ) : (
+          <span className="tabular-nums">{formatCents(r.tipsCents)}</span>
+        ),
     },
     {
       key: "share",
@@ -198,12 +272,32 @@ export function SalesScreen({
       label: "Pulled",
       width: 180,
       hideWhenCompact: true,
-      sortValue: (r) => r.syncedAt ?? "",
-      render: (r) => (
-        <span className="text-muted tabular-nums">
-          {r.syncedAt ? r.syncedAt.slice(0, 10) : "—"}
-        </span>
-      ),
+      sortValue: (r) => (r.source === "manual" ? "" : r.syncedAt ?? ""),
+      render: (r) =>
+        // A CORRECTED DAY SAYS SO, and says it here rather than beside the
+        // figure: what changed is not the number's meaning but its PROVENANCE,
+        // which is exactly what this column already reports. The sync skips
+        // these rows (065), so without the mark a stale correction would look
+        // like a day Square simply had not refreshed.
+        r.source === "manual" ? (
+          <span className="flex items-center gap-2">
+            <span className="bg-mark-fill px-1 text-[11px]">edited</span>
+            {canEdit ? (
+              <button
+                type="button"
+                className="text-[11px] text-muted underline hover:text-ink"
+                onClick={() => void revert(r)}
+                title="Hand this day back to Square. The next sync replaces both figures."
+              >
+                revert
+              </button>
+            ) : null}
+          </span>
+        ) : (
+          <span className="text-muted tabular-nums">
+            {r.syncedAt ? r.syncedAt.slice(0, 10) : "—"}
+          </span>
+        ),
     },
   ];
 
@@ -212,6 +306,7 @@ export function SalesScreen({
       <SalesSummary summary={summary} />
 
       <section className="space-y-4">
+        {revertError ? <p className="text-xs text-accent">{revertError}</p> : null}
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <Field label="Period">
           <TabPicker
