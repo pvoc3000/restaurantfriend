@@ -111,13 +111,27 @@ export default async function SalesPage({
   // Which shops this screen is ABOUT: the ones mapped to Square. A shop with no
   // mapping has no rows and never will, so listing it would only add an empty
   // column to every comparison.
+  //
+  // NOT filtered on `is_active`: the online channel is a VIRTUAL, INACTIVE
+  // location on purpose (Mark, 2026-08-23) — inactive keeps it out of
+  // `session.activeLocations` and so out of every per-location enumeration in
+  // the app, while `square_location_id` is what decides whether it has sales
+  // to show. Being mapped is the whole qualification.
+  //
+  // `open_days` comes with it because `missingDays` needs to know when a place
+  // TRADES: the online channel sells on about five days a year, and expecting a
+  // row from it every day would report ~230 phantom gaps.
   const { data: mapped } = await supabase
     .from("locations")
-    .select("id, code")
+    .select("id, code, open_days")
     .not("square_location_id", "is", null)
     .order("code");
 
-  const shops = (mapped ?? []).map((l) => ({ id: l.id as string, code: l.code as string }));
+  const shops = (mapped ?? []).map((l) => ({
+    id: l.id as string,
+    code: l.code as string,
+    openDays: (l.open_days as number[] | null) ?? null,
+  }));
 
   const locationFilter = first(params.location) ?? "";
   const visible = locationFilter

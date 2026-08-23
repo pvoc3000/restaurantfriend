@@ -10,7 +10,7 @@
  * cannot promise that.
  */
 
-import { addDays, daysBetween } from "./payPeriods";
+import { addDays, daysBetween, isoWeekday } from "./payPeriods";
 
 export type SalesDay = {
   location_id: string;
@@ -194,7 +194,7 @@ function fractionChange(from: number, to: number): number | null {
  */
 export function missingDays(
   days: readonly SalesDay[],
-  locations: readonly { id: string; code: string }[],
+  locations: readonly SalesLocation[],
   range: DateRange,
   through?: string
 ): { location_id: string; locationCode: string; business_date: string }[] {
@@ -204,12 +204,50 @@ export function missingDays(
   const out: { location_id: string; locationCode: string; business_date: string }[] = [];
   for (let date = range.from; date <= last; date = addDays(date, 1)) {
     for (const loc of locations) {
+      // A DAY THE PLACE DOES NOT TRADE IS NOT A GAP. `locations.open_days` is
+      // 017's ISO weekday set, already filled in — [1..7] for both shops.
+      //
+      // Without this the online channel alone would report ~230 gaps a year,
+      // because it sells on about five days and the loop expects a row from
+      // every location on every date. A banner that always reads "230 shop-days
+      // have not been pulled" is precisely the failure this line exists to
+      // prevent: an always-on warning is one nobody reads, and then the real
+      // gap goes past unnoticed.
+      //
+      // An EMPTY open_days means "no fixed trading days" — an online channel, an
+      // events location — and expects nothing. Null or absent means we were
+      // never told, and then the old behaviour stands: expect a row every day,
+      // because silence about a shop's hours must not silence a real gap.
+      if (!expectsSalesOn(loc, date)) continue;
       if (!have.has(`${loc.id}|${date}`)) {
         out.push({ location_id: loc.id, locationCode: loc.code, business_date: date });
       }
     }
   }
   return out;
+}
+
+/** A location as this screen needs it: enough to know when it trades. */
+export type SalesLocation = {
+  id: string;
+  code: string;
+  /** `locations.open_days` — ISO weekdays, 1 = Monday. See `expectsSalesOn`. */
+  openDays?: readonly number[] | null;
+};
+
+/**
+ * Would we expect this location to have taken money on this date?
+ *
+ * Three states, and the middle one is the reason this exists:
+ *   * a weekday set — trades on those days only;
+ *   * an EMPTY set — no fixed trading days, so never a gap;
+ *   * null/absent — unknown, so assume every day, which keeps a real gap loud.
+ */
+export function expectsSalesOn(loc: SalesLocation, dateISO: string): boolean {
+  const open = loc.openDays;
+  if (open === null || open === undefined) return true;
+  if (open.length === 0) return false;
+  return open.includes(isoWeekday(dateISO));
 }
 
 /** Both shops' figures folded into one row per date. */

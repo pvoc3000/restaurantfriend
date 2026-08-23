@@ -22,6 +22,7 @@ import {
   elapsedRange,
   isPartial,
   openingSlice,
+  expectsSalesOn,
   type SalesDay,
 } from "../../src/lib/sales";
 import { isoWeekday, daysBetween } from "../../src/lib/payPeriods";
@@ -456,3 +457,52 @@ function addDaysLocal(iso: string, n: number): string {
   d.setUTCDate(d.getUTCDate() + n);
   return d.toISOString().slice(0, 10);
 }
+
+// ---------------------------------------------------------------------------
+// missingDays respects open_days — a day the place doesn't trade is not a gap
+// ---------------------------------------------------------------------------
+
+test("a location with an EMPTY open_days never reports a gap", () => {
+  // The online channel: sells on about five days a year. Expecting a row from
+  // it every day would bury the real gaps under ~230 phantom ones.
+  const online = { id: "online", code: "ONLINE", openDays: [] as number[] };
+  const gaps = missingDays([], [online], { from: "2026-08-01", to: "2026-08-31" });
+  eq(gaps.length, 0, "no fixed trading days, so nothing is missing");
+});
+
+test("a location with NO open_days still expects a row every day", () => {
+  // Silence about a shop's hours must not silence a real gap.
+  for (const openDays of [null, undefined]) {
+    const loc = { id: "x", code: "DF01", openDays };
+    const gaps = missingDays([], [loc], { from: "2026-08-01", to: "2026-08-03" });
+    eq(gaps.length, 3, `openDays=${String(openDays)} expects every day`);
+  }
+});
+
+test("a location open only some weekdays reports gaps on those days ALONE", () => {
+  // 2026-08-01 is a Saturday. Open Mon–Fri (ISO 1..5) means Sat and Sun are
+  // never gaps.
+  eq(isoWeekday("2026-08-01"), 6, "2026-08-01 is a Saturday");
+  const weekdaysOnly = { id: "w", code: "WK", openDays: [1, 2, 3, 4, 5] };
+  const gaps = missingDays([], [weekdaysOnly], { from: "2026-08-01", to: "2026-08-07" });
+  eq(
+    gaps.map((g) => g.business_date),
+    ["2026-08-03", "2026-08-04", "2026-08-05", "2026-08-06", "2026-08-07"],
+    "Mon–Fri only; the weekend is not a gap"
+  );
+});
+
+test("a shop open every day still reports a real hole", () => {
+  // The case the whole line exists for — this must not be softened by the fix.
+  const shop = { id: "df01", code: "DF01", openDays: [1, 2, 3, 4, 5, 6, 7] };
+  const days = [day("DF01", "2026-08-01", 1, 1, "df01"), day("DF01", "2026-08-03", 1, 1, "df01")];
+  const gaps = missingDays(days, [shop], { from: "2026-08-01", to: "2026-08-03" });
+  eq(gaps.map((g) => g.business_date), ["2026-08-02"], "the middle day is still a gap");
+});
+
+test("expectsSalesOn states the three cases directly", () => {
+  eq(expectsSalesOn({ id: "a", code: "A", openDays: null }, "2026-08-01"), true, "unknown");
+  eq(expectsSalesOn({ id: "a", code: "A", openDays: [] }, "2026-08-01"), false, "no fixed days");
+  eq(expectsSalesOn({ id: "a", code: "A", openDays: [6] }, "2026-08-01"), true, "a Saturday");
+  eq(expectsSalesOn({ id: "a", code: "A", openDays: [1] }, "2026-08-01"), false, "Mondays only");
+});
