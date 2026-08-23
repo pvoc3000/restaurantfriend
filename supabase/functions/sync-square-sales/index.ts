@@ -7,11 +7,14 @@
 // prefer it if they didn't."
 //
 // WHAT MAKES THE FIGURES MATCH THE DASHBOARD, which is the whole point: the
-// Reporting API's `local_reporting_timestamp` dimension is the seller's own
-// REPORTING DAY, and Donut Friend's runs 1:00 AM – 12:59 AM PT. Aggregating
-// orders by UTC timestamp — the obvious alternative — can never reproduce that,
-// so the numbers would be close, always slightly different, and impossible to
+// Reporting API's `reporting_day` dimension is the seller's own REPORTING DAY,
+// and Donut Friend's runs 1:00 AM – 12:59 AM PT. Aggregating orders by UTC
+// timestamp — the obvious alternative — can never reproduce that, so the
+// numbers would be close, always slightly different, and impossible to
 // reconcile against the screen Mark actually reads.
+//
+// It must be `reporting_day` and NOT `local_reporting_timestamp`; see the note
+// on the queries below, which is the one detail here that cost a backfill.
 //
 // Design rule 1: the Supabase client here carries the CALLER's JWT, so every
 // query and the write flow through RLS exactly as they would from the browser.
@@ -200,7 +203,7 @@ async function loadCube(
  * Pull one measure over a window, as cells.
  *
  * The cube's own key names come back prefixed and, on some deployments,
- * granularity-suffixed (`Sales.local_reporting_timestamp.day`), so the reader
+ * granularity-suffixed (`Sales.reporting_day.day`), so the reader
  * matches on a SUFFIX rather than an exact string. A rename still fails, and
  * fails loudly at the row level rather than silently returning nothing.
  */
@@ -237,8 +240,12 @@ Deno.serve(async (req) => {
     const payload = await req.json().catch(() => ({}));
     const { mode, from, to } = payload as { mode?: string; from?: string; to?: string };
 
-    if (mode !== "locations" && (!from || !to)) {
-      return json(400, { error: "missing from and to (or mode: 'locations')" });
+    // The two catalogue modes need no window; the sync needs one.
+    const NO_WINDOW_MODES = ["locations", "meta"];
+    if (!NO_WINDOW_MODES.includes(mode ?? "") && (!from || !to)) {
+      return json(400, {
+        error: `missing from and to (or mode: ${NO_WINDOW_MODES.map((m) => `'${m}'`).join(" / ")})`,
+      });
     }
     if (from && to && from > to) {
       return json(400, { error: "`from` is after `to`" });
@@ -302,6 +309,24 @@ Deno.serve(async (req) => {
     // a dashboard URL and choosing from a list. It also lets the setup doc
     // carry a self-check: if the timezone Square reports for a shop is not the
     // org's own, stop and ask, because the reporting day will not line up.
+    // --- mode: meta ---------------------------------------------------------
+    //
+    // The cube catalogue, straight from Square. This exists because the first
+    // backfill was WRONG in a way only real data showed: net sales and tips
+    // disagreed with the dashboard on 32 and 10 cells, always as adjacent pairs
+    // that summed to zero — a late-night order landing on the wrong side of a
+    // day boundary, never a wrong amount. Guessing a second dimension name
+    // would have been guessing twice; this asks.
+    if (mode === "meta") {
+      let body: Record<string, unknown>;
+      try {
+        body = await squareFetch(token, "/reporting/v1/meta");
+      } catch (e) {
+        return squareFailure(e, rawToken, token);
+      }
+      return json(200, body);
+    }
+
     if (mode === "locations") {
       let body: Record<string, unknown>;
       try {
@@ -356,19 +381,32 @@ Deno.serve(async (req) => {
     // reports: Mark's dashboard exported them as two separate files. If a
     // single combined query turns out to work, collapsing these is a small,
     // safe edit — the join below stops mattering.
+    // `reporting_day`, NOT `local_reporting_timestamp` — and the difference is
+    // an hour of somebody's takings landing on the wrong day.
+    //
+    // Square describes `reporting_day` as "Seller reporting day for this row's
+    // revenue recognition timestamp, REPRESENTED AS MIDNIGHT ON THE LOCAL
+    // REPORTING DATE". It is the seller's reporting day already resolved.
+    // `local_reporting_timestamp` is the raw local timestamp, so asking for
+    // `day` granularity truncates it at midnight and throws the 1:00 AM offset
+    // away.
+    //
+    // MEASURED, not reasoned about. The first backfill used the timestamp and
+    // disagreed with Mark's dashboard on 32 net-sales cells and 10 tip cells —
+    // always as ADJACENT PAIRS THAT SUMMED TO ZERO (−$52.00 on 03-28, +$52.00
+    // on 03-29), which is a single late-night order on the wrong side of a
+    // boundary and never a wrong amount. The dashboard held the money on the
+    // EARLIER day, we held it on the later one: exactly midnight-vs-1am.
+    // `/reporting/v1/meta` then named the right dimension outright.
     const netQuery = {
       measures: ["Sales.net_sales"],
       dimensions: ["Sales.location_id"],
-      timeDimensions: [
-        { dimension: "Sales.local_reporting_timestamp", dateRange, granularity: "day" },
-      ],
+      timeDimensions: [{ dimension: "Sales.reporting_day", dateRange, granularity: "day" }],
     };
     const tipsQuery = {
       measures: ["Orders.tips_amount"],
       dimensions: ["Orders.location_id"],
-      timeDimensions: [
-        { dimension: "Orders.local_reporting_timestamp", dateRange, granularity: "day" },
-      ],
+      timeDimensions: [{ dimension: "Orders.reporting_day", dateRange, granularity: "day" }],
     };
 
     let netRows: Record<string, unknown>[];
@@ -421,12 +459,12 @@ Deno.serve(async (req) => {
     };
 
     absorb(
-      readCells(netRows, "Sales.net_sales", "Sales.location_id", "Sales.local_reporting_timestamp"),
+      readCells(netRows, "Sales.net_sales", "Sales.location_id", "Sales.reporting_day"),
       "net",
       "Net sales"
     );
     absorb(
-      readCells(tipRows, "Orders.tips_amount", "Orders.location_id", "Orders.local_reporting_timestamp"),
+      readCells(tipRows, "Orders.tips_amount", "Orders.location_id", "Orders.reporting_day"),
       "tips",
       "Tips"
     );
