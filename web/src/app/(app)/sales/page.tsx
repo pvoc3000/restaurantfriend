@@ -123,7 +123,7 @@ export default async function SalesPage({
   // row from it every day would report ~230 phantom gaps.
   const { data: mapped } = await supabase
     .from("locations")
-    .select("id, code, open_days")
+    .select("id, code, open_days, is_active")
     .not("square_location_id", "is", null)
     .order("code");
 
@@ -131,6 +131,7 @@ export default async function SalesPage({
     id: l.id as string,
     code: l.code as string,
     openDays: (l.open_days as number[] | null) ?? null,
+    isActive: (l.is_active as boolean | null) ?? null,
   }));
 
   const locationFilter = first(params.location) ?? "";

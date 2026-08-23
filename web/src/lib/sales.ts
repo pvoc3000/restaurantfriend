@@ -233,6 +233,9 @@ export type SalesLocation = {
   code: string;
   /** `locations.open_days` — ISO weekdays, 1 = Monday. See `expectsSalesOn`. */
   openDays?: readonly number[] | null;
+  /** `locations.is_active`. False means a shop that has CLOSED, or a channel
+   *  kept for its history — either way, no new sales are expected. */
+  isActive?: boolean | null;
 };
 
 /**
@@ -244,6 +247,20 @@ export type SalesLocation = {
  *   * null/absent — unknown, so assume every day, which keeps a real gap loud.
  */
 export function expectsSalesOn(loc: SalesLocation, dateISO: string): boolean {
+  // A CLOSED SHOP IS NOT A GAP. DF03 traded until November 2025 and its history
+  // is worth keeping, but expecting a row from it every day since would report
+  // ~250 phantom gaps a year — the same failure the open_days rule prevents,
+  // in the time dimension rather than the weekday one.
+  //
+  // The honest limitation, stated rather than discovered: what we actually want
+  // is "was this place trading ON THIS DATE", and a CLOSING DATE is not
+  // modelled anywhere. `is_active` is the proxy, and it is a blunt one — it
+  // means no gap is ever reported for a closed shop, including inside the years
+  // it really was trading. That is the right trade while the alternative is a
+  // permanent false alarm, but if a closed shop's history ever needs auditing,
+  // this is the line that will not help.
+  if (loc.isActive === false) return false;
+
   const open = loc.openDays;
   if (open === null || open === undefined) return true;
   if (open.length === 0) return false;

@@ -506,3 +506,20 @@ test("expectsSalesOn states the three cases directly", () => {
   eq(expectsSalesOn({ id: "a", code: "A", openDays: [6] }, "2026-08-01"), true, "a Saturday");
   eq(expectsSalesOn({ id: "a", code: "A", openDays: [1] }, "2026-08-01"), false, "Mondays only");
 });
+
+test("a CLOSED shop is never a gap, whatever its open_days say", () => {
+  // DF03 traded Mon–Sun until November 2025. Mapped and marked inactive, it
+  // would otherwise report ~250 phantom gaps a year.
+  const closed = { id: "df03", code: "DF03", openDays: [1,2,3,4,5,6,7], isActive: false };
+  eq(missingDays([], [closed], { from: "2026-08-01", to: "2026-08-31" }).length, 0);
+  // …while an open shop with the same weekdays still reports every one.
+  const open = { id: "df01", code: "DF01", openDays: [1,2,3,4,5,6,7], isActive: true };
+  eq(missingDays([], [open], { from: "2026-08-01", to: "2026-08-03" }).length, 3);
+});
+
+test("is_active unknown does not suppress a gap", () => {
+  // Silence must not silence — the same rule open_days follows.
+  eq(expectsSalesOn({ id: "a", code: "A", isActive: null }, "2026-08-01"), true);
+  eq(expectsSalesOn({ id: "a", code: "A" }, "2026-08-01"), true, "absent");
+  eq(expectsSalesOn({ id: "a", code: "A", isActive: false }, "2026-08-01"), false);
+});
