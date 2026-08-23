@@ -5,6 +5,8 @@ import { formatFraction, tipFraction, type Comparison, type SalesTotals } from "
 export type SalesSummaryData = {
   rangeLabel: string;
   fellBack: boolean;
+  /** Set while the period is still running — see the note below. */
+  partial: { elapsed: number; total: number } | null;
   current: SalesTotals;
   vsPrevious: Comparison;
   vsLastYear: Comparison;
@@ -45,6 +47,19 @@ export function SalesSummary({ summary }: { summary: SalesSummaryData }) {
           <ShareDelta c={vsLastYear} what="a year ago" />
         </Figure>
       </div>
+
+      {summary.partial ? (
+        // The one thing a reader must know before trusting a comparison on a
+        // period that has not finished: BOTH sides are the same number of days.
+        // Stated rather than implied, because "−12% vs last period" means
+        // something quite different if the two sides are seven days and
+        // fourteen.
+        <p className="text-xs text-muted">
+          {summary.partial.elapsed} of {summary.partial.total} days so far —
+          comparisons are against the same {summary.partial.elapsed} days of
+          each earlier period.
+        </p>
+      ) : null}
 
       {summary.fellBack ? (
         <p className="text-xs text-muted">

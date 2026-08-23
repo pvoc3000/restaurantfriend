@@ -167,4 +167,12 @@ test("cents read back as dollars", () => {
   eq(formatCents(5), "$0.05");
   eq(formatCents(0), "$0.00");
   eq(formatCents(-125), "-$1.25");
+  // GROUPED past a thousand — /sales quotes a year of takings, where an
+  // ungrouped "$65500.43" has to be counted rather than read. Still integer
+  // arithmetic: the dollars are grouped as a string.
+  eq(formatCents(100000), "$1,000.00");
+  eq(formatCents(6550043), "$65,500.43");
+  eq(formatCents(119386243), "$1,193,862.43");
+  eq(formatCents(-6550043), "-$65,500.43");
+  eq(formatCents(99999), "$999.99", "no comma below a thousand");
 });

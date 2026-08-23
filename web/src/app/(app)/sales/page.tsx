@@ -13,8 +13,12 @@ import {
   lastYearRange,
   compareTotals,
   missingDays,
+  elapsedRange,
+  isPartial,
+  openingSlice,
   type SalesDay,
 } from "@/lib/sales";
+import { daysBetween } from "@/lib/payPeriods";
 import { SalesSummary } from "@/components/sales/SalesSummary";
 import { SalesScreen } from "@/components/sales/SalesScreen";
 
@@ -121,13 +125,26 @@ export default async function SalesPage({
     : days;
   const shopsInScope = locationFilter ? shops.filter((s) => s.code === locationFilter) : shops;
 
-  const current = daysIn(visible, resolved.range);
-  const prevRange = previousRange(resolved.range);
-  const yearRange = lastYearRange(resolved.range);
+  // LIKE FOR LIKE. The totals are of what has HAPPENED, and each comparison is
+  // against the same number of days of its own period — seven days in, we
+  // compare against the previous fortnight's first seven days, not all
+  // fourteen. Without this the current period reads −58.6% for a week and a
+  // half (measured on the real 2026-08-17 period), which is the calendar and
+  // not the business.
+  const elapsed = elapsedRange(resolved.range, today);
+  const elapsedDays = daysBetween(elapsed.from, elapsed.to);
+  const partial = isPartial(resolved.range, today);
+
+  const current = daysIn(visible, elapsed);
+  const prevRange = openingSlice(previousRange(resolved.range), elapsedDays);
+  const yearRange = openingSlice(lastYearRange(resolved.range), elapsedDays);
 
   const summary = {
     rangeLabel: resolved.label,
     fellBack: resolved.fellBack,
+    partial: partial
+      ? { elapsed: elapsedDays, total: daysBetween(resolved.range.from, resolved.range.to) }
+      : null,
     current: sumSales(current),
     vsPrevious: compareTotals(
       sumSales(current),
@@ -141,7 +158,7 @@ export default async function SalesPage({
     ),
     // `today` is excluded: the shops have not finished trading, so reporting it
     // as a gap every single day is how a reader learns to ignore this line.
-    gaps: missingDays(current, shopsInScope, resolved.range, previousDay(today)),
+    gaps: missingDays(current, shopsInScope, elapsed, previousDay(today)),
   };
 
   return (

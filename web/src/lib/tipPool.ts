@@ -150,7 +150,13 @@ export function formatRate(rateMillicents: number): string {
 export function formatCents(cents: number): string {
   const sign = cents < 0 ? "-" : "";
   const abs = Math.abs(cents);
-  return `${sign}$${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, "0")}`;
+  // GROUPED, and still integer-only: the dollars are grouped as a STRING, so
+  // nothing here ever becomes a float. Ungrouped was fine while every caller
+  // was a tip pool or one person's share — hundreds of dollars — and stopped
+  // being fine when /sales started quoting a year of takings, where "$65500.43"
+  // has to be counted rather than read.
+  const dollars = String(Math.floor(abs / 100)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return `${sign}$${dollars}.${String(abs % 100).padStart(2, "0")}`;
 }
 
 /**

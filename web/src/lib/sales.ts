@@ -111,6 +111,36 @@ function shiftYear(iso: string): string {
   return `${year}-${String(m).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 
+/**
+ * The part of `range` that has actually HAPPENED.
+ *
+ * A pay period is fourteen days long from the moment it opens, so on day seven
+ * the naive sum is seven days of takings sitting in a fourteen-day box. That is
+ * fine as a total and ruinous as a COMPARISON: measured on the real 2026-08-17
+ * period, seven days against a complete fortnight reads −58.6%, which looks
+ * like the business falling over and is only the calendar.
+ */
+export function elapsedRange(range: DateRange, today: string): DateRange {
+  return { from: range.from, to: today < range.to ? today : range.to };
+}
+
+/** Is this range still running? */
+export function isPartial(range: DateRange, today: string): boolean {
+  return today < range.to;
+}
+
+/**
+ * The first `days` of a range — the like-for-like basis for a period still
+ * running. Seven days in, we compare against the previous period's FIRST seven
+ * days, not all fourteen of them.
+ *
+ * Clamped, so asking for more days than the range holds returns the range.
+ */
+export function openingSlice(range: DateRange, days: number): DateRange {
+  const to = addDays(range.from, Math.max(0, days - 1));
+  return { from: range.from, to: to > range.to ? range.to : to };
+}
+
 export type Comparison = {
   current: SalesTotals;
   basis: SalesTotals;

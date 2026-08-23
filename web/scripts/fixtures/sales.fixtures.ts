@@ -19,6 +19,9 @@ import {
   parseSalesRange,
   resolveSalesRange,
   fetchWindow,
+  elapsedRange,
+  isPartial,
+  openingSlice,
   type SalesDay,
 } from "../../src/lib/sales";
 import { isoWeekday, daysBetween } from "../../src/lib/payPeriods";
@@ -382,3 +385,74 @@ test("fetchWindow always CONTAINS all three windows", () => {
     ok(w.from <= r.from && r.to <= w.to, `window contains ${JSON.stringify(r)}`);
   }
 });
+
+// ---------------------------------------------------------------------------
+// Like-for-like: a period that has not finished yet
+// ---------------------------------------------------------------------------
+
+test("elapsedRange clips a running period to today", () => {
+  eq(elapsedRange({ from: "2026-08-17", to: "2026-08-30" }, "2026-08-23"), {
+    from: "2026-08-17",
+    to: "2026-08-23",
+  });
+});
+
+test("elapsedRange leaves a FINISHED period alone", () => {
+  const done = { from: "2026-08-03", to: "2026-08-16" };
+  eq(elapsedRange(done, "2026-08-23"), done, "nothing to clip");
+  eq(isPartial(done, "2026-08-23"), false);
+  eq(isPartial({ from: "2026-08-17", to: "2026-08-30" }, "2026-08-23"), true);
+});
+
+test("openingSlice takes the FIRST n days, which is the honest basis", () => {
+  // The real case: on 2026-08-23 the current period is 7 days in, so last
+  // period contributes its first 7 days — 08-03..08-09 — and not all fourteen.
+  eq(openingSlice({ from: "2026-08-03", to: "2026-08-16" }, 7), {
+    from: "2026-08-03",
+    to: "2026-08-09",
+  });
+  eq(daysBetween("2026-08-03", "2026-08-09"), 7, "really seven days");
+});
+
+test("openingSlice clamps rather than running past the range", () => {
+  const r = { from: "2026-08-03", to: "2026-08-05" };
+  eq(openingSlice(r, 99), r, "asking for more days than exist");
+  eq(openingSlice(r, 1), { from: "2026-08-03", to: "2026-08-03" }, "one day");
+});
+
+test("THE WHOLE POINT: a part-finished period compares like for like", () => {
+  // Fourteen days of trade in the previous period, seven so far in this one.
+  // Compared naively that is a 50% collapse; compared honestly it is flat.
+  const range = { from: "2026-08-17", to: "2026-08-30" };
+  const today = "2026-08-23";
+
+  const days: SalesDay[] = [];
+  for (const [from, to] of [["2026-08-03", "2026-08-16"], ["2026-08-17", "2026-08-23"]]) {
+    for (let d = from; d <= to; d = addDaysLocal(d, 1)) days.push(day("DF01", d, 10000, 1000));
+  }
+
+  const elapsed = elapsedRange(range, today);
+  const n = daysBetween(elapsed.from, elapsed.to);
+  const current = sumSales(daysIn(days, elapsed));
+
+  const naive = compareTotals(
+    current,
+    sumSales(daysIn(days, previousRange(range))),
+    previousRange(range)
+  );
+  ok((naive.netDeltaFraction as number) < -0.49, "the naive answer reads as a collapse");
+
+  const honest = compareTotals(
+    current,
+    sumSales(daysIn(days, openingSlice(previousRange(range), n))),
+    openingSlice(previousRange(range), n)
+  );
+  eq(honest.netDeltaFraction, 0, "like for like, trade is flat");
+});
+
+/** A tiny local date step, so this file needs no extra import. */
+function addDaysLocal(iso: string, n: number): string {
+  const d = new Date(`${iso}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + n);
+  return d.toISOString().slice(0, 10);
+}
