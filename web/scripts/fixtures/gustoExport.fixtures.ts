@@ -444,3 +444,53 @@ test("the earnings map is untouched by an existing three-argument caller", () =>
   );
   eq(rows[0].earnings, {});
 });
+
+// ---------------------------------------------------------------------------
+// An employee id goes out EXACTLY as Gusto writes it — bare
+// ---------------------------------------------------------------------------
+
+test("a numeric-looking gusto id is written BARE, like Gusto's own template", () => {
+  // Mark, 2026-08-23: "I don't think the payroll id is being exported as text
+  // but a number." The symptom is real — Jesus Villegas Martinez's id is
+  // `018e53`, and a spreadsheet renders that as 1.8E+54.
+  //
+  // But the FILE is right. Gusto's own import template (FMP Export/HR/Gusto
+  // Import Template.csv) writes that very id — and `060f28`, with its leading
+  // zero — bare, unquoted, with no `="…"` prefix. The mangling happens when a
+  // spreadsheet OPENS the file, not when we write it.
+  //
+  // So this pins the shape AGAINST a well-meaning fix. Quoting would not stop
+  // Excel coercing anyway; an `="…"` prefix would stop it and would also make
+  // our file differ from Gusto's own, which is the file their importer is
+  // built for. The hazard is opening and re-saving in a spreadsheet, and that
+  // is answered on the export panel, not here.
+  const row = {
+    last_name: "Villegas Martinez",
+    first_name: "Jesus",
+    title: "Donut Friend (Primary)",
+    gusto_employee_id: "018e53",
+    regular_hours: 10,
+    overtime_hours: 0,
+    double_overtime_hours: 0,
+    missed_break_hours: 0,
+    paycheck_tips: null,
+    earnings: {},
+    isPrimary: true,
+    employee_id: "e1",
+  };
+  const field = toCsv([row]).split("\r\n")[1].split(",")[3];
+  eq(field, "018e53", "bare — no quotes, no ='…' prefix");
+  ok(!field.startsWith('"'), "not quoted");
+  ok(!field.startsWith("="), "not an Excel text formula");
+});
+
+test("a leading-zero id keeps its zero in the file", () => {
+  const row = {
+    last_name: "Aguirre", first_name: "Anthony", title: "Donut Friend (Primary)",
+    gusto_employee_id: "060f28",
+    regular_hours: 0, overtime_hours: 0, double_overtime_hours: 0,
+    missed_break_hours: 0, paycheck_tips: null, earnings: {},
+    isPrimary: true, employee_id: "e2",
+  };
+  eq(toCsv([row]).split("\r\n")[1].split(",")[3], "060f28");
+});

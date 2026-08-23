@@ -312,7 +312,24 @@ export function ExportTimesheets({
                 Close
               </button>
               {!worksheetError && (
-                <button type="button" onClick={download} className={BUTTON}>
+                <button
+                  type="button"
+                  onClick={download}
+                  className={BUTTON}
+                  // UPLOAD IT AS DOWNLOADED (Mark, 2026-08-23, on seeing an id
+                  // render as 1.8E+54). The FILE is right — Gusto's own import
+                  // template writes `018e53` and `060f28` bare, unquoted and
+                  // with no `="…"` prefix, and this produces byte-identical
+                  // output. A spreadsheet is what turns `018e53` into
+                  // scientific notation, and only on the way IN.
+                  //
+                  // So the hazard is not the export, it is opening the file to
+                  // look at it and saving it again — which would send Gusto an
+                  // id that no longer exists. Said here, on the control that
+                  // produces it, because there is nothing to fix in the file
+                  // and a fixture already stops anyone "fixing" it.
+                  title="Upload this to Gusto as downloaded. Opening it in a spreadsheet can turn an employee id like 018e53 into 1.8E+54 — don't open and re-save it."
+                >
                   Export Timesheets
                 </button>
               )}
