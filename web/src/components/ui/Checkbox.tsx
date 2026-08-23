@@ -15,6 +15,7 @@ export function Checkbox({
   label,
   children,
   size = 22,
+  className = "",
 }: {
   checked: boolean;
   onChange?: (next: boolean) => void;
@@ -23,6 +24,16 @@ export function Checkbox({
   label?: string;
   children?: ReactNode;
   size?: number;
+  /**
+   * Extra classes on the control itself.
+   *
+   * Added for `ui/PickSet`, whose rows are checkboxes that must fill an
+   * anchored panel's width and carry its hover treatment. The alternative was
+   * to draw a second checkbox by hand inside a row button — a nested button,
+   * which is invalid, and a duplicated box, which is what the parts table
+   * exists to stop.
+   */
+  className?: string;
 }) {
   return (
     <button
@@ -46,7 +57,7 @@ export function Checkbox({
       // 662 against a cell midpoint of 662, on rows of every height.
       className={`cursor-pointer items-center gap-3 text-left disabled:cursor-default disabled:opacity-35 ${
         children ? "inline-flex" : "flex"
-      }`}
+      } ${className}`}
     >
       <span
         aria-hidden

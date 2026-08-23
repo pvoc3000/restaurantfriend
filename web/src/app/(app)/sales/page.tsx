@@ -7,19 +7,15 @@ import {
   parseSalesRange,
   resolveSalesRange,
   fetchWindow,
-  daysIn,
-  sumSales,
   previousRange,
   lastYearRange,
-  compareTotals,
-  missingDays,
   elapsedRange,
   isPartial,
   openingSlice,
   type SalesDay,
 } from "@/lib/sales";
 import { daysBetween } from "@/lib/payPeriods";
-import { SalesSummary } from "@/components/sales/SalesSummary";
+import { SyncFromSquare } from "@/components/sales/SyncFromSquare";
 import { SalesScreen } from "@/components/sales/SalesScreen";
 
 /**
@@ -134,68 +130,63 @@ export default async function SalesPage({
     isActive: (l.is_active as boolean | null) ?? null,
   }));
 
-  const locationFilter = first(params.location) ?? "";
-  const visible = locationFilter
-    ? days.filter((d) => d.locationCode === locationFilter)
-    : days;
-  const shopsInScope = locationFilter ? shops.filter((s) => s.code === locationFilter) : shops;
+  // A SET, comma-separated, and EMPTY MEANS ALL — `FILTER_ALL`'s convention in
+  // a plural form. A code no shop answers to is dropped rather than obeyed
+  // (`parseFilterValues`' rule), so a stale link narrows to nothing rather than
+  // showing an empty screen with no way out.
+  const known = new Set(shops.map((s) => s.code));
+  const picked = (first(params.location) ?? "")
+    .split(",")
+    .map((c) => c.trim())
+    .filter((c) => known.has(c));
 
-  // LIKE FOR LIKE. The totals are of what has HAPPENED, and each comparison is
-  // against the same number of days of its own period — seven days in, we
-  // compare against the previous fortnight's first seven days, not all
-  // fourteen. Without this the current period reads −58.6% for a week and a
-  // half (measured on the real 2026-08-17 period), which is the calendar and
-  // not the business.
+  // THE SHOP FILTER IS APPLIED ON THE CLIENT, and the whole window's rows go
+  // down unfiltered.
+  //
+  // It used to be applied here, which made every tick of the shop picker a
+  // `router.push`: measured at 886ms and one history entry EACH, so choosing
+  // three shops cost 2.7 seconds and three back-presses to undo. That is the
+  // deviation, not the fix — `lib/filterMenus` has always filtered in the
+  // browser and written the URL with `history.replaceState`, for exactly this
+  // reason.
+  //
+  // It costs nothing to send: the window is bounded at ~5 shops × 365 days
+  // even on a year view, and the rows were already fetched in one query.
   const elapsed = elapsedRange(resolved.range, today);
   const elapsedDays = daysBetween(elapsed.from, elapsed.to);
-  const partial = isPartial(resolved.range, today);
-
-  const current = daysIn(visible, elapsed);
-  const prevRange = openingSlice(previousRange(resolved.range), elapsedDays);
-  const yearRange = openingSlice(lastYearRange(resolved.range), elapsedDays);
-
-  const summary = {
-    rangeLabel: resolved.label,
-    fellBack: resolved.fellBack,
-    partial: partial
-      ? { elapsed: elapsedDays, total: daysBetween(resolved.range.from, resolved.range.to) }
-      : null,
-    current: sumSales(current),
-    vsPrevious: compareTotals(
-      sumSales(current),
-      sumSales(daysIn(visible, prevRange)),
-      prevRange
-    ),
-    vsLastYear: compareTotals(
-      sumSales(current),
-      sumSales(daysIn(visible, yearRange)),
-      yearRange
-    ),
-    // `today` is excluded: the shops have not finished trading, so reporting it
-    // as a gap every single day is how a reader learns to ignore this line.
-    gaps: missingDays(current, shopsInScope, elapsed, previousDay(today)),
-  };
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-[28px] font-bold uppercase tracking-[0.08em]">Sales</h1>
-        <p className="mt-1 text-sm text-muted">
-          Net sales and tips per shop per day, from Square.
-        </p>
+      {/* COMMANDS LEVEL WITH THE TITLE (Mark, 2026-08-23) — the special-order
+          record's arrangement, and for its reason: pulling from Square is a
+          command about the SCREEN, where everything in the filter row below is
+          about the VIEW. `items-start` so the button lines up with the top of
+          the heading rather than centring against a block whose height changes
+          with the description. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[28px] font-bold uppercase tracking-[0.08em]">Sales</h1>
+          <p className="mt-1 text-sm text-muted">
+            Net sales and tips per shop per day, from Square.
+          </p>
+        </div>
+        {canSyncSales(session.membership.role) ? <SyncFromSquare today={today} /> : null}
       </div>
 
-      <SalesSummary summary={summary} />
-
       <SalesScreen
-        days={visible}
-        allDays={days}
+        days={days}
         range={resolved.range}
+        rangeLabel={resolved.label}
+        fellBack={resolved.fellBack}
+        elapsed={elapsed}
+        elapsedDays={elapsedDays}
+        partial={isPartial(resolved.range, today)}
+        prevRange={openingSlice(previousRange(resolved.range), elapsedDays)}
+        yearRange={openingSlice(lastYearRange(resolved.range), elapsedDays)}
         rangeKey={rangeKey}
         shops={shops}
-        locationFilter={locationFilter}
-        canSync={canSyncSales(session.membership.role)}
-        today={today}
+        initialPicked={picked}
+        yesterday={previousDay(today)}
         params={params}
       />
     </div>

@@ -1,3 +1,5 @@
+"use client";
+
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { formatCents } from "@/lib/tipPool";
 import { formatFraction, tipFraction, type Comparison, type SalesTotals } from "@/lib/sales";
@@ -21,7 +23,10 @@ export type SalesSummaryData = {
  * the other is seasonality — and putting them behind a toggle means whichever
  * one is not selected never gets looked at.
  *
- * A server component: it renders figures and holds no state.
+ * A CLIENT component since 2026-08-23 — not because it gained state, it has
+ * none, but because the shop filter moved into the browser and this is now
+ * rendered from a component that holds it. Nothing here does anything but
+ * render figures.
  */
 export function SalesSummary({ summary }: { summary: SalesSummaryData }) {
   const { current, vsPrevious, vsLastYear, gaps } = summary;

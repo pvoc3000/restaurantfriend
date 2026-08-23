@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { PickSet } from "@/components/ui/PickSet";
 import { DateField } from "@/components/ui/DateField";
 import { formatCents } from "@/lib/tipPool";
 import {
@@ -12,12 +13,18 @@ import {
   formatFraction,
   tipFraction,
   rollUpByDate,
+  sumSales,
+  daysIn,
+  compareTotals,
+  missingDays,
   type DateRange,
   type SalesDay,
+  type SalesLocation,
   type SalesRangeKey,
 } from "@/lib/sales";
+import { SalesSummary } from "./SalesSummary";
+import { daysBetween } from "@/lib/payPeriods";
 import type { RawSearchParams } from "@/lib/filterMenus";
-import { SyncFromSquare } from "./SyncFromSquare";
 
 type Row = SalesDay & { id: string };
 
@@ -33,33 +40,87 @@ type Row = SalesDay & { id: string };
 export function SalesScreen({
   days,
   range,
+  rangeLabel,
+  fellBack,
+  elapsed,
+  elapsedDays,
+  partial,
+  prevRange,
+  yearRange,
   rangeKey,
   shops,
-  locationFilter,
-  canSync,
-  today,
+  initialPicked,
+  yesterday,
   params,
 }: {
+  /** The whole window, EVERY shop — the filter is applied here. */
   days: SalesDay[];
-  allDays: SalesDay[];
   range: DateRange;
+  rangeLabel: string;
+  fellBack: boolean;
+  elapsed: DateRange;
+  elapsedDays: number;
+  partial: boolean;
+  prevRange: DateRange;
+  yearRange: DateRange;
   rangeKey: SalesRangeKey;
-  shops: { id: string; code: string }[];
-  locationFilter: string;
-  canSync: boolean;
-  today: string;
+  shops: SalesLocation[];
+  initialPicked: string[];
+  yesterday: string;
   params: RawSearchParams;
 }) {
   const router = useRouter();
   const [customFrom, setCustomFrom] = useState(range.from);
   const [customTo, setCustomTo] = useState(range.to);
 
+  // THE SHOP FILTER IS LOCAL STATE, and the URL follows it rather than driving
+  // it. Every tick used to be a `router.push` — 886ms and a history entry each,
+  // so three shops cost 2.7s and three back-presses. `history.replaceState` is
+  // what `lib/filterMenus` has always done and what this should have done.
+  const [picked, setPicked] = useState<string[]>(initialPicked);
+
+  function pick(next: string[]) {
+    setPicked(next);
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(params)) {
+      const s = Array.isArray(v) ? v[0] : v;
+      if (s) q.set(k, s);
+    }
+    if (next.length) q.set("location", next.join(","));
+    else q.delete("location");
+    window.history.replaceState(null, "", `/sales${q.toString() ? `?${q}` : ""}`);
+  }
+
+  const visible = useMemo(
+    () => (picked.length ? days.filter((d) => picked.includes(d.locationCode)) : days),
+    [days, picked]
+  );
+  const shopsInScope = useMemo(
+    () => (picked.length ? shops.filter((s) => picked.includes(s.code)) : shops),
+    [shops, picked]
+  );
+
+  const summary = useMemo(() => {
+    const current = daysIn(visible, elapsed);
+    const totals = sumSales(current);
+    return {
+      rangeLabel,
+      fellBack,
+      partial: partial ? { elapsed: elapsedDays, total: daysBetween(range.from, range.to) } : null,
+      current: totals,
+      vsPrevious: compareTotals(totals, sumSales(daysIn(visible, prevRange)), prevRange),
+      vsLastYear: compareTotals(totals, sumSales(daysIn(visible, yearRange)), yearRange),
+      gaps: missingDays(current, shopsInScope, elapsed, yesterday),
+    };
+  }, [visible, shopsInScope, elapsed, elapsedDays, partial, prevRange, yearRange,
+      rangeLabel, fellBack, yesterday, range]);
+
   const rows: Row[] = useMemo(
     () =>
-      days
+      visible
         .filter((d) => d.business_date >= range.from && d.business_date <= range.to)
         .map((d) => ({ ...d, id: `${d.location_id}|${d.business_date}` })),
-    [days, range.from, range.to]
+    [visible, range.from, range.to]
   );
 
   // Both shops folded into one figure per date, for the Combined view. A day
@@ -147,7 +208,10 @@ export function SalesScreen({
   ];
 
   return (
-    <section className="space-y-4">
+    <div className="space-y-8">
+      <SalesSummary summary={summary} />
+
+      <section className="space-y-4">
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <Field label="Period">
           <TabPicker
@@ -159,15 +223,20 @@ export function SalesScreen({
         </Field>
 
         {shops.length > 1 ? (
-          <Field label="Shop">
-            <TabPicker
-              options={[
-                { key: "", label: "All shops" },
-                ...shops.map((s) => ({ key: s.code, label: s.code })),
-              ]}
-              value={locationFilter}
-              onChange={(code) => go({ location: code || null })}
-              ariaLabel="Which shop to show"
+          <Field label="Shops">
+            {/* A SET, not a one-of-N (Mark, 2026-08-23). This began as a
+                TabPicker over two shops; with five mapped it was a six-cell bar
+                that could still only ever say ONE of them — and "DF01 and DF02
+                together, without the closed one" is the question this screen is
+                actually asked. */}
+            <PickSet
+              options={shops.map((s) => ({ value: s.code, label: s.code }))}
+              value={picked}
+              onChange={pick}
+              allLabel="All shops"
+              noun="shops"
+              label="Which shops to show"
+              className="min-w-[11rem]"
             />
           </Field>
         ) : null}
@@ -203,11 +272,6 @@ export function SalesScreen({
           </Field>
         ) : null}
 
-        {canSync ? (
-          <div className="ml-auto">
-            <SyncFromSquare today={today} />
-          </div>
-        ) : null}
       </div>
 
       <DataTable
@@ -218,12 +282,7 @@ export function SalesScreen({
         defaultSort={{ key: "date", dir: "desc" }}
         columnChooser
         compactBelow={1024}
-        empty={
-          <span>
-            No sales for this period.{" "}
-            {canSync ? "Pull them from Square with the button above." : null}
-          </span>
-        }
+        empty={<span>No sales for this period.</span>}
         group={{
           label: (r) => r.business_date,
           sortKey: "date",
@@ -257,8 +316,9 @@ export function SalesScreen({
             ),
           };
         }}
-      />
-    </section>
+        />
+      </section>
+    </div>
   );
 }
 

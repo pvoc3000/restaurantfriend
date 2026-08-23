@@ -5,11 +5,17 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
-import { confirmDialog } from "@/lib/confirm";
 import { addDays } from "@/lib/payPeriods";
 
 /**
  * Pull sales and tips from Square.
+ *
+ * ONE COMMAND, not two. There was a `Backfill…` beside this that walked every
+ * month back to 2015; it did its job on 2026-08-23 (8,418 shop-days, eleven
+ * years, five locations) and a button whose only purpose is a one-time
+ * migration is dead machinery on the screen forever after. Re-pulling a deeper
+ * range is a loop over this same function and belongs in a script, not in front
+ * of somebody reading yesterday's takings.
  *
  * THE LOOP IS HERE, NOT IN THE EDGE FUNCTION. That function does ONE window,
  * because a single multi-year request is exactly the one that dies at the wall
@@ -123,30 +129,6 @@ export function SyncFromSquare({ today }: { today: string }) {
           Sync from Square
         </button>
 
-        <button
-          type="button"
-          className={BUTTON_CLASS}
-          disabled={busy !== null}
-          onClick={async () => {
-            const from = `${Number(today.slice(0, 4)) - 1}-01-01`;
-            const months = monthsBetween(from, today);
-            if (
-              !(await confirmDialog({
-                title: "Backfill from Square?",
-                body:
-                  `This pulls ${months.length} months (${from} to ${today}), one request at a ` +
-                  `time, and may take a few minutes. Days already stored are updated in place, ` +
-                  `so it is safe to run again. Tips are only written for days in an open pay ` +
-                  `period — closed fortnights are left alone.`,
-              }))
-            ) {
-              return;
-            }
-            void run(months, "Backfilling");
-          }}
-        >
-          Backfill…
-        </button>
       </div>
 
       {busy ? <ProgressBand label={busy} /> : null}

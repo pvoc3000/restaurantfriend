@@ -138,15 +138,14 @@ export const SECTIONS: NavSection[] = [
     slug: "operations",
     label: "Operations",
     subs: [
-      // FIRST in the section (Mark, 2026-08-23). Daily net sales and tips per
-      // shop, pulled from Square — the numbers closing supervisors used to
-      // transcribe into FileMaker's shift report. It leads because it is the
-      // section's most-read screen, and it is deliberately NOT the Shift
-      // Reports stub below: that one is the whole closing form (leftovers,
-      // production counts) and belongs with Production, which is where the
-      // brief deferred it so it would not be built twice.
-      { slug: "sales", label: "Sales", href: "/sales", built: true },
+      // AFTER Shift Reports (Mark, 2026-08-23; it led the section for a few
+      // hours first). Daily net sales and tips per shop, pulled from Square —
+      // the numbers closing supervisors used to transcribe into FileMaker's
+      // shift report. It is deliberately NOT that stub: Shift Reports is the
+      // whole closing form (leftovers, production counts) and belongs with
+      // Production, where the brief deferred it so it would not be built twice.
       stub("operations", "shift-reports", "Shift Reports"),
+      { slug: "sales", label: "Sales", href: "/sales", built: true },
       stub("operations", "documents", "Documents"),
       stub("operations", "policies", "Policies"),
       stub("operations", "check-lists", "Check Lists"),
