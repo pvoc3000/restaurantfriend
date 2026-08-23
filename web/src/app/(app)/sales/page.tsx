@@ -69,12 +69,39 @@ export default async function SalesPage({
   // slicing in TypeScript is cheaper than asking three times.
   const window = fetchWindow(resolved.range);
 
-  const { data: salesRows, error } = await supabase
-    .from("daily_sales")
-    .select("location_id, business_date, net_sales_cents, tips_cents, synced_at, source")
-    .gte("business_date", window.from)
-    .lte("business_date", window.to)
-    .order("business_date", { ascending: false });
+  // PAGINATED, AND THIS IS NOT OPTIONAL. PostgREST caps a select at 1,000 rows
+  // and says nothing about it — no error, no flag, just a short array.
+  //
+  // Measured on the real database (Mark spotted the symptom, 2026-08-23): a
+  // year-to-date view spans 2025-01-02 → 2026-08-23, which is 1,531 rows across
+  // five locations. The unpaginated query returned exactly 1,000 of them,
+  // ordered newest first, so it could see no further back than 2025-06-29 — and
+  // the "vs a year ago" basis came out $324,765 instead of $1,542,560. The
+  // screen reported **+268.2% when the truth was −22.5%**: not merely wrong,
+  // wrong in the flattering direction, and entirely plausible-looking.
+  //
+  // The sweep MUST be ordered by something total, or pages overlap and rows go
+  // missing — `(business_date, location_id)` is unique per row here, which the
+  // table's own key guarantees.
+  const PAGE = 1000;
+  const salesRows: Record<string, unknown>[] = [];
+  let error: { message: string } | null = null;
+  for (let from = 0; ; from += PAGE) {
+    const { data, error: pageError } = await supabase
+      .from("daily_sales")
+      .select("location_id, business_date, net_sales_cents, tips_cents, synced_at, source")
+      .gte("business_date", window.from)
+      .lte("business_date", window.to)
+      .order("business_date")
+      .order("location_id")
+      .range(from, from + PAGE - 1);
+    if (pageError) {
+      error = pageError;
+      break;
+    }
+    salesRows.push(...(data ?? []));
+    if (!data || data.length < PAGE) break;
+  }
 
   if (error) {
     return (
@@ -92,7 +119,7 @@ export default async function SalesPage({
 
   const codeFor = new Map(session.locations.map((l) => [l.id, l.code]));
 
-  const days: SalesDay[] = (salesRows ?? []).map((r) => ({
+  const days: SalesDay[] = salesRows.map((r) => ({
     location_id: r.location_id as string,
     locationCode: codeFor.get(r.location_id as string) ?? "—",
     business_date: r.business_date as string,
