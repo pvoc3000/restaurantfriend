@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
     const { mode, from, to } = payload as { mode?: string; from?: string; to?: string };
 
     // The two catalogue modes need no window; the sync needs one.
-    const NO_WINDOW_MODES = ["locations", "meta"];
+    const NO_WINDOW_MODES = ["locations", "meta"];  // a dry run still needs a window
     if (!NO_WINDOW_MODES.includes(mode ?? "") && (!from || !to)) {
       return json(400, {
         error: `missing from and to (or mode: ${NO_WINDOW_MODES.map((m) => `'${m}'`).join(" / ")})`,
@@ -440,14 +440,19 @@ Deno.serve(async (req) => {
         if (!c.squareLocationId || !c.date) continue;
         if (!bySquareId.has(c.squareLocationId)) {
           unmapped.add(c.squareLocationId);
-          continue;
+          // A DRY RUN READS ON, so an unmapped location can be VALUED before
+          // anybody decides whether to map it. The write path below still only
+          // ever emits rows for mapped locations — `bySquareId.get(...)!` there
+          // is what enforces it — so this widens what can be SEEN and never
+          // what is stored.
+          if (!payload?.dry) continue;
         }
         const cents = moneyToCents(c.value);
         if (cents === null) {
           // Never a silent zero. An unreadable figure is the money-unit
           // question showing itself, and it must be a sentence somebody reads.
           warnings.push(
-            `${label} for ${bySquareId.get(c.squareLocationId)?.code} on ${c.date} was not a readable amount (${JSON.stringify(c.value)})`
+            `${label} for ${bySquareId.get(c.squareLocationId)?.code ?? c.squareLocationId} on ${c.date} was not a readable amount (${JSON.stringify(c.value)})`
           );
           continue;
         }
@@ -481,7 +486,14 @@ Deno.serve(async (req) => {
 
     for (const [key, v] of merged) {
       const [squareId, date] = key.split("|");
-      const loc = bySquareId.get(squareId)!;
+      const loc = bySquareId.get(squareId);
+
+      // AN UNMAPPED LOCATION NEVER BECOMES A ROW. During a dry run `merged`
+      // deliberately carries them so they can be valued, and this is the line
+      // that keeps that from ever reaching the database. It is a real guard
+      // rather than a type-narrowing formality: without it the dry run's own
+      // widening would silently make the write path wrong.
+      if (!loc) continue;
 
       // A DATE WITH NO CELL WRITES NOTHING, and a half-answered one is the same
       // case. A zero row claims "the shop took $0.00"; absence is the truth,
@@ -502,6 +514,50 @@ Deno.serve(async (req) => {
         tips_cents: v.tips ?? 0,
       });
       perLocation.set(loc.code, (perLocation.get(loc.code) ?? 0) + 1);
+    }
+
+    // --- dry run ------------------------------------------------------------
+    //
+    // `{"dry": true}` reads and returns WITHOUT WRITING ANYTHING — including
+    // for locations that are not mapped, which is the point of it.
+    //
+    // It exists because the mapping question is not answerable any other way:
+    // deciding whether ONLINE STORE belongs to a shop needs to know what it is
+    // WORTH, and the only route to that figure was to map it first — which is
+    // the very decision being made, and which would write tips into a shop's
+    // pool as a side effect of asking a question.
+    //
+    // Unmapped locations are reported here under their Square id and are still
+    // never written; a dry run widens what you can SEE, never what is stored.
+    if (payload?.dry) {
+      const byId = new Map<string, { code: string; net: number; tips: number; days: Set<string> }>();
+      for (const [key, v] of merged) {
+        const [squareId, date] = key.split("|");
+        const known = bySquareId.get(squareId);
+        const bucket =
+          byId.get(squareId) ??
+          { code: known?.code ?? `(unmapped ${squareId})`, net: 0, tips: 0, days: new Set<string>() };
+        bucket.net += v.net ?? 0;
+        bucket.tips += v.tips ?? 0;
+        bucket.days.add(date);
+        byId.set(squareId, bucket);
+      }
+      return json(200, {
+        dry: true,
+        from,
+        to,
+        wrote: "nothing",
+        locations: [...byId].map(([id, b]) => ({
+          square_location_id: id,
+          code: b.code,
+          mapped: bySquareId.has(id),
+          days: b.days.size,
+          net_sales_cents: b.net,
+          tips_cents: b.tips,
+        })),
+        square_calls: calls,
+        waited_ms: waitedMs,
+      });
     }
 
     const { data: report, error: writeError } = await supabase.rpc("record_daily_sales", {
