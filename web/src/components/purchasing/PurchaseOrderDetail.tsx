@@ -26,6 +26,7 @@ import type { SignedAttachment } from "@/lib/attachments";
 import { PoAttachments } from "./PoAttachments";
 import { StickyFooter } from "@/components/ui/StickyFooter";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
+import { SaveLineToCatalog } from "./SaveLineToCatalog";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { PickList } from "@/components/ui/PickList";
@@ -348,6 +349,21 @@ export function PurchaseOrderDetail({
                 4px to its right. */}
             {description && (
               <span className="-ml-1 block text-xs text-muted">{description}</span>
+            )}
+            {/* A line with no vendor item — a one-off just added, or one whose
+                catalog row was deleted — offers to become one. It goes HERE
+                rather than in the Product ID cell beside the `↗`, even though
+                the two are the same slot logically: this cell already wraps and
+                has the width for a phrase, and 130px of Product ID does not. */}
+            {canEditLines && !l.vendor_items && (
+              <span className="block">
+                <SaveLineToCatalog
+                  line={l}
+                  orgId={orgId}
+                  vendorId={order.vendor_id}
+                  vendorName={order.vendors?.name ?? "this vendor"}
+                />
+              </span>
             )}
           </span>
         );
