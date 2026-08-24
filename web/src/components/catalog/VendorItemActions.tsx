@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { RowMenu } from "@/components/ui/RowMenu";
+import { InventoryItemPicker } from "./InventoryItemPicker";
 import {
   Dialog,
   DIALOG_CANCEL_CLASS,
@@ -94,12 +95,25 @@ export function VendorItemActions({
   vendorItemId,
   label,
   isActive,
+  inventoryItem,
   afterDelete = "refresh",
 }: {
   vendorItemId: string;
   /** What to call this item in the dialog — the catalog name where there is one. */
   label: string;
   isActive: boolean;
+  /**
+   * The row's inventory-item link, when this menu should be able to change it.
+   *
+   * Passed by the TABLE and deliberately not by the vendor item's own detail
+   * screen, where the same picker already sits inline in the `dl` and a second
+   * route to it would be one fact with two controls.
+   *
+   * `{ id: null }` is a real value — an unlinked row still has the command,
+   * reading "Link…" instead of "Change…". Omitting the prop entirely is what
+   * says "this menu does not do that".
+   */
+  inventoryItem?: { id: string | null; name: string | null };
   /**
    * Where to end up once the row is gone. A list refreshes in place; a detail
    * screen is now looking at nothing and has to navigate. An href rather than a
@@ -111,6 +125,7 @@ export function VendorItemActions({
   const router = useRouter();
   const supabase = createClient();
   const [confirming, setConfirming] = useState(false);
+  const [linking, setLinking] = useState(false);
   const [usage, setUsage] = useState<Usage | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -191,6 +206,20 @@ export function VendorItemActions({
             disabled: busy !== null,
             onSelect: () => void duplicate(),
           },
+          ...(inventoryItem
+            ? [
+                {
+                  label: inventoryItem.id
+                    ? "Change inventory item…"
+                    : "Link inventory item…",
+                  hint: inventoryItem.id
+                    ? inventoryItem.name ?? "Point it at another item"
+                    : "It is on no order guide until you do",
+                  disabled: busy !== null,
+                  onSelect: () => setLinking(true),
+                },
+              ]
+            : []),
           {
             label: "Delete…",
             hint: "Shows what would go with it",
@@ -200,6 +229,21 @@ export function VendorItemActions({
           },
         ]}
       />
+
+      {/* The menu closes on select, so the picker cannot live inside it — it is
+          mounted here and opens on mount, `ui/PickList`'s `defaultOpen`. */}
+      {linking && inventoryItem && (
+        <InventoryItemPicker
+          table="vendor_items"
+          rowId={vendorItemId}
+          currentItemId={inventoryItem.id}
+          currentItemName={inventoryItem.name}
+          variant="cell"
+          allowUnlink
+          defaultOpen
+          onClose={() => setLinking(false)}
+        />
+      )}
 
       {/* The menu closes on select, so a duplicate failure has nowhere of its
           own to land — it goes beside the row. */}

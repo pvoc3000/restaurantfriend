@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Dialog } from "@/components/ui/Dialog";
+import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_DANGER_CLASS } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
 import { inventorySearchWords } from "@/lib/catalog";
 
@@ -47,6 +47,9 @@ export function InventoryItemPicker({
   allowUnlink = false,
   variant = "inline",
   trigger,
+  currentItemName,
+  defaultOpen = false,
+  onClose,
 }: {
   /** The table holding the `inventory_item_id` column being written. */
   table: "vendor_items" | "production_elements";
@@ -95,10 +98,35 @@ export function InventoryItemPicker({
    * it carries the value.
    */
   trigger?: ReactNode;
+  /**
+   * What the row is linked to NOW, for the dialog to say out loud.
+   *
+   * `currentItemId` marks the result already chosen; this is the sentence at
+   * the top, which matters most where the caller is a ⋯ menu and the cell that
+   * carries the name is somewhere else on the row.
+   */
+  currentItemName?: string | null;
+  /**
+   * Open on mount — `ui/PickList`'s prop and its reason: a deliberate act
+   * already summoned this, so making the person press a second control to see
+   * the thing they just asked for is a tax. Only ever pass it to a picker some
+   * command opened.
+   */
+  defaultOpen?: boolean;
+  /**
+   * Fires whenever the dialog closes — dismissed, unlinked, or linked.
+   *
+   * NOT `PickList`'s narrower contract, where `onClose` skips the pick path,
+   * and deliberately so: a caller that mounts this on a menu command has to
+   * unmount it again, and one that only heard about dismissals would be left
+   * holding an open flag over a component rendering nothing, with its own
+   * command then a no-op.
+   */
+  onClose?: () => void;
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
   const [term, setTerm] = useState(initialTerm ?? "");
   const [results, setResults] = useState<ItemRow[]>([]);
   const [busy, setBusy] = useState(false);
@@ -160,18 +188,25 @@ export function InventoryItemPicker({
       setError("Not allowed — you need purchaser access to change this.");
       return;
     }
-    setOpen(false);
     setTerm(initialTerm ?? "");
+    close();
     router.refresh();
   }
 
+  function close() {
+    setOpen(false);
+    onClose?.();
+  }
+
   function toggle() {
-    setOpen((v) => {
-      // Re-seed on OPEN, so a search you cleared and abandoned does not come
-      // back empty next time.
-      if (!v) setTerm(initialTerm ?? "");
-      return !v;
-    });
+    if (open) {
+      close();
+      return;
+    }
+    // Re-seed on OPEN, so a search you cleared and abandoned does not come back
+    // empty next time.
+    setTerm(initialTerm ?? "");
+    setOpen(true);
   }
 
   // The search and its results, wherever they end up rendering. In `cell` mode
@@ -239,31 +274,74 @@ export function InventoryItemPicker({
             iPad there is no hover to reveal that something is pressable, and a
             value that looks like description is exactly how this control went
             missing for 71 rows. */}
-        <button
-          type="button"
-          onClick={toggle}
-          disabled={busy}
-          title={
-            currentItemId
-              ? "Point this at a different inventory item"
-              : "Link this to an inventory item"
-          }
-          className="max-w-full truncate underline decoration-neutral-400 underline-offset-[3px] hover:decoration-current disabled:opacity-35"
-        >
-          {busy ? "saving…" : trigger}
-        </button>
+        {/* No trigger at all when a command already opened this — a ⋯ menu item
+            IS the button, and a second one would render into the row it came
+            from. */}
+        {trigger !== undefined && (
+          <button
+            type="button"
+            onClick={toggle}
+            disabled={busy}
+            title={
+              currentItemId
+                ? "Point this at a different inventory item"
+                : "Link this to an inventory item"
+            }
+            className="max-w-full truncate underline decoration-neutral-400 underline-offset-[3px] hover:decoration-current disabled:opacity-35"
+          >
+            {busy ? "saving…" : trigger}
+          </button>
+        )}
         {open && (
           <Dialog
-            title="Link inventory item"
-            onClose={() => setOpen(false)}
+            title={currentItemId ? "Change inventory item" : "Link inventory item"}
+            onClose={close}
             busy={busy}
             width="max-w-lg"
+            footer={
+              <>
+                <button
+                  type="button"
+                  onClick={close}
+                  disabled={busy}
+                  className={DIALOG_CANCEL_CLASS}
+                >
+                  Cancel
+                </button>
+                {/* Unlink lives HERE rather than as a second menu command, and
+                    that is the whole reason it is two taps: it takes the row off
+                    the order guide, and the sentence saying so has to be on
+                    screen beside the button that does it. Picking a different
+                    item from the list is the ordinary fix; this is for the row
+                    that should carry no link at all. */}
+                {allowUnlink && currentItemId && (
+                  <button
+                    type="button"
+                    onClick={() => void write(null)}
+                    disabled={busy}
+                    className={DIALOG_DANGER_CLASS}
+                  >
+                    {busy ? "Working…" : "Unlink"}
+                  </button>
+                )}
+              </>
+            }
           >
             <div className="space-y-2">
-              <p className="text-sm text-muted">
-                Search the catalog and link this vendor item to the inventory item it
-                is bought as.
-              </p>
+              {currentItemName ? (
+                <p className="text-sm text-muted">
+                  Linked to{" "}
+                  <span className="text-ink">{currentItemName}</span>. Search the
+                  catalog to point it somewhere else, or unlink it — an unlinked
+                  vendor item keeps its history and its price, and drops off the
+                  order guide until it is linked again.
+                </p>
+              ) : (
+                <p className="text-sm text-muted">
+                  Search the catalog and link this vendor item to the inventory item
+                  it is bought as.
+                </p>
+              )}
               {error && <p className="text-sm text-accent">{error}</p>}
               {search}
             </div>

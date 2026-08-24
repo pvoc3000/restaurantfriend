@@ -377,6 +377,18 @@ export function VendorItemsTable({
                     "this vendor item"
                   }
                   isActive={vi.is_active}
+                  // Only where the column that shows the link is on screen. On
+                  // the ITEM's own screen every row is that item by definition,
+                  // so re-pointing one from here would be a way to make a row
+                  // vanish off the table you are looking at.
+                  inventoryItem={
+                    showItem
+                      ? {
+                          id: vi.inventory_items?.id ?? null,
+                          name: vi.inventory_items?.name ?? null,
+                        }
+                      : undefined
+                  }
                 />
               </span>
             ),
