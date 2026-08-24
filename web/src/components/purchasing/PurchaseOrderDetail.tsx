@@ -865,18 +865,19 @@ export function PurchaseOrderDetail({
         // name moved into the wrapping Item cell.)
         storageKey="rf.purchaseOrderLines.columnWidths.v4"
         columnChooser
-        // The lines scroll in their own pane so the page ends where the window
-        // does (Mark, 2026-08-02 — on 142-181119-01 the list ran off the
-        // screen). `scroll` is all it takes: DataTable then sizes the pane with
-        // useFillViewportHeight, which measures its own top AND everything
-        // below it — including the clearance left for the pinned Paperwork
-        // band. No constant to go stale when the bar above changes height.
+        // NOT `scroll` (Mark, 2026-08-24: "make the header able to be scrolled
+        // away leaving just the column titles"), which reverses the 2026-08-02
+        // call that put the lines in their own pane.
         //
-        // Past the hook's 256px floor it stops shrinking and lets the page
-        // scroll instead, which is the honest answer: a 19-line order in a
-        // short window can't have both a readable list and everything else, and
-        // a 60px pane would be neither.
-        scroll
+        // That pane kept the page exactly one window tall, and the price was
+        // that everything above it — the title, the two totals, the fields, the
+        // Process card — was permanently on screen whether or not you were
+        // reading it, so a 19-line order was read through a ~300px slot. Page
+        // scroll spends the header's height on rows instead: it costs nothing
+        // to get back, since scrolling up is how you reach it, and the column
+        // labels stay put on their own (`STICKY_HEAD_ROW`, under the masthead's
+        // measured `--rf-header-h`), which is the half of the pane that was
+        // actually doing the work.
         // Type first (Mark, 2026-07-27): it groups the order the way the
         // vendor-facing PDF does, so the screen and the document read alike.
         defaultSort={{ key: "item_type" }}
