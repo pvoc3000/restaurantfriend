@@ -51,7 +51,7 @@ export default async function SalesPage({
 
   // The pay-period calendar, newest first. 30 is generous: the picker only
   // needs the one containing today and the one before it, and a year of
-  // fortnights is 26.
+  // pay periods is 26.
   const { data: periodRows } = await supabase
     .from("pay_periods")
     .select("start_date, end_date")

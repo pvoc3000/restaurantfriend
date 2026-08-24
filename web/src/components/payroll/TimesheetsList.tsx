@@ -139,10 +139,10 @@ const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: TimesheetRow) => string
 };
 
 /**
- * A fortnight of shifts.
+ * A pay period of shifts.
  *
  * Scoped to ONE pay period and never to "everything": there are 44,721 rows in
- * this table and the question is always about a particular fortnight. The
+ * this table and the question is always about a particular pay period. The
  * picker is the screen's primary control, which is why it leads the filter row.
  *
  * NO `/timesheets/[id]` ROUTE, deliberately. A shift is a row, not a record,
@@ -164,7 +164,7 @@ export function TimesheetsList({
   benefitNotes,
 }: {
   rows: TimesheetRow[];
-  /** The fortnight these rows are from, chosen on the bar above. */
+  /** The pay period these rows are from, chosen on the bar above. */
   period: PeriodOption | null;
   canWrite: boolean;
   /** The org's zone. Punches are instants; reading one back needs a zone, and
@@ -208,10 +208,10 @@ export function TimesheetsList({
     canWrite && period !== null && (period.status === "open" || period.status === "review");
 
   /**
-   * The recompute, over the WHOLE fortnight — never over the filtered set.
+   * The recompute, over the WHOLE pay period — never over the filtered set.
    * Overtime is a property of an employee's workweek, so hiding half a week
    * behind a search box would change the answer for the half still showing.
-   * Measured at 63ms for all 44,721 rows, so a fortnight is free.
+   * Measured at 63ms for all 44,721 rows, so a pay period is free.
    */
   const proposals = useMemo(
     () =>
@@ -726,7 +726,7 @@ export function TimesheetsList({
       // Until tips came from Square there was nothing to put here — the pool
       // was usually empty, so the only tip fact a row HAD was its tri-state.
       // Now every shop-day in an open period carries a real figure, and the
-      // question you ask scanning a fortnight is what somebody made, not
+      // question you ask scanning a pay period is what somebody made, not
       // whether they were in the pool. The tri-state moved to the row's Tips
       // block, under the share it governs.
       key: "tips",
@@ -817,16 +817,16 @@ export function TimesheetsList({
               2026-08-05 call that put it inside the New timesheet dialog as the
               single door. That reasoning — "I need a timesheet that isn't here"
               is the question both answer — reads well and turned out to cost a
-              click on the thing you do every fortnight, to save one on the
+              click on the thing you do every pay period, to save one on the
               thing you do rarely. Importing IS the routine; typing a shift by
               hand is the exception.
 
               NOT disabled on a closed period, unlike New timesheet beside it:
               this navigates to a screen rather than writing anything, the
               import screen states the period problem in its own words, and it
-              is also how you reach a DIFFERENT fortnight's file. */}
+              is also how you reach a DIFFERENT pay period's file. */}
           {/* BLACK WHILE THE PERIOD IS EMPTY (Mark, 2026-08-22). An empty
-              fortnight has exactly one thing worth doing, and it is this; once
+              pay period has exactly one thing worth doing, and it is this; once
               there are shifts the weight moves to Close pay period on the bar
               above. `PRIMARY_BUTTON_CLASS` is for precisely this — a commit
               standing beside no peers, decided by state rather than a standing
@@ -852,7 +852,7 @@ export function TimesheetsList({
             total is a number you check against the column above it, and one set
             in a band four inches away has to be re-read to be placed. It is the
             same argument that moved the GROUP subtotals out of their band on
-            2026-08-05, arriving at the grand total a fortnight later.
+            2026-08-05, arriving at the grand total a pay period later.
             What stays here is what is NOT a column: the count, and the three
             flags. */}
         {totals.sick > 0 && (
@@ -892,7 +892,7 @@ export function TimesheetsList({
 
       {/* THE COLUMN TOTALS, under the columns they sum (Mark, 2026-08-22).
           Handed the rows the table is SHOWING, so it agrees with a search or a
-          filter rather than quietly reporting the whole fortnight; `DataTable`
+          filter rather than quietly reporting the whole pay period; `DataTable`
           passes its own sorted set. Break is summed in HOURS because that is
           what the column reads — the column stores minutes and `BreakCell`
           scales it, so totalling the stored value would put "1705" under a
@@ -931,7 +931,7 @@ export function TimesheetsList({
             // ALWAYS, unlike the per-group subtotal, which shows sick only
             // where there is any: that rule is about a 0.00 repeating down
             // every band, and a grand total appears once. Here the zero is an
-            // answer — nobody was off sick this fortnight.
+            // answer — nobody was off sick this pay period.
             sick: n(sick),
           };
         }}
@@ -1002,7 +1002,7 @@ export function TimesheetsList({
  *   2. Does OUR recompute disagree with what the row says? A `≠` chip naming
  *      both figures. This is the one that was invisible in the grid until
  *      2026-08-05: it lived behind the Needs-review tab and the row expansion,
- *      so a fortnight looked settled while the app privately disagreed with
+ *      so a pay period looked settled while the app privately disagreed with
  *      fifteen rows of it (Mark: "should be obvious when app recommends
  *      something different for a particular time sheet. Need a way to flag").
  *   3. WHY there is overtime at all — the reasons `proposeOvertime` already

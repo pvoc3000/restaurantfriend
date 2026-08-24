@@ -18,8 +18,8 @@ export type SalesSummaryData = {
 /**
  * SUMMARY FIRST (Mark, 2026-08-23), with the daily table below it.
  *
- * BOTH COMPARISONS ARE ALWAYS SHOWN. "Against the last fortnight" and "against
- * the same fortnight last year" answer different questions — one is momentum,
+ * BOTH COMPARISONS ARE ALWAYS SHOWN. "Against the last pay period" and "against
+ * the same pay period last year" answer different questions — one is momentum,
  * the other is seasonality — and putting them behind a toggle means whichever
  * one is not selected never gets looked at.
  *
@@ -103,7 +103,7 @@ export function SalesSummary({ summary }: { summary: SalesSummaryData }) {
         // NOT decoration. Every figure above is a sum, and a sum over a window
         // with holes in it is smaller than the truth while looking exactly as
         // authoritative — a period missing two Saturdays reads as a bad
-        // fortnight. Today is deliberately not counted: the shops have not
+        // pay period. Today is deliberately not counted: the shops have not
         // finished trading.
         <p className="text-xs">
           <span className="bg-mark-fill px-1">
@@ -164,7 +164,7 @@ function Delta({
   const basis = field === "net" ? c.basis.netSalesCents : c.basis.tipsCents;
 
   // Nothing to compare against is a real state and says so, rather than
-  // printing a confident "+100%" against a fortnight the shop was shut.
+  // printing a confident "+100%" against a pay period the shop was shut.
   if (basis === 0) {
     return <Line what={what}>no figures</Line>;
   }

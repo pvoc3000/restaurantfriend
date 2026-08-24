@@ -1215,7 +1215,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    one is in our favour, and the first is the big one.
    **The brief's central premise is FALSE for the current data.** It says
    Homebase splits a shift at midnight and so under-counts CA daily overtime.
-   The real Homebase CSVs (DF01 + DF02, the 07/20–08/02 fortnight) have
+   The real Homebase CSVs (DF01 + DF02, the 07/20–08/02 pay period) have
    separate `Clock in date` and `Clock out date` columns and keep an overnight
    shift WHOLE — zero adjacent-at-local-midnight pairs across both shops — and
    Homebase's own overtime is correct on them: Gaspar López 6:01pm→8:10am =
@@ -1250,8 +1250,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    which is what makes "which period owns this workday" a TOTAL function so 028
    can fill `pay_period_id` by trigger. Read is membership-only (a period is two
    dates and a status, and a supervisor reporting Saturday's tips must know
-   which fortnight is open); write is owner/admin; no delete policy. The
-   fortnight lives in `orgs.settings.payroll` per design rule 2 — 024's lesson
+   which pay period is open); write is owner/admin; no delete policy. The
+   pay period lives in `orgs.settings.payroll` per design rule 2 — 024's lesson
    that a statement true of finished data is still wrong as a constraint.
    Loaded the real calendar: **178 periods, 2019-10-07 → 2026-08-02**, every one
    14 days from a Monday, zero gaps, zero overlaps, re-derived from the file by
@@ -1312,7 +1312,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `ts_Date_End` is corroboration only.
    `/timesheets` is scoped to ONE pay period (44,721 rows exist) and opens on
    the most recent period that HAS shifts, not the newest — which after the load
-   is an empty current fortnight. **No `/timesheets/[id]` route**: a shift is a
+   is an empty current pay period. **No `/timesheets/[id]` route**: a shift is a
    row, not a record, and what a detail screen would show lives in the row's
    expansion. The Worked column is DECIMAL, not a `5:13` clock reading, because
    Regular + OT + Double must visibly sum to it.
@@ -1401,7 +1401,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    changed figure, one row in the table with the value updated, FileMaker's
    44,721 untouched, then everything deleted leaving 44,721 timesheets and 178
    periods exactly as found. That is the case that matters: Homebase emits no
-   shift id and a fortnight is re-exported whenever somebody fixes a punch.
+   shift id and a pay period is re-exported whenever somebody fixes a punch.
    **393 fixtures pass**, and every rule above was checked by BREAKING it. Two
    fixture gaps were found that way rather than by reading: the
    one-premium-per-day case only asserted "at most one finding" (which the
@@ -1448,12 +1448,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    type — it holds Homebase's `Role` and FMP's `ts_Position`, while
    `employees.position` holds a THIRD vocabulary of abbreviations ("DF",
    "Sr. DF") matching shift positions on only 8 of 22 people in the last real
-   fortnight.
+   pay period.
    **THE `(Primary)` SUFFIX IS NEVER STORED.** Both columns hold the bare title
    and the export appends it by comparing them, which makes the file's central
    invariant STRUCTURAL: one `primary_wage_type` per person → exactly one
    primary row → exactly one place for the earnings. Storing it per shift would
-   let a fortnight produce two primary rows, or none. The backfill reads FMP's
+   let a pay period produce two primary rows, or none. The backfill reads FMP's
    `ts_Wage_Type` out of `source_payload`; 198 employees have one in history,
    134 have exactly one ever and **64 CHANGED** (promotions), so **latest
    wins** — verified with a seeded promotion resolving to Manager, and zero
@@ -1474,7 +1474,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **`getAppSession` now embeds `orgs(name, settings)`**, not settings alone, so
    the export names its file without a second query. `session.orgName` is new.
    Then phase 7's parallel run, which `docs/master-plan.md` already requires —
-   one full fortnight through both FMP and this module, diffed per employee,
+   one full pay period through both FMP and this module, diffed per employee,
    before anyone trusts the export. **The one thing still unverified is what
    rate Gusto actually pays `missed_break_hours` at**; if it ever disagrees with
    the base rate, the fallback is `custom_earning_premium` in dollars, and
@@ -1489,12 +1489,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    through to `unpaid_break_minutes`, and **`late_meal` could never fire at all**
    while a missed meal was inferred from the absence of a deduction (Mark:
    "missed break not flagged by app… what about late breaks?"). The reader now
-   accepts BOTH spellings — which is what makes the fortnight already imported
+   accepts BOTH spellings — which is what makes the pay period already imported
    work with no backfill and no re-import — and the importer writes the canonical
    snake_case names beside the raw row, so the two sources stop drifting. That
    also fixes the row expansion, which reads the same keys and had shown em
    dashes for every imported shift.
-   Measured on the real 07/06–07/19 fortnight: **61 late meals found where the
+   Measured on the real 07/06–07/19 pay period: **61 late meals found where the
    rule had been structurally silent**, against FileMaker's own
    `cTimeSheetError` flagging 49 Late Break on the same 163 rows — the extras are
    overnight shifts, where FMP's wall-clock arithmetic goes wrong and ours
@@ -1583,12 +1583,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the new timesheet dialogue and directly onto the timesheet screen"). It is a
    `Link` beside New timesheet in the filter row's right-hand cluster now. The
    2026-08-05 argument reads well and had the frequencies backwards: it costs a
-   click on the thing you do EVERY FORTNIGHT to save one on the thing you do
+   click on the thing you do EVERY PAY PERIOD to save one on the thing you do
    rarely. Importing is the routine; typing a shift by hand is the exception.
    It is deliberately **NOT disabled on a closed period** where New timesheet
    beside it is — it navigates rather than writing, the import screen states any
    period problem in its own words, and it is also how you reach a DIFFERENT
-   fortnight's file. The importer OFFERS to open the period a file needs,
+   pay period's file. The importer OFFERS to open the period a file needs,
    continuing the cadence from `nextPeriodAfter` rather than wrapping the file's
    dates, where it used to state that none covered them and stop; the import screen ends with
    a **`Done`** at the lower right, OUTSIDE the `plan &&` block so it is
@@ -1606,8 +1606,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    — Homebase prints one for every scheduled day — and ten warnings in front of
    someone whose file is perfect teaches them to skim the section that also holds
    the real failures; and **"fortnight" is "pay period"** in every visible
-   string.
-   Known and NOT a bug: 90 meal findings on that fortnight's 163 shifts reads as
+   string — a rule since widened to EVERYTHING, comments and conversation
+   included; see Conventions.
+   Known and NOT a bug: 90 meal findings on that pay period's 163 shifts reads as
    a lot, and 28 of the 31 no-meal days would be covered by a signed waiver.
    (This said "zero waivers are loaded — FMP keeps them in its Events table";
    both clauses were wrong by 2026-08-06. 21 waiver PDFs are on file and the
@@ -1668,7 +1669,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **Consequence for data already imported:** the fix is in the parser, so rows
    written before it keep the wrong figure until the file is imported again —
    which corrects them in place, the upsert being on `source_row_key`. Measured
-   on the 07/20–08/02 fortnight: 6 rows, all Gaspar's, 3.03 hours over-counted.
+   on the 07/20–08/02 pay period: 6 rows, all Gaspar's, 3.03 hours over-counted.
    **ONE PLACE TO DO THE WORK, AND IT IS THE TIMESHEET ROW** (Mark, 2026-08-05:
    "I'm not sure whether it's in pay periods or in timesheets, but there should
    be one place to do what we need… Timesheets seems more natural to me because
@@ -1700,7 +1701,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    had moved onto the shift row, what was left on `/pay-periods/[id]` decided
    nothing — it stated the period, stepped it along the ladder, rolled the shifts
    up and produced the file — and the 178-row LIST beside it existed only to
-   choose a fortnight, which `/timesheets`' own `PickList` already did.
+   choose a pay period, which `/timesheets`' own `PickList` already did.
    So: `components/payroll/ExportTimesheets.tsx` is the old record, opened as a
    `ui/Dialog` at `h-[88vh]` from a command on the new `PeriodBar` (period picker
    · `StatusChip` · New pay period · Export timesheets…) above the shift filters.
@@ -1760,7 +1761,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **Migration 032 — a reason is required only when the premium is OWED.** 029
    made it NOT NULL with a non-empty check on the reasoning that a decision
    nobody can audit is worthless; that is true of the one that PAYS and false of
-   the other two, and a fortnight carries ninety findings, most of them a short
+   the other two, and a pay period carries ninety findings, most of them a short
    shift that needed no meal at all. Demanding a sentence for each is how a
    reviewer learns to stop reviewing (Mark: "don't make it required to enter a
    'why' when waiving or declaring not owed"). The requirement moved onto the
@@ -1855,8 +1856,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    their workday either way. Adopting is decision 2 working as designed.
    **Consequence for the parallel run, which will otherwise read as a defect:
    Homebase does not know about the boundary and never will**, so its OT column
-   disagrees with ours on the kitchen's evening shifts EVERY fortnight, forever.
-   That is the feature, not a reconciliation failure. ~3 rows a fortnight.
+   disagrees with ours on the kitchen's evening shifts EVERY pay period, forever.
+   That is the feature, not a reconciliation failure. ~3 rows a pay period.
    Screens: the field is on the employee record's Payroll block, and
    **`InlineValue` gained `kind="time"`** (delegating to `ui/TimeField`, which
    already handles Postgres's `HH:MM:SS` → `HH:MM`) — the third kind that does
@@ -1899,7 +1900,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the answer is usually zero — and it checks the row count afterwards, since a
    closed period matches no policy, changes nothing and returns NO error.
    Verified against the live 08-03 → 08-16 period, all three directions: **0
-   moves as things stand** (idempotent, the fortnight is already right), **24
+   moves as things stand** (idempotent, the pay period is already right), **24
    would move back if every boundary were cleared** (the undo path, and exactly
    the 24 that moved), and giving a 6:30am starter a 14:00 boundary moves
    **nothing** — which is the front-of-house-is-untouched property demonstrated
@@ -1915,7 +1916,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    shape general enough for the overnight differential and reimbursements Mark
    has already named. It fills `custom_earning_commuter_benefit`, which
    `lib/gustoExport` had been emitting as a hardcoded empty string — so the
-   export as it stood was **$432 a fortnight short across five people**.
+   export as it stood was **$432 a pay period short across five people**.
    Three measurements out of the real FileMaker export decided the design, and
    each one killed a piece of the FMP model:
    **(a) `locations` is not touched at all.** FMP had a boolean + amount +
@@ -1967,7 +1968,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **`freeze_pay_period` gained a 4th argument and 033 DROPS IT FIRST.**
    `create or replace` cannot change an argument list — it would create an
    OVERLOAD and leave 029's three-arg version live, so a stale tab would keep
-   freezing fortnights with no benefits in them and no error. With the drop a
+   freezing pay periods with no benefits in them and no error. With the drop a
    stale tab gets PostgREST's `PGRST202`, which is loud. The benefit payload is
    **sparse by construction** (most shifts accrue nothing), so it checks that
    every row it was GIVEN landed rather than that every timesheet is covered —
@@ -2015,7 +2016,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    freeze refused bogus ids BY NAME and replaced rather than duplicated on
    re-freeze, 479 fixtures pass (29 new, each rule checked by breaking it), and
    **the real export rendered through the real components over the real
-   07/20–08/02 fortnight matches Mark's actual Gusto file person for person —
+   07/20–08/02 pay period matches Mark's actual Gusto file person for person —
    $432.00 vs $432.00.**
    **Qualification is PUNCH-BASED, not hours-based**, and that is the choice a
    rewrite would most likely flip: a flat allowance pays for showing up, so a
@@ -4259,7 +4260,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    where t.business_date not between p.start_date and p.end_date` (**0**);
    `select count(*) from timesheets where pay_period_id is null` (**0**); and
    `select count(*) from timesheets where workday <> business_date` (**24** —
-   the kitchen's evening shifts in the 08-03→08-16 fortnight, the first rows in
+   the kitchen's evening shifts in the 08-03→08-16 pay period, the first rows in
    seven years where the two columns differ at all).
    Note 062 is RERUNNABLE where 061 is not, and its backfill is a no-op once the
    invariant holds — verified by running it twice on the Docker harness.
@@ -4835,7 +4836,7 @@ inherit the benefit's $12. Verified the same day — the three tables select, th
 commuter benefit is seeded, and the OLD three-argument `freeze_pay_period` is
 GONE (a call to it returns PostgREST's `PGRST202`) while the four-argument one
 raises "No such pay period" from inside its own body. That pair of probes is the
-one that matters: two live overloads would let a stale tab freeze a fortnight
+one that matters: two live overloads would let a stale tab freeze a pay period
 with no benefits in it and no error. A second `--apply` wrote 0 new and updated
 19, so the select-then-update idempotency holds without an `on conflict` target.
 Then the whole stack was run against the LIVE database — 159 shifts, 19
@@ -5116,6 +5117,22 @@ weekday column, and 003 then silently made it per-vendor-item.
 
 ## Conventions
 
+- **IT IS A PAY PERIOD, NEVER A "FORTNIGHT"** (Mark, 2026-08-23: "stop
+  referring to pay periods as 'fortnights'. It's a pay period. say 'pay period'
+  please"). This was already the rule for VISIBLE STRINGS when `/timesheets`
+  shipped; it now covers comments, commit messages, the headers of NEW
+  migrations, and how you talk about it — but NOT a migration that has already
+  been applied, which is history under 055's rule and stays exactly as it was
+  run. (063 and 064 each carry the old word; 064's is inside a `comment on
+  function` string literal, so rewording it would have changed executed SQL for
+  a word nobody reads.) `pay_periods` is what the table is called, "pay period" is
+  what payroll software says, and it is the phrase the business uses — where
+  "fortnight" is a synonym that happens to be true of a 14-day cadence and
+  would quietly become false the day one changes.
+  The word is still correct for a plain TWO-WEEK WINDOW that is not a pay
+  period — the production item's two-week history, for instance — but prefer
+  "two weeks" there too, so nobody has to judge which sense is meant.
+
 - **USE THE PARTS THAT EXIST — don't hand-roll a second one.** This app has no
   component library by design (Next ships none, Tailwind ships none), so every
   shared control is one we wrote and every one of them encodes a decision that
@@ -5155,7 +5172,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/DocumentChip` | a bordered div with a thumbnail strip | a filed document in a list — PO attachments, employee paperwork. Full-bleed preview (image, or PDF via `<object>`) with the text semi-opaque over it; the plugin is `pointer-events-none` and a transparent anchor takes the click |
   | `ui/StickyFooter` | a hand-placed `fixed bottom-0` div plus a guessed spacer | a band pinned to the foot of the window — PO paperwork, employee paperwork. MEASURES its own height into a spacer so the page's last block doesn't slide under it, minus what already follows (the layout's `py-8`), and fires a `resize` so `useFillViewportHeight` reclaims space when it SHRINKS |
   | `ui/RevealPanel` | a section that is always fully open, or a hand-rolled hover-expand | a block whose body costs more screen than it earns — both paperwork areas. Header always visible (title, count, Add as, Attach, progress, errors); the body opens on hover, on focus, or from a pinning toggle, and is ABSOLUTELY POSITIONED so it never reflows the page. **`alwaysOpen`** drops the toggle and puts the body IN FLOW, for when the panel gets a screen of its own and the crowding it was hiding from is gone |
-  | `ui/buttons` `PRIMARY_BUTTON_CLASS` | a black class string you type yourself | the ONE case where a command button on a SCREEN is filled black — a record in an abnormal state with exactly one way out (a flagged order's "Resolve the issue"), or a screen whose ONE obvious next act depends on its state — the timesheets screen fills **Import timesheets** while the fortnight is empty and **Close pay period…** once it has shifts, and never both (Mark, 2026-08-22). `DIALOG_COMMIT_CLASS`'s argument outside a dialog; only ever right CONDITIONALLY, never as a screen's standing "primary" |
+  | `ui/buttons` `PRIMARY_BUTTON_CLASS` | a black class string you type yourself | the ONE case where a command button on a SCREEN is filled black — a record in an abnormal state with exactly one way out (a flagged order's "Resolve the issue"), or a screen whose ONE obvious next act depends on its state — the timesheets screen fills **Import timesheets** while the pay period is empty and **Close pay period…** once it has shifts, and never both (Mark, 2026-08-22). `DIALOG_COMMIT_CLASS`'s argument outside a dialog; only ever right CONDITIONALLY, never as a screen's standing "primary" |
   | `ui/buttons` `DANGER_BUTTON_CLASS` | re-typing the red class string | any destructive command out on a screen — Delete, Void, "Deactivate everywhere". Red EVEN THOUGH most only open a confirm: a reader can't tell "opens a confirm" from "destroys" by looking. Bordered, never filled. NOT the same as `DIALOG_DANGER_CLASS` (`px-5`, a dialog footer's commit) — don't merge them. Positional classes stay at the call site |
   | `ui/FileDropZone` | `onDrop` on a div | dropping files onto a region. Its OVERLAY takes the drop (a PDF `<object>` is a plugin and swallows drag events — confirmed working over a live PDF, Mark 2026-08-04), it arms off WINDOW drag events so it's up before the pointer arrives, it vets types itself (`accept` governs only the picker), and it stops a stray drop navigating the page away |
   | `ui/SectionNav` | a second sidebar, underline tabs, or a `TabPicker` turned sideways | **the sections of one detail record** — the employee screen's Info · Employment · Events · Documents · Admin. Plain text links, no box: active bold black, inactive `text-muted`. `orientation="horizontal"` is the narrow-screen form. See "A detail screen that outgrows one page" below — REUSE THIS, don't re-derive it |
@@ -6610,7 +6627,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   straddling shop-day?** Raised 2026-08-22 by 061 and NOT answered. All eleven
   people with a workday boundary have `excludes_tips = false`, which is the
   DEFAULT rather than a decision anyone made. Since 061 a shift can have its
-  `workday` in one fortnight and its `business_date` in the previous one, so its
+  `workday` in one pay period and its `business_date` in the previous one, so its
   shop-day pool is visible from two worksheets. `/timesheets` widens the
   `tip_pools` fetch by ONE DAY to stop that pool reading as missing — provably
   enough, since 061's noon floor means the workday moves forward by at most one

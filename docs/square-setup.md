@@ -20,7 +20,7 @@ The figures land in two places, and the split matters:
 | Table | Holds | Why |
 | --- | --- | --- |
 | `daily_sales` | **Everything Square has**, sales and tips, however far back | Reporting: year-over-year, per pay period, tips as a share of sales |
-| `tip_pools.reported_cents` | Tips **only for days in an open or review pay period** | Payroll. 177 of 180 periods are closed and those fortnights are paid — a sync must not move money that already went out |
+| `tip_pools.reported_cents` | Tips **only for days in an open or review pay period** | Payroll. 177 of 180 periods are closed and those pay periods are paid — a sync must not move money that already went out |
 
 `corrected_cents` stays yours alone. A re-sync updates what Square says and
 **never touches a correction you made** — there is a fixture that fails if

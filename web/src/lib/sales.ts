@@ -74,7 +74,7 @@ export function tipFraction(t: SalesTotals): number | null {
  * overlapping.
  *
  * NB `daysBetween` is INCLUSIVE — 2026-07-20 → 2026-08-02 is 14, not 13 — so
- * the shift is the span itself and not the span plus one. A fortnight compared
+ * the shift is the span itself and not the span plus one. A pay period compared
  * against fifteen days would understate every rise by a day's takings.
  */
 export function previousRange(range: DateRange): DateRange {
@@ -87,7 +87,7 @@ export function previousRange(range: DateRange): DateRange {
  *
  * This is a real decision, not a rounding convenience. Comparing Saturday
  * 2026-08-22 against Friday 2025-08-22 compares two different businesses: a
- * bakery's Saturday and its Friday are not the same shop, and over a fortnight
+ * bakery's Saturday and its Friday are not the same shop, and over a pay period
  * the calendar answer silently shifts every weekend by a day. 364 is 52 whole
  * weeks, so every date lands on the same weekday it started on.
  *
@@ -120,7 +120,7 @@ function shiftYear(iso: string): string {
  * A pay period is fourteen days long from the moment it opens, so on day seven
  * the naive sum is seven days of takings sitting in a fourteen-day box. That is
  * fine as a total and ruinous as a COMPARISON: measured on the real 2026-08-17
- * period, seven days against a complete fortnight reads −58.6%, which looks
+ * period, seven days against a complete pay period reads −58.6%, which looks
  * like the business falling over and is only the calendar.
  */
 export function elapsedRange(range: DateRange, today: string): DateRange {
@@ -188,7 +188,7 @@ function fractionChange(from: number, to: number): number | null {
  * It matters more than it looks: every comparison above is a sum, and a sum
  * over a window with holes in it is smaller than the truth while looking
  * exactly as authoritative. A period missing two Saturdays reads as a bad
- * fortnight. So the screen states the holes beside the figures rather than
+ * pay period. So the screen states the holes beside the figures rather than
  * leaving the reader to trust them.
  *
  * `through` exists because today is always missing — the shop has not finished
@@ -341,7 +341,7 @@ export function parseSalesRange(raw: string | undefined | null): SalesRangeKey {
  * pay-period windows fall back to the last 14 days when the calendar cannot
  * answer — after the FileMaker load there were spells with no open period at
  * all, and a screen that renders nothing because a period is missing is worse
- * than one that shows a fortnight and says which.
+ * than one that shows a pay period and says which.
  */
 export function resolveSalesRange(
   key: SalesRangeKey,
@@ -352,7 +352,7 @@ export function resolveSalesRange(
   const sorted = [...periods].sort((a, b) => (a.start_date < b.start_date ? 1 : -1));
   const containing = sorted.find((p) => p.start_date <= today && today <= p.end_date);
 
-  const fortnight = (): DateRange => ({ from: addDays(today, -13), to: today });
+  const twoWeeks = (): DateRange => ({ from: addDays(today, -13), to: today });
 
   switch (key) {
     case "period": {
@@ -363,7 +363,7 @@ export function resolveSalesRange(
           fellBack: false,
         };
       }
-      return { range: fortnight(), label: "the last 14 days", fellBack: true };
+      return { range: twoWeeks(), label: "the last 14 days", fellBack: true };
     }
     case "last-period": {
       const idx = containing ? sorted.indexOf(containing) : -1;
@@ -375,8 +375,8 @@ export function resolveSalesRange(
           fellBack: false,
         };
       }
-      const back = previousRange(fortnight());
-      return { range: back, label: "the fortnight before last", fellBack: true };
+      const back = previousRange(twoWeeks());
+      return { range: back, label: "the pay period before last", fellBack: true };
     }
     case "mtd":
       return {

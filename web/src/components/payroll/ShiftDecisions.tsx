@@ -91,7 +91,7 @@ export function ShiftPremium({
 
   // A REASON IS REQUIRED ONLY FOR `owed` (migration 032). That is the decision
   // that pays an hour, and the row is the only record of why it was granted;
-  // the other two may be recorded bare, because a fortnight carries ninety
+  // the other two may be recorded bare, because a pay period carries ninety
   // findings and demanding a sentence for each is how a reviewer learns to stop
   // reviewing.
   const needsReason = decision === "owed";
@@ -348,7 +348,7 @@ export function ShiftTips({
             under the share it governs, where "excluded from the pool" above
             and the control that causes it are one glance apart. On the list it
             was a picker in a 100px cell answering a question nobody asks while
-            scanning a fortnight. */}
+            scanning a pay period. */}
         <dt className="text-subtle">In pool</dt>
         <dd>
           <TipExclusion

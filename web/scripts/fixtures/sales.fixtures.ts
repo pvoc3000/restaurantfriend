@@ -97,10 +97,10 @@ test("tipFraction of zero tips on real sales is 0, which is a real answer", () =
 // ---------------------------------------------------------------------------
 
 test("previousRange is the SAME LENGTH and touches without overlapping", () => {
-  // A real fortnight from pay_periods.
+  // A real pay period from pay_periods.
   const range = { from: "2026-07-20", to: "2026-08-02" };
   const prev = previousRange(range);
-  eq(prev, { from: "2026-07-06", to: "2026-07-19" }, "the fortnight before");
+  eq(prev, { from: "2026-07-06", to: "2026-07-19" }, "the pay period before");
   eq(daysBetween(prev.from, prev.to), daysBetween(range.from, range.to), "same length");
   eq(prev.to < range.from, true, "does not overlap");
 });
@@ -321,7 +321,7 @@ test("`last-period` is the one before that, not merely an earlier one", () => {
 test("the pay-period windows FALL BACK when no period covers today", () => {
   // After the FileMaker load there was no open period at all. A screen that
   // renders nothing because the calendar has a hole is worse than one that
-  // shows a fortnight and says so.
+  // shows a pay period and says so.
   const r = resolveSalesRange("period", "2027-01-01", PERIODS);
   eq(r.fellBack, true, "it says it fell back");
   eq(r.range, { from: "2026-12-19", to: "2027-01-01" }, "14 days");
@@ -373,7 +373,7 @@ test("a custom range refuses a date that is not real", () => {
 
 test("fetchWindow spans the range, the one before it, AND a year back", () => {
   const w = fetchWindow({ from: "2026-08-17", to: "2026-08-30" });
-  // 364 days before 2026-08-17 is 2025-08-18; the previous fortnight ends
+  // 364 days before 2026-08-17 is 2025-08-18; the previous pay period ends
   // 2026-08-16, so the widest window runs from last year to this period's end.
   eq(w.from, "2025-08-18", "a year back");
   eq(w.to, "2026-08-30", "this period's end");
