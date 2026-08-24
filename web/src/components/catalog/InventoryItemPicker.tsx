@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { Dialog } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
 import { inventorySearchWords } from "@/lib/catalog";
 
@@ -44,6 +45,8 @@ export function InventoryItemPicker({
   currentItemId,
   initialTerm,
   allowUnlink = false,
+  variant = "inline",
+  trigger,
 }: {
   /** The table holding the `inventory_item_id` column being written. */
   table: "vendor_items" | "production_elements";
@@ -69,6 +72,29 @@ export function InventoryItemPicker({
    * no link at all, and without it linking is a one-way door.
    */
   allowUnlink?: boolean;
+  /**
+   * Where the search itself renders.
+   *
+   * `inline` grows the search box and its results underneath the button — right
+   * on a detail screen, which has the room and nothing below to displace.
+   *
+   * `cell` is for a TABLE cell, where growing is not available: the table is
+   * `table-fixed` with `truncate` cells, so an 80-unit-wide search box inside a
+   * 205px column is clipped rather than wrapped. The search goes in a
+   * `ui/Dialog` instead, which escapes the cell entirely and is already the
+   * app's floating panel — including the two properties a dialog rendered from
+   * a table cell needs, `text-ink` and `whitespace-normal`, which that cell's
+   * own `truncate` would otherwise cascade straight into.
+   */
+  variant?: "inline" | "cell";
+  /**
+   * What the button says in `cell` mode — the cell's own text, so the value you
+   * were already reading becomes the control that changes it.
+   *
+   * Ignored inline, where the button is "Link…" / "Change" and the row beside
+   * it carries the value.
+   */
+  trigger?: ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -139,19 +165,120 @@ export function InventoryItemPicker({
     router.refresh();
   }
 
+  function toggle() {
+    setOpen((v) => {
+      // Re-seed on OPEN, so a search you cleared and abandoned does not come
+      // back empty next time.
+      if (!v) setTerm(initialTerm ?? "");
+      return !v;
+    });
+  }
+
+  // The search and its results, wherever they end up rendering. In `cell` mode
+  // this fills a dialog, so the fixed 80-unit width that suits a detail screen
+  // would leave the panel half empty.
+  const wide = variant === "cell";
+  const search = (
+    <span className="flex flex-col gap-1">
+      <TextInput
+        autoFocus
+        value={term}
+        onValueChange={setTerm}
+        placeholder="Search inventory items by name…"
+        clearLabel="Clear the search"
+        className={wide ? "w-full" : "w-80"}
+      />
+      {canSearch && results.length === 0 && (
+        <span className="text-xs text-subtle">No items match.</span>
+      )}
+      {!canSearch && wide && (
+        <span className="text-xs text-subtle">Type at least two letters.</span>
+      )}
+      {canSearch && results.length > 0 && (
+        <ul
+          className={`overflow-auto border border-ink ${wide ? "max-h-[50vh] w-full" : "max-h-64 w-80"}`}
+        >
+          {results.map((it) => {
+            const isCurrent = it.id === currentItemId;
+            return (
+              <li
+                key={it.id}
+                className="flex items-center gap-2 border-b border-hairline px-2 py-1 text-sm last:border-b-0"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate">{it.name}</span>
+                  <span className="block text-xs text-subtle">
+                    {it.category ?? "no category"} · {it.base_unit}
+                    {!it.is_active && (
+                      <span className="ml-1 border border-neutral-300 bg-neutral-100 px-1 text-muted">
+                        inactive
+                      </span>
+                    )}
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  disabled={busy || isCurrent}
+                  onClick={() => write(it.id)}
+                  className="shrink-0 border border-ink px-2 py-0.5 text-xs transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+                >
+                  {isCurrent ? "current" : "Link"}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </span>
+  );
+
+  if (variant === "cell") {
+    return (
+      <>
+        {/* The cell's own text IS the button — underlined at rest, because on an
+            iPad there is no hover to reveal that something is pressable, and a
+            value that looks like description is exactly how this control went
+            missing for 71 rows. */}
+        <button
+          type="button"
+          onClick={toggle}
+          disabled={busy}
+          title={
+            currentItemId
+              ? "Point this at a different inventory item"
+              : "Link this to an inventory item"
+          }
+          className="max-w-full truncate underline decoration-neutral-400 underline-offset-[3px] hover:decoration-current disabled:opacity-35"
+        >
+          {busy ? "saving…" : trigger}
+        </button>
+        {open && (
+          <Dialog
+            title="Link inventory item"
+            onClose={() => setOpen(false)}
+            busy={busy}
+            width="max-w-lg"
+          >
+            <div className="space-y-2">
+              <p className="text-sm text-muted">
+                Search the catalog and link this vendor item to the inventory item it
+                is bought as.
+              </p>
+              {error && <p className="text-sm text-accent">{error}</p>}
+              {search}
+            </div>
+          </Dialog>
+        )}
+      </>
+    );
+  }
+
   return (
     <span className="inline-flex flex-col gap-1">
       <span className="inline-flex items-center gap-2">
         <button
           type="button"
-          onClick={() =>
-            setOpen((v) => {
-              // Re-seed on OPEN, so a search you cleared and abandoned does not
-              // come back empty next time.
-              if (!v) setTerm(initialTerm ?? "");
-              return !v;
-            })
-          }
+          onClick={toggle}
           disabled={busy}
           title={
             currentItemId
@@ -181,54 +308,7 @@ export function InventoryItemPicker({
 
       {error && <span className="text-xs text-accent">{error}</span>}
 
-      {open && (
-        <span className="flex flex-col gap-1">
-          <TextInput
-            autoFocus
-            value={term}
-            onValueChange={setTerm}
-            placeholder="Search inventory items by name…"
-            clearLabel="Clear the search"
-            className="w-80"
-          />
-          {canSearch && results.length === 0 && (
-            <span className="text-xs text-subtle">No items match.</span>
-          )}
-          {canSearch && results.length > 0 && (
-            <ul className="max-h-64 w-80 overflow-auto border border-ink">
-              {results.map((it) => {
-                const isCurrent = it.id === currentItemId;
-                return (
-                  <li
-                    key={it.id}
-                    className="flex items-center gap-2 border-b border-hairline px-2 py-1 text-sm last:border-b-0"
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate">{it.name}</span>
-                      <span className="block text-xs text-subtle">
-                        {it.category ?? "no category"} · {it.base_unit}
-                        {!it.is_active && (
-                          <span className="ml-1 border border-neutral-300 bg-neutral-100 px-1 text-muted">
-                            inactive
-                          </span>
-                        )}
-                      </span>
-                    </span>
-                    <button
-                      type="button"
-                      disabled={busy || isCurrent}
-                      onClick={() => write(it.id)}
-                      className="shrink-0 border border-ink px-2 py-0.5 text-xs transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-                    >
-                      {isCurrent ? "current" : "Link"}
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </span>
-      )}
+      {open && search}
     </span>
   );
 }

@@ -7,6 +7,7 @@ import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import type { StaleBucket } from "@/lib/lastOrdered";
 import { PACKAGE_DESC_OPTIONS } from "@/lib/units";
 import { InlineValue } from "./InlineValue";
+import { InventoryItemPicker } from "./InventoryItemPicker";
 import { ActiveToggle } from "./ActiveToggle";
 import { DataTable, type DataColumn } from "./DataTable";
 import { ListFilters, type ActiveFilter, type StaleFilter } from "./ListFilters";
@@ -220,6 +221,24 @@ export function VendorItemsTable({
                 >
                   {vi.inventory_items.name}
                 </Link>
+              ) : canEdit ? (
+                // "unlinked" IS the control (Mark, 2026-08-24: "clicking
+                // unlinked should pop up a list of inventory items"). It was
+                // dead text, and the picker that fixes it lived only on the
+                // vendor item's own detail screen — which nothing on this page
+                // links to, and which an unlinked row cannot reach through the
+                // order guide either, the guide being built from inventory
+                // items. So the 71 rows that need linking were the exact rows
+                // with no route to the thing that links them.
+                <span className="text-accent">
+                  <InventoryItemPicker
+                    table="vendor_items"
+                    rowId={vi.id}
+                    currentItemId={null}
+                    variant="cell"
+                    trigger="unlinked"
+                  />
+                </span>
               ) : (
                 <span className="text-accent">unlinked</span>
               ),
