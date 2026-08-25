@@ -676,6 +676,42 @@ export function OrderGuide({
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
             Order Guide
           </h1>
+
+          {/* THE DAY — the screen's ONE piece of day state, and it sits in the
+              identity block after the title because that is what it is: which
+              walk you are looking at, not a filter over one (Mark, 2026-08-25).
+              Heading scale for the same reason.
+
+              The WEEKDAY is shown beside the date because it is the value doing
+              the work — order days, favorites and par are all scoped by it, and
+              "08/24/2026" says nothing about which day that is. It takes the
+              mark FILL when the day on screen is not today, so "these
+              quantities are being filed against Monday" is a colour rather than
+              a sentence. */}
+          <span className="flex items-center gap-2 text-[20px]">
+            <span
+              className={`px-1.5 font-semibold uppercase tracking-[0.06em] ${
+                guideDate === today ? "text-subtle" : "bg-mark-fill text-ink"
+              }`}
+            >
+              {WEEKDAY_LABELS[weekday - 1]}
+            </span>
+            <DateField
+              variant="title"
+              ariaLabel="The day this guide is showing"
+              value={guideDate}
+              onChange={(next) => router.push(guideHref(next ?? today, today))}
+            />
+            {guideDate !== today && (
+              <Link
+                href={guideHref(today, today)}
+                className="text-[12px] uppercase tracking-[0.12em] text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+              >
+                Today
+              </Link>
+            )}
+          </span>
+
           <p className="text-[12px] uppercase tracking-[0.12em] text-subtle">
             {visibleRows.length} of {rows.length} items
           </p>
@@ -777,41 +813,6 @@ export function OrderGuide({
         className="sticky top-[var(--rf-header-h)] z-30 bg-white py-3"
       >
       <div className="flex flex-wrap items-center gap-4 text-sm">
-        {/* THE DAY, and it is the only day control on the screen (Mark,
-            2026-08-25 — it replaced a weekday picker that sat beside it). It
-            lives in the STICKY band rather than up in the title block, which is
-            what lets it be the only one: a control that scrolls away needs a
-            second thing warning you which day you are on, and two elements for
-            one idea is what was wrong before.
-
-            The weekday is shown because it is the value that does the work —
-            order days, favorites and par are all scoped by it, and a native
-            date input renders "08/24/2026" with no hint of which day that is.
-            It carries the mark FILL when the day on screen is not today, so
-            "these quantities are being filed against Monday" is a colour rather
-            than a sentence. */}
-        <span className="flex items-center gap-2">
-          <span
-            className={`px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.12em] ${
-              guideDate === today ? "text-subtle" : "bg-mark-fill text-ink"
-            }`}
-          >
-            {WEEKDAY_LABELS[weekday - 1]}
-          </span>
-          <DateField
-            ariaLabel="The day this guide is showing"
-            value={guideDate}
-            onChange={(next) => router.push(guideHref(next ?? today, today))}
-          />
-          {guideDate !== today && (
-            <Link
-              href={guideHref(today, today)}
-              className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-            >
-              Today
-            </Link>
-          )}
-        </span>
         <TextInput
           value={term}
           onValueChange={setTerm}

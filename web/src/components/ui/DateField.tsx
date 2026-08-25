@@ -97,7 +97,10 @@ export function DateField({
    * screen's `dl`: button padding, no border, a hover wash. `field` is a
    * standalone bordered box for a FORM — 48px tall and 16px type, which is the
    * public inquiry page's dress and, for the type, the threshold below which
-   * iOS Safari zooms the whole page on focus.
+   * iOS Safari zooms the whole page on focus. `title` is `cell` at heading
+   * scale, for a date that is part of a screen's IDENTITY rather than one of
+   * its fields — the order guide's day, which sits beside the `h1` and says
+   * which walk you are looking at (Mark, 2026-08-25).
    *
    * The POINT of the prop is that the customer-facing form does not get to
    * hand-roll its own date input. Everything in this file is a bug a second
@@ -106,7 +109,7 @@ export function DateField({
    * paint today, and somebody would submit no date at all believing they had
    * asked for today.
    */
-  variant?: "cell" | "field";
+  variant?: "cell" | "field" | "title";
   /**
    * The latest date offered, as `YYYY-MM-DD` — forwarded straight to the input,
    * so the native picker greys out everything after it.
@@ -120,6 +123,7 @@ export function DateField({
   const ref = useRef<HTMLInputElement>(null);
   const empty = value === null || value === "";
   const field = variant === "field";
+  const title = variant === "title";
 
   const openPicker = () => {
     const el = ref.current;
@@ -143,7 +147,9 @@ export function DateField({
       className={
         field
           ? "flex h-12 w-full items-center gap-2 border border-ink px-3 focus-within:border-2"
-          : "inline-flex items-center gap-1 px-1 py-0.5 hover:bg-neutral-100"
+          : `inline-flex items-center px-1 py-0.5 hover:bg-neutral-100 ${
+              title ? "gap-2" : "gap-1"
+            }`
       }
     >
       {/* One fixed width in both states, so the glyph doesn't move when a date
@@ -154,8 +160,8 @@ export function DateField({
         className={
           field
             ? "relative flex h-full flex-1 items-center"
-            : `relative inline-flex h-6 items-center ${
-                empty && collapseWhenEmpty ? "w-4" : "w-28"
+            : `relative inline-flex items-center ${title ? "h-9" : "h-6"} ${
+                empty && collapseWhenEmpty ? "w-4" : title ? "w-[9.5rem]" : "w-28"
               }`
         }
       >
@@ -180,13 +186,15 @@ export function DateField({
           // over its own 16px, which showPicker needs and which is a small hit
           // area beside the glyph rather than nothing at all.
           className={`rf-date bg-transparent tabular-nums outline-none disabled:opacity-35 ${
-            field ? "h-full text-[16px]" : "h-6"
+            field ? "h-full text-[16px]" : title ? "h-9 text-[20px]" : "h-6"
           } ${
             empty
               ? "absolute inset-0 cursor-pointer opacity-0"
               : field
                 ? "w-full"
-                : "w-28"
+                : title
+                  ? "w-[9.5rem]"
+                  : "w-28"
           } ${className}`}
         />
       </span>
