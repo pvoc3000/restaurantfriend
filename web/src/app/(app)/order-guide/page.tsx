@@ -6,6 +6,8 @@ import type { GuideRequest } from "@/components/purchasing/GuideRequests";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import {
   guideToday,
+  parseGuideDate,
+  weekdayOf,
   parseGuideView,
   serverTimeZone,
   GUIDE_VIEW_COOKIE,
@@ -63,7 +65,14 @@ export default async function OrderGuidePage({
   // Comes with the session now (one embedded jsonb column on the membership
   // query) rather than its own round trip.
   const timeZone = session.orgSettings.timezone ?? serverTimeZone();
-  const { date: guideDate, weekday: todayWeekday } = guideToday(timeZone);
+  const { date: today, weekday: todayWeekday } = guideToday(timeZone);
+
+  // WHICH DAY'S WALK. Today unless `?date=` says otherwise — see
+  // parseGuideDate, which refuses the future and anything that doesn't
+  // round-trip. This used to be today and nothing else, which is why an
+  // unfinished walk read as having been thrown away at midnight: the entries
+  // were always still there, the page just stopped asking for them.
+  const guideDate = parseGuideDate(one(params.date), today);
 
   // How you left the guide last time, from the session cookie — so coming back
   // via the nav link doesn't reset the day, filter and grouping you'd set
@@ -73,9 +82,18 @@ export default async function OrderGuidePage({
   // Precedence: an explicit ?day= (a shared link, or the panel's back-trail)
   // beats the remembered day, which beats today. The guide exists every day, so
   // a day with no should-order lines just renders quiet.
+  // Precedence for the WEEKDAY: an explicit ?day= wins; then the walked date's
+  // own weekday whenever that isn't today, because opening Monday's walk with
+  // Thursday's should-order list is not a view anybody wants; then the
+  // remembered day; then today. `guideHref` always writes both, so in practice
+  // the second rung only catches a hand-typed or shared `?date=` on its own.
   const requested = Number(one(params.day));
   const weekday =
-    requested >= 1 && requested <= 7 ? requested : (view.weekday ?? todayWeekday);
+    requested >= 1 && requested <= 7
+      ? requested
+      : guideDate !== today
+        ? weekdayOf(guideDate)
+        : (view.weekday ?? todayWeekday);
 
   // Fired BEFORE the guide rows and awaited after: the two don't depend on each
   // other, and the guide query takes ~850ms, so this one is free.
@@ -277,6 +295,7 @@ export default async function OrderGuidePage({
       initialIgnoreDays={view.ignoreDays}
       initialTerm={view.term}
       guideDate={guideDate}
+      today={today}
       locationId={locationId}
       locationCode={session.activeLocation.code}
       requests={requests}

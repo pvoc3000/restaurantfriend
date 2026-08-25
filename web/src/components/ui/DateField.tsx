@@ -62,6 +62,7 @@ export function DateField({
   className = "",
   collapseWhenEmpty = false,
   variant = "cell",
+  max,
 }: {
   /** An ISO yyyy-mm-dd, or null for no date. */
   value: string | null;
@@ -106,6 +107,15 @@ export function DateField({
    * asked for today.
    */
   variant?: "cell" | "field";
+  /**
+   * The latest date offered, as `YYYY-MM-DD` — forwarded straight to the input,
+   * so the native picker greys out everything after it.
+   *
+   * A hint and never a guarantee: the attribute is advisory in every engine and
+   * the value can still be typed, so whoever reads the date validates it too
+   * (the order guide's `parseGuideDate` does).
+   */
+  max?: string;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const empty = value === null || value === "";
@@ -153,6 +163,7 @@ export function DateField({
           ref={ref}
           type="date"
           value={empty ? "" : value}
+          max={max}
           disabled={disabled}
           required={required}
           aria-label={ariaLabel}

@@ -674,6 +674,72 @@ export function guideToday(timeZone: string): { date: string; weekday: number } 
 // date windows need the same fallback, and one definition can't drift.
 export { serverTimeZone } from "./today";
 
+/**
+ * WHICH DAY'S WALK IS ON SCREEN, from `?date=` (Mark, 2026-08-25).
+ *
+ * Until now `guideDate` was always today, and that is why a walk you did not
+ * finish felt like it had been thrown away at midnight: `order_guide_entries`
+ * is keyed (location, guide_date, vendor_item) and NOTHING has ever deleted a
+ * row — 2,890 of them are on file, including every quantity from the day this
+ * was reported — but the page only ever asked for today's, so from 00:00 in the
+ * org's zone yesterday's numbers had no route back. The weekday chips do not
+ * help: they choose which day's WORK is listed, never which date's entries are
+ * read.
+ *
+ * TODAY WRITES NO PARAMETER, so the guide keeps one canonical address — which
+ * is also what stops the date being sticky. It is deliberately NOT in the view
+ * cookie beside the weekday, filter and grouping: those are how you like to
+ * work and should survive, where a date is about one walk, and a remembered one
+ * would silently keep filing tomorrow's counts under Sunday. That is the
+ * failure this exists to prevent, pointing the other way.
+ *
+ * THE FUTURE IS REFUSED. A guide entry is a record of a walk you did, and
+ * `create_purchase_orders_from_guide` stamps the guide date onto the PO as its
+ * order date — so a walk dated forward produces an order claiming to have been
+ * placed on a day that has not happened.
+ *
+ * The check is a ROUND TRIP rather than a regex, for `invoiceDeliveryDate`'s
+ * reason: `new Date("2026-02-31")` does not fail, it rolls over to March 2nd.
+ */
+export function parseGuideDate(raw: string | undefined, today: string): string {
+  if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return today;
+  const d = new Date(`${raw}T00:00:00Z`);
+  if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== raw) return today;
+  return raw > today ? today : raw;
+}
+
+/** The ISO weekday (Mon=1) of a `YYYY-MM-DD`, read off the date and not an instant. */
+export function weekdayOf(date: string): number {
+  return ((new Date(`${date}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
+}
+
+/**
+ * A link to the guide, carrying whichever of the two axes is not at rest.
+ *
+ * The day chips have to go through this or they drop the date you are on —
+ * they were bare `/order-guide?day=N` — and the date links have to go through
+ * it because CHANGING THE DATE SETS THE WEEKDAY. Opening Sunday's walk with
+ * Monday's should-order list is not a view anybody wants, and the weekday would
+ * otherwise come from the cookie. The reverse does not hold: picking a chip
+ * leaves the date alone, which is the existing model ("the weekday picks which
+ * day's work to show; the date is when you walked it") and the only way to look
+ * at another day's list without pretending to have walked it.
+ */
+export function guideHref({
+  date,
+  day,
+  today,
+}: {
+  date: string;
+  day: number;
+  today: string;
+}): string {
+  const params = new URLSearchParams();
+  params.set("day", String(day));
+  if (date !== today) params.set("date", date);
+  return `/order-guide?${params.toString()}`;
+}
+
 
 /**
  * The item header's one-line answer to "when did we last buy this, and as

@@ -9,6 +9,7 @@ import { withFrom } from "@/lib/breadcrumbs";
 import { useScrollMemoryKey } from "@/lib/scrollMemory";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { DateField } from "@/components/ui/DateField";
 import {
   applyExpansions,
   daySourceIndex,
@@ -24,6 +25,8 @@ import {
   GUIDE_GROUPINGS,
   GUIDE_VIEW_COOKIE,
   WEEKDAY_LABELS,
+  guideHref,
+  weekdayOf,
   type EntryState,
   type GuideEntry,
   type GuideFilter,
@@ -81,6 +84,7 @@ export function OrderGuide({
   initialIgnoreDays,
   initialTerm,
   guideDate,
+  today,
   locationId,
   locationCode,
   orgId,
@@ -103,6 +107,8 @@ export function OrderGuide({
   /** The remembered search term — see GuideView.term. */
   initialTerm: string;
   guideDate: string;
+  /** Today in the ORG's zone. `guideDate` is usually this and need not be. */
+  today: string;
   locationId: string;
   locationCode: string;
   orgId: string;
@@ -699,15 +705,47 @@ export function OrderGuide({
             list to what's orderable then, and a day with nothing scheduled
             simply renders empty rather than disappearing. This control is
             where TabPicker's look comes from (Mark, 2026-08-01). */}
-        <TabPicker
-          ariaLabel="Guide day"
-          value={String(weekday)}
-          options={[1, 2, 3, 4, 5, 6, 7].map((d) => ({
-            key: String(d),
-            label: WEEKDAY_LABELS[d - 1],
-            href: `/order-guide?day=${d}`,
-          }))}
-        />
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <TabPicker
+            ariaLabel="Guide day"
+            value={String(weekday)}
+            options={[1, 2, 3, 4, 5, 6, 7].map((d) => ({
+              key: String(d),
+              label: WEEKDAY_LABELS[d - 1],
+              // Through `guideHref`, or a chip drops the date you are on and
+              // silently puts today's entries back on screen.
+              href: guideHref({ date: guideDate, day: d, today }),
+            }))}
+          />
+
+          {/* WHICH DAY'S WALK, beside the chips because the two are the same
+              question asked at two grains — which day's list, and which day's
+              numbers. It sits in the title block rather than the sticky band:
+              this is set before you set off, where search and the filters are
+              what you reach for mid-walk. The band carries the WARNING instead,
+              which is the half that has to follow you down the page. */}
+          <span className="flex items-center gap-2">
+            <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+              Walked
+            </span>
+            <DateField
+              ariaLabel="The day this walk is recorded against"
+              value={guideDate}
+              max={today}
+              onChange={(next) =>
+                router.push(
+                  guideHref({
+                    date: next ?? today,
+                    // Changing the DATE sets the weekday — see guideHref. The
+                    // reverse deliberately doesn't hold.
+                    day: weekdayOf(next ?? today),
+                    today,
+                  })
+                )
+              }
+            />
+          </span>
+        </div>
       </div>
 
       {/* Vendor totals bar — the guide's central instrument (§4.2): square
@@ -784,6 +822,29 @@ export function OrderGuide({
         data-guide-controls=""
         className="sticky top-[var(--rf-header-h)] z-30 bg-white py-3"
       >
+      {/* NOT TODAY, and it rides in the STICKY band while the date control that
+          set it sits up in the title block. That split is the point: the
+          control is something you set before you set off, and this is a fact
+          about every quantity you are about to type — it has to still be on
+          screen forty rows down. Yellow as a FILL, which is what this palette's
+          mark colour is for; `text-mark` on white measures 1.43:1 and is not
+          text anybody can read. */}
+      {guideDate !== today && (
+        <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <span className="bg-mark-fill px-2 py-0.5 font-semibold">
+            Walking {guideDate}, not today
+          </span>
+          <span className="text-muted">
+            Counts and quantities you enter are filed against that day.
+          </span>
+          <Link
+            href={guideHref({ date: today, day: weekdayOf(today), today })}
+            className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+          >
+            Back to today
+          </Link>
+        </p>
+      )}
       <div className="flex flex-wrap items-center gap-4 text-sm">
         <TextInput
           value={term}

@@ -16,6 +16,7 @@ import "./employeeDocuments.fixtures";
 import "./employeeEvents.fixtures";
 import "./employees.fixtures";
 import "./fileDrop.fixtures";
+import "./guideDate.fixtures";
 import "./gustoExport.fixtures";
 import "./homebaseImport.fixtures";
 import "./invoiceDate.fixtures";
