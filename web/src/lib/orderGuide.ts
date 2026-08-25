@@ -320,22 +320,23 @@ export const GROUPING_LABEL: Record<GuideGrouping, string> = {
 export const GUIDE_GROUPINGS: GuideGrouping[] = ["section", "item", "vendor"];
 
 /**
- * How you left the guide: the day you were walking, the filter, the grouping
- * and whether the day gates were lifted. Kept in a SESSION cookie rather than
- * the URL (the convention for list filters) for two reasons: the nav link is a
- * bare `/order-guide` with no query to carry, and the weekday has to be known
- * on the SERVER before the view is queried, so a client-side store would render
- * the wrong day first and correct it. The cookie dies with the browser session
- * and `signOut` clears it — "until you log out", as asked (Mark, 2026-07-23).
+ * How you left the guide: the filter, the grouping, whether the day gates were
+ * lifted, and the search. Kept in a SESSION cookie rather than the URL (the
+ * convention for list filters) because the nav link is a bare `/order-guide`
+ * with no query to carry, and it has to be known on the SERVER before the view
+ * is queried, so a client-side store would render the wrong list first and
+ * correct it. The cookie dies with the browser session and `signOut` clears
+ * it — "until you log out", as asked (Mark, 2026-07-23).
  *
- * An explicit `?day=` still wins, so shared links and the panel's back-trail
- * keep working.
+ * THE DAY IS NOT IN HERE (Mark, 2026-08-25). It was, back when a weekday picker
+ * chose it; the date replaced that picker, and a remembered date is the one
+ * thing this feature must not have — you would come back tomorrow still filing
+ * counts against Monday. So the guide opens on today, always, and a `day` left
+ * in an older cookie is simply ignored.
  */
 export const GUIDE_VIEW_COOKIE = "rf.guide.view";
 
 export type GuideView = {
-  /** null = no remembered day, fall back to today. */
-  weekday: number | null;
   filter: GuideFilter;
   grouping: GuideGrouping;
   ignoreDays: boolean;
@@ -356,7 +357,6 @@ export type GuideView = {
 };
 
 export const DEFAULT_GUIDE_VIEW: GuideView = {
-  weekday: null,
   filter: "favorites",
   grouping: "section",
   ignoreDays: false,
@@ -376,12 +376,10 @@ export function parseGuideView(raw: string | undefined | null): GuideView {
   if (!raw) return DEFAULT_GUIDE_VIEW;
   const q = new URLSearchParams(raw);
 
-  const day = Number(q.get("day"));
   const filter = q.get("filter") as GuideFilter | null;
   const grouping = q.get("group") as GuideGrouping | null;
 
   return {
-    weekday: day >= 1 && day <= 7 ? day : null,
     filter: filter && GUIDE_FILTERS.includes(filter) ? filter : DEFAULT_GUIDE_VIEW.filter,
     grouping:
       grouping && GUIDE_GROUPINGS.includes(grouping)
@@ -394,7 +392,6 @@ export function parseGuideView(raw: string | undefined | null): GuideView {
 
 export function serializeGuideView(view: GuideView): string {
   return new URLSearchParams({
-    day: String(view.weekday ?? ""),
     filter: view.filter,
     group: view.grouping,
     ignore: view.ignoreDays ? "1" : "0",
@@ -675,28 +672,35 @@ export function guideToday(timeZone: string): { date: string; weekday: number } 
 export { serverTimeZone } from "./today";
 
 /**
- * WHICH DAY'S WALK IS ON SCREEN, from `?date=` (Mark, 2026-08-25).
+ * WHICH DAY THE GUIDE IS SHOWING — the screen's ONE piece of day state, from
+ * `?date=` (Mark, 2026-08-25).
  *
- * Until now `guideDate` was always today, and that is why a walk you did not
- * finish felt like it had been thrown away at midnight: `order_guide_entries`
- * is keyed (location, guide_date, vendor_item) and NOTHING has ever deleted a
- * row — 2,890 of them are on file, including every quantity from the day this
- * was reported — but the page only ever asked for today's, so from 00:00 in the
- * org's zone yesterday's numbers had no route back. The weekday chips do not
- * help: they choose which day's WORK is listed, never which date's entries are
- * read.
+ * It shipped beside the weekday picker and that was a mistake, in his words
+ * "very confusing": two controls for one idea, where the date moved the weekday
+ * and the weekday did not move the date. Worse than confusing, as it turned
+ * out — you could LOOK at Friday's list while your quantities were still being
+ * filed under Tuesday, with nothing on screen saying so. The weekday is now
+ * simply `weekdayOf(guideDate)`, so what is on screen and what is written to
+ * are the same day by construction rather than by agreement.
  *
- * TODAY WRITES NO PARAMETER, so the guide keeps one canonical address — which
- * is also what stops the date being sticky. It is deliberately NOT in the view
- * cookie beside the weekday, filter and grouping: those are how you like to
- * work and should survive, where a date is about one walk, and a remembered one
- * would silently keep filing tomorrow's counts under Sunday. That is the
- * failure this exists to prevent, pointing the other way.
+ * Why the DATE is the survivor: `order_guide_entries` is keyed by date, so only
+ * a date can name a particular walk. A weekday can only ever mean "the current
+ * one", which is exactly the assumption that made an unfinished walk read as
+ * having been cleared at midnight.
  *
- * THE FUTURE IS REFUSED. A guide entry is a record of a walk you did, and
+ * TODAY WRITES NO PARAMETER, so the guide keeps one canonical address — and
+ * that is also what stops the date being sticky. It is deliberately NOT
+ * remembered in the view cookie beside the filter, grouping and search: those
+ * are how you like to work, where a date is about one walk, and a remembered
+ * one would quietly file tomorrow's counts under Monday.
+ *
+ * ANY DATE IS ALLOWED, forward included. The weekday picker could reach all
+ * seven days, so refusing the future would be a capability this took away
+ * rather than one it never had. The consequence to know:
  * `create_purchase_orders_from_guide` stamps the guide date onto the PO as its
- * order date — so a walk dated forward produces an order claiming to have been
- * placed on a day that has not happened.
+ * `order_date`, so generating from a forward-dated guide dates the order
+ * forward too — which is why the control marks itself whenever the day on
+ * screen is not today.
  *
  * The check is a ROUND TRIP rather than a regex, for `invoiceDeliveryDate`'s
  * reason: `new Date("2026-02-31")` does not fail, it rolls over to March 2nd.
@@ -705,7 +709,7 @@ export function parseGuideDate(raw: string | undefined, today: string): string {
   if (!raw || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return today;
   const d = new Date(`${raw}T00:00:00Z`);
   if (Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== raw) return today;
-  return raw > today ? today : raw;
+  return raw;
 }
 
 /** The ISO weekday (Mon=1) of a `YYYY-MM-DD`, read off the date and not an instant. */
@@ -714,30 +718,11 @@ export function weekdayOf(date: string): number {
 }
 
 /**
- * A link to the guide, carrying whichever of the two axes is not at rest.
- *
- * The day chips have to go through this or they drop the date you are on —
- * they were bare `/order-guide?day=N` — and the date links have to go through
- * it because CHANGING THE DATE SETS THE WEEKDAY. Opening Sunday's walk with
- * Monday's should-order list is not a view anybody wants, and the weekday would
- * otherwise come from the cookie. The reverse does not hold: picking a chip
- * leaves the date alone, which is the existing model ("the weekday picks which
- * day's work to show; the date is when you walked it") and the only way to look
- * at another day's list without pretending to have walked it.
+ * A link to the guide on a given day. ONE axis, because there is one control:
+ * today is the bare path, any other day carries its date.
  */
-export function guideHref({
-  date,
-  day,
-  today,
-}: {
-  date: string;
-  day: number;
-  today: string;
-}): string {
-  const params = new URLSearchParams();
-  params.set("day", String(day));
-  if (date !== today) params.set("date", date);
-  return `/order-guide?${params.toString()}`;
+export function guideHref(date: string, today: string): string {
+  return date === today ? "/order-guide" : `/order-guide?date=${date}`;
 }
 
 

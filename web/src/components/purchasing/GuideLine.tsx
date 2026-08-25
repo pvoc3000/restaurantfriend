@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { withFrom } from "@/lib/breadcrumbs";
+import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import {
   deliveryLabel,
   notGreenReason,
@@ -31,6 +31,7 @@ export function GuideLine({
   row,
   entry,
   weekday,
+  backHref,
   ignoreDays,
   itemPar,
   baseUnit,
@@ -41,6 +42,8 @@ export function GuideLine({
   row: GuideRow;
   entry: EntryState | undefined;
   weekday: number;
+  /** Where an item link should come back to — the guide on this day. */
+  backHref: Crumb;
   ignoreDays: boolean;
   itemPar: number | null;
   baseUnit: string;
@@ -159,7 +162,9 @@ export function GuideLine({
   // item, so it opens the vendor item — where its favorite days, per-location
   // price and order history live. (The item header above links to the
   // inventory item.)
-  const here = { href: `/order-guide?day=${weekday}`, label: "Order Guide" };
+  // Handed down rather than rebuilt: the guide knows which day it is showing
+  // and a second construction here is a second place to forget the date.
+  const here = backHref;
 
   // Only orderable lines reach the guide — the page filters on the view's
   // active cascade — so there's no blocked state to render here.

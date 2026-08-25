@@ -59,13 +59,12 @@ export default async function OrderGuidePage({
 
   const locationId = session.activeLocation.id;
 
-  // Date and weekday both come from the org's timezone so they can't disagree
-  // (see guideToday). The weekday picks WHICH day's work to show; the date is
-  // when you walked it, and is what entries are recorded against.
+  // Today comes from the ORG's timezone so an evening walk isn't filed under
+  // tomorrow (see guideToday).
   // Comes with the session now (one embedded jsonb column on the membership
   // query) rather than its own round trip.
   const timeZone = session.orgSettings.timezone ?? serverTimeZone();
-  const { date: today, weekday: todayWeekday } = guideToday(timeZone);
+  const { date: today } = guideToday(timeZone);
 
   // WHICH DAY'S WALK. Today unless `?date=` says otherwise — see
   // parseGuideDate, which refuses the future and anything that doesn't
@@ -79,21 +78,11 @@ export default async function OrderGuidePage({
   // (Mark, 2026-07-23). Read on the server so the first paint is already right.
   const view = parseGuideView((await cookies()).get(GUIDE_VIEW_COOKIE)?.value);
 
-  // Precedence: an explicit ?day= (a shared link, or the panel's back-trail)
-  // beats the remembered day, which beats today. The guide exists every day, so
-  // a day with no should-order lines just renders quiet.
-  // Precedence for the WEEKDAY: an explicit ?day= wins; then the walked date's
-  // own weekday whenever that isn't today, because opening Monday's walk with
-  // Thursday's should-order list is not a view anybody wants; then the
-  // remembered day; then today. `guideHref` always writes both, so in practice
-  // the second rung only catches a hand-typed or shared `?date=` on its own.
-  const requested = Number(one(params.day));
-  const weekday =
-    requested >= 1 && requested <= 7
-      ? requested
-      : guideDate !== today
-        ? weekdayOf(guideDate)
-        : (view.weekday ?? todayWeekday);
+  // DERIVED, never chosen (Mark, 2026-08-25). The weekday is what scopes the
+  // list — order days, favorites, par — and it is simply the day the walked
+  // date falls on. There is no `?day=` any more: two controls for one idea let
+  // you read Friday's list while writing Tuesday's numbers.
+  const weekday = weekdayOf(guideDate);
 
   // Fired BEFORE the guide rows and awaited after: the two don't depend on each
   // other, and the guide query takes ~850ms, so this one is free.

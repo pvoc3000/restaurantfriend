@@ -26,7 +26,6 @@ import {
   GUIDE_VIEW_COOKIE,
   WEEKDAY_LABELS,
   guideHref,
-  weekdayOf,
   type EntryState,
   type GuideEntry,
   type GuideFilter,
@@ -230,7 +229,6 @@ export function OrderGuide({
   // (no max-age) is what "until you log out" means here, and signOut clears it.
   useEffect(() => {
     document.cookie = `${GUIDE_VIEW_COOKIE}=${serializeGuideView({
-      weekday,
       filter,
       grouping,
       ignoreDays,
@@ -309,7 +307,9 @@ export function OrderGuide({
 
   // Leaving the guide for an item must lead back to the guide — and to the day
   // you were walking, not whichever day defaults today.
-  const here = { href: `/order-guide?day=${weekday}`, label: "Order Guide" };
+  // The trail back from an item returns to the DAY you left, which is now one
+  // parameter rather than two.
+  const here = { href: guideHref(guideDate, today), label: "Order Guide" };
 
   /**
    * Last purchase keyed by item-location, so an item header is a map lookup
@@ -700,52 +700,6 @@ export function OrderGuide({
           </p>
         )}
 
-        {/* All seven days, always, as one segmented control, directly under
-            the title. The guide exists every day — picking one scopes the
-            list to what's orderable then, and a day with nothing scheduled
-            simply renders empty rather than disappearing. This control is
-            where TabPicker's look comes from (Mark, 2026-08-01). */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <TabPicker
-            ariaLabel="Guide day"
-            value={String(weekday)}
-            options={[1, 2, 3, 4, 5, 6, 7].map((d) => ({
-              key: String(d),
-              label: WEEKDAY_LABELS[d - 1],
-              // Through `guideHref`, or a chip drops the date you are on and
-              // silently puts today's entries back on screen.
-              href: guideHref({ date: guideDate, day: d, today }),
-            }))}
-          />
-
-          {/* WHICH DAY'S WALK, beside the chips because the two are the same
-              question asked at two grains — which day's list, and which day's
-              numbers. It sits in the title block rather than the sticky band:
-              this is set before you set off, where search and the filters are
-              what you reach for mid-walk. The band carries the WARNING instead,
-              which is the half that has to follow you down the page. */}
-          <span className="flex items-center gap-2">
-            <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-              Walked
-            </span>
-            <DateField
-              ariaLabel="The day this walk is recorded against"
-              value={guideDate}
-              max={today}
-              onChange={(next) =>
-                router.push(
-                  guideHref({
-                    date: next ?? today,
-                    // Changing the DATE sets the weekday — see guideHref. The
-                    // reverse deliberately doesn't hold.
-                    day: weekdayOf(next ?? today),
-                    today,
-                  })
-                )
-              }
-            />
-          </span>
-        </div>
       </div>
 
       {/* Vendor totals bar — the guide's central instrument (§4.2): square
@@ -822,30 +776,42 @@ export function OrderGuide({
         data-guide-controls=""
         className="sticky top-[var(--rf-header-h)] z-30 bg-white py-3"
       >
-      {/* NOT TODAY, and it rides in the STICKY band while the date control that
-          set it sits up in the title block. That split is the point: the
-          control is something you set before you set off, and this is a fact
-          about every quantity you are about to type — it has to still be on
-          screen forty rows down. Yellow as a FILL, which is what this palette's
-          mark colour is for; `text-mark` on white measures 1.43:1 and is not
-          text anybody can read. */}
-      {guideDate !== today && (
-        <p className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
-          <span className="bg-mark-fill px-2 py-0.5 font-semibold">
-            Walking {guideDate}, not today
-          </span>
-          <span className="text-muted">
-            Counts and quantities you enter are filed against that day.
-          </span>
-          <Link
-            href={guideHref({ date: today, day: weekdayOf(today), today })}
-            className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-          >
-            Back to today
-          </Link>
-        </p>
-      )}
       <div className="flex flex-wrap items-center gap-4 text-sm">
+        {/* THE DAY, and it is the only day control on the screen (Mark,
+            2026-08-25 — it replaced a weekday picker that sat beside it). It
+            lives in the STICKY band rather than up in the title block, which is
+            what lets it be the only one: a control that scrolls away needs a
+            second thing warning you which day you are on, and two elements for
+            one idea is what was wrong before.
+
+            The weekday is shown because it is the value that does the work —
+            order days, favorites and par are all scoped by it, and a native
+            date input renders "08/24/2026" with no hint of which day that is.
+            It carries the mark FILL when the day on screen is not today, so
+            "these quantities are being filed against Monday" is a colour rather
+            than a sentence. */}
+        <span className="flex items-center gap-2">
+          <span
+            className={`px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.12em] ${
+              guideDate === today ? "text-subtle" : "bg-mark-fill text-ink"
+            }`}
+          >
+            {WEEKDAY_LABELS[weekday - 1]}
+          </span>
+          <DateField
+            ariaLabel="The day this guide is showing"
+            value={guideDate}
+            onChange={(next) => router.push(guideHref(next ?? today, today))}
+          />
+          {guideDate !== today && (
+            <Link
+              href={guideHref(today, today)}
+              className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+            >
+              Today
+            </Link>
+          )}
+        </span>
         <TextInput
           value={term}
           onValueChange={setTerm}
@@ -1269,6 +1235,7 @@ export function OrderGuide({
                         row={row}
                         entry={entries.get(row.vendor_item_id)}
                         weekday={weekday}
+                        backHref={here}
                         ignoreDays={ignoreDays}
                         itemPar={item.par_qty}
                         baseUnit={item.base_unit}
