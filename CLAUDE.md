@@ -2363,6 +2363,15 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    counts conditioned on it. Its Clear knows only its own four, so the caller
    puts the tier back, or "Clear 2 filters" would also throw you from Shift
    ratings to Notes & warnings while counting itself as two.
+   **THE TWO PICKERS SHARE ONE ROW, TIER FIRST, AND NEITHER IS CAPTIONED**
+   (Mark, 2026-08-26: "you don't need 'how far back', it's obvious from the
+   choices"). The ORDER is what keeps the row still — the window is offered on
+   two tiers of three, so with it leading, every switch to Shift ratings shoved
+   the tier picker down a line and back up. Dropping the captions is what
+   finished the job: a caption on the window alone made the row 23px taller on
+   those same two tiers, so the tier picker and the whole table under it moved
+   by the height of a label. Measured after: the tier picker holds y=199 on
+   every tier. The `ariaLabel`s stay, since "7 days" read aloud names nothing.
    **Kind's options are the ten NARRATIVE kinds only**, plus a derived
    `disciplinary` (warnings + incidents, 633 live) that gives `isDisciplinary`
    its first list-level reader. The tier says which population, Kind says which

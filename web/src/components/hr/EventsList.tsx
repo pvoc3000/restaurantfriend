@@ -464,27 +464,37 @@ export function EventsList({
       }
       leading={
         <div className="space-y-3">
-          {tier === "narrative" ? null : (
-            // Hidden on the notes tier, where it changes nothing on screen — a
-            // control that does nothing is a control people stop trusting.
-            <div className="space-y-1.5">
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                How far back
-              </span>
+          {/* BOTH PICKERS ON ONE ROW, tier first (Mark, 2026-08-26).
+
+              The order is what keeps the row still: the window is only offered
+              on two of the three tiers, so with it leading, every switch to
+              Shift ratings shoved the tier picker down a line and back up again.
+
+              NEITHER IS CAPTIONED (Mark: "you don't need 'how far back', it's
+              obvious from the choices"). Every cell names itself, which is the
+              same reason the vendor screen's age filter lost its label — and it
+              is what makes the row a constant 36px, so the tier picker and the
+              whole table under it no longer move by the height of a caption
+              that existed on two tiers of three. The `ariaLabel`s stay: "7 days"
+              read aloud on its own names nothing. */}
+          <div className="flex flex-wrap items-end gap-3">
+            <TabPicker
+              ariaLabel="Which events"
+              value={tier}
+              onChange={changeTier}
+              options={TIERS.map((t) => ({ key: t, label: TIER_LABEL[t], count: tierCounts[t] }))}
+            />
+            {tier === "narrative" ? null : (
+              // Hidden on the notes tier, where it changes nothing on screen — a
+              // control that does nothing is a control people stop trusting.
               <TabPicker
                 ariaLabel="How far back to read shift ratings"
                 value={windowKey}
                 onChange={changeWindow}
                 options={RATING_WINDOWS.map((k) => ({ key: k, label: RATING_WINDOW_LABEL[k] }))}
               />
-            </div>
-          )}
-          <TabPicker
-            ariaLabel="Which events"
-            value={tier}
-            onChange={changeTier}
-            options={TIERS.map((t) => ({ key: t, label: TIER_LABEL[t], count: tierCounts[t] }))}
-          />
+            )}
+          </div>
           <FilterMenus
             rows={tiered}
             total={rows.length}
