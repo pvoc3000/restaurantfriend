@@ -28,6 +28,26 @@
 import type { PickOption } from "@/components/ui/PickList";
 import { daysBefore } from "./today";
 
+/* -- the row both screens read --------------------------------------------- */
+
+/**
+ * Every column the employee record's Events tab and `/events` select.
+ *
+ * ONE list, so the two cannot drift: they render the same row through the same
+ * labels and the same expansion, and a column present in one select and missing
+ * from the other is a cell that reads an em dash on one screen and a value on
+ * the other, with nothing to catch it.
+ *
+ * `employee_id` rides along on the record screen, where it is already `.eq()`'d
+ * — 500 uuids on a tab that fetches 500 rows. Cheaper than a second constant
+ * somebody has to keep in step.
+ */
+// ONE STRING LITERAL, never a concatenation: supabase-js parses this at the type
+// level to give the row back typed, and `"a" + "b"` widens to `string`, which
+// collapses every selected column to `GenericStringError`.
+export const EVENT_SELECT =
+  "id, employee_id, occurred_on, kind, score, shift, position, headline, detail, outcome, author_employee_id, author_name, location_id";
+
 /* -- the vocabulary -------------------------------------------------------- */
 
 export type EventKind =
@@ -344,4 +364,96 @@ export function ratingSummary(
     scores.length === 0 ? null : Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 100) / 100;
 
   return { shifts: scores.length, mean, last };
+}
+
+/* -- how far back a list reads shift ratings -------------------------------- */
+
+/**
+ * The window picker on `/events`.
+ *
+ * It lives HERE rather than in a module of its own because `ratingSummary`
+ * above already implements this exact window — `daysBefore(today, days - 1)`,
+ * N calendar days ending today inclusive — and `RATING_WINDOW_DAYS` is already
+ * 90. A second home would be two definitions of "90 days" that agree today.
+ *
+ * Why a window at all: notes and warnings are 2,635 rows over twelve years and
+ * are fetched WHOLE, but there are 43,918 shift ratings, so the shift half has
+ * to be bounded by something. A date is the honest bound — "the most recent 500
+ * org-wide" is three weeks and says so nowhere.
+ */
+export const RATING_WINDOW_PARAM = "window";
+
+export type RatingWindowKey = "7" | "30" | "90" | "year";
+
+export const RATING_WINDOWS: readonly RatingWindowKey[] = ["7", "30", "90", "year"];
+
+export const DEFAULT_RATING_WINDOW: RatingWindowKey = "90";
+
+/** On the picker's own cells, where the control beside it supplies the noun. */
+export const RATING_WINDOW_LABEL: Record<RatingWindowKey, string> = {
+  "7": "7 days",
+  "30": "30 days",
+  "90": "90 days",
+  year: "This year",
+};
+
+/**
+ * The same four windows as a phrase that reads inside a sentence — "Shift
+ * ratings in the last 90 days", "No shift ratings this year".
+ *
+ * The PREPOSITION is baked in, which is the only reason one map covers both
+ * sentences: "the last 90 days" needs an "in" that "this year" must not have,
+ * and a caller composing one would get "in this year" on the fourth key.
+ */
+export const RATING_WINDOW_SINCE: Record<RatingWindowKey, string> = {
+  "7": "in the last 7 days",
+  "30": "in the last 30 days",
+  "90": "in the last 90 days",
+  year: "this year",
+};
+
+/**
+ * Anything unrecognised falls back to the default — `parseSalesRange`'s rule.
+ * A stale bookmark should show the screen, not an error.
+ */
+export function parseRatingWindow(raw: string | string[] | undefined): RatingWindowKey {
+  const one = Array.isArray(raw) ? raw[0] : raw;
+  return RATING_WINDOWS.includes(one as RatingWindowKey) ? (one as RatingWindowKey) : DEFAULT_RATING_WINDOW;
+}
+
+/**
+ * The FIRST date in the window, inclusive — a lower bound and nothing else.
+ *
+ * There is deliberately no upper bound. `ratingSummary` ignores a future-dated
+ * shift because a typo must not move a mean; a LIST is the opposite case, where
+ * a rating dated 2027 is a typo somebody has to find and an upper bound is the
+ * one place it would be invisible.
+ *
+ * `year` is January 1st of today's year, not the last 365 days — which does
+ * mean a one-day window on New Year's Day. That is what the label says.
+ */
+export function ratingWindowFrom(key: RatingWindowKey, today: string): string {
+  if (key === "year") return `${today.slice(0, 4)}-01-01`;
+  return daysBefore(today, Number(key) - 1);
+}
+
+/**
+ * Put the window on a href — and this is load-bearing rather than a convenience.
+ *
+ * `filterQuery` builds its query string FROM SCRATCH out of the search term, the
+ * declared dimensions and the sort, so a bare `filterHref(PATH, …)` silently
+ * DROPS `?window=30`. Every `history.replaceState` on that screen would then
+ * reset the address bar to the default while the rendered rows stayed on 30 —
+ * invisible until somebody presses Back. Wrap every href in this.
+ *
+ * The default key DELETES the parameter, so the plain list keeps one canonical
+ * address, the way `employeeTabHref` writes no `tab` for `info`.
+ */
+export function withRatingWindow(href: string, key: RatingWindowKey): string {
+  const [path, query = ""] = href.split("?");
+  const params = new URLSearchParams(query);
+  if (key === DEFAULT_RATING_WINDOW) params.delete(RATING_WINDOW_PARAM);
+  else params.set(RATING_WINDOW_PARAM, key);
+  const rest = params.toString();
+  return rest ? `${path}?${rest}` : path;
 }

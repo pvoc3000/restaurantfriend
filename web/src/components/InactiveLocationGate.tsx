@@ -34,6 +34,10 @@ const UNSCOPED_ROUTES = [
   // here rather than a scope around it — there is nothing to empty when the
   // working location is closed.
   "/sales",
+  // The whole org's events on one screen, so the shop is a filter DIMENSION
+  // rather than a scope around the screen — /sales' argument exactly. There is
+  // nothing here for a closed working location to empty.
+  "/events",
 ];
 
 function isUnscopedRoute(pathname: string): boolean {

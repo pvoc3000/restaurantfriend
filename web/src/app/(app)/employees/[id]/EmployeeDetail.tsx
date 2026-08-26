@@ -47,6 +47,7 @@ import {
   type EmployeeEventRow,
 } from "@/components/hr/EmployeeEvents";
 import { NewEmployeeEvent } from "@/components/hr/NewEmployeeEvent";
+import { EVENT_SELECT } from "@/lib/employeeEvents";
 
 const Heading = SectionHeading;
 
@@ -57,8 +58,6 @@ const Heading = SectionHeading;
  */
 const EVENT_PAGE = 500;
 
-const EVENT_COLUMNS =
-  "id, occurred_on, kind, score, shift, position, headline, detail, outcome, author_employee_id, author_name, location_id";
 
 /**
  * One person's record.
@@ -167,7 +166,7 @@ export async function EmployeeDetail({
     wantsEvents
       ? supabase
           .from("employee_events")
-          .select(EVENT_COLUMNS)
+          .select(EVENT_SELECT)
           .eq("employee_id", id)
           .neq("kind", "shift")
           .order("occurred_on", { ascending: false })
@@ -180,7 +179,7 @@ export async function EmployeeDetail({
     wantsEvents
       ? supabase
           .from("employee_events")
-          .select(EVENT_COLUMNS, { count: "exact" })
+          .select(EVENT_SELECT, { count: "exact" })
           .eq("employee_id", id)
           .eq("kind", "shift")
           .order("occurred_on", { ascending: false })

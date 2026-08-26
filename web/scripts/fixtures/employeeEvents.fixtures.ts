@@ -12,17 +12,26 @@ import {
   AD_HOC_EVENT_KINDS,
   EVENT_KIND_LABEL,
   EVENT_KIND_OPTIONS,
+  DEFAULT_RATING_WINDOW,
+  RATING_WINDOWS,
   RATING_WINDOW_DAYS,
+  RATING_WINDOW_LABEL,
+  RATING_WINDOW_SINCE,
   averageScore,
   eventSummaryLine,
   isDisciplinary,
   normalizeEventKind,
+  parseRatingWindow,
   ratingSummary,
+  ratingWindowFrom,
   shiftSlotFromLabel,
   shiftSlotFromSortField,
+  withRatingWindow,
   type EventKind,
+  type RatingWindowKey,
   type ScoredEvent,
 } from "../../src/lib/employeeEvents";
+import { daysBefore } from "../../src/lib/today";
 
 /** The harness has no `throws`; this is the local one. */
 function throws(run: () => unknown, what = "call") {
@@ -285,4 +294,115 @@ test("the mean is rounded to 2dp, and a custom window is honoured", () => {
 test("a zero score pulls the mean down rather than being skipped", () => {
   // The same rule as averageScore, one level up: a no-show is a 0, not a gap.
   eq(ratingSummary([shift("2026-08-06", 0), shift("2026-08-05", 5)], { today: TODAY }).mean, 2.5);
+});
+
+/* -- the window picker ----------------------------------------------------- */
+
+test("an unrecognised window falls back to the default rather than throwing", () => {
+  // A stale bookmark or a hand-edited URL should show the screen, which is
+  // `parseSalesRange`'s rule. `"180"` is the interesting one: a plausible number
+  // that is not a key.
+  for (const raw of [undefined, "", "nonsense", "180", "YEAR", "0"]) {
+    eq(parseRatingWindow(raw), DEFAULT_RATING_WINDOW, `parseRatingWindow(${JSON.stringify(raw)})`);
+  }
+  eq(parseRatingWindow(["nonsense"]), DEFAULT_RATING_WINDOW, "an array of junk");
+});
+
+test("every declared window key is read back as itself", () => {
+  // Add a key to RATING_WINDOWS without teaching the parser and this goes red.
+  for (const key of RATING_WINDOWS) {
+    eq(parseRatingWindow(key), key, `parseRatingWindow(${key})`);
+    eq(parseRatingWindow([key, "junk"]), key, `the first of a repeated param`);
+  }
+});
+
+test("the window is N calendar days ENDING TODAY, inclusive", () => {
+  // Drop the `- 1` and all three of these move by a day, which is a whole day of
+  // somebody's ratings appearing or vanishing from the list.
+  eq(ratingWindowFrom("7", TODAY), "2026-07-31", "7 days");
+  eq(ratingWindowFrom("30", TODAY), "2026-07-08", "30 days");
+  eq(ratingWindowFrom("90", TODAY), "2026-05-09", "90 days");
+});
+
+test("the 90-day window and the record screen's default ARE the same window", () => {
+  // The anti-drift case. `ratingSummary` computes its own bound from
+  // RATING_WINDOW_DAYS; this computes one from the key. Move either and they
+  // must move together — 2026-05-09 is the very date the "first day in the
+  // window" case above already asserts.
+  eq(ratingWindowFrom("90", TODAY), daysBefore(TODAY, RATING_WINDOW_DAYS - 1));
+  eq(DEFAULT_RATING_WINDOW, "90", "the picker opens where the record screen looks");
+});
+
+test("`year` is January 1st of today's year, not the last 365 days", () => {
+  eq(ratingWindowFrom("year", "2026-12-31"), "2026-01-01", "the end of the year");
+  eq(ratingWindowFrom("year", TODAY), "2026-01-01", "the middle of it");
+  // Correct, and it will read as broken to somebody on 2 January. The label says
+  // "This year" rather than "365 days" precisely so it cannot be misread.
+  eq(ratingWindowFrom("year", "2026-01-01"), "2026-01-01", "a one-day window on New Year's Day");
+});
+
+test("the window is date arithmetic, not string arithmetic", () => {
+  // Any 30-day-month shortcut fails both of these.
+  eq(ratingWindowFrom("30", "2026-01-05"), "2025-12-07", "across a year end");
+  eq(ratingWindowFrom("7", "2024-03-01"), "2024-02-24", "across a leap day");
+});
+
+test("every window key is labelled exactly once, in both vocabularies", () => {
+  for (const [what, map] of [
+    ["RATING_WINDOW_LABEL", RATING_WINDOW_LABEL],
+    ["RATING_WINDOW_SINCE", RATING_WINDOW_SINCE],
+  ] as const) {
+    eq(Object.keys(map).sort(), [...RATING_WINDOWS].sort(), `${what} covers the keys and nothing else`);
+  }
+});
+
+test("the sentence phrase carries its own preposition", () => {
+  // One map covers both "Shift ratings <x>" and "No shift ratings <x>", which
+  // only works while the preposition is inside it: composing "in " + phrase at
+  // the call site reads "in this year" on the fourth key.
+  eq(`Shift ratings ${RATING_WINDOW_SINCE["90"]}`, "Shift ratings in the last 90 days");
+  eq(`No shift ratings ${RATING_WINDOW_SINCE.year}`, "No shift ratings this year");
+  no(RATING_WINDOW_SINCE.year.startsWith("in "), "`this year` takes no preposition");
+});
+
+/* -- the window in the URL ------------------------------------------------- */
+//
+// `filterQuery` rebuilds a list's query string FROM SCRATCH out of the search
+// term, the declared dimensions and the sort — so it drops a parameter it has
+// never heard of. Every one of these cases is a way `/events` would otherwise
+// end up with an address bar disagreeing with the rows on screen.
+
+test("the default window writes no parameter at all", () => {
+  eq(withRatingWindow("/events", "90"), "/events", "a bare path");
+  eq(
+    withRatingWindow("/events?q=late&kind=incident", "90"),
+    "/events?q=late&kind=incident",
+    "and it leaves the other params alone",
+  );
+});
+
+test("a non-default window is appended, with the right separator", () => {
+  eq(withRatingWindow("/events", "30"), "/events?window=30", "? on a bare path");
+  eq(withRatingWindow("/events?q=late", "year"), "/events?q=late&window=year", "& on one with a query");
+});
+
+test("it REPLACES a window already on the href rather than duplicating it", () => {
+  // Naive concatenation gives `?window=7&window=30`, and which one wins is the
+  // browser's business rather than ours.
+  const href = withRatingWindow("/events?window=7&q=late", "30");
+  eq([...new URLSearchParams(href.split("?")[1]).getAll("window")], ["30"], "exactly one window");
+});
+
+test("going back to the default STRIPS a window already on the href", () => {
+  // Without this, widening to 7 days and narrowing back to 90 leaves `?window=7`
+  // in the address bar while the server has re-fetched 90 days of ratings.
+  eq(withRatingWindow("/events?window=7", "90"), "/events", "nothing else left");
+  eq(withRatingWindow("/events?q=late&window=7", "90"), "/events?q=late", "the rest survives");
+});
+
+test("a window key is only ever one of the four", () => {
+  // A compile-time claim made at runtime: RatingWindowKey is a closed set, so a
+  // caller cannot invent `"120"` and have the server quietly accept it.
+  const keys: RatingWindowKey[] = [...RATING_WINDOWS];
+  eq(keys.length, 4, "seven, thirty, ninety, this year");
 });

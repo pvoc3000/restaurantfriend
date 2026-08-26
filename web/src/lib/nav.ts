@@ -88,8 +88,25 @@ export const SECTIONS: NavSection[] = [
         // the tab out of the menu for people it would never open for.
         roles: ["owner", "admin"],
       },
-      stub("hr", "team-events", "Team Events"),
-      stub("hr", "team-ratings", "Team Ratings"),
+      {
+        // The whole team's events on one screen (migration 035). The slug keeps
+        // FileMaker's word because the `rf.nav` cookie stores it; the LABEL is
+        // just "Events", since the section band above already says HR.
+        //
+        // `team-ratings` used to sit beside this and went with it landing: 035
+        // merged Ratings into Events, so a rating IS `kind = 'shift'` — a filter
+        // on this screen pretending to be a screen of its own, and whichever of
+        // the two you pressed you would have got the same list.
+        //
+        // 035's RLS is owner/admin on all four verbs, and the screen says so
+        // itself for anyone who reaches it by URL; this only keeps the tab out
+        // of the menu for people it would never open for.
+        slug: "team-events",
+        label: "Events",
+        href: "/events",
+        built: true,
+        roles: ["owner", "admin"],
+      },
       stub("hr", "team-reviews", "Team Reviews"),
       // Pay Periods used to sit here, and it went on 2026-08-06 (Mark: "since
       // pay periods are now on the timesheet screen, there's no need for a pay
