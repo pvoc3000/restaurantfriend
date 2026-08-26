@@ -2363,15 +2363,29 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    counts conditioned on it. Its Clear knows only its own four, so the caller
    puts the tier back, or "Clear 2 filters" would also throw you from Shift
    ratings to Notes & warnings while counting itself as two.
-   **THE TWO PICKERS SHARE ONE ROW, TIER FIRST, AND NEITHER IS CAPTIONED**
-   (Mark, 2026-08-26: "you don't need 'how far back', it's obvious from the
-   choices"). The ORDER is what keeps the row still — the window is offered on
-   two tiers of three, so with it leading, every switch to Shift ratings shoved
-   the tier picker down a line and back up. Dropping the captions is what
-   finished the job: a caption on the window alone made the row 23px taller on
-   those same two tiers, so the tier picker and the whole table under it moved
-   by the height of a label. Measured after: the tier picker holds y=199 on
-   every tier. The `ariaLabel`s stay, since "7 days" read aloud names nothing.
+   **THE TWO PICKERS SHARE ONE ROW, ON EVERY TIER, AND NEITHER IS CAPTIONED**
+   (Mark, 2026-08-26, in three passes — one line, no caption, always visible).
+   **THE WINDOW WAS HIDDEN UNDER Notes & warnings AND THAT WAS WRONG ON A FACT,
+   not on a judgement.** It was hidden on the grounds that a control which does
+   nothing is one people stop trusting — but the window is NOT inert there: the
+   **"Shift ratings 520" count in the tab beside it is a function of it**, so
+   hiding it left that number governed by a setting you could not see. Measured
+   live: from the Notes & warnings tier, moving the window to 30 days takes that
+   tab 520 → 66 and All 3,155 → 2,701. It also broke the rule `NewTimesheet`
+   already settled (Mark, 2026-08-05) — a control that VANISHES cannot be told
+   from a feature that does not exist, which is why that button is disabled
+   rather than hidden. **Check that rule before hiding any control.**
+   The window's sentence went with it and is now on every tier too, counted from
+   `tierCounts` rather than a second `filter`, so the sentence and the tab cannot
+   disagree about one number — under Notes & warnings it is what explains why
+   the tab beside says 520 and this one says 2,635.
+   Tier still LEADS, which is now just reading order (which population, then how
+   much of it) rather than a fix for anything. Dropping the captions was the
+   other half: captioning the window alone made the row 23px taller on two tiers
+   of three, so the tier picker and the whole table under it moved by the height
+   of a label. Measured after all three passes: tier, window and the table head
+   hold **identical positions on all three tiers** — nothing in the control area
+   moves at all. The `ariaLabel`s stay, since "7 days" read aloud names nothing.
    **Kind's options are the ten NARRATIVE kinds only**, plus a derived
    `disciplinary` (warnings + incidents, 633 live) that gives `isDisciplinary`
    its first list-level reader. The tier says which population, Kind says which

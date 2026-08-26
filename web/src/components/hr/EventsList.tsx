@@ -424,7 +424,13 @@ export function EventsList({
 
   const sorted = sortRows(visible, columns, sort ?? NATURAL_SORT);
 
-  const shiftsShown = tier === "narrative" ? 0 : searched.filter((r) => r.kind === "shift").length;
+  /**
+   * How many shift ratings the window is currently holding — `tierCounts` and
+   * not a second `filter`, so the sentence below and the tab above cannot
+   * disagree about one number. Counted on every tier, because the window is
+   * live on every tier.
+   */
+  const shiftsShown = tierCounts.shifts ?? 0;
 
   return (
     <DataTable
@@ -466,9 +472,18 @@ export function EventsList({
         <div className="space-y-3">
           {/* BOTH PICKERS ON ONE ROW, tier first (Mark, 2026-08-26).
 
-              The order is what keeps the row still: the window is only offered
-              on two of the three tiers, so with it leading, every switch to
-              Shift ratings shoved the tier picker down a line and back up again.
+              ALWAYS BOTH, on every tier (Mark: "I think it should be always
+              visible"). The first cut hid the window under Notes & warnings, on
+              the grounds that a control which does nothing is one people stop
+              trusting — and the premise was simply wrong. The window is NOT
+              inert there: the "Shift ratings 520" count in the tab beside it is
+              a function of it, so hiding it left that number governed by a
+              setting you could not see. It also broke the rule `NewTimesheet`
+              already settled (Mark, 2026-08-05) — a control that vanishes cannot
+              be told from a feature that does not exist.
+
+              Tier still leads, because that is the reading order: which
+              population, then how much of it.
 
               NEITHER IS CAPTIONED (Mark: "you don't need 'how far back', it's
               obvious from the choices"). Every cell names itself, which is the
@@ -484,16 +499,12 @@ export function EventsList({
               onChange={changeTier}
               options={TIERS.map((t) => ({ key: t, label: TIER_LABEL[t], count: tierCounts[t] }))}
             />
-            {tier === "narrative" ? null : (
-              // Hidden on the notes tier, where it changes nothing on screen — a
-              // control that does nothing is a control people stop trusting.
-              <TabPicker
-                ariaLabel="How far back to read shift ratings"
-                value={windowKey}
-                onChange={changeWindow}
-                options={RATING_WINDOWS.map((k) => ({ key: k, label: RATING_WINDOW_LABEL[k] }))}
-              />
-            )}
+            <TabPicker
+              ariaLabel="How far back to read shift ratings"
+              value={windowKey}
+              onChange={changeWindow}
+              options={RATING_WINDOWS.map((k) => ({ key: k, label: RATING_WINDOW_LABEL[k] }))}
+            />
           </div>
           <FilterMenus
             rows={tiered}
@@ -522,15 +533,16 @@ export function EventsList({
               </div>
             }
           />
-          {tier === "narrative" ? null : (
-            // A WINDOW statement, not a row count: this list is bounded by a
-            // date rather than by `.range()`, so the honest sentence names the
-            // date. It never appears on the tier that is complete.
-            <p className="text-[13px] text-subtle">
-              Shift ratings {RATING_WINDOW_SINCE[windowKey]} ({shiftsShown.toLocaleString()}). Every
-              note and warning is here, back to 2014.
-            </p>
-          )}
+          {/* A WINDOW statement, not a row count: this list is bounded by a date
+              rather than by `.range()`, so the honest sentence names the date.
+              It sits on every tier now that the picker does — under Notes &
+              warnings it is the sentence that explains why the tab beside says
+              520 and this one says 2,635, which is the question the two counts
+              raise. */}
+          <p className="text-[13px] text-subtle">
+            Shift ratings {RATING_WINDOW_SINCE[windowKey]} ({shiftsShown.toLocaleString()}). Every
+            note and warning is here, back to 2014.
+          </p>
           {nameError ? (
             <p className="text-[12px] text-accent">Names could not be loaded: {nameError}</p>
           ) : null}
