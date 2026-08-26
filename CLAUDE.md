@@ -2180,6 +2180,55 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    paperwork on file that isn't recorded as a bill — and it deliberately does
    NOT ask whether the bill is approved: a delivery can be complete Friday and
    the bill approved Tuesday.
+   **Shipped 2026-08-25 — THE INVOICE SAYS WHICH ORDER IT IS FOR, and now we
+   check** (`printedPoDisagreement` in `lib/invoices`, a chip on receiving's
+   `InvoiceSummary` band). The reader had captured `purchase_order_number` since
+   the 2026-08-04 redeploy — 22 of 42 stored extractions carry one — and NOTHING
+   had ever compared it to the order's own number, so the data sat there unread.
+   Found by Mark reconciling 8/17 at DF01 and noticing by eye that the numbers
+   on two invoices weren't ours.
+   **The cause was a one-off and the check is still worth it**: he was out of
+   town, that week's ordering ran through FileMaker, and both shops' invoices
+   came back carrying FMP's own numbering — Chefs Warehouse `132-18033-01`
+   against our `132-181184-01`, Unified Paper `142-18041-01` against
+   `142-181187-01`. FMP's run sat at **18029 on 2026-07-20**, its last day
+   before the app took over, and 18033/18041 continue it. Ordering is back in
+   the app and this exact cause is retired, but a vendor keys our number BY HAND
+   (Chefs Warehouse prints an order taker on every invoice), so filing an
+   invoice against the wrong order stays a live way to lose money.
+   Three rules, each a real invoice rather than a hypothetical.
+   **SILENCE IS NOT DISAGREEMENT** — BakeMark prints no customer PO number at
+   all, so an absent value never warns, or the one vendor whose paperwork is
+   built differently flags every delivery and the mark stops meaning anything
+   where it does. **ANY MATCH IS AGREEMENT** — a consolidated invoice
+   legitimately names several orders (which is why `printedPoNumbers` reads the
+   lines as well as the header), so ours being among them is agreement, not a
+   partial one. **PUNCTUATION IS NOT A MISMATCH** — Chefs Warehouse printed
+   `132 181164 01` on 2026-08-10 for our `132-181164-01`, spaces for hyphens, so
+   it compares through `normalizeInvoiceNumber`, which is what the printed-number
+   LINK already uses: the warning and the link must not disagree about what "the
+   same number" means. What it returns is what is PRINTED, never the normalized
+   form — the reader is checking paper against a screen, so the screen shows the
+   characters on the paper.
+   **Yellow FILL, not red and not `text-mark`** (1.43:1 on white). Red says
+   something is WRONG; nearly every cause here is benign and none makes the
+   delivery in front of you incorrect. The chip says what it means in words
+   rather than only in its `title`, because the iPad has no hover.
+   **Deliberately NOT in `closeReadiness`.** That confirm names what is
+   unresolved and lets you through, and its own rule is that naming something
+   the screen gives you no way to fix teaches people to stop reading confirms —
+   you cannot change what a vendor printed, and in the common case there is
+   nothing to settle. It is a question asked BEFORE you count, not a gate on
+   finishing.
+   Verified by rendering the real `InvoiceSummary` in Node over the live rows
+   (the `PoPdf` idiom): both 8/17 invoices warn with the right copy, 8/10's
+   spaces stay silent, and BakeMark stays silent. 8 fixtures, each of the three
+   rules checked by BREAKING it — dropping the silence guard reddens BakeMark,
+   a raw `===` reddens the spaces case, and `every` for `some` reddens the
+   consolidated case.
+   Not done, and worth asking about: the same check on `InvoiceDetail`, where a
+   FILED invoice is linked to an order and `printedPoNumbers` is already read
+   for the link proposal.
    Also shipped: **Delete on invoice detail**, found by using the module — Void
    covers "this isn't payable" and not "this shouldn't exist", and filing was
    one tap with no way back. EmployeeActions' template, and it removes

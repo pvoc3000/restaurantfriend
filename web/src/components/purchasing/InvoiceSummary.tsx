@@ -7,6 +7,7 @@ import {
   type InvoiceExtraction,
 } from "@/lib/invoiceExtraction";
 import type { MatchResult } from "@/lib/invoiceMatch";
+import { printedPoDisagreement } from "@/lib/invoices";
 
 /**
  * What was read, how much of it lined up, and — deliberately prominent —
@@ -47,6 +48,7 @@ function takeLabel(
 
 export function InvoiceSummary({
   invoiceCount = 0,
+  poNumber,
   extraction,
   match,
   fileName,
@@ -61,6 +63,9 @@ export function InvoiceSummary({
    *  than one — that's the backorder case, and the band otherwise describes
    *  the one document on screen without qualification. */
   invoiceCount?: number;
+  /** The order being received. Compared against whatever purchase order number
+   *  the invoice prints back at us — see `printedPoDisagreement`. */
+  poNumber: string;
   extraction: InvoiceExtraction;
   match: MatchResult;
   fileName: string | null;
@@ -85,6 +90,13 @@ export function InvoiceSummary({
   const total = extraction.invoice_total;
   const short = total !== null && receivedTotal < Number(total) - 0.005;
 
+  /** The invoice naming an order that isn't this one. Nothing here is an ERROR
+   *  — the vendor keys our number by hand, and on 2026-08-17 a week of ordering
+   *  ran through FileMaker while Mark was away, so both shops' invoices came
+   *  back carrying that system's numbering. But it is the question you want
+   *  asked before you record quantities: is this the right delivery's paper? */
+  const wrongOrder = printedPoDisagreement(extraction, poNumber);
+
   // The date the goods moved, and whether taking it would change anything.
   const delivered = invoiceDeliveryDate(extraction);
   const takeable =
@@ -106,6 +118,33 @@ export function InvoiceSummary({
             !restatesInvoiceDate &&
             ` · ${extraction.invoice_date}`}
         </span>
+
+        {/* The invoice printing somebody else's order number.
+
+            YELLOW, NOT RED, and a FILL rather than ink (text-mark on white is
+            1.43:1). Red says something is WRONG; this says look at it. Nearly
+            every cause is benign — a rep mis-keys the number, or the order was
+            placed from another system — and none of them makes the delivery in
+            front of you incorrect. What it is worth is the five seconds it
+            takes to confirm you are counting against the right order before
+            fifteen quantities get written.
+
+            The chip SAYS what it means rather than hiding it in the title: the
+            tooltip is a native one and the iPad has no hover. */}
+        {wrongOrder && (
+          <span
+            className="border border-ink bg-mark-fill px-2 text-[12px] uppercase tracking-[0.12em]"
+            title={
+              `This invoice prints purchase order ${wrongOrder.join(", ")}, ` +
+              `but you are receiving ${poNumber}. Check the paper belongs to ` +
+              `this order before recording quantities.`
+            }
+          >
+            {wrongOrder.length > 1 ? "Invoice names other orders" : "Invoice names a different order"}
+            {" · "}
+            {wrongOrder.join(", ")}
+          </span>
+        )}
 
         {/* Two invoices against one order is a partial shipment, and the
             quantities below come from BOTH — so the band has to say so rather

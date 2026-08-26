@@ -641,6 +641,45 @@ export function printedPoNumbers(extraction: InvoiceExtraction): string[] {
 }
 
 /**
+ * The purchase order numbers this invoice prints that are NOT the order you are
+ * standing in front of — or null when there is nothing to say.
+ *
+ * Three rules, and each one is a real invoice rather than a hypothetical:
+ *
+ * SILENCE IS NOT DISAGREEMENT. BakeMark prints no customer PO number at all, so
+ * an absent value must never warn — otherwise the one vendor whose paperwork is
+ * simply built differently flags every delivery, and the mark stops meaning
+ * anything on the deliveries where it does.
+ *
+ * ANY MATCH IS AGREEMENT. A consolidated invoice legitimately names several
+ * orders (that is why `printedPoNumbers` reads the lines as well as the header),
+ * so ours being among them is agreement, not a partial one.
+ *
+ * PUNCTUATION IS NOT A MISMATCH. Chefs Warehouse printed `132 181164 01` on
+ * 2026-08-10 for our `132-181164-01` — the same number, spaces for hyphens.
+ * `normalizeInvoiceNumber` is what the printed-number LINK already compares
+ * with, so the warning and the link cannot disagree about what "the same
+ * number" means.
+ *
+ * What comes back is what is PRINTED, not the normalized form: the reader is
+ * being asked to check a document against a screen, so the screen has to show
+ * the characters that are on the document.
+ */
+export function printedPoDisagreement(
+  extraction: InvoiceExtraction,
+  poNumber: string
+): string[] | null {
+  const printed = printedPoNumbers(extraction);
+  if (printed.length === 0) return null;
+
+  const ours = normalizeInvoiceNumber(poNumber);
+  if (!ours) return null;
+  if (printed.some((n) => normalizeInvoiceNumber(n) === ours)) return null;
+
+  return printed;
+}
+
+/**
  * The purchase order a printed number refers to — but only when exactly ONE
  * candidate answers to it.
  *

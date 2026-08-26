@@ -19,6 +19,7 @@ import {
   lineSumReconciliation,
   matchPrintedPoNumber,
   normalizeInvoiceNumber,
+  printedPoDisagreement,
   printedPoNumber,
   signedTotal,
   sumSignedTotals,
@@ -674,6 +675,104 @@ test("printed PO: lines that DISAGREE yield nothing — that's the consolidated 
 
 test("printed PO: nothing printed anywhere yields null", () => {
   eq(printedPoNumber(extraction({})), null);
+});
+
+// --- printedPoDisagreement -------------------------------------------------
+// The cases are the real 2026-08 invoices, because the two that matter were
+// both found on paper rather than imagined: Chefs Warehouse printing spaces
+// for hyphens (agreement that a naive === would have flagged) and the 08-17
+// FileMaker week (disagreement nothing was watching for).
+//
+// Checked by breaking it: dropping the `printed.length === 0` guard reddens
+// the BakeMark case, and comparing raw strings instead of
+// `normalizeInvoiceNumber` reddens the 08-10 spaces case.
+
+test("PO disagreement: an invoice printing our own number says nothing", () => {
+  eq(
+    printedPoDisagreement(
+      extraction({ purchase_order_number: "132-181142-01" }),
+      "132-181142-01"
+    ),
+    null
+  );
+});
+
+test("PO disagreement: spaces for hyphens is the SAME number (Chefs Warehouse, 2026-08-10)", () => {
+  eq(
+    printedPoDisagreement(
+      extraction({ purchase_order_number: "132 181164 01" }),
+      "132-181164-01"
+    ),
+    null,
+    "punctuation is not a mismatch"
+  );
+});
+
+test("PO disagreement: a genuinely different order is reported AS PRINTED (2026-08-17)", () => {
+  eq(
+    printedPoDisagreement(
+      extraction({ purchase_order_number: "132-18033-01" }),
+      "132-181184-01"
+    ),
+    ["132-18033-01"]
+  );
+});
+
+test("PO disagreement: Unified Paper's 2026-08-17 invoice, the second real one", () => {
+  eq(
+    printedPoDisagreement(
+      extraction({ purchase_order_number: "142-18041-01" }),
+      "142-181187-01"
+    ),
+    ["142-18041-01"]
+  );
+});
+
+test("PO disagreement: an invoice printing NO number is silent, not disagreeing (BakeMark)", () => {
+  eq(
+    printedPoDisagreement(extraction({}), "112-181186-01"),
+    null,
+    "the one vendor whose paperwork omits it must not flag every delivery"
+  );
+});
+
+test("PO disagreement: a consolidated invoice naming us among others agrees", () => {
+  eq(
+    printedPoDisagreement(
+      extraction({
+        lines: [
+          invoiceLine({ purchase_order_number: "132-181184-01" }),
+          invoiceLine({ purchase_order_number: "132-181195-02" }),
+        ],
+      }),
+      "132-181184-01"
+    ),
+    null,
+    "ours being among several is agreement, not a partial one"
+  );
+});
+
+test("PO disagreement: a consolidated invoice naming only OTHER orders reports all of them", () => {
+  eq(
+    printedPoDisagreement(
+      extraction({
+        purchase_order_number: "132-18033-01",
+        lines: [invoiceLine({ purchase_order_number: "132-18034-02" })],
+      }),
+      "132-181184-01"
+    ),
+    ["132-18033-01", "132-18034-02"]
+  );
+});
+
+test("PO disagreement: a line number is read even when the header is blank", () => {
+  eq(
+    printedPoDisagreement(
+      extraction({ lines: [invoiceLine({ purchase_order_number: "999-99999-01" })] }),
+      "132-181184-01"
+    ),
+    ["999-99999-01"]
+  );
 });
 
 const CANDIDATES = [

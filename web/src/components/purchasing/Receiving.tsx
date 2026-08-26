@@ -598,6 +598,7 @@ export function Receiving({
         {source?.extraction && match && (
           <InvoiceSummary
             invoiceCount={linkedInvoices.length}
+            poNumber={order.po_number}
             extraction={source.extraction}
             match={match}
             fileName={source.file_name}
