@@ -854,8 +854,22 @@ check `max(OrderID)` against the live layout before trusting it.**
 
    The Square form can retire now — 4a is live. 4b and 4c are additions to a
    door that already works, not prerequisites for it.
-5. **Production + recurrence.** Schedule/unschedule against 040's seam
-   (verify the packet picks the lines up — it should, by construction); the
+5. **Production + recurrence.** Schedule/unschedule against 040's seam —
+   **DONE 2026-08-27, migrations 067 + 068** (see CLAUDE.md 4g for the whole
+   argument). Three things a reader of decision 9 below needs to know, because
+   the decision as written is now wrong in one place and incomplete in two:
+   **(a)** the schedule line is keyed `(schedule_id, item_id, coalesce(subtype,
+   ''))`, NOT `(schedule_id, item_id)` — one generic `Letter` production item
+   per flavour means 18 letters on #7769 collapse to one line otherwise, and
+   30.1% of linkable orders collide;
+   **(b)** "re-scheduling after edits replaces the lines" is REVERSED — a
+   scheduled order LOCKS (items, event date, kitchen) and you unschedule to
+   change it, which deletes the schedule and is refused once printed or
+   counted;
+   **(c)** the packet pulls a night's special orders in behind its PLAN
+   schedule, so "by construction" is now true rather than dependent on somebody
+   ticking the right rows.
+   Still to do here: the standing-order materializer; the
    standing-order materializer (verified idempotent on the harness: two
    calls one row, a cancelled day stays cancelled, a paused order makes
    nothing) wired into the list and into generation, with the "materialize

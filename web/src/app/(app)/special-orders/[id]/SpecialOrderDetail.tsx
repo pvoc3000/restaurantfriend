@@ -2,7 +2,7 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canEnterCounts } from "@/lib/roles";
+import { canEnterCounts, canWriteCatalog } from "@/lib/roles";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { RawSearchParams } from "@/lib/filterMenus";
@@ -39,6 +39,7 @@ import { StatusCatchUp } from "@/components/specialOrders/StatusCatchUp";
 import { OrderTotals } from "@/components/specialOrders/OrderTotals";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
 import { OrderActions } from "@/components/specialOrders/OrderActions";
+import { ScheduleProduction } from "@/components/specialOrders/ScheduleProduction";
 import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
 import { TimeCell } from "@/components/specialOrders/TimeCell";
 import { StandingOrderBlock } from "@/components/specialOrders/StandingOrderBlock";
@@ -307,6 +308,48 @@ export async function SpecialOrderDetail({
   });
 
   const canWrite = canEnterCounts(session.membership.role);
+
+  /* ------------------------------------------------------------------------
+   * DECISION 9's LOCK (Mark, 2026-08-27)
+   * ------------------------------------------------------------------------
+   * Once the kitchen has this order, the three things the schedule was BUILT
+   * from go read-only: the items, the event date and the kitchen. Everything
+   * else — money, contact, notes, documents, payments, the pickup shop — stays
+   * editable, because none of it changes what gets made.
+   *
+   * There is no sync. Unscheduling deletes the schedule and unlocks the order,
+   * which is a rule you can state in a sentence; keeping a live schedule in
+   * step with a changing order is a standing obligation nobody can predict.
+   *
+   * It is a UI lock and does not pretend otherwise — the guard that matters,
+   * the one protecting a PRINTED or COUNTED night, is inside
+   * `unschedule_special_order`.
+   */
+  const scheduleId = (row.production_schedule_id as string | null) ?? null;
+  const scheduled = Boolean(scheduleId);
+  const canEditItems = canWrite && !scheduled;
+
+  // The schedule's two shops, coerced exactly as `schedule_special_order` does,
+  // so the dialog states what the function will actually write.
+  const orderKitchenId = (row.kitchen_location_id as string | null) ?? null;
+  const orderSellsId = (row.location_id as string | null) ?? null;
+  const kitchenId = orderKitchenId ?? orderSellsId;
+  const sellsId = orderSellsId ?? orderKitchenId;
+  const codeFor = (loc: string | null) =>
+    session.locations.find((l) => l.id === loc)?.code ?? null;
+
+  // A HEAD count, and only when there is a schedule to count. It cannot join
+  // the wave above: it depends on `production_schedule_id`, which arrives in
+  // it. `head: true` fetches no rows — the number is all either the link's
+  // label or the unschedule confirm needs, and naming what goes is the whole
+  // point of that confirm.
+  const { count: scheduleLines } = scheduleId
+    ? await supabase
+        .from("production_schedule_items")
+        .select("id", { count: "exact", head: true })
+        .eq("schedule_id", scheduleId)
+    : { count: 0 };
+  const scheduleLineCount = scheduleLines ?? 0;
   const trail = parseTrail(rawParams, SPECIAL_ORDERS_CRUMB);
   const tabs = tabsFor(kind, (row.fulfillment as string | null) ?? "pickup");
   const tabOptions = tabs.map((t) => ({
@@ -427,6 +470,26 @@ export async function SpecialOrderDetail({
               />
             ) : null}
             <OrderActions
+              scheduled={scheduled}
+              schedule={
+                kind === "order" && status !== "cancelled" && canWriteCatalog(session.membership.role) ? (
+                  <ScheduleProduction
+                    orderId={id}
+                    number={row.number as string}
+                    title={(row.title as string | null) ?? null}
+                    eventDate={(row.event_date as string | null) ?? null}
+                    today={today}
+                    kitchenCode={codeFor(kitchenId)}
+                    sellsCode={codeFor(sellsId)}
+                    kitchenAssumed={orderKitchenId === null && orderSellsId !== null}
+                    sellsAssumed={orderSellsId === null && orderKitchenId !== null}
+                    lines={lines}
+                    scheduleId={scheduleId}
+                    scheduleLineCount={scheduleLineCount}
+                    order={row as never}
+                  />
+                ) : null
+              }
               id={id}
               number={row.number as string}
               kind={kind}
@@ -492,7 +555,7 @@ export async function SpecialOrderDetail({
                     </Row>
                     <Row label="Event date">
                       <Cell table="special_orders" id={id} column="event_date" kind="date"
-                            value={row.event_date as string | null} canWrite={canWrite}
+                            value={row.event_date as string | null} canWrite={canEditItems}
                             ariaLabel="Event date" />
                     </Row>
                     <Row label="Event time">
@@ -523,7 +586,7 @@ export async function SpecialOrderDetail({
                       {/* Decision 8: kitchen is where it is MADE… */}
                       <Cell table="special_orders" id={id} column="kitchen_location_id" kind="pick"
                             options={locationOptions} value={row.kitchen_location_id as string | null}
-                            canWrite={canWrite} ariaLabel="Kitchen" />
+                            canWrite={canEditItems} ariaLabel="Kitchen" />
                     </Row>
                     <Row label="Pickup shop">
                       {/* …and location is where it is PICKED UP. */}
@@ -728,13 +791,22 @@ export async function SpecialOrderDetail({
               {lineError ? (
                 <p className="text-sm text-accent">Could not load the lines: {lineError.message}</p>
               ) : (
-                <OrderLines
-                  orderId={id}
-                  orgId={row.org_id as string}
-                  rows={lines}
-                  canWrite={canWrite}
-                  menu={menu}
-                />
+                <>
+                  {scheduled ? (
+                    <p className="mb-3 text-[13px]">
+                      <span className="bg-mark-fill px-1">
+                        The kitchen has this order. Unschedule it to change the items.
+                      </span>
+                    </p>
+                  ) : null}
+                  <OrderLines
+                    orderId={id}
+                    orgId={row.org_id as string}
+                    rows={lines}
+                    canWrite={canEditItems}
+                    menu={menu}
+                  />
+                </>
               )}
 
               {/* PAYMENTS LEFT, MONEY RIGHT (Mark, 2026-08-19: "move the

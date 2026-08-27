@@ -84,7 +84,70 @@ export type PacketData = {
   printedOn: string;
   schedules: PacketSchedule[];
   kitchens: PacketKitchen[];
+  /**
+   * The special-order schedules pulled in behind the plan nights that were
+   * SELECTED (decision 11). Named so the dialog can say what it added, and kept
+   * apart from `schedules` so the filename can still describe the selection —
+   * one chosen night must not become "packet.pdf" because a wedding came with
+   * it.
+   */
+  companions: PacketSchedule[];
 };
+
+/**
+ * The special-order schedules that belong to the same nights as these.
+ *
+ * Decision 11 (Mark, 2026-08-27): selecting a night's PLAN schedule pulls in
+ * its special orders. Before this the packet summed the schedules you had
+ * TICKED, so "the tray guides include special orders by construction" was only
+ * true if somebody remembered to tick them — and forgetting produced a guide
+ * that looked complete and was short by a wedding.
+ *
+ * One direction only. A kitchen's night is (kitchen, date), so a plan schedule
+ * names the night and everything made in that kitchen that night comes with it.
+ * Ticking a special order alone does NOT drag the plan in: printing one order's
+ * sheet is a real thing to want.
+ *
+ * PostgREST cannot express a two-column `IN`, so this asks for the union of the
+ * kitchens and the union of the dates and narrows to the exact pairs here. Over
+ * a night or two that over-fetches a handful of rows.
+ */
+export async function companionScheduleIds(
+  supabase: SupabaseClient,
+  scheduleIds: string[]
+): Promise<string[]> {
+  if (scheduleIds.length === 0) return [];
+
+  const { data: seed } = await supabase
+    .from("production_schedules")
+    .select("id, schedule_date, kitchen_location_id, source")
+    .in("id", scheduleIds);
+
+  const nights = new Set(
+    (seed ?? [])
+      .filter((s) => s.source === "plan")
+      .map((s) => `${s.schedule_date as string}|${s.kitchen_location_id as string}`)
+  );
+  if (nights.size === 0) return [];
+
+  const { data: rows } = await supabase
+    .from("production_schedules")
+    .select("id, schedule_date, kitchen_location_id")
+    .eq("source", "special_order")
+    .in("schedule_date", [...new Set((seed ?? []).map((s) => s.schedule_date as string))])
+    .in("kitchen_location_id", [
+      ...new Set((seed ?? []).map((s) => s.kitchen_location_id as string)),
+    ]);
+
+  const already = new Set(scheduleIds);
+  return (rows ?? [])
+    .filter(
+      (r) =>
+        nights.has(`${r.schedule_date as string}|${r.kitchen_location_id as string}`) &&
+        !already.has(r.id as string)
+    )
+    .map((r) => r.id as string);
+}
 
 /** PostgREST caps a select at 1,000 rows and says nothing about it. */
 async function fetchAll<T>(
@@ -118,8 +181,15 @@ export async function fetchPacketData(
   scheduleIds: string[]
 ): Promise<PacketData> {
   if (scheduleIds.length === 0) {
-    return { orgName: "", printedOn: today(), schedules: [], kitchens: [] };
+    return { orgName: "", printedOn: today(), schedules: [], kitchens: [], companions: [] };
   }
+
+  // Decision 11: a night's special orders come with its plan schedule. Done
+  // HERE rather than in the caller so every route into the packet gets it, and
+  // so `requested` stays available for the things that must not use the
+  // expanded set — see `PrintPacket`'s filename.
+  const companions = await companionScheduleIds(supabase, scheduleIds);
+  const allIds = [...scheduleIds, ...companions];
 
   const [{ data: org }, { data: scheduleRows, error: schedErr }] = await Promise.all([
     supabase.from("orgs").select("name").limit(1).maybeSingle(),
@@ -131,7 +201,7 @@ export async function fetchPacketData(
         `id, schedule_date, location_id, kitchen_location_id, source, title,
          generated_at, generated_by, printed_at, note`
       )
-      .in("id", scheduleIds),
+      .in("id", allIds),
   ]);
   if (schedErr) throw new Error(`schedules: ${schedErr.message}`);
   const schedules = scheduleRows ?? [];
@@ -150,7 +220,7 @@ export async function fetchPacketData(
       `id, schedule_id, item_id, item_name, item_type, subtype, finish, size,
        tally_box_size, tray_capacity, tray_number, par, made, leftover, sort`,
       "id",
-      (q) => (q as never as { in: (c: string, v: string[]) => unknown }).in("schedule_id", scheduleIds)
+      (q) => (q as never as { in: (c: string, v: string[]) => unknown }).in("schedule_id", allIds)
     ),
     supabase.from("locations").select("id, code").in("id", locationIds).then((r) => r.data ?? []),
     supabase.from("org_members").select("user_id, display_name").then((r) => r.data ?? []),
@@ -366,6 +436,7 @@ export async function fetchPacketData(
     // week later says so.
     printedOn: today(),
     schedules: packetSchedules,
+    companions: packetSchedules.filter((s) => companions.includes(s.id)),
     kitchens: [...kitchens.values()].sort(
       (a, b) => a.date.localeCompare(b.date) || a.kitchenCode.localeCompare(b.kitchenCode)
     ),

@@ -105,13 +105,26 @@ test("a returned quote is an invoice waiting to be sent", () => {
   );
 });
 
-test("a scheduled order is a receipt waiting to go out", () => {
+test("a scheduled order that was PRINTED is a receipt waiting to go out", () => {
   eq(
     cols(afterDateSet(
-      order({ status: "order", todo: null, order_scheduled_at: TODAY }),
+      order({ status: "order", todo: null, order_printed_at: TODAY, order_scheduled_at: TODAY }),
       "order_scheduled_at"
     )),
     [["todo", "Send Receipt"]]
+  );
+});
+
+test("a scheduled order that was NOT printed asks to be printed", () => {
+  // The sixth rung is compound — printed AND scheduled — and since scheduling
+  // became a command the order can arrive at it from either side. Offering
+  // "Send Receipt" to an order the kitchen has no paper for skips a step.
+  eq(
+    cols(afterDateSet(
+      order({ status: "order", todo: null, order_printed_at: null, order_scheduled_at: TODAY }),
+      "order_scheduled_at"
+    )),
+    [["todo", "Print Order"]]
   );
 });
 

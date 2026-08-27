@@ -284,7 +284,8 @@ export function GenerateSchedules({
                   Ignore special orders
                   <span className="block text-xs text-muted">
                     Recorded on each schedule so the printed totals explain
-                    themselves later. Nothing generates special orders yet.
+                    themselves later. A special order becomes its OWN schedule,
+                    scheduled from the order — this never writes one.
                   </span>
                 </span>
               </div>

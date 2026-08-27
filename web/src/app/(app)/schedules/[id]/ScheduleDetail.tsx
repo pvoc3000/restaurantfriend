@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
@@ -65,6 +66,28 @@ export async function ScheduleDetail({
     );
   }
   if (!schedule) notFound();
+
+  /* ------------------------------------------------------------------------
+   * THE ORDER BEHIND A SPECIAL-ORDER SCHEDULE
+   * ------------------------------------------------------------------------
+   * `source_ref` has been selected here since 040 and rendered nowhere. It is
+   * the route back, plus the two facts a kitchen needs that a plan schedule has
+   * no room for: when it is wanted, and what nobody may eat.
+   *
+   * ITS OWN QUERY, AND ITS EMPTY RESULT IS NOT AN ERROR. Reading
+   * `production_schedules` is membership-wide (040), while `special_orders` is
+   * supervisor+ (051) — so a staff member opening this page gets NO ROWS and NO
+   * ERROR from the query below, which is RLS working. Folding it into the wave
+   * as a required join would blank the whole screen for them instead.
+   */
+  const { data: sourceOrder } =
+    schedule.source === "special_order" && schedule.source_ref
+      ? await supabase
+          .from("special_orders")
+          .select("id, number, title, event_date, event_time, ready_by_time, allergen_info")
+          .eq("id", schedule.source_ref as string)
+          .maybeSingle()
+      : { data: null };
 
   const [
     { data: lineRows, error: lineErr },
@@ -188,6 +211,28 @@ export async function ScheduleDetail({
           {" · "}made at <span className="font-medium text-ink">{kitchenCode}</span>
           {schedule.ignored_special_orders ? " · special orders ignored" : ""}
         </p>
+        {sourceOrder ? (
+          <p className="text-sm">
+            <Link
+              href={`/special-orders/${sourceOrder.id as string}`}
+              className="underline hover:text-muted"
+            >
+              Order #{sourceOrder.number as string}
+            </Link>
+            {sourceOrder.event_date ? (
+              <span className="text-muted">
+                {" · wanted "}
+                {sourceOrder.event_date as string}
+                {sourceOrder.event_time ? ` at ${(sourceOrder.event_time as string).slice(0, 5)}` : ""}
+              </span>
+            ) : null}
+            {sourceOrder.allergen_info ? (
+              <span className="ml-2 bg-mark-fill px-1">
+                {sourceOrder.allergen_info as string}
+              </span>
+            ) : null}
+          </p>
+        ) : null}
       </header>
 
       <dl className="grid gap-x-10 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">

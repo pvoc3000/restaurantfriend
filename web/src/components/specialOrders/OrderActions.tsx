@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
@@ -30,6 +30,8 @@ export function OrderActions({
   lineCount,
   paymentCount,
   canWrite,
+  scheduled,
+  schedule,
 }: {
   id: string;
   number: string;
@@ -39,6 +41,15 @@ export function OrderActions({
   lineCount: number;
   paymentCount: number;
   canWrite: boolean;
+  /** True once a production schedule exists for this order. */
+  scheduled: boolean;
+  /**
+   * `<ScheduleProduction>`, composed upstream — `ScheduleDetail` passes
+   * `print={<PrintPacket/>}` into `ScheduleActions` the same way. It keeps this
+   * component from growing eight props it does not otherwise need, and keeps
+   * the order row a thing only `SpecialOrderDetail` reads.
+   */
+  schedule?: ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -107,7 +118,11 @@ export function OrderActions({
     if (
       !(await confirmDialog({
         ...splitConfirmMessage(
-          `Cancel order ${number}?\n\nIt stays on the list, greyed and struck through, and drops out of every working view. Cancelling is reversible — set the status back on the Info tab.`
+          `Cancel order ${number}?\n\nIt stays on the list, greyed and struck through, and drops out of every working view. Cancelling is reversible — set the status back on the Info tab.${
+            scheduled
+              ? " The kitchen still has this order: cancelling does NOT unschedule it, so unschedule it as well or those donuts get made."
+              : ""
+          }`
         ),
         confirmLabel: "Cancel the order",
         tone: "danger",
@@ -227,6 +242,18 @@ export function OrderActions({
   }
 
   async function remove() {
+    // REFUSED, not warned. `production_schedules.source_ref` deliberately
+    // carries no FK (040: the table did not exist yet), so deleting the order
+    // would leave a live schedule pointing at a uuid that is gone — a kitchen
+    // document with a dead backlink and nothing to explain it. Unscheduling
+    // first is one click and is what the confirm points at.
+    if (scheduled) {
+      setError(
+        "This order's production is scheduled. Unschedule it first — deleting now would leave the kitchen holding a schedule with nothing behind it."
+      );
+      return;
+    }
+
     const damage = [
       lineCount ? `${lineCount} line${lineCount === 1 ? "" : "s"}` : null,
       paymentCount ? `${paymentCount} payment${paymentCount === 1 ? "" : "s"}` : null,
@@ -277,6 +304,9 @@ export function OrderActions({
        row so a refusal appears beside the button that caused it. */
     <div className="flex flex-wrap items-center gap-3">
       <div className="flex flex-wrap items-center gap-3">
+        {/* LEADS THE ROW: scheduling is a thing you do WITH an order, where
+            everything after it is done TO the record. */}
+        {schedule}
         <button type="button" className={BUTTON_CLASS} onClick={duplicate} disabled={pending}>
           Duplicate
         </button>

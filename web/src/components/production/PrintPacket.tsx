@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { openWindowNow, showBlob } from "@/lib/poProcessing";
-import { fetchPacketData, stampPrinted } from "@/lib/productionPacket";
+import { companionScheduleIds, fetchPacketData, stampPrinted } from "@/lib/productionPacket";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { PACKET_PARTS, type PacketPart } from "@/components/production/pdf/ProductionPacketPdfs";
@@ -65,11 +65,17 @@ export function PrintPacket({
   const [parts, setParts] = useState<PacketPart[]>(() => PACKET_PARTS.map((p) => p.key));
   const [pending, start] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
+  // How many special-order schedules will come along with the selection
+  // (decision 11). Asked when the dialog OPENS rather than held in a prop, so
+  // an order scheduled a minute ago is already counted.
+  const [companions, setCompanions] = useState(0);
 
   function openDialog() {
     setFailed(null);
     setParts(initialParts());
+    setCompanions(0);
     setOpen(true);
+    void companionScheduleIds(supabase, scheduleIds).then((ids) => setCompanions(ids.length));
   }
 
   function toggle(key: PacketPart) {
@@ -97,9 +103,13 @@ export function PrintPacket({
           <docs.ProductionPacketPdf packet={packet} parts={parts} />
         ).toBlob();
 
-        const first = packet.schedules[0];
+        // NAMED FROM WHAT WAS SELECTED, never from the expanded set: one
+        // chosen night that pulled a wedding in with it is still one night, and
+        // "Production packet ….pdf" would be a worse name for it.
+        const chosen = packet.schedules.filter((s) => scheduleIds.includes(s.id));
+        const first = chosen[0];
         const name =
-          packet.schedules.length === 1 && first
+          chosen.length === 1 && first
             ? `${first.date} ${first.sellsCode} packet.pdf`
             : `Production packet ${packet.printedOn}.pdf`;
         showBlob(win, blob, name);
@@ -111,7 +121,14 @@ export function PrintPacket({
         // than from a `getUser()` round trip out here — the server already
         // knows who is asking, and the client's answer was only ever a copy.
         if (stampable) {
-          const stampError = await stampPrinted(supabase, scheduleIds);
+          // THE EXPANDED SET, not the selection. A special-order schedule that
+          // came along and was printed but never stamped would slip past
+          // `unschedule_special_order`'s printed guard — and the kitchen would
+          // still be holding the paper.
+          const stampError = await stampPrinted(
+            supabase,
+            packet.schedules.map((s) => s.id)
+          );
           if (stampError) setFailed(stampError);
         }
         setOpen(false);
@@ -166,10 +183,20 @@ export function PrintPacket({
           <div className="mt-3 space-y-4">
             <p className="text-sm text-muted">
               One file for {scheduleIds.length}{" "}
-              {scheduleIds.length === 1 ? "night" : "nights"}. The premade
-              schedule is per shop; the guides and element sheets are per
-              KITCHEN and sum every schedule it is filling, which is what makes
-              them include special orders without a switch.
+              {scheduleIds.length === 1 ? "night" : "nights"}
+              {companions > 0 ? (
+                <>
+                  , and the{" "}
+                  <span className="bg-mark-fill px-1">
+                    {companions} special-order{" "}
+                    {companions === 1 ? "schedule" : "schedules"}
+                  </span>{" "}
+                  for the same kitchens
+                </>
+              ) : null}
+              . The premade schedule is per shop; the guides and element sheets
+              are per KITCHEN and sum every schedule it is filling, which is
+              what makes them include special orders without a switch.
             </p>
 
             <ul className="divide-y divide-hairline border border-ink">

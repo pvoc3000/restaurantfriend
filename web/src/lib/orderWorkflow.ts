@@ -126,7 +126,13 @@ const DATE_IMPLIES: Partial<
   // "call about the balloons" in there is not asking for it to be thrown away
   // because a sheet came off the printer.
   order_printed_at: (o) => (o.todo === "Print Order" ? [clearTodo("Print Order")] : []),
-  order_scheduled_at: () => [todo("Send Receipt")],
+  // WHICHEVER HALF OF THE SIXTH RUNG IS STILL MISSING. `suggestedTodo` already
+  // sequences Print Order before Schedule Production, and scheduling is now a
+  // COMMAND rather than only a date somebody types — so the order can reach this
+  // rung from either side, and the offer has to know which. Printed already:
+  // the ladder is done and the next thing is the receipt.
+  order_scheduled_at: (o) =>
+    o.order_printed_at ? [todo("Send Receipt")] : [todo("Print Order")],
   receipt_sent_at: (o) => (o.todo === "Send Receipt" ? [clearTodo("Send Receipt")] : []),
 };
 

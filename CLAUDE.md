@@ -3725,15 +3725,147 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    real tables (its census caught all of this). Ships vestigial:
    `locations.kitchen_by_weekday` / `shops_for` retire when kitchen-on-plan
    lands.
-4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3 AND 4a DONE, LIVE
-   AND IN USE (2026-08-21); 4b, 4c and 5 not built. NOTHING IS OUTSTANDING —
-   migrations 051–058 are applied and all three of the module's edge functions
-   are deployed.**
+4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3, 4a AND THE
+   PRODUCTION HALF OF 5 DONE; 4b, 4c and recurrence not built. Migrations
+   051–058 are applied and all three edge functions are deployed;
+   067 + 068 NEED APPLYING.** *Probe, don't read this line.*
    The module records, quotes, invoices, prints, emails as specialorders@, takes
-   a customer's approval on a public page, takes inquiries on a public form, and
-   proposes the next step as things happen. What remains is the inquiry form's
-   own build-your-box picker (4b), the organic-email parser (4c) and
-   production/recurrence (5).
+   a customer's approval on a public page, takes inquiries on a public form,
+   proposes the next step as things happen, and **puts the order's donuts on a
+   real production schedule**. What remains is the inquiry form's
+   own build-your-box picker (4b), the organic-email parser (4c) and the
+   standing-order materializer (the rest of 5).
+
+   **Shipped 2026-08-27 — DECISION 9, SCHEDULING PRODUCTION (migrations 067 +
+   068, BOTH NEED APPLYING).** 040 shipped the entire seam and left it unused
+   for three weeks: `production_schedules.source` already accepted
+   `'special_order'` with `source_ref` and `title` beside it,
+   `production_schedule_items.par_source` accepted it too, its `tray_number`
+   comment named "every special-order line", 051 gave
+   `special_orders.production_schedule_id` an FK **that nothing had ever read**,
+   `unschedulableLines()` was written and exported with **zero callers**, and
+   the generate dialog said in user-visible copy *"Nothing generates special
+   orders yet."*
+   **067 EXISTS BECAUSE `unique (schedule_id, item_id)` CANNOT HOLD, and that is
+   a MEASUREMENT.** `production_items` has **ONE generic `Letter` subtype** — 56
+   rows, one per FLAVOUR — and no per-character item, because the character is a
+   property of the ORDER. So every letter of a customer's name resolves to the
+   same production item: order **#7769** spells HAPPY BIRTHDAY VINNY in 18 lines
+   that ALL point at `Rites of Sprinkles - Choc`, which under 040's key is one
+   line reading "18 × Rites of Sprinkles - Letter" and a decorator who does not
+   know which letters to cut. Not an edge case — **943 of the 3,133 orders
+   carrying linked lines (30.1%)** have two lines sharing a production item, and
+   **roughly three in four of those collisions are different letters** rather
+   than duplicates. So the key is
+   `(schedule_id, item_id, coalesce(subtype, ''))`, an EXPRESSION index because
+   two NULLs are never equal in a plain unique index. Cheap when it landed: 17
+   schedules, 546 lines, all `source = 'plan'`.
+   **PLAN SCHEDULES ARE UNAFFECTED AND THAT IS PROVABLE**: `production_day`
+   groups by `(kitchen, item_id)` and returns one row per item, each with one
+   subtype, so there is never a second row to split from.
+   **THE DELETE-STALE PREDICATE HAD TO MOVE WITH THE CONFLICT TARGET, and
+   forgetting it is a silently DOUBLED PAR.** 040's replacement pass deletes a
+   line only when the day no longer carries its `item_id`; with the key widened
+   but that predicate left alone, renaming an item's subtype in the catalog and
+   regenerating leaves the old line standing AND inserts a new one. **Measured
+   by breaking it on the harness: 2 lines, 48 donuts where 24 is right.** Both
+   `not exists` blocks — the delete and the `v_lost` actuals count above it —
+   gain `coalesce(d.subtype,'') = coalesce(li.subtype,'')`, and they must keep
+   saying the same thing or the guard and the delete disagree about what is
+   about to be lost. The function is REPRODUCED IN FULL (055's rule); the
+   reproduction was diffed against 040:821-1109 and is byte-identical but for
+   those three lines.
+   **068 IS THE `freeze_pay_period` SHAPE: TypeScript computes, SQL validates
+   and commits.** Grouping means normalising the CUT, and the live data holds
+   **93 letter-ish spellings** of forty-odd characters (`Letter - "A"` 1,170,
+   `Letter "A"` 17, `Letter. "A"`, lowercase, a stray `Letter - U"`, one
+   escape-mangled `Letter - ""Y""`). That logic already exists, fixture-tested,
+   in `lib/specialOrderLines`; a PL/pgSQL twin is 016's `nextDeliveryDate` trap
+   on a document a kitchen bakes from. `lib/specialOrderSchedule` groups on
+   `(production_item_id, canonicalCut)` and SUMS — repeated letters within a
+   word are one line ("HAPPY" is 2 for P) — which is exactly what Mark asked
+   for. A **bare `Letter`** is its own group and is never folded into a
+   character (935 real rows: letters ordered, the word not settled), and a
+   non-letter cut is trimmed and otherwise untouched, because two spellings of
+   `Promise Ring` are both somebody's deliberate typing.
+   **THE PAYLOAD IS NOT TRUSTED.** Every item must be a production item in this
+   org AND appear as the `production_item_id` of a line on THIS order — without
+   the second half, a caller holding one order's id could schedule any item in
+   the catalog against it. Plus `(item_id, subtype)` unique within the payload
+   (checked before it can raise as a `unique_violation` naming an index) and
+   every par positive.
+   **BOTH FUNCTIONS ARE `security invoker`, WHICH IS 013's PRECEDENT VERBATIM.**
+   `production_schedules` is purchaser+ on insert and delete (040) while this
+   module is supervisor+ (051), so a definer would silently widen "who commits a
+   kitchen's night" as a side effect of wanting atomicity. Verified on the
+   harness as real roles: **a supervisor's schedule is refused by RLS by name, a
+   supervisor's unschedule DELETES ZERO ROWS AND RETURNS NO ERROR** — which is
+   why `unschedule_special_order` checks the row count and says so — and `anon`
+   is refused both outright. Atomicity holds anyway: a function body is one
+   transaction, so an order can never rest half-scheduled.
+   **`order_scheduled_at` TAKES TODAY, NOT THE PRODUCTION DATE**, and `p_today`
+   is a PARAMETER — `current_date` is UTC, so after 4pm Pacific it dates an act
+   to a day that has not happened. Every stage date beside it records the day
+   the ACT happened; the day production was scheduled FOR is on the schedule.
+   Only when empty (SendDocument's rule).
+   **BOTH SHOP COERCIONS ARE NAMED IN THE DIALOG** (040's "names every coercion
+   in its receipt"): the schedule's two location columns are NOT NULL where the
+   order's are both nullable (kitchen filled on 83%, pickup shop only on recent
+   rows), so kitchen ?? pickup and pickup ?? kitchen, with a yellow mark saying
+   which stood in. Verified on the real #7769, which has no pickup shop.
+   **054's TRIGGER WATCHES NEITHER `production_schedule_id` NOR THE STAGE
+   DATES**, so the biggest act in the module would have left no trace in its own
+   history. Both functions write a `special_order_events` row — the
+   `Duplicated from order N` case, a fact with no watched column behind it.
+   Unscheduling says it discarded a document and NOT that it undid anybody's
+   decision: a to-do or status the workflow offer moved stays where a human put
+   it.
+   **SCHEDULED IS A LOCK, NOT A SYNC** (Mark's call). The Items tab, the event
+   date and the kitchen — the three things the schedule was BUILT from — go
+   read-only until somebody unschedules, which deletes the schedule outright.
+   Everything else stays editable, because none of it changes what gets made.
+   Keeping a live schedule in step with a changing order is a standing
+   obligation; delete-and-rebuild is a rule you can state in a sentence. It is a
+   UI lock and does not pretend otherwise — the guard that matters is in the
+   function.
+   **UNSCHEDULE REFUSES ONCE PRINTED OR COUNTED**, which is the one place this
+   module is stricter than `closeReadiness`'s name-it-and-let-you-through rule,
+   and deliberately: both facts are about the WORLD rather than the record —
+   paper is in a kitchen, or somebody stood at a bench and counted. The escape
+   hatch is real and is not a hole: a purchaser deletes the schedule from
+   `/schedules/[id]`, which clears the link through the FK, and that confirm is
+   now source-aware because "generating the day again would rebuild it from the
+   plans" is FALSE here.
+   **DELETING THE ORDER IS REFUSED WHILE IT IS SCHEDULED**, because `source_ref`
+   deliberately carries no FK (040: the table did not exist yet), so the delete
+   would leave a kitchen holding a schedule with a dead backlink. Cancelling is
+   allowed and NAMES the schedule — cancelling does not unschedule, so those
+   donuts still get made.
+   **DECISION 11: SELECTING A NIGHT'S PLAN SCHEDULE PULLS IN ITS SPECIAL
+   ORDERS** (`companionScheduleIds`). The packet summed the schedules you had
+   TICKED, so "the tray guides include special orders by construction" was only
+   true if somebody remembered — and forgetting produced a guide that looked
+   complete and was short by a wedding. ONE DIRECTION only: ticking a special
+   order alone does not drag the plan in, because printing one order's sheet is
+   a real thing to want. Two consequences that are easy to get backwards: the
+   print stamp goes on the EXPANDED set (an unstamped special-order schedule
+   would slip past the printed guard while the kitchen holds the paper), and the
+   FILENAME comes from the SELECTION (one chosen night is still one night).
+   PostgREST has no tuple `IN`, so it is two `.in()`s narrowed to exact pairs in
+   JS.
+   `DATE_IMPLIES.order_scheduled_at` is order-aware now — the sixth rung is
+   compound (printed AND scheduled) and since scheduling became a command the
+   order can arrive from either side, so it offers **Print Order** when the
+   order has not been printed and Send Receipt when it has.
+   Verified: all 68 migrations replay on the Docker harness and every rule was
+   checked by BREAKING it; **1,273 fixtures pass** (25 new), the anchor being
+   #7769 verbatim — 21 order lines becoming **12 schedule lines** with Y=3,
+   H/A/P/I/N=2 and the two identical Mini lines merged to 100. The same order
+   rendered through the real dialog against the LIVE database gives the same 12
+   lines and 118 to make, and the commit refuses legibly ("migration 068 has not
+   been applied") while writing nothing.
+   Known and NOT fixed: a group merges two order lines under the FIRST line's
+   name, so the dialog shows "(2 lines)" beside it rather than both names.
    **Read `docs/special-orders-brief.md` before designing or touching anything
    here, and START AT ITS "Where a next session picks up" SECTION** — that is
    the handoff, and it carries the probes for everything this line claims, what
@@ -4431,6 +4563,28 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    second time, which is the signal it already ran — and all-or-nothing, since
    a partial run dies on that rename before it reaches the constraint, the
    policy or the index.
+
+   **067 AND 068 NEED APPLYING** (2026-08-27 — scheduling a special order's
+   production). *Probe, don't read this line; it has been wrong in both
+   directions for four different migrations.* For 067, three probes because it
+   does three things:
+   `select conname from pg_constraint where conrelid =
+   'public.production_schedule_items'::regclass and contype = 'u'` — must NOT
+   include `production_schedule_items_schedule_id_item_id_key`;
+   `select indexname from pg_indexes where tablename =
+   'production_schedule_items'` — must include `production_schedule_items_line`;
+   and `select count(*) from pg_proc where proname =
+   'generate_production_schedules'` — must be **ONE**, because two means the
+   argument list drifted and 040's version is live beside it (033's
+   `freeze_pay_period` trap).
+   For 068: `select public.schedule_special_order(null, null, null, null, null)`
+   must raise **"no order given"** from its first statement, and
+   `select public.unschedule_special_order(null)` the same, which proves the
+   code ran; and `select count(*) from production_schedules where source =
+   'special_order'` — 0 until somebody schedules one.
+   067 must go FIRST: 068's insert relies on the widened key. Neither is
+   rerunnable — 067's `drop constraint` fails a second time, which is the signal
+   it already ran.
 
    **060 IS APPLIED** (Mark, 2026-08-22 — the request's details box).
    *Probe, don't read this line.* `select column_name, is_nullable from

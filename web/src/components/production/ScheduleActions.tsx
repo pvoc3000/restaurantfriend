@@ -172,11 +172,20 @@ export function ScheduleActions({
   }
 
   async function remove() {
+    // THE LAST LINE IS SOURCE-AWARE, because on a special-order schedule the
+    // plan sentence is simply false — regenerating rebuilds nothing here (the
+    // generator only ever touches `source = 'plan'`), and this route also
+    // bypasses `unschedule_special_order`'s printed/counted guard. The FK's
+    // `set null` clears the order's `production_schedule_id`, but its
+    // `order_scheduled_at` is left claiming production is scheduled.
     const message =
       `Delete the ${scheduleDate} schedule for ${sellsCode}?\n\n` +
       `${lineCount} ${lineCount === 1 ? "item" : "items"} go with it` +
       (hasActuals ? `, including counted quantities somebody entered` : "") +
-      `.\n\nGenerating the day again would rebuild it from the plans.`;
+      `.\n\n` +
+      (source === "special_order"
+        ? `This came from a special order. Unscheduling it from the order is the ordinary way back — that also clears the order's Production scheduled date, and refuses if the night has been printed or counted.`
+        : `Generating the day again would rebuild it from the plans.`);
     if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Delete", tone: "danger" }))) return;
 
     setBusy("delete");
