@@ -24,6 +24,7 @@ import "./invoiceMatch.fixtures";
 import "./lastPurchase.fixtures";
 import "./invoices.fixtures";
 import "./filedInvoice.fixtures";
+import "./invoicePages.fixtures";
 import "./filterMenus.fixtures";
 import "./nav.fixtures";
 import "./vendors.fixtures";

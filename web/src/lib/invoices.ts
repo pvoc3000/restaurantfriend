@@ -344,6 +344,118 @@ export function filedInvoiceFor(
   return null;
 }
 
+/**
+ * What a printed line IS, for telling "another page" from "the same page
+ * again".
+ *
+ * Not an id — a reading has none. The SKU, the wording, the quantity and the
+ * two money figures together, normalized the way a human comparing two
+ * printouts would: case and spacing don't make a different line, and PostgREST
+ * hands numerics back as strings, so `1` and `"1.000"` must key the same or
+ * every comparison silently fails (`toInvoiceLine` carries the same warning).
+ */
+function linePrint(line: {
+  product_id?: string | null;
+  alt_product_id?: string | null;
+  description?: string | null;
+  qty?: number | string | null;
+  unit_price?: number | string | null;
+  extended?: number | string | null;
+}): string {
+  const sku =
+    normalizeInvoiceNumber(line.product_id ?? null) ??
+    normalizeInvoiceNumber(line.alt_product_id ?? null) ??
+    "";
+  const words = (line.description ?? "").trim().toUpperCase().replace(/\s+/g, " ");
+  const num = (v: number | string | null | undefined) =>
+    v === null || v === undefined || v === "" ? "" : Number(v).toFixed(4);
+  return [sku, words, num(line.qty), num(line.unit_price), num(line.extended)].join("|");
+}
+
+/**
+ * The lines of a reading that this invoice does NOT already hold — what a
+ * second page adds, and what a second copy of the same page does not.
+ *
+ * An invoice's pages are scanned and attached separately (Mark, 2026-08-27:
+ * "I've uploaded individual pages from the same invoice"), and the totals block
+ * prints on every page, so each page reads as the WHOLE bill: measured on Chefs
+ * Warehouse 73535581 at DF02, two pages produced two records both claiming
+ * $394.16, one holding 4 lines and the other 7 — so /invoices showed $788.32
+ * owed for a $394.16 bill. Joining them on the header is only half an answer;
+ * the record then has to end up holding the union of what its pages say, or
+ * seven lines are silently lost.
+ *
+ * A MULTISET, not a set, and that is the case worth not getting wrong: one
+ * invoice may legitimately print the same item twice at the same price. Each
+ * existing line is consumed at most once, so re-reading a page with [A, A]
+ * matches both and adds nothing, while a page with [A, A] against a record
+ * holding one A adds exactly one.
+ *
+ * Numbering CONTINUES from what is already there — `line_no` is the printed
+ * order and there is no unique constraint on it (025), so page two's lines sit
+ * after page one's rather than colliding with them.
+ */
+type PrintedLine = {
+  product_id?: string | null;
+  alt_product_id?: string | null;
+  description?: string | null;
+  qty?: number | string | null;
+  unit_price?: number | string | null;
+  extended?: number | string | null;
+};
+
+export function unfiledLines<T extends PrintedLine & { line_no: number | null }>(
+  existing: (PrintedLine & { line_no?: number | null })[],
+  drafts: T[]
+): T[] {
+  const have = new Map<string, number>();
+  for (const line of existing) {
+    const key = linePrint(line);
+    have.set(key, (have.get(key) ?? 0) + 1);
+  }
+
+  let next = existing.reduce((max, l) => Math.max(max, Number(l.line_no ?? 0)), 0);
+  const out: T[] = [];
+  for (const draft of drafts) {
+    const key = linePrint(draft);
+    const count = have.get(key) ?? 0;
+    if (count > 0) {
+      have.set(key, count - 1);
+      continue;
+    }
+    next += 1;
+    out.push({ ...draft, line_no: next });
+  }
+  return out;
+}
+
+/**
+ * The header fields a later page can fill IN, never overwrite.
+ *
+ * A multi-page invoice does not print everything on page one — the totals block
+ * and the due date routinely sit on the last page — so a record filed from page
+ * one can be missing figures that page two has. Filling only what is null is
+ * what keeps this from being an edit: a value already on the record was either
+ * read from a page or typed by a person, and neither should be replaced by
+ * another page's guess.
+ *
+ * There is deliberately no special case for `is_credit`. A guard was written
+ * for it and removed once a fixture showed it changed nothing: `false` is a
+ * value rather than a blank, so the null test already refuses to touch it, and
+ * a second rule saying the same thing is one more thing to keep true.
+ */
+export function blankHeaderFields(
+  existing: Record<string, unknown>,
+  header: Record<string, unknown>
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(header)) {
+    if (value === null || value === undefined) continue;
+    if (existing[key] === null || existing[key] === undefined) patch[key] = value;
+  }
+  return patch;
+}
+
 /** Same vendor, same money, within a week — the numberless re-upload. */
 const NEAR_DUPLICATE_DAYS = 7;
 

@@ -15,9 +15,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { InvoiceExtraction } from "./invoiceExtraction";
 import {
+  blankHeaderFields,
   filedInvoiceFor,
   invoiceHeaderFromExtraction,
   invoiceLinesFromExtraction,
+  unfiledLines,
 } from "./invoices";
 import { matchInvoiceToOrder } from "./invoiceMatch";
 import type { PoLine } from "./purchaseOrders";
@@ -136,20 +138,15 @@ export async function createInvoiceFromReading(
     onFile ?? []
   );
   if (existing) {
-    // Tag the document and link whatever of the EXISTING invoice's lines this
-    // order can claim. Linking is not a nicety here: receiving reads the lines
-    // pointing at its own PO, so joining without it would leave the second
-    // order of a consolidated invoice with no invoice at all — worse than the
-    // duplicate this replaces.
-    if (order) {
-      const linkError = await linkMatchedLines(supabase, {
-        invoiceId: existing.id,
-        order,
-        extraction,
-      });
-      if (linkError) {
-        return { error: `Filed against invoice ${existing.invoice_number ?? ""} but linking failed: ${linkError}` };
-      }
+    const joinError = await absorbIntoInvoice(supabase, {
+      orgId,
+      invoiceId: existing.id,
+      extraction,
+      header,
+      order,
+    });
+    if (joinError) {
+      return { error: `Filed against invoice ${existing.invoice_number ?? ""}, but ${joinError}` };
     }
     const { error: tagError } = await supabase
       .from("purchase_order_attachments")
@@ -213,6 +210,83 @@ export async function createInvoiceFromReading(
   }
 
   return { invoiceId, joined: false };
+}
+
+/**
+ * Fold a reading into an invoice that already exists — ANOTHER PAGE of a bill
+ * this record already holds, or another copy of a page it holds already.
+ *
+ * This is the other half of joining, and without it joining would be a
+ * different bug rather than a fix. Chefs Warehouse 73535581 at DF02 is the
+ * worked example: two pages scanned and attached separately, the totals block
+ * printed on both, so each page read as the whole $394.16 bill and each became
+ * its own record — one holding 4 lines, the other 7. Matching them on the
+ * header and stopping there would leave one record holding 4 of the 11 lines,
+ * and seven lines would vanish without a word.
+ *
+ * Three writes, each of which only ever ADDS:
+ *
+ *   1. the lines this record does not already hold (`unfiledLines`, a multiset
+ *      so a repeated item is not mistaken for a repeated page),
+ *   2. header fields that are still blank (`blankHeaderFields`) — a later page
+ *      often carries the totals and the due date, and never overwrites what is
+ *      already there,
+ *   3. the order links, on lines that have none.
+ *
+ * Nothing here replaces a value. A record that has been read once has been seen
+ * by somebody, and a second page is not entitled to revise it.
+ */
+async function absorbIntoInvoice(
+  supabase: SupabaseClient,
+  {
+    orgId,
+    invoiceId,
+    extraction,
+    header,
+    order,
+  }: {
+    orgId: string;
+    invoiceId: string;
+    extraction: InvoiceExtraction;
+    header: ReturnType<typeof invoiceHeaderFromExtraction>;
+    order: InvoiceCreationOrder | null;
+  }
+): Promise<string | null> {
+  const { data: held, error: heldError } = await supabase
+    .from("vendor_invoice_lines")
+    .select("line_no, product_id, alt_product_id, description, qty, unit_price, extended")
+    .eq("invoice_id", invoiceId);
+  if (heldError) return `could not read its lines: ${heldError.message}`;
+
+  const fresh = unfiledLines(held ?? [], invoiceLinesFromExtraction(extraction));
+  if (fresh.length > 0) {
+    const { error } = await supabase
+      .from("vendor_invoice_lines")
+      .insert(fresh.map((line) => ({ ...line, org_id: orgId, invoice_id: invoiceId })));
+    if (error) return `its extra lines failed: ${error.message}`;
+  }
+
+  const { data: current, error: currentError } = await supabase
+    .from("vendor_invoices")
+    .select("invoice_number, invoice_date, due_date, terms, subtotal, tax, freight, other_charges, total")
+    .eq("id", invoiceId)
+    .single();
+  if (currentError) return `could not read it: ${currentError.message}`;
+
+  const patch = blankHeaderFields(current as Record<string, unknown>, header);
+  if (Object.keys(patch).length > 0) {
+    const { error } = await supabase.from("vendor_invoices").update(patch).eq("id", invoiceId);
+    if (error) return `filling in its blanks failed: ${error.message}`;
+  }
+
+  // Receiving reads the lines that name ITS purchase order, so a joined invoice
+  // with no links would leave the second order of a consolidated invoice with
+  // no invoice at all — worse than the duplicate this replaces.
+  if (order) {
+    const linkError = await linkMatchedLines(supabase, { invoiceId, order, extraction });
+    if (linkError) return `linking failed: ${linkError}`;
+  }
+  return null;
 }
 
 /**
