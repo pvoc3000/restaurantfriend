@@ -353,8 +353,14 @@ export function filedInvoiceFor(
  * printouts would: case and spacing don't make a different line, and PostgREST
  * hands numerics back as strings, so `1` and `"1.000"` must key the same or
  * every comparison silently fails (`toInvoiceLine` carries the same warning).
+ *
+ * EXPORTED for `migration/cleanup-duplicate-invoices.mjs`, which folds records
+ * the old auto-filer produced. That script has to pair a duplicate's lines with
+ * the survivor's to carry PO links across, and pairing by anything other than
+ * this would be a second definition of "the same printed line" — the drift this
+ * file keeps warning about. Nothing in `web/src` calls it directly.
  */
-function linePrint(line: {
+export function linePrint(line: {
   product_id?: string | null;
   alt_product_id?: string | null;
   description?: string | null;
