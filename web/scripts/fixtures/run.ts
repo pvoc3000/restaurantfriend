@@ -23,6 +23,7 @@ import "./invoiceDate.fixtures";
 import "./invoiceMatch.fixtures";
 import "./lastPurchase.fixtures";
 import "./invoices.fixtures";
+import "./filedInvoice.fixtures";
 import "./filterMenus.fixtures";
 import "./nav.fixtures";
 import "./vendors.fixtures";

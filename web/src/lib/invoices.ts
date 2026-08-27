@@ -294,6 +294,56 @@ export function normalizeInvoiceNumber(raw: string | null): string | null {
   return cleaned.replace(/^0+/, "") || cleaned;
 }
 
+/**
+ * The invoice a READING should join rather than duplicate.
+ *
+ * `findPossibleDuplicates` below is the same question asked of a HUMAN, and it
+ * warns rather than blocking because a person is standing there to judge. The
+ * auto-filer has nobody: it runs on the act of attaching a document, so
+ * whatever it decides is what happens. Left with no answer it created a second
+ * record every time — measured on the live database 2026-08-27, 7 numbers were
+ * on file more than once and 49 filings had produced 49 records where they
+ * should have produced 41. Replaying those 49 through this function joins
+ * exactly the 8 redundant ones and leaves no (vendor, number) pair repeated.
+ *
+ * So this is the CERTAIN half of that function, promoted from a warning to an
+ * action, and nothing else:
+ *
+ * - **The number must match** (normalized the same way, so the auto-join and
+ *   the on-screen warning cannot disagree about what "the same number" means).
+ *   Rank 1 — same money, about the same day — stays a warning FOREVER: it is a
+ *   heuristic, and two genuinely different bills merged by a machine is a worse
+ *   outcome than the duplicate this exists to prevent.
+ * - **A numberless reading joins nothing.** A rent bill and a photographed
+ *   receipt have no key, which is the same reason migration 025 declines a
+ *   unique index; a null must not match another null.
+ * - **`is_credit` must agree.** A credit memo legitimately repeats the number
+ *   of the invoice it credits — that is the case the constraint discussion in
+ *   025 names — so merging the two would fold a refund into the bill.
+ * - **A VOID invoice is not a match.** Void means somebody decided that record
+ *   should not exist, so it no longer holds the number; filing the document
+ *   again is how you replace it.
+ */
+export function filedInvoiceFor(
+  reading: { vendor_id: string; invoice_number: string | null; is_credit: boolean },
+  others: Pick<
+    VendorInvoice,
+    "id" | "vendor_id" | "invoice_number" | "status" | "is_credit"
+  >[]
+): Pick<VendorInvoice, "id" | "invoice_number"> | null {
+  const number = normalizeInvoiceNumber(reading.invoice_number);
+  if (!number) return null;
+
+  for (const other of others) {
+    if (other.vendor_id !== reading.vendor_id) continue;
+    if (other.status === "void") continue;
+    if (other.is_credit !== reading.is_credit) continue;
+    if (normalizeInvoiceNumber(other.invoice_number) !== number) continue;
+    return other;
+  }
+  return null;
+}
+
 /** Same vendor, same money, within a week — the numberless re-upload. */
 const NEAR_DUPLICATE_DAYS = 7;
 

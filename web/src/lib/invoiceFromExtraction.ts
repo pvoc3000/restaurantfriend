@@ -15,6 +15,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { InvoiceExtraction } from "./invoiceExtraction";
 import {
+  filedInvoiceFor,
   invoiceHeaderFromExtraction,
   invoiceLinesFromExtraction,
 } from "./invoices";
@@ -29,7 +30,9 @@ export type InvoiceCreationOrder = {
 };
 
 export type InvoiceCreationResult =
-  | { invoiceId: string }
+  /** `joined` when this reading was filed against an invoice that already
+   *  existed, rather than becoming a new one. */
+  | { invoiceId: string; joined: boolean }
   | { error: string };
 
 /**
@@ -46,6 +49,27 @@ export type InvoiceCreationResult =
  *   4. the attachment's `invoice_id` LAST, because that is the flag which stops
  *      a re-read creating a second record — it should only be set once the
  *      record it names actually exists.
+ *
+ * THAT FLAG WAS THE ONLY GUARD AND IT IS PER-FILE, which is why duplicates
+ * happened anyway (Mark, 2026-08-27, and confirmed on the live database: 7
+ * numbers on file more than once, so 49 filings had produced 49 records where
+ * they should have produced 41). It cannot
+ * see a second COPY of the same invoice — two files, two rows, two nulls — and
+ * it cannot see the same invoice read on a second order. Both are ordinary: a
+ * retaken photo, a second page saved separately, a consolidated invoice
+ * covering two POs.
+ *
+ * There are now two guards in front of it, in this order:
+ *
+ *   0a. the attachment's flag is RE-READ from the database rather than taken
+ *       from the caller's props. `router.refresh()` is in flight for a second
+ *       or two after a file, so a second Read in that window sees a stale null
+ *       — and since step 4 is last-writer-wins, the earlier invoice is orphaned
+ *       rather than found. Eight of the live duplicates had no attachment
+ *       pointing at them at all, which is that race's signature.
+ *   0b. an invoice already on file under the same vendor and number is JOINED,
+ *       not duplicated — see `filedInvoiceFor`, which is the certain half of
+ *       the warning the detail screen already shows a human.
  */
 export async function createInvoiceFromReading(
   supabase: SupabaseClient,
@@ -72,7 +96,70 @@ export async function createInvoiceFromReading(
     return { error: "No vendor or location to file this invoice against." };
   }
 
+  // 0a. What does the DATABASE say this document is filed under? The caller's
+  // copy can be a refresh behind, and acting on it is how an invoice ends up
+  // with nothing pointing at it.
+  const { data: current, error: currentError } = await supabase
+    .from("purchase_order_attachments")
+    .select("invoice_id")
+    .eq("id", attachmentId)
+    .single();
+  if (currentError) {
+    return { error: `Could not check whether this file is already filed: ${currentError.message}` };
+  }
+  if (current?.invoice_id) {
+    return { invoiceId: current.invoice_id as string, joined: true };
+  }
+
   const header = invoiceHeaderFromExtraction(extraction);
+
+  // 0b. Is this bill already on record? Same vendor, same number — the one
+  // signal certain enough to act on without asking.
+  //
+  // Bounded and ordered NEWEST FIRST on purpose. PostgREST truncates a select
+  // at 1,000 rows and says nothing about it, so a busy vendor would one day
+  // start silently missing matches; asking for the most recent 1,000 makes the
+  // cut-off harmless instead, because a second copy of a bill is filed days
+  // after the first, never years.
+  const { data: onFile, error: onFileError } = await supabase
+    .from("vendor_invoices")
+    .select("id, vendor_id, invoice_number, status, is_credit")
+    .eq("org_id", orgId)
+    .eq("vendor_id", vendorId)
+    .order("created_at", { ascending: false })
+    .limit(1000);
+  if (onFileError) {
+    return { error: `Could not check for an existing invoice: ${onFileError.message}` };
+  }
+  const existing = filedInvoiceFor(
+    { vendor_id: vendorId, invoice_number: header.invoice_number, is_credit: header.is_credit },
+    onFile ?? []
+  );
+  if (existing) {
+    // Tag the document and link whatever of the EXISTING invoice's lines this
+    // order can claim. Linking is not a nicety here: receiving reads the lines
+    // pointing at its own PO, so joining without it would leave the second
+    // order of a consolidated invoice with no invoice at all — worse than the
+    // duplicate this replaces.
+    if (order) {
+      const linkError = await linkMatchedLines(supabase, {
+        invoiceId: existing.id,
+        order,
+        extraction,
+      });
+      if (linkError) {
+        return { error: `Filed against invoice ${existing.invoice_number ?? ""} but linking failed: ${linkError}` };
+      }
+    }
+    const { error: tagError } = await supabase
+      .from("purchase_order_attachments")
+      .update({ invoice_id: existing.id })
+      .eq("id", attachmentId);
+    if (tagError) {
+      return { error: `Found the invoice already on file, but could not tag this file: ${tagError.message}` };
+    }
+    return { invoiceId: existing.id, joined: true };
+  }
 
   const { data: invoice, error: headerError } = await supabase
     .from("vendor_invoices")
@@ -125,15 +212,24 @@ export async function createInvoiceFromReading(
     return { error: `Filed the invoice, but could not tag the file: ${flagError.message}` };
   }
 
-  return { invoiceId };
+  return { invoiceId, joined: false };
 }
 
 /**
  * Write the matcher's pairing onto the invoice's lines.
  *
- * The matcher works over the EXTRACTION's lines, and the rows we just inserted
+ * The matcher works over the EXTRACTION's lines, and the rows inserted above
  * are in that same order with `line_no` counting from 1 — which is what lets a
  * match on the reading be turned into an update on a row without a second join.
+ *
+ * IT ONLY EVER FILLS AN EMPTY LINK, never replaces one. On a fresh invoice
+ * every line is empty and this is invisible; it earns its keep on the JOIN
+ * path, where the invoice already exists and some of its lines already name
+ * the FIRST order they were read on. A consolidated invoice covering two POs
+ * is the case the many-to-many was designed for (migration 025 puts the link
+ * on the LINE for exactly this), and it only works if the second reading adds
+ * to the first rather than dragging every line onto whichever order was read
+ * last.
  */
 async function linkMatchedLines(
   supabase: SupabaseClient,
@@ -150,12 +246,14 @@ async function linkMatchedLines(
 
   const { data: rows, error } = await supabase
     .from("vendor_invoice_lines")
-    .select("id, line_no")
+    .select("id, line_no, purchase_order_id")
     .eq("invoice_id", invoiceId);
   if (error) return error.message;
 
   const rowByLineNo = new Map<number, string>();
   for (const r of rows ?? []) {
+    // Already claimed by an order — leave it. See the note above.
+    if (r.purchase_order_id) continue;
     if (r.line_no !== null) rowByLineNo.set(Number(r.line_no), r.id as string);
   }
 
