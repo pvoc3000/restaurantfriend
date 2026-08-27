@@ -40,9 +40,12 @@ const TIER_MIN = "min-h-7";
  *
  * The two bands are one black block — no rule between them (Mark, 2026-07-25).
  * Active is white type in BOTH bands, neither underlined: the brightest thing
- * in a band is where you are. There is no colour anywhere in the menu now —
- * the location tab was yellow when it wore the shop's code, and stopped being
- * either on 2026-08-27 (see lib/nav and components/WorkingLocation).
+ * in a band is where you are. No TAB carries colour any more — the location
+ * one was yellow while it wore the shop's code, and stopped being either on
+ * 2026-08-27, when the picker at the end of row 1 took both the code and the
+ * yellow (see lib/nav and components/WorkingLocation). So the masthead's one
+ * yellow is still the working shop; it has just moved to the control that
+ * sets it.
  */
 export function AppNav({
   sections,

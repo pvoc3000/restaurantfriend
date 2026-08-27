@@ -384,7 +384,23 @@ export function PickList({
                 // `bg-white`. Type matches the section tabs beside it (12px
                 // semibold uppercase) and the box is a tier tall, so the
                 // masthead's two columns still line up.
-                `flex h-6 items-center gap-2 border border-white/40 bg-transparent px-2 text-left text-[12px] font-semibold uppercase tracking-[0.06em] text-white hover:border-white disabled:opacity-35 ${className}`
+                //
+                // YELLOW (Mark, 2026-08-27: "so it stands out"), which is the
+                // rule applying rather than an exception to it. `text-mark` is
+                // 1.43:1 on white and is banned as an ink there — but ON BLACK
+                // it is the app's own mark for WHICH SHOP YOU ARE AT, worn by
+                // this exact spot's predecessor (the location tab was
+                // `text-mark` from every other section until this control took
+                // the code off it) and by `WorkingHere`'s chip. Type, not a
+                // fill: a filled yellow box in the masthead would be the one
+                // yellow-filled button in the app, and `WorkingHere` refuses a
+                // black fill for the same reason in reverse.
+                //
+                // The colour is in the VARIANT because the masthead has one
+                // picker and yellow is what it is FOR. A second one that isn't
+                // about the working location wants the colour split out to a
+                // prop, not this dress reused.
+                `flex h-6 items-center gap-2 border border-mark/40 bg-transparent px-2 text-left text-[12px] font-semibold uppercase tracking-[0.06em] text-mark hover:border-mark disabled:opacity-35 ${className}`
               : // The same dotted underline InlineValue rests in, so an editable
                 // cell reads as editable whether it takes typing or a choice.
                 `flex w-full items-center gap-1 px-1 py-0.5 text-left underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 disabled:opacity-35 ${

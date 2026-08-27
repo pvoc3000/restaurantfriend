@@ -64,12 +64,13 @@ export function WorkingHere({
     // delimiting band, or a panel commit. A chip in a table column is none of
     // those, so this was off-rule as well as ambiguous.
     //
-    // Why yellow specifically: it was already this app's mark for WHICH ONE
-    // YOU ARE AT — `AppNav` marked the location tab `text-mark` from every
-    // other section. That tab lost its yellow on 2026-08-27 when it stopped
-    // wearing the shop's code, so this is now the only yellow of its kind
-    // left; the reasoning stands on its own either way, since no button
-    // anywhere is filled yellow and so this cannot be misread as one.
+    // Why yellow specifically: it is this app's mark for WHICH ONE YOU ARE AT.
+    // `AppNav` marked the location TAB `text-mark` when that tab wore the
+    // shop's code; on 2026-08-27 the code moved to the masthead's picker and
+    // the yellow went with it, so the mark still means exactly one thing in
+    // exactly two places — the control that sets the working shop, and this
+    // chip on the row that IS it. And no button anywhere is filled yellow, so
+    // this cannot be misread as one.
     //
     // The 130×30 optical compensation went with the black: a solid dark block
     // reads smaller than an outline around white, but a pale yellow fill is a

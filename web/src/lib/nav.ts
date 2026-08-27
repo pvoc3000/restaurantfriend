@@ -60,10 +60,16 @@ export const SECTIONS: NavSection[] = [
     // while leading to a list of all six can go back to naming the list.
     label: "Locations",
     subs: [
-      // A list of all six, and where the working location is chosen (Mark,
-      // 2026-08-01) — this replaced the masthead switcher. It used to be a
-      // singular, id-less /location showing whichever one you were working at.
-      { slug: "locations", label: "Locations", href: "/locations", built: true },
+      // A list of all six, and one of the two places the working location is
+      // chosen (Mark, 2026-08-01) — this replaced the masthead switcher, which
+      // came back beside it on 2026-08-27. It used to be a singular, id-less
+      // /location showing whichever one you were working at.
+      //
+      // Labelled "All", not "Locations" (Mark, 2026-08-27): the band above it
+      // says Locations, so the sub only has to say WHICH of them — the same
+      // trim that made HR's "Team Ratings" just "Events". The slug is
+      // untouched, which is what the nav cookie stores.
+      { slug: "locations", label: "All", href: "/locations", built: true },
       {
         slug: "shop-sections",
         label: "Shop Sections",
