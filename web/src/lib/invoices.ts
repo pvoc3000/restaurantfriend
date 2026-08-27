@@ -456,6 +456,42 @@ export function blankHeaderFields(
   return patch;
 }
 
+/**
+ * What the close confirm's checkbox says.
+ *
+ * It counts BILLS, not documents, and that distinction is the whole of it: two
+ * pages of one invoice are two attachments that will JOIN into a single record
+ * (`filedInvoiceFor`), so "File 2 invoices" would promise something the write
+ * will not do and would read as the duplicate bug still being there. Distinct
+ * printed numbers is the closest thing to a bill count available before the
+ * write, and it is exactly what the join keys on.
+ *
+ * A reading with no number is its own bill for counting purposes — there is
+ * nothing to join it to, which is the same reason `filedInvoiceFor` refuses to
+ * match one.
+ */
+export function fileReadingsLabel(
+  readings: readonly { extraction: InvoiceExtraction | null }[]
+): string {
+  const numbered = new Set<string>();
+  let unnumbered = 0;
+  for (const r of readings) {
+    const n = normalizeInvoiceNumber(r.extraction?.invoice_number ?? null);
+    if (n) numbered.add(n);
+    else unnumbered += 1;
+  }
+  const bills = numbered.size + unnumbered;
+  if (bills === 1 && numbered.size === 1) {
+    // The number as PRINTED, not the normalized form — the reader is checking
+    // this against paper, so it has to be the characters on the paper.
+    const printed = readings.find((r) => r.extraction?.invoice_number)?.extraction
+      ?.invoice_number;
+    return `Also file invoice ${printed?.trim()} as a bill`;
+  }
+  if (bills === 1) return "Also file this invoice as a bill";
+  return `Also file these ${bills} invoices as bills`;
+}
+
 /** Same vendor, same money, within a week — the numberless re-upload. */
 const NEAR_DUPLICATE_DAYS = 7;
 

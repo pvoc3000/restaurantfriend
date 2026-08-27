@@ -22,7 +22,9 @@ import {
   type PurchaseOrder,
 } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
-import type { SignedAttachment } from "@/lib/attachments";
+import { unfiledReadings, type SignedAttachment } from "@/lib/attachments";
+import { fileReadingsLabel } from "@/lib/invoices";
+import { fileReadings } from "@/lib/invoiceFromExtraction";
 import { PoAttachments } from "./PoAttachments";
 import { StickyFooter } from "@/components/ui/StickyFooter";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
@@ -35,7 +37,7 @@ import { OrderBar } from "./OrderBar";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 import { nextDeliveryDate } from "@/lib/poProcessing";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
-import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { confirmDialog, confirmDialogWithOption, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * PO detail: what was ordered, what arrived, and the gap between them.
@@ -173,8 +175,61 @@ export function PurchaseOrderDetail({
       (caveats.length > 0
         ? `\n\nStill unresolved:\n· ${caveats.join("\n· ")}\n\nClosing anyway is fine — it just means you're done with this order.`
         : "\n\nEverything is received, reconciled and filed.");
-    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Close order" }))) return;
+    // The one caveat closing can SETTLE rather than merely report — the same
+    // offer the receiving screen's Complete makes, in the same words, because
+    // it is the same act reached from the other screen.
+    const unfiled = unfiledReadings(attachments);
+    const outcome = unfiled.length
+      ? await confirmDialogWithOption({
+          ...splitConfirmMessage(message),
+          confirmLabel: "Close order",
+          option: { label: fileReadingsLabel(unfiled), defaultChecked: true },
+        })
+      : {
+          ok: await confirmDialog({
+            ...splitConfirmMessage(message),
+            confirmLabel: "Close order",
+          }),
+          option: false,
+        };
+    if (!outcome.ok) return;
     await setStatus("closed");
+    // After the close and unable to undo it — the module's rule for a chained
+    // write. A failure reports beside the order, where the paperwork and the
+    // standing "File as bill" both still are.
+    if (outcome.option) await fileUnfiled(unfiled);
+  }
+
+  /**
+   * Record the paperwork on this order as a bill.
+   *
+   * Reached two ways and they must not disagree: as the ticked consequence of
+   * closing, and as a standing command beside Reconcile PO for an order that is
+   * not being closed today. Both call this.
+   *
+   * It is keyed on there being an UNFILED READING, never on the order's status
+   * (Mark, 2026-08-27, proposing the button change to "Generate Invoice" for
+   * closed orders). Status is the wrong key in both directions: a `received`
+   * order with unfiled paperwork needs the offer, and a `closed` order that
+   * already has its bill must not get it — which is how a second record gets
+   * minted for one invoice.
+   */
+  async function fileUnfiled(readings: SignedAttachment[]) {
+    setBusy(true);
+    setError(null);
+    const result = await fileReadings(supabase, {
+      orgId,
+      order: {
+        id: order.id,
+        vendor_id: order.vendor_id,
+        location_id: order.location_id,
+        lines,
+      },
+      readings: readings.map((a) => ({ id: a.id, extraction: a.extraction! })),
+    });
+    setBusy(false);
+    if (result.error) setError(result.error);
+    router.refresh();
   }
 
   const columns: DataColumn<PoLine>[] = [
@@ -644,6 +699,27 @@ export function PurchaseOrderDetail({
       >
         Reconcile PO
       </Link>
+
+      {/* Beside Reconcile PO, never instead of it (Mark, 2026-08-27, who
+          proposed replacing that link on a closed order). Two reasons to keep
+          both: Reconcile PO is the ONLY route from here to the receiving
+          screen, and a closed order is exactly when you go back to it — the
+          invoice arrived late, a price was wrong. And what this offer depends
+          on is the PAPERWORK, not the status; see `fileUnfiled`.
+
+          It shows only while there is something to file, which is the whole of
+          its state: a bill already recorded offers nothing, and an order with
+          no document has nothing to record. */}
+      {canEditLines && unfiledReadings(attachments).length > 0 && (
+        <button
+          disabled={busy}
+          onClick={() => void fileUnfiled(unfiledReadings(attachments))}
+          className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+          title={fileReadingsLabel(unfiledReadings(attachments))}
+        >
+          File as bill
+        </button>
+      )}
 
       {/* The end of the order's life, and the only route to it that means
           anything — the status menu can always set `closed`, but says nothing

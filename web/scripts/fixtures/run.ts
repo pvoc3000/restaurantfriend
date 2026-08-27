@@ -25,6 +25,7 @@ import "./lastPurchase.fixtures";
 import "./invoices.fixtures";
 import "./filedInvoice.fixtures";
 import "./invoicePages.fixtures";
+import "./fileReadings.fixtures";
 import "./filterMenus.fixtures";
 import "./nav.fixtures";
 import "./vendors.fixtures";

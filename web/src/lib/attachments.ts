@@ -98,6 +98,28 @@ export type PoAttachment = {
   extraction_model: string | null;
 };
 
+/**
+ * Documents that have been READ but never recorded as a bill.
+ *
+ * The gap `closeReadiness` has named since it was written ("the paperwork on
+ * file isn't recorded as a bill yet") and which, until now, only PO detail's
+ * Paperwork card could act on — the receiving screen, where Complete lives,
+ * named it in a confirm and offered no way to settle it. That is the exact trap
+ * this codebase warns about twice: a confirm naming something the screen cannot
+ * fix teaches people to stop reading confirms.
+ *
+ * An invoice-KIND document only. A packing slip or a photo may well have been
+ * read, and neither is a bill; `kind` is what the person said the document was
+ * when they attached it, and it is the only thing that distinguishes them.
+ *
+ * Measured on the live database 2026-08-27: 8 closed orders are in this state.
+ */
+export function unfiledReadings<T extends Pick<PoAttachment, "kind" | "extraction" | "invoice_id">>(
+  attachments: readonly T[]
+): T[] {
+  return attachments.filter((a) => a.kind === "invoice" && a.extraction !== null && !a.invoice_id);
+}
+
 /** An attachment plus somewhere to look at it — null when signing failed. */
 export type SignedAttachment = PoAttachment & { url: string | null };
 

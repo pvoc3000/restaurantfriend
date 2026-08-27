@@ -12,9 +12,12 @@ import { useFillToBottom } from "@/lib/fillHeight";
 import { useViewportAtLeast } from "@/lib/tableHead";
 import {
   attachmentRejection,
+  unfiledReadings,
   type AttachmentKind,
   type SignedAttachment,
 } from "@/lib/attachments";
+import { fileReadingsLabel } from "@/lib/invoices";
+import { fileReadings } from "@/lib/invoiceFromExtraction";
 import { matchInvoiceToOrder, matchesFromLinks } from "@/lib/invoiceMatch";
 import type { OrderInvoice } from "@/lib/invoiceQueries";
 import {
@@ -55,7 +58,7 @@ import { DocumentPane } from "./DocumentPane";
 import { InvoiceSummary } from "./InvoiceSummary";
 import { ReceivingRow } from "./ReceivingRow";
 import { useAttachmentActions } from "./useAttachmentActions";
-import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { confirmDialog, confirmDialogWithOption, splitConfirmMessage } from "@/lib/confirm";
 
 /**
  * Receiving a delivery: the invoice on one side, the order's lines on the
@@ -397,7 +400,34 @@ export function Receiving({
       (caveats.length > 0
         ? `\n\nStill unresolved:\n· ${caveats.join("\n· ")}\n\nClosing anyway is fine — it just means you're done with this order.`
         : "\n\nEverything is received, reconciled and filed.");
-    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Close order" }))) return;
+
+    // The one caveat this screen can now SETTLE rather than merely report
+    // (Mark, 2026-08-27: "after we reconcile/close a PO, the app could ask
+    // 'Generate an Invoice for Purchase Order X?'"). Offered as a ticked box
+    // beside the question, not as a second dialog — `whatFollows`' shape, and
+    // the reason it is one line rather than a chain: two panels for one act
+    // reads as the app second-guessing the answer you just gave.
+    //
+    // FILE, never GENERATE. When a document is on the order the bill exists and
+    // this records it; when none is, there is nothing to record and no offer is
+    // made. Inventing a bill from the received quantities was considered and
+    // dropped (Mark, same day): the orders with no paperwork are internal
+    // transfers and prepaid online purchases, which do not produce one.
+    const unfiled = unfiledReadings(attachments);
+    const outcome = unfiled.length
+      ? await confirmDialogWithOption({
+          ...splitConfirmMessage(message),
+          confirmLabel: "Close order",
+          option: { label: fileReadingsLabel(unfiled), defaultChecked: true },
+        })
+      : {
+          ok: await confirmDialog({
+            ...splitConfirmMessage(message),
+            confirmLabel: "Close order",
+          }),
+          option: false,
+        };
+    if (!outcome.ok) return;
     setError(null);
     const { data, error: closeError } = await supabase
       .from("purchase_orders")
@@ -412,6 +442,26 @@ export function Receiving({
       setError("That didn't close — you may not have permission to close this order.");
       return;
     }
+
+    // Filing runs AFTER the close and cannot undo it — the house rule for a
+    // chained write in this module (the upload stands if the read fails, the
+    // read stands if filing fails, a sent email stands if its bookkeeping
+    // does not). A failure here therefore reports and STAYS on the order,
+    // where the paperwork and the offer both still are, rather than navigating
+    // away from a message nobody would see.
+    if (outcome.option) {
+      const filed = await fileReadings(supabase, {
+        orgId,
+        order: { id: order.id, vendor_id: order.vendor_id, location_id: order.location_id, lines },
+        readings: unfiled.map((a) => ({ id: a.id, extraction: a.extraction! })),
+      });
+      if (filed.error) {
+        setError(`${order.po_number} is closed, but filing the paperwork failed: ${filed.error}`);
+        router.refresh();
+        return;
+      }
+    }
+
     // No `router.refresh()` first: the order screen is a fresh server render
     // and will show the closed status by itself.
     startTransition(() => router.push(closeHref));

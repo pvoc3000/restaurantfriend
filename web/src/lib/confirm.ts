@@ -34,9 +34,28 @@ export type ConfirmRequest = {
    * Enter refuses to fire it. Default otherwise, which is the black commit.
    */
   tone?: "default" | "danger";
+  /**
+   * One consequence of saying yes, offered as a ticked box the reader can
+   * untick — the `whatFollows` shape from special orders, where "the app may
+   * suggest and must never write" is kept by making every line individually
+   * refusable while saving the typing in the ordinary case.
+   *
+   * ONE, deliberately. A confirm with a list of options is a form, and a form
+   * asked at the moment you press a button is a worse form than a screen.
+   */
+  option?: ConfirmOption;
 };
 
-export type ConfirmAsk = (request: ConfirmRequest) => Promise<boolean>;
+export type ConfirmOption = {
+  label: string;
+  /** Ticked by default — an offer, not a question. */
+  defaultChecked?: boolean;
+};
+
+/** What the reader answered: the commit, and the option's final state. */
+export type ConfirmOutcome = { ok: boolean; option: boolean };
+
+export type ConfirmAsk = (request: ConfirmRequest) => Promise<ConfirmOutcome>;
 
 /** Set by `ConfirmProvider` on mount. See `confirmDialog`. */
 let live: ConfirmAsk | null = null;
@@ -66,12 +85,40 @@ export function clearConfirmHandler(ask: ConfirmAsk) {
  * ```
  */
 export function confirmDialog(request: ConfirmRequest): Promise<boolean> {
+  return ask(request).then((outcome) => outcome.ok);
+}
+
+/**
+ * The same confirm, when saying yes ALSO does something the reader may decline.
+ *
+ * Separate from `confirmDialog` rather than a widened return type: that
+ * function is called from ~28 places as `if (!(await confirmDialog(…))) return;`
+ * and a boolean is exactly what all of them want. A single entry point
+ * returning an object would read as truthy at every one of those call sites and
+ * work by accident, which is the kind of thing that stops working quietly.
+ */
+export function confirmDialogWithOption(
+  request: ConfirmRequest & { option: ConfirmOption }
+): Promise<ConfirmOutcome> {
+  return ask(request);
+}
+
+function ask(request: ConfirmRequest): Promise<ConfirmOutcome> {
   if (live) return live(request);
   // No provider — outside the (app) layout, or a render this beat. Ask the
   // browser rather than returning false (which would silently skip the action)
   // or true (which would silently take it).
-  const text = [request.title, request.body].filter(Boolean).join("\n\n");
-  return Promise.resolve(window.confirm(text));
+  //
+  // The OPTION cannot be offered here, so it is stated in the text and comes
+  // back at its default: `window.confirm` has one question and one answer, and
+  // taking an unmentioned action on the back of it would be worse than either.
+  const text = [request.title, request.body, request.option?.label]
+    .filter(Boolean)
+    .join("\n\n");
+  return Promise.resolve({
+    ok: window.confirm(text),
+    option: request.option?.defaultChecked ?? false,
+  });
 }
 
 /**

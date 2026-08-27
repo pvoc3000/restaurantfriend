@@ -6,8 +6,10 @@ import {
   clearConfirmHandler,
   setConfirmHandler,
   type ConfirmAsk,
+  type ConfirmOutcome,
   type ConfirmRequest,
 } from "@/lib/confirm";
+import { Checkbox } from "./Checkbox";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS, DIALOG_DANGER_CLASS } from "./Dialog";
 
 /**
@@ -45,13 +47,13 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [request, setRequest] = useState<ConfirmRequest | null>(null);
   // The pending question's resolver. A ref rather than state: settling it is
   // not a render, and reading it from a stale closure would strand the caller.
-  const resolve = useRef<((ok: boolean) => void) | null>(null);
+  const resolve = useRef<((outcome: ConfirmOutcome) => void) | null>(null);
 
-  const settle = useCallback((ok: boolean) => {
+  const settle = useCallback((outcome: ConfirmOutcome) => {
     const pending = resolve.current;
     resolve.current = null;
     setRequest(null);
-    pending?.(ok);
+    pending?.(outcome);
   }, []);
 
   const ask = useCallback<ConfirmAsk>((next) => {
@@ -59,9 +61,9 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     // leaving its caller awaiting a promise that can never settle. It should
     // not happen — the first dialog covers the screen — but an awaited promise
     // that never resolves is a hang with no symptom, so it is closed off here.
-    resolve.current?.(false);
+    resolve.current?.({ ok: false, option: false });
     setRequest(next);
-    return new Promise<boolean>((r) => {
+    return new Promise<ConfirmOutcome>((r) => {
       resolve.current = r;
     });
   }, []);
@@ -87,9 +89,13 @@ function ConfirmPanel({
   onSettle,
 }: {
   request: ConfirmRequest;
-  onSettle: (ok: boolean) => void;
+  onSettle: (outcome: ConfirmOutcome) => void;
 }) {
   const danger = request.tone === "danger";
+  // Ticked unless the caller says otherwise — this is an offer the reader may
+  // refuse, not a question they must answer. Local state, discarded with the
+  // panel: a declined option is not a preference, it is an answer about today.
+  const [option, setOption] = useState(request.option?.defaultChecked ?? true);
   const commit = useRef<HTMLButtonElement | null>(null);
   const cancel = useRef<HTMLButtonElement | null>(null);
 
@@ -102,17 +108,17 @@ function ConfirmPanel({
   return (
     <Dialog
       title={request.title}
-      onClose={() => onSettle(false)}
+      onClose={() => onSettle({ ok: false, option: false })}
       width="max-w-lg"
       // A destructive confirm gets no Enter-to-commit, deliberately.
-      onSubmit={danger ? undefined : () => onSettle(true)}
+      onSubmit={danger ? undefined : () => onSettle({ ok: true, option })}
       footer={
         <>
           <button
             ref={cancel}
             type="button"
             className={DIALOG_CANCEL_CLASS}
-            onClick={() => onSettle(false)}
+            onClick={() => onSettle({ ok: false, option: false })}
           >
             {request.cancelLabel ?? "Cancel"}
           </button>
@@ -120,22 +126,34 @@ function ConfirmPanel({
             ref={commit}
             type="button"
             className={danger ? DIALOG_DANGER_CLASS : DIALOG_COMMIT_CLASS}
-            onClick={() => onSettle(true)}
+            onClick={() => onSettle({ ok: true, option })}
           >
             {request.confirmLabel ?? "Confirm"}
           </button>
         </>
       }
     >
-      {request.body ? (
+      {request.body || request.option ? (
         <div className="space-y-3 text-[14px] leading-relaxed text-body">
           {/* Blank line = paragraph; a single newline stays a line break, which
               is what keeps the "· " lists these messages were written with. */}
-          {request.body.split(/\n\s*\n/).map((paragraph, i) => (
+          {request.body?.split(/\n\s*\n/).map((paragraph, i) => (
             <p key={i} className="whitespace-pre-line">
               {paragraph}
             </p>
           ))}
+
+          {/* LAST, under whatever is unresolved: the caveats are what you read
+              to decide, and this is what happens once you have. */}
+          {/* `children`, not a wrapping <label>: this control is a BUTTON, so a
+              label around it would neither toggle it nor be valid markup. */}
+          {request.option && (
+            <div className="pt-1">
+              <Checkbox checked={option} onChange={setOption}>
+                {request.option.label}
+              </Checkbox>
+            </div>
+          )}
         </div>
       ) : null}
     </Dialog>

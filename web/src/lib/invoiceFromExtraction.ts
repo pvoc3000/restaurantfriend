@@ -38,6 +38,50 @@ export type InvoiceCreationResult =
   | { error: string };
 
 /**
+ * File every reading on an order that isn't recorded as a bill yet, and say
+ * what happened in one sentence.
+ *
+ * Two screens accept this offer — the receiving screen's Complete and PO
+ * detail's Close order / File as bill — and they must not each decide for
+ * themselves what "file the paperwork" does. On a multi-page invoice the second
+ * page JOINS the first (see `filedInvoiceFor` and `absorbIntoInvoice`), so
+ * filing three documents can quite correctly produce one bill; the sentence
+ * counts BILLS rather than documents, because that is what the person is about
+ * to be responsible for paying.
+ */
+export async function fileReadings(
+  supabase: SupabaseClient,
+  {
+    orgId,
+    order,
+    readings,
+  }: {
+    orgId: string;
+    order: InvoiceCreationOrder | null;
+    readings: { id: string; extraction: InvoiceExtraction }[];
+  }
+): Promise<{ filed: number; error?: string }> {
+  const invoices = new Set<string>();
+  for (const reading of readings) {
+    const result = await createInvoiceFromReading(supabase, {
+      orgId,
+      attachmentId: reading.id,
+      extraction: reading.extraction,
+      order,
+      fallback: null,
+    });
+    // Stop at the first failure rather than pressing on: the ones already filed
+    // stand (each is its own transaction), and a second error would only bury
+    // the first. What is left unfiled is still visible and still offered.
+    if ("error" in result) {
+      return { filed: invoices.size, error: result.error };
+    }
+    invoices.add(result.invoiceId);
+  }
+  return { filed: invoices.size };
+}
+
+/**
  * File a reading as an invoice record, and link it to the order it was read on.
  *
  * The write order is chosen the way `useAttachmentActions`' two opposite orders
