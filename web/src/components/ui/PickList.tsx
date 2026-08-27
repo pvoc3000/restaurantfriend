@@ -60,13 +60,15 @@ export type PickOption = {
  * asked for. It's listed above the vocabulary, marked as the current value —
  * under the clear row, where there is one.
  *
- * TWO TRIGGERS, one list (Mark, 2026-08-01). `inline` is the original: the
+ * THREE TRIGGERS, one list (Mark, 2026-08-01). `inline` is the original: the
  * dotted underline `InlineValue` rests in, for a cell whose value you edit in
  * place. `field` is a bordered h-9 box matching `TextInput` and `TabPicker`,
  * for a control standing on its own in a filter row or a form — which is what
- * finally retired the last native `<select>`s in the app. The panel is
- * identical either way, because the thing being chosen from doesn't change with
- * how the trigger is dressed.
+ * finally retired the last native `<select>`s in the app. `masthead` is that
+ * box inverted for the black bar (2026-08-27), which retired the last one
+ * OUTSIDE it — the working-location switcher. The panel is identical in every
+ * case, because the thing being chosen from doesn't change with how the
+ * trigger is dressed.
  */
 export function PickList({
   value,
@@ -83,6 +85,7 @@ export function PickList({
   align = "left",
   variant = "inline",
   className = "",
+  panelMinWidth = 168,
   defaultOpen = false,
   onClose,
 }: {
@@ -160,10 +163,14 @@ export function PickList({
   /**
    * `inline` — a dotted-underline value inside a cell (the default, and what
    * `InlineValue kind="pick"` uses). `field` — a bordered box standing on its
-   * own, for filter rows and forms.
+   * own, for filter rows and forms. `masthead` — the same box dressed for the
+   * black bar: white type on nothing, sized to a nav tier.
    */
-  variant?: "inline" | "field";
+  variant?: "inline" | "field" | "masthead";
   className?: string;
+  /** Narrowest the PANEL may be, in px — capped at 340 like the derived width.
+   *  Raise it where the trigger is much narrower than the rows it opens. */
+  panelMinWidth?: number;
   /**
    * Open the panel as soon as this renders, rather than waiting for a click.
    *
@@ -366,11 +373,23 @@ export function PickList({
               `flex h-9 items-center gap-2 border border-ink bg-white px-3 text-left text-sm hover:bg-neutral-100 disabled:opacity-35 ${
                 empty ? "text-faint" : ""
               } ${className}`
-            : // The same dotted underline InlineValue rests in, so an editable
-              // cell reads as editable whether it takes typing or a choice.
-              `flex w-full items-center gap-1 px-1 py-0.5 text-left underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 disabled:opacity-35 ${
-                empty ? "text-faint" : ""
-              } ${className}`
+            : variant === "masthead"
+              ? // `field`, inverted for the black bar. Everything that dresses
+                // the other two for a white page — bg-white, border-ink,
+                // text-faint, a grey hover wash — is either invisible or
+                // unreadable up there, so it is stated rather than overridden:
+                // Tailwind resolves competing utilities by STYLESHEET order,
+                // not class-string order, so a caller passing `bg-transparent`
+                // through `className` could not be relied on to beat
+                // `bg-white`. Type matches the section tabs beside it (12px
+                // semibold uppercase) and the box is a tier tall, so the
+                // masthead's two columns still line up.
+                `flex h-6 items-center gap-2 border border-white/40 bg-transparent px-2 text-left text-[12px] font-semibold uppercase tracking-[0.06em] text-white hover:border-white disabled:opacity-35 ${className}`
+              : // The same dotted underline InlineValue rests in, so an editable
+                // cell reads as editable whether it takes typing or a choice.
+                `flex w-full items-center gap-1 px-1 py-0.5 text-left underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 disabled:opacity-35 ${
+                  empty ? "text-faint" : ""
+                } ${className}`
         }
       >
         {/* Inline: the caret sits WITH the value, not pushed to the far edge —
@@ -381,7 +400,11 @@ export function PickList({
         <span className="truncate">{shownLabel}</span>
         <span
           aria-hidden
-          className={`shrink-0 text-[9px] text-muted ${variant === "field" ? "ml-auto" : ""}`}
+          className={`shrink-0 text-[9px] ${variant === "inline" ? "text-muted" : "ml-auto"} ${
+            // On the masthead the caret inherits the trigger's white; `text-muted`
+            // is a grey chosen against a white page and reads as a smudge on black.
+            variant === "field" ? "text-muted" : ""
+          }`}
         >
           {MENU_CARET}
         </span>
@@ -415,7 +438,12 @@ export function PickList({
               // CLAMPED INTO min-width, not expressed as a max-width beside it:
               // min-width WINS over max-width in CSS, so a 528px field kept a
               // 528px panel and the cap did nothing at all.
-              minWidth: Math.min(Math.max(box.width, 168), 340),
+              //
+              // The FLOOR is a caller's to raise (`panelMinWidth`, MenuButton's
+              // idiom): a trigger narrower than its own options — the masthead's
+              // 66px code — leaves 168px to set a label and a hint in, and a
+              // shop's full name then breaks over four lines.
+              minWidth: Math.min(Math.max(box.width, panelMinWidth), 340),
             }}
             className={MENU_PANEL_CLASS}
           >

@@ -4,6 +4,7 @@ import { signOut } from "@/app/actions";
 import { AppNav } from "@/components/AppNav";
 import { HeaderShell } from "@/components/HeaderShell";
 import { GearIcon, HomeIcon, IconButton } from "@/components/ui/IconButton";
+import { WorkingLocation } from "@/components/WorkingLocation";
 import { NAV_COOKIE, parseNavMemory } from "@/lib/navMemory";
 import { sectionsForRole } from "@/lib/nav";
 import type { AppSession } from "@/lib/session";
@@ -22,16 +23,17 @@ export async function AppHeader({ session }: { session: AppSession }) {
         // Filtered HERE, on the server, where the session already is.
         sections={sectionsForRole(session.membership.role)}
         initialMemory={initialMemory}
-        locationCode={session.activeLocation?.code ?? null}
         // Which shop's remembered screens the tabs should offer. A remembered
         // purchase order belongs to one location; `navPathKey` files them apart
         // so switching shops can't send you to another one's record.
         locationId={session.activeLocation?.id ?? null}
-        // Row 1: where to go. The location SWITCHER used to sit here; the
-        // Locations list replaced it (Mark, 2026-08-01), and the code you're
-        // working at is still on screen at all times — the tier-1 tab wears it
-        // (lib/nav sectionLabel). The chrome-collapse toggle sat here too until
-        // 2026-08-02; see components/HeaderShell.
+        // Row 1: where to go, and which shop you're doing it at. The location
+        // switcher sat here until 2026-08-01, when the Locations list replaced
+        // it and the tier-1 tab took over wearing the code; it is back
+        // (Mark, 2026-08-27), LAST — after Settings, at the far right of the
+        // masthead — and the tab is a plain "Locations" again. The
+        // chrome-collapse toggle was here too until 2026-08-02; see
+        // components/HeaderShell.
         controls={
           <>
             <IconButton href="/" label="Home">
@@ -41,6 +43,13 @@ export async function AppHeader({ session }: { session: AppSession }) {
             <IconButton href="/settings" label="Settings">
               <GearIcon />
             </IconButton>
+
+            {/* Active ones only — design rule 3's `activeLocations` is the list
+                you ENUMERATE, and only an open shop is one you can work at. */}
+            <WorkingLocation
+              locations={session.activeLocations}
+              working={session.activeLocation}
+            />
           </>
         }
         // Row 2: who you are, and leaving.

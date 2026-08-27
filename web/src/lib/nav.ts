@@ -52,12 +52,13 @@ function stub(section: string, slug: string, label: string): NavSub {
 export const SECTIONS: NavSection[] = [
   {
     slug: "location",
-    // Labelled with the active location's code (DF01, DF02…), never the word
-    // "Location" — see sectionLabel(). The old system did the same: the tab
-    // told you where you were working before you looked anywhere else. Since
-    // the switcher went, this is also the only place the code is on screen at
-    // every scroll position (with HeaderShell's collapsed strip).
-    label: "Location",
+    // Just the word (Mark, 2026-08-27). This tab wore the active location's
+    // CODE from 2026-08-01, when the masthead switcher was deleted and the tab
+    // became the only place the code stayed on screen. The switcher is back —
+    // `components/WorkingLocation`, at the far right of the same row — so the
+    // code is stated by the control that SETS it, and a tab that named a shop
+    // while leading to a list of all six can go back to naming the list.
+    label: "Locations",
     subs: [
       // A list of all six, and where the working location is chosen (Mark,
       // 2026-08-01) — this replaced the masthead switcher. It used to be a
@@ -300,14 +301,6 @@ export function sectionsForRole(role: Role): NavSection[] {
 
 export function findSub(section: NavSection, slug: string): NavSub | undefined {
   return section.subs.find((s) => s.slug === slug);
-}
-
-/**
- * The location section wears the active location's code. Falls back to the
- * generic word when there's no location at all (an org with none seeded).
- */
-export function sectionLabel(section: NavSection, locationCode: string | null): string {
-  return section.slug === "location" ? (locationCode ?? section.label) : section.label;
 }
 
 export type NavPosition = { sectionSlug: string; subSlug: string };

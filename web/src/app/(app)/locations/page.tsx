@@ -56,8 +56,8 @@ export default async function LocationsPage() {
         </h1>
         <p className="max-w-[72ch] text-sm text-muted">
           Every screen in the app is scoped to the location you&rsquo;re working
-          at — the one marked here, and the code the menu wears. Open a row to
-          read or edit that record.
+          at — the one marked here, and the code the masthead&rsquo;s picker
+          shows. Open a row to read or edit that record.
         </p>
       </div>
 

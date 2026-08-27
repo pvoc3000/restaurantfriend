@@ -5,7 +5,10 @@ import { setActiveLocation } from "@/app/actions";
 
 /**
  * The control that makes a location the one you're working at — FMP's button
- * beside each row (Mark, 2026-08-01), and what replaced the masthead switcher.
+ * beside each row (Mark, 2026-08-01), and what replaced the masthead switcher
+ * — which came BACK on 2026-08-27 (components/WorkingLocation). The two are not
+ * a duplication: this is where you read about a shop and then act on the row in
+ * front of you, that is where you switch on the way to somewhere else.
  *
  * Three states, and the third is the interesting one:
  *
@@ -61,10 +64,12 @@ export function WorkingHere({
     // delimiting band, or a panel commit. A chip in a table column is none of
     // those, so this was off-rule as well as ambiguous.
     //
-    // Why yellow specifically: it is already this app's mark for WHICH ONE
-    // YOU ARE AT — `AppNav` marks the active section `text-mark`, "the yellow
-    // says which module you're in". Same sentence, different noun. And no
-    // button anywhere is filled yellow, so it cannot be misread as one.
+    // Why yellow specifically: it was already this app's mark for WHICH ONE
+    // YOU ARE AT — `AppNav` marked the location tab `text-mark` from every
+    // other section. That tab lost its yellow on 2026-08-27 when it stopped
+    // wearing the shop's code, so this is now the only yellow of its kind
+    // left; the reasoning stands on its own either way, since no button
+    // anywhere is filled yellow and so this cannot be misread as one.
     //
     // The 130×30 optical compensation went with the black: a solid dark block
     // reads smaller than an outline around white, but a pale yellow fill is a

@@ -4,13 +4,7 @@ import { useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
-import {
-  resolveRoute,
-  sectionHref,
-  sectionLabel,
-  subHref,
-  type NavSection,
-} from "@/lib/nav";
+import { resolveRoute, sectionHref, subHref, type NavSection } from "@/lib/nav";
 import type { NavMemory } from "@/lib/navMemory";
 import { remember, useNavMemory } from "@/lib/navMemoryStore";
 
@@ -45,14 +39,14 @@ const TIER_MIN = "min-h-7";
  * lib/navMemoryStore.ts for the "last sub-section per section" memory.
  *
  * The two bands are one black block — no rule between them (Mark, 2026-07-25).
- * Active is yellow type on tier 1 and white type on tier 2, neither underlined:
- * the yellow says which module you're in, and within it the white sub-tab is
- * simply the brightest thing in the band.
+ * Active is white type in BOTH bands, neither underlined: the brightest thing
+ * in a band is where you are. There is no colour anywhere in the menu now —
+ * the location tab was yellow when it wore the shop's code, and stopped being
+ * either on 2026-08-27 (see lib/nav and components/WorkingLocation).
  */
 export function AppNav({
   sections,
   initialMemory,
-  locationCode,
   locationId,
   controls,
   identity,
@@ -61,7 +55,6 @@ export function AppNav({
    *  `sectionsForRole`, so no role ever reaches the client bundle. */
   sections: NavSection[];
   initialMemory: NavMemory;
-  locationCode: string | null;
   /** Which shop the remembered screens belong to — see `navPathKey`. Not the
    *  code: codes are for reading, and a record is keyed by the row's own id. */
   locationId: string | null;
@@ -131,33 +124,23 @@ export function AppNav({
           >
             {sections.map((section) => {
               const active = section.slug === sectionSlug;
-              // The location tab is yellow WHEREVER ELSE YOU ARE (Mark,
-              // 2026-08-06). It is the one tab that isn't a place you go: it
-              // names the shop every other screen is about, so "which shop am I
-              // ordering for" has to be answerable from any section without
-              // hunting for it.
-              //
-              // But SELECTION WINS when you are actually on it (Mark, same day).
-              // Otherwise the location is the one tab whose active state can't be
-              // seen, which trades a rare question for a constant one. White also
-              // matches the second tier, which had marked active in white all
-              // along — so the bands agree, and each colour means exactly one
-              // thing: white "you are here", yellow "this is the shop".
-              const isLocation = section.slug === "location";
+              // Every tab the same, the location one included (Mark,
+              // 2026-08-27). It was YELLOW wherever else you were, from
+              // 2026-08-06: it wore the working shop's code, which is a fact
+              // every other screen depends on, so it had to be findable from
+              // any section without hunting. It no longer wears the code — the
+              // picker at the end of this row does — so it is a tab like the
+              // other five and marks itself the way they do.
               return (
                 <Link
                   key={section.slug}
                   href={sectionHref(section, memory, locationId, sectionSlug ?? null)}
                   aria-current={active ? "page" : undefined}
                   className={`${TAB} ${
-                    active
-                      ? "text-white"
-                      : isLocation
-                        ? "text-mark"
-                        : "text-white/60 hover:text-white"
+                    active ? "text-white" : "text-white/60 hover:text-white"
                   }`}
                 >
-                  {sectionLabel(section, locationCode)}
+                  {section.label}
                 </Link>
               );
             })}
@@ -168,7 +151,7 @@ export function AppNav({
               the header, so the height change is absorbed. */}
           {currentSection && (
             <nav
-              aria-label={`${sectionLabel(currentSection, locationCode)} sub-sections`}
+              aria-label={`${currentSection.label} sub-sections`}
               className={`flex flex-wrap items-center gap-y-1 text-[11px] font-semibold uppercase tracking-[0.06em] ${TIER_MIN}`}
             >
               {currentSection.subs.map((sub) => {
