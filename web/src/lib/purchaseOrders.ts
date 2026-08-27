@@ -289,6 +289,41 @@ export function canClose(status: PoStatus): boolean {
  * about the definition rather than about a row anyone can point at — which is
  * exactly when it's cheap to get right.
  */
+/**
+ * What a purchase-order PDF is CALLED when it lands on disk (Mark, 2026-08-27:
+ * "the purchase order number should be the filename, or included in the
+ * filename").
+ *
+ * One rule for one PO and for a batch, in one place, because two callers
+ * spelling a filename two ways is how `nextDeliveryDate` went wrong: the
+ * process card names a single order's document and the list names a run of
+ * them, and they have to agree about what a PO document is called.
+ *
+ * A BATCH LISTS AT MOST THREE and then counts the rest. Every number is what
+ * the reader wants and sixteen of them is a filename no operating system will
+ * show you the end of — three is what fits in a Finder column, and the count
+ * is what stops the name lying about how much is in the file.
+ *
+ * Characters illegal in a filename are replaced rather than stripped: a PO
+ * number is the thing being communicated, so a silently shortened one is worse
+ * than a visibly substituted character. Ours are digits and hyphens today, so
+ * this never fires — it is here because the column is TEXT and a human has
+ * suffixed one before (`5689a`, `3932 cont.`).
+ */
+export function poDocumentFileName(
+  kind: "po" | "shopping",
+  numbers: readonly string[]
+): string {
+  const safe = numbers.map((n) => n.replace(/[/\\:*?"<>|]/g, "-").trim()).filter(Boolean);
+  const noun = kind === "po" ? "PO" : "Shopping list";
+  if (safe.length === 0) return `${noun}s.pdf`;
+  if (safe.length === 1) return `${noun} ${safe[0]}.pdf`;
+  const plural = kind === "po" ? "POs" : "Shopping lists";
+  const shown = safe.slice(0, 3).join(", ");
+  const rest = safe.length - 3;
+  return rest > 0 ? `${plural} ${shown} +${rest} more.pdf` : `${plural} ${shown}.pdf`;
+}
+
 export function isPoOpen(status: PoStatus): boolean {
   return status !== "closed" && status !== "void";
 }

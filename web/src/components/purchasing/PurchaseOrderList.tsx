@@ -7,17 +7,20 @@ import { createClient } from "@/lib/supabase/client";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
 import {
+  downloadBlob,
   fetchPoDocData,
   openWindowNow,
   showBlob,
   SENT_VIA_FOR_ORDER_TYPE,
 } from "@/lib/poProcessing";
+import { MenuButton } from "@/components/ui/MenuButton";
 import {
   money,
   PO_STATUS_CLASS,
   PO_STATUS_LABEL,
   PO_STATUS_ORDER,
   isPoOpen,
+  poDocumentFileName,
   type PoStatus,
 } from "@/lib/purchaseOrders";
 import {
@@ -222,6 +225,17 @@ export function PurchaseOrderList({
     });
   }
 
+  /** The selected orders' numbers, in the order the batch PDF will run them —
+   *  so the menu's hint is the name the file will actually get. */
+  const selectedNumbers = useMemo(
+    () =>
+      orders
+        .filter((po) => checked.has(po.id))
+        .map((po) => po.po_number)
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    [orders, checked]
+  );
+
   const selectedDrafts = useMemo(
     () => orders.filter((po) => checked.has(po.id) && po.status === "draft"),
     [orders, checked]
@@ -290,14 +304,23 @@ export function PurchaseOrderList({
     }
   }
 
-  /** One PDF for the whole selection — a page run per PO (spec §4.8's batch
-   *  preview / shopping-list modes). Opened, not downloaded: batch output is
-   *  for reading or printing, and the per-PO email flow does its own download. */
-  async function batchPdf(kind: "po" | "shopping") {
+  /**
+   * One PDF for the whole selection — a page run per PO (spec §4.8's batch
+   * preview / shopping-list modes), either OPENED for reading and printing or
+   * DOWNLOADED under a name that says which orders are in it.
+   *
+   * Two verbs, because a preview tab cannot be named (Mark, 2026-08-27): the
+   * tab is navigated to a `blob:` URL, whose path is a UUID and which carries
+   * no `Content-Disposition`, so saving from the browser's own PDF viewer
+   * yields `8f3c….pdf`. `a.download` is the only lever, and `downloadBlob` is
+   * the only place that pulls it — see `ProcessPo.downloadPdf`.
+   */
+  async function batchPdf(kind: "po" | "shopping", mode: "open" | "download") {
     // Opened before any await, while the click gesture still counts — a popup
-    // opened after async work is silently blocked.
-    const win = openWindowNow();
-    setBatchBusy(kind);
+    // opened after async work is silently blocked. `MenuButton` closes
+    // synchronously inside the click, so this is still inside the gesture.
+    const win = mode === "open" ? openWindowNow() : null;
+    setBatchBusy(`${kind}:${mode}`);
     setBatchError(null);
     try {
       const [{ pdf }, docs, { org, pos }] = await Promise.all([
@@ -308,11 +331,9 @@ export function PurchaseOrderList({
       pos.sort((a, b) => a.po_number.localeCompare(b.po_number, undefined, { numeric: true }));
       const Doc = kind === "po" ? docs.PoPdf : docs.ShoppingListPdf;
       const blob = await pdf(<Doc pos={pos} org={org} />).toBlob();
-      const name =
-        kind === "po"
-          ? `POs ${pos.map((p) => p.po_number).join(", ")}.pdf`
-          : `Shopping lists ${pos.map((p) => p.po_number).join(", ")}.pdf`;
-      showBlob(win, blob, name);
+      const name = poDocumentFileName(kind, pos.map((p) => p.po_number));
+      if (mode === "open") showBlob(win, blob, name);
+      else downloadBlob(blob, name);
     } catch (e) {
       win?.close();
       setBatchError(e instanceof Error ? e.message : String(e));
@@ -713,22 +734,47 @@ export function PurchaseOrderList({
             <span>{checked.size} selected</span>
             <span className="tabular-nums text-muted">{money(selectedTotal)}</span>
 
-            {/* Batch preview (spec §4.8): every selected PO as one PDF, a page
-                run per order, opened for reading or printing. */}
-            <button
+            {/* Batch documents (spec §4.8): every selected PO as one PDF, a
+                page run per order.
+                A MENU rather than buttons, which is what lets Download exist
+                without a seventh and eighth cell in this bar: four commands
+                behind one trigger is one fewer control than the two it
+                replaces. That is the opposite of ProcessPo's call, and for the
+                opposite reason — that card has room for two plain buttons and
+                Preview is its everyday act, where this bar is already six
+                commands wide and wraps. */}
+            <MenuButton
+              label="Batch document"
+              trigger={
+                batchBusy?.includes(":") ? "Rendering…" : "Documents"
+              }
+              triggerClassName="flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+              caret
               disabled={batchBusy !== null}
-              onClick={() => batchPdf("po")}
-              className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-            >
-              {batchBusy === "po" ? "Rendering…" : "PO PDFs"}
-            </button>
-            <button
-              disabled={batchBusy !== null}
-              onClick={() => batchPdf("shopping")}
-              className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-            >
-              {batchBusy === "shopping" ? "Rendering…" : "Shopping lists"}
-            </button>
+              minWidth={260}
+              items={[
+                {
+                  label: "Preview PO PDFs",
+                  hint: "Opens for reading or printing",
+                  onSelect: () => batchPdf("po", "open"),
+                },
+                {
+                  label: "Download PO PDFs",
+                  hint: poDocumentFileName("po", selectedNumbers),
+                  onSelect: () => batchPdf("po", "download"),
+                },
+                {
+                  label: "Preview shopping lists",
+                  hint: "Opens for reading or printing",
+                  onSelect: () => batchPdf("shopping", "open"),
+                },
+                {
+                  label: "Download shopping lists",
+                  hint: poDocumentFileName("shopping", selectedNumbers),
+                  onSelect: () => batchPdf("shopping", "download"),
+                },
+              ]}
+            />
             <button
               disabled={batchBusy !== null || selectedDrafts.length === 0}
               onClick={batchMarkSent}
@@ -823,6 +869,14 @@ export function PurchaseOrderList({
         // through the URL, so the caller decides — see DataGroup. Ordering
         // happens in batches, so a date band is a day's run of POs; the other
         // two are small vocabularies by construction.
+        // A VOID order is GREY (Mark, 2026-08-27), which is the treatment six
+        // catalog lists already give an inactive row — and `isPoOpen` has
+        // called void "inert" since it was written, without anything on screen
+        // saying so. Not `line-through` as well: a cancelled special order gets
+        // that because it was called OFF, where a void PO was never an order.
+        // The status chip keeps its own colours (PO_STATUS_CLASS sets them
+        // explicitly), so the row dims and the word Void stays legible.
+        rowClassName={(po) => (po.status === "void" ? "text-faint" : "")}
         group={GROUP_LABEL[filters.sort] ? { label: GROUP_LABEL[filters.sort]! } : undefined}
         empty={<p className="text-sm text-muted">No orders in this window.</p>}
       />

@@ -22,7 +22,7 @@ import {
   SENT_VIA_FOR_ORDER_TYPE,
   type EmailParts,
 } from "@/lib/poProcessing";
-import type { PurchaseOrder } from "@/lib/purchaseOrders";
+import { poDocumentFileName, type PurchaseOrder } from "@/lib/purchaseOrders";
 
 /** What the card needs beyond the order itself — fetched by the detail page. */
 export type ProcessingContext = {
@@ -168,6 +168,27 @@ export function ProcessPo({
       }
     });
 
+  /**
+   * The same §4.9 document as Preview, onto disk, NAMED (Mark, 2026-08-27:
+   * "the purchase order number should be the filename").
+   *
+   * It needs its own command, because a preview tab cannot answer this: the
+   * tab is navigated to a `blob:` URL, whose path is a UUID and which carries
+   * no `Content-Disposition` — measured, on a Blob AND on a File with a name,
+   * both — so saving from the browser's PDF viewer produces
+   * `8f3c….pdf` however the blob was made. `a.download` is the only lever
+   * there is, and `downloadBlob` is the only place that pulls it.
+   *
+   * So Preview and Download are two verbs rather than one, which is the split
+   * `SendDocument` already makes for a special order's paperwork.
+   */
+  const downloadPdf = () =>
+    run("download", async () => {
+      const { pdf, docs, org, po } = await loadDocs();
+      const blob = await pdf(<docs.PoPdf pos={[po]} org={org} />).toBlob();
+      downloadBlob(blob, poDocumentFileName("po", [po.po_number]));
+    });
+
   const previewPdf = () => {
     // Opened before any await, while the click gesture still counts — a popup
     // opened after async work is silently blocked.
@@ -176,7 +197,7 @@ export function ProcessPo({
       try {
         const { pdf, docs, org, po } = await loadDocs();
         const blob = await pdf(<docs.PoPdf pos={[po]} org={org} />).toBlob();
-        showBlob(win, blob, `PO ${po.po_number}.pdf`);
+        showBlob(win, blob, poDocumentFileName("po", [po.po_number]));
       } catch (e) {
         win?.close();
         throw e;
@@ -188,7 +209,7 @@ export function ProcessPo({
     run("shopping", async () => {
       const { pdf, docs, org, po } = await loadDocs();
       const blob = await pdf(<docs.ShoppingListPdf pos={[po]} org={org} />).toBlob();
-      downloadBlob(blob, `Shopping list ${po.po_number}.pdf`);
+      downloadBlob(blob, poDocumentFileName("shopping", [po.po_number]));
     });
 
   const openVendorSite = () =>
@@ -253,6 +274,18 @@ export function ProcessPo({
               three times. */}
           <button disabled={busy !== null} onClick={previewPdf} className={btn}>
             {busy === "preview" ? "Rendering…" : "Preview PDF"}
+          </button>
+
+          {/* Beside Preview on every order type, for Preview's own reason: what
+              the vendor was told is worth having on disk whatever route the
+              order took to them. */}
+          <button
+            disabled={busy !== null}
+            onClick={downloadPdf}
+            className={btn}
+            title={`Saves as “${poDocumentFileName("po", [order.po_number])}”`}
+          >
+            {busy === "download" ? "Rendering…" : "Download PDF"}
           </button>
 
           {context.order_type === "email_po" && compose === null && (

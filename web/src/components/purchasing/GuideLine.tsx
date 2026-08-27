@@ -176,7 +176,14 @@ export function GuideLine({
     // registry because the DOM already holds the one thing the jump needs,
     // which is where each row sits.
     <tr
-      className="border-b border-hairline"
+      // NO RULE UNDER A LINE (Mark, 2026-08-27: "we don't really need the
+      // dividers between vendor item lines"). It is the design system's own
+      // table rule arriving on the one list that isn't a `DataTable` — rows
+      // carry no dividing rule, and only a rule that DELIMITS stays. This one
+      // delimited nothing: an item's sources are siblings, `py-4` already sets
+      // them apart, and the next ITEM is 48px below (its header's `pt-12`),
+      // which is a far louder break than a hairline. What it did do was draw a
+      // line under every row of a long walk.
       data-guide-line=""
       data-untouched={qty === null ? "" : undefined}
     >
