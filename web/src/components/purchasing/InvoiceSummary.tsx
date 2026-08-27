@@ -7,7 +7,7 @@ import {
   type InvoiceExtraction,
 } from "@/lib/invoiceExtraction";
 import type { MatchResult } from "@/lib/invoiceMatch";
-import { printedPoDisagreement } from "@/lib/invoices";
+import { printedPoDisagreement, printedVendorDisagreement } from "@/lib/invoices";
 
 /**
  * What was read, how much of it lined up, and — deliberately prominent —
@@ -49,6 +49,7 @@ function takeLabel(
 export function InvoiceSummary({
   invoiceCount = 0,
   poNumber,
+  vendorName,
   extraction,
   match,
   fileName,
@@ -66,6 +67,9 @@ export function InvoiceSummary({
   /** The order being received. Compared against whatever purchase order number
    *  the invoice prints back at us — see `printedPoDisagreement`. */
   poNumber: string;
+  /** Who the ORDER says we are buying from, so a reading that names somebody
+   *  else can say so — see `printedVendorDisagreement`. */
+  vendorName: string | null;
   extraction: InvoiceExtraction;
   match: MatchResult;
   fileName: string | null;
@@ -96,6 +100,7 @@ export function InvoiceSummary({
    *  back carrying that system's numbering. But it is the question you want
    *  asked before you record quantities: is this the right delivery's paper? */
   const wrongOrder = printedPoDisagreement(extraction, poNumber);
+  const wrongVendor = printedVendorDisagreement(extraction, vendorName);
 
   // The date the goods moved, and whether taking it would change anything.
   const delivered = invoiceDeliveryDate(extraction);
@@ -143,6 +148,24 @@ export function InvoiceSummary({
             {wrongOrder.length > 1 ? "Invoice names other orders" : "Invoice names a different order"}
             {" · "}
             {wrongOrder.join(", ")}
+          </span>
+        )}
+
+        {/* The stronger of the two identity warnings, and it goes FIRST: a
+            printed order number one digit out is a misprint, where a different
+            company's name on the page means the document is not this order's at
+            all. It is the check that would have caught $1,985.99 of Dawn's bill
+            being filed under Vesta. */}
+        {wrongVendor && (
+          <span
+            className="border border-ink bg-mark-fill px-2 text-[12px] uppercase tracking-[0.12em]"
+            title={
+              `This invoice is from ${wrongVendor}, but this order is with ` +
+              `${vendorName ?? "another vendor"}. Filing it here would record the ` +
+              `bill against the wrong vendor — check the paper belongs to this order.`
+            }
+          >
+            Invoice is from {wrongVendor}
           </span>
         )}
 

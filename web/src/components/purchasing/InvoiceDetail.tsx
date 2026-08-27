@@ -19,6 +19,7 @@ import {
   lineSumReconciliation,
   matchPrintedPoNumber,
   printedPoNumbers,
+  printedVendorDisagreement,
   signedTotal,
   toInvoiceLine,
   AGING_LABEL,
@@ -178,16 +179,21 @@ export function InvoiceDetail({
     [lines, invoice.subtotal]
   );
 
-  // What the reader took off the page, when it disagrees with the vendor on the
-  // record — a cheap check that catches a wrong-vendor pick on a hand-created
-  // invoice, and a mis-filed auto-created one.
-  const readVendorName = shown?.extraction?.vendor_name ?? null;
-  const vendorDisagreement =
-    readVendorName &&
-    invoice.vendors &&
-    !normalizedEqual(readVendorName, invoice.vendors.name)
-      ? readVendorName
-      : null;
+  // What the reader took off the page, when it cannot be the vendor on the
+  // record — the check that catches a wrong-vendor pick on a hand-created
+  // invoice and a mis-filed auto-created one.
+  //
+  // This compared the two names for EQUALITY until 2026-08-27, punctuation
+  // stripped, and that is far too strict to be worth reading: measured over the
+  // 49 readings on file, only three of twelve distinct pairs match as text,
+  // because our catalog carries the name staff say and the invoice prints the
+  // name lawyers use ("BakeMark" against "BAKEMARK USA LLC"). It was warning on
+  // most invoices in the system, which is the same as warning on none.
+  // `printedVendorDisagreement` is the measured rule and lives in lib/invoices
+  // so the receiving screen's chip and this caveat cannot disagree.
+  const vendorDisagreement = shown?.extraction
+    ? printedVendorDisagreement(shown.extraction, invoice.vendors?.name ?? null)
+    : null;
 
   /**
    * The purchase order this invoice PRINTS, when exactly one candidate answers
@@ -915,11 +921,6 @@ function Cell({
 }
 
 /** Vendor names differ by punctuation and case far more often than by identity. */
-function normalizedEqual(a: string, b: string): boolean {
-  const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-  return norm(a) === norm(b);
-}
-
 /** The browser's day, for the aging chip only — the LIST computes its buckets
  *  from the org's timezone on the server, which is what the filters use. */
 function todayLocal(): string {

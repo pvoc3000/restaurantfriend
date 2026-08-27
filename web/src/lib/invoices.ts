@@ -884,6 +884,97 @@ export function printedPoDisagreement(
 }
 
 /**
+ * Words that say nothing about WHICH company this is.
+ *
+ * Legal forms, the trade the vendor is in, and the filler between. Dropping
+ * them is what lets "Dawn Foods" and "Dawn Food Products, Inc." be recognised
+ * as the same house while keeping "Unified Paper" and a hypothetical "Smart
+ * Paper Co" apart — without this list they would share `paper` and the check
+ * would stay quiet on a real mis-filing.
+ *
+ * Measured against the seven vendors whose invoices are on file; add to it when
+ * a real pair asks, never speculatively.
+ */
+const VENDOR_NOISE = new Set([
+  "the", "and", "of", "a",
+  "inc", "incorporated", "llc", "llp", "ltd", "limited", "co", "corp",
+  "corporation", "company", "usa", "us",
+  "food", "foods", "foodservice", "foodservices", "paper", "packaging",
+  "products", "product", "supply", "supplies", "distributing", "distributors",
+  "distribution", "wholesale", "service", "services", "brands", "group",
+]);
+
+/**
+ * The distinctive words in a company's name — lowercased, stripped of
+ * punctuation, plurals folded, and with `VENDOR_NOISE` removed.
+ *
+ * The plural fold is the SKU matcher's lesson arriving here: "Coconut Flakes"
+ * against "COCONUT FLAKE SWEET" cost that join a match, and "Dawn Foods"
+ * against "Dawn Food Products" is the same single letter. It is a trailing `s`
+ * and nothing cleverer — a stemmer would turn "Vesta" into "Vest".
+ */
+function vendorWords(name: string | null): Set<string> {
+  const words = (name ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .split(" ")
+    .map((w) => (w.length > 3 && w.endsWith("s") ? w.slice(0, -1) : w))
+    .filter((w) => w.length > 1 && !VENDOR_NOISE.has(w));
+  return new Set(words);
+}
+
+/**
+ * The vendor this invoice says it is from, when that cannot be the vendor whose
+ * order you are standing in front of — or null when there is nothing to say.
+ *
+ * It exists because of one real record. A Dawn Foods invoice was attached to a
+ * Vesta Foodservice order, and the filer takes the vendor from the ORDER and
+ * never from the page, so $1,985.99 of Dawn's bill sat on the books under Vesta
+ * — a duplicate no number-based check could ever catch, because it was filed
+ * under a vendor the real invoice has nothing to do with.
+ *
+ * IT WARNS ONLY WHEN THE TWO NAMES SHARE NOTHING, and that threshold is a
+ * measurement rather than a preference. Over the 49 readings on file, only
+ * three of twelve distinct pairs match as text: our catalog carries the name
+ * staff say and the invoice prints the name lawyers use.
+ *
+ *     BakeMark              BAKEMARK USA LLC
+ *     Chefs Warehouse       The Chefs' Warehouse West Coast, LLC
+ *     Cook's Vanilla        Cook Flavoring Company
+ *     Dawn Foods            Dawn Food Products, Inc.
+ *     Stumptown             Stumptown Coffee Roasters
+ *     Unified Paper         Unified Paper & Packaging
+ *     Vesta Foodservice     VESTA FOODSERVICE
+ *
+ * Anything stricter than "shares nothing" flags nine of those twelve, which is
+ * the failure `printedPoDisagreement` already names: the vendors whose paperwork
+ * is merely built differently flag every delivery, and the mark stops meaning
+ * anything where it matters. All seven stay silent here; Vesta against Dawn
+ * shares no distinctive word and speaks up.
+ *
+ * SILENCE WHERE IT CANNOT JUDGE, which is two more cases: a reading with no
+ * vendor name at all, and a name that reduces to nothing but noise words. An
+ * absent answer is not a disagreement.
+ *
+ * What comes back is what is PRINTED, not the normalized form — the reader is
+ * checking a document against a screen.
+ */
+export function printedVendorDisagreement(
+  extraction: InvoiceExtraction,
+  ourVendorName: string | null
+): string | null {
+  const printed = extraction.vendor_name?.trim();
+  if (!printed) return null;
+
+  const theirs = vendorWords(printed);
+  const ours = vendorWords(ourVendorName);
+  if (theirs.size === 0 || ours.size === 0) return null;
+
+  for (const word of ours) if (theirs.has(word)) return null;
+  return printed;
+}
+
+/**
  * The purchase order a printed number refers to — but only when exactly ONE
  * candidate answers to it.
  *

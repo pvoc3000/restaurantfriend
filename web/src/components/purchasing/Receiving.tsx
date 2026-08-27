@@ -649,6 +649,7 @@ export function Receiving({
           <InvoiceSummary
             invoiceCount={linkedInvoices.length}
             poNumber={order.po_number}
+            vendorName={order.vendors?.name ?? null}
             extraction={source.extraction}
             match={match}
             fileName={source.file_name}
