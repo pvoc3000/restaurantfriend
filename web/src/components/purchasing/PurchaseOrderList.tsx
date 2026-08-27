@@ -869,14 +869,32 @@ export function PurchaseOrderList({
         // through the URL, so the caller decides — see DataGroup. Ordering
         // happens in batches, so a date band is a day's run of POs; the other
         // two are small vocabularies by construction.
-        // A VOID order is GREY (Mark, 2026-08-27), which is the treatment six
-        // catalog lists already give an inactive row — and `isPoOpen` has
-        // called void "inert" since it was written, without anything on screen
-        // saying so. Not `line-through` as well: a cancelled special order gets
-        // that because it was called OFF, where a void PO was never an order.
-        // The status chip keeps its own colours (PO_STATUS_CLASS sets them
-        // explicitly), so the row dims and the word Void stays legible.
-        rowClassName={(po) => (po.status === "void" ? "text-faint" : "")}
+        // A VOID order is GREY — EVERY WORD OF IT (Mark, 2026-08-27, twice:
+        // "all the text in a purchase order list row should be faint"). It is
+        // the treatment six catalog lists give an inactive row, and `isPoOpen`
+        // has called void "inert" since it was written without anything on
+        // screen saying so. Not `line-through` as well: a cancelled special
+        // order gets that because it was called OFF, where a void PO was never
+        // an order.
+        //
+        // `text-faint` alone reaches only the cells that state no colour of
+        // their own, which on this row is four of eleven — the two links are
+        // `text-ink` and the dates, Received and Files are `text-muted`, and a
+        // child's own colour beats an inherited one whatever the stylesheet
+        // order says (this is specificity, not Tailwind's ordering rule). So
+        // the descendant variant, which is a real selector and outranks them:
+        // `[&_*]:text-faint` is (0,1,1) against a plain utility's (0,1,0), so
+        // it wins with no `!important` and nothing has to be restated at six
+        // call sites — a twelfth column added next month is faint for free.
+        //
+        // It reaches the status chip too, which already reads `text-faint` for
+        // void (PO_STATUS_CLASS), so that word is unchanged; the chip's border
+        // and fill are untouched, being background and border rather than
+        // colour. The links keep their underline — greying text you can still
+        // click reads as disabled, and the underline is what says it isn't.
+        rowClassName={(po) =>
+          po.status === "void" ? "text-faint [&_*]:text-faint" : ""
+        }
         group={GROUP_LABEL[filters.sort] ? { label: GROUP_LABEL[filters.sort]! } : undefined}
         empty={<p className="text-sm text-muted">No orders in this window.</p>}
       />
