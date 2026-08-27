@@ -374,16 +374,28 @@ export function PickList({
                 empty ? "text-faint" : ""
               } ${className}`
             : variant === "masthead"
-              ? // `field`, inverted for the black bar. Everything that dresses
-                // the other two for a white page — bg-white, border-ink,
-                // text-faint, a grey hover wash — is either invisible or
-                // unreadable up there, so it is stated rather than overridden:
-                // Tailwind resolves competing utilities by STYLESHEET order,
-                // not class-string order, so a caller passing `bg-transparent`
+              ? // NOT a box at all (Mark, 2026-08-27) — this is `field`'s
+                // metrics with `field`'s dress taken off. Everything that
+                // dresses the other two for a white page (bg-white,
+                // border-ink, text-faint, a grey hover wash) is either
+                // invisible or unreadable on the black bar, so nothing is
+                // inherited by accident: it is all stated, because Tailwind
+                // resolves competing utilities by STYLESHEET order rather than
+                // class-string order and a caller passing `bg-transparent`
                 // through `className` could not be relied on to beat
-                // `bg-white`. Type matches the section tabs beside it (12px
-                // semibold uppercase) and the box is a tier tall, so the
-                // masthead's two columns still line up.
+                // `bg-white`.
+                //
+                // The border went the way "Sign out" lost its: up here a box
+                // reads as a different KIND of object from the type it stands
+                // among, and this row is six quiet tabs, two line icons and
+                // this. What says it opens a list is the caret, which is the
+                // one mark that means that anywhere in the app.
+                //
+                // No horizontal padding, for the same reason: with the box
+                // gone, padding would hold the code 8px off the page gutter
+                // that "Sign out" directly beneath it sits on. `h-6` stays —
+                // it is a nav tier tall, so the masthead's two columns line up
+                // whether or not anything is drawn around it.
                 //
                 // YELLOW (Mark, 2026-08-27: "so it stands out"), which is the
                 // rule applying rather than an exception to it. `text-mark` is
@@ -391,16 +403,19 @@ export function PickList({
                 // it is the app's own mark for WHICH SHOP YOU ARE AT, worn by
                 // this exact spot's predecessor (the location tab was
                 // `text-mark` from every other section until this control took
-                // the code off it) and by `WorkingHere`'s chip. Type, not a
+                // the code off it) and by `WorkingHere`'s chip. Type, never a
                 // fill: a filled yellow box in the masthead would be the one
                 // yellow-filled button in the app, and `WorkingHere` refuses a
-                // black fill for the same reason in reverse.
+                // black fill for the same reason in reverse. Hover brightens
+                // to yellow-200 — yellow-500 is already near the top of its
+                // range, so a quiet control that darkens elsewhere has to go
+                // the other way here.
                 //
                 // The colour is in the VARIANT because the masthead has one
                 // picker and yellow is what it is FOR. A second one that isn't
                 // about the working location wants the colour split out to a
                 // prop, not this dress reused.
-                `flex h-6 items-center gap-2 border border-mark/40 bg-transparent px-2 text-left text-[12px] font-semibold uppercase tracking-[0.06em] text-mark hover:border-mark disabled:opacity-35 ${className}`
+                `flex h-6 items-center gap-2 bg-transparent text-left text-[12px] font-semibold uppercase tracking-[0.06em] text-mark hover:text-mark-fill disabled:opacity-35 ${className}`
               : // The same dotted underline InlineValue rests in, so an editable
                 // cell reads as editable whether it takes typing or a choice.
                 `flex w-full items-center gap-1 px-1 py-0.5 text-left underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 disabled:opacity-35 ${
