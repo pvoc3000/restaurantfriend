@@ -945,7 +945,41 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    migration 017 + `migration/backfill-locations.mjs`.
    Rebuilt 2026-08-01 on Mark's FileMaker shape, after living with the
    masthead's `<select>`: **the working location is CHOSEN FROM A LIST**, and
-   `components/LocationSwitcher.tsx` is deleted. The list leads with the Active
+   `components/LocationSwitcher.tsx` is deleted.
+   **A masthead picker came BACK on 2026-08-27** (Mark) —
+   `components/WorkingLocation.tsx`, last in the utilities row, after the gear.
+   That is not the 2026-08-01 decision being reversed, it is being HALVED: this
+   list is still the right place to READ about a shop and then act on the row in
+   front of you, and what it turned out not to be is a good place to SWITCH
+   from, because switching is something you do on the way to somewhere else and
+   it made you leave wherever you were. Both routes exist and the Working column
+   below stays.
+   Three things about it worth not rediscovering.
+   It is a **`ui/PickList`, not a `<select>`** — there are none of those left in
+   the app and a masthead is where an OS menu looks most out of place — which
+   needed a third trigger dress, **`variant="masthead"`**: yellow type, a caret,
+   NO BOX and no horizontal padding (Mark, 2026-08-27, in two steps). The box
+   went the way `Sign out`'s did: up there a box reads as a different KIND of
+   object from the type it stands among, and the padding went with it because
+   without the border it held the code 8px off the page gutter `Sign out` sits
+   on directly beneath (measured — both right edges are the same pixel, and the
+   gap to the gear matches Home-to-gear). Everything is STATED rather than
+   overridden, because Tailwind resolves competing utilities by stylesheet order
+   and a caller passing `bg-transparent` through `className` could not be relied
+   on to beat `field`'s `bg-white`. Hover BRIGHTENS (yellow-500 → yellow-200,
+   14.67:1 → 18.05:1) where every other quiet control in the app darkens —
+   yellow-500 is already near the top of its range. `h-6` stays whatever the
+   dress, so the box is a nav tier tall and the masthead's two columns line up.
+   Its panel needed **`panelMinWidth`** (`MenuButton`'s idiom, now on
+   `PickList`): a four-character trigger opens rows carrying a shop's full name,
+   and at the shared 168px floor "Donut Friend 01 Highland Park" broke over four
+   lines. 300 puts every row on one.
+   **It offers ACTIVE locations only**, which is `WorkingHere`'s rule and not
+   the old switcher's — that one listed closed shops because switching to one
+   was the only way to reach its record, and this list killed that reason. The
+   working shop is listed even if somebody has just closed it, hinted
+   "inactive", or the trigger would show a raw id instead of a code.
+   The list leads with the Active
    toggle (purchaser+ only, per 001's policy) and ENDS with the **Working**
    column (Mark, 2026-08-01 — read the row, then act on it, and the control you
    press repeatedly sits against the right edge, like the guide's stepper) —
@@ -954,12 +988,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    2026-08-02, when Mark read it as a button — down a table column the boxes sit
    56px apart, so they aren't read as one segmented control the way a
    TabPicker's abutting cells are, and alone a filled box with a label is a
-   button. Yellow is already this app's mark for WHICH SHOP YOU ARE AT:
-   `AppNav`'s location tab is `text-mark` from every other section, and no button
-   anywhere is filled yellow. (When this was written the nav marked its active
-   SECTION yellow; since 2026-08-06 selection is white in both bands and the
-   yellow belongs to the location alone — which if anything sharpens the
-   parallel.) The 130×30 optical compensation went with the black — a pale fill is
+   button. Yellow is already this app's mark for WHICH SHOP YOU ARE AT, and no
+   button anywhere is filled yellow. (Where that mark LIVES has moved twice
+   without its meaning changing: when this was written the nav marked its active
+   SECTION yellow; from 2026-08-06 selection was white in both bands and the
+   yellow belonged to the location TAB alone; since 2026-08-27 the tab is
+   ordinary and the masthead's picker wears it. Two places carry it now — the
+   control that SETS the working shop, and this chip on the row that IS it.) The 130×30 optical compensation went with the black — a pale fill is
    a light area like the outlined box beside it), a `Work here` button
    on any other ACTIVE one, and **nothing at all on an inactive one**. Chip and
    button are ONE box — same width, height and border, only the fill differs —
@@ -986,9 +1021,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    "drop the links, but keep the info. It's handy."): those screens follow the
    WORKING location, so from any record the link was right by coincidence and
    wrong on the other five. `/location` survives as a redirect shim to
-   `/locations/<working id>`; the nav's tier-2 item is now "Locations"
-   (`lib/nav.ts` — one line), and the tier-1 tab still wears the working code,
-   which is now the only place it's always on screen.
+   `/locations/<working id>`; the nav's tier-2 item became "Locations"
+   (`lib/nav.ts` — one line) and is **"All"** since 2026-08-27, and the tier-1
+   tab wore the working code from this change until the same day, when the
+   masthead picker took it back.
 4c. 🚧 **HR + app access** — the second module outside Purchasing, and the one
    that makes the app multi-user (Mark, 2026-08-01: "It's time to add users to
    the app"). Specced in `docs/hr-access-brief.md`.
@@ -5257,7 +5293,12 @@ weekday column, and 003 then silently made it per-vendor-item.
 3. **Location context**: the user is always "working at" one active location
    (persisted per user in `org_members.last_active_location_id`); every
    location-scoped screen filters by it; you switch by picking a row on
-   `/locations` (it was a 2-tap header control until 2026-08-01).
+   `/locations`, or from the picker at the right of the masthead. TWO routes,
+   deliberately (Mark, 2026-08-27): a header control was the ONLY route until
+   2026-08-01, the list was the only one from then until 2026-08-27, and each
+   was missing what the other has — the list is where you READ about a shop
+   before acting on the row in front of you, the picker is for switching on the
+   way to somewhere else, without leaving the screen you are on.
    The session carries TWO lists and picking the wrong one is a silent bug
    (2026-07-30): **`session.locations` is every location**, closed ones
    included — use it to LOOK UP a code by id, and a `vendor_locations` row at
@@ -5308,7 +5349,7 @@ weekday column, and 003 then silently made it per-vendor-item.
 
   | Reach for | Instead of | For |
   | --- | --- | --- |
-  | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary — a VALUE or a filter's VIEW; `variant="inline"` in a cell, `variant="field"` as a standalone box. Opens below the field, portals so panes can't clip it |
+  | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary — a VALUE or a filter's VIEW; `variant="inline"` in a cell, `variant="field"` as a standalone box, `variant="masthead"` on the black bar (yellow type, no box — the working-location picker, whose dress it is; build step 4b has the reasons). Opens below the field, portals so panes can't clip it; `panelMinWidth` raises the panel's floor where the trigger is much narrower than the rows it opens |
   | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons; `onSubmit` makes Enter commit (opt-in — see the Enter bullet below) |
   | `confirmDialog()` from `lib/confirm` | `window.confirm` | EVERY confirm (Mark, 2026-08-10: the browser's dialog "takes me out of the app experience"). A promise — `if (!(await confirmDialog({ title, body, tone: "danger" }))) return;` — so the handler becomes async; `splitConfirmMessage(msg)` spreads a one-string message into title + body. `ui/ConfirmDialog` is the panel and only the (app) layout touches it. Enter does NOT commit a `danger` confirm (it focuses Cancel), which is `ui/Dialog`'s rule applied |
   | `ui/MenuButton` | a button you wire to your own popup | a button that opens a short list of COMMANDS — the anchored menu with the trigger left to the caller. A menu, not a `PickList`: every row is a verb that happens once and leaves nothing selected, so the trigger's label never changes. `ui/RowMenu` is the `⋯` dress over it; a command bar passes words and `BUTTON_CLASS` |
@@ -5398,9 +5439,12 @@ weekday column, and 003 then silently made it per-vendor-item.
   a SHORT mark is a chip — `<span className="bg-mark-fill px-1">` — and a
   SENTENCE is plain ink, because a paragraph-sized yellow block is a banner
   rather than a mark. What a mark must never be is yellow words.
-  **The one place `text-mark` is right is on BLACK**: `AppNav`'s location tab is
-  yellow-500 on the ink masthead, which is high-contrast and is the app's mark
-  for WHICH SHOP YOU ARE AT.
+  **The one place `text-mark` is right is on BLACK**: the masthead's
+  working-location picker is yellow-500 on ink — measured **14.67:1**, against
+  7.37 for an inactive tab beside it, so it is the brightest thing up there
+  short of white. It is the app's mark for WHICH SHOP YOU ARE AT, and it is
+  where that mark lives now: `AppNav`'s location TAB wore it until 2026-08-27,
+  when the picker took the code off that tab and the yellow went with it.
   **And check the thing isn't already marked before marking it** (Mark, same
   day: "the yellow text seems redundant — there's also a yellow box on the same
   sheets"). The timesheets row expansion restated three findings the row already
@@ -5461,16 +5505,23 @@ weekday column, and 003 then silently made it per-vendor-item.
   system, which had killed the sub-nav): sections on top, that section's
   sub-sections under it, both bands black, **both marking active in WHITE**
   (told apart by 12px vs 11px, white/60 vs white/50, and a `white/15` hairline).
-  Six sections — the first is labelled with the ACTIVE LOCATION CODE, not
-  "Location" — and **that one tab is YELLOW wherever else you are, WHITE when
-  you are on it** (Mark, 2026-08-06). It is the only tab that isn't a place you
-  go: it names the shop every other screen is about, so "which shop am I
-  ordering for" has to be answerable from any section without hunting for it.
-  Selection still wins on it, though — yellow-always made the location the one
-  tab whose active state couldn't be seen, trading a rare question for a
-  constant one. Tier 1 used to mark its active section yellow while tier 2
-  already used white; that split is gone, the two bands agree, and each colour
-  means exactly one thing: white "you are here", yellow "this is the shop". Only Purchasing is built (Vendors · Inventory · Order Guide ·
+  Six sections, **every one of them an ordinary tab** — white when you are on
+  it, white/60 otherwise; no TAB carries colour in either band. The masthead's
+  one yellow is the working-location picker in the right-hand column.
+  **The first is "Locations" and is no longer special** (Mark, 2026-08-27). It
+  wore the ACTIVE LOCATION CODE from 2026-08-01, when the masthead switcher was
+  deleted and the tab became the only place the code stayed on screen; it was
+  additionally YELLOW from every other section (Mark, 2026-08-06) because it was
+  then the only tab that wasn't a place you go — it named the shop every other
+  screen is about, so "which shop am I ordering for" had to be answerable
+  without hunting. **The picker at the end of row 1 now carries both the code
+  and the yellow** (`components/WorkingLocation` — build step 4b), so
+  the tab went back to naming the list it leads to, and each colour still means
+  exactly one thing: white "you are here", yellow "this is the shop".
+  Its sub-tier's first entry is labelled **"All"**, not "Locations" — the band
+  above already says it, the same trim that made HR's "Team Ratings" just
+  "Events"; the SLUG is untouched, which is what the nav cookie stores.
+  Only Purchasing is built (Vendors · Inventory · Order Guide ·
   Purchase Orders · Cleanup, Mark's order); everything else lands on
   `/soon/<section>/<sub>`, one shared placeholder. **The menu is
   `web/src/lib/nav.ts`** — a screen ships by getting a real `href` there and
