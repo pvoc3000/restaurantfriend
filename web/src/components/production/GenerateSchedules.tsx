@@ -1,8 +1,20 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import {
+  pullReadiness,
+  scheduleDraft,
+  inGenerationRun,
+  scheduleKitchen,
+  scheduleTitle,
+  type PullCandidate,
+  type PullReadiness,
+  type SchedulableLine,
+} from "@/lib/specialOrderSchedule";
+import { STATUS_LABEL } from "@/lib/specialOrders";
+import { addDays } from "@/lib/payPeriods";
 import { createClient } from "@/lib/supabase/client";
 import { packetDate } from "@/lib/productionSchedule";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -70,6 +82,17 @@ type Receipt = {
   warnings: Warning[];
 };
 
+/** A special order the run could bring along, judged by `pullReadiness`. */
+type Candidate = {
+  order: PullCandidate;
+  draft: ReturnType<typeof scheduleDraft>;
+  readiness: PullReadiness;
+  kitchenCode: string;
+};
+
+/** What became of each one, for the receipt. */
+type Pulled = { number: string; title: string | null; lines: number; error?: string };
+
 const DAY_OPTIONS = [1, 2, 3, 4, 5, 6, 7, 10, 14, 21, 28].map((n) => ({
   value: String(n),
   label: n === 1 ? "1 day" : `${n} days`,
@@ -102,6 +125,12 @@ export function GenerateSchedules({
   const [running, setRunning] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // The special orders this run could bring along, and which of them are ticked.
+  const [candidates, setCandidates] = useState<Candidate[] | null>(null);
+  const [pullIds, setPullIds] = useState<Set<string>>(new Set());
+  const [pulled, setPulled] = useState<{ done: Pulled[]; failed: Pulled[] } | null>(null);
+  const [candidateError, setCandidateError] = useState<string | null>(null);
+  const loadSeq = useRef(0);
 
   function openDialog() {
     setOpen(true);
@@ -115,6 +144,117 @@ export function GenerateSchedules({
     // by the function itself rather than guessed at up front, because "which
     // kitchens does this day involve" is only answerable from the plans.
     setSelected(new Set(locations.map((l) => l.id)));
+    setCandidates(null);
+    setPullIds(new Set());
+    setPulled(null);
+    void loadCandidates(today, 1);
+  }
+
+  /**
+   * The special orders this run would bring along.
+   *
+   * EXPLICIT, not an effect: it is called when the dialog opens and when the
+   * date or the day count changes, which is exactly when the answer can move.
+   * An effect would re-run on every render of a dialog that also holds a
+   * checkbox per shop, and the `set-state-in-effect` lint exists for a reason.
+   *
+   * Two queries over a handful of rows — there were eleven upcoming orders in
+   * the whole database when this was written.
+   */
+  async function loadCandidates(from: string, dayCount: number) {
+    // A SEQUENCE GUARD, because two of these can be in flight: changing the
+    // date and then the day count fires both, and whichever answers LAST wins
+    // regardless of which was asked last. Without it a slow first query
+    // overwrites a fast second one and the list quietly describes the wrong
+    // window.
+    const seq = ++loadSeq.current;
+    const to = addDays(from, dayCount - 1);
+    const { data: orders, error: e } = await supabase
+      .from("special_orders")
+      .select(
+        `id, number, title, kind, status, event_date, flag_reason,
+         kitchen_location_id, location_id, production_schedule_id`
+      )
+      .eq("kind", "order")
+      .gte("event_date", from)
+      .lte("event_date", to);
+    if (seq !== loadSeq.current) return;
+    if (e) {
+      // NOT swallowed into an empty list: "none ready for production" is a
+      // claim, and a failed query must not make it.
+      setCandidateError(e.message);
+      setCandidates([]);
+      setPullIds(new Set());
+      return;
+    }
+    setCandidateError(null);
+    if (!orders?.length) {
+      setCandidates([]);
+      setPullIds(new Set());
+      return;
+    }
+
+    const { data: lineRows } = await supabase
+      .from("special_order_items")
+      .select("order_id, production_item_id, name, item_type, item_cut, item_finish, item_size, qty, notes, sort")
+      .in("order_id", orders.map((o) => o.id as string))
+      .order("sort", { ascending: true, nullsFirst: false });
+
+    const byOrder = new Map<string, SchedulableLine[]>();
+    for (const l of lineRows ?? []) {
+      const list = byOrder.get(l.order_id as string) ?? [];
+      list.push({
+        name: (l.name ?? "") as string,
+        production_item_id: (l.production_item_id ?? null) as string | null,
+        item_type: (l.item_type ?? null) as string | null,
+        item_cut: (l.item_cut ?? null) as string | null,
+        item_finish: (l.item_finish ?? null) as string | null,
+        item_size: (l.item_size ?? null) as string | null,
+        qty: l.qty === null ? null : Number(l.qty),
+        notes: (l.notes ?? null) as string | null,
+      });
+      byOrder.set(l.order_id as string, list);
+    }
+
+    const code = new Map(locations.map((l) => [l.id, l.code]));
+    const next: Candidate[] = orders.map((raw) => {
+      const order = {
+        id: raw.id as string,
+        number: String(raw.number ?? ""),
+        title: (raw.title ?? null) as string | null,
+        kind: (raw.kind ?? "") as string,
+        status: (raw.status ?? null) as string | null,
+        event_date: (raw.event_date ?? null) as string | null,
+        flag_reason: (raw.flag_reason ?? null) as string | null,
+        kitchen_location_id: (raw.kitchen_location_id ?? null) as string | null,
+        location_id: (raw.location_id ?? null) as string | null,
+        production_schedule_id: (raw.production_schedule_id ?? null) as string | null,
+      };
+      const draft = scheduleDraft(byOrder.get(order.id) ?? []);
+      return {
+        order,
+        draft,
+        readiness: pullReadiness(order, draft.lines.length, (v) =>
+          STATUS_LABEL[v as keyof typeof STATUS_LABEL] ?? v
+        ),
+        kitchenCode: code.get(scheduleKitchen(order) ?? "") ?? "—",
+      };
+    });
+
+    if (seq !== loadSeq.current) return;
+    setCandidates(next);
+    // Ticked by default, which is the point of offering them — everything held
+    // back has to be chosen deliberately.
+    setPullIds(new Set(next.filter((c) => c.readiness.state === "ready").map((c) => c.order.id)));
+  }
+
+  function togglePull(id: string) {
+    setPullIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   function toggle(id: string) {
@@ -140,16 +280,78 @@ export function GenerateSchedules({
       p_allow_actuals: allowActuals,
     });
 
-    setRunning(false);
     if (error) {
+      setRunning(false);
       setError(error.message);
       return;
     }
+
+    /* ----------------------------------------------------------------------
+     * THE SPECIAL ORDERS, PULLED IN — decision 12's toggle finally meaning
+     * something (Mark, 2026-08-27).
+     *
+     * IT RUNS IN THE CLIENT, one `schedule_special_order` per order, and that
+     * is the whole design rather than a shortcut. Folding this into
+     * `generate_production_schedules` would need a PL/pgSQL twin of
+     * `scheduleDraft` — the cut canonicalisation over 93 real spellings, the
+     * note copy, the Misc filter — which is 016's `nextDeliveryDate` trap and
+     * the very thing 069 argued against. So PUSH stays the only writer and
+     * this is a second DOOR onto it: same function, same guards, same
+     * transcript.
+     *
+     * Each call is its own transaction, so one failure does not take the rest
+     * with it — they are collected and named instead. An order somebody
+     * scheduled while this dialog was open refuses itself ("already
+     * scheduled"), which is why re-running is safe.
+     * -------------------------------------------------------------------- */
+    const done: Pulled[] = [];
+    const failed: Pulled[] = [];
+    if (!ignoreSpecial) {
+      for (const c of candidates ?? []) {
+        if (!pullIds.has(c.order.id) || !c.order.event_date) continue;
+        const entry = {
+          number: c.order.number,
+          title: c.order.title,
+          lines: c.draft.lines.length,
+        };
+        const { error: pullErr } = await supabase.rpc("schedule_special_order", {
+          p_order_id: c.order.id,
+          p_date: c.order.event_date,
+          p_today: today,
+          p_title: scheduleTitle(c.order.number, c.order.title),
+          p_lines: c.draft.lines,
+        });
+        if (pullErr) failed.push({ ...entry, error: pullErr.message });
+        else done.push(entry);
+      }
+    }
+
+    setRunning(false);
     setReceipt(data as Receipt);
+    setPulled({ done, failed });
     router.refresh();
   }
 
   const blockedByActuals = (receipt?.skipped ?? []).some((s) => s.has_actuals);
+
+  // Which candidates are in THIS run — recomputed as shops are ticked, since
+  // the query is by date and the shop filter is the cheap half.
+  const inRun = (candidates ?? []).filter(
+    (c) => start && inGenerationRun(c.order, start, addDays(start, Number(days) - 1), selected)
+  );
+  const offered = inRun.filter((c) => c.readiness.state !== "not_ready");
+  const withheld = inRun.filter((c) => c.readiness.state === "not_ready");
+  const withheldSentence =
+    withheld.length === 0
+      ? ""
+      : `${withheld.length} more not ready — ${[
+          ...new Map(
+            withheld.map((c) => [
+              c.readiness.state === "not_ready" ? c.readiness.reason : "",
+              c.readiness.state === "not_ready" ? c.readiness.reason : "",
+            ])
+          ).keys(),
+        ].join(", ")}.`;
 
   return (
     <>
@@ -223,7 +425,7 @@ export function GenerateSchedules({
           {error && <p className="mt-2 text-sm text-accent">{error}</p>}
 
           {receipt ? (
-            <Receipt receipt={receipt} />
+            <Receipt receipt={receipt} pulled={pulled} />
           ) : (
             <div className="mt-3 space-y-5">
               <p className="text-sm text-muted">
@@ -239,7 +441,10 @@ export function GenerateSchedules({
                   </span>
                   <DateField
                     value={start}
-                    onChange={setStart}
+                    onChange={(v) => {
+                      setStart(v);
+                      if (v) void loadCandidates(v, Number(days));
+                    }}
                     required
                     ariaLabel="First date to generate"
                   />
@@ -251,7 +456,10 @@ export function GenerateSchedules({
                   <PickList
                     variant="field"
                     value={days}
-                    onPick={setDays}
+                    onPick={(v) => {
+                      setDays(v);
+                      if (start) void loadCandidates(start, Number(v));
+                    }}
                     options={DAY_OPTIONS}
                     ariaLabel="How many days to generate"
                   />
@@ -284,6 +492,72 @@ export function GenerateSchedules({
                 </p>
               </div>
 
+              {/* THE SPECIAL ORDERS THIS RUN WOULD BRING ALONG.
+                  Only those READY FOR PRODUCTION are offered (Mark,
+                  2026-08-27) — `pullReadiness`, which means `status = 'order'`,
+                  the rung the module already calls "paid, printing and
+                  scheduling remain". Everything held back is COUNTED and named
+                  rather than silently absent, because an order that simply does
+                  not appear is indistinguishable from one the query missed. */}
+              <div className="space-y-2">
+                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  Special orders
+                </span>
+
+                {candidateError ? (
+                  <p className="text-sm text-accent">
+                    Could not check for special orders: {candidateError}
+                  </p>
+                ) : candidates === null ? (
+                  <p className="text-xs text-muted">Looking…</p>
+                ) : offered.length === 0 ? (
+                  <p className="text-sm text-muted">
+                    None ready for production on {days === "1" ? "that day" : "those days"}.
+                    {withheld.length > 0 ? ` ${withheldSentence}` : ""}
+                  </p>
+                ) : (
+                  <>
+                    <ul className="divide-y divide-hairline border border-ink">
+                      {offered.map((c) => (
+                        <li key={c.order.id} className="flex items-start gap-3 px-4 py-2.5 text-sm">
+                          <Checkbox
+                            checked={pullIds.has(c.order.id)}
+                            onChange={() => togglePull(c.order.id)}
+                            disabled={ignoreSpecial}
+                            label={`Schedule order ${c.order.number}`}
+                            size={18}
+                          />
+                          <span className="min-w-0 flex-1">
+                            <span className="font-semibold tabular-nums">#{c.order.number}</span>
+                            {c.order.title ? <span className="text-subtle"> {c.order.title}</span> : null}
+                            <span className="block text-xs text-muted">
+                              {c.order.event_date} · made at {c.kitchenCode} ·{" "}
+                              {c.draft.lines.length} line{c.draft.lines.length === 1 ? "" : "s"},{" "}
+                              {c.draft.total} to make
+                              {c.draft.blocked.length > 0
+                                ? ` · ${c.draft.blocked.length} line${
+                                    c.draft.blocked.length === 1 ? "" : "s"
+                                  } with no menu item will not be scheduled`
+                                : ""}
+                            </span>
+                            {/* Offered UNTICKED, saying why — 013's
+                                under-minimum vendor, unchecked-but-checkable. */}
+                            {c.readiness.state === "hold" ? (
+                              <span className="mt-1 inline-block bg-mark-fill px-1 text-xs">
+                                Flagged: {c.readiness.reason}
+                              </span>
+                            ) : null}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                    {withheld.length > 0 ? (
+                      <p className="text-xs text-muted">{withheldSentence}</p>
+                    ) : null}
+                  </>
+                )}
+              </div>
+
               <div className="flex items-start gap-3">
                 <Checkbox
                   checked={ignoreSpecial}
@@ -294,9 +568,9 @@ export function GenerateSchedules({
                 <span className="text-sm">
                   Ignore special orders
                   <span className="block text-xs text-muted">
-                    Recorded on each schedule so the printed totals explain
-                    themselves later. A special order becomes its OWN schedule,
-                    scheduled from the order — this never writes one.
+                    Generate the plans only, and leave the orders above for
+                    later. Recorded on each schedule it writes, so the printed
+                    totals explain themselves a month from now.
                   </span>
                 </span>
               </div>
@@ -308,11 +582,19 @@ export function GenerateSchedules({
   );
 }
 
-function Receipt({ receipt }: { receipt: Receipt }) {
+function Receipt({
+  receipt,
+  pulled,
+}: {
+  receipt: Receipt;
+  pulled: { done: Pulled[]; failed: Pulled[] } | null;
+}) {
   const nothing =
     receipt.created.length === 0 &&
     receipt.replaced.length === 0 &&
-    receipt.skipped.length === 0;
+    receipt.skipped.length === 0 &&
+    (pulled?.done.length ?? 0) === 0 &&
+    (pulled?.failed.length ?? 0) === 0;
 
   return (
     <div className="mt-3 space-y-5">
@@ -361,6 +643,30 @@ function Receipt({ receipt }: { receipt: Receipt }) {
               {s.has_actuals ? (
                 <span className="text-mark"> · has counted quantities</span>
               ) : null}
+            </Row>
+          ))}
+        </Block>
+      ) : null}
+
+      {pulled && pulled.done.length > 0 ? (
+        <Block title={`Special orders scheduled — ${pulled.done.length}`}>
+          {pulled.done.map((o) => (
+            <Row key={o.number} left={<span className="tabular-nums">#{o.number}</span>}>
+              {o.title ? <span className="text-subtle">{o.title} · </span> : null}
+              {o.lines} {o.lines === 1 ? "item" : "items"}
+            </Row>
+          ))}
+        </Block>
+      ) : null}
+
+      {/* Each order is its own transaction, so one refusal leaves the rest
+          done. Named rather than folded into a count — the commonest is
+          somebody having scheduled it while this dialog was open. */}
+      {pulled && pulled.failed.length > 0 ? (
+        <Block title={`Special orders NOT scheduled — ${pulled.failed.length}`}>
+          {pulled.failed.map((o) => (
+            <Row key={o.number} left={<span className="tabular-nums">#{o.number}</span>}>
+              <span className="text-accent">{o.error}</span>
             </Row>
           ))}
         </Block>

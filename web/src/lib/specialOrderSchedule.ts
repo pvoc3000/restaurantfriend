@@ -186,3 +186,104 @@ export function scheduleDraft<T extends SchedulableLine>(lines: T[]): {
     total: kept.reduce((sum, l) => sum + l.par, 0),
   };
 }
+
+/* ==========================================================================
+ * WHICH ORDERS A GENERATION SHOULD OFFER
+ * ========================================================================== */
+
+/** What the generate dialog needs to judge an order, and nothing more. */
+export type PullCandidate = {
+  id: string;
+  number: string;
+  title: string | null;
+  kind: string;
+  status: string | null;
+  event_date: string | null;
+  flag_reason: string | null;
+  kitchen_location_id: string | null;
+  location_id: string | null;
+  production_schedule_id: string | null;
+};
+
+export type PullReadiness =
+  /** Offer it, ticked. */
+  | { state: "ready" }
+  /** Offer it, UNTICKED, saying why — the PO generator's under-minimum vendor. */
+  | { state: "hold"; reason: string }
+  /** Do not offer it. Counted in a sentence so the omission is legible. */
+  | { state: "not_ready"; reason: string };
+
+/**
+ * Where this order would be MADE — the same coalesce `schedule_special_order`
+ * applies, since a schedule's two location columns are NOT NULL and an order's
+ * are both nullable.
+ */
+export function scheduleKitchen(o: {
+  kitchen_location_id: string | null;
+  location_id: string | null;
+}): string | null {
+  return o.kitchen_location_id ?? o.location_id ?? null;
+}
+
+/**
+ * Is this order READY FOR PRODUCTION? (Mark, 2026-08-27, asking that only those
+ * be offered when generating a night.)
+ *
+ * READY IS `status = 'order'`, AND THAT IS A MEASUREMENT RATHER THAN A TASTE.
+ * Of the eleven upcoming orders on 2026-08-27, the two Mark had scheduled by
+ * hand were both `order` and both paid; of the eight he had not, SIX WERE STILL
+ * QUOTES — four without even a returned quote — one was an unpaid invoice, and
+ * exactly one was a committed order. So the rung the module already calls
+ * "paid — printing and scheduling remain" is the rung he schedules at, and
+ * offering a quote would ask a kitchen to make donuts nobody has agreed to buy.
+ * It is also the app's own sequencing: `suggestedTodo` at `order` runs Print
+ * Order, then Schedule Production, then Send Receipt.
+ *
+ * A FLAGGED order is offered but NOT TICKED, with its flag as the reason —
+ * migration 013's dialog does exactly this for a vendor under its minimum
+ * ("unchecked-but-checkable"). A flag at this rung is an unresolved problem,
+ * which is a reason to look before making 200 donuts and not a reason to
+ * refuse.
+ *
+ * Everything else is withheld and COUNTED, never silently absent: an order that
+ * simply does not appear is indistinguishable from one the query missed.
+ */
+export function pullReadiness(
+  order: PullCandidate,
+  schedulableLines: number,
+  statusLabel: (s: string) => string = (s) => s
+): PullReadiness {
+  if (order.kind !== "order") return { state: "not_ready", reason: "not an order" };
+  if (order.status === "cancelled") return { state: "not_ready", reason: "cancelled" };
+  if (order.production_schedule_id) return { state: "not_ready", reason: "already scheduled" };
+  if (!order.event_date) return { state: "not_ready", reason: "no date" };
+  if (schedulableLines === 0) return { state: "not_ready", reason: "nothing to make" };
+  if (scheduleKitchen(order) === null) return { state: "not_ready", reason: "no shop" };
+  if (order.status !== "order") {
+    return { state: "not_ready", reason: `still a ${statusLabel(order.status ?? "")}` };
+  }
+  if (order.flag_reason) return { state: "hold", reason: order.flag_reason };
+  return { state: "ready" };
+}
+
+/**
+ * Is this order in the run's window and one of its kitchens?
+ *
+ * The dialog picks shops that SELL, while a special order's schedule is made at
+ * its KITCHEN — so the test is the kitchen, not the pickup shop. Generating
+ * DF01 brings along the wedding DF01 is baking, wherever it is collected.
+ *
+ * Dates compare as STRINGS, never through `new Date` (UTC midnight, and the
+ * range's ends move west of Greenwich).
+ */
+export function inGenerationRun(
+  order: PullCandidate,
+  from: string,
+  to: string,
+  shopIds: ReadonlySet<string>
+): boolean {
+  const kitchen = scheduleKitchen(order);
+  if (kitchen === null || !shopIds.has(kitchen)) return false;
+  const on = order.event_date;
+  return on !== null && on >= from && on <= to;
+}

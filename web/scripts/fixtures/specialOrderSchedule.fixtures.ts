@@ -17,11 +17,15 @@
 import { cutLetter } from "../../src/lib/specialOrderLines";
 import {
   canonicalCut,
+  inGenerationRun,
+  pullReadiness,
   scheduleDraft,
+  scheduleKitchen,
   scheduleTitle,
+  type PullCandidate,
   type SchedulableLine,
 } from "../../src/lib/specialOrderSchedule";
-import { eq, ok, test } from "./harness";
+import { eq, no, ok, test } from "./harness";
 
 const CHOC = "item-rites-choc";
 const VANILLA = "item-rites-vanilla";
@@ -270,4 +274,93 @@ test("scheduleTitle: number and order name, and the number alone without one", (
   eq(scheduleTitle("9885", null), "#9885", "no name");
   eq(scheduleTitle("9885", "   "), "#9885", "blank name");
   eq(scheduleTitle("3932 cont.", "Rehearsal"), "#3932 cont. · Rehearsal", "text number");
+});
+
+/* ==========================================================================
+ * READY FOR PRODUCTION — which orders a generation offers
+ * ========================================================================== */
+
+function candidate(over: Partial<PullCandidate> = {}): PullCandidate {
+  return {
+    id: "o-1",
+    number: "9618",
+    title: "Walk 'n Rollers",
+    kind: "order",
+    status: "order",
+    event_date: "2026-09-05",
+    flag_reason: null,
+    kitchen_location_id: "df01",
+    location_id: "df02",
+    production_schedule_id: null,
+    ...over,
+  };
+}
+
+test("pullReadiness: a committed order with donuts is ready", () => {
+  eq(pullReadiness(candidate(), 5), { state: "ready" }, "ready");
+});
+
+test("pullReadiness: a QUOTE is never offered", () => {
+  // The measurement this rule comes from: of the eight upcoming unscheduled
+  // orders, six were still quotes. Offering one asks a kitchen to make donuts
+  // nobody has agreed to buy.
+  eq(pullReadiness(candidate({ status: "quote" }), 5).state, "not_ready", "quote");
+  eq(pullReadiness(candidate({ status: "lead" }), 5).state, "not_ready", "lead");
+  eq(pullReadiness(candidate({ status: "invoice" }), 5).state, "not_ready", "invoice");
+});
+
+test("pullReadiness: a withheld order SAYS WHY, so its absence is legible", () => {
+  eq(
+    pullReadiness(candidate({ status: "quote" }), 5, (v) => v.toUpperCase()),
+    { state: "not_ready", reason: "still a QUOTE" },
+    "reason"
+  );
+});
+
+test("pullReadiness: a FLAGGED order is offered, unticked, with its flag", () => {
+  // 013's under-minimum vendor: unchecked-but-checkable. A flag here is a
+  // reason to look before making 200 donuts, not a reason to refuse.
+  eq(
+    pullReadiness(candidate({ flag_reason: "Customer changing the count" }), 5),
+    { state: "hold", reason: "Customer changing the count" },
+    "held"
+  );
+});
+
+test("pullReadiness: the disqualifiers, each by name", () => {
+  const why = (o: Partial<PullCandidate>, lines = 5) => {
+    const r = pullReadiness(candidate(o), lines);
+    return r.state === "ready" ? "ready" : r.reason;
+  };
+  eq(why({ kind: "template" }), "not an order", "template");
+  eq(why({ status: "cancelled" }), "cancelled", "cancelled");
+  eq(why({ production_schedule_id: "s-1" }), "already scheduled", "done");
+  eq(why({ event_date: null }), "no date", "undated");
+  eq(why({}, 0), "nothing to make", "no lines");
+  eq(why({ kitchen_location_id: null, location_id: null }), "no shop", "no shop");
+  // Ordering matters: a scheduled order that is ALSO flagged must read as done,
+  // or the dialog offers to schedule it a second time.
+  eq(why({ production_schedule_id: "s-1", flag_reason: "x" }), "already scheduled", "done first");
+});
+
+test("scheduleKitchen: kitchen, then pickup shop, then nothing", () => {
+  eq(scheduleKitchen({ kitchen_location_id: "df01", location_id: "df02" }), "df01", "kitchen");
+  eq(scheduleKitchen({ kitchen_location_id: null, location_id: "df02" }), "df02", "fallback");
+  eq(scheduleKitchen({ kitchen_location_id: null, location_id: null }), null, "neither");
+});
+
+test("inGenerationRun: matched on the KITCHEN, not the pickup shop", () => {
+  // The dialog picks shops that SELL; the schedule is made at the kitchen.
+  // Generating DF01 must bring along the wedding DF01 bakes for DF02.
+  const o = candidate({ kitchen_location_id: "df01", location_id: "df02" });
+  ok(inGenerationRun(o, "2026-09-01", "2026-09-30", new Set(["df01"])), "its kitchen");
+  no(inGenerationRun(o, "2026-09-01", "2026-09-30", new Set(["df02"])), "its shop only");
+});
+
+test("inGenerationRun: the window includes both ends", () => {
+  const o = candidate({ event_date: "2026-09-05" });
+  const shops = new Set(["df01"]);
+  ok(inGenerationRun(o, "2026-09-05", "2026-09-05", shops), "single day");
+  no(inGenerationRun(o, "2026-09-06", "2026-09-10", shops), "before");
+  no(inGenerationRun(o, "2026-09-01", "2026-09-04", shops), "after");
 });

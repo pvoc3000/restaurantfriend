@@ -3863,21 +3863,59 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    rendered through the real dialog against the LIVE database gives the same 12
    lines and 118 to make, and the commit refuses legibly ("migration 068 has not
    been applied") while writing nothing.
-   **"IGNORE SPECIAL ORDERS" IS INERT, AND MARK KNOWS — LEAVE IT** (asked and
-   answered 2026-08-27: "what does it do?" → nothing, → "leave it alone for
-   now"). Traced end to end: `p_ignore_special_orders` is WRITTEN to
-   `production_schedules.ignored_special_orders` and **read by nothing** — not
-   by the generator's own body, and in `web/src` only by the record's sentence
-   " · special orders ignored". It is 040 decision 12's leftover, from when
-   generation was expected to fold special orders into the plan schedule;
-   decision 9 went the other way (a special order becomes its OWN schedule), so
-   there was never anything for it to ignore and it was never wired.
-   **Do not "fix" it and do not delete it.** The one place the two sources now
-   meet is the PACKET — decision 11's pull-in — so if it is ever given a
-   meaning, that is the meaning: tick it and the night's packet does not pull in
-   that kitchen's special orders. Everything needed is already there (the column
-   is per schedule, the record already says it), and it is `companionScheduleIds`
-   reading one flag, with no migration. Offered and declined for now.
+   **GENERATING A NIGHT OFFERS ITS SPECIAL ORDERS — decision 12's pull, built
+   at last** (Mark, 2026-08-27: "initially we thought we would pull special
+   orders into a production schedule from this end, instead of pushing them
+   from the special order page? Is that still a possibility?" — he was right
+   about the history). Production brief decision 12 says special orders "inject
+   production the same way FMP's do" and "the generate dialog's 'ignore special
+   orders' toggle survives" — that toggle exists because FileMaker's generation
+   PULLED them in. Nine days later the special-orders brief's decision 9
+   specified push-from-the-order, nobody reconciled the two, and the toggle sat
+   **inert for three weeks**: `p_ignore_special_orders` was written to
+   `ignored_special_orders` and read by nothing.
+   **THE PULL RUNS IN THE CLIENT, AND THAT IS THE DESIGN RATHER THAN A
+   SHORTCUT.** Folding it into `generate_production_schedules` needs a PL/pgSQL
+   twin of `scheduleDraft` — the cut canonicalisation over 93 spellings, the
+   note copy, the Misc filter — which is 016's `nextDeliveryDate` trap and the
+   thing 069 argued against. So the dialog calls `schedule_special_order` once
+   per ticked order: **push stays the only writer and this is a second DOOR onto
+   it**, same function, same guards, same transcript. No migration, no
+   duplicated rule. Each call is its own transaction, so one refusal leaves the
+   rest done and is NAMED in the receipt (the commonest being somebody having
+   scheduled it while the dialog was open).
+   **"READY FOR PRODUCTION" IS `status = 'order'`, AND THAT IS A MEASUREMENT**
+   (Mark: "only special orders that are 'ready for production' (whatever that
+   ends up meaning) should be offered"). Of the eleven upcoming orders that day,
+   the two he had scheduled BY HAND were both `order` and both paid; of the
+   eight he had not, **six were still quotes** — four without even a returned
+   quote — one was an unpaid invoice, and exactly one was a committed order. So
+   the rung the module already calls "paid — printing and scheduling remain" is
+   the rung he schedules at, and offering a quote asks a kitchen to make donuts
+   nobody has agreed to buy. It is also `suggestedTodo`'s own sequencing.
+   Worth noting because the first reading of that data was ALARMIST and wrong:
+   "eight upcoming orders unscheduled" sounds like a hole and is mostly correct
+   behaviour.
+   **A FLAGGED order is offered UNTICKED with its flag as the reason** — 013's
+   under-minimum vendor, "unchecked-but-checkable". Everything else is withheld
+   and **COUNTED in a sentence** ("1 more not ready — still a Quote"), never
+   silently absent: an order that simply does not appear is indistinguishable
+   from one the query missed.
+   **The match is on the KITCHEN, not the pickup shop** — the dialog picks shops
+   that SELL, while the schedule is made at the kitchen, so generating DF01
+   brings along the wedding DF01 bakes for DF02.
+   **`loadCandidates` carries a SEQUENCE GUARD**, because changing the date and
+   then the day count puts two queries in flight and whichever answers last
+   wins regardless of which was asked last. It also refuses to swallow a query
+   failure into an empty list — "none ready for production" is a CLAIM, and a
+   failed query must not make it.
+   The toggle now means what it always said: tick it and the plans generate
+   alone. Verified live end to end and **left exactly as found** — #9618
+   offered and ticked while its quote-stage neighbour was withheld, generated
+   alongside two plan schedules, `order_scheduled_at` stamped **2026-08-27**
+   (the org's day, where UTC was already the 28th), `todo` untouched, five lines
+   each carrying its own note; then all of it deleted back to 19 events, 21
+   schedules, 622 lines.
 
    **THE GENERATE RECEIPT'S "DONE" WAS A NO-OP** (Mark, 2026-08-27), and the
    cause is worth knowing because it can only ever happen this way round: it was
