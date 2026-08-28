@@ -105,7 +105,15 @@ export function OrderTotals({
           gap was a fifth of a column, and the two `justify-between` rows
           already separate themselves — a value ending and a label starting is
           its own boundary. */}
-      <div className="grid max-w-[32rem] gap-x-8 gap-y-6 md:grid-cols-2">
+      {/* THE TWO TRACKS SIZE TO THEIR CONTENT, not to half the block each.
+          `grid-cols-2` is `repeat(2, minmax(0, 1fr))`, so both columns took the
+          width of the WIDER one — the inputs — and the figures beside them were
+          padded out to match. Sizing each to its own content lets the input
+          column take the ~40px the rush-fee offer needs while the figures give
+          back the ~60px they never used: measured, the whole block went from
+          505px to 483px and Payments beside it gained the difference. The
+          `max-w` cap stays as a backstop for the day a label grows. */}
+      <div className="grid max-w-[32rem] gap-x-8 gap-y-6 md:grid-cols-[auto_auto]">
         {/* --------- the inputs --------- */}
         <dl className="space-y-3 text-[14px]">
           <Line label="Tax rate">
@@ -127,17 +135,17 @@ export function OrderTotals({
             <Cell id={id} canWrite={canWrite} column="delivery_charge" value={inputs.delivery_charge} label="Delivery charge"
                   format={(v) => money(Number(v))} />
           </Line>
-          {/* THE SUGGESTION HANGS UNDER THE LABEL, not under the field (Mark,
-              2026-08-28). Beside the field it cost the field twice over —
-              squeezed to 88px where the other four were 96 (which is what
-              `shrink-0` on `MONEY_FIELD` now prevents), and pushed 67px off the
-              right edge they all share. Under the field it kept both, but broke
-              the one thing the fixed width bought: a clean column of identical
-              boxes. Under the label it costs nothing at all — that side has the
-              room, and the offer is a sentence rather than a value. */}
+          {/* THE SUGGESTION SITS AFTER THE LABEL, which is the third place it
+              has been and the one that costs nothing. Beside the FIELD it
+              squeezed it to 88px where the other four were 96 (which is what
+              `shrink-0` on `MONEY_FIELD` now prevents); under the field it kept
+              the width but broke the clean column of identical boxes that width
+              had just bought; under the LABEL it pushed every row beneath it
+              down. On the label's own line it takes room the track already had
+              once the two grid columns stopped being forced equal. */}
           <Line
             label="Rush fee"
-            under={
+            after={
               /* Decision 22: the receiving screen's `→` idiom. A SUGGESTION you
                  tap, never an automatic write — an automatic one would charge a
                  wholesale customer a rush fee every Friday, quietly. It states
@@ -212,33 +220,35 @@ export function OrderTotals({
 /**
  * A money input: its label, and the field against the right edge.
  *
- * `under` hangs something BENEATH THE LABEL rather than beneath the field
- * (Mark, 2026-08-28). Only the rush fee uses it, and the left side is the right
- * side for it: the field column is a stack of identical 96px boxes and anything
- * hung below one interrupts that column, where the label column has empty space
- * to spare and the suggestion is a sentence anyway.
+ * `after` puts something on the label's OWN LINE, to its right (Mark,
+ * 2026-08-28: "I think the rush fee would fit after the label. If not we could
+ * make a little more room for it"). Only the rush fee uses it.
+ *
+ * It fits because the two grid tracks stopped being forced equal — see the
+ * grid's own note. Beneath the label (where this sat for an hour) it pushed
+ * every later row down and made the block taller than the figures beside it;
+ * beside the label it costs the block nothing at all.
  *
  * It goes INSIDE the `dt` rather than in a wrapper around it, because `dl` >
- * `div` > `dt` is as deep as the grouping element is allowed to nest — another
- * div around the `dt` is invalid. `items-baseline` on the row uses the dt's
- * FIRST line, so the label and the field stay on one line however tall the dt
- * grows, and the dt's own uppercase tracking is reset for the text below.
+ * `div` > `dt` is as deep as the grouping element may nest — another div around
+ * the `dt` is invalid. The dt's uppercase tracking is reset for it, and the row
+ * stays `items-baseline` so the label, the offer and the field sit on one line.
  */
 function Line({
   label,
-  under,
+  after,
   children,
 }: {
   label: string;
-  under?: React.ReactNode;
+  after?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+      <dt className="flex items-baseline gap-2 whitespace-nowrap text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
         {label}
-        {under ? (
-          <span className="mt-1 block normal-case tracking-normal">{under}</span>
+        {after ? (
+          <span className="normal-case tracking-normal">{after}</span>
         ) : null}
       </dt>
       <dd className="text-right">{children}</dd>
