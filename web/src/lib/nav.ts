@@ -162,13 +162,30 @@ export const SECTIONS: NavSection[] = [
     slug: "operations",
     label: "Operations",
     subs: [
-      // AFTER Shift Reports (Mark, 2026-08-23; it led the section for a few
-      // hours first). Daily net sales and tips per shop, pulled from Square —
-      // the numbers closing supervisors used to transcribe into FileMaker's
-      // shift report. It is deliberately NOT that stub: Shift Reports is the
-      // whole closing form (leftovers, production counts) and belongs with
-      // Production, where the brief deferred it so it would not be built twice.
-      stub("operations", "shift-reports", "Shift Reports"),
+      // Sales sits AFTER Shift Reports (Mark, 2026-08-23; it led the section
+      // for a few hours first). Daily net sales and tips per shop, pulled from
+      // Square — the numbers closing supervisors used to transcribe into
+      // FileMaker's shift report. The two are related and distinct: Sales is
+      // the settled figure for any day, Shift Reports is the whole closing
+      // form (ratings, leftovers, production counts, tomorrow's paper).
+      //
+      // Shift Reports stays HERE rather than moving to Production (Mark,
+      // 2026-08-28). The note that used to sit above argued for Production on
+      // the grounds that the production brief deferred the screen there so it
+      // would not be built twice — that was about WHERE THE WORK WAS
+      // SEQUENCED, not where the menu entry belongs, and the screen is
+      // organised by the shift a supervisor is closing rather than by the
+      // tables it happens to write. The slug is untouched, so the `rf.nav`
+      // cookie keeps working.
+      //
+      // supervisor+ is 070's own RLS, restated for tidiness only.
+      {
+        slug: "shift-reports",
+        label: "Shift Reports",
+        href: "/shift-reports",
+        built: true,
+        roles: ["owner", "admin", "purchaser", "supervisor"],
+      },
       { slug: "sales", label: "Sales", href: "/sales", built: true },
       stub("operations", "documents", "Documents"),
       stub("operations", "policies", "Policies"),

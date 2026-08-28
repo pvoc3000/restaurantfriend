@@ -1,5 +1,6 @@
 import { getAppSession } from "@/lib/session";
 import { canManageMembers } from "@/lib/roles";
+import { ShiftReportSettings } from "@/components/settings/ShiftReportSettings";
 import { SpecialOrderSettings } from "@/components/settings/SpecialOrderSettings";
 
 /**
@@ -45,6 +46,13 @@ export default async function SettingsPage() {
         settings={session.orgSettings as Record<string, unknown>}
         editable={editable}
       />
+
+      <div className="border-t border-hairline pt-8">
+        <ShiftReportSettings
+          settings={session.orgSettings as Record<string, unknown>}
+          editable={editable}
+        />
+      </div>
 
       {/* Say what this screen does NOT cover, so its absence is a statement
           rather than something to hunt for. */}

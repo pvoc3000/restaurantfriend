@@ -297,9 +297,24 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    if (!member || !["owner", "admin"].includes(member.role as string)) {
+    // PREVIEW IS SUPERVISOR+, WRITING IS OWNER/ADMIN.
+    //
+    // The shift report reads today's figure live at the end of a shift, and
+    // today's figure is one the supervisor can already read off the register
+    // standing in front of them — so returning it is not the same act as
+    // writing `daily_sales`, which is the settled reporting day and which
+    // `tip_pools` is computed from. The split is between LOOKING and
+    // RECORDING, and only the second one touches anybody's pay.
+    const previewing = payload?.preview === true;
+    const allowed = previewing
+      ? ["owner", "admin", "purchaser", "supervisor"]
+      : ["owner", "admin"];
+
+    if (!member || !allowed.includes(member.role as string)) {
       return json(403, {
-        error: "a manager or the owner is required to sync sales from Square",
+        error: previewing
+          ? "a supervisor or above is required to read sales from Square"
+          : "a manager or the owner is required to sync sales from Square",
       });
     }
 
@@ -514,6 +529,34 @@ Deno.serve(async (req) => {
         tips_cents: v.tips ?? 0,
       });
       perLocation.set(loc.code, (perLocation.get(loc.code) ?? 0) + 1);
+    }
+
+    // --- preview --------------------------------------------------------
+    //
+    // WRITES NOTHING, and returns the very rows `record_daily_sales` would
+    // have been given — mapped to OUR location ids, which is what makes them
+    // usable by a caller that knows about shops rather than about Square.
+    //
+    // It exists for the shift report, where the closing supervisor needs
+    // today's figure at 9pm and Square's reporting day does not end until 1am.
+    // Letting that figure into `daily_sales` would put a PARTIAL day in the
+    // table payroll is computed from, so the answer is returned and never
+    // stored, and every screen showing it says it is provisional.
+    //
+    // Distinct from `dry` above, which answers a MAPPING question and so
+    // deliberately reports unmapped Square locations under their own ids.
+    // This one answers "what has this shop taken today" and returns nothing
+    // it could not attribute to a shop.
+    if (previewing) {
+      return json(200, {
+        preview: true,
+        from,
+        to,
+        wrote: "nothing",
+        rows,
+        warnings,
+        square_calls: calls,
+      });
     }
 
     // --- dry run ------------------------------------------------------------

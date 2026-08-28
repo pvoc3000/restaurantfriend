@@ -43,6 +43,19 @@ export type Mail = {
   subject: string;
   text: string;
   /**
+   * OPTIONAL, and when present the message goes out as multipart/alternative
+   * with `text` as the fallback part — so a client that will not render HTML
+   * still gets something readable rather than a blank body.
+   *
+   * Added for the shift report (2026-08-28), which is a page of tables rather
+   * than a document with a PDF attached. Optional and unset by every existing
+   * caller, so their messages are byte-identical to before — the same shape
+   * `messageId` was added in. `_shared` is compiled into each function AT
+   * DEPLOY TIME, so the others pick this up only when they are redeployed,
+   * which is hygiene rather than a requirement.
+   */
+  html?: string;
+  /**
    * OPTIONAL, because not every message this layer sends carries a document.
    * A purchase order and a quote always do; an approval CONFIRMATION does not,
    * and an earlier cut of that attached a one-line placeholder file rather than
@@ -120,6 +133,7 @@ async function sendViaResend(
       reply_to: mail.replyTo ?? undefined,
       subject: mail.subject,
       text: mail.text,
+      html: mail.html ?? undefined,
       headers: resendHeaders(mail),
       attachments: mail.attachment
         ? [{ filename: mail.attachment.filename, content: mail.attachment.base64 }]
@@ -179,6 +193,30 @@ function buildMime(mail: Mail & { from: string }): string {
     "MIME-Version: 1.0",
     `Content-Type: multipart/mixed; boundary="${boundary}"`,
   ].filter(Boolean);
+
+  // HTML with nothing to attach: multipart/alternative, text part FIRST.
+  // The order is the spec's and it is load-bearing — a client picks the LAST
+  // part it can render, so text-then-html gets HTML where possible and plain
+  // text where not. Reversed, every client shows the plain-text version.
+  if (mail.html && !mail.attachment) {
+    return [
+      ...headers.filter((h) => !String(h).startsWith("Content-Type: multipart")),
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      "",
+      `--${boundary}`,
+      'Content-Type: text/plain; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      fold(base64FromUtf8(mail.text)),
+      `--${boundary}`,
+      'Content-Type: text/html; charset="UTF-8"',
+      "Content-Transfer-Encoding: base64",
+      "",
+      fold(base64FromUtf8(mail.html)),
+      `--${boundary}--`,
+      "",
+    ].join("\r\n");
+  }
 
   // With nothing to attach it is an ORDINARY text message rather than a
   // one-part multipart — some clients render the latter as an empty body with
