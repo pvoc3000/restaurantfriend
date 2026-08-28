@@ -1,6 +1,7 @@
 "use client";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { InventoryItemPicker } from "@/components/catalog/InventoryItemPicker";
 import {
   ELEMENT_KIND_OPTIONS,
@@ -50,10 +51,11 @@ export function ElementFields({
   const gaps = unresolvedSummary(cost);
 
   return (
-    <dl className="grid grid-cols-[minmax(9rem,auto)_1fr] gap-x-6 gap-y-3 text-[14px]">
+    <dl className="grid grid-cols-[minmax(9rem,auto)_1fr] items-center gap-x-6 gap-y-3 text-[14px]">
       <Row label="Kind">
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="production_elements"
             id={element.id}
             column="kind"
@@ -70,6 +72,7 @@ export function ElementFields({
       <Row label="Type">
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="production_elements"
             id={element.id}
             column="element_type"
@@ -90,6 +93,7 @@ export function ElementFields({
       <Row label="Schedule">
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="production_elements"
             id={element.id}
             column="schedule_class"
@@ -109,32 +113,43 @@ export function ElementFields({
           the disease decision 2 exists to cure. */}
       {element.kind === "manual" ? (
         <Row label="Set cost">
-          <span className="flex items-baseline gap-2">
-            {editable ? (
-              <InlineValue
-                table="production_elements"
-                id={element.id}
-                column="manual_cost"
-                kind="number"
-                value={element.manual_cost}
-                format={(v) => `$${Number(v).toFixed(2)}`}
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>
-                {element.manual_cost === null ? "—" : `$${element.manual_cost.toFixed(2)}`}
-              </span>
-            )}
+          {/* A COMPOSITE ROW HAS NO TRACK TO FILL, so each half gets its own
+              definite-width wrapper — a boxed field's `w-full` has nothing to
+              resolve against in a shrink-to-fit row and two of them would each
+              demand the whole width. `items-center`, not `items-baseline`:
+              boxes align by their edges, not by the text inside them. */}
+          <span className="flex items-center gap-2">
+            <span className="block w-28">
+              {editable ? (
+                <InlineValue
+                  boxed={BOXED_FIELDS}
+                  table="production_elements"
+                  id={element.id}
+                  column="manual_cost"
+                  kind="number"
+                  value={element.manual_cost}
+                  format={(v) => `$${Number(v).toFixed(2)}`}
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>
+                  {element.manual_cost === null ? "—" : `$${element.manual_cost.toFixed(2)}`}
+                </span>
+              )}
+            </span>
             <span className="text-subtle">per</span>
-            {editable ? (
-              <InlineValue
-                table="production_elements"
-                id={element.id}
-                column="manual_cost_unit"
-                value={element.manual_cost_unit}
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{element.manual_cost_unit ?? "—"}</span>
-            )}
+            <span className="block w-28">
+              {editable ? (
+                <InlineValue
+                  boxed={BOXED_FIELDS}
+                  table="production_elements"
+                  id={element.id}
+                  column="manual_cost_unit"
+                  value={element.manual_cost_unit}
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>{element.manual_cost_unit ?? "—"}</span>
+              )}
+            </span>
           </span>
         </Row>
       ) : null}
@@ -193,7 +208,9 @@ export function ElementFields({
             {cost.unit ? <span className="text-subtle"> / {cost.unit}</span> : null}
           </span>
           {gaps ? (
-            <span className={`${READ_ONLY_VALUE} text-[13px] text-mark`}>{gaps}</span>
+            <span className={`${READ_ONLY_VALUE} box-decoration-clone bg-mark-fill text-[13px]`}>
+              {gaps}
+            </span>
           ) : null}
         </span>
       </Row>
@@ -201,6 +218,7 @@ export function ElementFields({
       <Row label="Notes">
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="production_elements"
             id={element.id}
             column="notes"
@@ -217,7 +235,7 @@ export function ElementFields({
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <>
-      <dt className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
         {label}
       </dt>
       <dd className="min-w-0">{children}</dd>

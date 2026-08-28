@@ -17,6 +17,7 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { CustomerActions } from "@/components/specialOrders/CustomerActions";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 
@@ -170,7 +171,7 @@ export async function CustomerDetail({
 
       <section className="space-y-3">
         <SectionHeading>Details</SectionHeading>
-        <div className="grid max-w-[56rem] gap-x-12 gap-y-4 sm:grid-cols-2">
+        <div className="grid max-w-[56rem] gap-x-6 gap-y-4 sm:grid-cols-2">
           <Row label="First name"><Cell id={id} canWrite={canWrite} address={address} column="first_name" value={customer.first_name as string | null} label="First name" /></Row>
           <Row label="Last name"><Cell id={id} canWrite={canWrite} address={address} column="last_name" value={customer.last_name as string | null} label="Last name" /></Row>
           <Row label="Company"><Cell id={id} canWrite={canWrite} address={address} column="company" value={customer.company as string | null} label="Company" /></Row>
@@ -188,7 +189,7 @@ export async function CustomerDetail({
         {/* jsonb, edited a key at a time — `locations.address`' idiom, and the
             reason it stays jsonb: an address is read whole and written whole,
             and `InlineValue` already has a json path for it. */}
-        <div className="grid max-w-[56rem] gap-x-12 gap-y-4 sm:grid-cols-2">
+        <div className="grid max-w-[56rem] gap-x-6 gap-y-4 sm:grid-cols-2">
           <Row label="Street"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["street"]} value={(address.street as string) ?? null} label="Street" /></Row>
           <Row label="Street 2"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["street2"]} value={(address.street2 as string) ?? null} label="Street line 2" /></Row>
           <Row label="City"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["city"]} value={(address.city as string) ?? null} label="City" /></Row>
@@ -200,10 +201,16 @@ export async function CustomerDetail({
       <section className="space-y-3">
         <SectionHeading>Notes</SectionHeading>
         {canWrite ? (
-          <InlineValue table="customers" id={id} column="notes" multiline
+          <InlineValue table="customers" id={id} column="notes" multiline boxed={BOXED_FIELDS}
                        value={customer.notes as string | null} ariaLabel="Notes about this customer" />
         ) : (
-          <p className={`${READ_ONLY_VALUE} whitespace-pre-wrap`}>{(customer.notes as string) ?? "—"}</p>
+          <p
+            className={`${READ_ONLY_VALUE} whitespace-pre-wrap ${
+              BOXED_FIELDS ? "block min-h-16 w-full border border-hairline" : ""
+            }`}
+          >
+            {(customer.notes as string) ?? "—"}
+          </p>
         )}
       </section>
 
@@ -348,6 +355,10 @@ function Cell({
   if (!canWrite) return <span className={READ_ONLY_VALUE}>{value ?? "—"}</span>;
   return (
     <InlineValue
+      // THE SEAM. Every editable cell on this record goes through here, so one
+      // default boxes the lot — and a read-only value keeps none, which is what
+      // the box means.
+      boxed={BOXED_FIELDS}
       table="customers"
       id={id}
       column={jsonPath ? "address" : column}

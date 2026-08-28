@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import type { CatalogItem } from "@/lib/catalog";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
 import { BaseUnitEditor } from "./BaseUnitEditor";
@@ -45,8 +46,8 @@ export function ItemFields({
         </span>
       </div>
 
-      <dl className="grid max-w-2xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="py-0.5 text-subtle">Category</dt>
+      <dl className="grid max-w-2xl grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+        <dt className="text-subtle">Category</dt>
         <dd>
           {/* Pick from what the catalog already uses, but ADD is allowed: this
               vocabulary genuinely grows (a new line of merchandise), unlike the
@@ -58,7 +59,7 @@ export function ItemFields({
             id={item.id}
             column="category"
             value={item.category}
-            placeholder="none"
+            boxed={BOXED_FIELDS}
             kind="pick"
             allowNew
             options={categories.map((c) => ({ value: c, label: c }))}
@@ -72,7 +73,7 @@ export function ItemFields({
             editor recomputes the ones whose pack can answer for them and
             reports the ones that need a human. Same component the cleanup
             drawer uses, so the two can't drift. */}
-        <dt className="py-0.5 text-subtle">Base unit</dt>
+        <dt className="text-subtle">Base unit</dt>
         <dd>
           <BaseUnitEditor
             key={`${item.id}:${item.base_unit}`}
@@ -82,14 +83,14 @@ export function ItemFields({
           />
         </dd>
 
-        <dt className="py-0.5 text-subtle">Note</dt>
+        <dt className="text-subtle">Note</dt>
         <dd>
           <InlineValue
             table="inventory_items"
             id={item.id}
             column="note"
             value={item.note}
-            placeholder="none"
+            boxed={BOXED_FIELDS}
           />
         </dd>
       </dl>

@@ -6,6 +6,7 @@ import { canLogBatch, canWriteCatalog } from "@/lib/roles";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { batchDate } from "@/lib/productionBatches";
 import { type BatchRow } from "@/components/production/BatchItemsTable";
@@ -289,14 +290,17 @@ export async function BatchLogRecord({
         {log.printed_at ? (
           <span className="text-muted">Printed {String(log.printed_at).slice(0, 10)}</span>
         ) : (
-          <span className="text-mark">not printed</span>
+          <span className="bg-mark-fill px-1">not printed</span>
         )}
-        <span className="flex min-w-0 items-baseline gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+        <span className="flex min-w-0 flex-1 items-center gap-2">
+          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
             Note
           </span>
           {editable ? (
+            // `flex-1` on the wrapper above: this strip is shrink-to-fit, so a
+            // boxed field's `w-full` needs a definite width to resolve against.
             <InlineValue
+              boxed={BOXED_FIELDS}
               table="production_batch_logs"
               id={id}
               column="note"

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { withFrom, type Crumb } from "@/lib/breadcrumbs";
 import { derivedPackContent, vendorItemTitle } from "@/lib/catalog";
 import { PACKAGE_DESC_OPTIONS, UNIT_PICK_OPTIONS } from "@/lib/units";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
 import { InventoryItemPicker } from "./InventoryItemPicker";
@@ -166,9 +167,9 @@ export function VendorItemFields({
         </span>
       </div>
 
-      <dl className="grid max-w-2xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
-        <dt className="py-0.5 text-subtle">Vendor</dt>
-        <dd className="py-0.5">
+      <dl className="grid max-w-2xl grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+        <dt className="text-subtle">Vendor</dt>
+        <dd>
           {vi.vendors ? (
             <Link
               href={withFrom(`/vendors/${vi.vendors.id}`, here)}
@@ -186,8 +187,8 @@ export function VendorItemFields({
           )}
         </dd>
 
-        <dt className="py-0.5 text-subtle">Inventory item</dt>
-        <dd className="flex flex-wrap items-start gap-2 py-0.5">
+        <dt className="text-subtle">Inventory item</dt>
+        <dd className="flex flex-wrap items-center gap-2">
           {vi.inventory_items ? (
             <Link
               href={withFrom(`/items/${vi.inventory_items.id}`, here)}
@@ -209,36 +210,36 @@ export function VendorItemFields({
             their product list, so it leads the PO line (§4.9) and the title
             above. Sits with the inventory item because the two together are
             "their name for our thing". */}
-        <dt className="py-0.5 text-subtle">Description</dt>
+        <dt className="text-subtle">Description</dt>
         <dd>
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="vendor_items"
             id={vi.id}
             column="description"
             value={vi.description}
-            placeholder="none"
           />
         </dd>
 
-        <dt className="py-0.5 text-subtle">Brand</dt>
+        <dt className="text-subtle">Brand</dt>
         <dd>
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="vendor_items"
             id={vi.id}
             column="brand"
             value={vi.brand}
-            placeholder="none"
           />
         </dd>
 
-        <dt className="py-0.5 text-subtle">Product ID</dt>
+        <dt className="text-subtle">Product ID</dt>
         <dd>
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="vendor_items"
             id={vi.id}
             column="product_id"
             value={vi.product_id}
-            placeholder="none"
           />
         </dd>
 
@@ -246,14 +247,14 @@ export function VendorItemFields({
             read as a pair when they aren't one (Mark, 2026-07-30). This is what
             the vendor SELLS you — one case, one bag — and prints as the PO's
             Pack column; the fields below are what's inside one of them. */}
-        <dt className="py-0.5 text-subtle">Sold as</dt>
+        <dt className="text-subtle">Sold as</dt>
         <dd>
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="vendor_items"
             id={vi.id}
             column="package_desc"
             value={vi.package_desc}
-            placeholder="none"
             kind="pick"
             options={PACKAGE_DESC_OPTIONS}
           />
@@ -273,13 +274,22 @@ export function VendorItemFields({
         {/* "Package", not "Contains" (Mark, 2026-08-03). The row IS the pack —
             count × size unit — and the base-unit total in parentheses is the
             only part of it that answers "contains". */}
-        <dt className="py-0.5 text-subtle">Package</dt>
+        <dt className="text-subtle">Package</dt>
         {/* Each cell is width-boxed. InlineValue's resting state is a `w-full`
             button, so left to themselves in a flex row they all demand 100%
-            and either squash to ragged widths or wrap one-per-line. */}
+            and either squash to ragged widths or wrap one-per-line — which is
+            also the definite-width WRAPPER a boxed field needs where there is
+            no grid track to fill.
+
+            THESE THREE KEEP THEIR HINTS where every other field on the record
+            dropped its stand-in word. The rule that an empty boxed field shows
+            nothing assumes a label saying what the field is; this row has one
+            label over three boxes, so "1 × size unit" is the only thing on
+            screen saying which is which. */}
         <dd className="flex items-center gap-0.5">
           <span className="w-10 shrink-0">
             <InlineValue
+              boxed={BOXED_FIELDS}
               table="vendor_items"
               id={vi.id}
               column="pack_count"
@@ -292,6 +302,7 @@ export function VendorItemFields({
           <span className="shrink-0 text-faint">×</span>
           <span className="w-14 shrink-0">
             <InlineValue
+              boxed={BOXED_FIELDS}
               table="vendor_items"
               id={vi.id}
               column="pack_size"
@@ -303,6 +314,7 @@ export function VendorItemFields({
           </span>
           <span className="w-14 shrink-0">
             <InlineValue
+              boxed={BOXED_FIELDS}
               table="vendor_items"
               id={vi.id}
               column="pack_unit"
@@ -317,13 +329,13 @@ export function VendorItemFields({
             <span>(</span>
             <span className="w-16">
               <InlineValue
+                boxed={BOXED_FIELDS}
                 table="vendor_items"
                 id={vi.id}
                 column="package_content"
                 value={vi.package_content}
                 kind="number"
-                placeholder="none"
-              />
+                  />
             </span>
             <span>{unit})</span>
           </span>
@@ -335,26 +347,26 @@ export function VendorItemFields({
           />
         </dd>
 
-        <dt className="py-0.5 text-subtle">Price</dt>
+        <dt className="text-subtle">Price</dt>
         <dd>
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="vendor_items"
             id={vi.id}
             column="price"
             value={vi.price}
             kind="number"
-            placeholder="none"
           />
         </dd>
 
-        <dt className="py-0.5 text-subtle">Notes</dt>
+        <dt className="text-subtle">Notes</dt>
         <dd>
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="vendor_items"
             id={vi.id}
             column="notes"
             value={vi.notes}
-            placeholder="none"
           />
         </dd>
       </dl>

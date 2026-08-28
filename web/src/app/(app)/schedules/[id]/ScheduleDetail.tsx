@@ -7,6 +7,7 @@ import { canWriteCatalog, canEnterCounts } from "@/lib/roles";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { packetDate, plansInForce } from "@/lib/productionSchedule";
 import { meansNoAllergy } from "@/lib/specialOrders";
@@ -356,12 +357,15 @@ export async function ScheduleDetail({
               {String(schedule.printed_at).slice(0, 10)}
             </span>
           ) : (
-            <span className={`${READ_ONLY_VALUE} text-mark`}>not printed</span>
+            <span className={`${READ_ONLY_VALUE}`}>
+              <span className="bg-mark-fill px-1">not printed</span>
+            </span>
           )}
         </Field>
         <Field label="Note" span>
           {editable ? (
             <InlineValue
+              boxed={BOXED_FIELDS}
               table="production_schedules"
               id={id}
               column="note"

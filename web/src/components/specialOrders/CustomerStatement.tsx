@@ -204,7 +204,7 @@ export function CustomerStatement({
             {preview && (
               <p className="text-[13px]">
                 {preview.orders.length === 0 ? (
-                  <span className="text-mark">
+                  <span className="box-decoration-clone bg-mark-fill px-1">
                     No orders between {usDate(from)} and {usDate(to)}.
                   </span>
                 ) : (

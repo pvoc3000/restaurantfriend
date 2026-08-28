@@ -75,14 +75,14 @@ export function ProductionItemHistory({
                             <Td align="right">{d.leftover?.toLocaleString() ?? "—"}</Td>
                             <Td
                               align="right"
-                              className={d.sold !== null && d.sold < 0 ? "text-mark" : ""}
+                              className={d.sold !== null && d.sold < 0 ? "bg-mark-fill" : ""}
                             >
                               {d.sold?.toLocaleString()}
                             </Td>
                           </>
                         ) : (
-                          <td colSpan={3} className="py-1.5 text-mark">
-                            not counted
+                          <td colSpan={3} className="py-1.5">
+                            <span className="bg-mark-fill px-1">not counted</span>
                           </td>
                         )}
                         <td className="py-1.5 text-muted">

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { UNIT_OPTIONS, UNIT_PICK_OPTIONS, normalizeUnit } from "@/lib/units";
 import { PickList } from "@/components/ui/PickList";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { derivedPackContent } from "@/lib/catalog";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
@@ -156,22 +157,23 @@ export function BaseUnitEditor({
 
   return (
     <div className="space-y-2 text-sm">
-      <div className="flex items-center gap-2">
-        {/* No box (Mark, 2026-08-02). The width stays, so the "Saving…" beside
-            it doesn't jump as the unit changes, but the border went: Category
-            directly above is a bare `InlineValue kind="pick"` and a framed
-            field beside an unframed one reads as a different KIND of control. */}
-        <span className="inline-block w-32">
-          <PickList
-            value={next}
-            options={UNIT_PICK_OPTIONS}
-            disabled={busy}
-            onPick={choose}
-            ariaLabel="base unit"
-          />
-        </span>
-        {busy && <span className="text-muted">Saving…</span>}
-      </div>
+      {/* IT WEARS THE BOX ITS NEIGHBOUR WEARS, and the 2026-08-02 note that
+          said the opposite is the same argument with its premise flipped: the
+          border came off then because Category directly above was a bare
+          `InlineValue kind="pick"`, and "a framed field beside an unframed one
+          reads as a different KIND of control". Category is boxed now, so this
+          is. It fills the track like every other field, and "Saving…" moved
+          BELOW rather than beside it — anything hung to a field's right breaks
+          the column's right edge. */}
+      <PickList
+        value={next}
+        options={UNIT_PICK_OPTIONS}
+        disabled={busy}
+        onPick={choose}
+        boxed={BOXED_FIELDS}
+        ariaLabel="base unit"
+      />
+      {busy && <p className="text-muted">Saving…</p>}
 
       {result && (
         <p className="border border-ink bg-[var(--rf-green-50)] px-2 py-1.5 text-ink">

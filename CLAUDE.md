@@ -5877,7 +5877,27 @@ weekday column, and 003 then silently made it per-vendor-item.
   **LISTS ARE A SEPARATE QUESTION and default to NO**: a `DataTable` already has
   headings and rules doing the box's job. The special-order Items table is boxed
   because it is part of a record, and even there it is the busiest result.
-  The rollout — ~200 call sites over 55 files — is inventoried in the brief.
+  **THE ROLLOUT IS DONE (2026-08-28)** — all fourteen detail screens, 31 files;
+  §9 of the brief is the per-screen record of what was converted and what was
+  deliberately left. Four things it taught, none of them in the original brief:
+  an **`h1` title keeps its dotted underline** (`/plans`, `/elements` edit the
+  record's name in the heading — a box round 28px uppercase is a frame, not a
+  field, and there is no label up there to confuse it with); **a converted
+  screen's other editable controls come too**, because the inventory was built
+  from `InlineValue` call sites and `/locations/[id]` also carries fourteen raw
+  `<input type="time">` at 30px and seven unboxed `PickList`s — grep cannot see
+  those, so LOOK before calling a screen done; **a block's track is a fact about
+  the SCREEN**, so the employee record's Payroll block took the Employment
+  block's `max-w-md`/`8rem` rather than keeping its own `max-w-2xl`/`10rem`,
+  which underlined was invisible and boxed is two different edges; and **a
+  stand-in word is example text and goes** — `fieldPlaceholder` only suppresses
+  the em dash, so ~25 `placeholder="none"`/`"unknown"`/`"still here"` came out by
+  hand, while real DATA stayed (`locations.public_name` shows the internal name)
+  along with the three hints in `VendorItemFields`' Package row, where ONE label
+  sits over THREE boxes.
+  Known cost, accepted: **`/batch-logs/[id]`'s detail pane shows about three
+  fields before it scrolls** — it was already scrolling and is drag-resizable,
+  but it is the one place the 36px rule is visibly expensive.
 
 - **YELLOW IS A FILL, NEVER AN INK — do not use `text-mark` on a light
   background** (Mark, 2026-08-22: "I find yellow text hard to read… a yellow
@@ -5905,11 +5925,17 @@ weekday column, and 003 then silently made it per-vendor-item.
   carried as fills four columns away, which added nothing and buried the marks
   that had nowhere else to appear. A fact gets ONE mark, next to the number it
   is about.
-  **Not swept: 44 further `text-mark` uses** across production, special orders
-  and the catalog still have the 1.43:1 problem (`DerivedDay` 5, `OrderLines` 3,
-  `PlanMatrix` 3, …). Each needs the same judgement — redundant with a fill
-  elsewhere, a short signal, or a sentence — so ask Mark before a mechanical
-  pass, and fix them as you touch those screens.
+  **The detail screens are swept (2026-08-28)** — `ElementFields`, `PlanDetail`,
+  `ScheduleDetail`, `PlanMatrix`, `ScheduleLines`, `ItemComponents`,
+  `ProductionItemHistory`, `BatchLogRecord`, `EmployeeDetail` and
+  `EmployeeDocuments` (both of those `--rf-yellow-600`, 1.88:1) and
+  `CustomerStatement` all carry fills now. **About 20 uses remain and they are
+  all on LISTS and on `/production-day`** — `DerivedDay` (5), `SchedulesList`,
+  `PlansList`, `RecipesList`, `BatchLogsIndex`, `ProductionItemsList`,
+  `SpecialOrdersList`, `EmployeesList`, `GenerateSchedules`,
+  `specialOrders/CustomerPicker`. Each needs the same judgement — redundant with
+  a fill elsewhere, a short signal, or a sentence — so fix them as you touch
+  those screens rather than in one mechanical pass.
 
 - **EVERY BUTTON IS WHITE; only a SET FILTER is black** (Mark, 2026-08-02, after
   a sweep). The outlined cell — `border border-ink bg-white`, filling black on

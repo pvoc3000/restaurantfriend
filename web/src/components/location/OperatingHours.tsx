@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { BOXED_FIELD, BOXED_FIELD_BORDER, BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
@@ -172,7 +173,13 @@ function TimeCell({
       defaultValue={toInput(value)}
       key={toInput(value)}
       onBlur={(e) => onCommit(e.target.value)}
-      className="border border-hairline px-2 py-1 tabular-nums disabled:opacity-35"
+      // The record's own field height. This block already wore a box; what it
+      // did not do was wear the SAME one, so a 30px time input sat beside 36px
+      // fields two blocks down. `w-auto` because a time input has a natural
+      // width and there is no grid track here to fill.
+      className={`${
+        BOXED_FIELDS ? `${BOXED_FIELD} ${BOXED_FIELD_BORDER} !w-auto px-2` : "border border-hairline px-2 py-1"
+      } tabular-nums disabled:opacity-35`}
     />
   );
 }

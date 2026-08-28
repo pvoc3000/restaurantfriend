@@ -1,6 +1,7 @@
 "use client";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import type { PickOption } from "@/components/ui/PickList";
 import { BATCH_STATUS_LABEL, BATCH_STATUS_OPTIONS, describeAmount } from "@/lib/productionBatches";
 import { BatchPhoto } from "@/components/production/BatchPhoto";
@@ -116,7 +117,7 @@ export function BatchFields({
           a column that scrolls its neighbours' content is the thing this
           layout exists to avoid. */}
       <dl
-        className={`grid grid-cols-[7.5rem_minmax(0,1fr)] items-baseline gap-x-3 gap-y-1.5 text-sm ${
+        className={`grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 text-sm ${
           fill ? "min-h-0 overflow-y-auto pr-1" : ""
         }`}
       >
@@ -125,7 +126,7 @@ export function BatchFields({
             // Uppercase on the CONTROL — a wrapper's `text-transform` never
             // reaches a button (the reset sets it to none).
             <InlineValue
-              table="production_batches" id={row.id} column="status" kind="pick"
+              boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="status" kind="pick"
               nullable={false} options={BATCH_STATUS_OPTIONS}
               value={row.status} className="uppercase" ariaLabel="Batch status"
             />
@@ -149,7 +150,7 @@ export function BatchFields({
         <Field label="Order">
           {editable ? (
             <InlineValue
-              table="production_batches" id={row.id} column="batch_label"
+              boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="batch_label"
               value={row.batch_label} ariaLabel="Which batch of the day"
             />
           ) : (
@@ -160,7 +161,7 @@ export function BatchFields({
         <Field label="Prepared by">
           {editable ? (
             <InlineValue
-              table="production_batches" id={row.id} column="operator_employee_id" kind="pick"
+              boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="operator_employee_id" kind="pick"
               options={operators} value={row.operator_employee_id}
               ariaLabel="Who made this batch"
             />
@@ -174,6 +175,7 @@ export function BatchFields({
         <Field label="Recipe version">
           {editable && versions.length > 0 ? (
             <BatchVersionCell
+              boxed={BOXED_FIELDS}
               batchId={row.id}
               value={row.recipe_version_id}
               options={versions}
@@ -220,7 +222,7 @@ export function BatchFields({
           <dd className="mt-0.5">
             {editable ? (
               <InlineValue
-                table="production_batches" id={row.id} column="notes" multiline
+                boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="notes" multiline
                 value={row.notes} ariaLabel="Notes on this batch"
               />
             ) : (
@@ -270,20 +272,33 @@ function Triple({
   return (
     // NO WRAP: a count, an × and a size are one reading, and broken over three
     // lines they read as three empty fields.
-    <span className="flex items-baseline gap-1">
-      <InlineValue
-        table="production_batches" id={row.id} column={`${prefix}_count`} kind="number"
-        value={count} ariaLabel={`${what} count`}
-      />
-      <span className="text-subtle">×</span>
-      <InlineValue
-        table="production_batches" id={row.id} column={`${prefix}_size`} kind="number"
-        value={size} ariaLabel={`${what} size`}
-      />
-      <InlineValue
-        table="production_batches" id={row.id} column={`${prefix}_unit`}
-        value={unit} ariaLabel={`${what} unit`}
-      />
+    // Each cell is WIDTH-BOXED: a boxed field is `w-full`, and three of them
+    // in a shrink-to-fit row have nothing to resolve that against, so they
+    // would either squash to ragged widths or wrap one per line. `items-center`
+    // rather than `items-baseline` — boxes line up by their edges.
+    <span className="flex items-center gap-1">
+      <span className="block w-14 shrink-0">
+        <InlineValue
+          boxed={BOXED_FIELDS}
+          table="production_batches" id={row.id} column={`${prefix}_count`} kind="number"
+          value={count} ariaLabel={`${what} count`}
+        />
+      </span>
+      <span className="shrink-0 text-subtle">×</span>
+      <span className="block w-16 shrink-0">
+        <InlineValue
+          boxed={BOXED_FIELDS}
+          table="production_batches" id={row.id} column={`${prefix}_size`} kind="number"
+          value={size} ariaLabel={`${what} size`}
+        />
+      </span>
+      <span className="block w-16 shrink-0">
+        <InlineValue
+          boxed={BOXED_FIELDS}
+          table="production_batches" id={row.id} column={`${prefix}_unit`}
+          value={unit} ariaLabel={`${what} unit`}
+        />
+      </span>
     </span>
   );
 }
@@ -301,7 +316,7 @@ function Triple({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <>
-      <dt className="pt-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
         {label}
       </dt>
       <dd className="min-w-0">{children}</dd>

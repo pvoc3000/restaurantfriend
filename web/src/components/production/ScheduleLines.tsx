@@ -327,7 +327,7 @@ export function ScheduleLines({
           <span className="text-faint">—</span>
         ) : (
           <span
-            className={`${READ_ONLY_VALUE} tabular-nums ${r.sold < 0 ? "text-mark" : ""}`}
+            className={`${READ_ONLY_VALUE} tabular-nums ${r.sold < 0 ? "bg-mark-fill px-1" : ""}`}
             title={r.sold < 0 ? "More left over than made — carried over from another day?" : undefined}
           >
             {r.sold}

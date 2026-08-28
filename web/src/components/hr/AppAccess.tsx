@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { PickList } from "@/components/ui/PickList";
 import { TextInput } from "@/components/ui/TextInput";
 import {
@@ -194,10 +195,10 @@ export function AppAccess({
 
       {state === "active" && (
         <div className="flex flex-wrap items-baseline gap-4">
-          <dl className="grid grid-cols-[6rem_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="py-0.5 text-subtle">Signs in as</dt>
+          <dl className="grid grid-cols-[6rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+            <dt className="text-subtle">Signs in as</dt>
             <dd>{displayName}</dd>
-            <dt className="py-0.5 text-subtle">Role</dt>
+            <dt className="text-subtle">Role</dt>
             <dd>
               {isOwner ? (
                 // The owner is not editable from here, and that's deliberate
@@ -213,6 +214,7 @@ export function AppAccess({
                    behind. Matched on the FULL primary key: org_members is
                    keyed (org_id, user_id) and has no `id` column at all. */
                 <InlineValue
+                  boxed={BOXED_FIELDS}
                   table="org_members"
                   column="role"
                   value={role}

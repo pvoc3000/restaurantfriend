@@ -1,6 +1,7 @@
 "use client";
 
 import { ORDER_TYPE_OPTIONS } from "@/lib/catalog";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { InlineValue } from "./InlineValue";
 
 export type VendorRecord = {
@@ -35,25 +36,26 @@ export function VendorFields({
   vendorTypes: string[];
 }) {
   return (
-    <dl className="grid max-w-2xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
-      <dt className="py-0.5 text-subtle">Type</dt>
+    <dl className="grid max-w-2xl grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+      <dt className="text-subtle">Type</dt>
       <dd>
         <InlineValue
+          boxed={BOXED_FIELDS}
           table="vendors"
           id={vendor.id}
           column="vendor_type"
           value={vendor.vendor_type}
-          placeholder="none"
           kind="pick"
           allowNew
           options={vendorTypes.map((t) => ({ value: t, label: t }))}
         />
       </dd>
 
-      <dt className="py-0.5 text-subtle">Order via</dt>
+      <dt className="text-subtle">Order via</dt>
       <dd>
         {/* A closed set — the DB's own check constraint — so no allowNew. */}
         <InlineValue
+          boxed={BOXED_FIELDS}
           table="vendors"
           id={vendor.id}
           column="order_type"
@@ -64,52 +66,56 @@ export function VendorFields({
         />
       </dd>
 
-      <dt className="py-0.5 text-subtle">Website</dt>
-      <dd className="flex items-center gap-2">
-        {/* min-w-0 flex-1: InlineValue's own trigger is w-full of ITS parent,
-            so this div is what actually shares the row with the open link. */}
-        <div className="min-w-0 flex-1">
-          <InlineValue
-            table="vendors"
-            id={vendor.id}
-            column="url"
-            value={vendor.url}
-            placeholder="none"
-          />
-        </div>
+      {/* THE OPEN LINK RIDES WITH THE LABEL, not beside the field. Anything
+          hung to a field's right breaks the column's right edge, which is
+          half of what the boxes are for; the label side has room to spare. */}
+      <dt className="text-subtle">
+        Website
         {vendor.url && (
-          <a
-            href={vendor.url}
-            target="_blank"
-            rel="noreferrer"
-            className="shrink-0 text-xs text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-          >
-            Open ↗
-          </a>
+          <>
+            {" "}
+            <a
+              href={vendor.url}
+              target="_blank"
+              rel="noreferrer"
+              className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+            >
+              Open ↗
+            </a>
+          </>
         )}
-      </dd>
-
-      <dt className="py-0.5 text-subtle">Description</dt>
+      </dt>
       <dd>
         <InlineValue
+          boxed={BOXED_FIELDS}
+          table="vendors"
+          id={vendor.id}
+          column="url"
+          value={vendor.url}
+        />
+      </dd>
+
+      <dt className="text-subtle">Description</dt>
+      <dd>
+        <InlineValue
+          boxed={BOXED_FIELDS}
           table="vendors"
           id={vendor.id}
           column="description"
           value={vendor.description}
-          placeholder="none"
         />
       </dd>
 
-      <dt className="py-0.5 text-subtle">Notes</dt>
+      <dt className="text-subtle">Notes</dt>
       <dd>
         {/* Operational constraints — "1pm cutoff" (the column's own comment
             in migration 001). */}
         <InlineValue
+          boxed={BOXED_FIELDS}
           table="vendors"
           id={vendor.id}
           column="notes"
           value={vendor.notes}
-          placeholder="none"
         />
       </dd>
     </dl>

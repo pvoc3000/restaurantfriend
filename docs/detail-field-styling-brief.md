@@ -1,8 +1,10 @@
 # Detail field styling — the boxed-field convention
 
-**Status: proven on `/special-orders/[id]` (2026-08-28) and adopted. Rolling out
-to every other detail screen.** Mark: *"The experiment is successful and I want
-to go through the app and update all detail pages in this way."*
+**Status: proven on `/special-orders/[id]` and ROLLED OUT to every detail
+screen in the app (2026-08-28).** Mark: *"The experiment is successful and I
+want to go through the app and update all detail pages in this way."* §9 records
+what each screen carries, what was deliberately left alone, and what the rollout
+itself taught.
 
 Read this before restyling a detail screen. It carries the rules, the mechanism,
 and — the part worth the file — the traps, each of which cost a round trip to
@@ -272,27 +274,66 @@ The checklist:
 
 ---
 
-## 9. The rollout
+## 9. The rollout — DONE, 2026-08-28
 
-~200 `InlineValue` call sites across 55 files. The detail screens, roughly in
-descending order of how much they carry:
+Every detail screen in the table below is converted. What each one carries is
+recorded here so the next person can tell a deliberate omission from a miss.
 
-| screen | where the cells live |
-| --- | --- |
-| `/employees/[id]` | `EmployeeDetail` (16), `EmployeePayroll`, `EmployeeBenefits`, `EmployeeEvents`, `EmployeeDocuments`, `AppAccess` |
-| `/invoices/[id]` | `InvoiceDetail` (14) — **has a `Cell` gate** |
-| `/purchase-orders/[id]` | `PurchaseOrderDetail` (12), `ReceivingRow`, `Receiving` |
-| `/vendor-items/[id]` | `VendorItemFields` (10) |
-| `/vendors/[id]` | `VendorFields`, `VendorItemsTable`, `VendorLocationsTable` |
-| `/items/[id]` | `ItemFields`, `ItemLocationRows` |
-| `/elements/[id]` | `ElementFields`, `ElementLocationRows`, `ElementNameCell` |
-| `/recipes/[id]` | `RecipeVersionSheet` (7), `RecipeScaleCell`, `RecipeInfo` |
-| `/batch-logs/[id]` | `BatchFields` (7), `BatchItemsTable`, `BatchVersionCell` |
-| `/plans/[id]` | `PlanDetail` (6), `PlanMatrix` |
-| `/production-items/[id]` | `ProductionItemFields`, `ProductionItemLocations`, `ItemComponents` |
-| `/locations/[id]` | `LocationDetail`, `OperationsFields`, `AddressFields` |
-| `/customers/[id]` | `CustomerDetail` — **has a `Cell` gate** |
-| `/schedules/[id]` | `ScheduleDetail`, `ScheduleLines` |
+| screen | converted | left alone, and why |
+| --- | --- | --- |
+| `/employees/[id]` | `EmployeeDetail` (16), `EmployeePayroll`, `AppAccess` | `EmployeeEvents`, `EmployeeBenefits` — `DataTable`s. `EmployeeDocuments` — its date lives inside a 176px `ui/DocumentChip`, which is a card and already has structure doing the box's job |
+| `/invoices/[id]` | `InvoiceDetail`'s Bill + Amounts (8, via the `Cell` gate's siblings) | its line table — a `DataTable` |
+| `/purchase-orders/[id]` | `PurchaseOrderDetail` (3), `ReceivingRow` (2), `Receiving` (1) | the PO's line table — a `DataTable` |
+| `/vendor-items/[id]` | `VendorItemFields` (10) | — |
+| `/vendors/[id]` | `VendorFields` (5) | `VendorItemsTable`, `VendorLocationsTable` — `DataTable`s |
+| `/items/[id]` | `ItemFields` (2), `BaseUnitEditor` | `ItemLocationRows` — a `DataTable` |
+| `/elements/[id]` | `ElementFields` (6) | `ElementLocationRows` — a `DataTable`. `ElementNameCell` — an `h1` |
+| `/recipes/[id]` | `RecipeInfo` (via its `Editable` gate) | `RecipeVersionSheet`, `RecipeScaleCell` — the ingredient GRID, which has headings and rules of its own |
+| `/batch-logs/[id]` | `BatchFields` (8), `BatchVersionCell`, `BatchLogRecord` (1) | `BatchItemsTable` — a `DataTable` |
+| `/plans/[id]` | `PlanDetail` (5) | `PlanMatrix` — a `DataTable`; its yellow was fixed |
+| `/production-items/[id]` | `ProductionItemFields` (3) | `ProductionItemLocations`, `ItemComponents` — `DataTable`s |
+| `/locations/[id]` | `LocationDetail` (3), `OperationsFields` (3), `AddressFields` (1), **`OperatingHours`**, **`ProductionMapping`** | — |
+| `/customers/[id]` | `CustomerDetail` (via its `Cell` gate) | — |
+| `/schedules/[id]` | `ScheduleDetail` (1) | `ScheduleLines` — a `DataTable`; its yellow was fixed |
+
+**The line drawn, and it is the one §9 already drew:** a `dl` of fields gets
+boxes, a table does not. Every "left alone" above is a `DataTable` or something
+that already has column headings and rules doing the box's work. That rule also
+answers the cases the inventory did not name, because the inventory was built
+from `InlineValue` call sites and two editable controls on a converted record
+are not `InlineValue`s — see the two bonus conversions below.
+
+### The four things the rollout added to this brief
+
+**AN `h1` TITLE KEEPS ITS DOTTED UNDERLINE.** `/plans/[id]` and `/elements/[id]`
+edit the record's name in the heading. A hairline box round 28px uppercase reads
+as a frame rather than as a field, `min-h-9` says nothing at that size, and the
+confusion the boxes exist to end — a field that looks like a label — cannot
+arise on a page heading, where there is no label to confuse it with. Worth
+Mark's eye; it is the one place the app now has two "editable" cues.
+
+**A CONVERTED SCREEN'S OTHER EDITABLE CONTROLS COME TOO.** `/locations/[id]`
+carries two that are not `InlineValue`s and so are not in the inventory:
+`OperatingHours`' fourteen `<input type="time">` (which already wore a box, at
+30px, so they read as a different KIND of control beside the 36px fields two
+blocks down) and `ProductionMapping`'s seven `PickList`s (which wore none at all
+and so read as not editable). Both now match. **Check a screen for controls the
+`InlineValue` grep cannot see before calling it done.**
+
+**A BLOCK'S TRACK IS A FACT ABOUT THE SCREEN, NOT ABOUT THE BLOCK.** The
+employee record's Employment block was `max-w-md` with `8rem` labels and Payroll
+directly beneath it was `max-w-2xl` with `10rem` — invisible underlined, and two
+different left AND right edges once boxed. Payroll took the block above it. Same
+argument retired the Info tab's lone `max-w-2xl` Notes field.
+
+**A STAND-IN WORD IS EXAMPLE TEXT AND GOES.** `fieldPlaceholder` suppresses only
+the em dash, so `placeholder="none"` / `"unknown"` / `"still here"` / `"not set"`
+had to be removed by hand — about 25 of them. Two kinds were KEPT and the
+distinction is the one §6 draws: a placeholder holding real DATA
+(`locations.public_name` shows the internal name a customer would otherwise
+see), and the three hints in `VendorItemFields`' Package row, where ONE label
+sits over THREE boxes and "1 × size unit" is the only thing on screen saying
+which is which.
 
 **Lists are a separate question and not covered here.** The convention is about
 RECORDS. A `DataTable` already has column headings and rules doing the job the
@@ -300,7 +341,44 @@ box does, and boxing every cell of a 790-row list is a different decision — th
 special-order Items table was converted because it is part of a record, and even
 there it is the busiest result. Decide list-by-list, and prefer leaving them.
 
----
+### Verified
+
+At 1280 and at 834 (portrait iPad), against the live database:
+
+- Every boxed field on every converted screen measures **36px**, with the two
+  legitimate exceptions the rules allow: a multiline note at 64, and a
+  short-text cell whose value WRAPS (the employee address, 46px — `min-h-9`
+  working as intended, and `scrollHeight === clientHeight`, so nothing spills).
+- Each block's fields share one left and one right edge — measured per `dl`
+  (vendors 160–688, items 192–720, PO 192–464, employees 384–688 on BOTH
+  blocks, invoices 160–401 / 577–818 at 834).
+- No read-only value carries a box. The employee's Sent-via/Cost-today/FileMaker-id
+  rows and the location's Email-sending block all render bare.
+- Clicking a field moves it **0.00px** in all four axes (checked on a text cell
+  on `/vendors/[id]` and on `/employees/[id]`).
+- **Zero horizontal page overflow** at either width on any converted screen.
+- The special-order record — the reference — is unchanged: 31 controls, all 36px,
+  page height 900 at 1280×900.
+- A list is untouched: `/shop-sections`' cells still report
+  `underline/dotted` and a `0px` border.
+- 1309 fixtures pass; `tsc` and `eslint` clean.
+
+### Known, and left
+
+- **`/batch-logs/[id]`'s detail pane shows about three fields before it
+  scrolls.** That pane was already scrolling before this (content ~230px in
+  129px); boxing took the content to 352px. It is drag-resizable and the
+  fraction persists, so a taller pane is one drag away — but it is the one place
+  the height rule cost something visible.
+- **37 → 20 uses of `text-mark` remain app-wide.** The ones on converted detail
+  screens are fixed (`ElementFields`, `PlanDetail`, `ScheduleDetail`,
+  `PlanMatrix`, `ScheduleLines`, `ItemComponents`, `ProductionItemHistory`,
+  `BatchLogRecord`, `EmployeeDetail`'s and `EmployeeDocuments`' yellow-600,
+  `CustomerStatement`). What is left is all on LISTS and on `/production-day` —
+  `DerivedDay` (5), `SchedulesList`, `PlansList`, `RecipesList`,
+  `BatchLogsIndex`, `ProductionItemsList`, `SpecialOrdersList`, `EmployeesList`,
+  `GenerateSchedules`, `specialOrders/CustomerPicker`. Same rule, same
+  judgement, when those screens are next touched.
 
 ## 10. Answered, 2026-08-28
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PickList } from "@/components/ui/PickList";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import type { Location } from "@/lib/session";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -104,6 +105,7 @@ export function ProductionMapping({
                         value={kitchen[i]}
                         options={options}
                         disabled={pending}
+                        boxed={BOXED_FIELDS}
                         placeholder="none"
                         ariaLabel={`${day}: produced at`}
                         onPick={(next) => setKitchenAt(i, next === "" ? null : next)}

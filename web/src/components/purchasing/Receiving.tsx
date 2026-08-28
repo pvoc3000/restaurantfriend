@@ -53,6 +53,7 @@ import {
   useReceivingSplit,
 } from "@/lib/receivingLayout";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { AddPoLines } from "./AddPoLines";
 import { DocumentPane } from "./DocumentPane";
 import { InvoiceSummary } from "./InvoiceSummary";
@@ -699,13 +700,19 @@ export function Receiving({
               Received
             </span>
             {canReceive ? (
-              <InlineValue
-                table="purchase_orders"
-                id={order.id}
-                column="delivery_date"
-                value={order.delivery_date}
-                kind="date"
-              />
+              // Width-boxed: this sits in a shrink-to-fit strip rather than a
+              // grid track, so a boxed field's `w-full` needs something
+              // definite to resolve against.
+              <span className="block w-36">
+                <InlineValue
+                  boxed={BOXED_FIELDS}
+                  table="purchase_orders"
+                  id={order.id}
+                  column="delivery_date"
+                  value={order.delivery_date}
+                  kind="date"
+                />
+              </span>
             ) : (
               <span className={`${READ_ONLY_VALUE} tabular-nums`}>
                 {order.delivery_date ?? "—"}

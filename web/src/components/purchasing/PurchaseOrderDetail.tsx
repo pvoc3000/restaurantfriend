@@ -30,6 +30,7 @@ import { StickyFooter } from "@/components/ui/StickyFooter";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { SaveLineToCatalog } from "./SaveLineToCatalog";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { PickList } from "@/components/ui/PickList";
 import { AddPoLines } from "./AddPoLines";
@@ -790,13 +791,14 @@ export function PurchaseOrderDetail({
           buttons, which needs the width more than the pairing does. */}
       <div className="grid items-start gap-x-8 gap-y-6 xl:grid-cols-[26rem_minmax(0,1fr)]">
         <div className="space-y-6">
-          <dl className="grid max-w-2xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
+          <dl className="grid max-w-2xl grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
             <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
               Ordered
             </dt>
             <dd className="tabular-nums">
               {canEditLines ? (
                 <InlineValue
+                  boxed={BOXED_FIELDS}
                   table="purchase_orders"
                   id={order.id}
                   column="order_date"
@@ -832,12 +834,21 @@ export function PurchaseOrderDetail({
                 delivery actually happens means generation should stop pre-filling
                 the column and the vendor PDF should derive the date instead — a
                 change to what the vendor document says, so it's Mark's call. */}
-            <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+            {/* THE EXPECTATION RIDES WITH THE LABEL, not beside the field:
+                anything hung to a field's right breaks the column's right
+                edge, and the label side has room to spare. */}
+            <dt className="flex flex-wrap items-center gap-2 text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
               Delivery
+              {expectedDelivery && (
+                <span className="border border-ink bg-[var(--rf-yellow-200)] px-1 py-0.5 text-[11px] normal-case tracking-normal text-ink">
+                  arrives {expectedDelivery}
+                </span>
+              )}
             </dt>
-            <dd className="flex flex-wrap items-center gap-2 tabular-nums">
+            <dd className="tabular-nums">
               {canEditLines ? (
                 <InlineValue
+                  boxed={BOXED_FIELDS}
                   table="purchase_orders"
                   id={order.id}
                   column="delivery_date"
@@ -846,11 +857,6 @@ export function PurchaseOrderDetail({
                 />
               ) : (
                 <span className={READ_ONLY_VALUE}>{order.delivery_date ?? "—"}</span>
-              )}
-              {expectedDelivery && (
-                <span className="border border-ink bg-[var(--rf-yellow-200)] px-2 py-0.5 text-xs text-ink">
-                  arrives {expectedDelivery}
-                </span>
               )}
             </dd>
 
@@ -870,11 +876,11 @@ export function PurchaseOrderDetail({
             <dd>
               {canEditLines ? (
                 <InlineValue
+                  boxed={BOXED_FIELDS}
                   table="purchase_orders"
                   id={order.id}
                   column="notes"
                   value={order.notes}
-                  placeholder="none"
                 />
               ) : (
                 <span className={READ_ONLY_VALUE}>{order.notes ?? "—"}</span>

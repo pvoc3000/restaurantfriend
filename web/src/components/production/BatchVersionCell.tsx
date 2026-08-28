@@ -21,13 +21,18 @@ export function BatchVersionCell({
   batchId,
   value,
   options,
+  boxed = false,
 }: {
   batchId: string;
   value: string | null;
   options: PickOption[];
+  /** Forwarded, so a record's field block can box this cell like its
+   *  neighbours while a list keeps it bare. */
+  boxed?: boolean;
 }) {
   return (
     <InlineValue
+      boxed={boxed}
       table="production_batches"
       id={batchId}
       column="recipe_version_id"

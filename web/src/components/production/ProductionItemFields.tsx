@@ -1,6 +1,7 @@
 "use client";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { formatCost, type Cost } from "@/lib/productionCost";
 import { formatMargin, margin, type ResolvedPrice } from "@/lib/productionPrice";
 
@@ -55,8 +56,13 @@ export function ProductionItemFields({
 }) {
   const m = margin(cost.cost, price.price);
 
+  // GAPS GROUP: four tracks are TWO PAIRS, and only the middle gap is a change
+  // of subject. A uniform 24px reads as four unrelated columns once the values
+  // are boxed — so the second LABEL of each row takes another 24px on its left,
+  // and the pairs separate without a fifth track that `Row`'s two children
+  // could not flow into.
   return (
-    <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] gap-x-6 gap-y-3 text-[14px] sm:grid-cols-[minmax(8rem,auto)_1fr_minmax(8rem,auto)_1fr]">
+    <dl className="grid grid-cols-[minmax(8rem,auto)_1fr] items-center gap-x-6 gap-y-3 text-[14px] sm:grid-cols-[minmax(8rem,auto)_1fr_minmax(8rem,auto)_1fr] sm:[&>*:nth-child(4n+3)]:pl-6">
       {/* THE SOURCE ORDER INTERLEAVES THE TWO COLUMNS, which is not the order
           you read (Mark, 2026-08-13). The grid is four tracks — label, value,
           label, value — and flows by ROW, so a pair written here lands side by
@@ -109,6 +115,7 @@ export function ProductionItemFields({
             Six for everything today; per item so it needn't stay that way. */}
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="production_items"
             id={item.id}
             column="tally_box_size"
@@ -132,7 +139,13 @@ export function ProductionItemFields({
 
       <Row label="Notes">
         {editable ? (
-          <InlineValue table="production_items" id={item.id} column="notes" value={item.notes} />
+          <InlineValue
+            boxed={BOXED_FIELDS}
+            table="production_items"
+            id={item.id}
+            column="notes"
+            value={item.notes}
+          />
         ) : (
           <span className={READ_ONLY_VALUE}>{item.notes ?? "—"}</span>
         )}
@@ -160,6 +173,7 @@ function Pick({
     <Row label={label}>
       {editable ? (
         <InlineValue
+          boxed={BOXED_FIELDS}
           table="production_items"
           id={item.id}
           column={column}
@@ -178,7 +192,7 @@ function Pick({
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <>
-      <dt className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
         {label}
       </dt>
       <dd className="min-w-0">{children}</dd>

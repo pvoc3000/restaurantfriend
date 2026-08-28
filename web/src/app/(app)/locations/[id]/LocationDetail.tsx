@@ -7,6 +7,7 @@ import type { RawSearchParams } from "@/lib/itemFilters";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { AddressFields } from "@/components/location/AddressFields";
 import { OperationsFields } from "@/components/location/OperationsFields";
@@ -172,14 +173,15 @@ export async function LocationDetail({
           />
         </div>
 
-        <dl className="grid max-w-md grid-cols-[6rem_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="py-0.5 text-subtle">Code</dt>
+        <dl className="grid max-w-md grid-cols-[6rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+          <dt className="text-subtle">Code</dt>
           <dd>
             {/* The PO number's location segment is the trailing digits of this
                 (migration 006), and every FMP-era join was on it. Editable, but
                 it is the one field here with consequences elsewhere. */}
             {editable ? (
               <InlineValue
+                boxed={BOXED_FIELDS}
                 table="locations"
                 id={location.id}
                 column="code"
@@ -190,7 +192,7 @@ export async function LocationDetail({
               location.code
             )}
           </dd>
-          <dt className="py-0.5 text-subtle">Public name</dt>
+          <dt className="text-subtle">Public name</dt>
           <dd>
             {/* WHAT A CUSTOMER SEES — the inquiry form's shop list, and
                 whatever else ever faces outward. `name` is internal and says
@@ -204,6 +206,7 @@ export async function LocationDetail({
                 now, whether or not anybody has set it. */}
             {editable ? (
               <InlineValue
+                boxed={BOXED_FIELDS}
                 table="locations"
                 id={location.id}
                 column="public_name"
@@ -215,10 +218,11 @@ export async function LocationDetail({
               location.public_name ?? location.name
             )}
           </dd>
-          <dt className="py-0.5 text-subtle">Kind</dt>
+          <dt className="text-subtle">Kind</dt>
           <dd>
             {editable ? (
               <InlineValue
+                boxed={BOXED_FIELDS}
                 table="locations"
                 id={location.id}
                 column="kind"
@@ -330,15 +334,15 @@ export async function LocationDetail({
       {/* ---- who POs come from ----------------------------------------- */}
       <section className="space-y-2">
         <Heading>Email sending</Heading>
-        <dl className="grid max-w-xl grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="py-0.5 text-subtle">Configured by</dt>
-          <dd className="py-0.5">{providerTier}</dd>
-          <dt className="py-0.5 text-subtle">Sends as</dt>
-          <dd className="py-0.5">
+        <dl className="grid max-w-xl grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+          <dt className="text-subtle">Configured by</dt>
+          <dd>{providerTier}</dd>
+          <dt className="text-subtle">Sends as</dt>
+          <dd>
             {provider?.from ?? <span className="text-faint">the app&rsquo;s default sender</span>}
           </dd>
-          <dt className="py-0.5 text-subtle">Transport</dt>
-          <dd className="py-0.5">{provider?.kind ?? "resend"}</dd>
+          <dt className="text-subtle">Transport</dt>
+          <dd>{provider?.kind ?? "resend"}</dd>
         </dl>
         <p className="max-w-[72ch] text-xs text-subtle">
           Purchase orders emailed from this location go out through whichever of

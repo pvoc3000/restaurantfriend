@@ -5,6 +5,7 @@ import { useLayoutEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Switch } from "@/components/ui/Switch";
 import { spaceBelow, useViewportAtLeast } from "@/lib/tableHead";
@@ -176,7 +177,7 @@ export function RecipeInfo({
       <section className="shrink-0 space-y-4">
         <SectionHeading>Version {version.version_label}</SectionHeading>
         <div className="grid gap-x-10 gap-y-3 lg:grid-cols-2">
-        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-6 gap-y-2 text-[14px]">
+        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] items-center gap-x-6 gap-y-2 text-[14px]">
           <Fact label="Description">
             <Editable id={version.id} column="description" value={version.description} editable={editable} />
           </Fact>
@@ -190,14 +191,14 @@ export function RecipeInfo({
             <span className={READ_ONLY_VALUE}>{stamp(modifiedAt(version)) ?? "—"}</span>
           </Fact>
         </dl>
-        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] gap-x-6 gap-y-2 text-[14px]">
+        <dl className="grid grid-cols-[minmax(6rem,auto)_1fr] items-center gap-x-6 gap-y-2 text-[14px]">
           <Fact label="Storage">
             <Editable id={version.id} column="storage" value={version.storage} editable={editable} />
           </Fact>
           <Fact label="Shelf life">
             <Editable id={version.id} column="shelf_life" value={version.shelf_life} editable={editable} />
           </Fact>
-          <Fact label="Tools">
+          <Fact label="Tools" top>
             <Editable id={version.id} column="tools" value={version.tools} editable={editable} multiline />
           </Fact>
         </dl>
@@ -517,10 +518,25 @@ function modifiedAt(version: SheetVersion): string | null {
   return version.fmp_modified_at ?? version.updated_at;
 }
 
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
+function Fact({
+  label,
+  top = false,
+  children,
+}: {
+  label: string;
+  /** Align the label to the FIRST LINE of a tall value rather than to the
+   *  middle of the row — a note's box is 64px and centring reads as a caption
+   *  floating halfway down it. */
+  top?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <>
-      <dt className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+      <dt
+        className={`text-[11px] font-semibold uppercase tracking-[0.12em] text-muted ${
+          top ? "self-start pt-2" : ""
+        }`}
+      >
         {label}
       </dt>
       <dd className="min-w-0">{children}</dd>
@@ -542,7 +558,9 @@ function Editable({
   multiline?: boolean;
 }) {
   return editable ? (
+    // THE SEAM. Every editable field in this block goes through here.
     <InlineValue
+      boxed={BOXED_FIELDS}
       table="production_recipe_versions"
       id={id}
       column={column}
@@ -550,7 +568,15 @@ function Editable({
       multiline={multiline}
     />
   ) : (
-    <span className={`${READ_ONLY_VALUE} ${multiline ? "whitespace-pre-wrap" : ""}`}>
+    // A read-only value carries no box — except a NOTE, where the box is doing
+    // a second job: without it the block reads as headings with loose text.
+    <span
+      className={`${READ_ONLY_VALUE} ${
+        multiline
+          ? `whitespace-pre-wrap ${BOXED_FIELDS ? "block min-h-16 w-full border border-hairline" : ""}`
+          : ""
+      }`}
+    >
       {value ?? "—"}
     </span>
   );

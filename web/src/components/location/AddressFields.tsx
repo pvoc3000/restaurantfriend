@@ -1,4 +1,5 @@
 import { InlineValue } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 
 export type AddressGroup = "shipping" | "billing";
 
@@ -40,21 +41,21 @@ export function AddressFields({
   const values = (address?.[group] ?? {}) as Record<string, unknown>;
 
   return (
-    <dl className="grid max-w-md grid-cols-[6rem_1fr] gap-x-4 gap-y-1 text-sm">
+    <dl className="grid max-w-md grid-cols-[6rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
       {fields.map((field) => {
         const raw = values[field.key];
         const value = raw === undefined || raw === null ? null : String(raw);
         return (
           <div key={field.key} className="contents">
-            <dt className="py-0.5 text-subtle">{field.label}</dt>
+            <dt className="text-subtle">{field.label}</dt>
             <dd>
               {editable ? (
                 <InlineValue
+                  boxed={BOXED_FIELDS}
                   table="locations"
                   id={locationId}
                   column={field.key}
                   value={value}
-                  placeholder="none"
                   jsonColumn="address"
                   jsonPath={[group, field.key]}
                   jsonDocument={address}

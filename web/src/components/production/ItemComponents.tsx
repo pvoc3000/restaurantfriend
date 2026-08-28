@@ -335,7 +335,7 @@ export function ItemComponents({
               </td>
               <td className="px-3 py-2 text-right tabular-nums">
                 {row.cost === null ? (
-                  <span className="text-mark">—</span>
+                  <span className="bg-mark-fill px-1">—</span>
                 ) : (
                   `$${row.cost.toFixed(4)}`
                 )}

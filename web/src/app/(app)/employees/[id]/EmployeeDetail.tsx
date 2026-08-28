@@ -28,6 +28,7 @@ import type { RawSearchParams } from "@/lib/itemFilters";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { EmployeeDocuments } from "@/components/hr/EmployeeDocuments";
@@ -426,32 +427,33 @@ export async function EmployeeDetail({
       {tab === "info" && (
         <>
       <div className="space-y-3">
-        <dl className="grid max-w-md grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="py-0.5 text-subtle">First name</dt>
+        <dl className="grid max-w-md grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+          <dt className="text-subtle">First name</dt>
           <dd>
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="first_name"
               value={person.first_name}
               nullable={false}
-              placeholder="First"
             />
           </dd>
-          <dt className="py-0.5 text-subtle">Last name</dt>
+          <dt className="text-subtle">Last name</dt>
           <dd>
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="last_name"
               value={person.last_name}
               nullable={false}
-              placeholder="Last"
             />
           </dd>
-          <dt className="py-0.5 text-subtle">Status</dt>
+          <dt className="text-subtle">Status</dt>
           <dd>
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="status"
@@ -461,14 +463,14 @@ export async function EmployeeDetail({
               options={STATUS_OPTIONS}
             />
           </dd>
-          <dt className="py-0.5 text-subtle">Goes by</dt>
+          <dt className="text-subtle">Goes by</dt>
           <dd>
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="nickname"
               value={person.nickname}
-              placeholder="none"
             />
           </dd>
         </dl>
@@ -477,46 +479,46 @@ export async function EmployeeDetail({
       {/* ---- contact --------------------------------------------------- */}
       <section className="space-y-2">
         <Heading>Personal</Heading>
-        <dl className="grid max-w-md grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="py-0.5 text-subtle">Phone</dt>
+        <dl className="grid max-w-md grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+          <dt className="text-subtle">Phone</dt>
           <dd>
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="phone"
               value={person.phone}
-              placeholder="none"
             />
           </dd>
-          <dt className="py-0.5 text-subtle">Email</dt>
+          <dt className="text-subtle">Email</dt>
           <dd>
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="email"
               value={person.email}
-              placeholder="none"
             />
           </dd>
-          <dt className="py-0.5 text-subtle">Address</dt>
+          <dt className="text-subtle">Address</dt>
           <dd>
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="address"
               value={person.address}
-              placeholder="none"
             />
           </dd>
-          <dt className="py-0.5 text-subtle">Born</dt>
+          <dt className="text-subtle">Born</dt>
           <dd>
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="date_of_birth"
               value={person.date_of_birth}
               kind="date"
-              placeholder="unknown"
             />
           </dd>
         </dl>
@@ -525,13 +527,13 @@ export async function EmployeeDetail({
       {/* ---- notes ----------------------------------------------------- */}
       <section className="space-y-2">
         <Heading>Notes</Heading>
-        <div className="max-w-2xl text-sm">
+        <div className="max-w-md text-sm">
           <InlineValue
+            boxed={BOXED_FIELDS}
             table={table}
             id={person.id}
             column="notes"
             value={person.notes}
-            placeholder="none"
           />
         </div>
       </section>
@@ -543,18 +545,18 @@ export async function EmployeeDetail({
       {/* ---- the job --------------------------------------------------- */}
       <section className="space-y-2">
         <Heading>Employment</Heading>
-        <dl className="grid max-w-md grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
-          <dt className="py-0.5 text-subtle">Location</dt>
+        <dl className="grid max-w-md grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+          <dt className="text-subtle">Location</dt>
           <dd>
             {/* The shop they mostly work at, not a restriction on where they
                 may work — nothing in the app scopes a person to a location. */}
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="main_location_id"
               value={person.main_location_id}
               kind="pick"
-              placeholder="none"
               options={session.locations.map((l) => ({
                 value: l.id,
                 label: l.code,
@@ -562,74 +564,88 @@ export async function EmployeeDetail({
               }))}
             />
           </dd>
-          <dt className="py-0.5 text-subtle">Position</dt>
+          <dt className="text-subtle">Position</dt>
           <dd>
             {/* Donut Friend's own vocabulary — Donut Friend, Supervisor, Baker,
                 Fryer, AB — so it's picked from what's already in use and grows
                 by typing, the inventory-category pattern. */}
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="position"
               value={person.position}
               kind="pick"
               allowNew
-              placeholder="none"
               options={positions.map((p) => ({ value: p, label: p }))}
             />
           </dd>
-          <dt className="py-0.5 text-subtle">Schedule</dt>
+          <dt className="text-subtle">Schedule</dt>
           <dd>
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="schedule"
               value={person.schedule}
               kind="pick"
-              placeholder="none"
               options={SCHEDULE_OPTIONS}
             />
           </dd>
-          <dt className="py-0.5 text-subtle">Type</dt>
+          <dt className="text-subtle">Type</dt>
           <dd>
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="employment_type"
               value={person.employment_type}
               kind="pick"
               allowNew
-              placeholder="none"
               options={employmentTypes.map((t) => ({ value: t, label: t }))}
             />
           </dd>
-          <dt className="py-0.5 text-subtle">Started</dt>
+          <dt className="text-subtle">Started</dt>
           <dd>
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="start_date"
               value={person.start_date}
               kind="date"
-              placeholder="unknown"
             />
           </dd>
-          <dt className="py-0.5 text-subtle">Ended</dt>
+          <dt className="text-subtle">Ended</dt>
           <dd>
             {/* FMP had no termination date at all — 417 former employees and no
                 record of when any of them left. Filled going forward. */}
             <InlineValue
+              boxed={BOXED_FIELDS}
               table={table}
               id={person.id}
               column="end_date"
               value={person.end_date}
               kind="date"
-              placeholder="still here"
             />
           </dd>
-          <dt className="py-0.5 text-subtle">Food card</dt>
+          {/* THE STATE MARK RIDES WITH THE LABEL. Hung to the field's right it
+              broke the column's right edge — and yellow is a FILL, never ink:
+              `--rf-yellow-600` on white is 1.88:1, which is not a legibility
+              complaint, it is text you cannot read. Red stays ink at 5.61:1. */}
+          <dt className="flex flex-wrap items-center gap-2 text-subtle">
+            Food card
+            {person.status !== "inactive" && fhc === "expired" && (
+              <span className="text-[11px] uppercase tracking-[0.12em] text-accent">expired</span>
+            )}
+            {person.status !== "inactive" && fhc === "soon" && (
+              <span className="bg-mark-fill px-1 text-[11px] uppercase tracking-[0.12em]">
+                expiring
+              </span>
+            )}
+          </dt>
           <dd className="space-y-0.5">
-            <div className="flex items-baseline gap-2">
+            <div className="flex items-center gap-2">
               {foodCard.source === "document" ? (
                 /* The card ITSELF is on file, so its own expiry is the record
                    and this row only reports it. Editing it here as well would
@@ -640,23 +656,13 @@ export async function EmployeeDetail({
                 </span>
               ) : (
                 <InlineValue
+                  boxed={BOXED_FIELDS}
                   table={table}
                   id={person.id}
                   column="food_handler_expires"
                   value={person.food_handler_expires}
                   kind="date"
-                  placeholder="none on file"
-                />
-              )}
-              {person.status !== "inactive" && fhc === "expired" && (
-                <span className="text-[11px] uppercase tracking-[0.12em] text-accent">
-                  expired
-                </span>
-              )}
-              {person.status !== "inactive" && fhc === "soon" && (
-                <span className="text-[11px] uppercase tracking-[0.12em] text-[var(--rf-yellow-600)]">
-                  expiring
-                </span>
+                    />
               )}
             </div>
             {/* Said ONLY when the date comes from a filed card, because then it

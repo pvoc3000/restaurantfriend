@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { withFrom } from "@/lib/breadcrumbs";
@@ -58,7 +59,7 @@ const INVOICE_LINE_WIDTHS_KEY = "rf.invoiceLines.columnWidths.v1";
  * 17px taller and the column read as ragged beside Amounts. 128px clears it —
  * measured, not guessed.
  */
-const DL_CLASS = "grid grid-cols-[8rem_1fr] items-baseline gap-y-1 text-sm";
+const DL_CLASS = "grid grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm";
 
 /**
  * One invoice: what we were billed, what it belongs to, and whether it should
@@ -600,6 +601,7 @@ export function InvoiceDetail({
               <Field label="Invoice number">
                 <Cell canEdit={canEdit} value={invoice.invoice_number}>
                   <InlineValue
+                    boxed={BOXED_FIELDS}
                     table="vendor_invoices"
                     id={invoice.id}
                     column="invoice_number"
@@ -610,6 +612,7 @@ export function InvoiceDetail({
               <Field label="Invoice date">
                 <Cell canEdit={canEdit} value={invoice.invoice_date}>
                   <InlineValue
+                    boxed={BOXED_FIELDS}
                     table="vendor_invoices"
                     id={invoice.id}
                     column="invoice_date"
@@ -621,6 +624,7 @@ export function InvoiceDetail({
               <Field label="Due date">
                 <Cell canEdit={canEdit} value={invoice.due_date}>
                   <InlineValue
+                    boxed={BOXED_FIELDS}
                     table="vendor_invoices"
                     id={invoice.id}
                     column="due_date"
@@ -635,6 +639,7 @@ export function InvoiceDetail({
               <Field label="Terms">
                 <Cell canEdit={canEdit} value={invoice.terms}>
                   <InlineValue
+                    boxed={BOXED_FIELDS}
                     table="vendor_invoices"
                     id={invoice.id}
                     column="terms"
@@ -645,6 +650,7 @@ export function InvoiceDetail({
               <Field label="Vendor">
                 <Cell canEdit={canEdit} value={invoice.vendors?.name ?? null}>
                   <InlineValue
+                    boxed={BOXED_FIELDS}
                     table="vendor_invoices"
                     id={invoice.id}
                     column="vendor_id"
@@ -659,6 +665,7 @@ export function InvoiceDetail({
               <Field label="Location">
                 <Cell canEdit={canEdit} value={locationCode}>
                   <InlineValue
+                    boxed={BOXED_FIELDS}
                     table="vendor_invoices"
                     id={invoice.id}
                     column="location_id"
@@ -676,6 +683,7 @@ export function InvoiceDetail({
               <Field label="Note">
                 <Cell canEdit={canEdit} value={invoice.notes}>
                   <InlineValue
+                    boxed={BOXED_FIELDS}
                     table="vendor_invoices"
                     id={invoice.id}
                     column="notes"
@@ -702,6 +710,7 @@ export function InvoiceDetail({
                 <Field key={column} label={label}>
                   <Cell canEdit={canEdit} value={value === null ? null : money(value)}>
                     <InlineValue
+                      boxed={BOXED_FIELDS}
                       table="vendor_invoices"
                       id={invoice.id}
                       column={column}

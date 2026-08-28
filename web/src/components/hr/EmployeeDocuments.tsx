@@ -68,7 +68,10 @@ function ExpiryLine({
             <span className="text-subtle">Expires</span>
             {state === "expired" && <span className="text-accent"> · expired</span>}
             {state === "soon" && (
-              <span className="text-[var(--rf-yellow-600)]"> · soon</span>
+              <>
+                {" · "}
+                <span className="bg-mark-fill px-1">soon</span>
+              </>
             )}
           </>
         )}
@@ -327,7 +330,7 @@ export function EmployeeDocuments({
         {status.expiring.length > 0 && (
           <p>
             <span className="text-subtle">Expiring soon: </span>
-            <span className="text-[var(--rf-yellow-600)]">
+            <span className="bg-mark-fill px-1">
               {status.expiring
                 .map((e) => `${DOCUMENT_KIND_LABEL[e.kind]} (${e.on})`)
                 .join(", ")}

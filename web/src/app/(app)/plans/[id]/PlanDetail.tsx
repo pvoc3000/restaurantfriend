@@ -6,6 +6,7 @@ import { canWriteCatalog } from "@/lib/roles";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { PlanMatrix } from "@/components/production/PlanMatrix";
 import {
@@ -175,13 +176,14 @@ export async function PlanDetail({
           ) : null}
         </div>
 
-        <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] gap-x-6 gap-y-3 text-[14px] sm:grid-cols-[minmax(7rem,auto)_1fr_minmax(7rem,auto)_1fr]">
+        <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] items-center gap-x-6 gap-y-3 text-[14px] sm:grid-cols-[minmax(7rem,auto)_1fr_minmax(7rem,auto)_1fr] sm:[&>*:nth-child(4n+3)]:pl-6">
           {/* Both shops are CHOSEN from a list — a known vocabulary is never
               typed. Enumerating over ACTIVE locations only (design rule 3): a
               closed shop is not one you can plan a menu for. */}
           <Row label="Sells at">
             {editable ? (
               <InlineValue
+                boxed={BOXED_FIELDS}
                 table="production_plans"
                 id={id}
                 column="location_id"
@@ -204,26 +206,27 @@ export async function PlanDetail({
               // which one takes it, and decision 9's fallback then reads it as
               // the selling shop.
               <InlineValue
+                boxed={BOXED_FIELDS}
                 table="production_plans"
                 id={id}
                 column="kitchen_location_id"
                 kind="pick"
                 value={(plan.kitchen_location_id ?? null) as string | null}
                 options={locationOptions}
-                placeholder="not set"
                 ariaLabel="Made at"
               />
             ) : (
               <span className={READ_ONLY_VALUE}>
                 {plan.kitchen_location_id
                   ? codeById.get(plan.kitchen_location_id as string) ?? "—"
-                  : <span className="text-mark">not set</span>}
+                  : <span className="bg-mark-fill px-1">not set</span>}
               </span>
             )}
           </Row>
           <Row label="Starts">
             {editable ? (
               <InlineValue
+                boxed={BOXED_FIELDS}
                 table="production_plans" id={id} column="starts_on"
                 kind="date" nullable={false} value={plan.starts_on as string}
               />
@@ -234,6 +237,7 @@ export async function PlanDetail({
           <Row label="Ends">
             {editable ? (
               <InlineValue
+                boxed={BOXED_FIELDS}
                 table="production_plans" id={id} column="ends_on"
                 kind="date" value={(plan.ends_on ?? null) as string | null}
               />
@@ -251,7 +255,13 @@ export async function PlanDetail({
           </Row>
           <Row label="Notes">
             {editable ? (
-              <InlineValue table="production_plans" id={id} column="notes" value={(plan.notes ?? null) as string | null} />
+              <InlineValue
+                boxed={BOXED_FIELDS}
+                table="production_plans"
+                id={id}
+                column="notes"
+                value={(plan.notes ?? null) as string | null}
+              />
             ) : (
               <span className={READ_ONLY_VALUE}>{(plan.notes as string) ?? "—"}</span>
             )}
@@ -328,7 +338,7 @@ export async function PlanDetail({
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <>
-      <dt className="pt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
         {label}
       </dt>
       <dd className="min-w-0">{children}</dd>

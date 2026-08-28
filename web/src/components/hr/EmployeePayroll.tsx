@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { formatWorkdayStart } from "@/lib/workday";
 
 /**
@@ -54,8 +55,12 @@ export function EmployeePayroll({
   wageTypes: string[];
   editable: boolean;
 }) {
+  // THE SAME TRACK THE EMPLOYMENT BLOCK ABOVE IT USES. Two field blocks
+  // stacked on one tab with different left and right edges read as
+  // misalignment the moment the values are boxed — which is half of what this
+  // convention makes visible.
   return (
-    <dl className="grid max-w-2xl grid-cols-[10rem_1fr] gap-x-4 gap-y-1 text-sm">
+    <dl className="grid max-w-md grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
       {/* The org's own employee number. It is `legacy_id` in the schema and
           FileMaker's `Employee_ID` in origin — all 445 people have one, range
           1–736 — and until now the detail screen queried it only to tell the
@@ -67,33 +72,33 @@ export function EmployeePayroll({
           on it, so CHANGING an existing one breaks reconciliation against the
           FileMaker export. Neither is a reason to make it read-only — both are
           reasons not to change one idly. */}
-      <dt className="py-0.5 text-subtle">Organization ID</dt>
+      <dt className="text-subtle">Organization ID</dt>
       <dd>
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="employees"
             id={employeeId}
             column="legacy_id"
             kind="number"
             value={legacyId}
-            placeholder="none"
           />
         ) : (
           <span className={READ_ONLY_VALUE}>{legacyId ?? "—"}</span>
         )}
       </dd>
 
-      <dt className="py-0.5 text-subtle">Primary job</dt>
+      <dt className="text-subtle">Primary job</dt>
       <dd>
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="employees"
             id={employeeId}
             column="primary_wage_type"
             kind="pick"
             allowNew
             value={primaryWageType}
-            placeholder="none"
             options={wageTypes.map((w) => ({ value: w, label: w }))}
           />
         ) : (
@@ -101,30 +106,30 @@ export function EmployeePayroll({
         )}
       </dd>
 
-      <dt className="py-0.5 text-subtle">Payroll ID</dt>
+      <dt className="text-subtle">Payroll ID</dt>
       <dd>
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="employees"
             id={employeeId}
             column="gusto_id"
             value={gustoId}
-            placeholder="none"
           />
         ) : (
           <span className={READ_ONLY_VALUE}>{gustoId ?? "—"}</span>
         )}
       </dd>
 
-      <dt className="py-0.5 text-subtle">Time Clock ID</dt>
+      <dt className="text-subtle">Time Clock ID</dt>
       <dd>
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="employees"
             id={employeeId}
             column="homebase_id"
             value={homebaseId}
-            placeholder="none"
           />
         ) : (
           <span className={READ_ONLY_VALUE}>{homebaseId ?? "—"}</span>
@@ -141,10 +146,11 @@ export function EmployeePayroll({
           It is on the payroll block rather than with Position because it is not
           a description of the job: it is the 24-hour window California daily
           overtime is counted over, and it changes what this person is paid. */}
-      <dt className="py-0.5 text-subtle">Workday starts</dt>
+      <dt className="self-start pt-2 text-subtle">Workday starts</dt>
       <dd>
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="employees"
             id={employeeId}
             column="workday_starts_at"
@@ -164,7 +170,7 @@ export function EmployeePayroll({
         </p>
       </dd>
 
-      <dt className="py-0.5 text-subtle">Tips</dt>
+      <dt className="text-subtle">Tips</dt>
       <dd>
         <ExcludesTips employeeId={employeeId} value={excludesTips} editable={editable} />
       </dd>

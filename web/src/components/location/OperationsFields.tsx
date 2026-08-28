@@ -1,6 +1,7 @@
 "use client";
 
 import { InlineValue } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 
 /**
  * Tax rate, labor rate, register count.
@@ -25,17 +26,17 @@ export function OperationsFields({
   editable: boolean;
 }) {
   return (
-    <dl className="grid max-w-md grid-cols-[8rem_1fr] gap-x-4 gap-y-1 text-sm">
-      <dt className="py-0.5 text-subtle">Tax rate</dt>
+    <dl className="grid max-w-md grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+      <dt className="text-subtle">Tax rate</dt>
       <dd>
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="locations"
             id={locationId}
             column="tax_rate"
             value={taxRate}
             kind="number"
-            placeholder="none"
             // Stored as a FRACTION, shown as a percentage: 0.0975 is what
             // arithmetic wants and 9.75% is what the sign on the wall says.
             // Editing shows the raw value — and a number cell takes
@@ -49,16 +50,16 @@ export function OperationsFields({
         )}
       </dd>
 
-      <dt className="py-0.5 text-subtle">Labor rate</dt>
+      <dt className="text-subtle">Labor rate</dt>
       <dd>
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="locations"
             id={locationId}
             column="labor_rate"
             value={laborRate}
             kind="number"
-            placeholder="none"
             format={(v) => `$${Number(v).toFixed(2)}/hr`}
           />
         ) : (
@@ -68,16 +69,16 @@ export function OperationsFields({
         )}
       </dd>
 
-      <dt className="py-0.5 text-subtle">Registers</dt>
+      <dt className="text-subtle">Registers</dt>
       <dd>
         {editable ? (
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="locations"
             id={locationId}
             column="register_count"
             value={registerCount}
             kind="number"
-            placeholder="none"
           />
         ) : (
           <span className={registerCount === null ? "text-faint" : ""}>

@@ -853,14 +853,16 @@ export function PlanMatrix({
                                       // Yellow rather than faint: an unset par is
                                       // worth your eye, because that slot makes
                                       // nothing. A zero is black — somebody said it.
-                                      emptyClassName="text-mark"
+                                      // A FILL, never ink: `text-mark` on white is
+                                      // 1.43:1, which is text you cannot read.
+                                      emptyClassName="bg-mark-fill"
                                       align="right"
                                       ariaLabel={`How many ${slot.name} on tray ${row.tray.tray_number}, ${WEEKDAYS[i].long}`}
                                     />
                                   ) : (
                                     <span
                                       className={`${READ_ONLY_VALUE} block text-right tabular-nums ${
-                                        slot.par === null ? "text-mark" : ""
+                                        slot.par === null ? "bg-mark-fill" : ""
                                       }`}
                                     >
                                       {slotParLabel(slot.par)}
@@ -898,7 +900,7 @@ export function PlanMatrix({
                                     disabled={pending}
                                     title={`${WEEKDAYS[i].long}'s default here is ${suggestionFor(slot, weekday)} — use it instead of ${slotParLabel(slot.par)}`}
                                     aria-label={`Use ${WEEKDAYS[i].long}'s default of ${suggestionFor(slot, weekday)} for ${slot.name}`}
-                                    className="whitespace-nowrap text-[11px] tabular-nums text-mark hover:text-ink"
+                                    className="whitespace-nowrap bg-mark-fill px-1 text-[11px] tabular-nums text-ink underline underline-offset-2 hover:bg-ink hover:text-white"
                                   >
                                     → use default {suggestionFor(slot, weekday)}
                                   </button>

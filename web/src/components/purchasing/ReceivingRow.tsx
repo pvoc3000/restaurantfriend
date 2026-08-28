@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { InlineValue } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { money, packType, type PoLine } from "@/lib/purchaseOrders";
 import type { LineMatch } from "@/lib/invoiceMatch";
 import { qtyLabel, receivedClass, type PriceAction } from "@/lib/receiving";
@@ -82,6 +83,7 @@ export function ReceivingRow({
   const priceCell = canReceive ? (
     <span className="w-24 shrink-0">
       <InlineValue
+        boxed={BOXED_FIELDS}
         table="purchase_order_items"
         id={line.id}
         column="unit_price"
@@ -310,9 +312,14 @@ export function ReceivingRow({
           </button>
         )}
 
-        <span className="ml-auto min-w-40 max-w-full">
+        {/* `flex-1`, not `ml-auto`: a boxed field is `w-full`, and a
+            shrink-to-fit wrapper gives that nothing to resolve against — so
+            the note takes the row's remaining width, which is where an auto
+            margin was pushing it anyway. */}
+        <span className="min-w-40 max-w-full flex-1">
           {canReceive ? (
             <InlineValue
+              boxed={BOXED_FIELDS}
               table="purchase_order_items"
               id={line.id}
               column="discrepancy_note"
