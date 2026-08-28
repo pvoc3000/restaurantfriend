@@ -141,8 +141,25 @@ const INLINE_REST_LOOK =
  * The underline comes OFF when this goes on: a box and a dotted rule are two
  * cues for one fact, and the second one just looks like an artefact.
  */
-const INLINE_REST_BOXED =
-  "min-h-16 border border-hairline hover:border-ink";
+const INLINE_REST_BOXED = "border border-hairline hover:border-ink";
+
+/**
+ * `min-h` is half the point FOR A NOTE, and only for a note.
+ *
+ * It used to live inside `INLINE_REST_BOXED`, from when `boxed` had exactly one
+ * caller and that caller was five paragraphs. It is split out because the box
+ * and the height answer different questions: the box says "editable", which any
+ * field may want to say, while 64px of it says "put a paragraph here", which
+ * would be absurd on a one-line date. A boxed MULTILINE field still gets both,
+ * so the Notes tab is unchanged.
+ */
+const INLINE_REST_TALL = "min-h-16";
+
+/** The resting dress: a box or the dotted underline, plus a note's height. */
+function restLook(boxed: boolean, multiline = false): string {
+  if (!boxed) return INLINE_REST_LOOK;
+  return multiline ? `${INLINE_REST_BOXED} ${INLINE_REST_TALL}` : INLINE_REST_BOXED;
+}
 
 /**
  * The editing frame. `-outline-offset-1` keeps it inside the cell's own padding
@@ -185,6 +202,7 @@ function Sizer({
   text,
   align,
   boxed = false,
+  multiline = false,
 }: {
   text: string;
   align?: "left" | "right";
@@ -192,13 +210,16 @@ function Sizer({
    *  height and the field jumps the moment you click into it. That is why the
    *  underline was here in the first place, and `boxed` inherits the rule. */
   boxed?: boolean;
+  /** …and so does a note's `min-h`, for exactly the same reason. */
+  multiline?: boolean;
 }) {
   return (
     <span
       aria-hidden
-      className={`invisible block whitespace-pre ${INLINE_BOX} ${
-        boxed ? INLINE_REST_BOXED : INLINE_REST_LOOK
-      } ${align === "right" ? "text-right tabular-nums" : "text-left"}`}
+      className={`invisible block whitespace-pre ${INLINE_BOX} ${restLook(
+        boxed,
+        multiline
+      )} ${align === "right" ? "text-right tabular-nums" : "text-left"}`}
     >
       {/* A space, never "", or an empty cell collapses to no height at all. */}
       {text === "" ? " " : text}
@@ -541,6 +562,12 @@ export function InlineValue({
           align={align}
           activateTable={activateTable}
           onPick={(next) => void write(next === "" ? null : next, false)}
+          // The three kinds that do not click-to-edit each carry their own
+          // control, so `boxed` has to be handed to each of them or a page
+          // that boxes its fields boxes only the typed ones — which says the
+          // pickers and dates are NOT editable, the exact opposite of what the
+          // box is for.
+          boxed={boxed}
           className={className}
         />
         {error && <span className="text-xs text-accent">{error}</span>}
@@ -572,6 +599,7 @@ export function InlineValue({
           required={!nullable}
           ariaLabel={ariaLabel ?? column}
           className={className}
+          boxed={boxed}
           onChange={(next) => {
             if (next === null && !nullable) {
               setError("required");
@@ -600,6 +628,7 @@ export function InlineValue({
           // caller had named it.
           ariaLabel={ariaLabel ?? column}
           className={className}
+          boxed={boxed}
           collapseWhenEmpty={collapseWhenEmpty}
           onChange={(next) => {
             if (next === null && !nullable) {
@@ -627,7 +656,7 @@ export function InlineValue({
             it falls back to the sizer's content width, which is the resting
             button's width. One rule, both cases. */}
         <span className="relative block w-full">
-          <Sizer text={draft} align={align} boxed={boxed} />
+          <Sizer text={draft} align={align} boxed={boxed} multiline />
         <textarea
           autoFocus
           rows={4}
@@ -717,9 +746,7 @@ export function InlineValue({
       title="Click to edit"
       aria-label={ariaLabel ?? column}
       // Dotted underline at rest — the quietest possible "this is editable".
-      className={`w-full ${INLINE_BOX} ${
-        boxed ? INLINE_REST_BOXED : INLINE_REST_LOOK
-      } hover:bg-neutral-100 ${
+      className={`w-full ${INLINE_BOX} ${restLook(boxed, multiline)} hover:bg-neutral-100 ${
         align === "right" ? "text-right tabular-nums" : "text-left"
       } ${multiline ? "whitespace-pre-wrap" : ""} ${
         shown === null || shown === "" ? emptyClassName : ""

@@ -1,6 +1,7 @@
 "use client";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "./fieldLook";
 
 /**
  * A `time` column, shown the way a person writes one.
@@ -28,6 +29,7 @@ export function TimeCell({
   label,
   canWrite,
   placeholder = "10:30 AM",
+  boxed = BOXED_FIELDS,
 }: {
   id: string;
   column: string;
@@ -35,6 +37,7 @@ export function TimeCell({
   label: string;
   canWrite: boolean;
   placeholder?: string;
+  boxed?: boolean;
 }) {
   if (!canWrite) {
     return <span className={READ_ONLY_VALUE}>{formatClock(value) ?? "—"}</span>;
@@ -47,6 +50,7 @@ export function TimeCell({
       value={value}
       ariaLabel={label}
       placeholder={placeholder}
+      boxed={boxed}
       format={(v) => formatClock(String(v)) ?? String(v)}
     />
   );

@@ -13,6 +13,7 @@ import { WorkflowOffer } from "./WorkflowOffer";
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { InlineValue } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "./fieldLook";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { PickList } from "@/components/ui/PickList";
@@ -191,7 +192,7 @@ export function OrderPayments({
               <tr key={p.id} className="hover:bg-neutral-50">
                 <td className="px-3 py-2">
                   {canWrite ? (
-                    <InlineValue table="special_order_payments" id={p.id} column="paid_on" kind="date"
+                    <InlineValue boxed={BOXED_FIELDS} table="special_order_payments" id={p.id} column="paid_on" kind="date"
                                  value={p.paid_on} ariaLabel="Payment date" />
                   ) : (
                     <span className="tabular-nums">{p.paid_on ?? "—"}</span>
@@ -199,7 +200,7 @@ export function OrderPayments({
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums">
                   {canWrite ? (
-                    <InlineValue table="special_order_payments" id={p.id} column="amount" kind="number"
+                    <InlineValue boxed={BOXED_FIELDS} table="special_order_payments" id={p.id} column="amount" kind="number"
                                  value={p.amount} nullable={false} align="right" className="text-right"
                                  ariaLabel="Payment amount" format={(v) => money(Number(v))} />
                   ) : (
@@ -208,7 +209,7 @@ export function OrderPayments({
                 </td>
                 <td className="px-3 py-2">
                   {canWrite ? (
-                    <InlineValue table="special_order_payments" id={p.id} column="payment_type" kind="pick"
+                    <InlineValue boxed={BOXED_FIELDS} table="special_order_payments" id={p.id} column="payment_type" kind="pick"
                                  allowNew clearable options={PAYMENT_TYPES} value={p.payment_type}
                                  ariaLabel="How it was paid" />
                   ) : (
@@ -217,7 +218,7 @@ export function OrderPayments({
                 </td>
                 <td className="px-3 py-2">
                   {canWrite ? (
-                    <InlineValue table="special_order_payments" id={p.id} column="note" value={p.note}
+                    <InlineValue boxed={BOXED_FIELDS} table="special_order_payments" id={p.id} column="note" value={p.note}
                                  ariaLabel="Payment note" placeholder="—" />
                   ) : (
                     <span className="text-muted">{p.note ?? "—"}</span>

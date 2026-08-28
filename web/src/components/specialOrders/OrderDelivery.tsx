@@ -1,6 +1,7 @@
 "use client";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "./fieldLook";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { TimeCell } from "./TimeCell";
 
@@ -39,6 +40,7 @@ export function OrderDelivery({
               <Row label="Address" wide>
                 {canWrite ? (
                   <InlineValue
+                    boxed={BOXED_FIELDS}
                     table="special_orders" id={id} column="delivery_address" multiline
                     value={address || null} ariaLabel="Delivery address"
                   />
@@ -172,6 +174,7 @@ function Cell({
   if (!canWrite) return <span className={READ_ONLY_VALUE}>{(value as string) ?? "—"}</span>;
   return (
     <InlineValue
+      boxed={BOXED_FIELDS}
       table="special_orders"
       id={id}
       column={column}

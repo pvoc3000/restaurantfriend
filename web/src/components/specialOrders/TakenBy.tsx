@@ -5,6 +5,7 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "./fieldLook";
 import type { PickOption } from "@/components/ui/PickList";
 
 /**
@@ -93,6 +94,7 @@ export function TakenBy({
   return (
     <span className="flex flex-wrap items-center gap-2">
       <InlineValue
+        boxed={BOXED_FIELDS}
         table="special_orders"
         id={orderId}
         column="taken_by_employee_id"

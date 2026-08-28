@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "./fieldLook";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Switch } from "@/components/ui/Switch";
 import { WeekdayPicker } from "@/components/catalog/WeekdayPicker";
@@ -117,7 +118,7 @@ export function StandingOrderBlock({
 
         <Row label="Starts">
           {canWrite ? (
-            <InlineValue table="special_orders" id={id} column="starts_on" kind="date"
+            <InlineValue boxed={BOXED_FIELDS} table="special_orders" id={id} column="starts_on" kind="date"
                          value={startsOn} ariaLabel="First day this runs" />
           ) : (
             <span className={READ_ONLY_VALUE}>{startsOn ?? "—"}</span>
@@ -125,7 +126,7 @@ export function StandingOrderBlock({
         </Row>
         <Row label="Ends">
           {canWrite ? (
-            <InlineValue table="special_orders" id={id} column="ends_on" kind="date"
+            <InlineValue boxed={BOXED_FIELDS} table="special_orders" id={id} column="ends_on" kind="date"
                          value={endsOn} ariaLabel="Last day this runs" />
           ) : (
             <span className={READ_ONLY_VALUE}>{endsOn ?? "—"}</span>

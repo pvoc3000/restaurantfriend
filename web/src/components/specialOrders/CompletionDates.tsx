@@ -3,6 +3,7 @@
 import { useState } from "react";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "./fieldLook";
 import { createClient } from "@/lib/supabase/client";
 import { WorkflowOffer } from "./WorkflowOffer";
 import {
@@ -80,6 +81,7 @@ export function CompletionDates({
               <dd className="min-w-0">
                 {canWrite ? (
                   <InlineValue
+                    boxed={BOXED_FIELDS}
                     table="special_orders"
                     id={id}
                     column={r.column}

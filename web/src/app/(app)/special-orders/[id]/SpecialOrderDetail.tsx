@@ -40,6 +40,7 @@ import { OrderTotals } from "@/components/specialOrders/OrderTotals";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
 import { OrderActions } from "@/components/specialOrders/OrderActions";
 import { ScheduleProduction } from "@/components/specialOrders/ScheduleProduction";
+import { BOXED_FIELDS } from "@/components/specialOrders/fieldLook";
 import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
 import { TimeCell } from "@/components/specialOrders/TimeCell";
 import { StandingOrderBlock } from "@/components/specialOrders/StandingOrderBlock";
@@ -943,6 +944,10 @@ function Row({
 function Cell({
   canWrite,
   value,
+  // THE EXPERIMENT'S SEAM. Every editable cell on this record goes through
+  // here, so one default boxes the lot — and a caller can still opt out per
+  // cell without unpicking it.
+  boxed = BOXED_FIELDS,
   ...props
 }: {
   canWrite: boolean;
@@ -964,20 +969,24 @@ function Cell({
       props.kind === "pick"
         ? props.options?.find((o) => o.value === value)?.label ?? (value as string) ?? "—"
         : (value as string) ?? "—";
-    // A boxed note keeps its box below purchaser+, or the Notes tab reads as
-    // five headings with loose text under them for anyone who can't write —
-    // which is the very thing the box was added to fix.
+    // A READ-ONLY VALUE GETS NO BOX, which is the whole point of the box: it
+    // means "you can change this". The one exception is a NOTE, which keeps
+    // its frame below purchaser+ because there the box is doing a second job —
+    // without it the Notes tab reads as five headings with loose text under
+    // them, which is what it was added to fix in the first place.
     return (
       <span
         className={`${READ_ONLY_VALUE} ${
-          props.boxed ? "block min-h-16 w-full whitespace-pre-wrap border border-hairline" : ""
+          props.multiline && boxed
+            ? "block min-h-16 w-full whitespace-pre-wrap border border-hairline"
+            : ""
         }`}
       >
         {shown || "—"}
       </span>
     );
   }
-  return <InlineValue value={value} {...props} />;
+  return <InlineValue value={value} boxed={boxed} {...props} />;
 }
 
 /**

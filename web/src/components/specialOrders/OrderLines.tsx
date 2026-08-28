@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { moveInOrder, renumber, useRowDrag, type DropTarget } from "@/lib/rowDrag";
 import { InlineValue } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "./fieldLook";
 import { ColumnHeader } from "@/components/catalog/ColumnHeader";
 import { useResizableColumns } from "@/lib/columnWidths";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -417,6 +418,7 @@ export function OrderLines({
                   <td className="px-3 py-2">
                     {canWrite ? (
                       <InlineValue
+                        boxed={BOXED_FIELDS}
                         table="special_order_items"
                         id={row.id}
                         column="name"
@@ -464,6 +466,7 @@ export function OrderLines({
                   <td className="px-3 py-2">
                     {canWrite ? (
                       <InlineValue
+                        boxed={BOXED_FIELDS}
                         table="special_order_items" id={row.id} column="notes" value={row.notes}
                         ariaLabel={`Note on ${row.name}`} placeholder="—"
                       />
@@ -475,6 +478,7 @@ export function OrderLines({
                   <td className="px-3 py-2 text-right tabular-nums">
                     {canWrite ? (
                       <InlineValue
+                        boxed={BOXED_FIELDS}
                         table="special_order_items" id={row.id} column="qty" kind="number"
                         value={row.qty} nullable={false} ariaLabel={`Quantity of ${row.name}`}
                         className="text-right"
@@ -487,6 +491,7 @@ export function OrderLines({
                   <td className="px-3 py-2 text-right tabular-nums">
                     {canWrite ? (
                       <InlineValue
+                        boxed={BOXED_FIELDS}
                         table="special_order_items" id={row.id} column="unit_price" kind="number"
                         value={row.unit_price} nullable={false} ariaLabel={`Price of ${row.name}`}
                         className="text-right"
@@ -653,6 +658,7 @@ function LineTaxonomy({ row, menu }: { row: OrderLineRow; menu: MenuItem[] }) {
     <span className="flex flex-wrap items-baseline gap-x-1 text-[12px] text-subtle">
       <Slot>
         <InlineValue
+          boxed={BOXED_FIELDS}
           table="special_order_items" id={row.id} column="item_donut" kind="pick"
           value={row.item_donut} options={donutOptions(menu)} allowNew
           ariaLabel={`Donut on ${row.name}`} className={cell}
@@ -661,6 +667,7 @@ function LineTaxonomy({ row, menu }: { row: OrderLineRow; menu: MenuItem[] }) {
       <Sep />
       <Slot>
         <InlineValue
+          boxed={BOXED_FIELDS}
           table="special_order_items" id={row.id} column="item_type" kind="pick"
           value={row.item_type} options={taxonomyOptions(menu, "item_type")} allowNew
           ariaLabel={`Type of ${row.name}`} className={cell}
@@ -671,6 +678,7 @@ function LineTaxonomy({ row, menu }: { row: OrderLineRow; menu: MenuItem[] }) {
       {isLetter && letter ? <span>Letter</span> : null}
       <Slot>
         <InlineValue
+          boxed={BOXED_FIELDS}
           table="special_order_items" id={row.id} column="item_cut" kind="pick"
           value={row.item_cut} options={cutOptions(menu, row.item_cut)} allowNew
           ariaLabel={
@@ -691,6 +699,7 @@ function LineTaxonomy({ row, menu }: { row: OrderLineRow; menu: MenuItem[] }) {
       <Sep />
       <Slot>
         <InlineValue
+          boxed={BOXED_FIELDS}
           table="special_order_items" id={row.id} column="item_finish" kind="pick"
           value={row.item_finish} options={taxonomyOptions(menu, "finish")} allowNew
           ariaLabel={`Finish on ${row.name}`} className={cell}
@@ -699,6 +708,7 @@ function LineTaxonomy({ row, menu }: { row: OrderLineRow; menu: MenuItem[] }) {
       <Sep />
       <Slot>
         <InlineValue
+          boxed={BOXED_FIELDS}
           table="special_order_items" id={row.id} column="item_size" kind="pick"
           value={row.item_size} options={taxonomyOptions(menu, "size")} allowNew
           ariaLabel={`Size of ${row.name}`} className={cell}

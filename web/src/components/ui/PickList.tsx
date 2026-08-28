@@ -84,6 +84,7 @@ export function PickList({
   ariaLabel,
   align = "left",
   variant = "inline",
+  boxed = false,
   className = "",
   panelMinWidth = 168,
   defaultOpen = false,
@@ -167,6 +168,17 @@ export function PickList({
    * black bar: white type on nothing, sized to a nav tier.
    */
   variant?: "inline" | "field" | "masthead";
+  /**
+   * Wear a bounding box instead of the dotted underline. `inline` only — the
+   * other two dresses already carry their own frame or deliberately carry
+   * none.
+   *
+   * It exists so a screen that boxes its editable fields can box ALL of them:
+   * `InlineValue` hands this straight down, and without it a page's typed
+   * fields would be boxed while its pickers stayed underlined, which reads as
+   * the pickers not being editable.
+   */
+  boxed?: boolean;
   className?: string;
   /** Narrowest the PANEL may be, in px — capped at 340 like the derived width.
    *  Raise it where the trigger is much narrower than the rows it opens. */
@@ -416,11 +428,16 @@ export function PickList({
                 // about the working location wants the colour split out to a
                 // prop, not this dress reused.
                 `flex h-6 items-center gap-2 bg-transparent text-left text-[12px] font-semibold uppercase tracking-[0.06em] text-mark hover:text-mark-fill disabled:opacity-35 ${className}`
-              : // The same dotted underline InlineValue rests in, so an editable
-                // cell reads as editable whether it takes typing or a choice.
-                `flex w-full items-center gap-1 px-1 py-0.5 text-left underline decoration-neutral-300 decoration-dotted underline-offset-4 hover:bg-neutral-100 disabled:opacity-35 ${
-                  empty ? "text-faint" : ""
-                } ${className}`
+              : // The same resting dress InlineValue wears, so an editable cell
+                // reads as editable whether it takes typing or a choice — the
+                // dotted underline, or the bounding box where the caller has
+                // asked for one. The underline comes OFF when the box goes on:
+                // two cues for one fact, and the second reads as an artefact.
+                `flex w-full items-center gap-1 px-1 py-0.5 text-left hover:bg-neutral-100 disabled:opacity-35 ${
+                  boxed
+                    ? "border border-hairline hover:border-ink"
+                    : "underline decoration-neutral-300 decoration-dotted underline-offset-4"
+                } ${empty ? "text-faint" : ""} ${className}`
         }
       >
         {/* Inline: the caret sits WITH the value, not pushed to the far edge —

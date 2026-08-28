@@ -62,6 +62,7 @@ export function DateField({
   className = "",
   collapseWhenEmpty = false,
   variant = "cell",
+  boxed = false,
   max,
 }: {
   /** An ISO yyyy-mm-dd, or null for no date. */
@@ -110,6 +111,8 @@ export function DateField({
    * asked for today.
    */
   variant?: "cell" | "field" | "title";
+  /** Wear a bounding box in the `cell` dress — see `PickList`'s own `boxed`. */
+  boxed?: boolean;
   /**
    * The latest date offered, as `YYYY-MM-DD` — forwarded straight to the input,
    * so the native picker greys out everything after it.
@@ -140,16 +143,20 @@ export function DateField({
     /* px-1 py-0.5 is the resting BUTTON's padding, not a field's: these sit in
        a dl beside text cells, and a date indented 8px while the note beside it
        is indented 4px is exactly the misalignment Mark caught on `sent_via`.
-       No border (Mark: "I don't like the bounding box on the date fields, but I
-       like the calendar icon") — the hover wash is what says the value takes an
-       edit. */
+       No border BY DEFAULT (Mark: "I don't like the bounding box on the date
+       fields, but I like the calendar icon") — the hover wash is what says the
+       value takes an edit. `boxed` is opt-in and belongs to the caller: a
+       screen that boxes every editable field has to box these too, or a date
+       is the one cell on the page that reads as read-only. Worth knowing that
+       the box here was once rejected on its own merits; this one is a hairline
+       at cell density rather than the heavy `field` frame that was. */
     <span
       className={
         field
           ? "flex h-12 w-full items-center gap-2 border border-ink px-3 focus-within:border-2"
           : `inline-flex items-center px-1 py-0.5 hover:bg-neutral-100 ${
               title ? "gap-2" : "gap-1"
-            }`
+            } ${boxed && !title ? "border border-hairline hover:border-ink" : ""}`
       }
     >
       {/* One fixed width in both states, so the glyph doesn't move when a date

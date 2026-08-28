@@ -34,6 +34,7 @@ export function TimeField({
   ariaLabel,
   className = "",
   variant = "cell",
+  boxed = false,
 }: {
   /** `HH:MM` or `HH:MM:SS` (what a Postgres `time` column reads back), or null. */
   value: string | null;
@@ -51,6 +52,8 @@ export function TimeField({
    * one of them being broken. Whatever dress the date wears, this wears too.
    */
   variant?: "cell" | "field";
+  /** …and so does `boxed`, for exactly that reason. */
+  boxed?: boolean;
 }) {
   const field = variant === "field";
 
@@ -59,7 +62,9 @@ export function TimeField({
       className={
         field
           ? "flex h-12 w-full items-center border border-ink px-3 focus-within:border-2"
-          : "inline-flex items-center px-1 py-0.5 hover:bg-neutral-100"
+          : `inline-flex items-center px-1 py-0.5 hover:bg-neutral-100 ${
+              boxed ? "border border-hairline hover:border-ink" : ""
+            }`
       }
     >
       <input
