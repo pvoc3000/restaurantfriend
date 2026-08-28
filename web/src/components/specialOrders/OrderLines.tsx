@@ -125,7 +125,11 @@ export function OrderLines({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const bodyRef = useRef<HTMLTableSectionElement | null>(null);
+  // THE TABLE, not the tbody — since 2026-08-28 each LINE is its own `<tbody>`
+  // (see the row markup), so there is no single section to hang this on.
+  // `useRowDrag` only ever calls `querySelectorAll("[data-row-id]")` on it and
+  // `closest("table")`, both of which the table itself answers.
+  const bodyRef = useRef<HTMLTableElement | null>(null);
 
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -349,7 +353,7 @@ export function OrderLines({
         {/* `table-fixed`, which is what makes a `<col>` width mean anything at
             all — in auto layout the browser sizes columns from their content
             and a dragged width is a suggestion it ignores. */}
-        <table className="w-full min-w-[54rem] table-fixed border-collapse text-[14px]">
+        <table ref={bodyRef} className="w-full min-w-[54rem] table-fixed border-collapse text-[14px]">
           <colgroup>
             {columnKeys.map((key) => (
               <col key={key} style={{ width: colWidth(key) }} />
@@ -387,15 +391,31 @@ export function OrderLines({
               {canWrite ? <th className="p-0" /> : null}
             </tr>
           </thead>
-          <tbody ref={bodyRef}>
-            {ordered.map((row) => {
+          {/* ONE `<tbody>` PER LINE, which is what lets a line be TWO ROWS and
+              still behave as one (Mark, 2026-08-28: the taxonomy should "not
+              wrap at the end of the column but instead continue in a straight
+              line under the note field").
+              The taxonomy was confined to the Item cell, so five pickers wrapped
+              inside ~300px. Given a row of its own spanning Item AND Note it has
+              twice the width and runs straight.
+              A tbody rather than two bare `<tr>`s because `data-row-id` goes on
+              it: `useRowDrag` measures whatever carries that attribute, so the
+              drag rect covers BOTH lines, the drop indicator lands below the
+              whole line rather than between its halves, and one `hover:` and one
+              `opacity-40` still dress the lot. Several tbodies in one table is
+              ordinary HTML; the drag needed no change at all. */}
+          {ordered.map((row) => {
               const production = isProductionLine(row);
+              // Line 2's trailing filler: everything after Item and Note, plus
+              // the ⋯ column when it is there.
+              const tailSpan = canWrite ? 5 : 4;
               return (
-                <tr
+                <tbody
                   key={row.id}
                   data-row-id={row.id}
                   className={`align-top hover:bg-neutral-50 ${dragging?.id === row.id ? "opacity-40" : ""}`}
                 >
+                <tr>
                   {canWrite ? (
                     <td className="px-0 py-2">
                       {/* A dedicated grip, `touch-none` on it alone: a row drag
@@ -415,7 +435,12 @@ export function OrderLines({
                     </td>
                   ) : null}
 
-                  <td className="px-3 py-2">
+                  {/* `pb-1`, not `py-2`: line 2 sits directly beneath and its
+                      own `pt-0` would let the two boxes touch (Mark,
+                      2026-08-28: "add a little padding between the first and
+                      second lines in each row so the boxes don't touch each
+                      other"). 4px here plus line 2's 4px is the gap. */}
+                  <td className="px-3 pb-1 pt-2">
                     {canWrite ? (
                       <InlineValue
                         boxed={BOXED_FIELDS}
@@ -429,41 +454,9 @@ export function OrderLines({
                     ) : (
                       <span className="font-medium">{row.name}</span>
                     )}
-                    {/* The taxonomy under the customized name — what the
-                        kitchen document prints beneath it, and the only way to
-                        tell four "Angry Samoa" lines apart. Editable in place
-                        since 2026-08-19; see the header. */}
-                    {canWrite ? (
-                      <LineTaxonomy row={row} menu={menu} />
-                    ) : (
-                      <span className="block text-[12px] text-subtle">
-                        {[row.item_donut, row.item_type, row.item_cut, row.item_finish, row.item_size]
-                          .filter(Boolean)
-                          .join(" · ") || "—"}
-                      </span>
-                    )}
-                    {!production ? (
-                      <span className="block text-[12px] text-mark">
-                        Money only — this never reaches the kitchen
-                      </span>
-                    ) : !row.production_item_id ? (
-                      /* Decision 9's precondition, said on the row that breaks
-                         it rather than only in the refusal at scheduling time.
-                         `production_schedule_items.item_id` is NOT NULL. */
-                      <span className="block text-[12px] text-mark">
-                        No production item — this line cannot be scheduled
-                      </span>
-                    ) : (
-                      <Link
-                        href={`/production-items/${row.production_item_id}`}
-                        className="block text-[12px] text-subtle underline underline-offset-2 hover:text-ink"
-                      >
-                        On the menu
-                      </Link>
-                    )}
                   </td>
 
-                  <td className="px-3 py-2">
+                  <td className="px-3 pb-1 pt-2">
                     {canWrite ? (
                       <InlineValue
                         boxed={BOXED_FIELDS}
@@ -545,9 +538,59 @@ export function OrderLines({
                     </td>
                   ) : null}
                 </tr>
+
+                {/* LINE 2 — the taxonomy, running under Item AND Note.
+                    `colSpan={2}` is the whole feature: five pickers in a 300px
+                    Item cell wrapped after three, where across both columns
+                    they run straight. `pt-0 pb-2` against line 1's `pb-1` puts
+                    8px between the two rows of boxes. */}
+                <tr>
+                  {canWrite ? <td className="px-0 pb-2 pt-0" /> : null}
+                  <td className="px-3 pb-2 pt-0" colSpan={2}>
+                    {/* The taxonomy under the customized name — what the
+                        kitchen document prints beneath it, and the only way to
+                        tell four "Angry Samoa" lines apart. Editable in place
+                        since 2026-08-19; see the header. */}
+                    {canWrite ? (
+                      <LineTaxonomy row={row} menu={menu} />
+                    ) : (
+                      <span className="block text-[12px] text-subtle">
+                        {[row.item_donut, row.item_type, row.item_cut, row.item_finish, row.item_size]
+                          .filter(Boolean)
+                          .join(" · ") || "—"}
+                      </span>
+                    )}
+                    {!production ? (
+                      <span className="mt-1 block text-[12px]">
+                        <span className="bg-mark-fill px-1">
+                          Money only — this never reaches the kitchen
+                        </span>
+                      </span>
+                    ) : !row.production_item_id ? (
+                      /* Decision 9's precondition, said on the row that breaks
+                         it rather than only in the refusal at scheduling time.
+                         `production_schedule_items.item_id` is NOT NULL. */
+                      <span className="mt-1 block text-[12px]">
+                        <span className="bg-mark-fill px-1">
+                          No production item — this line cannot be scheduled
+                        </span>
+                      </span>
+                    ) : (
+                      <Link
+                        href={`/production-items/${row.production_item_id}`}
+                        className="mt-1 block text-[12px] text-subtle underline underline-offset-2 hover:text-ink"
+                      >
+                        On the menu
+                      </Link>
+                    )}
+                  </td>
+                  <td className="px-3 pb-2 pt-0" colSpan={tailSpan} />
+                </tr>
+                </tbody>
               );
             })}
 
+          <tbody>
             {ordered.length === 0 ? (
               <tr>
                 <td colSpan={canWrite ? 8 : 6} className="px-3 py-6 text-sm text-muted">
@@ -655,7 +698,12 @@ function LineTaxonomy({ row, menu }: { row: OrderLineRow; menu: MenuItem[] }) {
   const letter = cutLetter(row.item_cut);
 
   return (
-    <span className="flex flex-wrap items-baseline gap-x-1 text-[12px] text-subtle">
+    // `gap-y-1` matters now that each picker is a box: it has a whole row to
+    // itself so it rarely wraps at all, but where it still does — a narrow
+    // window, a long letter cut — two rows of boxes would otherwise touch.
+    // `items-center`, not `items-baseline`: boxes align by their edges, and a
+    // baseline puts a bordered picker a pixel or two off its neighbour.
+    <span className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[12px] text-subtle">
       <Slot>
         <InlineValue
           boxed={BOXED_FIELDS}

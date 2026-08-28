@@ -63,15 +63,21 @@ export function OrderInfoLayout({
       // `min-w-0` on BOTH tracks and NOT behind a breakpoint — a flex item's
       // min-width defaults to min-content, so a long customer name or a wide
       // table would push the whole PAGE sideways rather than shrink.
-      // MORE AIR BETWEEN THE TWO COLUMNS THAN WITHIN ONE (Mark, 2026-08-28).
-      // Both gaps were 40px, so the space between Details and Customer — two
-      // different subjects — read the same as the space between Details and
-      // the block beneath it. Boxing the fields made that worse rather than
-      // revealing it: a column of outlined boxes has a hard right edge where
-      // ragged text had none, so the two columns now meet as two walls 40px
-      // apart. 64px across, 40px down; the gap you cross to change subject is
-      // wider than the one you cross to read on.
-      className="flex min-h-0 flex-col gap-10 xl:flex-row xl:gap-16"
+      // THE TAB IS FOUR COLUMNS, NOT TWO, and they are not all the same kind
+      // of gap (Mark, 2026-08-28: "reduce the padding between columns 1 & 2,
+      // and 3 & 4, and increase the padding between columns 2 & 3").
+      //
+      // Details and Customer are each a two-track grid, so what a reader sees
+      // is four columns of fields. Three gaps separate them and only the
+      // MIDDLE one is a change of subject — 1|2 and 3|4 are two halves of one
+      // block. Every gap was 40px, so all three read alike and the tab looked
+      // like four unrelated columns rather than two blocks of two.
+      //
+      // 96px in the middle (here), 24px inside each block (the grids' own
+      // `gap-x-6`). The arithmetic is close to free: each block gives 32px to
+      // the middle and takes 16px back from its own inner gap, so a field
+      // loses about 8px and the grouping becomes legible.
+      className="flex min-h-0 flex-col gap-10 xl:flex-row xl:gap-24"
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-10">
         <div className="shrink-0">{topLeft}</div>

@@ -82,7 +82,7 @@ export function CompletionDates({
           it likes, and the block reads like Details directly above it. It costs
           about 95px of height in a pane that scrolls, which is the cheaper half
           of the trade. */}
-      <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+      <div className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
         {rows.map((r) => {
           const value = (order[r.column] ?? null) as string | null;
           return (

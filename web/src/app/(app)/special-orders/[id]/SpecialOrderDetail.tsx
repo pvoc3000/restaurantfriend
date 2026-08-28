@@ -553,7 +553,7 @@ export async function SpecialOrderDetail({
               topLeft={
                 <section className="space-y-3">
                   <SectionHeading>Details</SectionHeading>
-                  <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
+                  <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
                     <Row label="Order name">
                       <Cell table="special_orders" id={id} column="title" value={row.title as string | null}
                             canWrite={canWrite} ariaLabel="What the order is for" />
@@ -646,7 +646,7 @@ export async function SpecialOrderDetail({
               topRight={
                 <section className="space-y-3">
                   <SectionHeading>Customer</SectionHeading>
-                  <div className="grid gap-x-10 gap-y-4 sm:grid-cols-2">
+                  <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
                     {/* THE LINK GOES BOTH WAYS NOW. Until 2026-08-18 the
                         only writer of `customer_id` was "New order for them"
                         on the customer record, so an order that started as a
