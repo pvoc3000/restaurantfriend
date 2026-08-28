@@ -1,18 +1,20 @@
 // scheduleDraft — a special order's items becoming a night's schedule lines.
 //
 // The anchor case is real: order #7769, "Birthday 07/15/2023", 21 lines that
-// spell HAPPY BIRTHDAY VINNY. Every one of its 18 letters points at the SAME
-// production item, because `production_items` has one generic `Letter` subtype
-// per flavour and no per-character rows. Group by item alone and the decorator
-// gets "18 x Rites of Sprinkles - Letter"; group by (item, cut) and they get
-// the word. That is the whole reason migration 067 moves the unique key.
+// spell HAPPY BIRTHDAY VINNY. NOTHING is rolled up (Mark, 2026-08-27) — one
+// order line becomes one schedule line, carrying its note, in the order's own
+// sequence, because on this order that sequence IS the word.
 //
-// The negative cases are the ones that matter most here, and each was checked
-// by breaking the code: fold the letter spellings together wrongly and the
-// three-spelling case goes red; group by item instead of (item, cut) and VINNY
-// collapses from 12 lines to 2; treat an untyped line as money and the ordinary
-// donut vanishes off the kitchen sheet.
+// The case that settled it is the pair of Mini lines: same item, same cut, same
+// size, notes "chocolate glaze" and "vanilla glaze". Any roll-up prints them as
+// one line of 100 and never tells the decorator that half are chocolate.
+//
+// The negative cases matter most, and each was checked by breaking the code:
+// sort by name and VINNY becomes an anagram; drop the note and the two Minis
+// are indistinguishable; sum by (item, cut) and 20 lines collapse to 12; treat
+// an untyped line as money and the ordinary donut vanishes off the sheet.
 
+import { cutLetter } from "../../src/lib/specialOrderLines";
 import {
   canonicalCut,
   scheduleDraft,
@@ -50,6 +52,7 @@ function order7769(): SchedulableLine[] {
       item_cut: "Promise Ring",
       item_size: "Mini",
       qty: 50,
+      notes: "chocolate glaze",
     }),
     line({
       name: "Rites of Sprinkles - Mini",
@@ -57,6 +60,7 @@ function order7769(): SchedulableLine[] {
       item_cut: "Promise Ring",
       item_size: "Mini",
       qty: 50,
+      notes: "vanilla glaze",
     }),
     ...VINNY.map((c) => line({ item_cut: `Letter - "${c}"` })),
     line({
@@ -75,50 +79,51 @@ function order7769(): SchedulableLine[] {
  * The anchor
  * ========================================================================== */
 
-test("scheduleDraft: #7769's 18 letters become one line per character", () => {
+test("scheduleDraft: #7769 transcribes, one order line to one schedule line", () => {
   const draft = scheduleDraft(order7769());
 
-  // 11 DISTINCT letters in HAPPYBIRTHDAYVINNY (H A P Y B I R T D V N), plus
-  // the Mini promise ring. Eighteen order lines, twelve things to make.
-  eq(draft.lines.length, 12, "line count");
+  // 18 letters + 2 Minis. NOT 12 — that was the rolled-up answer, and the
+  // assertion that fails first if anybody reintroduces grouping.
+  eq(draft.lines.length, 20, "line count");
   eq(draft.blocked.length, 0, "blocked");
   eq(draft.skippedMisc, 1, "Misc lines skipped");
-
-  // 18 letters + 100 minis. The Misc line's 4 is NOT in here.
   eq(draft.total, 118, "total donuts");
 
-  const byCut = new Map(draft.lines.map((l) => [l.subtype, l.par]));
-  // The repeated letters SUM. This is the assertion that fails if the group
-  // key becomes the order line rather than (item, cut).
-  eq(byCut.get(`Letter - "Y"`), 3, "Y");
-  eq(byCut.get(`Letter - "H"`), 2, "H");
-  eq(byCut.get(`Letter - "A"`), 2, "A");
-  eq(byCut.get(`Letter - "P"`), 2, "P");
-  eq(byCut.get(`Letter - "I"`), 2, "I");
-  eq(byCut.get(`Letter - "N"`), 2, "N");
-  eq(byCut.get(`Letter - "B"`), 1, "B");
-  eq(byCut.get(`Letter - "R"`), 1, "R");
-  eq(byCut.get(`Letter - "T"`), 1, "T");
-  eq(byCut.get(`Letter - "D"`), 1, "D");
-  eq(byCut.get(`Letter - "V"`), 1, "V");
+  // Two P's stay two lines of one, not one line of two.
+  const ps = draft.lines.filter((l) => l.subtype === `Letter - "P"`);
+  eq(ps.length, 2, "two P lines");
+  eq(ps.map((l) => l.par), [1, 1], "each of one");
 
-  // The two identical Mini lines are a TRUE duplicate and merge into one 100,
-  // and the merge is COUNTED, so the dialog can show it rather than quietly
-  // dropping one of the two names.
-  eq(byCut.get("Promise Ring"), 100, "the minis");
-  const minis = draft.lines.find((l) => l.subtype === "Promise Ring");
-  eq(minis?.sources, 2, "two order lines merged");
-  eq(draft.lines.find((l) => l.subtype === `Letter - "B"`)?.sources, 1, "a lone letter");
-  eq(draft.lines.find((l) => l.subtype === `Letter - "Y"`)?.sources, 3, "three Y lines");
+  const ys = draft.lines.filter((l) => l.subtype === `Letter - "Y"`);
+  eq(ys.length, 3, "three Y lines");
 });
 
-test("scheduleDraft: grouping by item alone would give 2 lines, not 12", () => {
+test("scheduleDraft: the order's line order survives, so the word does", () => {
   const draft = scheduleDraft(order7769());
-  const items = new Set(draft.lines.map((l) => l.item_id));
-  // Two items across twelve lines — the cut is doing the work. If this ever
-  // reads 2 items / 2 lines, the group key has lost the cut.
-  eq(items.size, 2, "distinct production items");
-  ok(draft.lines.length > items.size, "more lines than items");
+  const letters = draft.lines
+    .map((l) => cutLetter(l.subtype))
+    .filter((c): c is string => c !== null);
+  // Sorting by name would give A B D H H I I N N P P R T V Y Y Y — an anagram
+  // of the same donuts and useless to whoever is laying them out.
+  eq(letters.join(""), "HAPPYBIRTHDAYVINNY", "the word");
+  eq(draft.lines.map((l) => l.sort), Array.from({ length: 20 }, (_, i) => i + 1), "sort");
+});
+
+test("scheduleDraft: the note travels, and is what tells the Minis apart", () => {
+  const draft = scheduleDraft(order7769());
+  const minis = draft.lines.filter((l) => l.subtype === "Promise Ring");
+  eq(minis.length, 2, "two Mini lines");
+  eq(minis.map((l) => l.par), [50, 50], "not summed to 100");
+  eq(minis.map((l) => l.note), ["chocolate glaze", "vanilla glaze"], "notes");
+});
+
+test("scheduleDraft: an empty or whitespace note is null, never an empty string", () => {
+  const draft = scheduleDraft([
+    line({ notes: "   " }),
+    line({ item_cut: `Letter - "B"`, notes: "  extra sprinkles " }),
+    line({ item_cut: `Letter - "C"` }),
+  ]);
+  eq(draft.lines.map((l) => l.note), [null, "extra sprinkles", null], "notes");
 });
 
 test("scheduleDraft: the snapshot comes from the ORDER LINE", () => {
@@ -144,26 +149,23 @@ test("canonicalCut: every spelling of one letter is ONE group", () => {
   eq(canonicalCut(`Letter - A"`), `Letter - "A"`, "stray closing quote");
 });
 
-test("scheduleDraft: three spellings of A are one line of three", () => {
+test("scheduleDraft: three spellings of A stay three lines, spelled one way", () => {
+  // The canonicalisation survives the end of grouping, and its job changed:
+  // it no longer decides what merges, it decides what the SHEET says.
   const draft = scheduleDraft([
     line({ item_cut: `Letter - "A"` }),
     line({ item_cut: `Letter "A"` }),
     line({ item_cut: `Letter. "a"` }),
   ]);
-  eq(draft.lines.length, 1, "line count");
-  eq(draft.lines[0].subtype, `Letter - "A"`, "canonical spelling wins");
-  eq(draft.lines[0].par, 3, "summed");
+  eq(draft.lines.length, 3, "line count");
+  eq(draft.lines.map((l) => l.subtype), [`Letter - "A"`, `Letter - "A"`, `Letter - "A"`], "one spelling");
 });
 
 test("canonicalCut: a bare Letter is its own group, never folded into one", () => {
   // 935 real rows: letters ordered, the word not yet settled. Folding this
   // into any character would invent a decision nobody made.
   eq(canonicalCut("Letter"), "Letter", "bare");
-  const draft = scheduleDraft([
-    line({ item_cut: "Letter" }),
-    line({ item_cut: `Letter - "A"` }),
-  ]);
-  eq(draft.lines.length, 2, "kept apart");
+  eq(canonicalCut("Letter"), "Letter", "stays bare");
 });
 
 test("canonicalCut: punctuation characters survive, and are not upper-cased", () => {
@@ -217,6 +219,7 @@ test("scheduleDraft: a line with NO type is production, not money", () => {
 
 test("scheduleDraft: a zero or negative quantity never reaches the kitchen", () => {
   // Three real lines carry a negative qty — a credit for a short delivery.
+  // Dropped PER LINE now, so a credit no longer cancels a sibling's donuts.
   const draft = scheduleDraft([
     line({ item_cut: `Letter - "A"`, qty: 0 }),
     line({ name: "short (dropped bin)", item_cut: "Promise Ring", qty: -30 }),
@@ -225,6 +228,17 @@ test("scheduleDraft: a zero or negative quantity never reaches the kitchen", () 
   eq(draft.lines.length, 1, "only the real one");
   eq(draft.lines[0].subtype, `Letter - "B"`, "which one");
   eq(draft.total, 2, "total");
+});
+
+test("scheduleDraft: a credit does NOT cancel an identical positive line", () => {
+  // Under the old roll-up +80 and -80 on one (item, cut) summed to zero and the
+  // whole thing vanished off the sheet. Transcribing keeps the 80 to make.
+  const draft = scheduleDraft([
+    line({ item_cut: "Promise Ring", qty: 80 }),
+    line({ name: "short s'morrisseys", item_cut: "Promise Ring", qty: -80 }),
+  ]);
+  eq(draft.lines.length, 1, "the credit drops, the donuts stay");
+  eq(draft.total, 80, "total");
 });
 
 test("scheduleDraft: an order with nothing schedulable is an empty draft", () => {
@@ -237,7 +251,7 @@ test("scheduleDraft: an order with nothing schedulable is an empty draft", () =>
  * Sort and title
  * ========================================================================== */
 
-test("scheduleDraft: lines sort by name then cut, and number from 1", () => {
+test("scheduleDraft: lines keep the order given, and number from 1", () => {
   const draft = scheduleDraft([
     line({ name: "Zebra", item_cut: `Letter - "B"` }),
     line({ name: "Apple", item_cut: `Letter - "Z"` }),
@@ -245,8 +259,8 @@ test("scheduleDraft: lines sort by name then cut, and number from 1", () => {
   ]);
   eq(
     draft.lines.map((l) => `${l.item_name} ${l.subtype}`),
-    [`Apple Letter - "A"`, `Apple Letter - "Z"`, `Zebra Letter - "B"`],
-    "order"
+    [`Zebra Letter - "B"`, `Apple Letter - "Z"`, `Apple Letter - "A"`],
+    "order as given"
   );
   eq(draft.lines.map((l) => l.sort), [1, 2, 3], "sort");
 });

@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
-import { tallyBoxes, type ScheduleLine } from "@/lib/productionSchedule";
+import { type ScheduleLine } from "@/lib/productionSchedule";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 export type ScheduleLineRow = ScheduleLine & {
@@ -101,8 +101,6 @@ type Grouping = "type" | "tray" | "none";
  *
  *   * the item's NAME and taxonomy, which are the line's own SNAPSHOT — change
  *     them on the item, and a rename must not rewrite a printed document (038);
- *   * `planned_par`, which is what the plans said and exists precisely so the
- *     row can explain its own number;
  *   * the cost snapshot, which the Recost command writes from the live graph.
  *
  * Editing `par` also writes `par_source = 'manual'`, in ONE update. Two writes
@@ -222,23 +220,6 @@ export function ScheduleLines({
         ]
       : []),
     {
-      key: "item",
-      label: "Item",
-      width: 260,
-      pinned: true,
-      wrap: true,
-      sortValue: (r) => r.item_name,
-      // Read-only, deliberately: this is the line's snapshot, not a join.
-      render: (r) => (
-        <span className="block">
-          <span className="font-medium">{r.item_name}</span>
-          <span className="block text-[12px] text-muted">
-            {[r.subtype, r.finish].filter(Boolean).join(" · ") || "—"}
-          </span>
-        </span>
-      ),
-    },
-    {
       key: "type",
       label: "Type",
       width: 110,
@@ -254,26 +235,44 @@ export function ScheduleLines({
       render: (r) => <span className="text-muted">{r.size ?? "—"}</span>,
     },
     {
-      key: "tray",
-      label: "Tray",
-      width: 80,
-      sortValue: (r) => r.tray_number ?? "",
+      key: "cut",
+      label: "Cut",
+      width: 150,
+      sortValue: (r) => r.subtype ?? "",
+      // THE COLUMN THE LETTERS LIVE IN, which is why it is wide and why it is
+      // never dropped when the table goes compact. Migration 067 keys a
+      // schedule line on (item, cut) precisely because one generic `Letter`
+      // production item per flavour means the cut is the only thing telling
+      // `Letter - "H"` from `Letter - "A"` — so a table without it shows twelve
+      // identical-looking rows.
+      render: (r) => <span className="text-muted">{r.subtype ?? "—"}</span>,
+    },
+    {
+      key: "finish",
+      label: "Finish",
+      width: 120,
+      sortValue: (r) => r.finish ?? "",
       hideWhenCompact: true,
-      render: (r) =>
-        r.tray_number ? (
-          <span className="text-muted">{r.tray_number}</span>
-        ) : (
-          // An addition has no tray — the override key can't reference a slot
-          // without making additions inexpressible.
-          <span className="text-faint" title="Added rather than planned onto a tray">
-            —
-          </span>
-        ),
+      render: (r) => <span className="text-muted">{r.finish ?? "—"}</span>,
+    },
+    {
+      key: "item",
+      label: "Name",
+      width: 240,
+      pinned: true,
+      wrap: true,
+      sortValue: (r) => r.item_name,
+      // Read-only, deliberately: this is the line's snapshot, not a join.
+      //
+      // It carried `subtype · finish` on a second line until 2026-08-27. Both
+      // are columns of their own now, so repeating them here would be the same
+      // two facts twice on one row.
+      render: (r) => <span className="font-medium">{r.item_name}</span>,
     },
     {
       key: "par",
-      label: "To make",
-      width: 120,
+      label: "Par",
+      width: 100,
       align: "right",
       sortValue: (r) => r.par,
       render: (r) =>
@@ -294,41 +293,6 @@ export function ScheduleLines({
         ) : (
           <span className={`${READ_ONLY_VALUE} tabular-nums`}>{r.par}</span>
         ),
-    },
-    {
-      key: "planned",
-      label: "Planned",
-      width: 110,
-      align: "right",
-      sortValue: (r) => r.planned_par ?? -1,
-      // The row explains its own number. Yellow where it differs — worth an
-      // eye, not wrong; a hand-changed par is a decision somebody made.
-      render: (r) => {
-        if (r.par_source === "plan") return <span className="text-faint">—</span>;
-        return (
-          <span className="tabular-nums text-mark" title={sourceTitle(r)}>
-            {r.planned_par === null ? "not planned" : r.planned_par}
-          </span>
-        );
-      },
-    },
-    {
-      key: "boxes",
-      label: "Boxes",
-      width: 90,
-      align: "right",
-      sortValue: (r) => tallyBoxes(r.par, r.tally_box_size).filled,
-      hideWhenCompact: true,
-      // What the printed strip will shade, so the screen and the paper agree
-      // before anybody presses print.
-      render: (r) => {
-        const { filled } = tallyBoxes(r.par, r.tally_box_size);
-        return (
-          <span className="tabular-nums text-muted" title={`${r.tally_box_size} to a box`}>
-            {filled} × {r.tally_box_size}
-          </span>
-        );
-      },
     },
     {
       key: "made",
@@ -422,7 +386,7 @@ export function ScheduleLines({
         rows={sorted}
         columns={columns}
         rowKey={(r) => r.id}
-        storageKey="production-schedule-lines"
+        storageKey="production-schedule-lines.v2"
         compactBelow={1200}
         columnChooser
         group={group}
@@ -475,17 +439,4 @@ export function ScheduleLines({
       ) : null}
     </section>
   );
-}
-
-function sourceTitle(r: ScheduleLineRow): string {
-  switch (r.par_source) {
-    case "override":
-      return "A par override was written for this day";
-    case "manual":
-      return "Changed by hand on this schedule";
-    case "special_order":
-      return "From a special order";
-    default:
-      return "From the plans";
-  }
 }

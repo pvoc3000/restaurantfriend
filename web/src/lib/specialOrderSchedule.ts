@@ -11,22 +11,26 @@
  * trust what it is handed; see migration 068's header for what it re-checks.
  *
  * ---------------------------------------------------------------------------
- * ONE LINE PER (ITEM, CUT), NOT PER ITEM
+ * ONE ORDER LINE, ONE SCHEDULE LINE. NOTHING IS ROLLED UP
  * ---------------------------------------------------------------------------
- * `production_items` holds ONE generic `Letter` subtype — 56 rows, one per
- * flavour — and no per-character item, so every letter of a name resolves to
- * the same production item. Order #7769 spells HAPPY BIRTHDAY VINNY in 18 lines
- * that all point at `Rites of Sprinkles - Choc`; grouped by item alone that
- * reads "18 x Rites of Sprinkles - Letter" and the decorator does not know
- * which letters to cut.
+ * Mark, 2026-08-27: "don't consolidate lines, even if they result in the same
+ * donut. Keep each line intact, and be sure to copy the notes column."
  *
- * Measured over the live data: 943 of the 3,133 orders carrying linked lines
- * (30.1%) have two lines sharing a production item, and roughly three in four of
- * those collisions are DIFFERENT letters rather than duplicates. So the cut is
- * the discriminator, and migration 067 moves the schedule's unique key onto it.
+ * This function DID group on (production item, cut) and sum the quantities, and
+ * the first real order showed why that was wrong. #7769's two Mini lines are 50
+ * with a note reading "chocolate glaze" and 50 reading "vanilla glaze" — same
+ * menu item, same cut, same size, and not the same thing to make. Rolled up
+ * they printed as one line of 100 and the decorator was never told half were
+ * chocolate.
  *
- * Repeated letters within one word SUM — "HAPPY" is one line of 2 for P — which
- * is what makes the group key (item, cut) rather than the order line.
+ * No key over the taxonomy could have fixed that, because the distinguishing
+ * fact is in a free-text NOTE. That is the whole argument for transcribing
+ * rather than summarising: the order already says what to make, at the grain
+ * somebody typed it, and any grain we impose on top of it can only lose
+ * something.
+ *
+ * Migration 069 makes the schedule's unique key partial so it can be true —
+ * HAPPY has two P's, and two lines of one letter are two donuts.
  */
 
 import { isProductionLine, unschedulableLines } from "./specialOrders";
@@ -41,6 +45,10 @@ export type SchedulableLine = {
   item_finish?: string | null;
   item_size?: string | null;
   qty?: number | null;
+  /** Free text from the order line. The kitchen reads this one. */
+  notes?: string | null;
+  /** The order's own line order, which on a letter order spells the word. */
+  sort?: number | null;
 };
 
 /**
@@ -59,17 +67,15 @@ export type ScheduleDraftLine = {
   subtype: string | null;
   finish: string | null;
   size: string | null;
-  /** Sum of qty over the lines that grouped here. */
   par: number;
   /**
-   * How many ORDER lines merged into this one.
+   * The ORDER LINE's note, carried through to `production_schedule_items.note`.
    *
-   * Only the first line's name survives a merge, so a group of two that were
-   * customised differently keeps one of the two names. The dialog shows this
-   * count so the merge is visible before it is committed rather than
-   * discovered on the schedule afterwards.
+   * This is the field that made rolling up untenable, and it is the field the
+   * decorator actually works from — "chocolate glaze" is not decoration on the
+   * record, it is the instruction.
    */
-  sources: number;
+  note: string | null;
   sort: number;
 };
 
@@ -90,8 +96,11 @@ export type ScheduleDraft = {
  * letter-ish spellings for what is really 40-odd characters: `Letter - "A"`
  * (1,170 rows), `Letter "A"` (17, no dash), `Letter. "A"` (1), lowercase
  * `Letter - "y"`, a stray `Letter - U"` and one escape-mangled `Letter - ""Y""`.
- * Two spellings of one letter must be ONE line of two donuts, not two lines of
- * one — and the canonical form is what the sheet then prints.
+ *
+ * Since nothing groups any more this no longer decides which lines merge — it
+ * decides only what the kitchen SHEET says, and one spelling across the page
+ * beats a faithful copy of twelve years of typing. Reverting to the raw cut is
+ * one line if that is ever wanted.
  *
  * A bare `Letter` with no character is a real state (935 rows: somebody has
  * ordered letters and nobody has settled the word yet), so it stays its own
@@ -130,7 +139,7 @@ export function scheduleDraft<T extends SchedulableLine>(lines: T[]): {
   total: number;
 } {
   let skippedMisc = 0;
-  const groups = new Map<string, ScheduleDraftLine>();
+  const kept: ScheduleDraftLine[] = [];
 
   for (const line of lines) {
     if (!isProductionLine(line)) {
@@ -141,40 +150,31 @@ export function scheduleDraft<T extends SchedulableLine>(lines: T[]): {
     // `unschedulableLines` is that the app names these instead of shrugging.
     if (!line.production_item_id) continue;
 
-    const subtype = canonicalCut(line.item_cut);
-    const key = `${line.production_item_id} ${subtype ?? ""}`;
-    const qty = Number(line.qty ?? 0);
+    // A line asking for nothing is not a thing to make, and `par > 0` is 069's
+    // own check, so dropping it here keeps the payload one the function
+    // accepts. Three real lines carry a NEGATIVE qty — a credit for a short
+    // delivery — and those must not reach a kitchen sheet either.
+    const par = Number(line.qty ?? 0);
+    if (!(par > 0)) continue;
 
-    const existing = groups.get(key);
-    if (existing) {
-      existing.par += qty;
-      existing.sources += 1;
-      continue;
-    }
-    groups.set(key, {
+    kept.push({
       item_id: line.production_item_id,
       item_name: line.name,
       item_type: line.item_type ?? null,
-      subtype,
+      subtype: canonicalCut(line.item_cut),
       finish: line.item_finish ?? null,
       size: line.item_size ?? null,
-      par: qty,
-      sources: 1,
+      par,
+      note: (line.notes ?? "").trim() || null,
       sort: 0,
     });
   }
 
-  // A group summing to nothing is not a thing to make, and `par > 0` is 068's
-  // own check, so dropping them here keeps the payload one the function accepts.
-  // Three real lines carry a NEGATIVE qty (a credit for a short delivery), and
-  // they must not reach a kitchen sheet either.
-  const kept = [...groups.values()].filter((l) => l.par > 0);
-
-  kept.sort(
-    (a, b) =>
-      a.item_name.localeCompare(b.item_name) ||
-      (a.subtype ?? "").localeCompare(b.subtype ?? "")
-  );
+  // THE ORDER'S OWN SEQUENCE, not alphabetical. On a letter order the line
+  // order IS the word — #7769's eighteen letters spell HAPPY BIRTHDAY VINNY —
+  // so sorting by name would shuffle it into A, B, D, H, H, ... and hand the
+  // decorator an anagram. Ties keep the order they arrived in, which is the
+  // order the caller read them in.
   kept.forEach((line, i) => {
     line.sort = i + 1;
   });

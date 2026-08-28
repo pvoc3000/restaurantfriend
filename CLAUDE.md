@@ -3728,7 +3728,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3, 4a AND THE
    PRODUCTION HALF OF 5 DONE; 4b, 4c and recurrence not built. Migrations
    051–058 AND 067 + 068 are applied and all three edge functions are
-   deployed.** *Probe, don't read this line.*
+   deployed; 069 NEEDS APPLYING.** *Probe, don't read this line.*
    The module records, quotes, invoices, prints, emails as specialorders@, takes
    a customer's approval on a public page, takes inquiries on a public form,
    proposes the next step as things happen, and **puts the order's donuts on a
@@ -3857,13 +3857,36 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    compound (printed AND scheduled) and since scheduling became a command the
    order can arrive from either side, so it offers **Print Order** when the
    order has not been printed and Send Receipt when it has.
-   Verified: all 68 migrations replay on the Docker harness and every rule was
-   checked by BREAKING it; **1,273 fixtures pass** (25 new), the anchor being
-   #7769 verbatim — 21 order lines becoming **12 schedule lines** with Y=3,
-   H/A/P/I/N=2 and the two identical Mini lines merged to 100. The same order
+   Verified: all 69 migrations replay on the Docker harness and every rule was
+   checked by BREAKING it. (The 12-line roll-up this originally shipped is gone
+   — see the 069 block below; #7769 now transcribes to 20 lines.) The same order
    rendered through the real dialog against the LIVE database gives the same 12
    lines and 118 to make, and the commit refuses legibly ("migration 068 has not
    been applied") while writing nothing.
+   **THE SCHEDULE'S LINE TABLE LOST TWO COLUMNS AND GAINED TWO** (Mark,
+   2026-08-27): Type - Size - Cut - Finish - Name - Par - Made - Left over -
+   Sold - Note. **Tray** went because a special-order line never has one and a
+   plan line's is already the band you can group by; **Planned** went with it —
+   it was `planned_par`, what the plans said before an override or a hand edit,
+   and its job was to let a row explain its own number. The header's "n lines
+   differ from the plan" badge still counts them, so what is lost is the
+   per-row figure, and restoring the column is a dozen lines. `sourceTitle`
+   went too, being its only caller.
+   **Cut is the column that had to exist**: with one generic `Letter`
+   production item per flavour, twelve letter lines are twelve identical-looking
+   rows without it — so it is wide (150) and is the one descriptor never dropped
+   when the table goes compact. The Name cell stopped repeating
+   `subtype · finish` underneath itself, both being columns now. Widths key
+   bumped to `.v2`, or a stored order from before would outrank the new one.
+   **Boxes went as well and was NOT in the removals Mark named** — his column
+   list simply did not include it, and it is `filled × tally_box_size`, the
+   printed tally strip restated on screen. One line to restore if that was an
+   oversight.
+   Measured at 1280: nothing clipped, no page overflow, and every letter cut
+   fits the Cut column with room (`Letter - "<3"` is the widest at 87px in
+   107px of space; only the inactive `Bullseye "<3" Center` would ellipsis). At
+   1100 the compact tier sheds Size, Finish and Left over.
+
    **WALKED END TO END ON THE REAL #7769, 2026-08-27, AND LEFT AS FOUND**
    (17 schedules / 546 lines before and after, 27 events, the order byte-identical).
    Scheduled onto 2026-08-28 — a night DF01 already had a plan schedule for, so
@@ -3890,18 +3913,61 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    sentences, and as ordinary flex items in `OrderActions`' row one of them
    pushed Duplicate / Flag / Cancel / Delete off the side of the screen.
    `basis-full` puts it on its own line.
-   **OPEN, AND IT WANTS MARK'S EYE — A NOTE IS NOT PART OF THE KEY.** #7769's
-   two Mini lines are 50 "chocolate glaze" and 50 "vanilla glaze": same
-   production item, same cut, different NOTE. They merge into one schedule line
-   of 100 reading "Rites of Sprinkles - Mini", so the decorator is not told that
-   half are chocolate. The dialog says "(2 lines)" beside it, which is the merge
-   being visible rather than the problem being solved. Adding the note to the
-   group key is NOT obviously right — it is free text and also carries things
-   like "for 10am pickup", which would split a line for no kitchen reason — so
-   this is a question about which field carries a *decoration* instruction, not
-   a bug to fix quietly.
-   Known and NOT fixed: a group merges two order lines under the FIRST line's
-   name, so the dialog shows "(2 lines)" beside it rather than both names.
+   **THE ROLL-UP IS GONE — MIGRATION 069, NEEDS APPLYING** (Mark, 2026-08-27,
+   the same day, after seeing the first real one: "don't consolidate lines, even
+   if they result in the same donut. Keep each line intact, and be sure to copy
+   the notes column"). **ONE ORDER LINE IS ONE SCHEDULE LINE.**
+   **The case that settled it was on #7769 all along**, and the walk surfaced it
+   an hour after shipping the opposite: its two Mini lines are 50 with a note
+   reading "chocolate glaze" and 50 reading "vanilla glaze" — same menu item,
+   same cut, same size, and NOT the same thing to make. Rolled up they printed
+   as one line of 100 and the decorator was never told half were chocolate.
+   **No key over the taxonomy could have fixed that**, because the
+   distinguishing fact is free text, which is the whole argument for
+   transcribing rather than summarising: the order already says what to make, at
+   the grain somebody typed it, and any grain imposed on top can only lose
+   something.
+   **069 MAKES THE KEY PARTIAL AND TAKES 067's COLUMN BACK OUT OF IT** —
+   `unique (schedule_id, item_id) where par_source <> 'special_order'`. HAPPY
+   has two P's, so a repeated (item, cut) is now the NORMAL case and no
+   uniqueness can apply to these rows at all. 040's rule was always about
+   REGENERATION (two rows of one item double the day's par and nothing notices),
+   which is a fact about the generator and never about a special order — whose
+   lines are written once from a validated payload and which the generator
+   refuses to read. With special-order lines exempt, **subtype was doing nothing
+   in the key**: `production_day` returns one row per item, so there was never a
+   second row for it to separate.
+   That also RETIRES 067's own hazard rather than patching it. With subtype in
+   the key, renaming an item's subtype made the upsert miss its own row and a
+   regeneration left the old line standing beside the new one — measured at 2
+   lines and 48 donuts where 24 was right. 069's generator is **040's body byte
+   for byte** but for the conflict target gaining
+   `where par_source <> 'special_order'` (Postgres will not infer a PARTIAL
+   index from a bare `on conflict`, and fails loudly rather than misbehaving if
+   you forget). Verified on the harness: the rename case now gives 1 line and 24
+   donuts with no special predicate at all.
+   **The three line kinds separate cleanly, which is what makes the predicate
+   safe**: the generator writes `plan`/`override`, `AddScheduleItems` writes
+   `manual`, and only `schedule_special_order` writes `special_order`. Proved at
+   the boundary — a second `manual` line of one item is still refused by the
+   index, while a second `special_order` line is allowed.
+   **`note` now travels** from `special_order_items.notes` onto
+   `production_schedule_items.note`, where the schedule's own Note column
+   already renders and edits it.
+   **AND THE LINES KEEP THE ORDER'S OWN SEQUENCE, WHICH ON A LETTER ORDER IS THE
+   WORD.** Sorting by name would turn HAPPY BIRTHDAY VINNY into
+   A B D H H I I N N P P R T V Y Y Y — an anagram of the right donuts and
+   useless to whoever lays them out. Fixture-pinned by asserting the letters
+   join to `HAPPYBIRTHDAYVINNY`, and checked by breaking it (2 red).
+   One consequence worth knowing: a credit line no longer cancels its sibling.
+   Under the roll-up, +80 and −80 on one (item, cut) summed to zero and the
+   whole thing vanished off the sheet; now the credit is dropped on its own and
+   the 80 still get made.
+   `canonicalCut` survives and its JOB CHANGED: it no longer decides what
+   merges, only what the sheet SAYS, so three spellings of A are three lines
+   spelled one way. Reverting to the raw cut is one line if that is ever wanted.
+   Harness: 20 lines from #7769's 21, in order, the two Minis apart by their
+   notes. **1,276 fixtures pass.**
    **Read `docs/special-orders-brief.md` before designing or touching anything
    here, and START AT ITS "Where a next session picks up" SECTION** — that is
    the handoff, and it carries the probes for everything this line claims, what
@@ -4622,6 +4688,20 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    067 must go FIRST: 068's insert relies on the widened key. Neither is
    rerunnable — 067's `drop constraint` fails a second time, which is the signal
    it already ran.
+
+   **069 NEEDS APPLYING** (2026-08-27 — a special order's lines stop being
+   rolled up). *Probe, don't read this line.* The one that matters is the key's
+   shape, because everything else here follows from it:
+   `select indexname, indexdef from pg_indexes where tablename =
+   'production_schedule_items' and indexname like '%line%'` — expect ONE row,
+   `production_schedule_items_generated_line`, whose definition ends
+   `WHERE (par_source <> 'special_order'::text)`, and NO
+   `production_schedule_items_line`. Then
+   `select proname, count(*) from pg_proc where proname in
+   ('generate_production_schedules','schedule_special_order') group by 1` —
+   **1 each**, or an argument list drifted and an overload is live beside it.
+   NOT rerunnable: `drop index production_schedule_items_line` fails a second
+   time, which is the signal it already ran.
 
    **060 IS APPLIED** (Mark, 2026-08-22 — the request's details box).
    *Probe, don't read this line.* `select column_name, is_nullable from

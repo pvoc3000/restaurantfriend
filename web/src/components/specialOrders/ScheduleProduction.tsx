@@ -300,8 +300,8 @@ export function ScheduleProduction({
                         {l.subtype ? (
                           <span className="text-muted"> · {l.subtype}</span>
                         ) : null}
-                        {l.sources > 1 ? (
-                          <span className="text-muted"> ({l.sources} lines)</span>
+                        {l.note ? (
+                          <span className="block text-[12px] text-muted">{l.note}</span>
                         ) : null}
                       </td>
                       <td className="w-16 py-1 text-right text-[13px] tabular-nums">{l.par}</td>
