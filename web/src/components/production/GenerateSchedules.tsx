@@ -183,9 +183,20 @@ export function GenerateSchedules({
                       : `Regenerate these ${receipt.skipped.length}`}
                   </button>
                 ) : null}
-                <Link href="/schedules" className={`${DIALOG_COMMIT_CLASS} no-underline`}>
+                {/* A BUTTON THAT CLOSES, not a link to /schedules.
+                    This dialog only ever renders ON /schedules, so the link
+                    pointed at the page it was already on — which Next treats as
+                    a no-op, leaving the panel up and the button reading as
+                    dead. The list behind it was refreshed by `run` the moment
+                    the receipt arrived, so there is nothing to navigate TO;
+                    finishing here means putting the receipt away. */}
+                <button
+                  type="button"
+                  onClick={() => setOpen(false)}
+                  className={DIALOG_COMMIT_CLASS}
+                >
                   Done
-                </Link>
+                </button>
               </>
             ) : (
               <>

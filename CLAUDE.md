@@ -3863,6 +3863,15 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    rendered through the real dialog against the LIVE database gives the same 12
    lines and 118 to make, and the commit refuses legibly ("migration 068 has not
    been applied") while writing nothing.
+   **THE GENERATE RECEIPT'S "DONE" WAS A NO-OP** (Mark, 2026-08-27), and the
+   cause is worth knowing because it can only ever happen this way round: it was
+   a `<Link href="/schedules">` in a dialog that ONLY EVER RENDERS ON
+   `/schedules`, so it pointed at the page it was already on — which Next
+   correctly treats as nothing to do, leaving the panel up and the button
+   reading as dead. There was never anything to navigate to: `run` refreshes the
+   list the moment the receipt arrives, so finishing means putting the receipt
+   away, and it is a button that closes.
+
    **THE FROM COLUMN NAMES THE PLAN** (Mark, 2026-08-27: "instead of 'Plan' can
    the from column say the name of the plan instead?"). "Plan" was true of every
    plan schedule and so distinguished none of them, where "SUMMER 2026 (DF01)"
