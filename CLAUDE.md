@@ -5889,12 +5889,16 @@ weekday column, and 003 then silently made it per-vendor-item.
   **THE ROLLOUT IS DONE (2026-08-28)** — all fourteen detail screens, 31 files;
   §9 of the brief is the per-screen record of what was converted and what was
   deliberately left. Four things it taught, none of them in the original brief:
-  an **editable `h1` title wears the box too** — it shipped underlined and Mark
-  reversed that the same day, on the better argument: the title is editable on
-  FOUR records and plain text on every other, so the dotted rule was the only
-  thing telling those apart. It HUGS ITS OWN TEXT (`w-full` in the
+  an **editable `h1` title KEEPS ITS DOTTED UNDERLINE** and is the one exception
+  to the whole convention — boxed and reverted the same day (Mark, 2026-08-28:
+  "box the h1 titles too", then "I changed my mind on the h1 block. go back to
+  underlines on those only"). The box is what tells a FIELD from a LABEL, and an
+  `h1` is neither: it is the record's name at 28px with nothing beside it to be
+  mistaken for, which is the condition the underline was always right in. If it
+  is ever tried again, a boxed title HUGS ITS OWN TEXT (`w-full` in the
   shrink-to-fit row it shares with the Active toggle) and comes out ~41px, since
-  28px type has a taller line box than `min-h-9`; **a converted
+  28px type has a taller line box than `min-h-9`, and `items-baseline` on those
+  rows has to become `items-center`; **a converted
   screen's other editable controls come too**, because the inventory was built
   from `InlineValue` call sites and `/locations/[id]` also carries fourteen raw
   `<input type="time">` at 30px and seven unboxed `PickList`s — grep cannot see

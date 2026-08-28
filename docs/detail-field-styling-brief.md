@@ -30,7 +30,9 @@ wrapped value.
 ## 2. The rules
 
 1. **A box means "you can change this."** Every editable field on a detail
-   screen wears a hairline box. A read-only value wears none. That is the whole
+   screen wears a hairline box. A read-only value wears none. An editable `h1`
+   TITLE is the one exception and keeps the underline (§9): the box tells a
+   field from a label, and a page heading is neither. That is the whole
    distinction being drawn, so it is the one thing never to blur — if a
    `READ_ONLY_VALUE` grows a border, the screen stops answering the question.
 2. **The underline comes off with the box.** Two cues for one fact, and the
@@ -40,7 +42,8 @@ wrapped value.
 4. **One width: the track — and the track has a CEILING.** A field fills its own
    grid column, so a block's fields share a left and a right edge; and the block
    itself takes at most half the content column, a quarter on a record with few
-   short fields. See §5.
+   short fields. See §5. An editable `h1` title is the exception to the whole
+   convention and keeps its underline — see §9.
 5. **An empty field is empty.** No em dash, no example text.
 6. **A multiline field keeps its 64px floor** (`min-h-16`) — the box says
    "editable", the height says "put a paragraph here", and only notes want the
@@ -333,21 +336,27 @@ are not `InlineValue`s — see the two bonus conversions below.
 
 ### The four things the rollout added to this brief
 
-**AN EDITABLE `h1` TITLE WEARS THE BOX** (Mark, 2026-08-28: *"box the h1 titles
-too"*). It shipped underlined on the argument that a hairline box round 28px
-uppercase reads as a frame rather than as a field — true of the frame, and
-beside the point about the reader. The title is editable on FOUR records
-(`/items`, `/plans`, `/elements`, `/locations`) and plain text on every other,
-so without the box the only thing telling those apart was a dotted rule under a
-heading, which is exactly the cue that was not enough anywhere else.
+**AN `h1` TITLE KEEPS ITS DOTTED UNDERLINE, and it is the one place on a record
+that does.** Boxed and then reverted the same day (Mark, 2026-08-28: *"box the
+h1 titles too"*, then *"I changed my mind on the h1 block. go back to underlines
+on those only"*), so both readings are on the record and this is the one that
+stands.
 
-It **hugs its own text** rather than filling a track: `w-full` in the
-shrink-to-fit flex row the title shares with its Active toggle resolves to the
-content width, which is right here — a title has no column to share. Its box
-comes out ~41px rather than 36, because 28px type has a taller line box than
-`min-h-9`, and the Sizer wears the same dress so a click still moves it 0.00px.
-`items-baseline` on those rows became `items-center`: boxes line up by their
-edges, not by the text inside them.
+The case FOR the box was that the title is editable on four records — `/items`,
+`/plans`, `/elements`, `/locations` — and plain text on every other, so the
+underline was the only thing telling them apart. What decided it against is what
+the box MEANS: it is the cue that tells a FIELD from a LABEL, and an `h1` is
+neither. It is the record's name at 28px with nothing beside it to be mistaken
+for, which is exactly the condition §2 says the underline is right in — a
+heading is its own structure. A frame round it reads as a frame.
+
+Two mechanical notes, if it is ever tried again: a boxed title HUGS ITS OWN TEXT
+rather than filling a track (`w-full` in the shrink-to-fit row it shares with the
+Active toggle resolves to content width, and a title has no column to share), and
+it comes out ~41px rather than 36, because 28px type has a taller line box than
+`min-h-9`. `items-baseline` on those rows has to become `items-center` — boxes
+line up by their edges, not by the text inside them — and back again on the way
+out.
 
 **A CONVERTED SCREEN'S OTHER EDITABLE CONTROLS COME TOO.** `/locations/[id]`
 carries two that are not `InlineValue`s and so are not in the inventory:

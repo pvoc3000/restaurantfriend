@@ -150,14 +150,14 @@ export async function PlanDetail({
       />
 
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
           {/* The title is the record's own name, so it is edited where you read
               it. NOT NULL, so clearing it asks for a value instead of handing
               back a raw Postgres null-violation. */}
           <h1 className="min-w-0 text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
             {editable ? (
+              // The title keeps the underline — see `catalog/ItemFields`.
               <InlineValue
-                boxed={BOXED_FIELDS}
                 table="production_plans"
                 id={id}
                 column="title"

@@ -26,15 +26,13 @@ export function ItemFields({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          {/* THE TITLE WEARS THE BOX TOO (Mark, 2026-08-28). It was left underlined
-          on the argument that a box round a 28px heading reads as a frame —
-          which is true of the frame and beside the point about the reader:
-          this h1 is editable on four records and plain text on the rest, so
-          without the box the one cue telling those apart was a dotted rule
-          under a heading. It hugs its own text rather than filling a track,
-          because a title has no column to share. */}
+          {/* THE TITLE KEEPS THE UNDERLINE, and it is the one place on a record
+          that does (Mark, 2026-08-28, having tried it boxed). A box is what
+          tells a field from a label, and an `h1` is neither — it is the
+          record's name at 28px with nothing beside it to be confused with,
+          so the quietest possible "editable" is enough and a frame round a
+          page heading is not what the boxes are for. */}
           <InlineValue
-            boxed={BOXED_FIELDS}
             table="inventory_items"
             id={item.id}
             column="name"
