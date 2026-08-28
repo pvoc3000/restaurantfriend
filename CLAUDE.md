@@ -5826,6 +5826,51 @@ weekday column, and 003 then silently made it per-vendor-item.
   (Mark, 2026-07-26): `ActionBarButton` still has a `primary` white-fill
   variant, but nothing uses it, because against the bar's own black a white cell
   read as a different kind of object rather than as the important one.
+- **A DETAIL SCREEN'S EDITABLE FIELDS WEAR A BOX — read
+  `docs/detail-field-styling-brief.md` before restyling one.** Proven on
+  `/special-orders/[id]` (2026-08-28) and adopted for every record screen
+  (Mark: "the experiment is successful and I want to go through the app and
+  update all detail pages in this way").
+  A record is a `dl` of grey labels beside black values, and the app's dotted
+  underline is the quietest possible "editable" — right in a dense table where
+  the heading and the rules already bound each field, and not enough on a
+  record, where labels and values are both just text and the underline marks
+  only the LAST line of a wrapped value (Mark: "I'm having trouble
+  distinguishing editable from non-editable, and fields from labels. The page
+  just looks like a lot of text").
+  **THE BOX MEANS "YOU CAN CHANGE THIS", so a read-only value never gets one** —
+  that is the whole distinction being drawn and the one thing not to blur. The
+  underline comes OFF with it (two cues for one fact; the second reads as an
+  artefact), an empty field shows NOTHING (no em dash, no example text — inside
+  a box a grey hint reads as a value somebody typed), and a multiline field
+  keeps its 64px floor because the box says "editable" where the height says
+  "put a paragraph here".
+  `ui/fieldMetrics` is the one dress — **`min-h-8` and `w-full`**, a MINIMUM
+  because a short-text cell still wraps and a definite height spills it past its
+  own border. 32px rather than the app's `h-9`/36px form controls: the record is
+  four quadrants MEASURED to one screen, nine rows a column, so 36 would cost
+  ~68px per column. Width is THE TRACK, never a scale — the `dl` already defines
+  the columns, so a block's fields share a left and a right edge with no numbers
+  to keep in step.
+  **ALL FOUR CONTROLS TAKE `boxed`** — `InlineValue`, and the `PickList`,
+  `DateField` and `TimeField` it hands down to — or a page boxes its typed
+  fields while its pickers and dates stay underlined, which reads as those not
+  being editable. A caller normally touches only `InlineValue`.
+  The traps are in the brief and every one of them is invisible in review; the
+  two that recur most are that **an `inline-flex` wrapper eats `w-full`** (the
+  control comes out the width of its value — a boxed date sat at 144.5px among
+  214.3px fields) and that **the Sizer must wear whatever the resting state
+  wears**, or clicking a cell moves it. Verify by MEASURING, not by eye: one
+  height, one left and one right edge per block, nothing overflowing its box,
+  and a click that moves the field 0.00px in all four axes.
+  Gaps group: on a record whose blocks are two-track grids the reader sees FOUR
+  columns and only the middle gap is a change of subject — **24px inside a
+  block, 96px between** (all three at 40 read as four unrelated columns).
+  **LISTS ARE A SEPARATE QUESTION and default to NO**: a `DataTable` already has
+  headings and rules doing the box's job. The special-order Items table is boxed
+  because it is part of a record, and even there it is the busiest result.
+  The rollout — ~200 call sites over 55 files — is inventoried in the brief.
+
 - **YELLOW IS A FILL, NEVER AN INK — do not use `text-mark` on a light
   background** (Mark, 2026-08-22: "I find yellow text hard to read… a yellow
   filled square works as an attention signal, but not yellow text"). This is a
