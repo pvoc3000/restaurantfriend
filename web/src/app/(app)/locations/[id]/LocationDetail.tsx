@@ -141,6 +141,7 @@ export async function LocationDetail({
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
             {editable ? (
               <InlineValue
+                boxed={BOXED_FIELDS}
                 table="locations"
                 id={location.id}
                 column="name"

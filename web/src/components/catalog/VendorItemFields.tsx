@@ -167,7 +167,7 @@ export function VendorItemFields({
         </span>
       </div>
 
-      <dl className="grid max-w-2xl grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+      <dl className="grid max-w-[min(42rem,max(24rem,50%))] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
         <dt className="text-subtle">Vendor</dt>
         <dd>
           {vi.vendors ? (

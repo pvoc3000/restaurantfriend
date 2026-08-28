@@ -2,6 +2,7 @@
 
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue } from "@/components/catalog/InlineValue";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 
 /**
  * The element's own name, edited where you read it — the plan title's shape
@@ -39,6 +40,7 @@ export function ElementNameCell({ id, name }: { id: string; name: string }) {
 
   return (
     <InlineValue
+      boxed={BOXED_FIELDS}
       table="production_elements"
       id={id}
       column="name"

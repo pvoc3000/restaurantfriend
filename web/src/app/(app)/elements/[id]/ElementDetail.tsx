@@ -123,7 +123,7 @@ export async function ElementDetail({
           trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
         />
 
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           {/* The name is the record's own, so it is edited where you read it —
               `PlanDetail`'s title. The cell writes through its own statement so
               that renaming onto an existing element says so in words; see

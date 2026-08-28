@@ -51,7 +51,7 @@ export function ElementFields({
   const gaps = unresolvedSummary(cost);
 
   return (
-    <dl className="grid grid-cols-[minmax(9rem,auto)_1fr] items-center gap-x-6 gap-y-3 text-[14px]">
+    <dl className="grid max-w-[min(28rem,max(17rem,25%))] grid-cols-[minmax(7rem,auto)_1fr] items-center gap-x-4 gap-y-3 text-[14px]">
       <Row label="Kind">
         {editable ? (
           <InlineValue

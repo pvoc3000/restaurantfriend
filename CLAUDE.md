@@ -5859,7 +5859,16 @@ weekday column, and 003 then silently made it per-vendor-item.
   contrast. `h-8` stays a real member of the scale (`TabPicker size="sm"`, "for
   tight bands"); a record is not a tight band.
   Width is THE TRACK, never a scale — the `dl` already defines the columns, so a
-  block's fields share a left and a right edge with no numbers to keep in step.
+  block's fields share a left and a right edge with no numbers to keep in step —
+  **and the block itself takes at most HALF the content column, a quarter where
+  the fields are few and short** (Mark, 2026-08-28: a block running the full
+  width of a 1280 window is a 1,100px box holding the word "Purchased").
+  Written as a ceiling over a floor — `max-w-[min(42rem,max(24rem,50%))]`, and
+  `min(28rem,max(17rem,25%))` on `/elements` — because the percentage resolves
+  against the CONTENT COLUMN so it really is half the screen, the `min()` stops
+  a wide monitor making half absurd, and the `max()` keeps the fraction a
+  CEILING rather than also a floor: half of a portrait iPad's content column is
+  385px, which a four-track grid divides into ~20px a field.
   **ALL FOUR CONTROLS TAKE `boxed`** — `InlineValue`, and the `PickList`,
   `DateField` and `TimeField` it hands down to — or a page boxes its typed
   fields while its pickers and dates stay underlined, which reads as those not
@@ -5880,9 +5889,12 @@ weekday column, and 003 then silently made it per-vendor-item.
   **THE ROLLOUT IS DONE (2026-08-28)** — all fourteen detail screens, 31 files;
   §9 of the brief is the per-screen record of what was converted and what was
   deliberately left. Four things it taught, none of them in the original brief:
-  an **`h1` title keeps its dotted underline** (`/plans`, `/elements` edit the
-  record's name in the heading — a box round 28px uppercase is a frame, not a
-  field, and there is no label up there to confuse it with); **a converted
+  an **editable `h1` title wears the box too** — it shipped underlined and Mark
+  reversed that the same day, on the better argument: the title is editable on
+  FOUR records and plain text on every other, so the dotted rule was the only
+  thing telling those apart. It HUGS ITS OWN TEXT (`w-full` in the
+  shrink-to-fit row it shares with the Active toggle) and comes out ~41px, since
+  28px type has a taller line box than `min-h-9`; **a converted
   screen's other editable controls come too**, because the inventory was built
   from `InlineValue` call sites and `/locations/[id]` also carries fourteen raw
   `<input type="time">` at 30px and seven unboxed `PickList`s — grep cannot see

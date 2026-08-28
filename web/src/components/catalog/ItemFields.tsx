@@ -26,7 +26,15 @@ export function ItemFields({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          {/* THE TITLE WEARS THE BOX TOO (Mark, 2026-08-28). It was left underlined
+          on the argument that a box round a 28px heading reads as a frame —
+          which is true of the frame and beside the point about the reader:
+          this h1 is editable on four records and plain text on the rest, so
+          without the box the one cue telling those apart was a dotted rule
+          under a heading. It hugs its own text rather than filling a track,
+          because a title has no column to share. */}
           <InlineValue
+            boxed={BOXED_FIELDS}
             table="inventory_items"
             id={item.id}
             column="name"
@@ -46,7 +54,7 @@ export function ItemFields({
         </span>
       </div>
 
-      <dl className="grid max-w-2xl grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+      <dl className="grid max-w-[min(42rem,max(24rem,50%))] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
         <dt className="text-subtle">Category</dt>
         <dd>
           {/* Pick from what the catalog already uses, but ADD is allowed: this

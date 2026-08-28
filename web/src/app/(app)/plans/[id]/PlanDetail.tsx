@@ -150,13 +150,14 @@ export async function PlanDetail({
       />
 
       <div className="space-y-3">
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
           {/* The title is the record's own name, so it is edited where you read
               it. NOT NULL, so clearing it asks for a value instead of handing
               back a raw Postgres null-violation. */}
           <h1 className="min-w-0 text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
             {editable ? (
               <InlineValue
+                boxed={BOXED_FIELDS}
                 table="production_plans"
                 id={id}
                 column="title"
@@ -176,7 +177,7 @@ export async function PlanDetail({
           ) : null}
         </div>
 
-        <dl className="grid grid-cols-[minmax(7rem,auto)_1fr] items-center gap-x-6 gap-y-3 text-[14px] sm:grid-cols-[minmax(7rem,auto)_1fr_minmax(7rem,auto)_1fr] sm:[&>*:nth-child(4n+3)]:pl-6">
+        <dl className="grid max-w-[min(46rem,max(32rem,50%))] grid-cols-[minmax(7rem,auto)_1fr] items-center gap-x-6 gap-y-3 text-[14px] sm:grid-cols-[minmax(7rem,auto)_1fr_minmax(7rem,auto)_1fr] sm:[&>*:nth-child(4n+3)]:pl-6">
           {/* Both shops are CHOSEN from a list — a known vocabulary is never
               typed. Enumerating over ACTIVE locations only (design rule 3): a
               closed shop is not one you can plan a menu for. */}

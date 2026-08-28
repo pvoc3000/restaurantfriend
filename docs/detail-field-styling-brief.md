@@ -37,8 +37,10 @@ wrapped value.
    second reads as an artefact.
 3. **One height: 36px** (`min-h-9`) — the app's own field height, every
    control, every kind, including the buttons beside them.
-4. **One width: the track.** A field fills its own grid column, so a block's
-   fields share a left AND a right edge.
+4. **One width: the track — and the track has a CEILING.** A field fills its own
+   grid column, so a block's fields share a left and a right edge; and the block
+   itself takes at most half the content column, a quarter on a record with few
+   short fields. See §5.
 5. **An empty field is empty.** No em dash, no example text.
 6. **A multiline field keeps its 64px floor** (`min-h-16`) — the box says
    "editable", the height says "put a paragraph here", and only notes want the
@@ -150,6 +152,32 @@ two-track grids, so the reader sees four columns separated by three gaps — and
 only the middle one is a change of subject. On the special-order Info tab:
 **24px inside a block, 96px between blocks.** All three at 40px read as four
 unrelated columns.
+
+**A FIELD BLOCK TAKES AT MOST HALF THE SCREEN** (Mark, 2026-08-28: *"there are
+two columns that span the entire screen. they should only span 1/2 at most …
+`/elements/[id]` should probably only span 1/4"*). Underlined, a field block
+running the width of a 1280px window was just text with a lot of air after it;
+boxed, it is a 1,100px box holding the word "Purchased". The cap is written as a
+**ceiling over a floor** —
+
+```
+max-w-[min(42rem,max(24rem,50%))]     /* half   — /items, /vendor-items       */
+max-w-[min(46rem,max(32rem,50%))]     /* half   — /plans, a four-track grid   */
+max-w-[min(28rem,max(17rem,25%))]     /* quarter— /elements                   */
+```
+
+— and both halves are load-bearing. The percentage resolves against the CONTENT
+COLUMN, not the viewport, so it is genuinely "half the screen"; the `min()` stops
+a very wide monitor turning half into something absurd; and the `max()` keeps the
+fraction a CEILING rather than also becoming a floor. Without it, half of a
+portrait iPad's content column is 385px, which a four-track grid divides into
+~20px a field. Measured after: `/plans` 592px (46%) at 1280 and 512 (61%) at 834,
+`/items` 592 (46%), `/elements` 296 (23%) at 1280 and 272 (33%) at 834, nothing
+clipped at either width.
+
+**A quarter needs a smaller label track.** `/elements` went `minmax(9rem,auto)`
+→ `minmax(7rem,auto)` and `gap-x-6` → `gap-x-4` to buy its fields 166px instead
+of 136. Its labels are one word each and measure 114px, so nothing wraps.
 
 **A `justify-between` row has no track**, so `w-full` resolves to the value's
 own width and an empty field collapses. Measured in the money block: 44, 49, 57,
@@ -305,12 +333,21 @@ are not `InlineValue`s — see the two bonus conversions below.
 
 ### The four things the rollout added to this brief
 
-**AN `h1` TITLE KEEPS ITS DOTTED UNDERLINE.** `/plans/[id]` and `/elements/[id]`
-edit the record's name in the heading. A hairline box round 28px uppercase reads
-as a frame rather than as a field, `min-h-9` says nothing at that size, and the
-confusion the boxes exist to end — a field that looks like a label — cannot
-arise on a page heading, where there is no label to confuse it with. Worth
-Mark's eye; it is the one place the app now has two "editable" cues.
+**AN EDITABLE `h1` TITLE WEARS THE BOX** (Mark, 2026-08-28: *"box the h1 titles
+too"*). It shipped underlined on the argument that a hairline box round 28px
+uppercase reads as a frame rather than as a field — true of the frame, and
+beside the point about the reader. The title is editable on FOUR records
+(`/items`, `/plans`, `/elements`, `/locations`) and plain text on every other,
+so without the box the only thing telling those apart was a dotted rule under a
+heading, which is exactly the cue that was not enough anywhere else.
+
+It **hugs its own text** rather than filling a track: `w-full` in the
+shrink-to-fit flex row the title shares with its Active toggle resolves to the
+content width, which is right here — a title has no column to share. Its box
+comes out ~41px rather than 36, because 28px type has a taller line box than
+`min-h-9`, and the Sizer wears the same dress so a click still moves it 0.00px.
+`items-baseline` on those rows became `items-center`: boxes line up by their
+edges, not by the text inside them.
 
 **A CONVERTED SCREEN'S OTHER EDITABLE CONTROLS COME TOO.** `/locations/[id]`
 carries two that are not `InlineValue`s and so are not in the inventory:
