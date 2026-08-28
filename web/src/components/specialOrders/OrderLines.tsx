@@ -560,9 +560,23 @@ export function OrderLines({
                     exactly half, with nothing on line 1 moving and no row
                     getting denser. The 6px that remains is real clearance —
                     the pickers cannot touch the name box. */}
+                {/* AIR BETWEEN LINES, ALL OF IT ON THIS ROW'S FLOOR (Mark,
+                    2026-08-28: "a little padding between rows to help
+                    differentiate them"). 16px here plus the next line's own
+                    `pt-2` puts 24px between one line's last content and the
+                    next line's name box, against 6px between the two rows
+                    WITHIN a line — so the four-to-one ratio is what groups
+                    them, rather than a rule, which this app's tables do not
+                    carry.
+                    It is added at the BOTTOM rather than shared with line 1's
+                    top for one reason: every cell in line 1 must keep the same
+                    `pt`, or the name box sits lower than the qty and price
+                    boxes beside it. One class on this row moves nothing else.
+                    The `hover:` wash is on the tbody, so it covers this
+                    trailing space too and a hovered line reads as one block. */}
                 <tr>
-                  {canWrite ? <td className="px-0 pb-2 pt-0" /> : null}
-                  <td className="px-3 pb-2 pt-0" colSpan={2}>
+                  {canWrite ? <td className="px-0 pb-4 pt-0" /> : null}
+                  <td className="px-3 pb-4 pt-0" colSpan={2}>
                    <div className="-mt-1.5">
                     {/* The taxonomy under the customized name — what the
                         kitchen document prints beneath it, and the only way to
@@ -602,7 +616,7 @@ export function OrderLines({
                     )}
                    </div>
                   </td>
-                  <td className="px-3 pb-2 pt-0" colSpan={tailSpan} />
+                  <td className="px-3 pb-4 pt-0" colSpan={tailSpan} />
                 </tr>
                 </tbody>
               );
@@ -761,7 +775,7 @@ function LineTaxonomy({ row, menu }: { row: OrderLineRow; menu: MenuItem[] }) {
           "Letter" is a legitimate state — 935 real lines are exactly that, an
           order for letters whose word nobody has settled — so this is a note in
           the mark colour rather than a red one. */}
-      {isLetter && !letter ? <span className="text-mark">(no letter yet)</span> : null}
+      {isLetter && !letter ? <span className="bg-mark-fill px-1">(no letter yet)</span> : null}
       <Sep />
       <Slot>
         <InlineValue

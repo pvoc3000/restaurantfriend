@@ -65,7 +65,7 @@ export function StatusCatchUp({
         onClick={() => void take()}
         disabled={saving}
         title="The dates say this order has got further than its status does."
-        className="text-[11px] font-semibold uppercase tracking-[0.06em] text-mark underline decoration-dotted underline-offset-2 hover:text-ink disabled:opacity-35"
+        className="text-[11px] font-semibold uppercase tracking-[0.06em] bg-mark-fill px-1 text-ink underline underline-offset-2 hover:bg-ink hover:text-white disabled:opacity-35"
       >
         {saving ? "…" : `→ ${proposal.label.replace(/^Move the order to /, "")}`}
       </button>

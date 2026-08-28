@@ -127,22 +127,29 @@ export function OrderTotals({
             <Cell id={id} canWrite={canWrite} column="delivery_charge" value={inputs.delivery_charge} label="Delivery charge"
                   format={(v) => money(Number(v))} />
           </Line>
-          <Line label="Rush fee">
-            <span className="inline-flex items-baseline gap-2">
-              <Cell id={id} canWrite={canWrite} column="rush_fee" value={inputs.rush_fee} label="Rush fee"
-                    format={(v) => money(Number(v))} />
-              {/* Decision 22: the receiving screen's `→` idiom. A SUGGESTION
-                  you tap, never an automatic write — an automatic one would
-                  charge a wholesale customer a rush fee every Friday, quietly.
-                  It states the terms so the number is not a mystery. */}
-              {offerRush ? (
-                <>
+          {/* THE SUGGESTION HANGS UNDER THE LABEL, not under the field (Mark,
+              2026-08-28). Beside the field it cost the field twice over —
+              squeezed to 88px where the other four were 96 (which is what
+              `shrink-0` on `MONEY_FIELD` now prevents), and pushed 67px off the
+              right edge they all share. Under the field it kept both, but broke
+              the one thing the fixed width bought: a clean column of identical
+              boxes. Under the label it costs nothing at all — that side has the
+              room, and the offer is a sentence rather than a value. */}
+          <Line
+            label="Rush fee"
+            under={
+              /* Decision 22: the receiving screen's `→` idiom. A SUGGESTION you
+                 tap, never an automatic write — an automatic one would charge a
+                 wholesale customer a rush fee every Friday, quietly. It states
+                 the terms so the number is not a mystery. */
+              offerRush ? (
+                <span className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => takeRushFee(rushSuggestion)}
                     disabled={pending}
                     title="Inside two business days: $25 or 30%, whichever is greater"
-                    className="text-[12px] text-mark underline underline-offset-2 hover:text-ink disabled:opacity-35"
+                    className="text-[12px] bg-mark-fill px-1 text-ink underline underline-offset-2 hover:bg-ink hover:text-white disabled:opacity-35"
                   >
                     → {money(rushSuggestion)}
                   </button>
@@ -154,9 +161,12 @@ export function OrderTotals({
                   >
                     ✕
                   </button>
-                </>
-              ) : null}
-            </span>
+                </span>
+              ) : null
+            }
+          >
+            <Cell id={id} canWrite={canWrite} column="rush_fee" value={inputs.rush_fee} label="Rush fee"
+                  format={(v) => money(Number(v))} />
           </Line>
           {/* NO EXPLANATORY SENTENCE BESIDE THE SWITCH (Mark, 2026-08-19:
               "remove the note"). It read "Wholesale days are billed weekly, not
@@ -199,10 +209,38 @@ export function OrderTotals({
   );
 }
 
-function Line({ label, children }: { label: string; children: React.ReactNode }) {
+/**
+ * A money input: its label, and the field against the right edge.
+ *
+ * `under` hangs something BENEATH THE LABEL rather than beneath the field
+ * (Mark, 2026-08-28). Only the rush fee uses it, and the left side is the right
+ * side for it: the field column is a stack of identical 96px boxes and anything
+ * hung below one interrupts that column, where the label column has empty space
+ * to spare and the suggestion is a sentence anyway.
+ *
+ * It goes INSIDE the `dt` rather than in a wrapper around it, because `dl` >
+ * `div` > `dt` is as deep as the grouping element is allowed to nest — another
+ * div around the `dt` is invalid. `items-baseline` on the row uses the dt's
+ * FIRST line, so the label and the field stay on one line however tall the dt
+ * grows, and the dt's own uppercase tracking is reset for the text below.
+ */
+function Line({
+  label,
+  under,
+  children,
+}: {
+  label: string;
+  under?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="flex items-baseline justify-between gap-4">
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">{label}</dt>
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+        {label}
+        {under ? (
+          <span className="mt-1 block normal-case tracking-normal">{under}</span>
+        ) : null}
+      </dt>
       <dd className="text-right">{children}</dd>
     </div>
   );
@@ -233,10 +271,33 @@ function Figure({
 }
 
 /**
- * One money INPUT — never a derived figure, which is the whole of decision 6.
+ * EVERY MONEY INPUT IS THIS WIDE (Mark, 2026-08-28: "make the fields in the
+ * money section the same width so empty ones don't collapse. The column can be
+ * wider if necessary to accommodate").
+ *
+ * They collapsed because `BOXED_FIELD`'s `w-full` had nothing to resolve
+ * against: each sits in a `justify-between` row whose `<dd>` is shrink-to-fit,
+ * so the box came out the width of its VALUE — measured at 44, 49, 57 and, for
+ * the empty discount rate, FOURTEEN PIXELS. Underlined that read as a short
+ * number; boxed it reads as a broken control, and the one field you most need
+ * to find is the empty one.
+ *
+ * 96px holds "$1,234.56" (~78px of digits, padding and border) with room, which
+ * is the widest thing a wedding order puts here. It is a definite width on a
+ * WRAPPER rather than a `w-24` passed through `className`: `InlineValue`'s own
+ * `w-full` is a competing width utility, and Tailwind resolves those by
+ * stylesheet order rather than by the order of the class string, so overriding
+ * it from outside is a coin toss.
+ *
+ * The block grows to fit — it is `shrink-0` and content-sized under a
+ * `max-w-[32rem]` cap, so the rows going from 201px to 237px widen it to ~506
+ * and Payments beside it gives up the difference. That is the trade Mark
+ * offered.
  *
  * MODULE SCOPE — see `CustomerDetail`'s note.
  */
+const MONEY_FIELD = "block w-24 shrink-0";
+
 function Cell({
   id,
   canWrite,
@@ -253,13 +314,16 @@ function Cell({
   format?: (v: string | number) => string;
 }) {
   if (!canWrite) {
+    // The same width below purchaser+, or the block reflows depending on who
+    // is looking at it.
     return (
-      <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+      <span className={`${MONEY_FIELD} ${READ_ONLY_VALUE} text-right tabular-nums`}>
         {value === null ? "—" : format ? format(value) : value}
       </span>
     );
   }
   return (
+    <span className={MONEY_FIELD}>
     <InlineValue
       boxed={BOXED_FIELDS}
       table="special_orders"
@@ -272,5 +336,6 @@ function Cell({
       ariaLabel={label}
       format={format}
     />
+    </span>
   );
 }

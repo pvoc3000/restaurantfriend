@@ -238,7 +238,7 @@ export function AddOrderLine({
                           .filter(Boolean)
                           .join(" · ") || "—"}
                         {already ? (
-                          <span className="text-mark"> · {already} already on this order</span>
+                          <span className="bg-mark-fill px-1">{already} already on this order</span>
                         ) : null}
                       </span>
                     </td>

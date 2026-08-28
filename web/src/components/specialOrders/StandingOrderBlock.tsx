@@ -156,11 +156,13 @@ export function StandingOrderBlock({
           to remember.
         </p>
         {paused ? (
-          <p className="text-mark">Paused, so nothing new is being made.</p>
+          <p><span className="bg-mark-fill px-1">Paused, so nothing new is being made.</span></p>
         ) : upcoming.length === 0 ? (
-          <p className="text-mark">
-            No days in the next {horizonDays} — check the weekdays and the date
-            range above.
+          <p>
+            <span className="bg-mark-fill px-1">
+              No days in the next {horizonDays} — check the weekdays and the
+              date range above.
+            </span>
           </p>
         ) : (
           <p className="text-muted">

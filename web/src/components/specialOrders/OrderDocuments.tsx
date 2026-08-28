@@ -245,8 +245,8 @@ export function OrderDocuments({
           settled: the app has worked something out and you take it, rather than
           finding it already written. */}
       {offerStamp && canWrite && (
-        <p className="text-[13px] text-mark">
-          Filed a signed quote —{" "}
+        <p className="text-[13px]">
+          <span className="bg-mark-fill px-1">Filed a signed quote</span>{" "}
           <button
             type="button"
             onClick={() => void stampReturned()}
