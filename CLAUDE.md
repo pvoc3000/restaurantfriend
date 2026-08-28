@@ -3727,8 +3727,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    lands.
 4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3, 4a AND THE
    PRODUCTION HALF OF 5 DONE; 4b, 4c and recurrence not built. Migrations
-   051–058 are applied and all three edge functions are deployed;
-   067 + 068 NEED APPLYING.** *Probe, don't read this line.*
+   051–058 AND 067 + 068 are applied and all three edge functions are
+   deployed.** *Probe, don't read this line.*
    The module records, quotes, invoices, prints, emails as specialorders@, takes
    a customer's approval on a public page, takes inquiries on a public form,
    proposes the next step as things happen, and **puts the order's donuts on a
@@ -3864,6 +3864,42 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    rendered through the real dialog against the LIVE database gives the same 12
    lines and 118 to make, and the commit refuses legibly ("migration 068 has not
    been applied") while writing nothing.
+   **WALKED END TO END ON THE REAL #7769, 2026-08-27, AND LEFT AS FOUND**
+   (17 schedules / 546 lines before and after, 27 events, the order byte-identical).
+   Scheduled onto 2026-08-28 — a night DF01 already had a plan schedule for, so
+   decision 11 could be tested — and what that proved beyond the harness:
+   **`order_scheduled_at` STAYED 2023-07-14.** The real order already carried
+   one, and the coalesce refused to move a date its 2023 paperwork was dated
+   with. That is also the fact that makes the RESTORE step non-optional if
+   anybody walks this again: **unscheduling CLEARS that column**, so on an order
+   that had a real date, a test unschedule destroys it. Capture it first.
+   **Both stamps landed on the right rows**: printing the DF01 plan schedule
+   alone stamped `printed_at` on it AND on the special order, while the
+   unselected DF02 plan schedule stayed null — which is the expanded-set
+   stamping, and exactly what stops a printed special order slipping past the
+   unschedule guard.
+   **Both refusals fired by name** — first "was printed on 2026-08-28", then,
+   after a real count entered through 044's definer on the schedule screen,
+   "has counted quantities on 1 of 12 lines". Deleting the ORDER while scheduled
+   was refused without even opening its confirm.
+   The lock was checked for what it does NOT touch as well: no Add item, no row
+   drag, no line remove — while the six column-RESIZE grips and "Remove this
+   payment" stayed live, which is the rule (view controls and money are not
+   what the schedule was built from).
+   **One layout bug only the live walk found**: the refusal sentences are whole
+   sentences, and as ordinary flex items in `OrderActions`' row one of them
+   pushed Duplicate / Flag / Cancel / Delete off the side of the screen.
+   `basis-full` puts it on its own line.
+   **OPEN, AND IT WANTS MARK'S EYE — A NOTE IS NOT PART OF THE KEY.** #7769's
+   two Mini lines are 50 "chocolate glaze" and 50 "vanilla glaze": same
+   production item, same cut, different NOTE. They merge into one schedule line
+   of 100 reading "Rites of Sprinkles - Mini", so the decorator is not told that
+   half are chocolate. The dialog says "(2 lines)" beside it, which is the merge
+   being visible rather than the problem being solved. Adding the note to the
+   group key is NOT obviously right — it is free text and also carries things
+   like "for 10am pickup", which would split a line for no kitchen reason — so
+   this is a question about which field carries a *decoration* instruction, not
+   a bug to fix quietly.
    Known and NOT fixed: a group merges two order lines under the FIRST line's
    name, so the dialog shows "(2 lines)" beside it rather than both names.
    **Read `docs/special-orders-brief.md` before designing or touching anything
@@ -4564,8 +4600,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    a partial run dies on that rename before it reaches the constraint, the
    policy or the index.
 
-   **067 AND 068 NEED APPLYING** (2026-08-27 — scheduling a special order's
-   production). *Probe, don't read this line; it has been wrong in both
+   **067 AND 068 ARE APPLIED** (Mark, 2026-08-27 — scheduling a special order's
+   production), and the whole loop was WALKED on the real #7769 the same day and
+   left exactly as found. *Probe, don't read this line; it has been wrong in both
    directions for four different migrations.* For 067, three probes because it
    does three things:
    `select conname from pg_constraint where conrelid =

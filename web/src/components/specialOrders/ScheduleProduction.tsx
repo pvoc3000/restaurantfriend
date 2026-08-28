@@ -151,7 +151,12 @@ export function ScheduleProduction({
             Unschedule
           </button>
         </div>
-        {error ? <p className="mt-2 text-sm text-accent">{error}</p> : null}
+        {/* `basis-full`, because this renders INSIDE `OrderActions`' own flex
+            row: these refusals are whole sentences naming a print date or a
+            count, and as an ordinary flex item one pushes Duplicate, Flag,
+            Cancel and Delete off the side of the screen. Its own line is also
+            where a reader expects to find it. */}
+        {error ? <p className="basis-full text-sm text-accent">{error}</p> : null}
       </>
     );
   }
