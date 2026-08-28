@@ -84,16 +84,28 @@ export function PremadesPage({
         </p>
       ) : null}
 
-      <table className="w-full">
+      {/* `table-fixed` with a colgroup, or the two 112px input columns push the
+          Note header into Left's and it renders as "LEFTNOTE". A `w-28` on a
+          `th` is a suggestion an auto-layout table is free to ignore. */}
+      <table className="w-full table-fixed">
+        <colgroup>
+          <col className="w-[9%]" />
+          <col className="w-[11%]" />
+          <col className="w-[28%]" />
+          <col className="w-[7%]" />
+          <col className="w-[13%]" />
+          <col className="w-[13%]" />
+          <col className="w-[19%]" />
+        </colgroup>
         <thead>
           <tr className="border-b-2 border-ink text-xs font-semibold uppercase tracking-[0.08em]">
-            <th className="py-2 text-left">Type</th>
-            <th className="py-2 text-left">Sub type</th>
-            <th className="py-2 text-left">Name</th>
-            <th className="py-2 text-right">Par</th>
-            <th className="w-28 py-2 text-right">Made</th>
-            <th className="w-28 py-2 text-right">Left</th>
-            <th className="py-2 text-left">Note</th>
+            <th className="py-2 pr-3 text-left">Type</th>
+            <th className="py-2 pr-3 text-left">Sub type</th>
+            <th className="py-2 pr-3 text-left">Name</th>
+            <th className="py-2 pr-3 text-right">Par</th>
+            <th className="py-2 pr-2 text-right">Made</th>
+            <th className="py-2 pr-2 text-right">Left</th>
+            <th className="py-2 pl-4 text-left">Note</th>
           </tr>
         </thead>
         <tbody>
@@ -119,7 +131,7 @@ export function PremadesPage({
                   ariaLabel={`Left over, ${r.name}`}
                 />
               </td>
-              <td className="py-2 text-[15px] text-muted">{r.note ?? ""}</td>
+              <td className="py-2 pl-4 text-[15px] text-muted">{r.note ?? ""}</td>
             </tr>
           ))}
         </tbody>

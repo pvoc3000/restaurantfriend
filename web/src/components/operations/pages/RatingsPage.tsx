@@ -166,8 +166,9 @@ export function RatingsPage({
               checked={row.gotBreak === true}
               disabled={!editable}
               onChange={(next) => patch(row.id, { got_break: next })}
-              label="Received a 30 minute break"
-            />
+            >
+              Received a 30 minute break
+            </Checkbox>
             {row.gotBreak === false ? (
               <div className="min-w-64 flex-1 space-y-1">
                 <TextField

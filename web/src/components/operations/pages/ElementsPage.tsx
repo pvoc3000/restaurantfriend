@@ -81,7 +81,18 @@ export function ElementsPage({
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
-      <table className="w-full">
+      {/* Same reason as Premades: fixed layout, or the input columns crowd the
+          headers out. */}
+      <table className="w-full table-fixed">
+        <colgroup>
+          <col className="w-[8%]" />
+          <col className="w-[22%]" />
+          <col className="w-[12%]" />
+          <col className="w-[12%]" />
+          <col className="w-[10%]" />
+          <col className="w-[16%]" />
+          <col className="w-[20%]" />
+        </colgroup>
         <thead>
           <tr className="border-b-2 border-ink text-xs font-semibold uppercase tracking-[0.08em]">
             <th className="py-2 text-left">#</th>

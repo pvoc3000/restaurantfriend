@@ -281,6 +281,7 @@ export default async function RunShiftReportPage({
   const bodies: Partial<Record<ShiftReportPage, React.ReactNode>> = {
     info: (
       <InfoPage
+        key="info"
         reportId={id}
         reportDate={reportDate}
         shift={shift}
@@ -293,6 +294,7 @@ export default async function RunShiftReportPage({
     ),
     ratings: (
       <RatingsPage
+        key="ratings"
         reportId={id}
         orgId={report.org_id as string}
         rows={ratingRows}
@@ -302,6 +304,7 @@ export default async function RunShiftReportPage({
     ),
     report: (
       <ReportPage
+        key="report"
         reportId={id}
         narrative={(report.narrative as string | null) ?? null}
         editable={editable}
@@ -309,6 +312,7 @@ export default async function RunShiftReportPage({
     ),
     submit: (
       <SubmitPage
+        key="submit"
         reportId={id}
         editable={editable}
         readiness={{
@@ -331,6 +335,7 @@ export default async function RunShiftReportPage({
   if (wants("sales")) {
     bodies.sales = (
       <SalesPage
+        key="sales"
         reportId={id}
         locationId={report.location_id as string}
         reportDate={reportDate}
@@ -346,6 +351,7 @@ export default async function RunShiftReportPage({
   if (wants("premades")) {
     bodies.premades = (
       <PremadesPage
+        key="premades"
         reportId={id}
         orgId={report.org_id as string}
         scheduleTitle={scheduleTitle}
@@ -358,6 +364,7 @@ export default async function RunShiftReportPage({
   if (wants("elements")) {
     bodies.elements = (
       <ElementsPage
+        key="elements"
         reportId={id}
         orgId={report.org_id as string}
         rows={elementRows}
@@ -369,6 +376,7 @@ export default async function RunShiftReportPage({
   if (wants("tomorrow")) {
     bodies.tomorrow = (
       <TomorrowPage
+        key="tomorrow"
         reportId={id}
         nextProductionDate={nextDay}
         kitchenId={kitchenId}

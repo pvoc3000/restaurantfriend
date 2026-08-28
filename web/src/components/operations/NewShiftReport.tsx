@@ -78,7 +78,13 @@ export function NewShiftReport({
         return;
       }
       setOpen(false);
-      router.refresh();
+      // NO `router.refresh()` before this push, and that is not a tidy-up.
+      // `NewPlan` does refresh-then-push and gets away with it because it
+      // navigates WITHIN the (app) group; this crosses into (fullscreen),
+      // which is a different layout, and the refresh's re-render of the list
+      // can land after the push and put the old tree back — the screen simply
+      // does not change when you press the button. There is nothing to refresh
+      // anyway: we are leaving, and the list re-fetches on the way back.
       router.push(`/shift-reports/${data.id}/run`);
     });
   }

@@ -81,8 +81,9 @@ export function SubmitPage({
                 checked={l.done}
                 disabled={!editable}
                 onChange={(next) => flag(l.toggle as string, next)}
-                label={l.label}
-              />
+              >
+                {l.label}
+              </Checkbox>
             ) : (
               <span className="flex items-center gap-4">
                 {/* U+FE0E on both, or Apple renders a colour box beside a plain

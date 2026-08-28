@@ -167,8 +167,9 @@ export function TomorrowPage({
           checked={specialOrdersDone}
           disabled={!editable}
           onChange={(next) => flag("task_special_orders_done", next)}
-          label="Tomorrow's special orders are printed"
-        />
+        >
+          Tomorrow&rsquo;s special orders are printed
+        </Checkbox>
       </section>
 
       <section className="space-y-4">
@@ -213,8 +214,9 @@ export function TomorrowPage({
           checked={schedulesDone}
           disabled={!editable}
           onChange={(next) => flag("task_schedules_done", next)}
-          label="Tomorrow's production logs are printed"
-        />
+        >
+          Tomorrow&rsquo;s production logs are printed
+        </Checkbox>
       </section>
     </div>
   );
