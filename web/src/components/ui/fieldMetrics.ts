@@ -13,15 +13,33 @@
  * value; boxed, both read as misalignment, because a box declares where a
  * thing begins and ends.
  *
- * HEIGHT IS 32px, WHICH IS A CHOICE BETWEEN TWO EXISTING NUMBERS. The app's
- * form controls — `TextInput`, `TabPicker`, `PickList variant="field"` — are
- * all `h-9`/36px, and matching them would have been the tidiest answer on
- * paper. It costs too much here: the Info tab is FOUR QUADRANTS MEASURED TO
- * ONE SCREEN (`useExactViewportHeight`), nine rows to a column, so 36px adds
- * ~68px per column and pushes the panes that scroll into scrolling sooner.
- * 32px clears the tallest natural control (the 30px date) with room for its
- * border, and adds ~32px per column. If the record ever stops being one
- * measured screen, `h-9` is the value to revisit.
+ * HEIGHT IS `h-9`/36px — THE APP'S OWN FIELD HEIGHT, and the whole point is
+ * that it is not a number invented here. `TextInput` says so in its own
+ * comment: "h-9 is the app's field height — `TabPicker`'s cells and
+ * `PickList`'s". Every button is `h-9` too. So a boxed field, a command button,
+ * a filter tab and a form input are now one height everywhere in the app, which
+ * is what Mark asked for when he was given the choice (2026-08-28: "whatever
+ * would make for a consistent look app wide").
+ *
+ * IT SHIPPED AT 32px FIRST, ON A PREDICTION THAT TURNED OUT TO BE WRONG, and
+ * the correction is worth keeping because the reasoning was plausible. The
+ * argument was that the special-order Info tab is FOUR QUADRANTS MEASURED TO
+ * ONE SCREEN (`useExactViewportHeight`) at nine rows a column, so 36px would
+ * add "~68px per column" and push the scrolling panes into scrolling sooner.
+ * Nobody measured it. Measured: the layout absorbs it almost entirely, because
+ * the panes that scroll are exactly what gives way — the Completion dates pane
+ * went 160px to 152px, EIGHT pixels, and the page's own scroll went 100px to
+ * 103. On the 21-line order the table grew ~5px a row.
+ *
+ * What 32px cost, against that, was the thing the boxes exist for: on the Info
+ * tab it left 23 fields at 32px sitting under 8 command buttons at 36, which is
+ * a near-miss rather than a contrast and exactly the class of difference the
+ * boxes made visible in the first place. At 36 the screen measures ONE height,
+ * 190 controls of it.
+ *
+ * `h-8` remains a real member of the scale — it is `TabPicker size="sm"`, "for
+ * tight bands like the receiving screen's" — so a genuinely dense band may
+ * still want it. A record is not a tight band.
  *
  * WIDTH IS THE TRACK, NOT A SCALE. Mark asked whether a predetermined set of
  * widths would help pages stay coherent; the answer here is that the `dl`
@@ -40,18 +58,36 @@
  */
 
 /**
+ * DO DETAIL SCREENS BOX THEIR EDITABLE FIELDS? (Mark, 2026-08-28: "app wide".)
+ *
+ * It began as one constant in `components/specialOrders/fieldLook.ts` while the
+ * look was an experiment on one record; that file is gone and this is the same
+ * switch with the whole app behind it. It stays a switch rather than being
+ * inlined for the reason it was one: a look this pervasive should be judgeable
+ * and reversible in a single edit, not forty.
+ *
+ * IT IS ABOUT RECORDS, NOT LISTS (Mark, same day: "lists are fine as is"). A
+ * `DataTable` already has column headings and rules doing the work the box
+ * does, and boxing every cell of a 790-row list is a different decision. The
+ * special-order Items table is boxed because it is part of a record, and even
+ * there it is the busiest result on the screen — so a caller inside a list
+ * passes `boxed={false}` deliberately rather than reading this.
+ */
+export const BOXED_FIELDS = true;
+
+/**
  * A single-line boxed field: one height, fills its track.
  *
- * A MINIMUM, NEVER A FIXED HEIGHT. `h-8` was the first cut and it clipped: a
- * short-text cell still WRAPS when the value is long enough — the note on a
- * special order's first line does — and a definite height does not grow, so the
- * second line spilled 6px past the border it was meant to sit inside
- * (measured: scrollHeight 36 against clientHeight 30). `min-h-8` renders every
- * ordinary one-line field at exactly 32px, because one line of 13px text plus
- * the padding comes to less, and lets the rare wrapping one take the room it
- * needs. Uniform where uniformity is possible, correct where it is not.
+ * A MINIMUM, NEVER A FIXED HEIGHT. A fixed one clipped: a short-text cell still
+ * WRAPS when the value is long enough — the note on a special order's first
+ * line does — and a definite height does not grow, so the second line spilled
+ * 6px past the border it was meant to sit inside (measured: scrollHeight 36
+ * against clientHeight 30). `min-h-9` renders every ordinary one-line field at
+ * exactly 36px, because one line of 13px text plus the padding comes to less,
+ * and lets the rare wrapping one take the room it needs. Uniform where
+ * uniformity is possible, correct where it is not.
  */
-export const BOXED_FIELD = "min-h-8 w-full";
+export const BOXED_FIELD = "min-h-9 w-full";
 
 /** The box itself — the resting cue that says "you can change this". */
 export const BOXED_FIELD_BORDER = "border border-hairline hover:border-ink";

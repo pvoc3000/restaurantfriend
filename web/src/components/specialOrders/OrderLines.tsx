@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useTransition, type ReactNode } from "react";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -9,7 +10,6 @@ import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { moveInOrder, renumber, useRowDrag, type DropTarget } from "@/lib/rowDrag";
 import { InlineValue } from "@/components/catalog/InlineValue";
-import { BOXED_FIELDS } from "./fieldLook";
 import { ColumnHeader } from "@/components/catalog/ColumnHeader";
 import { useResizableColumns } from "@/lib/columnWidths";
 import { SectionHeading } from "@/components/ui/SectionHeading";

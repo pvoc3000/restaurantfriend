@@ -1,7 +1,7 @@
 "use client";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { BOXED_FIELDS } from "./fieldLook";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { TimeCell } from "./TimeCell";
 

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
@@ -40,7 +41,6 @@ import { OrderTotals } from "@/components/specialOrders/OrderTotals";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
 import { OrderActions } from "@/components/specialOrders/OrderActions";
 import { ScheduleProduction } from "@/components/specialOrders/ScheduleProduction";
-import { BOXED_FIELDS } from "@/components/specialOrders/fieldLook";
 import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
 import { TimeCell } from "@/components/specialOrders/TimeCell";
 import { StandingOrderBlock } from "@/components/specialOrders/StandingOrderBlock";

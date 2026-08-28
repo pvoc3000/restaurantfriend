@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { BOXED_FIELDS } from "./fieldLook";
 import { createClient } from "@/lib/supabase/client";
 import { WorkflowOffer } from "./WorkflowOffer";
 import {

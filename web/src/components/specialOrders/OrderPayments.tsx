@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { useRouter } from "next/navigation";
 
 import {
@@ -13,7 +14,6 @@ import { WorkflowOffer } from "./WorkflowOffer";
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { InlineValue } from "@/components/catalog/InlineValue";
-import { BOXED_FIELDS } from "./fieldLook";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { PickList } from "@/components/ui/PickList";

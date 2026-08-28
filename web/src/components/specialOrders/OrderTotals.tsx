@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { BOXED_FIELDS } from "./fieldLook";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Switch } from "@/components/ui/Switch";
 import { money, type MoneyOrder, type OrderTotals as Totals } from "@/lib/specialOrders";

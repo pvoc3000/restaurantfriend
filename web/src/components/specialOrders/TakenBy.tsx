@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { BOXED_FIELDS } from "./fieldLook";
 import type { PickOption } from "@/components/ui/PickList";
 
 /**

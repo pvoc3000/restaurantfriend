@@ -5845,13 +5845,21 @@ weekday column, and 003 then silently made it per-vendor-item.
   a box a grey hint reads as a value somebody typed), and a multiline field
   keeps its 64px floor because the box says "editable" where the height says
   "put a paragraph here".
-  `ui/fieldMetrics` is the one dress — **`min-h-8` and `w-full`**, a MINIMUM
-  because a short-text cell still wraps and a definite height spills it past its
-  own border. 32px rather than the app's `h-9`/36px form controls: the record is
-  four quadrants MEASURED to one screen, nine rows a column, so 36 would cost
-  ~68px per column. Width is THE TRACK, never a scale — the `dl` already defines
-  the columns, so a block's fields share a left and a right edge with no numbers
-  to keep in step.
+  `ui/fieldMetrics` is the one dress AND the app-wide `BOXED_FIELDS` switch
+  (Mark, 2026-08-28) — **`min-h-9` and `w-full`**, a MINIMUM because a
+  short-text cell still wraps and a definite height spills it past its own
+  border. **36px is the app's OWN field height**, which `TextInput` says in its
+  own comment and every button already uses, so a field, a command button, a
+  filter tab and a form input are now one height everywhere.
+  It shipped at 32px first ON A PREDICTION NOBODY MEASURED — that 36 would cost
+  the measured four-quadrant record "~68px per column". Measured, the panes that
+  scroll absorb it: Completion dates went 160px to 152, EIGHT pixels, and a
+  21-line table grew ~5px a row. What 32 cost instead was the thing the boxes
+  exist for — 23 fields at 32 under 8 buttons at 36 is a near-miss rather than a
+  contrast. `h-8` stays a real member of the scale (`TabPicker size="sm"`, "for
+  tight bands"); a record is not a tight band.
+  Width is THE TRACK, never a scale — the `dl` already defines the columns, so a
+  block's fields share a left and a right edge with no numbers to keep in step.
   **ALL FOUR CONTROLS TAKE `boxed`** — `InlineValue`, and the `PickList`,
   `DateField` and `TimeField` it hands down to — or a page boxes its typed
   fields while its pickers and dates stay underlined, which reads as those not

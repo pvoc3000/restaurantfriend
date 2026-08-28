@@ -33,7 +33,8 @@ wrapped value.
    `READ_ONLY_VALUE` grows a border, the screen stops answering the question.
 2. **The underline comes off with the box.** Two cues for one fact, and the
    second reads as an artefact.
-3. **One height: 32px** (`min-h-8`), every control, every kind.
+3. **One height: 36px** (`min-h-9`) — the app's own field height, every
+   control, every kind, including the buttons beside them.
 4. **One width: the track.** A field fills its own grid column, so a block's
    fields share a left AND a right edge.
 5. **An empty field is empty.** No em dash, no example text.
@@ -42,16 +43,30 @@ wrapped value.
    second.
 7. **Yellow is a fill, never ink.** See §7.
 
-### Why 32px and not the app's `h-9`
+### Why 36px, and the wrong turn on the way
 
-`TextInput`, `TabPicker` and `PickList variant="field"` are all 36px, and
-matching them is the tidier answer on paper. It costs too much on a record: the
-special-order Info tab is four quadrants measured to one screen
-(`useExactViewportHeight`), nine rows a column, so 36px adds ~68px per column
-and pushes the scrolling panes into scrolling sooner. 32px clears the tallest
-natural control (a 30px date) with room for its border. **If a record is not a
-measured one-screen layout, `h-9` is worth revisiting** — but prefer consistency
-across records over local optimisation.
+`h-9` is the app's OWN field height — `TextInput` says so in its own comment
+("h-9 is the app's field height — `TabPicker`'s cells and `PickList`'s"), and
+every button is `h-9` too. So a boxed field, a command button, a filter tab and
+a form input are one height everywhere. Mark, given the choice: *"whatever would
+make for a consistent look app wide."*
+
+**It shipped at 32px first, on a prediction nobody measured**, and the
+correction is worth keeping because the reasoning was plausible: the
+special-order Info tab is four quadrants measured to one screen, nine rows a
+column, so 36px "would add ~68px per column and push the scrolling panes into
+scrolling sooner". Measured, the layout absorbs it almost entirely — the panes
+that scroll are exactly what gives way. The Completion dates pane went **160px
+to 152px**, and the page's own scroll 100px to 103. On a 21-line order the table
+grew ~5px a row.
+
+What 32px cost instead was the thing the boxes exist for: 23 fields at 32px
+sitting under 8 command buttons at 36 is a near-miss rather than a contrast —
+exactly the class of difference the boxes had just made visible. At 36 the
+screen measures ONE height, 190 controls of it.
+
+`h-8` is still a real member of the scale — it is `TabPicker size="sm"`, "for
+tight bands like the receiving screen's". A record is not a tight band.
 
 ### Why the track and not a width scale
 
@@ -72,10 +87,11 @@ shrink-to-fit and there is no track to fill — see the money block, §5.
 
 | export | what it is |
 | --- | --- |
-| `BOXED_FIELD` | `min-h-8 w-full` — one height, fills its track |
+| `BOXED_FIELD` | `min-h-9 w-full` — one height, fills its track |
 | `BOXED_FIELD_BORDER` | `border border-hairline hover:border-ink` |
 | `BOXED_FIELD_TALL` | `min-h-16 w-full` — the multiline floor |
 | `EMPTY_FIELD_DASH` / `fieldPlaceholder()` | suppresses the em dash on a boxed field |
+| `BOXED_FIELDS` | the app-wide switch |
 
 Four controls understand `boxed`, and **all four must get it** or a page boxes
 its typed fields while its pickers and dates stay underlined, which reads as
@@ -89,16 +105,16 @@ those not being editable:
 `InlineValue` hands `boxed` down to the other three, so **a caller normally only
 touches `InlineValue`.**
 
-### The per-screen switch
+### The switch
 
-`components/specialOrders/fieldLook.ts` exports `BOXED_FIELDS = true`, imported
-by every call site on that record. One constant, so the look can be judged and
-then kept, trimmed or reverted in a single edit rather than forty.
+`BOXED_FIELDS` lives in the same module and is **app-wide** (Mark, 2026-08-28).
+It began as one constant in `components/specialOrders/fieldLook.ts` while the
+look was an experiment on one record; that file is gone. It stays a switch
+rather than being inlined for the reason it was one: a look this pervasive
+should be judgeable and reversible in a single edit, not two hundred.
 
-**For the rollout, promote this to one app-wide constant** rather than one per
-module — the point of the convention is that records look alike. Keep the
-indirection: it is what made the experiment cheap to evaluate, and it is how a
-future "boxes off on this screen" gets answered.
+A caller inside a LIST passes `boxed={false}` deliberately rather than reading
+it — see §9.
 
 ---
 
@@ -164,9 +180,9 @@ percentage width nothing to resolve against, so the control comes out the width
 of its VALUE. A boxed date sat at 144.5px in a row of 214.3px fields.
 *Symptom: one control is short and nothing in its own classes explains it.*
 
-**A fixed height clips a wrapping value.** `h-8` looks right until a short-text
+**A fixed height clips a wrapping value.** `h-9` looks right until a short-text
 cell wraps — the second line spilled 6px past its own border (scrollHeight 36,
-clientHeight 30). Use `min-h-8`.
+clientHeight 30). Use `min-h-9`.
 
 **The Sizer must wear whatever the resting state wears.** `InlineValue` holds an
 invisible copy of the value behind the input so clicking a cell does not move
@@ -241,7 +257,8 @@ const heights = {}; for (const e of f) {
 
 The checklist:
 
-- [ ] every field one height (32px), and nothing overflowing its box
+- [ ] every field one height (36px) — and so is every button beside them —
+      with nothing overflowing its box
 - [ ] every block's fields share one left and one right edge
 - [ ] no read-only value carries a box (except a multiline note)
 - [ ] no em dash or example text in an empty boxed field
@@ -285,12 +302,17 @@ there it is the busiest result. Decide list-by-list, and prefer leaving them.
 
 ---
 
-## 10. Open questions for Mark
+## 10. Answered, 2026-08-28
 
-- **One app-wide constant or one per module?** Recommend app-wide (see §3).
-- **Do lists get this at all?** Recommend not, by default (see §9).
-- **`h-9` instead of `h-8`** for records that are not measured one-screen
-  layouts — consistency probably wins, but it has not been tested on a screen
-  with room to spare.
-- The special-order record still scrolls ~100px at 1280x720. Pre-existing
-  (measured identical with the boxes on and off), never chased down.
+- **One app-wide constant**, in `ui/fieldMetrics` (§3).
+- **Lists stay as they are** — "lists are fine as is" (§9).
+- **36px, not 32** — the app's own field height, measured rather than argued
+  (see §2). This is the one thing already-converted code had to change.
+
+Still open, and neither is about this convention:
+
+- The special-order record scrolls ~103px at 1280x720. Pre-existing — measured
+  identical with the boxes on and off — and never chased down.
+- The record's command cluster (`OrderActions`) is `shrink-0` at 722px, so the
+  page overflows below `md`. Also pre-existing, below the widths the app
+  targets.
