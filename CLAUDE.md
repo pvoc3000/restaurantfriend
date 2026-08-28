@@ -3727,8 +3727,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    lands.
 4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3, 4a AND THE
    PRODUCTION HALF OF 5 DONE; 4b, 4c and recurrence not built. Migrations
-   051–058 AND 067 + 068 are applied and all three edge functions are
-   deployed; 069 NEEDS APPLYING.** *Probe, don't read this line.*
+   051–058 AND 067–069 are applied and all three edge functions are
+   deployed.** *Probe, don't read this line.*
    The module records, quotes, invoices, prints, emails as specialorders@, takes
    a customer's approval on a public page, takes inquiries on a public form,
    proposes the next step as things happen, and **puts the order's donuts on a
@@ -3863,6 +3863,55 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    rendered through the real dialog against the LIVE database gives the same 12
    lines and 118 to make, and the commit refuses legibly ("migration 068 has not
    been applied") while writing nothing.
+   **THE FROM COLUMN NAMES THE PLAN** (Mark, 2026-08-27: "instead of 'Plan' can
+   the from column say the name of the plan instead?"). "Plan" was true of every
+   plan schedule and so distinguished none of them, where "SUMMER 2026 (DF01)"
+   is the thing you would go and look at — and the record's own sentence now
+   names it too, as a LINK to `/plans/[id]`.
+   **IT IS DERIVED, NOT SNAPSHOTTED, and that is the thing to know before
+   trusting it.** Nothing records which plans fed a generation, so
+   `plansInForce` answers "which plans are in force for this shop, KITCHEN and
+   day" — which is the claim the record screen has always made in words ("From
+   the plans active that day"), now with the names in it. The cost: activating
+   or retiring a plan changes what an OLD schedule says it came from.
+   Snapshotting `plan_ids` at generation is the fix and it is a migration.
+   **The kitchen is in the match, not just the shop**: a shop running two plans
+   into two kitchens produces two schedules, each fed by one of them, and
+   without that test the wrong plan's name lands on the row. A plan with a null
+   kitchen falls back to its selling shop (039's nullable column, decision 9's
+   reading). Dates compare as STRINGS — `new Date` is UTC midnight and moves a
+   plan's first day west of Greenwich.
+   **Several plans can be in force**, since decision 9 makes a shop's menu their
+   union and their pars SUM, so the label holds two names and counts past that
+   ("EVERYDAY + 2 more", the full list in the row's `title`). Measured
+   2026-08-27: all 17 real plan schedules resolve to exactly one.
+   `scheduleSourceLabel` is ONE function called by the column that renders it
+   AND the search that has to find it; sorting moved onto the LABEL, since
+   sorting by the raw `source` would group every plan schedule under an order
+   the reader cannot see. Date gave up 30px to pay for From's 210.
+
+   **THE RECORD'S COMMANDS MOVED UP INTO THE IDENTITY BLOCK** (Mark,
+   2026-08-27, "like we do in the other detail views"). Print / Recost /
+   Regenerate / Delete sat under the field grid, so on a long night they were a
+   scroll away from the thing they act on. `items-start`, so they line up with
+   the TOP of the title rather than centring against a block whose height
+   changes with the source line and the special-order backlink; right-aligned
+   beside it and left-aligned once they wrap under it. Measured: the h1's top
+   and Print's top are the same pixel, and Delete, Add item and the table all
+   end on 1217 — the page's own content edge. `ScheduleActions` lost the
+   `ml-auto` on Delete, which in a content-sized cluster could only ever have
+   been a no-op.
+
+   **THE ALLERGEN CHIP ONLY SHOWS WHEN IT SAYS SOMETHING**, which the same
+   session's backlink introduced and this fixes. Measured over the 835 real
+   orders carrying `allergen_info`: **446 of them (53%) say some spelling of
+   "no"** — "no" 242, "none" 132, "n/a" 44. A yellow mark reading "none" on
+   half the orders is how the one reading PEANUTS stops being read.
+   `meansNoAllergy` is a WHOLE-STRING match against a closed list and **fails
+   safe**: "no nuts" contains "no" and means the opposite of it, so anything
+   unrecognised is SHOWN. A new way of writing nothing costs one redundant
+   chip; a new way of writing an allergy costs a great deal more.
+
    **THE SCHEDULE'S LINE TABLE LOST TWO COLUMNS AND GAINED TWO** (Mark,
    2026-08-27): Type - Size - Cut - Finish - Name - Par - Made - Left over -
    Sold - Note. **Tray** went because a special-order line never has one and a
@@ -4689,8 +4738,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    rerunnable — 067's `drop constraint` fails a second time, which is the signal
    it already ran.
 
-   **069 NEEDS APPLYING** (2026-08-27 — a special order's lines stop being
-   rolled up). *Probe, don't read this line.* The one that matters is the key's
+   **069 IS APPLIED** (Mark, 2026-08-27 — a special order's lines stop being
+   rolled up), and it was VINDICATED on his own data within the hour: he
+   scheduled two real orders, and **#9886 is two rows differing only by their
+   note — 18 "Vanilla glaze with gold dust sprinkles" and 18 "Maple glaze with
+   gold dust sprinkles", same item, same cut, same size.** Under the roll-up
+   that was one line of 36 Custom Mini and the kitchen made whichever it
+   guessed. *Probe, don't read this line.* The one that matters is the key's
    shape, because everything else here follows from it:
    `select indexname, indexdef from pg_indexes where tablename =
    'production_schedule_items' and indexname like '%line%'` — expect ONE row,

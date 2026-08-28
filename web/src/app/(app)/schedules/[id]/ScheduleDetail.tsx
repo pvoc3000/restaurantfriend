@@ -8,7 +8,8 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
-import { packetDate } from "@/lib/productionSchedule";
+import { packetDate, plansInForce } from "@/lib/productionSchedule";
+import { meansNoAllergy } from "@/lib/specialOrders";
 import { ScheduleLines, type ScheduleLineRow } from "@/components/production/ScheduleLines";
 import { ScheduleActions } from "@/components/production/ScheduleActions";
 import { AddScheduleItems, type AddableItem } from "@/components/production/AddScheduleItems";
@@ -93,6 +94,7 @@ export async function ScheduleDetail({
     { data: lineRows, error: lineErr },
     { data: members },
     { data: catalog },
+    { data: planRows },
   ] = await Promise.all([
       // THE VIEW, not the table. `sold` is defined once, in SQL
       // (v_production_schedule_lines), so there is no TypeScript twin to drift
@@ -115,6 +117,12 @@ export async function ScheduleDetail({
         .select("id, name, item_type, subtype, finish, size, tally_box_size, tray_capacity")
         .eq("is_active", true)
         .order("name"),
+      // So a plan schedule can NAME its plan rather than saying "the plans
+      // active that day" and leaving you to work out which (Mark, 2026-08-27,
+      // asking for the same thing on the list's From column).
+      supabase
+        .from("production_plans")
+        .select("id, title, location_id, kitchen_location_id, is_active, starts_on, ends_on"),
     ]);
 
   // NOT folded into the page's own error, and not swallowed either. An empty
@@ -187,6 +195,32 @@ export async function ScheduleDetail({
       tray_capacity: Number(i.tray_capacity ?? 24),
     }));
 
+  // Derived, not snapshotted: nothing records which plans fed a generation, so
+  // this is "which were in force for this shop, kitchen and day" — the claim
+  // this sentence has always made, now with the names in it. See
+  // `scheduleSourceLabel` for what that costs.
+  const sourcePlans =
+    (schedule.source ?? "plan") === "plan"
+      ? plansInForce(
+          {
+            source: "plan",
+            title: null,
+            schedule_date: schedule.schedule_date as string,
+            location_id: schedule.location_id as string,
+            kitchen_location_id: schedule.kitchen_location_id as string,
+          },
+          (planRows ?? []).map((pl) => ({
+            id: pl.id as string,
+            title: (pl.title ?? "") as string,
+            location_id: pl.location_id as string,
+            kitchen_location_id: (pl.kitchen_location_id ?? null) as string | null,
+            is_active: Boolean(pl.is_active),
+            starts_on: pl.starts_on as string,
+            ends_on: (pl.ends_on ?? null) as string | null,
+          }))
+        )
+      : [];
+
   const trail = parseTrail(rawParams, { href: "/schedules", label: "Schedules" });
   const generatedBy = schedule.generated_by
     ? nameByUser.get(schedule.generated_by as string) ?? null
@@ -200,14 +234,39 @@ export async function ScheduleDetail({
         trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
       />
 
-      <header className="space-y-3">
+      {/* COMMANDS LEVEL WITH THE TITLE (Mark, 2026-08-27), which is what every
+          other record screen does. They sat under the field grid, so on a long
+          night Print and Delete were a scroll away from the thing they act on.
+
+          `items-start` so the buttons line up with the TOP of the heading
+          rather than centring against a block whose height changes with the
+          source line and the special-order backlink; right-aligned beside the
+          title and left-aligned once they wrap under it, because right reads as
+          one cluster against the page margin and wrong indented under a
+          heading. */}
+      <header className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
+        <div className="min-w-0 space-y-3">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           {sellsCode} — {packetDate(schedule.schedule_date as string)}
         </h1>
         <p className="text-sm text-muted">
-          {schedule.source === "plan"
-            ? "From the plans active that day"
-            : schedule.title ?? (schedule.source === "special_order" ? "Special order" : "Entered by hand")}
+          {schedule.source === "plan" && sourcePlans.length > 0 ? (
+            <>
+              From{" "}
+              {sourcePlans.map((pl, i) => (
+                <span key={pl.id}>
+                  {i > 0 ? " + " : ""}
+                  <Link href={`/plans/${pl.id}`} className="text-ink underline hover:text-muted">
+                    {pl.title}
+                  </Link>
+                </span>
+              ))}
+            </>
+          ) : schedule.source === "plan" ? (
+            "From the plans active that day"
+          ) : (
+            schedule.title ?? (schedule.source === "special_order" ? "Special order" : "Entered by hand")
+          )}
           {" · "}made at <span className="font-medium text-ink">{kitchenCode}</span>
           {schedule.ignored_special_orders ? " · special orders ignored" : ""}
         </p>
@@ -226,13 +285,31 @@ export async function ScheduleDetail({
                 {sourceOrder.event_time ? ` at ${(sourceOrder.event_time as string).slice(0, 5)}` : ""}
               </span>
             ) : null}
-            {sourceOrder.allergen_info ? (
+            {/* ONLY WHEN IT SAYS SOMETHING. 53% of the real orders carrying an
+                allergen note say some spelling of "no", and a yellow mark
+                reading "none" is how the one reading "PEANUTS" stops being
+                read. `meansNoAllergy` fails safe — see it. */}
+            {meansNoAllergy(sourceOrder.allergen_info as string | null) ? null : (
               <span className="ml-2 bg-mark-fill px-1">
                 {sourceOrder.allergen_info as string}
               </span>
-            ) : null}
+            )}
           </p>
         ) : null}
+        </div>
+
+        <ScheduleActions
+          scheduleId={id}
+          scheduleDate={schedule.schedule_date as string}
+          locationId={schedule.location_id as string}
+          sellsCode={sellsCode}
+          kitchenCode={kitchenCode}
+          source={(schedule.source ?? "plan") as string}
+          hasActuals={rows.some((r) => r.made !== null || r.leftover !== null)}
+          lineCount={rows.length}
+          editable={editable}
+          print={<PrintPacket scheduleIds={[id]} stampable={countable} label="Print…" />}
+        />
       </header>
 
       <dl className="grid gap-x-10 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
@@ -303,19 +380,6 @@ export async function ScheduleDetail({
           ) : null}
         </div>
       )}
-
-      <ScheduleActions
-        scheduleId={id}
-        scheduleDate={schedule.schedule_date as string}
-        locationId={schedule.location_id as string}
-        sellsCode={sellsCode}
-        kitchenCode={kitchenCode}
-        source={(schedule.source ?? "plan") as string}
-        hasActuals={rows.some((r) => r.made !== null || r.leftover !== null)}
-        lineCount={rows.length}
-        editable={editable}
-        print={<PrintPacket scheduleIds={[id]} stampable={countable} label="Print…" />}
-      />
 
       <ScheduleLines
         rows={rows}

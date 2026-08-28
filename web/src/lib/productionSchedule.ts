@@ -464,3 +464,95 @@ export function packetDate(iso: string): string {
 export function totalDonuts(lines: ScheduleLine[]): number {
   return sum(lines);
 }
+
+/* ==========================================================================
+ * WHERE A SCHEDULE CAME FROM
+ * ========================================================================== */
+
+/** Just enough of a plan to say whether it was in force, and what it is called. */
+export type SchedulePlan = {
+  id: string;
+  title: string;
+  location_id: string;
+  kitchen_location_id: string | null;
+  is_active: boolean;
+  starts_on: string;
+  ends_on: string | null;
+};
+
+/** Just enough of a schedule to match plans against. */
+export type ScheduleOrigin = {
+  source: string;
+  title: string | null;
+  schedule_date: string;
+  location_id: string;
+  kitchen_location_id: string;
+};
+
+/**
+ * The plans in force for a schedule's shop, kitchen and day.
+ *
+ * Mirrors `production_day`'s own `planned` CTE — active, this SELLING location,
+ * and the date inside `[starts_on, ends_on]` — plus the kitchen, because a shop
+ * running two plans into two kitchens produces two schedules and each is fed by
+ * one of them. 039 leaves a plan's kitchen nullable and decision 9 reads that as
+ * the selling shop, so the fallback is applied here too.
+ *
+ * Dates compare as STRINGS, never through `new Date`, which is UTC midnight and
+ * moves a plan's first day for everyone west of Greenwich (`lib/productionPlans`
+ * documents the same trap).
+ */
+export function plansInForce<T extends SchedulePlan>(
+  schedule: ScheduleOrigin,
+  plans: readonly T[]
+): T[] {
+  return plans.filter(
+    (p) =>
+      p.is_active &&
+      p.location_id === schedule.location_id &&
+      (p.kitchen_location_id ?? p.location_id) === schedule.kitchen_location_id &&
+      p.starts_on <= schedule.schedule_date &&
+      (p.ends_on === null || p.ends_on >= schedule.schedule_date)
+  );
+}
+
+/**
+ * What the From column says: where this day came from.
+ *
+ * ONE function, called by the column that renders it AND by the search that has
+ * to find it — a second copy of these cases is a second thing to keep in step,
+ * and the one that would fall behind is the invisible one.
+ *
+ * A plan schedule NAMES ITS PLAN (Mark, 2026-08-27). "Plan" was true of every
+ * such row and so distinguished none of them, where "SUMMER 2026 (DF01)" is the
+ * thing you would actually go and look at.
+ *
+ * IT IS DERIVED, NOT SNAPSHOTTED, and that is worth knowing: nothing records
+ * which plans fed a generation, so this answers "which plans are in force for
+ * that shop and day" — which is exactly the claim the record screen already
+ * makes in words ("From the plans active that day"). The cost is that
+ * activating or retiring a plan changes what an OLD schedule says it came from.
+ * Snapshotting `plan_ids` at generation is the fix if that ever bites, and it
+ * is a migration.
+ *
+ * Several plans can be in force at once — decision 9 makes a shop's menu their
+ * union and their pars SUM — so the label has to hold more than one. Measured
+ * 2026-08-27: all 17 real plan schedules resolve to exactly one.
+ */
+export function scheduleSourceLabel(
+  schedule: ScheduleOrigin,
+  plans: readonly SchedulePlan[] = []
+): string {
+  if (schedule.source === "special_order") return schedule.title ?? "Special order";
+  if (schedule.source !== "plan") return schedule.title ?? "By hand";
+
+  const inForce = plansInForce(schedule, plans);
+  if (inForce.length === 0) return "Plan";
+  if (inForce.length === 1) return inForce[0].title;
+  // Two names is a readable column; five is a paragraph in a 130px cell, so
+  // past a pair it counts the rest. The full list rides in the row's `title`
+  // attribute at the call site.
+  return inForce.length === 2
+    ? `${inForce[0].title} + ${inForce[1].title}`
+    : `${inForce[0].title} + ${inForce.length - 1} more`;
+}

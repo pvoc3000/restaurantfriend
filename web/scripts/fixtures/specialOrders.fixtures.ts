@@ -13,15 +13,19 @@
 //   · `isSettled` written as `=== 0` leaves every overpaid order in the unpaid
 //     queue forever.
 
-import { test, eq, ok, no } from "./harness";
+import { eq, no, ok, test } from "./harness";
 import {
+  DEFAULT_ATTENTION,
+  DEFAULT_RUSH_TERMS,
+  STAGES,
   addDays,
   businessDaysUntil,
   customerLabel,
-  isoWeekday,
   isProductionLine,
   isSettled,
+  isoWeekday,
   lineTotal,
+  meansNoAllergy,
   money,
   needsAttention,
   orderTotals,
@@ -30,12 +34,9 @@ import {
   standingMaterializationDates,
   suggestedRushFee,
   suggestedTodo,
-  unschedulableLines,
-  DEFAULT_ATTENTION,
-  DEFAULT_RUSH_TERMS,
-  STAGES,
   type AttentionOrder,
   type MoneyOrder,
+  unschedulableLines,
 } from "../../src/lib/specialOrders";
 
 /* -------------------------------------------------------------------------- */
@@ -627,4 +628,38 @@ test("customerLabel puts the company first and keeps the person", () => {
   eq(customerLabel({ first_name: "Alexandra", last_name: "David", company: null }), "Alexandra David");
   eq(customerLabel({ first_name: null, last_name: null, company: "Yeastie Boys" }), "Yeastie Boys");
   eq(customerLabel(null), "—");
+});
+
+/* ==========================================================================
+ * meansNoAllergy — the chip that must not cry wolf
+ * ========================================================================== */
+
+test("meansNoAllergy: the six spellings that cover 446 of 835 real orders", () => {
+  for (const v of ["no", "none", "n/a", "na", "nope", "no allergies"]) {
+    ok(meansNoAllergy(v), v);
+  }
+  eq(meansNoAllergy("  NONE. "), true, "cased, spaced and punctuated");
+  eq(meansNoAllergy(null), true, "null");
+  eq(meansNoAllergy("   "), true, "blank");
+});
+
+test("meansNoAllergy: a real allergy is NEVER suppressed", () => {
+  for (const v of ["nuts", "dairy", "peanuts", "egg", "tree nuts", "nut allergy", "vegan"]) {
+    no(meansNoAllergy(v), v);
+  }
+});
+
+test("meansNoAllergy: 'no nuts' is an ALLERGY, not a no", () => {
+  // The whole reason this is a whole-string match against a closed list rather
+  // than a substring test. Getting this backwards sends somebody to hospital.
+  no(meansNoAllergy("no nuts"), "no nuts");
+  no(meansNoAllergy("none except dairy"), "none except dairy");
+  no(meansNoAllergy("no gluten please"), "no gluten please");
+});
+
+test("meansNoAllergy: anything unrecognised is SHOWN", () => {
+  // Fails safe: a new way of writing nothing costs one redundant chip, a new
+  // way of writing an allergy costs a great deal more.
+  no(meansNoAllergy("¯\\_(ツ)_/¯"), "unknown");
+  no(meansNoAllergy("ask the customer"), "unknown phrase");
 });

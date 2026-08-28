@@ -213,7 +213,11 @@ export function ScheduleActions({
   }
 
   return (
-    <div className="space-y-3">
+    /* Sized to its buttons and right-aligned, because since 2026-08-27 this
+       sits in the record's identity row rather than across the page. The
+       messages below take the cluster's full width and read left, since a
+       right-aligned sentence is hard work. */
+    <div className="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
       <div className="flex flex-wrap items-center gap-3">
         {print}
         {editable ? (
@@ -235,7 +239,11 @@ export function ScheduleActions({
               type="button"
               onClick={remove}
               disabled={busy !== null}
-              className={`${DANGER_BUTTON_CLASS} ml-auto`}
+              // `ml-auto` was pushing Delete to the far side of a full-width
+              // row. In a content-sized cluster there is no slack to push into,
+              // so it would only ever have been a no-op — and it is a lie about
+              // the arrangement.
+              className={DANGER_BUTTON_CLASS}
             >
               {busy === "delete" ? "Deleting…" : "Delete"}
             </button>
@@ -245,9 +253,13 @@ export function ScheduleActions({
 
       {/* A recost walks the whole graph and can take a few seconds on a big
           night. A band, not a dialog — the table behind it stays readable. */}
-      {busy === "recost" ? <ProgressBand label="Costing tonight's items…" /> : null}
-      {error ? <p className="text-sm text-accent">{error}</p> : null}
-      {done ? <p className="text-sm text-muted">{done}</p> : null}
+      {busy === "recost" ? (
+        <div className="w-full">
+          <ProgressBand label="Costing tonight's items…" />
+        </div>
+      ) : null}
+      {error ? <p className="w-full max-w-md text-left text-sm text-accent">{error}</p> : null}
+      {done ? <p className="w-full max-w-md text-left text-sm text-muted">{done}</p> : null}
     </div>
   );
 }

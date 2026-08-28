@@ -3,6 +3,7 @@ import { getAppSession } from "@/lib/session";
 import { canWriteCatalog, canEnterCounts } from "@/lib/roles";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SchedulesList, type ScheduleRow } from "@/components/production/SchedulesList";
+import type { SchedulePlan } from "@/lib/productionSchedule";
 import { GenerateSchedules } from "@/components/production/GenerateSchedules";
 
 /**
@@ -35,7 +36,8 @@ export default async function SchedulesPage() {
   const from = addDays(today, -28);
   const to = addDays(today, 28);
 
-  const [{ data: schedules, error }, { data: lines, error: lineErr }] = await Promise.all([
+  const [{ data: schedules, error }, { data: lines, error: lineErr }, { data: planRows }] =
+    await Promise.all([
     supabase
       .from("production_schedules")
       // One string literal, never a concatenation: Supabase types the result
@@ -52,6 +54,14 @@ export default async function SchedulesPage() {
       .from("production_schedule_items")
       .select("schedule_id, par, made, leftover")
       .limit(20000),
+    // The From column names a plan schedule's PLAN. A whole-table read of a
+    // handful of rows, and it has to be every plan rather than the active ones:
+    // `plansInForce` decides that itself, and a schedule at a shop whose plan
+    // has since been retired should still fail to match rather than silently
+    // matching a different one.
+    supabase
+      .from("production_plans")
+      .select("id, title, location_id, kitchen_location_id, is_active, starts_on, ends_on"),
   ]);
 
   if (error) {
@@ -81,6 +91,16 @@ export default async function SchedulesPage() {
   // since closed should still say which shop (design rule 3).
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
 
+  const plans: SchedulePlan[] = (planRows ?? []).map((p) => ({
+    id: p.id as string,
+    title: (p.title ?? "") as string,
+    location_id: p.location_id as string,
+    kitchen_location_id: (p.kitchen_location_id ?? null) as string | null,
+    is_active: Boolean(p.is_active),
+    starts_on: p.starts_on as string,
+    ends_on: (p.ends_on ?? null) as string | null,
+  }));
+
   const rows: ScheduleRow[] = (schedules ?? []).map((s) => {
     const stat = stats.get(s.id as string) ?? { lines: 0, par: 0, counted: 0 };
     return {
@@ -90,6 +110,10 @@ export default async function SchedulesPage() {
       kitchenCode: codeById.get(s.kitchen_location_id as string) ?? "—",
       source: (s.source ?? "plan") as string,
       title: (s.title ?? null) as string | null,
+      // Kept on the row because `scheduleSourceLabel` matches on them, and the
+      // list already holds the codes for display.
+      location_id: s.location_id as string,
+      kitchen_location_id: s.kitchen_location_id as string,
       generatedAt: (s.generated_at ?? null) as string | null,
       printedAt: (s.printed_at ?? null) as string | null,
       regenerations: (s.regeneration_count ?? 0) as number,
@@ -133,7 +157,7 @@ export default async function SchedulesPage() {
           are picked up whenever generation runs.
         </p>
       ) : (
-        <SchedulesList rows={rows} stampable={countable} today={today} />
+        <SchedulesList rows={rows} plans={plans} stampable={countable} today={today} />
       )}
     </div>
   );

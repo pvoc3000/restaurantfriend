@@ -8,7 +8,12 @@ import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { usePublishRecordSet } from "@/lib/recordSet";
-import { packetDate } from "@/lib/productionSchedule";
+import {
+  packetDate,
+  plansInForce,
+  scheduleSourceLabel,
+  type SchedulePlan,
+} from "@/lib/productionSchedule";
 import { PrintPacket } from "@/components/production/PrintPacket";
 
 export type ScheduleRow = {
@@ -18,6 +23,8 @@ export type ScheduleRow = {
   kitchenCode: string;
   source: string;
   title: string | null;
+  location_id: string;
+  kitchen_location_id: string;
   generatedAt: string | null;
   printedAt: string | null;
   regenerations: number;
@@ -29,17 +36,6 @@ export type ScheduleRow = {
 
 type Tier = "upcoming" | "today" | "unprinted" | "all";
 
-/**
- * What the From column says: where this day came from. One function, called by
- * the column that renders it AND by the search that has to find it — a second
- * copy of these three cases is a second thing to keep in step, and the one that
- * would fall behind is the invisible one.
- */
-function sourceLabel(r: ScheduleRow): string {
-  if (r.source === "plan") return "Plan";
-  if (r.source === "special_order") return r.title ?? "Special order";
-  return r.title ?? "By hand";
-}
 type Grouping = "date" | "kitchen" | "sells" | "none";
 
 const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: ScheduleRow) => string> = {
@@ -77,10 +73,13 @@ const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: ScheduleRow) => string> =
  */
 export function SchedulesList({
   rows,
+  plans,
   stampable,
   today,
 }: {
   rows: ScheduleRow[];
+  /** Every plan, active or not — `plansInForce` decides which are in force. */
+  plans: SchedulePlan[];
   /** Supervisor and up — the only thing this list writes is the print stamp. */
   stampable: boolean;
   today: string;
@@ -121,7 +120,7 @@ export function SchedulesList({
         // The From column's own words, through the same function it renders
         // with — so "by hand" finds the ones made by hand. Calling the helper
         // rather than repeating its three cases is what stops the two drifting.
-        sourceLabel(r),
+        scheduleSourceLabel(r, plans),
         r.title ?? "",
         r.note ?? "",
       ]
@@ -129,7 +128,7 @@ export function SchedulesList({
         .toLowerCase()
         .includes(q);
     });
-  }, [rows, tier, term, today]);
+  }, [rows, plans, tier, term, today]);
 
   const visible = useMemo(() => {
     const value = (r: ScheduleRow): string | number => {
@@ -212,7 +211,7 @@ export function SchedulesList({
     {
       key: "date",
       label: "Date",
-      width: 170,
+      width: 140,
       pinned: true,
       sortValue: (r) => r.schedule_date,
       render: (r) => (
@@ -245,10 +244,26 @@ export function SchedulesList({
     {
       key: "source",
       label: "From",
-      width: 110,
-      sortValue: (r) => r.source,
+      width: 210,
+      // Sorted by the LABEL, not by `source`: the column shows plan names now,
+      // so sorting by the raw value would group every plan schedule together
+      // under an order the reader cannot see.
+      sortValue: (r) => scheduleSourceLabel(r, plans),
       hideWhenCompact: true,
-      render: (r) => <span className="text-muted">{sourceLabel(r)}</span>,
+      render: (r) => {
+        // The `title` carries the full list where the label had to summarise —
+        // a hover is no use on an iPad, but this is the overflow of a rare
+        // multi-plan day rather than something you need in order to work.
+        const named = r.source === "plan" ? plansInForce(r, plans) : [];
+        return (
+          <span
+            className="text-muted"
+            title={named.length > 2 ? named.map((p) => p.title).join(" + ") : undefined}
+          >
+            {scheduleSourceLabel(r, plans)}
+          </span>
+        );
+      },
     },
     {
       key: "lines",
