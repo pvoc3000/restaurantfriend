@@ -542,11 +542,28 @@ export function OrderLines({
                 {/* LINE 2 — the taxonomy, running under Item AND Note.
                     `colSpan={2}` is the whole feature: five pickers in a 300px
                     Item cell wrapped after three, where across both columns
-                    they run straight. `pt-0 pb-2` against line 1's `pb-1` puts
-                    8px between the two rows of boxes. */}
+                    they run straight.
+
+                    THE GAP TO LINE 1 IS MOSTLY NOT PADDING, which is why
+                    halving it (Mark, 2026-08-28) is a negative margin rather
+                    than a smaller `pb`. Measured: the name box ends 12px above
+                    the pickers, of which only 4 is line 1's `pb-1` — the other
+                    8 is SLACK. Every cell in line 1 is stretched to the tallest
+                    one, and that is the ⋯ menu: a 36px `RowMenu` in a `py-2`
+                    cell needs 52px where the name cell needs 44, so the name
+                    box sits 8px clear of its own cell's floor with `align-top`
+                    holding it at the ceiling.
+                    Trimming the padding alone could not reach half — with the
+                    row pinned at 48px by the qty and price cells, the gap has a
+                    floor of 8px however little `pb` line 1 keeps. So line 2's
+                    content is pulled up through the slack instead: 12px → 6px,
+                    exactly half, with nothing on line 1 moving and no row
+                    getting denser. The 6px that remains is real clearance —
+                    the pickers cannot touch the name box. */}
                 <tr>
                   {canWrite ? <td className="px-0 pb-2 pt-0" /> : null}
                   <td className="px-3 pb-2 pt-0" colSpan={2}>
+                   <div className="-mt-1.5">
                     {/* The taxonomy under the customized name — what the
                         kitchen document prints beneath it, and the only way to
                         tell four "Angry Samoa" lines apart. Editable in place
@@ -583,6 +600,7 @@ export function OrderLines({
                         On the menu
                       </Link>
                     )}
+                   </div>
                   </td>
                   <td className="px-3 pb-2 pt-0" colSpan={tailSpan} />
                 </tr>
