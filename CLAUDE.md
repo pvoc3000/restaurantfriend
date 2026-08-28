@@ -3863,6 +3863,22 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    rendered through the real dialog against the LIVE database gives the same 12
    lines and 118 to make, and the commit refuses legibly ("migration 068 has not
    been applied") while writing nothing.
+   **"IGNORE SPECIAL ORDERS" IS INERT, AND MARK KNOWS — LEAVE IT** (asked and
+   answered 2026-08-27: "what does it do?" → nothing, → "leave it alone for
+   now"). Traced end to end: `p_ignore_special_orders` is WRITTEN to
+   `production_schedules.ignored_special_orders` and **read by nothing** — not
+   by the generator's own body, and in `web/src` only by the record's sentence
+   " · special orders ignored". It is 040 decision 12's leftover, from when
+   generation was expected to fold special orders into the plan schedule;
+   decision 9 went the other way (a special order becomes its OWN schedule), so
+   there was never anything for it to ignore and it was never wired.
+   **Do not "fix" it and do not delete it.** The one place the two sources now
+   meet is the PACKET — decision 11's pull-in — so if it is ever given a
+   meaning, that is the meaning: tick it and the night's packet does not pull in
+   that kitchen's special orders. Everything needed is already there (the column
+   is per schedule, the record already says it), and it is `companionScheduleIds`
+   reading one flag, with no migration. Offered and declined for now.
+
    **THE GENERATE RECEIPT'S "DONE" WAS A NO-OP** (Mark, 2026-08-27), and the
    cause is worth knowing because it can only ever happen this way round: it was
    a `<Link href="/schedules">` in a dialog that ONLY EVER RENDERS ON
