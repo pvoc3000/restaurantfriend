@@ -58,3 +58,29 @@ export const BOXED_FIELD_BORDER = "border border-hairline hover:border-ink";
 
 /** A boxed MULTILINE field grows instead, from a paragraph's worth of floor. */
 export const BOXED_FIELD_TALL = "min-h-16 w-full";
+
+/**
+ * WHAT AN EMPTY FIELD USED TO SAY, and no longer needs to (Mark, 2026-08-28:
+ * "with the boxes, there's no longer a need for the em dashes in other empty
+ * fields… we can tell it's empty now").
+ *
+ * The em dash was never decoration: an underlined cell with nothing in it is a
+ * few pixels of dotted rule, which is neither legible as a field nor a target
+ * you can hit, so something had to stand in the gap. A box does that job
+ * properly — it has an outline and 32px of height whether or not it holds
+ * anything — and the dash left over reads as a VALUE, which on a field that is
+ * genuinely empty is the same lie the time examples told.
+ *
+ * SUPPRESSED, NOT FORBIDDEN, and the difference matters: only a placeholder
+ * that IS this dash goes. A caller passing real text still shows it — `TakenBy`
+ * puts FileMaker's own name there on the 7,944 migrated orders that have no
+ * employee link, and blanking that would delete the only record of who took
+ * the order rather than tidying a hint.
+ */
+export const EMPTY_FIELD_DASH = "—";
+
+/** What a boxed field should show when it holds nothing: the caller's
+ *  placeholder, unless that placeholder is the dash a box makes redundant. */
+export function fieldPlaceholder(placeholder: string, boxed: boolean): string {
+  return boxed && placeholder === EMPTY_FIELD_DASH ? "" : placeholder;
+}

@@ -85,7 +85,7 @@ export function OrderDelivery({
             <div className="grid gap-x-12 gap-y-4 sm:grid-cols-2">
               <Row label="Company">
                 <Cell id={id} canWrite={canWrite} column="delivery_company" value={row.delivery_company as string | null}
-                      label="Delivery company" placeholder="DeliverLA" />
+                      label="Delivery company" />
               </Row>
               <Row label="Their phone">
                 <Cell id={id} canWrite={canWrite} column="delivery_company_phone" value={row.delivery_company_phone as string | null}

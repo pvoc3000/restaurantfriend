@@ -63,7 +63,15 @@ export function OrderInfoLayout({
       // `min-w-0` on BOTH tracks and NOT behind a breakpoint — a flex item's
       // min-width defaults to min-content, so a long customer name or a wide
       // table would push the whole PAGE sideways rather than shrink.
-      className="flex min-h-0 flex-col gap-10 xl:flex-row xl:gap-10"
+      // MORE AIR BETWEEN THE TWO COLUMNS THAN WITHIN ONE (Mark, 2026-08-28).
+      // Both gaps were 40px, so the space between Details and Customer — two
+      // different subjects — read the same as the space between Details and
+      // the block beneath it. Boxing the fields made that worse rather than
+      // revealing it: a column of outlined boxes has a hard right edge where
+      // ragged text had none, so the two columns now meet as two walls 40px
+      // apart. 64px across, 40px down; the gap you cross to change subject is
+      // wider than the one you cross to read on.
+      className="flex min-h-0 flex-col gap-10 xl:flex-row xl:gap-16"
     >
       <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-10">
         <div className="shrink-0">{topLeft}</div>
@@ -120,7 +128,7 @@ export function OrderSplitLayout({
   useExactViewportHeight(frame, wide, 420);
 
   return (
-    <div ref={frame} className="flex min-h-0 flex-col gap-10 xl:flex-row xl:gap-10">
+    <div ref={frame} className="flex min-h-0 flex-col gap-10 xl:flex-row xl:gap-16">
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <GrowingPane>{left}</GrowingPane>
       </div>

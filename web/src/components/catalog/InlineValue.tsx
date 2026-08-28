@@ -10,6 +10,7 @@ import {
   BOXED_FIELD,
   BOXED_FIELD_BORDER,
   BOXED_FIELD_TALL,
+  fieldPlaceholder,
 } from "@/components/ui/fieldMetrics";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { useCalcField } from "@/components/ui/CalcPad";
@@ -781,7 +782,12 @@ export function InlineValue({
           that still jumped, from 4px to a full line, the moment you did.
           Invisible either way, so nothing looks different at rest. */}
       {shown === null || shown === ""
-        ? placeholder === "" ? "\u00A0" : placeholder
+        ? // A box says "empty" by itself, so the dash comes off — see
+          // `fieldPlaceholder`. The non-breaking space stays: it is what gives
+          // the button a line box, and without it an empty cell is 4px tall.
+          fieldPlaceholder(placeholder, boxed) === ""
+          ? "\u00A0"
+          : fieldPlaceholder(placeholder, boxed)
         : format
           ? format(shown)
           : String(shown)}

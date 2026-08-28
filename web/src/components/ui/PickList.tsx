@@ -1,7 +1,11 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { BOXED_FIELD, BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
+import {
+  BOXED_FIELD,
+  BOXED_FIELD_BORDER,
+  fieldPlaceholder,
+} from "@/components/ui/fieldMetrics";
 import { createPortal } from "react-dom";
 import { confirmDialog } from "@/lib/confirm";
 import { createClient } from "@/lib/supabase/client";
@@ -337,7 +341,9 @@ export function PickList({
   }
 
   const current = options.find((o) => o.value === value);
-  const shownLabel = current?.label ?? (value || placeholder);
+  // Boxed, an empty pick shows NOTHING — the box and its caret already say
+  // both that it is a field and that it is unset. See `fieldPlaceholder`.
+  const shownLabel = current?.label ?? (value || fieldPlaceholder(placeholder, boxed));
   // Faint means "nothing chosen". An option that legitimately IS the empty
   // string — a filter's "All categories" — is a real choice with a real label,
   // so it reads at full strength; only a value with no option behind it fades.
