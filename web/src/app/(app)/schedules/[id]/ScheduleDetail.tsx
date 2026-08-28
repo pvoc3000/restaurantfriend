@@ -309,6 +309,15 @@ export async function ScheduleDetail({
           lineCount={rows.length}
           editable={editable}
           print={<PrintPacket scheduleIds={[id]} stampable={countable} label="Print…" />}
+          add={
+            editable ? (
+              <AddScheduleItems
+                scheduleId={id}
+                orgId={session.membership.org_id}
+                items={addable}
+              />
+            ) : null
+          }
         />
       </header>
 
@@ -381,20 +390,7 @@ export async function ScheduleDetail({
         </div>
       )}
 
-      <ScheduleLines
-        rows={rows}
-        editable={editable}
-        countable={countable}
-        add={
-          editable ? (
-            <AddScheduleItems
-              scheduleId={id}
-              orgId={session.membership.org_id}
-              items={addable}
-            />
-          ) : null
-        }
-      />
+      <ScheduleLines rows={rows} editable={editable} countable={countable} />
     </div>
   );
 }

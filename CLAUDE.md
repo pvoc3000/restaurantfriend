@@ -3891,7 +3891,20 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the reader cannot see. Date gave up 30px to pay for From's 210.
 
    **THE RECORD'S COMMANDS MOVED UP INTO THE IDENTITY BLOCK** (Mark,
-   2026-08-27, "like we do in the other detail views"). Print / Recost /
+   2026-08-27, "like we do in the other detail views"), **Add item… with them**
+   — so the row is Add item · Print · Recost · Regenerate · Delete, which reads
+   build → produce → maintain → destroy. Add LEADS because it is the only one
+   that changes what the kitchen MAKES; the rest act on the document as a whole.
+   It rides in ScheduleActions as an `add` SLOT, `print`'s own idiom, which
+   keeps the panel's query and state out of that component while letting the row
+   decide the order. The Items heading is now a heading and nothing else.
+   **That move exposed FOUR hand-typed near-copies of one button class** —
+   `ScheduleActions`' local `COMMAND`, `AddScheduleItems`, `PrintPacket` and
+   `ui/buttons`' own `BUTTON_CLASS` — which had already drifted (one had lost
+   its `disabled:` state). Harmless while they sat on different rows; they now
+   stand in ONE row where any drift is visible at a glance, so all three copies
+   read `${BUTTON_CLASS} shrink-0`. Measured after: all five buttons 36px tall,
+   1px border, 12px, 16px padding, tops on the same pixel as the h1. Print / Recost /
    Regenerate / Delete sat under the field grid, so on a long night they were a
    scroll away from the thing they act on. `items-start`, so they line up with
    the TOP of the title rather than centring against a block whose height

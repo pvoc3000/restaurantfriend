@@ -6,12 +6,16 @@ import { createClient } from "@/lib/supabase/client";
 import { loadProductionGraph, loadItemGraph } from "@/lib/productionQueries";
 import { itemCost } from "@/lib/productionCost";
 import { resolveItemPrice } from "@/lib/productionPrice";
-import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
-const COMMAND =
-  "inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+// THE SHARED CLASS, not a local copy. There were FOUR hand-typed near-copies of
+// this button in the module — here, `AddScheduleItems`, `PrintPacket` and the
+// original of this — and they had already drifted (one had lost its disabled
+// state). Harmless while they sat on different rows; since 2026-08-27 they all
+// stand in this one, where any drift is visible at a glance.
+const COMMAND = `${BUTTON_CLASS} shrink-0`;
 
 /**
  * The commands on one night: print, recost, regenerate, delete.
@@ -31,6 +35,7 @@ export function ScheduleActions({
   lineCount,
   editable,
   print,
+  add,
 }: {
   scheduleId: string;
   scheduleDate: string;
@@ -46,6 +51,12 @@ export function ScheduleActions({
   lineCount: number;
   editable: boolean;
   print: React.ReactNode;
+  /**
+   * `AddScheduleItems`, composed upstream — `print` is passed the same way, and
+   * for the same reason: the slot keeps the panel's own state and query out of
+   * this component while letting the ROW decide the order.
+   */
+  add?: React.ReactNode;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -219,6 +230,10 @@ export function ScheduleActions({
        right-aligned sentence is hard work. */
     <div className="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
       <div className="flex flex-wrap items-center gap-3">
+        {/* ADD LEADS, and the row then reads build - produce - maintain -
+            destroy. It is the only command here that changes what the kitchen
+            MAKES; everything after it acts on the document as a whole. */}
+        {add}
         {print}
         {editable ? (
           <>

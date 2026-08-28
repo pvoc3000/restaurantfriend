@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { openWindowNow, showBlob } from "@/lib/poProcessing";
 import { companionScheduleIds, fetchPacketData, stampPrinted } from "@/lib/productionPacket";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -147,7 +148,7 @@ export function PrintPacket({
         type="button"
         onClick={openDialog}
         disabled={scheduleIds.length === 0}
-        className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+        className={`${BUTTON_CLASS} shrink-0`}
       >
         {label}
       </button>

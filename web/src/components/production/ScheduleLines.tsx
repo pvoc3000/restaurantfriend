@@ -111,14 +111,12 @@ export function ScheduleLines({
   rows,
   editable,
   countable,
-  add,
 }: {
   rows: ScheduleLineRow[];
   /** Purchaser+ — the par, the note, adding and striking lines. */
   editable: boolean;
   /** Supervisor and up — the two counting cells, and only those. */
   countable: boolean;
-  add: React.ReactNode;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -375,10 +373,9 @@ export function ScheduleLines({
 
   return (
     <section className="space-y-3">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <SectionHeading count={rows.length}>Items</SectionHeading>
-        {add}
-      </div>
+      {/* Add item… moved up to the record's command row (Mark, 2026-08-27), so
+          this is a heading and nothing else. */}
+      <SectionHeading count={rows.length}>Items</SectionHeading>
 
       {error ? <p className="text-sm text-accent">{error}</p> : null}
 
