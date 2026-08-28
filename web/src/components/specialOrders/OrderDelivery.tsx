@@ -70,12 +70,12 @@ export function OrderDelivery({
                     back as `10:00:00`. Same reason as the record's event time. */}
                 <TimeCell id={id} canWrite={canWrite} column="delivery_window_start"
                           value={row.delivery_window_start as string | null}
-                          label="Delivery window start" placeholder="10:00 AM" />
+                          label="Delivery window start" />
               </Row>
               <Row label="Window closes">
                 <TimeCell id={id} canWrite={canWrite} column="delivery_window_end"
                           value={row.delivery_window_end as string | null}
-                          label="Delivery window end" placeholder="11:00 AM" />
+                          label="Delivery window end" />
               </Row>
             </div>
           </section>

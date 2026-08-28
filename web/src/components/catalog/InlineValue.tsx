@@ -6,6 +6,11 @@ import { createClient } from "@/lib/supabase/client";
 import { evaluateNumeric, looksLikeExpression } from "@/lib/calc";
 import { DateField } from "@/components/ui/DateField";
 import { TimeField } from "@/components/ui/TimeField";
+import {
+  BOXED_FIELD,
+  BOXED_FIELD_BORDER,
+  BOXED_FIELD_TALL,
+} from "@/components/ui/fieldMetrics";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { useCalcField } from "@/components/ui/CalcPad";
 
@@ -141,7 +146,7 @@ const INLINE_REST_LOOK =
  * The underline comes OFF when this goes on: a box and a dotted rule are two
  * cues for one fact, and the second one just looks like an artefact.
  */
-const INLINE_REST_BOXED = "border border-hairline hover:border-ink";
+const INLINE_REST_BOXED = BOXED_FIELD_BORDER;
 
 /**
  * `min-h` is half the point FOR A NOTE, and only for a note.
@@ -153,12 +158,23 @@ const INLINE_REST_BOXED = "border border-hairline hover:border-ink";
  * would be absurd on a one-line date. A boxed MULTILINE field still gets both,
  * so the Notes tab is unchanged.
  */
-const INLINE_REST_TALL = "min-h-16";
+const INLINE_REST_TALL = BOXED_FIELD_TALL;
 
-/** The resting dress: a box or the dotted underline, plus a note's height. */
-function restLook(boxed: boolean, multiline = false): string {
+/**
+ * The resting dress: a box or the dotted underline.
+ *
+ * A BOXED FIELD ALSO TAKES THE SHARED METRICS — one height, the width of its
+ * track — because the box is what makes a 1.5px difference read as a mistake.
+ * `flex items-center` is what centres a single line inside a height it no
+ * longer gets from its own content; `justify-*` carries the alignment that
+ * `text-right` used to, since a flex container ignores it.
+ */
+function restLook(boxed: boolean, multiline = false, align?: "left" | "right"): string {
   if (!boxed) return INLINE_REST_LOOK;
-  return multiline ? `${INLINE_REST_BOXED} ${INLINE_REST_TALL}` : INLINE_REST_BOXED;
+  if (multiline) return `${INLINE_REST_BOXED} ${INLINE_REST_TALL}`;
+  return `${INLINE_REST_BOXED} ${BOXED_FIELD} flex items-center ${
+    align === "right" ? "justify-end" : "justify-start"
+  }`;
 }
 
 /**
@@ -216,10 +232,11 @@ function Sizer({
   return (
     <span
       aria-hidden
-      className={`invisible block whitespace-pre ${INLINE_BOX} ${restLook(
-        boxed,
-        multiline
-      )} ${align === "right" ? "text-right tabular-nums" : "text-left"}`}
+      className={`invisible whitespace-pre ${INLINE_BOX} ${
+        boxed && !multiline ? "" : "block"
+      } ${restLook(boxed, multiline, align)} ${
+        align === "right" ? "text-right tabular-nums" : "text-left"
+      }`}
     >
       {/* A space, never "", or an empty cell collapses to no height at all. */}
       {text === "" ? " " : text}
@@ -592,7 +609,12 @@ export function InlineValue({
   // and there is no half-typed state to protect.
   if (kind === "time") {
     return (
-      <span className="inline-flex flex-col items-start">
+      // `inline-flex` is SHRINK-TO-FIT, so a boxed control's `w-full` resolves
+      // against its own content and the field comes out the width of the value
+      // rather than the width of the column. Measured: a boxed date sat at
+      // 144.5px in a row of 214.3px fields, which is the misalignment this was
+      // meant to end.
+      <span className={boxed ? "flex w-full flex-col" : "inline-flex flex-col items-start"}>
         <TimeField
           value={value === null ? null : String(value)}
           disabled={saving}
@@ -617,7 +639,7 @@ export function InlineValue({
 
   if (kind === "date") {
     return (
-      <span className="inline-flex flex-col items-start">
+      <span className={boxed ? "flex w-full flex-col" : "inline-flex flex-col items-start"}>
         <DateField
           value={value === null ? null : String(value)}
           disabled={saving}
@@ -746,7 +768,7 @@ export function InlineValue({
       title="Click to edit"
       aria-label={ariaLabel ?? column}
       // Dotted underline at rest — the quietest possible "this is editable".
-      className={`w-full ${INLINE_BOX} ${restLook(boxed, multiline)} hover:bg-neutral-100 ${
+      className={`w-full ${INLINE_BOX} ${restLook(boxed, multiline, align)} hover:bg-neutral-100 ${
         align === "right" ? "text-right tabular-nums" : "text-left"
       } ${multiline ? "whitespace-pre-wrap" : ""} ${
         shown === null || shown === "" ? emptyClassName : ""

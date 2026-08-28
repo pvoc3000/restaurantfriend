@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef } from "react";
+import { BOXED_FIELD, BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
 
 /**
  * The calendar affordance, drawn rather than borrowed: Safari renders no icon
@@ -154,9 +155,18 @@ export function DateField({
       className={
         field
           ? "flex h-12 w-full items-center gap-2 border border-ink px-3 focus-within:border-2"
-          : `inline-flex items-center px-1 py-0.5 hover:bg-neutral-100 ${
+          : `items-center px-1 py-0.5 hover:bg-neutral-100 ${
               title ? "gap-2" : "gap-1"
-            } ${boxed && !title ? "border border-hairline hover:border-ink" : ""}`
+            } ${
+              boxed && !title
+                ? // A BOX MEANS THE SHARED FIELD DRESS, not just a border: one
+                  // height and the width of its track, so a date lines up with
+                  // the text cell above it instead of sitting 72px short in a
+                  // box of its own size. `flex` rather than `inline-flex` is
+                  // what lets `w-full` mean the column.
+                  `flex ${BOXED_FIELD_BORDER} ${BOXED_FIELD}`
+                : "inline-flex"
+            }`
       }
     >
       {/* One fixed width in both states, so the glyph doesn't move when a date
@@ -167,9 +177,17 @@ export function DateField({
         className={
           field
             ? "relative flex h-full flex-1 items-center"
-            : `relative inline-flex items-center ${title ? "h-9" : "h-6"} ${
-                empty && collapseWhenEmpty ? "w-4" : title ? "w-[9.5rem]" : "w-28"
-              }`
+            : boxed && !title
+              ? // FILLS THE BOX, and `min-w-0` is what lets it SHRINK: the old
+                // fixed 112px is why the Completion dates block has been
+                // overflowing its quadrant since long before any of this.
+                // `h-6`, not `h-full`: the box is a MINIMUM height now, so
+                // there is no definite height for a percentage to resolve
+                // against — the wrapper's `items-center` does the centring.
+                "relative flex h-6 min-w-0 flex-1 items-center"
+              : `relative inline-flex items-center ${title ? "h-9" : "h-6"} ${
+                  empty && collapseWhenEmpty ? "w-4" : title ? "w-[9.5rem]" : "w-28"
+                }`
         }
       >
         <input
@@ -197,7 +215,7 @@ export function DateField({
           } ${
             empty
               ? "absolute inset-0 cursor-pointer opacity-0"
-              : field
+              : field || (boxed && !title)
                 ? "w-full"
                 : title
                   ? "w-[9.5rem]"

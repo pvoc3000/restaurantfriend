@@ -414,10 +414,28 @@ export async function SpecialOrderDetail({
 
           {/* Decision 19's sentence, on the record as well as in the list.
               RED when a human flagged it, YELLOW when the app worked it out —
-              the same split the list's to-do column makes. */}
+              the same split the list's to-do column makes.
+
+              THE YELLOW IS A FILL, THE RED IS INK (Mark, 2026-08-28: "you have
+              yellow warning text in the identity area that should be converted
+              to a yellow box"), which is the app's standing rule rather than a
+              local choice: `text-mark` on white measures 1.43:1, so it is not
+              a legibility complaint but text you cannot read, where
+              `bg-mark-fill` puts ink on yellow-200 at 15.53:1. Red needs no
+              such help at 5.61:1 and stays a colour on the words.
+
+              `inline-block` so the fill is the length of the SENTENCE. Full
+              width it would be a banner across the record rather than a mark
+              on one fact. */}
           {attention ? (
-            <p className={`text-[13px] ${row.flag_reason ? "text-accent" : "text-mark"}`}>
-              {attention}
+            <p className="text-[13px]">
+              <span
+                className={
+                  row.flag_reason ? "text-accent" : "inline-block bg-mark-fill px-1"
+                }
+              >
+                {attention}
+              </span>
             </p>
           ) : null}
         </div>
@@ -574,7 +592,7 @@ export async function SpecialOrderDetail({
                     </Row>
                     <Row label="Ready by">
                       <TimeCell id={id} column="ready_by_time" value={row.ready_by_time as string | null}
-                                label="Ready by" canWrite={canWrite} placeholder="9:00 AM" />
+                                label="Ready by" canWrite={canWrite} />
                     </Row>
                     <Row label="Taken by">
                       {/* A LINK TO AN EMPLOYEE since migration 053, with
@@ -1106,7 +1124,10 @@ async function OtherOrdersThatDay({
                     names its own. Repeating "DF01" down a list already
                     headed "At DF01" would be noise. */}
                 {o.kitchen_location_id !== kitchenId || !kitchenId ? (
-                  <span className="ml-1.5 text-[12px] text-mark">
+                  // A CHIP, for the reason above — and this one is the case the
+                  // rule was written for: a shop code at 12px in `text-mark` is
+                  // 1.43:1, which is decoration that happens to have a shape.
+                  <span className="ml-1.5 bg-mark-fill px-1 text-[12px]">
                     {codeOf(o.kitchen_location_id) ?? "no kitchen"}
                   </span>
                 ) : null}

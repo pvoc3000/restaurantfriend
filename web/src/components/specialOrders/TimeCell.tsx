@@ -28,7 +28,23 @@ export function TimeCell({
   value,
   label,
   canWrite,
-  placeholder = "10:30 AM",
+  /**
+   * AN EMPTY TIME SHOWS NOTHING (Mark, 2026-08-28: "remove the example text in
+   * time fields when the field is blank — it makes it look filled when it's
+   * not").
+   *
+   * It used to default to "10:30 AM", and "9:00 AM" on Ready by. Muted grey in
+   * a bare cell reads as a hint; muted grey INSIDE A BOX reads as a value
+   * somebody typed and the app has greyed out — which on a pickup time is a
+   * claim about when the customer is coming. The box is what changed it, so
+   * the example goes.
+   *
+   * `""` and not undefined: `InlineValue` renders a non-breaking space for an
+   * empty placeholder, which keeps the line box — without it the button has no
+   * height to click, and here it would be an empty 32px box with nothing to
+   * aim at.
+   */
+  placeholder = "",
   boxed = BOXED_FIELDS,
 }: {
   id: string;

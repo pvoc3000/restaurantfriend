@@ -70,12 +70,24 @@ export function CompletionDates({
 
   return (
     <>
-      <div className="grid gap-x-10 gap-y-1.5 sm:grid-cols-2">
+      {/* STACKED, LIKE EVERY OTHER BLOCK ON THIS TAB (2026-08-28).
+          It was a fixed 128px label track with the value beside it, and boxing
+          the fields made that arrangement impossible rather than merely tight.
+          Measured: the longest label here wants 174px ("Production scheduled")
+          and a date needs ~96px, in a 205px column — so the label wrapped AND
+          the date was left 65px, which clipped it to "06/1".
+          Before the boxes the same block simply OVERFLOWED its quadrant by
+          75px instead, which is the same problem wearing a different failure.
+          Stacked, the field gets the whole column, the label may be as long as
+          it likes, and the block reads like Details directly above it. It costs
+          about 95px of height in a pane that scrolls, which is the cheaper half
+          of the trade. */}
+      <div className="grid gap-x-8 gap-y-3 sm:grid-cols-2">
         {rows.map((r) => {
           const value = (order[r.column] ?? null) as string | null;
           return (
-            <div key={r.column} className="flex items-baseline gap-3">
-              <dt className="w-32 shrink-0 text-right text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            <div key={r.column} className="min-w-0 space-y-1">
+              <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                 {r.label}
               </dt>
               <dd className="min-w-0">

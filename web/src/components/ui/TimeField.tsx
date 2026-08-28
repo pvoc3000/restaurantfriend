@@ -1,5 +1,7 @@
 "use client";
 
+import { BOXED_FIELD, BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
+
 /**
  * A time of day, entered with the browser's own control.
  *
@@ -62,8 +64,10 @@ export function TimeField({
       className={
         field
           ? "flex h-12 w-full items-center border border-ink px-3 focus-within:border-2"
-          : `inline-flex items-center px-1 py-0.5 hover:bg-neutral-100 ${
-              boxed ? "border border-hairline hover:border-ink" : ""
+          : `items-center px-1 py-0.5 hover:bg-neutral-100 ${
+              boxed
+                ? `flex ${BOXED_FIELD_BORDER} ${BOXED_FIELD}`
+                : "inline-flex"
             }`
       }
     >
@@ -79,7 +83,7 @@ export function TimeField({
         autoComplete="off"
         onChange={(e) => onChange(e.target.value || null)}
         className={`bg-transparent tabular-nums outline-none disabled:opacity-35 ${
-          field ? "h-full w-full text-[16px]" : "h-6"
+          field ? "h-full w-full text-[16px]" : boxed ? "h-6 w-full" : "h-6"
         } ${className}`}
       />
     </span>

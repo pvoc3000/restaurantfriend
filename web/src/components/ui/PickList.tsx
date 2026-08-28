@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
+import { BOXED_FIELD, BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
 import { createPortal } from "react-dom";
 import { confirmDialog } from "@/lib/confirm";
 import { createClient } from "@/lib/supabase/client";
@@ -435,20 +436,29 @@ export function PickList({
                 // two cues for one fact, and the second reads as an artefact.
                 `flex w-full items-center gap-1 px-1 py-0.5 text-left hover:bg-neutral-100 disabled:opacity-35 ${
                   boxed
-                    ? "border border-hairline hover:border-ink"
+                    ? `${BOXED_FIELD_BORDER} ${BOXED_FIELD}`
                     : "underline decoration-neutral-300 decoration-dotted underline-offset-4"
                 } ${empty ? "text-faint" : ""} ${className}`
         }
       >
-        {/* Inline: the caret sits WITH the value, not pushed to the far edge —
-            in a definition list the field is as wide as the column, and a
-            marker floating 400px from the word it belongs to reads as a
-            different control. As a FIELD it goes to the right edge, which is
-            where a box's own marker belongs and where a `<select>` put it. */}
-        <span className="truncate">{shownLabel}</span>
+        {/* WHERE THE CARET SITS IS DECIDED BY WHETHER THERE IS A BOX.
+            Underlined, it sits WITH the value: the field's extent is invisible,
+            so a marker floating 400px from the word it belongs to reads as a
+            different control altogether. Boxed — as a `field`, or `inline` with
+            `boxed` — it goes to the RIGHT EDGE (Mark, 2026-08-28: "align the
+            downward pointing triangle glyph in picklists to the right while
+            keeping the text aligned to the left"), which is where a box's own
+            marker belongs and where a `<select>` has always put it. The border
+            is what makes it legible: it says where the control ends, so the
+            caret is plainly this field's rather than the next one's.
+            The label keeps `truncate` and gains `min-w-0`, or a long option
+            would push the caret back out of the corner it was just put in. */}
+        <span className={`truncate ${boxed ? "min-w-0" : ""}`}>{shownLabel}</span>
         <span
           aria-hidden
-          className={`shrink-0 text-[9px] ${variant === "inline" ? "text-muted" : "ml-auto"} ${
+          className={`shrink-0 text-[9px] ${
+            variant === "inline" && !boxed ? "text-muted" : "ml-auto"
+          } ${boxed ? "text-muted" : ""} ${
             // On the masthead the caret inherits the trigger's white; `text-muted`
             // is a grey chosen against a white page and reads as a smudge on black.
             variant === "field" ? "text-muted" : ""
