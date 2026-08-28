@@ -751,7 +751,20 @@ export function PlanMatrix({
                     </td>
                   </tr>
                 ) : null}
-                <tr className="group/tray align-top">
+                {/* A RULE BETWEEN TRAYS (Mark, 2026-08-28). A tray row is
+                    tall — seven cells of stacked chips, and a busy day runs to
+                    four or five — so with nothing between them two trays' chips
+                    read as one column of chips. This is not `DataTable`'s
+                    no-rule rule being broken: that one is about 56px rows of
+                    single values, where the row IS the visual unit. Here the
+                    unit is a grid cell and the rule is what says where a tray
+                    ends.
+
+                    On the `<tr>`, which `border-collapse` honours — and where
+                    the head's own `border-b-2 border-ink` wins the collapse
+                    against the first row's hairline, so the table still opens
+                    on one heavy rule rather than two stacked. */}
+                <tr className="group/tray border-t border-hairline align-top">
                   <td className={`px-1 py-2 ${row.endsSubGroup ? "pb-6" : ""}`}>
                     <div className="min-w-0">
                       <span className="block truncate font-medium">{row.tray.tray_number}</span>

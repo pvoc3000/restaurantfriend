@@ -328,6 +328,37 @@ export const SALES_RANGE_LABEL: Record<SalesRangeKey, string> = {
   custom: "Custom",
 };
 
+/**
+ * WHAT THE PREVIOUS-PERIOD COMPARISON IS CALLED (Mark, 2026-08-28).
+ *
+ * "vs last period" is right for the pay-period views and says nothing for the
+ * three calendar ones — under Month to date it is the month before, under Last
+ * 30 days the thirty before that, under Year to date the year before. A label
+ * that is the same on every view distinguishes none of them.
+ *
+ * READ IT WITH THE DATE LINE UNDER THE GRID, which is not decoration here.
+ * These name the SHAPE of the comparison, while `previousRange` computes the
+ * window of the SAME LENGTH immediately before this one — so on 28 August the
+ * "last month" basis is 4–31 July rather than the whole of July, and the "last
+ * year to date" basis is 6 May – 31 December 2025 rather than January to August.
+ * The summary prints both bases in dates directly beneath, which is the
+ * standing rule: a comparison that will not say what it compared is worth
+ * nothing.
+ *
+ * Making those two labels literally true means changing the BASIS, not the
+ * word — and for Year to date that basis is the one "a year ago" already
+ * reports beside it, so the two comparisons would say the same thing twice.
+ * Worth a decision; it is not this one.
+ */
+export const SALES_PREVIOUS_LABEL: Record<SalesRangeKey, string> = {
+  period: "last period",
+  "last-period": "last period",
+  mtd: "last month",
+  "last-30": "last thirty days",
+  ytd: "last year to date",
+  custom: "last period",
+};
+
 export function parseSalesRange(raw: string | undefined | null): SalesRangeKey {
   // Anything unrecognised falls back to the default rather than erroring: a
   // stale bookmark should show you the screen, not a stack trace.

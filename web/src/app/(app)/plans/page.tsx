@@ -3,6 +3,7 @@ import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { PlansList, type PlanRow } from "@/components/production/PlansList";
+import { planKitchen } from "@/lib/productionPlans";
 import { NewPlan } from "@/components/production/NewPlan";
 import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
 
@@ -60,7 +61,29 @@ export default async function PlansPage({
   // "look up a code by id" half).
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
 
-  const rows: PlanRow[] = (plans ?? []).map((p) => ({
+  /* --------------------------------------------------------------------------
+   * SCOPED TO THE WORKING KITCHEN (Mark, 2026-08-28).
+   *
+   * A plan carries TWO shops and this list is filtered on the one that MAKES —
+   * `planKitchen`, so a plan with no kitchen set falls back to its selling shop
+   * rather than belonging to nobody and disappearing from every list.
+   *
+   * The rows themselves are untouched: both columns stay, so a plan DF01 bakes
+   * for DF02 still says so. What changes is which plans are yours to read.
+   * ------------------------------------------------------------------------ */
+  const workingId = session.activeLocation?.id ?? null;
+  const mine = workingId
+    ? (plans ?? []).filter(
+        (p) =>
+          planKitchen({
+            location_id: p.location_id as string,
+            kitchen_location_id: (p.kitchen_location_id ?? null) as string | null,
+          }) === workingId
+      )
+    : (plans ?? []);
+  const hiddenElsewhere = (plans ?? []).length - mine.length;
+
+  const rows: PlanRow[] = mine.map((p) => ({
     id: p.id as string,
     title: p.title as string,
     location_id: p.location_id as string,
@@ -92,11 +115,28 @@ export default async function PlansPage({
         ) : null}
       </div>
 
+      {/* The scope is STATED, never merely applied. A shorter list with no
+          explanation reads as plans having gone missing, and the count is what
+          tells you the one you are hunting for is at another kitchen. */}
+      <p className="text-sm text-muted">
+        Plans made at{" "}
+        <span className="font-semibold text-ink">
+          {session.activeLocation?.code ?? "this shop"}
+        </span>
+        {hiddenElsewhere > 0
+          ? ` — ${hiddenElsewhere} more ${
+              hiddenElsewhere === 1 ? "plan is" : "plans are"
+            } made at another kitchen. Switch shops to see ${
+              hiddenElsewhere === 1 ? "it" : "them"
+            }.`
+          : "."}
+      </p>
+
       {rows.length === 0 ? (
         <p className="max-w-[80ch] text-sm text-muted">
-          No plans yet. A plan is a shop&rsquo;s display case over a stretch of
-          time — which trays hold what, on which days. Several can be active at
-          once, and their union is that shop&rsquo;s menu.
+          No plans made here yet. A plan is a shop&rsquo;s display case over a
+          stretch of time — which trays hold what, on which days. Several can be
+          active at once, and their union is that shop&rsquo;s menu.
         </p>
       ) : (
         <PlansList

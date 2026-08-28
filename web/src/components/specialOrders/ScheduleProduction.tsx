@@ -50,6 +50,33 @@ function readable(message: string, code?: string): string {
  * actually affects their work.
  *
  * ---------------------------------------------------------------------------
+ * YOU SCHEDULE FOR THE KITCHEN YOU ARE STANDING IN (Mark, 2026-08-28)
+ * ---------------------------------------------------------------------------
+ * The same rule `/schedules` generates under: a night belongs to the kitchen
+ * that bakes it, so an order made at DF02 is scheduled from DF02. The order's
+ * kitchen is `kitchen_location_id ?? location_id`, coerced by the caller, which
+ * is what `schedule_special_order` itself writes.
+ *
+ * THE BUTTON STILL OPENS AND THE DIALOG SAYS NO, which is this component's own
+ * established shape — the same `blocker` chain that already answers "no kitchen
+ * at all" and "nothing here reaches the kitchen". Its reason applies verbatim:
+ * a greyed control explains itself only on hover and the iPad has none, so a
+ * refusal that needs a sentence is said where there is room for one.
+ *
+ * A disabled button with the sentence BESIDE it was tried first and is worth
+ * not retrying. `OrderActions` lays its commands out in a `flex flex-wrap` row
+ * inside a `shrink-0` column that is sized to its content, so a wrapping
+ * paragraph in that row contributes its MAX-CONTENT width and pushed Preview,
+ * Download and Email clean off the right edge of the page — and capping the
+ * width to stop that defeats the `basis-full` that put it on its own line in
+ * the first place. The dialog has room; the command row does not.
+ *
+ * UNSCHEDULE IS DELIBERATELY NOT GATED. Scheduling LOCKS the order's items,
+ * event date and kitchen, so gating the way back out would leave a DF02 order
+ * permanently uneditable from DF01 — a lock with the key in another building.
+ * Only making the commitment is the kitchen's own act.
+ *
+ * ---------------------------------------------------------------------------
  * SCHEDULED IS A LOCK, NOT A SYNC (Mark, 2026-08-27)
  * ---------------------------------------------------------------------------
  * There is no "reschedule". Once an order is scheduled its items, event date
@@ -72,6 +99,8 @@ export function ScheduleProduction({
   scheduleId,
   scheduleLineCount,
   order,
+  atThisKitchen,
+  workingCode,
 }: {
   orderId: string;
   number: string;
@@ -90,6 +119,10 @@ export function ScheduleProduction({
   scheduleId: string | null;
   scheduleLineCount: number;
   order: WorkflowOrder;
+  /** Is this order's kitchen the shop you are working at? */
+  atThisKitchen: boolean;
+  /** The working shop's code, for the sentence when it isn't. */
+  workingCode: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -171,9 +204,13 @@ export function ScheduleProduction({
   const blocker =
     kitchenCode === null
       ? "This order has no kitchen and no pickup shop, so there is nowhere to make it."
-      : draft.lines.length === 0
-        ? "Nothing on this order reaches the kitchen."
-        : null;
+      : !atThisKitchen
+        ? `This order is made at ${kitchenCode}${
+            workingCode ? `, and you are working at ${workingCode}` : ""
+          }. A night belongs to the kitchen that bakes it, so switch to ${kitchenCode} to schedule this one.`
+        : draft.lines.length === 0
+          ? "Nothing on this order reaches the kitchen."
+          : null;
 
   async function commit() {
     if (!date) return;

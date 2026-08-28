@@ -15,10 +15,16 @@ import { GenerateSchedules } from "@/components/production/GenerateSchedules";
  * element sheets are renderings of these same lines re-cut, computed at print
  * time and never stored.
  *
- * Deliberately NOT location-scoped to the working shop. A kitchen's night is
- * every schedule it makes FOR — DF01 fills its own case and DF02's raised
- * donuts — so scoping to one shop would hide half of what DF01 is making. The
- * list filters by shop and by kitchen instead, and defaults to neither.
+ * SCOPED TO THE WORKING KITCHEN (Mark, 2026-08-28), and on the KITCHEN rather
+ * than the selling shop — which is what keeps decision 9 intact. A kitchen's
+ * night is every schedule it makes FOR, so at DF01 this still carries the DF02
+ * schedule DF01 actually bakes; what it stops carrying is a night DF01 has no
+ * hand in. Scoping on the selling shop instead would have hidden exactly the
+ * case the whole kitchen-on-plan design exists for.
+ *
+ * `production_schedules.kitchen_location_id` is NOT NULL (040), so unlike the
+ * plans list this needs no fallback — every schedule already names its kitchen.
+ * The Shop and Kitchen columns stay, so a row still says who it is for.
  */
 export default async function SchedulesPage() {
   const session = await getAppSession();
@@ -36,6 +42,12 @@ export default async function SchedulesPage() {
   const from = addDays(today, -28);
   const to = addDays(today, 28);
 
+  // The kitchen this screen is about. Null only when the member has no active
+  // location at all, which `InactiveLocationGate` already handles upstream —
+  // the impossible-uuid keeps the query total rather than silently unscoped.
+  const kitchen = session.activeLocation;
+  const kitchenId = kitchen?.id ?? "00000000-0000-0000-0000-000000000000";
+
   const [{ data: schedules, error }, { data: lines, error: lineErr }, { data: planRows }] =
     await Promise.all([
     supabase
@@ -49,6 +61,10 @@ export default async function SchedulesPage() {
       )
       .gte("schedule_date", from)
       .lte("schedule_date", to)
+      // In the DATABASE, not in the browser: the window is four weeks either
+      // side of today and the rows carry no filter of their own, so narrowing
+      // here is one less page of lines to roll up as well.
+      .eq("kitchen_location_id", kitchenId)
       .order("schedule_date", { ascending: false }),
     supabase
       .from("production_schedule_items")
@@ -130,13 +146,28 @@ export default async function SchedulesPage() {
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           Schedules
         </h1>
-        {editable ? (
+        {editable && kitchen ? (
           <GenerateSchedules
             locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
             today={today}
+            kitchenId={kitchen.id}
+            kitchenCode={kitchen.code}
+            // Every plan, not the active ones: `sellingShopsForKitchen` decides
+            // that itself, and the dialog re-asks as the date range moves.
+            plans={plans}
           />
         ) : null}
       </div>
+
+      {/* The scope, stated rather than merely applied — the plans list's rule.
+          A shorter list with no explanation reads as nights having gone
+          missing. */}
+      <p className="text-sm text-muted">
+        Nights made at{" "}
+        <span className="font-semibold text-ink">{kitchen?.code ?? "this shop"}</span>
+        {" "}— including what this kitchen bakes for another shop. Switch shops
+        to see another kitchen&rsquo;s.
+      </p>
 
       {lineErr ? (
         // Not folded into the page's own error: a line-count failure must not
@@ -151,10 +182,10 @@ export default async function SchedulesPage() {
 
       {rows.length === 0 ? (
         <p className="max-w-[80ch] text-sm text-muted">
-          Nothing scheduled in the four weeks either side of {today}. A schedule
-          is generated from the active plans for a date — one per shop per
-          kitchen — and generating ahead is fine: par overrides written later
-          are picked up whenever generation runs.
+          Nothing for the {kitchen?.code ?? "this"} kitchen in the four weeks
+          either side of {today}. A schedule is generated from the active plans
+          for a date — one per shop per kitchen — and generating ahead is fine:
+          par overrides written later are picked up whenever generation runs.
         </p>
       ) : (
         <SchedulesList rows={rows} plans={plans} stampable={countable} today={today} />

@@ -14,6 +14,8 @@ import {
   stepPar,
   nextTrayNumber,
   duplicateTitle,
+  planKitchen,
+  sellingShopsForKitchen,
   NO_CATEGORY,
   NO_TYPE,
   NO_CUT,
@@ -499,4 +501,70 @@ test("duplicateTitle ignores surrounding whitespace when checking what's taken",
   // A title typed with a trailing space is the same name to a reader, so it
   // must not free up a name that looks identical in the list.
   eq(duplicateTitle(["A", "  A copy  "], "A"), "A copy 2");
+});
+
+/* -- which kitchen makes it, and who sells it ------------------------------ */
+//
+// The rule /plans, /schedules and the generate dialog are all scoped by since
+// 2026-08-28. Every case here is one where the obvious implementation makes a
+// plan belong to nobody, which is silent and total: it simply vanishes.
+
+test("planKitchen takes the kitchen when one is set", () => {
+  eq(planKitchen(plan({ location_id: DF02, kitchen_location_id: DF01 })), DF01);
+});
+
+test("planKitchen falls back to the selling shop when the kitchen is unset", () => {
+  // 039 left the kitchen nullable and decision 9 reads a null as "the shop
+  // makes its own". Without this the plan matches NO kitchen and disappears
+  // from every list in the app.
+  eq(planKitchen(plan({ location_id: DF02, kitchen_location_id: null })), DF02);
+});
+
+test("sellingShopsForKitchen finds the shop a kitchen bakes for", () => {
+  const plans = [
+    plan({ id: "a", location_id: DF01, kitchen_location_id: DF01 }),
+    plan({ id: "b", location_id: DF02, kitchen_location_id: DF01 }),
+    plan({ id: "c", location_id: DF02, kitchen_location_id: DF02 }),
+  ];
+  const range = { starts_on: "2026-10-05", ends_on: "2026-10-05" };
+  // DF01's kitchen sells through BOTH shops — decision 9's whole case.
+  eq(sellingShopsForKitchen(plans, DF01, range).sort(), [DF01, DF02]);
+  eq(sellingShopsForKitchen(plans, DF02, range), [DF02]);
+});
+
+test("sellingShopsForKitchen counts a null-kitchen plan as its own shop", () => {
+  const plans = [plan({ location_id: DF02, kitchen_location_id: null })];
+  const range = { starts_on: "2026-10-05", ends_on: "2026-10-05" };
+  eq(sellingShopsForKitchen(plans, DF02, range), [DF02]);
+  eq(sellingShopsForKitchen(plans, DF01, range), []);
+});
+
+test("sellingShopsForKitchen ignores inactive plans", () => {
+  // Generation reads the ACTIVE plans, so a retired one would offer a shop
+  // that then generates nothing and reports an empty run.
+  const plans = [plan({ location_id: DF02, kitchen_location_id: DF01, is_active: false })];
+  eq(sellingShopsForKitchen(plans, DF01, { starts_on: "2026-10-05", ends_on: "2026-10-05" }), []);
+});
+
+test("sellingShopsForKitchen ignores a plan whose dates miss the window", () => {
+  const plans = [plan({ location_id: DF02, kitchen_location_id: DF01 })]; // October
+  eq(sellingShopsForKitchen(plans, DF01, { starts_on: "2026-11-01", ends_on: "2026-11-03" }), []);
+  // Touching at one end is enough — a run that reaches the plan's first day
+  // legitimately generates it.
+  eq(sellingShopsForKitchen(plans, DF01, { starts_on: "2026-09-28", ends_on: "2026-10-01" }), [DF02]);
+});
+
+test("sellingShopsForKitchen returns each shop once however many plans it has", () => {
+  const plans = [
+    plan({ id: "a", location_id: DF02, kitchen_location_id: DF01 }),
+    plan({ id: "b", location_id: DF02, kitchen_location_id: DF01, title: "October B" }),
+  ];
+  // Overlapping plans are the FEATURE (their pars sum), so two of them must
+  // not offer the same shop twice or `p_location_ids` generates it twice.
+  eq(sellingShopsForKitchen(plans, DF01, { starts_on: "2026-10-05", ends_on: "2026-10-05" }), [DF02]);
+});
+
+test("sellingShopsForKitchen is empty when no plan reaches the kitchen", () => {
+  const plans = [plan({ location_id: DF02, kitchen_location_id: DF02 })];
+  eq(sellingShopsForKitchen(plans, DF01, { starts_on: "2026-10-05", ends_on: "2026-10-05" }), []);
 });

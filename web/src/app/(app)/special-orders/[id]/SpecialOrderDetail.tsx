@@ -483,6 +483,12 @@ export async function SpecialOrderDetail({
                     sellsCode={codeFor(sellsId)}
                     kitchenAssumed={orderKitchenId === null && orderSellsId !== null}
                     sellsAssumed={orderSellsId === null && orderKitchenId !== null}
+                    // You commit the night for the kitchen you are standing in
+                    // (Mark, 2026-08-28) — the same rule /schedules generates
+                    // under. Null when the order names no shop at all, which
+                    // `ScheduleProduction` already refuses for its own reason.
+                    atThisKitchen={kitchenId !== null && kitchenId === session.activeLocation?.id}
+                    workingCode={session.activeLocation?.code ?? null}
                     lines={lines}
                     scheduleId={scheduleId}
                     scheduleLineCount={scheduleLineCount}

@@ -23,6 +23,23 @@ import { addDays } from "@/lib/payPeriods";
  * for free, and migration 063's upsert makes a part-finished backfill harmless
  * — re-running a month re-lands it.
  *
+ * COMPLETE DAYS ONLY — the pull STOPS AT YESTERDAY (Mark, 2026-08-28). The
+ * shops are still trading today, so today's figure is a part-day: it lands in
+ * the table looking exactly as authoritative as the fourteen complete days
+ * beside it, drags every average down, and turns each comparison into
+ * thirteen-and-a-bit days against fourteen. Worse, it is WRONG RATHER THAN
+ * MISSING — pulling it again tomorrow corrects it, but nothing on the screen
+ * says which of the two you are looking at.
+ *
+ * It costs nothing, because the rest of the screen already draws the line in
+ * the same place: `missingDays` is passed YESTERDAY as its `through`, so a day
+ * with no row is only reported as a gap once it is over. Today was never
+ * counted as missing, and now it is never half-filled either.
+ *
+ * Yesterday in the ORG's calendar, never the browser's — `today` arrives from
+ * `todayInTimeZone` on the server for that reason, and `addDays` is plain
+ * string arithmetic (`new Date("2026-08-28")` is UTC midnight).
+ *
  * Owner/admin only. `record_daily_sales` re-checks that itself; this just keeps
  * the button off a screen where pressing it could only fail.
  */
@@ -34,6 +51,9 @@ export function SyncFromSquare({ today }: { today: string }) {
   const [result, setResult] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [failed, setFailed] = useState<string | null>(null);
+
+  /** The last day the shops have finished trading. */
+  const lastComplete = addDays(today, -1);
 
   async function run(months: { from: string; to: string }[], what: string) {
     setBusy(what);
@@ -121,9 +141,9 @@ export function SyncFromSquare({ today }: { today: string }) {
           onClick={() => {
             // The ordinary case: this month and last, which covers every day
             // anybody is likely to be looking at and re-pulls recent days in
-            // case a tip settled late.
+            // case a tip settled late — ending YESTERDAY, see the header.
             const from = addDays(`${today.slice(0, 7)}-01`, -1);
-            void run(monthsBetween(`${from.slice(0, 7)}-01`, today), "Syncing");
+            void run(monthsBetween(`${from.slice(0, 7)}-01`, lastComplete), "Syncing");
           }}
         >
           Sync from Square
@@ -134,7 +154,14 @@ export function SyncFromSquare({ today }: { today: string }) {
       {busy ? <ProgressBand label={busy} /> : null}
 
       {failed ? <p className="text-xs text-accent">{failed}</p> : null}
-      {result && !failed ? <p className="text-xs text-muted">{result}</p> : null}
+      {result && !failed ? (
+        // The end date is NAMED. Somebody who presses this at 4pm and then
+        // looks for today's takings needs to be told they were not asked for,
+        // or the sync reads as having quietly failed on its most recent day.
+        <p className="text-xs text-muted">
+          {result} Complete days only, up to {lastComplete}.
+        </p>
+      ) : null}
 
       {warnings.length ? (
         // Warnings ride a SUCCESS: the pull happened, and a mapping complaint

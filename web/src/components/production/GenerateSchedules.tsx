@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -15,6 +15,7 @@ import {
 } from "@/lib/specialOrderSchedule";
 import { STATUS_LABEL } from "@/lib/specialOrders";
 import { addDays } from "@/lib/payPeriods";
+import { sellingShopsForKitchen, type PlanSummary } from "@/lib/productionPlans";
 import { createClient } from "@/lib/supabase/client";
 import { packetDate } from "@/lib/productionSchedule";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -34,6 +35,22 @@ import {
  * DAYS and a location set because generating ahead is a real workflow — closed
  * days, long weekends, a supervisor who won't be in. FMP's own generator dialog
  * takes exactly these three.
+ *
+ * ONE KITCHEN — THE WORKING ONE (Mark, 2026-08-28). You commit the night for
+ * the kitchen you are standing in, so the Shops list no longer offers every
+ * active shop: it offers the shops that SELL what this kitchen makes, which is
+ * usually just the one and is DF02 as well when DF01 bakes for it.
+ *
+ * That indirection is forced by the function rather than chosen. 040's comment
+ * still holds in 069 — "the kitchen is NOT a parameter: the DAY tells you which
+ * kitchens are involved" — so `p_location_ids` is a list of SELLERS and the
+ * only way to aim a run at one kitchen from out here is to ask which sellers
+ * feed it. `sellingShopsForKitchen` carries that, and the known limit with it.
+ *
+ * The SPECIAL ORDERS beside them are matched on the kitchen DIRECTLY, not
+ * through that set. `inGenerationRun` has always compared `scheduleKitchen`
+ * against whatever set it was handed, and it used to be handed the selling
+ * shops — harmless while the two coincided, and wrong the moment they do not.
  *
  * Everything else FMP put around it is gone. Its Skip/Continue gauntlet, its
  * overwrite warning and its "locked" flag all existed because a pre-generated
@@ -110,9 +127,17 @@ const WARNING_TITLE: Record<string, string> = {
 export function GenerateSchedules({
   locations,
   today,
+  kitchenId,
+  kitchenCode,
+  plans,
 }: {
   locations: { id: string; code: string; name: string }[];
   today: string;
+  /** The working location — the kitchen every schedule this run writes is for. */
+  kitchenId: string;
+  kitchenCode: string;
+  /** Every plan in the org; which ones count is decided per date range. */
+  plans: PlanSummary[];
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -139,15 +164,39 @@ export function GenerateSchedules({
     setStart(today);
     setDays("1");
     setIgnoreSpecial(false);
-    // Every active shop, preselected. Unlike the PO generator there is no
-    // per-location guard to encode here — an already-generated day is reported
-    // by the function itself rather than guessed at up front, because "which
-    // kitchens does this day involve" is only answerable from the plans.
-    setSelected(new Set(locations.map((l) => l.id)));
+    // Every shop this kitchen sells THROUGH, preselected. Unlike the PO
+    // generator there is no per-location guard to encode here — an
+    // already-generated day is reported by the function itself rather than
+    // guessed at up front.
+    setSelected(new Set(shopsFor(today, 1).map((l) => l.id)));
     setCandidates(null);
     setPullIds(new Set());
     setPulled(null);
     void loadCandidates(today, 1);
+  }
+
+  /**
+   * The shops whose plans feed THIS kitchen over a window.
+   *
+   * Recomputed from the date range rather than fixed at open, because a plan
+   * starting next week legitimately adds a shop to a run that reaches it — the
+   * same reason the special-order list is re-asked on every date change.
+   */
+  function shopsFor(from: string, dayCount: number) {
+    const ids = new Set(
+      sellingShopsForKitchen(plans, kitchenId, {
+        starts_on: from,
+        ends_on: addDays(from, Math.max(0, dayCount - 1)),
+      })
+    );
+    return locations.filter((l) => ids.has(l.id));
+  }
+
+  /** Both halves of "what does changing the window change" — the shops this
+   *  kitchen can generate for, and the orders it could bring along. */
+  function rescope(from: string, dayCount: number) {
+    setSelected(new Set(shopsFor(from, dayCount).map((l) => l.id)));
+    void loadCandidates(from, dayCount);
   }
 
   /**
@@ -271,19 +320,36 @@ export function GenerateSchedules({
     setRunning(true);
     setError(null);
 
-    const { data, error } = await supabase.rpc("generate_production_schedules", {
-      p_start: start,
-      p_days: Number(days),
-      p_location_ids: [...selected],
-      p_ignore_special_orders: ignoreSpecial,
-      p_replace: replace,
-      p_allow_actuals: allowActuals,
-    });
+    /* NO SHOPS IS A LEGITIMATE RUN, so the function is not called at all.
+       A special order needs no plan — a wedding at a kitchen with nothing on
+       its menu that week is exactly the case — and
+       `generate_production_schedules` RAISES "no locations given" on an empty
+       array, which would report a failure over a pull that worked fine. */
+    let data: Receipt = {
+      start,
+      days: Number(days),
+      created: [],
+      skipped: [],
+      replaced: [],
+      warnings: [],
+    };
 
-    if (error) {
-      setRunning(false);
-      setError(error.message);
-      return;
+    if (selected.size > 0) {
+      const { data: got, error } = await supabase.rpc("generate_production_schedules", {
+        p_start: start,
+        p_days: Number(days),
+        p_location_ids: [...selected],
+        p_ignore_special_orders: ignoreSpecial,
+        p_replace: replace,
+        p_allow_actuals: allowActuals,
+      });
+
+      if (error) {
+        setRunning(false);
+        setError(error.message);
+        return;
+      }
+      data = got as Receipt;
     }
 
     /* ----------------------------------------------------------------------
@@ -327,20 +393,36 @@ export function GenerateSchedules({
     }
 
     setRunning(false);
-    setReceipt(data as Receipt);
+    setReceipt(data);
     setPulled({ done, failed });
     router.refresh();
   }
 
   const blockedByActuals = (receipt?.skipped ?? []).some((s) => s.has_actuals);
 
-  // Which candidates are in THIS run — recomputed as shops are ticked, since
-  // the query is by date and the shop filter is the cheap half.
+  // The shops on offer for the window as it currently stands.
+  const eligible = start ? shopsFor(start, Number(days)) : [];
+
+  // Which candidates are in THIS run.
+  //
+  // MATCHED ON THE KITCHEN — a set holding the working location and nothing
+  // else — never on `selected`. `inGenerationRun` compares an order's
+  // `scheduleKitchen` against the set it is handed, and it used to be handed
+  // the ticked SELLING shops: harmless while a shop sold only what it baked,
+  // and wrong the moment DF01 bakes for DF02, when it would have offered DF01's
+  // orders under a DF02 tick and withheld them under DF01's.
+  const kitchenSet = useMemo(() => new Set([kitchenId]), [kitchenId]);
   const inRun = (candidates ?? []).filter(
-    (c) => start && inGenerationRun(c.order, start, addDays(start, Number(days) - 1), selected)
+    (c) => start && inGenerationRun(c.order, start, addDays(start, Number(days) - 1), kitchenSet)
   );
   const offered = inRun.filter((c) => c.readiness.state !== "not_ready");
   const withheld = inRun.filter((c) => c.readiness.state === "not_ready");
+  /** Orders actually ticked and in this run — what makes a shopless run worth
+   *  pressing. */
+  const pullCount = ignoreSpecial
+    ? 0
+    : offered.filter((c) => pullIds.has(c.order.id)).length;
+
   const withheldSentence =
     withheld.length === 0
       ? ""
@@ -413,7 +495,7 @@ export function GenerateSchedules({
                 <button
                   type="button"
                   onClick={() => run(false, false)}
-                  disabled={running || selected.size === 0 || !start}
+                  disabled={running || !start || (selected.size === 0 && pullCount === 0)}
                   className={DIALOG_COMMIT_CLASS}
                 >
                   {running ? "Generating…" : "Generate"}
@@ -443,7 +525,7 @@ export function GenerateSchedules({
                     value={start}
                     onChange={(v) => {
                       setStart(v);
-                      if (v) void loadCandidates(v, Number(days));
+                      if (v) rescope(v, Number(days));
                     }}
                     required
                     ariaLabel="First date to generate"
@@ -458,7 +540,7 @@ export function GenerateSchedules({
                     value={days}
                     onPick={(v) => {
                       setDays(v);
-                      if (start) void loadCandidates(start, Number(v));
+                      if (start) rescope(start, Number(v));
                     }}
                     options={DAY_OPTIONS}
                     ariaLabel="How many days to generate"
@@ -466,29 +548,66 @@ export function GenerateSchedules({
                 </div>
               </div>
 
+              {/* THE SHOPS THIS KITCHEN SELLS THROUGH.
+                  ONE ROW is stated rather than offered — a checkbox list of a
+                  single item asks a question with one answer, and every real
+                  plan today sells and bakes at the same shop. The list comes
+                  back the moment a second shop's plan points here, which is
+                  decision 9's case and the only time the choice is real. */}
               <div className="space-y-2">
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
                   Shops
                 </span>
-                <ul className="divide-y divide-hairline border border-ink">
-                  {locations.map((l) => (
-                    <li key={l.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                      <Checkbox
-                        checked={selected.has(l.id)}
-                        onChange={() => toggle(l.id)}
-                        label={`Generate schedules for ${l.name}`}
-                        size={18}
-                      />
-                      <span className="text-[13px] font-semibold uppercase tracking-[0.06em]">
-                        {l.code}
-                      </span>
-                      <span className="text-subtle">{l.name}</span>
-                    </li>
-                  ))}
-                </ul>
+
+                {eligible.length === 0 ? (
+                  // Named, not an empty box: "no shops" and "no plans reach
+                  // this kitchen on those dates" look identical on screen and
+                  // are answered in completely different places.
+                  <p className="text-sm">
+                    <span className="bg-mark-fill px-1">
+                      No active plan makes anything at {kitchenCode}
+                      {start
+                        ? days === "1"
+                          ? ` on ${start}`
+                          : ` over those ${days} days`
+                        : ""}
+                      .
+                    </span>{" "}
+                    <span className="text-muted">
+                      A plan needs {kitchenCode}{" "}
+                      as its kitchen and a date range covering these days.
+                    </span>
+                  </p>
+                ) : eligible.length === 1 ? (
+                  <p className="text-sm">
+                    Made at <span className="font-bold">{kitchenCode}</span>, sold at{" "}
+                    <span className="font-bold">{eligible[0].code}</span>{" "}
+                    <span className="text-subtle">({eligible[0].name})</span>.
+                  </p>
+                ) : (
+                  <ul className="divide-y divide-hairline border border-ink">
+                    {eligible.map((l) => (
+                      <li key={l.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                        <Checkbox
+                          checked={selected.has(l.id)}
+                          onChange={() => toggle(l.id)}
+                          label={`Generate schedules for ${l.name}`}
+                          size={18}
+                        />
+                        <span className="text-[13px] font-semibold uppercase tracking-[0.06em]">
+                          {l.code}
+                        </span>
+                        <span className="text-subtle">{l.name}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
                 <p className="text-xs text-muted">
-                  The shop that SELLS. Which kitchen makes each item comes from
-                  the plans, so one shop can produce two schedules.
+                  Only the {kitchenCode}{" "}
+                  kitchen&rsquo;s nights are generated here — these are the
+                  shops it makes them for. Switch shops to generate another
+                  kitchen&rsquo;s.
                 </p>
               </div>
 

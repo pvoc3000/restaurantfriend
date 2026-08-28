@@ -9,6 +9,9 @@ export type SalesSummaryData = {
   fellBack: boolean;
   /** Set while the period is still running — see the note below. */
   partial: { elapsed: number; total: number } | null;
+  /** What the previous-period comparison is CALLED on this view —
+   *  `SALES_PREVIOUS_LABEL`. "last month" under Month to date, and so on. */
+  previousLabel: string;
   current: SalesTotals;
   vsPrevious: Comparison;
   vsLastYear: Comparison;
@@ -29,7 +32,7 @@ export type SalesSummaryData = {
  * render figures.
  */
 export function SalesSummary({ summary }: { summary: SalesSummaryData }) {
-  const { current, vsPrevious, vsLastYear, gaps } = summary;
+  const { current, vsPrevious, vsLastYear, gaps, previousLabel } = summary;
   const share = tipFraction(current);
 
   return (
@@ -38,17 +41,17 @@ export function SalesSummary({ summary }: { summary: SalesSummaryData }) {
 
       <div className="grid gap-px border border-hairline bg-hairline sm:grid-cols-3">
         <Figure label="Net sales" value={formatCents(current.netSalesCents)}>
-          <Delta c={vsPrevious} field="net" what="last period" />
+          <Delta c={vsPrevious} field="net" what={previousLabel} />
           <Delta c={vsLastYear} field="net" what="a year ago" />
         </Figure>
 
         <Figure label="Tips" value={formatCents(current.tipsCents)}>
-          <Delta c={vsPrevious} field="tips" what="last period" />
+          <Delta c={vsPrevious} field="tips" what={previousLabel} />
           <Delta c={vsLastYear} field="tips" what="a year ago" />
         </Figure>
 
         <Figure label="Tips as a share of sales" value={formatFraction(share)}>
-          <ShareDelta c={vsPrevious} what="last period" />
+          <ShareDelta c={vsPrevious} what={previousLabel} />
           <ShareDelta c={vsLastYear} what="a year ago" />
         </Figure>
       </div>
@@ -70,7 +73,7 @@ export function SalesSummary({ summary }: { summary: SalesSummaryData }) {
       <p className="text-xs text-muted">
         Compared with{" "}
         <span className="tabular-nums text-ink">{rangeText(vsPrevious.basisRange)}</span>{" "}
-        (last period) and{" "}
+        ({previousLabel}) and{" "}
         <span
           className="tabular-nums text-ink"
           title="52 weeks back, so every date lands on the same weekday — a bakery's Saturday and its Friday are not the same shop."

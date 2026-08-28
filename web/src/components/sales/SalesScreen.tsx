@@ -10,6 +10,7 @@ import { formatCents } from "@/lib/tipPool";
 import {
   SALES_RANGES,
   SALES_RANGE_LABEL,
+  SALES_PREVIOUS_LABEL,
   formatFraction,
   tipFraction,
   rollUpByDate,
@@ -113,13 +114,14 @@ export function SalesScreen({
       rangeLabel,
       fellBack,
       partial: partial ? { elapsed: elapsedDays, total: daysBetween(range.from, range.to) } : null,
+      previousLabel: SALES_PREVIOUS_LABEL[rangeKey],
       current: totals,
       vsPrevious: compareTotals(totals, sumSales(daysIn(visible, prevRange)), prevRange),
       vsLastYear: compareTotals(totals, sumSales(daysIn(visible, yearRange)), yearRange),
       gaps: missingDays(current, shopsInScope, elapsed, yesterday),
     };
   }, [visible, shopsInScope, elapsed, elapsedDays, partial, prevRange, yearRange,
-      rangeLabel, fellBack, yesterday, range]);
+      rangeLabel, fellBack, yesterday, range, rangeKey]);
 
   const supabase = createClient();
 

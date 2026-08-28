@@ -13,6 +13,7 @@ import { ColumnHeader } from "@/components/catalog/ColumnHeader";
 import { useResizableColumns } from "@/lib/columnWidths";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { RowMenu } from "@/components/ui/RowMenu";
 import { AddOrderLine, type MenuItem } from "./AddOrderLine";
 import { isProductionLine, lineTotal, money } from "@/lib/specialOrders";
 import {
@@ -72,7 +73,9 @@ const LINE_WIDTHS: Record<string, number> = {
   price: 104,
   tax: 64,
   total: 112,
-  remove: 36,
+  // The ⋯ menu. 44 rather than the ×'s 36: `RowMenu`'s trigger is a 36px square
+  // and the cell has to hold it without clipping the hover wash.
+  actions: 44,
 };
 
 /**
@@ -145,28 +148,43 @@ export function OrderLines({
    * updates zero rows and PostgREST returns NO error, so a bare call would
    * report success over a list that never moved.
    */
+  /**
+   * Write a whole new line order. Returns the failure, or null.
+   *
+   * Shared by the drag and by Duplicate, which both have to renumber the LIST
+   * rather than one row — see `renumber`'s own rule above.
+   */
+  async function writeOrder(
+    next: readonly string[],
+    sorts: ReadonlyMap<string, number | null>
+  ): Promise<string | null> {
+    const writes = renumber(next, sorts);
+    if (writes.length === 0) return null;
+    const results = await Promise.all(
+      writes.map((w) =>
+        supabase.from("special_order_items").update({ sort: w.sort }).eq("id", w.id).select("id")
+      )
+    );
+    const failed = results.find((r) => r.error);
+    if (failed?.error) return failed.error.message;
+    if (results.some((r) => !r.data?.length)) {
+      return "The new order wasn't saved — the database refused it and said nothing.";
+    }
+    return null;
+  }
+
   function dropRow(dragId: string, target: DropTarget) {
     const next = moveInOrder(ordered.map((r) => r.id), dragId, target);
-    const writes = renumber(next, new Map(ordered.map((r) => [r.id, r.sort])));
-    if (writes.length === 0) return;
+    const sorts = new Map(ordered.map((r) => [r.id, r.sort]));
+    if (renumber(next, sorts).length === 0) return;
 
     setError(null);
     setOptimistic({ order: next, basedOn: serverOrder });
     start(async () => {
-      const results = await Promise.all(
-        writes.map((w) =>
-          supabase.from("special_order_items").update({ sort: w.sort }).eq("id", w.id).select("id")
-        )
-      );
-      const failed = results.find((r) => r.error);
-      if (failed?.error) {
+      const failure = await writeOrder(next, sorts);
+      if (failure) {
         setOptimistic(null);
-        setError(failed.error.message);
-        return;
-      }
-      if (results.some((r) => !r.data?.length)) {
-        setOptimistic(null);
-        setError("The new order wasn't saved — the database refused it and said nothing.");
+        setError(failure);
         return;
       }
       router.refresh();
@@ -179,7 +197,10 @@ export function OrderLines({
   });
 
   const { widths, startResize, setWidth, reset, customized } = useResizableColumns(
-    "rf.specialOrderLines.columnWidths.v1",
+    // v2: the `remove` column became `actions`, so a stored v1 map holds a
+    // width for a key that no longer exists and none for the one that does —
+    // which changes the visible total every other column is a share of.
+    "rf.specialOrderLines.columnWidths.v2",
     LINE_WIDTHS
   );
 
@@ -192,7 +213,7 @@ export function OrderLines({
     "price",
     "tax",
     "total",
-    ...(canWrite ? ["remove"] : []),
+    ...(canWrite ? ["actions"] : []),
   ];
   // `DataTable`'s own arithmetic: a weight over the visible total, as a
   // percentage. Never mixed with a px length in the same value — a `<col>` width
@@ -227,6 +248,77 @@ export function OrderLines({
       if (!data?.length) {
         setError("Nothing was removed — the database refused it and said nothing.");
         return;
+      }
+      router.refresh();
+    });
+  }
+
+  /**
+   * COPY A LINE, and land the copy DIRECTLY BELOW THE ONE IT CAME FROM.
+   *
+   * The order IS the document (see LINE_WIDTHS), and on a letter order it is
+   * the customer's word — #7769 spells HAPPY BIRTHDAY VINNY across 21 lines.
+   * Dropping a duplicate at the end would be an anagram, which is the same
+   * argument migration 069 made about not rolling these lines up.
+   *
+   * `sort` is an INTEGER (051), so there is no half-step between two rows: the
+   * copy is written last and then the WHOLE list is renumbered, which is the
+   * mechanism the drag already uses. Two round trips, and the second one
+   * failing leaves a real line at the bottom rather than a hole — recoverable
+   * by dragging, and named either way.
+   *
+   * EVERY COLUMN TRAVELS, `production_item_id` included: a duplicate of a
+   * scheduled-able line has to stay scheduled-able, and the whole point of the
+   * copy is that you are about to change one field of it — the letter, the
+   * glaze in the note. `id` and the timestamps are the only things left behind.
+   */
+  function duplicate(row: OrderLineRow) {
+    setError(null);
+    start(async () => {
+      const lastSort = ordered.reduce((a, l) => Math.max(a, l.sort ?? 0), 0);
+      const { data, error: e } = await supabase
+        .from("special_order_items")
+        .insert({
+          // Explicit, always — design rule 1. Omitting it reports an RLS
+          // violation, which sends you looking at roles.
+          org_id: orgId,
+          order_id: orderId,
+          sort: lastSort + 1,
+          production_item_id: row.production_item_id,
+          name: row.name,
+          item_donut: row.item_donut,
+          item_type: row.item_type,
+          item_cut: row.item_cut,
+          item_finish: row.item_finish,
+          item_size: row.item_size,
+          notes: row.notes,
+          qty: row.qty,
+          unit_price: row.unit_price,
+          taxable: row.taxable,
+        })
+        .select("id");
+      if (e) {
+        setError(e.message);
+        return;
+      }
+      if (!data?.length) {
+        setError("Nothing was copied — the database refused the insert and said nothing.");
+        return;
+      }
+
+      const newId = data[0].id as string;
+      const at = ordered.findIndex((r) => r.id === row.id);
+      const ids = ordered.map((r) => r.id);
+      const next = [...ids.slice(0, at + 1), newId, ...ids.slice(at + 1)];
+      const sorts = new Map<string, number | null>(ordered.map((r) => [r.id, r.sort]));
+      sorts.set(newId, lastSort + 1);
+
+      const failure = await writeOrder(next, sorts);
+      if (failure) {
+        // The copy EXISTS — it is at the bottom of the list. Said plainly
+        // rather than reported as a failed duplicate, which would send
+        // somebody to press the button a second time.
+        setError(`Copied, but it could not be moved into place: ${failure}`);
       }
       router.refresh();
     });
@@ -419,17 +511,32 @@ export function OrderLines({
                   <td className="px-3 py-2 text-right tabular-nums">{money(lineTotal(row))}</td>
 
                   {canWrite ? (
-                    <td className="px-1 py-2 text-right">
-                      <button
-                        type="button"
-                        onClick={() => remove(row)}
-                        disabled={pending}
-                        aria-label={`Remove ${row.name}`}
-                        title={`Remove ${row.name}`}
-                        className="px-1 text-[15px] leading-none text-subtle hover:text-accent disabled:opacity-35"
-                      >
-                        ×
-                      </button>
+                    /* THE ROW'S OWN COMMANDS, in the app's ⋯ idiom (Mark,
+                       2026-08-28, asking for Duplicate "as a more options
+                       popup"). This replaces the bare × rather than sitting
+                       beside it: two routes to Remove is two things to keep in
+                       step, and the plan matrix made the same swap in August
+                       for the same reason — a menu is more discoverable than a
+                       glyph, and it has somewhere to put the next command. */
+                    <td className="px-0 py-2 text-right">
+                      <RowMenu
+                        label={`Actions for ${row.name}`}
+                        items={[
+                          {
+                            label: "Duplicate line",
+                            hint: "An identical copy, directly below this one",
+                            disabled: pending,
+                            onSelect: () => duplicate(row),
+                          },
+                          {
+                            label: "Remove line",
+                            hint: "Takes it off the order; the catalog is untouched",
+                            danger: true,
+                            disabled: pending,
+                            onSelect: () => void remove(row),
+                          },
+                        ]}
+                      />
                     </td>
                   ) : null}
                 </tr>

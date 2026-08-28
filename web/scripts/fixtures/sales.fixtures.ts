@@ -18,6 +18,8 @@ import {
   formatFraction,
   parseSalesRange,
   resolveSalesRange,
+  SALES_RANGES,
+  SALES_PREVIOUS_LABEL,
   fetchWindow,
   elapsedRange,
   isPartial,
@@ -522,4 +524,25 @@ test("is_active unknown does not suppress a gap", () => {
   eq(expectsSalesOn({ id: "a", code: "A", isActive: null }, "2026-08-01"), true);
   eq(expectsSalesOn({ id: "a", code: "A" }, "2026-08-01"), true, "absent");
   eq(expectsSalesOn({ id: "a", code: "A", isActive: false }, "2026-08-01"), false);
+});
+
+/* -- what the previous-period comparison is called -------------------------- */
+
+test("each period names its own comparison", () => {
+  eq(SALES_PREVIOUS_LABEL.mtd, "last month");
+  eq(SALES_PREVIOUS_LABEL["last-30"], "last thirty days");
+  eq(SALES_PREVIOUS_LABEL.ytd, "last year to date");
+});
+
+test("the pay-period and custom views keep the generic wording", () => {
+  eq(SALES_PREVIOUS_LABEL.period, "last period");
+  eq(SALES_PREVIOUS_LABEL["last-period"], "last period");
+  eq(SALES_PREVIOUS_LABEL.custom, "last period");
+});
+
+test("every range has a label", () => {
+  // The record is keyed by SalesRangeKey, so a new range fails to compile
+  // rather than rendering "undefined" beside a percentage — this pins that the
+  // two lists stay the same length if anyone widens one with a cast.
+  for (const k of SALES_RANGES) ok(SALES_PREVIOUS_LABEL[k]?.length, `label for ${k}`);
 });

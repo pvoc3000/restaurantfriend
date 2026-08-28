@@ -52,6 +52,60 @@ export type PlanSummary = {
 };
 
 /**
+ * WHICH KITCHEN MAKES THIS PLAN'S DONUTS.
+ *
+ * `kitchen_location_id` is NULLABLE — 039 left it open for a plan written
+ * before anyone had decided — and decision 9's reading of a null is that the
+ * selling shop makes its own. `plansInForce` has always applied that fallback;
+ * this is the same rule with a name, so the three screens that now scope
+ * themselves by kitchen cannot each remember it differently.
+ *
+ * Getting it wrong is silent and total: without the fallback a plan whose
+ * kitchen is unset belongs to NO shop and vanishes from every list.
+ */
+export function planKitchen(plan: {
+  location_id: string;
+  kitchen_location_id: string | null;
+}): string {
+  return plan.kitchen_location_id ?? plan.location_id;
+}
+
+/**
+ * The shops that SELL what this kitchen makes, over a date range.
+ *
+ * `generate_production_schedules` is asked for SELLING shops and works out the
+ * kitchens itself from the plans — "the kitchen is NOT a parameter: the DAY
+ * tells you which kitchens are involved" (040, still true in 069). So the only
+ * way to aim a run at one kitchen from outside the function is to ask which
+ * sellers feed it, which is what this answers.
+ *
+ * ACTIVE plans only, because generation reads the active ones; a retired plan
+ * naming this kitchen would offer a shop that then generates nothing.
+ *
+ * KNOWN LIMIT, and it is the function's shape rather than a bug: a selling shop
+ * whose plans point at TWO kitchens qualifies here on the strength of one of
+ * them, and generating it also writes the other kitchen's schedule. Measured
+ * 2026-08-28 over the live data — 2 plans, both selling and making at the same
+ * shop, ZERO shops with plans spanning two kitchens — so the case does not
+ * exist today. Closing it properly means a kitchen argument on the generator,
+ * which is a migration reproducing 069's function in full.
+ */
+export function sellingShopsForKitchen(
+  plans: readonly PlanSummary[],
+  kitchenId: string,
+  range: PlanDates
+): string[] {
+  const out = new Set<string>();
+  for (const p of plans) {
+    if (!p.is_active) continue;
+    if (planKitchen(p) !== kitchenId) continue;
+    if (!rangesOverlap(p, range)) continue;
+    out.add(p.location_id);
+  }
+  return [...out];
+}
+
+/**
  * Which ACTIVE plans overlap each other at one shop — decision 9's
  * generation-time warning, computed here so the plan list can show it long
  * before anyone generates anything.
