@@ -104,8 +104,12 @@ export function NewShiftReport({
           onSubmit={() => {
             if (ready) create();
           }}
+          // A FRAGMENT, not a wrapper — `ui/Dialog`'s own footer is already
+          // `flex justify-end gap-4`, so a `justify-between` div inside it is
+          // content-sized and the two buttons end up flush against each other
+          // with no gap at all. Every other caller passes them bare.
           footer={
-            <div className="flex items-center justify-between">
+            <>
               <button
                 type="button"
                 className={DIALOG_CANCEL_CLASS}
@@ -121,11 +125,28 @@ export function NewShiftReport({
               >
                 Start the report
               </button>
-            </div>
+            </>
           }
         >
+          {/* ONE SIZE FOR EVERY FIELD (Mark, 2026-08-28), the same call as
+              page 1 of the report this opens. `DateField variant="field"` is
+              48px natively while a `PickList` is 36, so a column of five
+              controls came out at two heights and two widths.
+              48 rather than the app's usual 36 because of where this leads: the
+              next thing the person sees is the runner, which is tablet-first,
+              and a dialog that steps down 12px on the way in reads as two
+              different apps. `size="lg"` also brings 16px type, below which iOS
+              Safari zooms the page on focus. */}
           <div className="space-y-5">
             {failed ? <p className="text-sm text-accent">{failed}</p> : null}
+
+            {/* Location leads and is stated, not asked — page 1's order. */}
+            <div className="space-y-1.5">
+              <span className="block text-xs font-semibold uppercase tracking-[0.08em]">
+                Location
+              </span>
+              <p className="text-[16px] font-semibold">{locationCode}</p>
+            </div>
 
             <label className="block space-y-1.5">
               <span className="text-xs font-semibold uppercase tracking-[0.08em]">Date</span>
@@ -141,11 +162,6 @@ export function NewShiftReport({
               </span>
             </label>
 
-            <label className="block space-y-1.5">
-              <span className="text-xs font-semibold uppercase tracking-[0.08em]">Location</span>
-              <span className="block text-sm">{locationCode}</span>
-            </label>
-
             <div className="space-y-1.5">
               <span className="block text-xs font-semibold uppercase tracking-[0.08em]">
                 Supervisor
@@ -156,6 +172,9 @@ export function NewShiftReport({
                 onPick={setSupervisor}
                 placeholder="Who ran the shift"
                 variant="field"
+                size="lg"
+                boxed
+                className="w-full"
                 ariaLabel="The supervisor who ran this shift"
               />
             </div>
@@ -167,6 +186,9 @@ export function NewShiftReport({
                 options={SHIFT_OPTIONS}
                 onPick={(next) => setShift(next as ShiftSlot)}
                 variant="field"
+                size="lg"
+                boxed
+                className="w-full"
                 ariaLabel="Which shift"
               />
               {duplicate ? (
