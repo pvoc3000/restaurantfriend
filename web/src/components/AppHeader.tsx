@@ -44,10 +44,12 @@ export async function AppHeader({ session }: { session: AppSession }) {
               <GearIcon />
             </IconButton>
 
-            {/* Active ones only — design rule 3's `activeLocations` is the list
-                you ENUMERATE, and only an open shop is one you can work at. */}
+            {/* The ones this member MAY WORK AT — `workableLocations`, which
+                is `activeLocations` narrowed by 073's grid and identical to it
+                for anybody unrestricted. A switcher must never offer a shop
+                `set_my_member_profile` would refuse. */}
             <WorkingLocation
-              locations={session.activeLocations}
+              locations={session.workableLocations}
               working={session.activeLocation}
             />
           </>

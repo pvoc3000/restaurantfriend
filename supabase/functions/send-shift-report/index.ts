@@ -149,6 +149,37 @@ Deno.serve(async (req) => {
       [...MANAGEMENT_ROLES, ...SUPERVISOR_ROLES].includes(m.role)
     );
 
+    // ---- 073: the supervisor version follows the access grid ---------------
+    //
+    // Mark, 2026-08-29: DF01's report goes to the supervisors who may work at
+    // DF01. The grid is the one place that says who those are, so this reads
+    // it rather than inventing a second notion of "belongs to a shop".
+    //
+    // NO ROWS FOR A MEMBER MEANS EVERY SHOP — 073's central rule, and it has
+    // to hold here too or applying the migration would silently stop every
+    // report reaching anybody. So the default is INCLUDE, and a member is
+    // dropped only when they have rows and this shop is not among them.
+    //
+    // MANAGEMENT IS NEVER SCOPED. A manager sees every shop, and Mark's own
+    // employee record has no main location at all — a location-scoped rule
+    // would quietly drop the owner off the DF01 report, which is exactly the
+    // kind of silence this module keeps trying not to produce.
+    const { data: gridRows } = await admin
+      .from("location_members")
+      .select("user_id, location_id")
+      .eq("org_id", report.org_id);
+
+    const restricted = new Map<string, Set<string>>();
+    for (const g of gridRows ?? []) {
+      const set = restricted.get(g.user_id) ?? new Set<string>();
+      set.add(g.location_id);
+      restricted.set(g.user_id, set);
+    }
+    const worksHere = (userId: string) => {
+      const set = restricted.get(userId);
+      return !set || set.has(report.location_id);
+    };
+
     const emailById = new Map<string, string>();
     // Paged, because `listUsers` defaults to 50 and an org that outgrows one
     // page would silently stop emailing whoever sorted last.
@@ -166,6 +197,7 @@ Deno.serve(async (req) => {
 
     const supervisorTo = wanted
       .filter((m) => SUPERVISOR_ROLES.includes(m.role))
+      .filter((m) => worksHere(m.user_id))
       .map((m) => emailById.get(m.user_id))
       .filter((e): e is string => Boolean(e));
 

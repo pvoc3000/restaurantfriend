@@ -13,6 +13,7 @@ import {
   DIALOG_COMMIT_CLASS,
 } from "@/components/ui/Dialog";
 import { ROLE_LABEL, ROLE_OPTIONS, type Role } from "@/lib/roles";
+import { LocationAccess } from "./LocationAccess";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
@@ -44,6 +45,8 @@ export function AppAccess({
   orgId,
   userId,
   role,
+  locations,
+  allowedLocationIds,
   displayName,
   invitedAt,
 }: {
@@ -54,6 +57,10 @@ export function AppAccess({
   /** The linked auth user, or null when this person has no access. */
   userId: string | null;
   role: Role | null;
+  /** Active shops, for 073's access grid. */
+  locations: { id: string; code: string; name: string }[];
+  /** Which of them this member may work at. Empty = every one. */
+  allowedLocationIds: string[];
   displayName: string | null;
   invitedAt: string | null;
 }) {
@@ -198,6 +205,19 @@ export function AppAccess({
           <dl className="grid grid-cols-[6rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
             <dt className="text-subtle">Signs in as</dt>
             <dd>{displayName}</dd>
+            <dt className="text-subtle">Works at</dt>
+            <dd>
+              {/* 073's grid. Beside the role, because the two together are the
+                  whole of what app access means: what you may do, and where. */}
+              <LocationAccess
+                orgId={orgId}
+                userId={userId ?? ""}
+                role={role}
+                locations={locations}
+                allowed={allowedLocationIds}
+                editable={!isOwner}
+              />
+            </dd>
             <dt className="text-subtle">Role</dt>
             <dd>
               {isOwner ? (

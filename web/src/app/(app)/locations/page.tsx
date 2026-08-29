@@ -67,6 +67,7 @@ export default async function LocationsPage() {
           away the reader's search and sort on every "Work here" tap. */}
       <LocationsList
         rows={rows}
+        workableIds={session.workableLocations.map((l) => l.id)}
         workingLocationId={session.activeLocation?.id ?? null}
         editable={editable}
       />

@@ -37,12 +37,16 @@ type SortKey = "active" | "working" | "code" | "name" | "kind" | "city";
 export function LocationsList({
   rows,
   workingLocationId,
+  workableIds,
   editable,
 }: {
   rows: LocationRow[];
   workingLocationId: string | null;
+  /** 073: the shops this member may work at — `session.workableLocations`. */
+  workableIds: string[];
   editable: boolean;
 }) {
+  const workable = new Set(workableIds);
   const [search, setSearch] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: SortDir }>({
     key: "code",
@@ -173,6 +177,7 @@ export function LocationsList({
           locationId={r.id}
           isWorking={r.id === workingLocationId}
           isActive={r.is_active}
+          mayWork={workable.has(r.id)}
         />
       ),
     },

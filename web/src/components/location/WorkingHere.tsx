@@ -36,10 +36,21 @@ export function WorkingHere({
   locationId,
   isWorking,
   isActive,
+  mayWork = true,
 }: {
   locationId: string;
   isWorking: boolean;
   isActive: boolean;
+  /**
+   * 073's grid. False on an open shop this member may not work at — the column
+   * then shows NOTHING, exactly as it does for a closed one, rather than a
+   * button that would be refused by `set_my_member_profile`.
+   *
+   * Nothing rather than a disabled button, and that is the Locations list's own
+   * rule rather than a new one: a closed shop shows nothing here for the same
+   * reason, and greying a control you can still see reads as broken.
+   */
+  mayWork?: boolean;
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -83,7 +94,9 @@ export function WorkingHere({
     );
   }
 
-  if (!isActive) return null;
+  // A closed shop, or one this member may not work at — the same nothing in
+  // both cases, because in both the answer to "can I work here?" is no.
+  if (!isActive || !mayWork) return null;
 
   return (
     <button

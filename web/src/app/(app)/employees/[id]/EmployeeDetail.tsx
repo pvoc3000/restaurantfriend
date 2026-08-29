@@ -249,6 +249,17 @@ export async function EmployeeDetail({
         .maybeSingle()
     : { data: null };
 
+  // 073's grid, for the same tab and the same reason. The error is swallowed:
+  // until the migration is applied the table does not exist, and an empty list
+  // reads as "every shop", which is both the correct answer then and what the
+  // whole app does in that state.
+  const { data: gridRows } = person.user_id && tab === "admin"
+    ? await supabase
+        .from("location_members")
+        .select("location_id")
+        .eq("user_id", person.user_id)
+    : { data: null };
+
   // Sign every document in ONE batch on the server — not a round trip per card,
   // and a URL built to expire doesn't outlive the page.
   const docs = (documentRows ?? []) as unknown as EmployeeDocument[];
@@ -782,6 +793,12 @@ export async function EmployeeDetail({
           role={(membership?.role ?? null) as Role | null}
           displayName={(membership?.display_name ?? null) as string | null}
           invitedAt={(membership?.invited_at ?? null) as string | null}
+          locations={session.activeLocations.map((l) => ({
+            id: l.id,
+            code: l.code,
+            name: l.name,
+          }))}
+          allowedLocationIds={(gridRows ?? []).map((g) => g.location_id as string)}
         />
       </section>
 

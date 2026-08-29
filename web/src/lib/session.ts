@@ -56,6 +56,24 @@ export type AppSession = {
    * don't sprout dead rows on every screen in the app.
    */
   activeLocations: Location[];
+  /**
+   * The shops THIS MEMBER MAY WORK AT — active, and permitted by 073's
+   * `location_members` grid. The list to reach for when offering somebody a
+   * SWITCH: the masthead picker, and the Locations list's Work here.
+   *
+   * A THIRD list, and picking the wrong one of the three is a silent bug, so:
+   *   `locations`        every one, closed included — LOOK UP a code by id
+   *   `activeLocations`  the open ones — ENUMERATE (a row per shop, a scope
+   *                      over shops); never narrowed by the grid, because
+   *                      "may work at" is not "may see" and an item's
+   *                      per-location rows must not vanish for a restricted
+   *                      member
+   *   `workableLocations` the ones you may SWITCH to
+   *
+   * With no rows in the grid this equals `activeLocations`, which is what
+   * every member has until somebody ticks a box.
+   */
+  workableLocations: Location[];
   activeLocation: Location | null;
   /** orgs.settings, embedded here rather than fetched again: it's one jsonb
    *  column reached through an FK the membership query already traverses, and
@@ -93,6 +111,7 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
   const [
     { data: membership, error: membershipError },
     { data: locations, error: locationsError },
+    { data: grid, error: gridError },
   ] = await Promise.all([
     supabase
       .from("org_members")
@@ -105,6 +124,10 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
       .from("locations")
       .select("id, code, name, kind, is_active, labor_rate")
       .order("code"),
+    // 073. The member's OWN rows only — no rows means unrestricted, so this is
+    // usually empty and costs a primary-key lookup. In the same wave rather
+    // than a second one: this is on every page load.
+    supabase.from("location_members").select("location_id").eq("user_id", user.id),
   ]);
 
   if (membershipError) throw membershipError;
@@ -128,6 +151,29 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
   // working context would otherwise fall through to the `?? …[0]` and snap
   // silently back to DF01, which looks exactly like the write not landing.
   // The fallback stays active-only so a fresh user lands somewhere real.
+  /**
+   * NO ROWS MEANS EVERY LOCATION — 073's central rule, restated here because
+   * this is the reader that makes it true for the whole app. An empty grid is
+   * what exists the moment the migration runs, and reading it as "no shops"
+   * would log the company out of everywhere at once.
+   *
+   * Owner and admin are never restricted, which `may_work_at` also enforces
+   * in SQL; this is the same rule on the screen so the picker never offers
+   * something the RPC would refuse, nor hides something it would allow.
+   *
+   * `gridError` is swallowed DELIBERATELY: until 073 is applied the table does
+   * not exist, and an unrestricted app is the correct behaviour then. A hard
+   * failure here would take down every screen over a feature nobody has
+   * configured yet.
+   */
+  const unrestricted =
+    gridError !== null ||
+    (grid ?? []).length === 0 ||
+    membership.role === "owner" ||
+    membership.role === "admin";
+  const permitted = new Set((grid ?? []).map((g) => g.location_id as string));
+  const workable = unrestricted ? active : active.filter((l) => permitted.has(l.id));
+
   const activeLocation =
     list.find((l) => l.id === membership.last_active_location_id) ?? active[0] ?? null;
 
@@ -137,6 +183,7 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
     membership,
     locations: list,
     activeLocations: active,
+    workableLocations: workable,
     activeLocation,
     orgSettings: membership.orgs?.settings ?? {},
     // The org's own name, from the SAME embed rather than a second query.

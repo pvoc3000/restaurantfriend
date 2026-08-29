@@ -38,8 +38,9 @@ export function WorkingLocation({
   locations,
   working,
 }: {
-  /** The ACTIVE ones — `session.activeLocations`, per design rule 3: this is a
-   *  control that enumerates locations, not one that looks a code up. */
+  /** The ones you MAY WORK AT — `session.workableLocations`. This control
+   *  offers a SWITCH, so it must never list a shop `set_my_member_profile`
+   *  would refuse; `activeLocations` is the list for enumerating shops. */
   locations: Location[];
   working: Location | null;
 }) {

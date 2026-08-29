@@ -171,6 +171,7 @@ export async function LocationDetail({
             locationId={location.id}
             isWorking={location.id === session.activeLocation?.id}
             isActive={location.is_active}
+            mayWork={session.workableLocations.some((l) => l.id === location.id)}
           />
         </div>
 
