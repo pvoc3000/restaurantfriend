@@ -119,8 +119,14 @@ export type PacketData = {
  * A special order's sheet is headed by the ORDER (Mark, 2026-08-29): a page
  * reading "DF01 PREMADE SCHEDULE" buries the only thing that tells a kitchen
  * which of the night's four sheets they are holding. The heading names the
- * order — "Special Order 9761" — and the order's own name goes beneath it,
+ * order — "SPECIAL ORDER #9761" — and the order's own name goes beneath it,
  * which is where a subtitle belongs and what it is for.
+ *
+ * CAPS AND THE HASH are Mark's (2026-08-29), and they put this heading in the
+ * same voice as the one it replaces: "DF01 PREMADE SCHEDULE" is upper case in
+ * its own content rather than by a style rule, so a mixed-case sibling read as
+ * a different KIND of document. The hash is how an order is written
+ * everywhere else in the app.
  *
  * The two halves come from `splitScheduleTitle`, the inverse of the function
  * that composed them at scheduling time. Nothing here re-spells anything: a
@@ -146,7 +152,7 @@ export function premadeSheetTitle(schedule: {
   // A special-order schedule with no parseable number falls back to the whole
   // stored title rather than printing "Special Order null".
   return number
-    ? { heading: `Special Order ${number}`, subtitle: name }
+    ? { heading: `SPECIAL ORDER #${number}`, subtitle: name }
     : { heading: title, subtitle: null };
 }
 

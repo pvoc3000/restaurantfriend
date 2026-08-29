@@ -450,14 +450,14 @@ test("a null type, size or subtype does not throw and sorts consistently", () =>
 import { premadeSheetTitle } from "../../src/lib/productionPacket";
 import { scheduleTitle, splitScheduleTitle } from "../../src/lib/specialOrderSchedule";
 
-test("a special order's sheet is headed by the order and subtitled by its name", () => {
+test("a special order's sheet is headed SPECIAL ORDER #n, subtitled by its name", () => {
   eq(
     premadeSheetTitle({
       source: "special_order",
       title: "#9761 · Wedding 8/29/2026",
       sellsCode: "DF01",
     }),
-    { heading: "Special Order 9761", subtitle: "Wedding 8/29/2026" }
+    { heading: "SPECIAL ORDER #9761", subtitle: "Wedding 8/29/2026" }
   );
 });
 
@@ -476,7 +476,7 @@ test("THE SPLIT IS scheduleTitle's INVERSE — pinned against the composer itsel
 test("an order with no name at all still heads correctly", () => {
   eq(
     premadeSheetTitle({ source: "special_order", title: scheduleTitle("9761", null), sellsCode: "DF01" }),
-    { heading: "Special Order 9761", subtitle: null }
+    { heading: "SPECIAL ORDER #9761", subtitle: null }
   );
 });
 
