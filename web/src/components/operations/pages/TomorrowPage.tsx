@@ -182,13 +182,26 @@ export function TomorrowPage({
           </p>
         ) : (
           <ul className="divide-y divide-hairline border border-hairline">
+            {/* A PRINT PER ROW (Mark, 2026-08-29), the special orders' shape
+                above. The button below prints the whole night in one file,
+                which is what you want at the end of a shift; this is for the
+                one sheet that jammed, or the one a baker walked off with.
+                It says "printed <date>" the same way an order does, and the
+                verb changes to "Print again" once it has been — a button that
+                said "Print" on something already printed would make you check
+                the row twice. */}
             {schedules.map((s) => (
               <li key={s.id} className="flex items-center gap-4 px-4 py-3">
                 <span className="w-16 text-[15px]">{s.sellsCode}</span>
                 <span className="flex-1 text-[15px]">{s.title ?? "Premade schedule"}</span>
                 {s.printedAt ? (
-                  <span className="text-xs text-muted">printed</span>
+                  <span className="text-xs text-muted">printed {s.printedAt.slice(0, 10)}</span>
                 ) : null}
+                <PrintPacket
+                  scheduleIds={[s.id]}
+                  stampable={stampable}
+                  label={s.printedAt ? "Print again" : "Print"}
+                />
               </li>
             ))}
           </ul>

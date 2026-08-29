@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canEnterCounts, canReadHr } from "@/lib/roles";
+import { ReopenShiftReport } from "@/components/operations/ReopenShiftReport";
 import { daysBefore } from "@/lib/today";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { parseTrail } from "@/lib/breadcrumbs";
@@ -62,7 +63,8 @@ export default async function ShiftReportPage({
   const reportDate = report.report_date as string;
   const isDraft = report.status === "draft";
 
-  const [{ data: takers }, { data: ratings }, { data: sales }] = await Promise.all([
+  const [{ data: takers }, { data: ratings }, { data: sales }, { count: countRows }] =
+    await Promise.all([
     supabase.rpc("special_order_takers", { p_org_id: report.org_id }),
     // 070's own policy decides whether these come back at all: owner/admin, or
     // the person who wrote the report. A supervisor reading a colleague's
@@ -77,6 +79,10 @@ export default async function ShiftReportPage({
       .select("business_date, net_sales_cents, tips_cents")
       .eq("location_id", report.location_id)
       .in("business_date", [reportDate, daysBefore(reportDate, 7)]),
+    supabase
+      .from("shift_report_counts")
+      .select("*", { count: "exact", head: true })
+      .eq("report_id", id),
   ]);
 
   const nameById = new Map<string, string>(
@@ -133,6 +139,16 @@ export default async function ShiftReportPage({
             <Link href={`/shift-reports/${id}/run`} className="text-sm underline">
               Resume this report
             </Link>
+          ) : canReadHr(role) ? (
+            // Owner/admin only, which is 072's own rule and 070's for touching a
+            // sent report at all: a supervisor writes and sends their own, but
+            // taking one back un-writes rows on other people's HR records.
+            <ReopenShiftReport
+              reportId={id}
+              ratingCount={ratingRows.length}
+              countCount={countRows ?? 0}
+              emailed={report.emailed_at !== null}
+            />
           ) : null}
         </div>
 
