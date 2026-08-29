@@ -30,7 +30,14 @@ function Welcome() {
   const router = useRouter();
   const params = useSearchParams();
   const tokenHash = params.get("token_hash");
-  const type = params.get("type") === "magiclink" ? "magiclink" : "invite";
+  // Three kinds of link land here, and all three end the same way: this person
+  // chooses a password and is signed in. `recovery` is 074's forgot-password
+  // flow (Mark, 2026-08-29); the other two are an invitation and the re-send
+  // for an account that already existed.
+  const raw = params.get("type");
+  const type: "invite" | "magiclink" | "recovery" =
+    raw === "magiclink" ? "magiclink" : raw === "recovery" ? "recovery" : "invite";
+  const returning = type === "recovery";
 
   // Cosmetic, and passed in the link because this page has no session and so
   // can't read the org or the employee itself. Trimmed to a sane length: it
@@ -105,7 +112,9 @@ function Welcome() {
       // reason, which is the last thing you want when someone is stuck on
       // their own invitation and you're not in the room.
       setError(
-        `This invitation didn't work — it has probably expired or been used already. (${verifyError.message})`
+        `${
+          returning ? "This link" : "This invitation"
+        } didn't work — it has probably expired or been used already. (${verifyError.message})`
       );
       return;
     }
@@ -154,7 +163,11 @@ function Welcome() {
             It comes down the link rather than being hardcoded (design rule 2);
             a plain "Welcome" is the fallback when it isn't there. */}
         <h1 className="bg-ink px-6 py-4 text-[15px] font-bold uppercase tracking-[0.06em] text-white">
-          {org ? `Welcome to ${org}!` : "Welcome"}
+          {returning
+            ? "Set a new password"
+            : org
+              ? `Welcome to ${org}!`
+              : "Welcome"}
         </h1>
 
         <div className="space-y-5 p-6">
@@ -165,7 +178,7 @@ function Welcome() {
           {tokenHash ? (
             <p className="text-sm text-muted">
               Choose a password and you&rsquo;re in. You&rsquo;ll sign in with
-              the email address this invitation was sent to.
+              the email address {returning ? "the link" : "this invitation"} was sent to.
             </p>
           ) : (
             <p className="text-sm text-accent">

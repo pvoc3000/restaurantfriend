@@ -10,6 +10,7 @@ import {
   useAnchoredPanel,
 } from "@/lib/anchoredPanel";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { BOXED_FIELD_BORDER } from "./fieldMetrics";
 
 export type PickSetOption = {
   value: string;
@@ -50,6 +51,7 @@ export function PickSet({
   noun,
   disabled = false,
   align = "left",
+  boxed = false,
   minWidth = 220,
   className = "",
 }: {
@@ -64,6 +66,12 @@ export function PickSet({
   /** Pluralised in the trigger past two — "3 shops". */
   noun: string;
   disabled?: boolean;
+  /**
+   * The detail-field dress: a hairline that blackens on hover, instead of the
+   * standing black rule a filter row wants. `ui/PickList`'s prop, same name and
+   * same meaning, so a column holding one of each matches.
+   */
+  boxed?: boolean;
   align?: "left" | "right";
   minWidth?: number;
   className?: string;
@@ -104,7 +112,14 @@ export function PickSet({
         aria-label={label}
         disabled={disabled}
         onClick={() => setOpen((v) => !v)}
-        className={`flex h-9 items-center gap-2 border border-ink bg-white px-3 text-[13px] disabled:opacity-40 ${className}`}
+        // `boxed` is `ui/PickList`'s prop, doing PickList's job, so the two
+        // read as one control when they sit in the same column: a FILTER row
+        // wants the black rule its neighbours have, a detail FIELD wants the
+        // hairline that blackens on hover. Mark, 2026-08-29 — Works at and
+        // Role were a black border beside a grey one.
+        className={`flex h-9 items-center gap-2 bg-white px-3 text-[13px] disabled:opacity-40 ${
+          boxed ? BOXED_FIELD_BORDER : "border border-ink"
+        } ${className}`}
       >
         <span className="truncate">{summary}</span>
         <span aria-hidden className="ml-auto shrink-0 text-[9px] text-muted">

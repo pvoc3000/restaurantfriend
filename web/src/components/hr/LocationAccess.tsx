@@ -127,6 +127,7 @@ export function LocationAccess({
         allLabel="All shops"
         label="Which shops this member may work at"
         noun="shop"
+        boxed
         className={fullWidth ? "w-full" : ""}
       />
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
