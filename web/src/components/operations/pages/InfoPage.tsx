@@ -57,7 +57,21 @@ export function InfoPage({
   }
 
   return (
+    // ONE WIDTH FOR EVERY FIELD (Mark, 2026-08-28). The two PickLists sized to
+    // their own content while the dates filled the column, so a column of five
+    // fields had three different right edges. The detail-field convention is
+    // that the TRACK is the width — the block defines one edge and every field
+    // in it shares both.
     <div className="mx-auto max-w-2xl space-y-8">
+      {/* LOCATION LEADS, because it is the one thing here nobody can change
+          (Mark, 2026-08-28) — a read-only value below four editable ones reads
+          as a field that has stopped working. At the top it is the heading it
+          actually is: which shop this report is about. */}
+      <div className="space-y-2">
+        <FieldLabel>Location</FieldLabel>
+        <p className="text-[16px] font-semibold">{locationCode}</p>
+      </div>
+
       <label className="block space-y-2">
         <FieldLabel hint="the day your shift started, not ended!">Date</FieldLabel>
         <DateField
@@ -71,11 +85,6 @@ export function InfoPage({
       </label>
 
       <div className="space-y-2">
-        <FieldLabel>Location</FieldLabel>
-        <p className="text-[16px]">{locationCode}</p>
-      </div>
-
-      <div className="space-y-2">
         <FieldLabel>Supervisor</FieldLabel>
         <PickList
           value={supervisorId}
@@ -83,6 +92,9 @@ export function InfoPage({
           onPick={(next) => save({ supervisor_employee_id: next })}
           placeholder="Who ran the shift"
           variant="field"
+          size="lg"
+          boxed
+          className="w-full"
           disabled={!editable}
           ariaLabel="The supervisor who ran this shift"
         />
@@ -95,6 +107,9 @@ export function InfoPage({
           options={SHIFT_OPTIONS}
           onPick={(next) => save({ shift: next })}
           variant="field"
+          size="lg"
+          boxed
+          className="w-full"
           disabled={!editable}
           ariaLabel="Which shift"
         />

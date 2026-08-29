@@ -396,3 +396,49 @@ test("wrapEmail wraps and does not disturb the split", () => {
 test("the subject names the shop, the shift and the day", () => {
   eq(emailSubject(REPORT), "DF02 closing shift report — 2026-08-27");
 });
+
+// ---------------------------------------------------------------------------
+// The counting page reads down the printed sheet
+// ---------------------------------------------------------------------------
+
+import { compareForPremadeSheet } from "../../src/lib/productionSchedule";
+
+const row = (item_type: string | null, size: string | null, subtype: string | null, item_name: string) =>
+  ({ item_type, size, subtype, item_name });
+
+test("premade order is type, then size, then subtype, then name", () => {
+  const shuffled = [
+    row("Raised", "Regular", "Bar", "Bar - Maple"),
+    row("Cake", "Regular", "Vanilla", "Angry Samoa"),
+    row("Raised", "Mini", "Promise Ring", "Promise Ring - Choc"),
+    row("Cake", "Regular", "Banana", "Bananaversary"),
+    row("Raised", "Regular", "Bar", "Band of Hostess"),
+  ];
+  eq(
+    [...shuffled].sort(compareForPremadeSheet).map((r) => r.item_name),
+    [
+      "Bananaversary",          // Cake / Regular / Banana
+      "Angry Samoa",            // Cake / Regular / Vanilla
+      "Promise Ring - Choc",    // Raised / Mini
+      "Band of Hostess",        // Raised / Regular / Bar — by name within
+      "Bar - Maple",
+    ]
+  );
+});
+
+test("it is case- and number-aware, like every other sort in the app", () => {
+  eq(compareForPremadeSheet(row("cake", null, null, "a"), row("Cake", null, null, "a")), 0);
+  ok(
+    compareForPremadeSheet(row("A", null, null, "Item 2"), row("A", null, null, "Item 10")) < 0,
+    "Item 2 sorts before Item 10, not after"
+  );
+});
+
+test("a null type, size or subtype does not throw and sorts consistently", () => {
+  const rows = [row(null, null, null, "z"), row("Cake", null, null, "a"), row(null, null, null, "a")];
+  const sorted = [...rows].sort(compareForPremadeSheet).map((r) => r.item_name);
+  eq(sorted.length, 3);
+  // Whatever the nulls do, they must do it deterministically — sorting twice
+  // is the property that matters when two surfaces share the comparator.
+  eq([...rows].sort(compareForPremadeSheet).map((r) => r.item_name), sorted);
+});

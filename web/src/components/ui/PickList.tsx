@@ -90,6 +90,7 @@ export function PickList({
   align = "left",
   variant = "inline",
   boxed = false,
+  size = "md",
   className = "",
   panelMinWidth = 168,
   defaultOpen = false,
@@ -184,6 +185,19 @@ export function PickList({
    * the pickers not being editable.
    */
   boxed?: boolean;
+  /**
+   * `field` only. `md` is the app's own 36px field height, which is what a
+   * filter row and a desk form want. `lg` is 48px with 16px type, for a
+   * TABLET-FIRST surface — the shift report, where a field is pressed at arm's
+   * length and where anything under 16px makes iOS Safari zoom the page on
+   * focus.
+   *
+   * A PROP rather than a `className` override, because Tailwind resolves
+   * competing utilities by STYLESHEET order rather than class-string order, so
+   * a caller passing `h-12` could not be relied on to beat this component's own
+   * `h-9`. The same reason `variant` is stated rather than overridden.
+   */
+  size?: "md" | "lg";
   className?: string;
   /** Narrowest the PANEL may be, in px — capped at 340 like the derived width.
    *  Raise it where the trigger is much narrower than the rows it opens. */
@@ -389,7 +403,9 @@ export function PickList({
           variant === "field"
             ? // A box like TextInput's and TabPicker's, so a filter row reads as
               // one set of controls at one height.
-              `flex h-9 items-center gap-2 border border-ink bg-white px-3 text-left text-sm hover:bg-neutral-100 disabled:opacity-35 ${
+              `flex ${
+                size === "lg" ? "h-12 text-[16px]" : "h-9 text-sm"
+              } items-center gap-2 border border-ink bg-white px-3 text-left hover:bg-neutral-100 disabled:opacity-35 ${
                 empty ? "text-faint" : ""
               } ${className}`
             : variant === "masthead"

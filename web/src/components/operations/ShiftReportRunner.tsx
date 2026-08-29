@@ -31,6 +31,10 @@ import { salesSnapshot, serverSalesSnapshot, subscribeSales } from "@/lib/shiftR
  * rather than a save. What none of them touches is the tables that OWN these
  * facts — that is `submit_shift_report`, once, at the end.
  */
+/** One dress for every footer cell, so a four-across row cannot drift. */
+const FOOTER_CELL =
+  "min-h-14 px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white disabled:opacity-35";
+
 export function ShiftReportRunner({
   reportId,
   shift,
@@ -171,12 +175,19 @@ export function ShiftReportRunner({
         {pages[page] ?? <p className="text-sm text-muted">Nothing to do on this page.</p>}
       </main>
 
-      {/* FMP's footer, and its three commands. 44px targets throughout: this is
-          read at arm's length on an iPad by somebody who is tired. */}
-      <footer className="sticky bottom-0 grid grid-cols-3 divide-x divide-white/20 border-t border-white/20 bg-ink">
+      {/* FOUR CELLS, FIXED (Mark, 2026-08-28: "Pause & close only appears on the
+          first page ... seems like it should always be available"). It used to
+          share a cell with Back, which meant the one command you reach for when
+          the shop gets busy was available only on page 1 — the page you are
+          least likely to be on when that happens.
+          A fixed four means no cell ever changes what it DOES as you page
+          through: Back is disabled on page 1 rather than absent, so nothing
+          shifts under a thumb. 44px targets throughout — this is read at arm's
+          length by somebody who is tired. */}
+      <footer className="sticky bottom-0 grid grid-cols-4 divide-x divide-white/20 border-t border-white/20 bg-ink">
         <button
           type="button"
-          className="min-h-14 px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white disabled:opacity-35"
+          className={FOOTER_CELL}
           onClick={() => void cancel()}
           disabled={busy !== null}
         >
@@ -184,16 +195,24 @@ export function ShiftReportRunner({
         </button>
         <button
           type="button"
-          className="min-h-14 px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white disabled:opacity-35"
-          onClick={() => (first ? pause() : setIndex(index - 1))}
+          className={FOOTER_CELL}
+          onClick={pause}
           disabled={busy !== null}
         >
-          {first ? "Pause & close" : "Back"}
+          Pause &amp; close
+        </button>
+        <button
+          type="button"
+          className={FOOTER_CELL}
+          onClick={() => setIndex(index - 1)}
+          disabled={busy !== null || first}
+        >
+          Back
         </button>
         {last ? (
           <button
             type="button"
-            className="min-h-14 px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-mark disabled:opacity-35"
+            className={`${FOOTER_CELL} text-mark`}
             onClick={send}
             disabled={busy !== null || isSent || !canSend}
             title={
@@ -209,7 +228,7 @@ export function ShiftReportRunner({
         ) : (
           <button
             type="button"
-            className="min-h-14 px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white disabled:opacity-35"
+            className={FOOTER_CELL}
             onClick={() => setIndex(index + 1)}
             disabled={busy !== null}
           >

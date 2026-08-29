@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canEnterCounts } from "@/lib/roles";
+import { canEnterCounts, canReadHr } from "@/lib/roles";
 import { daysBefore } from "@/lib/today";
+import { compareForPremadeSheet } from "@/lib/productionSchedule";
 import {
   pagesForShift,
   type EmailReport,
@@ -25,6 +27,41 @@ import {
   type TomorrowSchedule,
 } from "@/components/operations/pages/TomorrowPage";
 import { SubmitPage } from "@/components/operations/pages/SubmitPage";
+
+/**
+ * The ratings, with a ONE-SHOT RETRY without `break_started_at`.
+ *
+ * 071 adds that column and migrations are applied by hand, so between a deploy
+ * and the SQL editor the select would 400 and — because this query's error is
+ * not fatal to the page — the ratings would render as NONE. Somebody testing
+ * would reasonably conclude their ratings had been lost.
+ *
+ * `BatchLogRecord`'s pattern: ask for everything, and if the message names the
+ * new column, ask again without it. The break time then reads as unrecorded,
+ * which is exactly what it is until the migration runs.
+ */
+async function ratingsQuery(supabase: SupabaseClient, reportId: string) {
+  const full = await supabase
+    .from("shift_report_ratings")
+    .select("id, employee_id, position, score, note, got_break, break_started_at, break_reason")
+    .eq("report_id", reportId)
+    .order("created_at");
+
+  if (!full.error || !/break_started_at/.test(full.error.message)) return full;
+
+  return supabase
+    .from("shift_report_ratings")
+    .select("id, employee_id, position, score, note, got_break, break_reason")
+    .eq("report_id", reportId)
+    .order("created_at");
+}
+
+/** The packet's comparator over the runner's own row shape. */
+const compareRows = (a: PremadeRow, b: PremadeRow) =>
+  compareForPremadeSheet(
+    { item_type: a.itemType, size: a.size, subtype: a.subtype, item_name: a.name },
+    { item_type: b.itemType, size: b.size, subtype: b.subtype, item_name: b.name }
+  );
 
 /** Standing in for a query this shift does not need. The employee record's
  *  tab-fetching idiom: only the pages in play cost anything. */
@@ -99,6 +136,7 @@ export default async function RunShiftReportPage({
 
   const [
     { data: takers },
+    { data: positionRows },
     { data: ratings },
     { data: todaySchedule },
     { data: batchLog },
@@ -108,11 +146,15 @@ export default async function RunShiftReportPage({
     { data: plans },
   ] = await Promise.all([
     supabase.rpc("special_order_takers", { p_org_id: report.org_id }),
-    supabase
-      .from("shift_report_ratings")
-      .select("id, employee_id, position, score, note, got_break, break_reason")
-      .eq("report_id", id)
-      .order("created_at"),
+    // The shop's own position vocabulary. `employees.position` is the third of
+    // the three this schema carries and the one that holds the abbreviations a
+    // supervisor actually writes — "DF", "Sr. DF" — where `timesheets.position`
+    // holds Homebase's Role. Owner/admin only, so below that the picker falls
+    // back to whatever is already on the row plus anything typed.
+    canReadHr(role)
+      ? supabase.from("employees").select("position").not("position", "is", null)
+      : SKIP,
+    ratingsQuery(supabase, id),
     wants("premades")
       ? supabase
           .from("production_schedules")
@@ -166,6 +208,18 @@ export default async function RunShiftReportPage({
     label: t.name,
   }));
 
+  // Distinct and sorted here rather than in SQL: PostgREST has no DISTINCT, and
+  // 445 rows of one short column is cheaper to de-duplicate than to think about.
+  const positions = [
+    ...new Set(
+      ((positionRows as { position: string | null }[] | null) ?? [])
+        .map((p) => (p.position ?? "").trim())
+        .filter((p) => p !== "")
+    ),
+  ]
+    .sort((a, b) => a.localeCompare(b))
+    .map((p) => ({ value: p, label: p }));
+
   const ratingRows: RatingRow[] = ((ratings as Record<string, unknown>[] | null) ?? []).map(
     (r) => ({
       id: r.id as string,
@@ -175,6 +229,8 @@ export default async function RunShiftReportPage({
       score: r.score === null ? null : Number(r.score),
       note: (r.note as string | null) ?? null,
       gotBreak: (r.got_break as boolean | null) ?? null,
+      // Postgres `time` arrives as HH:MM:SS; `ui/TimeField` wants HH:MM.
+      breakStartedAt: ((r.break_started_at as string | null) ?? null)?.slice(0, 5) ?? null,
       breakReason: (r.break_reason as string | null) ?? null,
     })
   );
@@ -206,6 +262,7 @@ export default async function RunShiftReportPage({
       return {
         scheduleItemId: l.id as string,
         itemType: (l.item_type as string | null) ?? null,
+        size: (l.size as string | null) ?? null,
         subtype: (l.subtype as string | null) ?? null,
         name: l.item_name as string,
         par: l.par === null ? null : Number(l.par),
@@ -214,6 +271,11 @@ export default async function RunShiftReportPage({
         note: (l.note as string | null) ?? null,
       };
     });
+    // THE ORDER OF THE PRINTED SHEET, not the schedule's own `sort` (Mark,
+    // 2026-08-28). Somebody counting leftovers is holding that sheet and
+    // reading down it; a screen in a different order makes them find every row
+    // twice. `compareForPremadeSheet` is the packet's own comparator.
+    premadeRows.sort(compareRows);
   }
 
   // ---- elements: the kitchen's batch log for the day ----------------------
@@ -299,6 +361,7 @@ export default async function RunShiftReportPage({
         orgId={report.org_id as string}
         rows={ratingRows}
         roster={roster}
+        positions={positions}
         editable={editable}
       />
     ),

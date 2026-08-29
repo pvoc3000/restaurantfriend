@@ -85,15 +85,19 @@ export function SubmitPage({
                 {l.label}
               </Checkbox>
             ) : (
-              <span className="flex items-center gap-4">
-                {/* U+FE0E on both, or Apple renders a colour box beside a plain
-                    outline one — the order guide's heart and star carry the
-                    same selector for the same reason. */}
-                <span aria-hidden className="text-lg">
-                  {l.done ? "☑︎" : "☐︎"}
-                </span>
-                <span className={l.done ? "" : "text-muted"}>{l.label}</span>
-              </span>
+              // A DERIVED line still looks like the others (Mark, 2026-08-28:
+              // "the 'complete shift report' checkbox looks different from the
+              // others"). It was drawn as ☑︎/☐︎ glyphs because nothing here is
+              // clickable — the narrative existing is what ticks it — and that
+              // made the one line nobody sets the one line that looks wrong.
+              //
+              // It is the real control now, disabled: same box, same label, same
+              // baseline. Disabled reads as "this one answers itself", which is
+              // true, and it is what `NewTimesheet` settled — a control that
+              // looks DIFFERENT cannot be told from one that is broken.
+              <Checkbox checked={l.done} disabled onChange={() => {}}>
+                {l.label}
+              </Checkbox>
             )}
           </li>
         ))}

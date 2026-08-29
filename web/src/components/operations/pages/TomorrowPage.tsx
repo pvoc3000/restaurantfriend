@@ -194,18 +194,29 @@ export function TomorrowPage({
           </ul>
         )}
         <div className="flex flex-wrap items-center gap-3">
+          {/* WHICHEVER ONE IS NEXT IS BLACK, and never both (Mark,
+              2026-08-28). With no schedule for that night the only thing to do
+              is generate; once one exists the only thing left is to print it.
+              That is the panel-commit exception applied to a screen — a state
+              with exactly one obvious next act — rather than a standing
+              "primary", which this app does not have. */}
           <GenerateSchedules
             locations={locations}
             today={nextProductionDate}
             kitchenId={kitchenId}
             kitchenCode={kitchenCode}
             plans={plans}
+            primary={schedules.length === 0}
           />
           {schedules.length > 0 ? (
             <PrintPacket
+              // Every schedule this KITCHEN is filling that night, special
+              // orders included — which is what `schedules` already holds, and
+              // `fetchPacketData` widens further through `companionScheduleIds`
+              // so nothing depends on this list being complete.
               scheduleIds={schedules.map((s) => s.id)}
               stampable={stampable}
-              label="Print the packet…"
+              primary
               onPrinted={() => flag("task_schedules_done", true)}
             />
           ) : null}

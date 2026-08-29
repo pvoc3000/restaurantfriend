@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { openWindowNow, showBlob } from "@/lib/poProcessing";
 import { companionScheduleIds, fetchPacketData, stampPrinted } from "@/lib/productionPacket";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -42,8 +42,9 @@ function initialParts(): PacketPart[] {
 export function PrintPacket({
   scheduleIds,
   stampable,
-  label = "Print packet…",
+  label = "Print All Documents",
   onPrinted,
+  primary = false,
 }: {
   scheduleIds: string[];
   /**
@@ -58,6 +59,8 @@ export function PrintPacket({
   stampable: boolean;
   label?: string;
   onPrinted?: () => void;
+  /** Fill the trigger black — see `GenerateSchedules.primary`. */
+  primary?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -148,7 +151,7 @@ export function PrintPacket({
         type="button"
         onClick={openDialog}
         disabled={scheduleIds.length === 0}
-        className={`${BUTTON_CLASS} shrink-0`}
+        className={`${primary ? PRIMARY_BUTTON_CLASS : BUTTON_CLASS} shrink-0`}
       >
         {label}
       </button>
@@ -187,17 +190,14 @@ export function PrintPacket({
               {scheduleIds.length === 1 ? "night" : "nights"}
               {companions > 0 ? (
                 <>
-                  , and the{" "}
+                  , including{" "}
                   <span className="bg-mark-fill px-1">
                     {companions} special-order{" "}
                     {companions === 1 ? "schedule" : "schedules"}
-                  </span>{" "}
-                  for the same kitchens
+                  </span>
                 </>
               ) : null}
-              . The premade schedule is per shop; the guides and element sheets
-              are per KITCHEN and sum every schedule it is filling, which is
-              what makes them include special orders without a switch.
+              .
             </p>
 
             <ul className="divide-y divide-hairline border border-ink">
@@ -210,7 +210,6 @@ export function PrintPacket({
                     size={18}
                   />
                   <span className="font-medium">{p.label}</span>
-                  <span className="ml-auto text-xs text-muted">{p.hint}</span>
                 </li>
               ))}
             </ul>

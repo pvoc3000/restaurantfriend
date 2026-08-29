@@ -8,6 +8,7 @@ import { CountField } from "./fields";
 export type PremadeRow = {
   scheduleItemId: string;
   itemType: string | null;
+  size: string | null;
   subtype: string | null;
   name: string;
   par: number | null;
@@ -91,8 +92,9 @@ export function PremadesPage({
         <colgroup>
           <col className="w-[9%]" />
           <col className="w-[11%]" />
-          <col className="w-[28%]" />
+          <col className="w-[24%]" />
           <col className="w-[7%]" />
+          <col className="w-[5%]" />
           <col className="w-[13%]" />
           <col className="w-[13%]" />
           <col className="w-[19%]" />
@@ -102,7 +104,8 @@ export function PremadesPage({
             <th className="py-2 pr-3 text-left">Type</th>
             <th className="py-2 pr-3 text-left">Sub type</th>
             <th className="py-2 pr-3 text-left">Name</th>
-            <th className="py-2 pr-3 text-right">Par</th>
+            <th className="py-2 pr-1 text-right">Par</th>
+            <th className="py-2" />
             <th className="py-2 pr-2 text-right">Made</th>
             <th className="py-2 pr-2 text-right">Left</th>
             <th className="py-2 pl-4 text-left">Note</th>
@@ -114,7 +117,28 @@ export function PremadesPage({
               <td className="py-2 pr-3 text-[15px]">{r.itemType ?? "—"}</td>
               <td className="py-2 pr-3 text-[15px]">{r.subtype ?? "—"}</td>
               <td className="py-2 pr-3 text-[15px]">{r.name}</td>
-              <td className="py-2 pr-3 text-right text-[15px]">{r.par ?? "—"}</td>
+              <td className="py-2 pr-1 text-right text-[15px]">{r.par ?? "—"}</td>
+              {/* TAKE THE PAR (Mark, 2026-08-28). The receiving screen's `→`
+                  idiom, and for its reason: the usual answer is "we made what
+                  we were asked to", and typing it out forty times is the work.
+                  An ARROW rather than a prefilled box — a box that filled
+                  itself would make merely OPENING the page look like somebody
+                  had counted, which is the one thing the report must not
+                  claim. Hidden when there is no par to take, and when the made
+                  figure already equals it. */}
+              <td className="py-2 pr-1 text-center align-middle">
+                {editable && r.par !== null && r.made !== r.par ? (
+                  <button
+                    type="button"
+                    className="px-2 py-2 text-lg leading-none text-muted hover:text-ink"
+                    onClick={() => save(r.scheduleItemId, { made: r.par })}
+                    title={`Made ${r.par}`}
+                    aria-label={`Made ${r.par}, ${r.name}`}
+                  >
+                    &rarr;
+                  </button>
+                ) : null}
+              </td>
               <td className="py-2 pr-2">
                 <CountField
                   value={r.made}

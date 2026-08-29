@@ -210,6 +210,37 @@ const name = (v: string | null | undefined) => (v ?? "").trim();
  * on the 8/7 packet, whose types run CAKE · MOCHI · OLD FASHIONED · RAISED ·
  * SCRAP and whose subtypes and items are alphabetical within.
  */
+/**
+ * The order the PREMADE SHEET prints in: type, then size, then subtype, then
+ * the item's own name.
+ *
+ * Exported because a second surface needs it — the shift report's counting page
+ * (Mark, 2026-08-28: "make sure the order of the donuts on page 4 follows how
+ * they print out on the premade sheets"). Somebody counting leftovers is
+ * holding the printed sheet and reading down it; a screen in a different order
+ * makes them find every row twice.
+ *
+ * `rollUp` below sorts the same keys with the same comparator and MUST keep
+ * doing so — it groups Maps where this sorts a flat list, so the two cannot be
+ * one function, but they can and do share this definition of "before".
+ */
+export function compareForPremadeSheet(
+  a: { item_type: string | null; size: string | null; subtype: string | null; item_name: string },
+  b: { item_type: string | null; size: string | null; subtype: string | null; item_name: string }
+): number {
+  return (
+    byName(name(a.item_type), name(b.item_type)) ||
+    byName(name(a.size), name(b.size)) ||
+    byName(name(a.subtype), name(b.subtype)) ||
+    byName(a.item_name, b.item_name)
+  );
+}
+
+/** Empty-last, numeric-aware, case-insensitive — `lib/tableSort`'s manners. */
+function byName(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+}
+
 export function rollUp(lines: ScheduleLine[], grain: Grain): RollType[] {
   const types = new Map<string, Map<string, Map<string, ScheduleLine[]>>>();
 
@@ -224,9 +255,6 @@ export function rollUp(lines: ScheduleLine[], grain: Grain): RollType[] {
     if (!subs.has(st)) subs.set(st, []);
     subs.get(st)!.push(line);
   }
-
-  const byName = (a: string, b: string) =>
-    a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
 
   return [...types.entries()]
     .sort((a, b) => byName(a[0], b[0]))

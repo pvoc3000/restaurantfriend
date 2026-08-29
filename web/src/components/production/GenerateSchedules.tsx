@@ -21,6 +21,7 @@ import { packetDate } from "@/lib/productionSchedule";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
+import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import {
   Dialog,
   DIALOG_CANCEL_CLASS,
@@ -36,12 +37,13 @@ import {
  * days, long weekends, a supervisor who won't be in. FMP's own generator dialog
  * takes exactly these three.
  *
- * ONE KITCHEN — THE WORKING ONE (Mark, 2026-08-28). You commit the night for
- * the kitchen you are standing in, so the Shops list no longer offers every
- * active shop: it offers the shops that SELL what this kitchen makes, which is
- * usually just the one and is DF02 as well when DF01 bakes for it.
+ * ONE KITCHEN — THE WORKING ONE, AND NOBODY IS ASKED WHICH SHOPS.
+ * Mark, 2026-08-28: "we should be able to schedule anything that will be made
+ * at the current working location. We don't care where it's sold." So there is
+ * no Shops list any more; every shop this kitchen bakes for is generated.
  *
- * That indirection is forced by the function rather than chosen. 040's comment
+ * The indirection survives INSIDE, forced by the function rather than chosen.
+ * 040's comment
  * still holds in 069 — "the kitchen is NOT a parameter: the DAY tells you which
  * kitchens are involved" — so `p_location_ids` is a list of SELLERS and the
  * only way to aim a run at one kitchen from out here is to ask which sellers
@@ -130,6 +132,7 @@ export function GenerateSchedules({
   kitchenId,
   kitchenCode,
   plans,
+  primary = false,
 }: {
   locations: { id: string; code: string; name: string }[];
   today: string;
@@ -138,6 +141,15 @@ export function GenerateSchedules({
   kitchenCode: string;
   /** Every plan in the org; which ones count is decided per date range. */
   plans: PlanSummary[];
+  /**
+   * Fill the trigger black.
+   *
+   * The panel-commit exception applied to a screen: on the shift report the
+   * night either has schedules or it does not, and whichever answer it is
+   * there is exactly ONE thing to press next (Mark, 2026-08-28). Only ever
+   * right CONDITIONALLY — never as a standing "primary".
+   */
+  primary?: boolean;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -306,14 +318,7 @@ export function GenerateSchedules({
     });
   }
 
-  function toggle(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
+
 
   async function run(replace: boolean, allowActuals: boolean) {
     if (!start) return;
@@ -440,7 +445,7 @@ export function GenerateSchedules({
       <button
         type="button"
         onClick={openDialog}
-        className="border border-ink bg-white px-4 py-2 text-[13px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white"
+        className={`${primary ? PRIMARY_BUTTON_CLASS : BUTTON_CLASS} shrink-0`}
       >
         Generate schedules…
       </button>
@@ -510,12 +515,6 @@ export function GenerateSchedules({
             <Receipt receipt={receipt} pulled={pulled} />
           ) : (
             <div className="mt-3 space-y-5">
-              <p className="text-sm text-muted">
-                One schedule per shop per kitchen, from the plans active on each
-                date plus any par overrides written for it. A day that already
-                has a schedule is reported rather than replaced.
-              </p>
-
               <div className="flex flex-wrap items-end gap-6">
                 <label className="space-y-1.5">
                   <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
@@ -548,68 +547,29 @@ export function GenerateSchedules({
                 </div>
               </div>
 
-              {/* THE SHOPS THIS KITCHEN SELLS THROUGH.
-                  ONE ROW is stated rather than offered — a checkbox list of a
-                  single item asks a question with one answer, and every real
-                  plan today sells and bakes at the same shop. The list comes
-                  back the moment a second shop's plan points here, which is
-                  decision 9's case and the only time the choice is real. */}
-              <div className="space-y-2">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                  Shops
-                </span>
-
-                {eligible.length === 0 ? (
-                  // Named, not an empty box: "no shops" and "no plans reach
-                  // this kitchen on those dates" look identical on screen and
-                  // are answered in completely different places.
-                  <p className="text-sm">
-                    <span className="bg-mark-fill px-1">
-                      No active plan makes anything at {kitchenCode}
-                      {start
-                        ? days === "1"
-                          ? ` on ${start}`
-                          : ` over those ${days} days`
-                        : ""}
-                      .
-                    </span>{" "}
-                    <span className="text-muted">
-                      A plan needs {kitchenCode}{" "}
-                      as its kitchen and a date range covering these days.
-                    </span>
-                  </p>
-                ) : eligible.length === 1 ? (
-                  <p className="text-sm">
-                    Made at <span className="font-bold">{kitchenCode}</span>, sold at{" "}
-                    <span className="font-bold">{eligible[0].code}</span>{" "}
-                    <span className="text-subtle">({eligible[0].name})</span>.
-                  </p>
-                ) : (
-                  <ul className="divide-y divide-hairline border border-ink">
-                    {eligible.map((l) => (
-                      <li key={l.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
-                        <Checkbox
-                          checked={selected.has(l.id)}
-                          onChange={() => toggle(l.id)}
-                          label={`Generate schedules for ${l.name}`}
-                          size={18}
-                        />
-                        <span className="text-[13px] font-semibold uppercase tracking-[0.06em]">
-                          {l.code}
-                        </span>
-                        <span className="text-subtle">{l.name}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-
-                <p className="text-xs text-muted">
-                  Only the {kitchenCode}{" "}
-                  kitchen&rsquo;s nights are generated here — these are the
-                  shops it makes them for. Switch shops to generate another
-                  kitchen&rsquo;s.
+              {/* WHAT WILL BE MADE HERE — stated, never chosen.
+                  Mark, 2026-08-28: "we should be able to schedule anything that
+                  will be made at the current working location. We don't care
+                  where it's sold." The dialog used to offer the SELLING shops
+                  as a checkbox list, which asked a question with one sensible
+                  answer: every plan whose kitchen is this one is a plan this
+                  kitchen has to bake for. `selected` still exists and still
+                  carries every eligible shop to the RPC, because
+                  `p_location_ids` is how the function is addressed — it is just
+                  no longer a thing anybody is asked about. */}
+              {eligible.length === 0 ? (
+                <p className="text-sm">
+                  <span className="bg-mark-fill px-1">
+                    No active plan makes anything at {kitchenCode}
+                    {start
+                      ? days === "1"
+                        ? ` on ${start}`
+                        : ` over those ${days} days`
+                      : ""}
+                    .
+                  </span>
                 </p>
-              </div>
+              ) : null}
 
               {/* THE SPECIAL ORDERS THIS RUN WOULD BRING ALONG.
                   Only those READY FOR PRODUCTION are offered (Mark,
@@ -684,14 +644,7 @@ export function GenerateSchedules({
                   label="Ignore special orders"
                   size={18}
                 />
-                <span className="text-sm">
-                  Ignore special orders
-                  <span className="block text-xs text-muted">
-                    Generate the plans only, and leave the orders above for
-                    later. Recorded on each schedule it writes, so the printed
-                    totals explain themselves a month from now.
-                  </span>
-                </span>
+                <span className="text-sm">Ignore special orders</span>
               </div>
             </div>
           )}
@@ -719,10 +672,8 @@ function Receipt({
     <div className="mt-3 space-y-5">
       {nothing ? (
         <p className="text-sm text-muted">
-          Nothing to generate. No plan active on{" "}
-          {receipt.days === 1 ? packetDate(receipt.start) : `those ${receipt.days} days`}{" "}
-          carries an item with a par at the shops you chose — which is what the
-          “not made” notes below explain, if there are any.
+          Nothing to generate for{" "}
+          {receipt.days === 1 ? packetDate(receipt.start) : `those ${receipt.days} days`}.
         </p>
       ) : null}
 

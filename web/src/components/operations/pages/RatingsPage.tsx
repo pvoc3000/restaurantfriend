@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { TimeField } from "@/components/ui/TimeField";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { FieldLabel, TextField } from "./fields";
 
@@ -16,6 +17,7 @@ export type RatingRow = {
   score: number | null;
   note: string | null;
   gotBreak: boolean | null;
+  breakStartedAt: string | null;
   breakReason: string | null;
 };
 
@@ -47,12 +49,15 @@ export function RatingsPage({
   orgId,
   rows,
   roster,
+  positions,
   editable,
 }: {
   reportId: string;
   orgId: string;
   rows: RatingRow[];
   roster: PickOption[];
+  /** The shop's own vocabulary — `employees.position`, "DF", "Sr. DF". */
+  positions: PickOption[];
   editable: boolean;
 }) {
   const router = useRouter();
@@ -113,11 +118,26 @@ export function RatingsPage({
               <FieldLabel>Employee</FieldLabel>
               <p className="text-[16px] font-semibold">{row.employeeName}</p>
             </div>
-            <div className="w-44 space-y-2">
+            {/* BOTH PICKERS, BOTH `size="lg"`, both boxed (Mark, 2026-08-28).
+                Position was free text and is a vocabulary — `employees.position`
+                already holds the shop's own abbreviations. `allowNew`, because
+                that list legitimately grows and a role nobody has yet must not
+                be unenterable.
+                `size="lg"` is what makes them the same height as the fields
+                around them; `boxed` is what stops an unset one showing an em
+                dash, which the boxed-field convention forbids — inside a box a
+                stand-in character reads as a value somebody typed. */}
+            <div className="w-48 space-y-2">
               <FieldLabel>Position</FieldLabel>
-              <TextField
+              <PickList
                 value={row.position}
-                onCommit={(next) => patch(row.id, { position: next })}
+                options={positions}
+                onPick={(next) => patch(row.id, { position: next })}
+                variant="field"
+                size="lg"
+                boxed
+                allowNew
+                className="w-full"
                 disabled={!editable}
                 ariaLabel={`Position, ${row.employeeName}`}
               />
@@ -129,6 +149,9 @@ export function RatingsPage({
                 options={SCORES}
                 onPick={(next) => patch(row.id, { score: Number(next) })}
                 variant="field"
+                size="lg"
+                boxed
+                className="w-full"
                 disabled={!editable}
                 ariaLabel={`Score, ${row.employeeName}`}
               />
@@ -169,6 +192,26 @@ export function RatingsPage({
             >
               Received a 30 minute break
             </Checkbox>
+            {/* WHAT TIME (Mark, 2026-08-28: "in fmp we had supervisors enter
+                the time of the break"). California's rule is about TIMING — the
+                meal has to begin within five hours — so "yes they got one" and
+                "at 4:45pm off a 10am start" are different facts and only the
+                second one shows a late meal. Stays optional: a supervisor who
+                did not note the clock must not have to invent a time. */}
+            {row.gotBreak === true ? (
+              <div className="w-40 space-y-1">
+                <FieldLabel>Started at</FieldLabel>
+                <TimeField
+                  value={row.breakStartedAt}
+                  onChange={(next) => patch(row.id, { break_started_at: next })}
+                  variant="field"
+                  boxed
+                  disabled={!editable}
+                  ariaLabel={`Time the break started, ${row.employeeName}`}
+                />
+              </div>
+            ) : null}
+
             {row.gotBreak === false ? (
               <div className="min-w-64 flex-1 space-y-1">
                 <TextField

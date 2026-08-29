@@ -38,14 +38,21 @@ export type PacketPart =
   | "ab"
   | "weekly";
 
-export const PACKET_PARTS: { key: PacketPart; label: string; hint: string }[] = [
-  { key: "premade", label: "Premade schedule", hint: "one per shop — the record" },
-  { key: "baker", label: "Baker tray guide", hint: "what to cut" },
-  { key: "fryer", label: "Fryer tray guide", hint: "what to prep" },
-  { key: "decorator", label: "Decorator tray guide", hint: "what to decorate" },
-  { key: "donut", label: "Donut element sheet", hint: "batches to make" },
-  { key: "ab", label: "AB element sheet", hint: "the AB rhythm" },
-  { key: "weekly", label: "Weekly element sheet", hint: "the weekly rhythm" },
+// NO HINTS (Mark, 2026-08-28). Each part used to carry a gloss — "one per shop
+// — the record", "what to cut" — and the names below say what they are to
+// anybody who works here. A caption under every row of a checklist is a second
+// thing to read on the way to a decision that is already obvious.
+//
+// The three sheet names are Mark's own words, not ours: "element" is the
+// schema's vocabulary and not the kitchen's.
+export const PACKET_PARTS: { key: PacketPart; label: string }[] = [
+  { key: "premade", label: "Premade schedule" },
+  { key: "baker", label: "Baker tray guide" },
+  { key: "fryer", label: "Fryer tray guide" },
+  { key: "decorator", label: "Decorator tray guide" },
+  { key: "donut", label: "Production Items Sheet" },
+  { key: "ab", label: "AB Items" },
+  { key: "weekly", label: "Weekly Production" },
 ];
 
 const INK = "#111";
