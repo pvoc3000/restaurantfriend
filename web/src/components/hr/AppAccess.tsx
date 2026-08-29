@@ -201,8 +201,16 @@ export function AppAccess({
       )}
 
       {state === "active" && (
-        <div className="flex flex-wrap items-baseline gap-4">
-          <dl className="grid grid-cols-[6rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+        <div className="flex flex-wrap items-start gap-4">
+          {/* ONE TRACK FOR EVERY FIELD, the detail-field convention: the block
+              defines the edges and each control fills them. Both pickers sized
+              to their own words before this ("All shops", "Staff"), so a
+              two-field column had two right edges and neither matched the
+              other. `min-w-0 flex-1` is what lets the 1fr track actually be
+              1fr — a flex item defaults to min-content, so without it the dl
+              shrink-wraps its widest control and `w-full` inside resolves
+              against that. */}
+          <dl className="grid min-w-0 flex-1 grid-cols-[6rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
             <dt className="text-subtle">Signs in as</dt>
             <dd>{displayName}</dd>
             <dt className="text-subtle">Works at</dt>
@@ -216,6 +224,7 @@ export function AppAccess({
                 locations={locations}
                 allowed={allowedLocationIds}
                 editable={!isOwner}
+                fullWidth
               />
             </dd>
             <dt className="text-subtle">Role</dt>
@@ -242,6 +251,7 @@ export function AppAccess({
                   nullable={false}
                   options={ROLE_OPTIONS}
                   match={{ org_id: orgId, user_id: userId ?? "" }}
+                  className="w-full"
                 />
               )}
             </dd>
@@ -309,7 +319,7 @@ export function AppAccess({
                 placeholder="name@example.com"
                 aria-label="Email to invite"
                 clearLabel="Clear the email"
-                className="w-full"
+                fullWidth
               />
             </div>
             <div className="space-y-1.5">

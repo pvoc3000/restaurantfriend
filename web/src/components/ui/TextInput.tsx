@@ -56,6 +56,7 @@ export function TextInput({
   value,
   onValueChange,
   clearLabel = "Clear this field",
+  fullWidth = false,
   size = "md",
   className = "",
   ...rest
@@ -65,6 +66,14 @@ export function TextInput({
   onValueChange: (next: string) => void;
   /** What the ✕ empties, for screen readers: "Clear the search", say. */
   clearLabel?: string;
+  /**
+   * Fill the container instead of shrink-wrapping.
+   *
+   * For a field in a FORM, where every control shares one track — the invite
+   * dialog, a create panel. A filter row wants the default, where an explicit
+   * `w-72` decides.
+   */
+  fullWidth?: boolean;
   /** Height and type size. Leave it alone unless the row genuinely can't fit. */
   size?: keyof typeof SIZE_CLASS;
   /**
@@ -89,14 +98,23 @@ export function TextInput({
 
   return (
     // The button is positioned against this, not against the input: an input
-    // can't contain anything. Shrink-wraps, so the caller's width class on the
-    // input still decides how wide the field is.
+    // can't contain anything. Shrink-wraps by default, so the caller's width
+    // class on the input still decides how wide the field is — `w-72` on a
+    // search box works exactly as it reads.
+    //
+    // WHICH IS WHY `w-full` ALONE DOES NOTHING. It resolves against a span
+    // that is itself sized by the input, so the pair settles at the input's
+    // intrinsic width — 206px, whatever the column around it. Found on the
+    // invite dialog, where the email field came out less than half the width
+    // of the role picker beneath it despite both saying `w-full`.
+    // `fullWidth` is the way to say it: the WRAPPER stretches, and the input's
+    // own `w-full` then means what it looks like it means.
     //
     // The hover is tracked on the WRAPPER rather than on the input, so pointing
     // at the ✕ itself doesn't count as leaving the field and unmount the thing
     // you are reaching for.
     <span
-      className="relative inline-flex"
+      className={`relative ${fullWidth ? "flex w-full" : "inline-flex"}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -106,7 +124,14 @@ export function TextInput({
         onChange={(e) => onValueChange(e.target.value)}
         onFocus={() => setFocused(true)}
         onBlur={() => setFocused(false)}
-        className={`border border-ink bg-white pl-3 pr-9 outline-none focus:border-2 ${SIZE_CLASS[size]} ${className}`}
+        // `fullWidth` has to say it TWICE — the wrapper stretches, and the
+        // input stretches inside it. An input in a flex row keeps its
+        // intrinsic ~20-character width unless told otherwise, so a stretched
+        // wrapper alone just leaves it floating at 206px with space beside it.
+        // Before `${className}`, so a caller can still override.
+        className={`border border-ink bg-white pl-3 pr-9 outline-none focus:border-2 ${
+          SIZE_CLASS[size]
+        } ${fullWidth ? "w-full" : ""} ${className}`}
         {...rest}
       />
       {showClear && (
