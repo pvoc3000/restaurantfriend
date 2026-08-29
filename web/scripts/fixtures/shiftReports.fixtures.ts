@@ -442,3 +442,71 @@ test("a null type, size or subtype does not throw and sorts consistently", () =>
   // is the property that matters when two surfaces share the comparator.
   eq([...rows].sort(compareForPremadeSheet).map((r) => r.item_name), sorted);
 });
+
+// ---------------------------------------------------------------------------
+// What the premade sheet is called
+// ---------------------------------------------------------------------------
+
+import { premadeSheetTitle } from "../../src/lib/productionPacket";
+import { scheduleTitle, splitScheduleTitle } from "../../src/lib/specialOrderSchedule";
+
+test("a special order's sheet is headed by the order and subtitled by its name", () => {
+  eq(
+    premadeSheetTitle({
+      source: "special_order",
+      title: "#9761 · Wedding 8/29/2026",
+      sellsCode: "DF01",
+    }),
+    { heading: "Special Order 9761", subtitle: "Wedding 8/29/2026" }
+  );
+});
+
+test("THE SPLIT IS scheduleTitle's INVERSE — pinned against the composer itself", () => {
+  // If either side is ever re-spelled, this fails rather than the paper and the
+  // screen quietly disagreeing about one document's name.
+  for (const [number, name] of [
+    ["9761", "Wedding 8/29/2026"],
+    ["10015", "Cafe Knotted"],
+    ["7769", "Wedding · Reception"], // a name containing the separator
+  ] as const) {
+    eq(splitScheduleTitle(scheduleTitle(number, name)), { number, name }, `#${number}`);
+  }
+});
+
+test("an order with no name at all still heads correctly", () => {
+  eq(
+    premadeSheetTitle({ source: "special_order", title: scheduleTitle("9761", null), sellsCode: "DF01" }),
+    { heading: "Special Order 9761", subtitle: null }
+  );
+});
+
+test("a plan's sheet keeps the shop heading", () => {
+  eq(
+    premadeSheetTitle({ source: "plan", title: null, sellsCode: "DF02" }),
+    { heading: "DF02 PREMADE SCHEDULE", subtitle: null }
+  );
+});
+
+test("a plan that somehow has a title shows it BELOW the shop heading", () => {
+  eq(
+    premadeSheetTitle({ source: "plan", title: "Summer menu", sellsCode: "DF02" }),
+    { heading: "DF02 PREMADE SCHEDULE", subtitle: "Summer menu" }
+  );
+});
+
+test("a special order whose title is not composed falls back to the whole title", () => {
+  eq(
+    premadeSheetTitle({ source: "special_order", title: "Hand typed", sellsCode: "DF01" }),
+    { heading: "Hand typed", subtitle: null }
+  );
+});
+
+test("a special order with an empty title falls back to the shop heading", () => {
+  for (const title of [null, "", "   "]) {
+    eq(
+      premadeSheetTitle({ source: "special_order", title, sellsCode: "DF01" }),
+      { heading: "DF01 PREMADE SCHEDULE", subtitle: null },
+      `title ${JSON.stringify(title)}`
+    );
+  }
+});

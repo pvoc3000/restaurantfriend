@@ -32,6 +32,7 @@ import {
   type ScheduleLine,
 } from "./productionSchedule";
 import type { CostElement, CostLine } from "./productionCost";
+import { splitScheduleTitle } from "./specialOrderSchedule";
 
 export type PacketSchedule = {
   id: string;
@@ -112,6 +113,43 @@ export type PacketData = {
  * kitchens and the union of the dates and narrows to the exact pairs here. Over
  * a night or two that over-fetches a handful of rows.
  */
+/**
+ * What the premade sheet is CALLED, in two lines.
+ *
+ * A special order's sheet is headed by the ORDER (Mark, 2026-08-29): a page
+ * reading "DF01 PREMADE SCHEDULE" buries the only thing that tells a kitchen
+ * which of the night's four sheets they are holding. The heading names the
+ * order — "Special Order 9761" — and the order's own name goes beneath it,
+ * which is where a subtitle belongs and what it is for.
+ *
+ * The two halves come from `splitScheduleTitle`, the inverse of the function
+ * that composed them at scheduling time. Nothing here re-spells anything: a
+ * hyphen where that one puts a middle dot would make the paper and the screen
+ * disagree about the name of one document.
+ *
+ * A plan schedule keeps the shop heading, and its title — null on every one of
+ * them today — would show as the subtitle rather than replacing the heading.
+ */
+export function premadeSheetTitle(schedule: {
+  source: string;
+  title: string | null;
+  sellsCode: string;
+}): { heading: string; subtitle: string | null } {
+  const title = (schedule.title ?? "").trim();
+  const shopHeading = `${schedule.sellsCode} PREMADE SCHEDULE`;
+
+  if (schedule.source !== "special_order" || title === "") {
+    return { heading: shopHeading, subtitle: title || null };
+  }
+
+  const { number, name } = splitScheduleTitle(title);
+  // A special-order schedule with no parseable number falls back to the whole
+  // stored title rather than printing "Special Order null".
+  return number
+    ? { heading: `Special Order ${number}`, subtitle: name }
+    : { heading: title, subtitle: null };
+}
+
 export async function companionScheduleIds(
   supabase: SupabaseClient,
   scheduleIds: string[]

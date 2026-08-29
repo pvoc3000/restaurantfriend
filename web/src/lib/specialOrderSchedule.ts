@@ -126,6 +126,31 @@ export function scheduleTitle(number: string, title: string | null | undefined):
 }
 
 /**
+ * `scheduleTitle`'s inverse, and it lives here so the pair is visible.
+ *
+ * The premade sheet prints the two halves separately — "Special Order 9761"
+ * over "Wedding 8/29/2026" (Mark, 2026-08-29) — and the only place that knows
+ * the composed shape is the function directly above.
+ *
+ * Splits on the FIRST separator, so an order whose own name contains one
+ * ("Wedding · Reception") keeps it. A title that does not look composed at all
+ * comes back whole as the name with no number, which is what a hand-typed
+ * schedule title should do rather than being mangled into a number.
+ */
+export function splitScheduleTitle(
+  title: string
+): { number: string | null; name: string | null } {
+  const trimmed = title.trim();
+  if (!trimmed.startsWith("#")) return { number: null, name: trimmed || null };
+  const at = trimmed.indexOf(" · ");
+  if (at < 0) return { number: trimmed.slice(1).trim() || null, name: null };
+  return {
+    number: trimmed.slice(1, at).trim() || null,
+    name: trimmed.slice(at + 3).trim() || null,
+  };
+}
+
+/**
  * The whole payload, from an order's lines.
  *
  * Three populations out of one list, which is why this returns a record rather

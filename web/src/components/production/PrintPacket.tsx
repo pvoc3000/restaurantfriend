@@ -5,7 +5,12 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { openWindowNow, showBlob } from "@/lib/poProcessing";
-import { companionScheduleIds, fetchPacketData, stampPrinted } from "@/lib/productionPacket";
+import {
+  companionScheduleIds,
+  fetchPacketData,
+  premadeSheetTitle,
+  stampPrinted,
+} from "@/lib/productionPacket";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { PACKET_PARTS, type PacketPart } from "@/components/production/pdf/ProductionPacketPdfs";
@@ -112,9 +117,17 @@ export function PrintPacket({
         // "Production packet ….pdf" would be a worse name for it.
         const chosen = packet.schedules.filter((s) => scheduleIds.includes(s.id));
         const first = chosen[0];
+        // A SPECIAL ORDER'S FILE IS NAMED AFTER THE ORDER, for the reason its
+        // page is titled after it: "2026-08-29 DF01 packet.pdf" tells you
+        // nothing about which of the night's four documents you just saved.
+        // `premadeHeading` so the file and the page cannot disagree about the
+        // name of one document; the slashes in an order title would make a
+        // path, so they become dashes.
         const name =
           chosen.length === 1 && first
-            ? `${first.date} ${first.sellsCode} packet.pdf`
+            ? first.source === "special_order" && first.title
+              ? `${first.date} ${premadeSheetTitle(first).heading.replace(/[/\\]/g, "-")}.pdf`
+              : `${first.date} ${first.sellsCode} packet.pdf`
             : `Production packet ${packet.printedOn}.pdf`;
         showBlob(win, blob, name);
 

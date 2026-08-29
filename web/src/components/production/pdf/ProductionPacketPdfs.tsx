@@ -27,6 +27,7 @@ import {
   type RollType,
   type ScheduleLine,
 } from "@/lib/productionSchedule";
+import { premadeSheetTitle } from "@/lib/productionPacket";
 import type { PacketData, PacketKitchen, PacketSchedule, SheetElement } from "@/lib/productionPacket";
 
 export type PacketPart =
@@ -222,15 +223,20 @@ function Fragmentish({ children }: { children: React.ReactNode }) {
 
 function PremadePage({ schedule, packet }: { schedule: PacketSchedule; packet: PacketData }) {
   const rolled = rollUp(schedule.lines, "item");
+
+  const { heading, subtitle } = premadeSheetTitle(schedule);
+
   return (
     <Page size="LETTER" style={styles.page} wrap>
       <View style={styles.headerRow}>
         <View>
           <View style={{ flexDirection: "row", alignItems: "baseline" }}>
-            <Text style={styles.title}>{schedule.sellsCode} PREMADE SCHEDULE</Text>
+            <Text style={styles.title}>{heading}</Text>
             <Text style={styles.titleAside}>*** KITCHEN: {schedule.kitchenCode} ***</Text>
           </View>
-          {schedule.title ? <Text style={styles.subtitle}>{schedule.title}</Text> : null}
+          {/* The order's own name, under the order's number. The NOTE below is
+              a different fact somebody typed and is kept either way. */}
+          {subtitle ? <Text style={styles.subtitle}>{subtitle}</Text> : null}
           {schedule.note ? <Text style={styles.subtitle}>{schedule.note}</Text> : null}
         </View>
         <Text style={styles.dateBig}>{packetDate(schedule.date)}</Text>
