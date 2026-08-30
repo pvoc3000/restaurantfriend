@@ -1,8 +1,13 @@
 # Facility checks — checklists, walkthroughs, tasks, maintenance, inspections, equipment
 
-Read this before designing or touching anything in migrations 075–077,
+Read this before designing or touching anything in migrations 075–078,
 `lib/checklists`, `lib/facilityTasks`, `components/checklists/`,
 `components/tasks/` or `components/equipment/`.
+
+**For what is still OUTSTANDING, read `docs/checklists-handoff.md` first** — it
+starts with the two things that are actually wrong, including the fact that a
+flagged issue does not yet reach the emailed shift report, which is the
+requirement the module was asked for.
 
 Settled in conversation with Mark on 2026-08-29.
 

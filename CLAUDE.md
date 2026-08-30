@@ -5624,7 +5624,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    checklists, tasks, and maintenance requests as one, interconnected and
    interdependent module."
    **Read `docs/checklists-brief.md` before designing or touching any of it** —
-   it carries the decisions, the traps and the probes.
+   it carries the decisions, the traps and the probes — and
+   **`docs/checklists-handoff.md` for what is still OUTSTANDING**, which starts
+   with the two things that are actually wrong.
+   **THE MODULE DOES NOT YET DO THE THING IT WAS ASKED FOR.** Mark's first
+   sentence was "anything flagged as an issue on a checklist would be included
+   in the report that gets emailed", and it isn't: the checklist reaches the
+   shift report's PAGES and its READINESS, but `supervisorBody` has no
+   checklist section, so nothing about a flagged issue leaves the building. It
+   was in the approved plan and did not get built. Second: `/checklists/[id]`
+   offers **Reopen** on a submitted record and NOTHING anywhere sets a run back
+   to `open`, so the button lands you on a read-only screen — rename it "View"
+   or build a real reopen (076's policy already allows owner/admin, so no
+   migration), and ask which.
    FMP's closing routine had a piece the app didn't: a list the supervisor
    walks at the end of a shift, grouped by shop section, ticked off,
    photographed, with anything wrong flagged into the emailed report. It was
