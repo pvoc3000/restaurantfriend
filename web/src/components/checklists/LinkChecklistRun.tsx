@@ -62,7 +62,7 @@ export function LinkChecklistRun({
       ]);
 
       if (!template) {
-        setFailed("Could not read that master list.");
+        setFailed("Could not read that template.");
         return;
       }
 

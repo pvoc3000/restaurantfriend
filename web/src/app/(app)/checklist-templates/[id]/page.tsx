@@ -19,6 +19,7 @@ import {
 } from "@/lib/checklists";
 import { TemplateShiftSet } from "@/components/checklists/TemplateShiftSet";
 import { TemplateActions } from "@/components/checklists/TemplateActions";
+import { AddTemplateItem } from "@/components/checklists/AddTemplateItem";
 import {
   TemplateItemsTable,
   type TemplateItemRow,
@@ -26,10 +27,10 @@ import {
 
 // The list lives on `/checklists` as a tab now, so the crumb points there
 // rather than at this route's own shim — one redirect fewer on the way back.
-const CRUMB = { href: "/checklists?view=templates", label: "Master lists" };
+const CRUMB = { href: "/checklists?view=templates", label: "Templates" };
 
 /**
- * One master list: what it is, when it is asked for, and what it asks.
+ * One template: what it is, when it is asked for, and what it asks.
  *
  * The fields are BOXED (docs/detail-field-styling-brief.md) — the box is what
  * says "you can change this", so a read-only value never gets one, which is why
@@ -76,7 +77,7 @@ export default async function ChecklistTemplatePage({
   if (error) {
     return (
       <p className="max-w-[72ch] text-sm text-accent">
-        Could not load this master list: {error.message}
+        Could not load this template: {error.message}
         {error.message.includes("checklist_templates") &&
           " — migration 076 has not been applied yet."}
       </p>
@@ -159,6 +160,21 @@ export default async function ChecklistTemplatePage({
           orgId={session.membership.org_id}
           locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
           editable={editable}
+          add={
+            editable ? (
+              <AddTemplateItem
+                templateId={id}
+                orgId={session.membership.org_id}
+                sections={localSections.map((s) => ({
+                  id: s.id as string,
+                  display_name: s.display_name as string,
+                }))}
+                nextSort={
+                  rows.length === 0 ? 10 : Math.max(...rows.map((r) => r.sort)) + 10
+                }
+              />
+            ) : null
+          }
         />
       </div>
 
@@ -278,8 +294,6 @@ export default async function ChecklistTemplatePage({
 
       <TemplateItemsTable
         rows={rows}
-        templateId={id}
-        orgId={session.membership.org_id}
         editable={editable}
         sections={localSections.map((s) => ({
           id: s.id as string,

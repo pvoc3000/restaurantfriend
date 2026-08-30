@@ -7,6 +7,7 @@ import {
   type RunRow,
   type StartableTemplate,
 } from "@/components/checklists/ChecklistsList";
+import { StartWalk } from "@/components/checklists/StartWalk";
 
 /**
  * Inspection logs — the SAME runs table, seen through `kind`.
@@ -105,26 +106,32 @@ export default async function InspectionLogsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Inspection logs
-        </h1>
-        <p className="max-w-[72ch] text-sm text-muted">
-          Outside visits at {active.code} — the health inspector, the fire
-          marshal, pest control, the hood cleaner. Findings become tasks, and
-          anything with an expiry belongs on the equipment it certifies.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Inspection logs
+          </h1>
+          <p className="max-w-[72ch] text-sm text-muted">
+            Outside visits at {active.code} — the health inspector, the fire
+            marshal, pest control, the hood cleaner. Findings become tasks, and
+            anything with an expiry belongs on the equipment it certifies.
+          </p>
+        </div>
+        {canWalkChecklists(session.membership.role) && (
+          <StartWalk
+            templates={startable}
+            today={today}
+            orgId={session.membership.org_id}
+            locationId={active.id}
+          />
+        )}
       </div>
 
       <ChecklistsList
         key={active.id}
         rows={rows}
         startable={startable}
-        today={today}
-        orgId={session.membership.org_id}
-        locationId={active.id}
         locationCode={active.code}
-        editable={canWalkChecklists(session.membership.role)}
       />
     </div>
   );

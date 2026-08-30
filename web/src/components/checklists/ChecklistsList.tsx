@@ -6,7 +6,6 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { SHIFT_SLOT_LABEL } from "@/lib/employeeEvents";
 import { CHECKLIST_KIND_LABEL, type ChecklistKind } from "@/lib/checklists";
-import { StartWalk } from "./StartWalk";
 
 const WIDTHS_KEY = "rf.checklists.columnWidths.v1";
 
@@ -32,22 +31,22 @@ export type StartableTemplate = {
   already_run_today: boolean;
 };
 
+/**
+ * The walks.
+ *
+ * It renders NO create command of its own (Mark, 2026-08-30): both callers —
+ * `/checklists` and `/inspection-logs` — put Start a walk beside their own
+ * heading, which is where this app keeps a screen's commands. Passing one in
+ * would have been a slot nobody needs; the caller already owns that row.
+ */
 export function ChecklistsList({
   rows,
   startable,
-  today,
-  orgId,
-  locationId,
   locationCode,
-  editable,
 }: {
   rows: RunRow[];
   startable: StartableTemplate[];
-  today: string;
-  orgId: string;
-  locationId: string;
   locationCode: string;
-  editable: boolean;
 }) {
   const [tier, setTier] = useState<"open" | "all">("open");
 
@@ -159,17 +158,6 @@ export function ChecklistsList({
             ))}
           </ul>
         </section>
-      )}
-
-      {editable && (
-        <div className="flex justify-end">
-          <StartWalk
-            templates={startable}
-            today={today}
-            orgId={orgId}
-            locationId={locationId}
-          />
-        </div>
       )}
 
       <div className="flex flex-wrap items-end gap-4">

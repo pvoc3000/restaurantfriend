@@ -95,7 +95,7 @@ export const SECTIONS: NavSection[] = [
       // the list, work what came out of it, then the register of things the
       // whole module points at.
       //
-      // supervisor+ on the three that write; Master Lists and Equipment are
+      // supervisor+ on the three that write; Templates and Equipment are
       // unrestricted because their READ is membership (076/075's own RLS), and
       // everyone should be able to see what they will be asked and to resolve
       // the name of the thing they are asked about. Tidiness only — RLS is the
@@ -103,7 +103,7 @@ export const SECTIONS: NavSection[] = [
       {
         // ONE ENTRY, TWO VIEWS (Mark, 2026-08-30): "instead of having a
         // checklist and master checklist menu options, what about just having a
-        // Checklist screen with tab picker". The walks and the master lists are
+        // Checklist screen with tab picker". The walks and the templates are
         // the same subject at two moments, and two adjacent entries made you
         // decide which one you wanted before you could look at either.
         //

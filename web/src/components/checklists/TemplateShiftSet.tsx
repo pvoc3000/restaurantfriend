@@ -8,7 +8,7 @@ import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SHIFT_SLOT_LABEL, SHIFT_SLOT_OPTIONS } from "@/lib/employeeEvents";
 
 /**
- * Which shifts this master list is asked for.
+ * Which shifts this template is asked for.
  *
  * `ui/PickSet` rather than an `InlineValue`, because the column is a text ARRAY
  * and `InlineValue`'s array support writes ONE SLOT of a positional strip (the

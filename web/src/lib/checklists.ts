@@ -434,9 +434,11 @@ export const CHECKLIST_VIEWS: ChecklistView[] = ["walks", "templates"];
 
 export const CHECKLIST_VIEW_LABEL: Record<ChecklistView, string> = {
   walks: "Walks",
-  // "Master lists", not "Templates": it is the word the module already uses,
-  // and neither label repeats the screen's own name the way "Checklists" would.
-  templates: "Master lists",
+  // "Templates" (Mark, 2026-08-30), which is also what the route and the
+  // `?view=` parameter have always said — only the visible word was out of
+  // step. Neither label repeats the screen's own name the way "Checklists"
+  // would.
+  templates: "Templates",
 };
 
 /**

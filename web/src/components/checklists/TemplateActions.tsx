@@ -11,7 +11,7 @@ import { confirmDialog } from "@/lib/confirm";
 import { duplicateReceipt, sectionMapForDuplicate } from "@/lib/checklists";
 
 /**
- * Duplicate a master list to another shop, and delete one.
+ * Duplicate a template to another shop, and delete one.
  *
  * DUPLICATE IS THE SHORTCUT MARK ASKED FOR (2026-08-29): "we should be able to
  * duplicate checklists then change the location to something else as a short
@@ -36,6 +36,7 @@ export function TemplateActions({
   orgId,
   locations,
   editable,
+  add,
 }: {
   templateId: string;
   name: string;
@@ -44,6 +45,17 @@ export function TemplateActions({
   orgId: string;
   locations: { id: string; code: string }[];
   editable: boolean;
+  /**
+   * Add item, rendered by the caller (Mark, 2026-08-30: "move the add item
+   * button up with the other action buttons").
+   *
+   * A SLOT rather than props, which is `ScheduleActions`' own shape and its
+   * reason: the dialog's query and state stay with the component that owns
+   * them, while this row decides the ORDER. Add LEADS, because it is the only
+   * one of the three that changes what the list ASKS — the other two act on
+   * the document as a whole.
+   */
+  add?: React.ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -217,6 +229,7 @@ export function TemplateActions({
 
   return (
     <div className="flex flex-wrap items-start gap-3">
+      {add}
       <button
         type="button"
         className={`${BUTTON_CLASS} shrink-0`}
@@ -242,7 +255,7 @@ export function TemplateActions({
 
       {open && (
         <Dialog
-          title="Duplicate this master list"
+          title="Duplicate this template"
           onClose={() => setOpen(false)}
           width="max-w-lg"
           busy={busy}

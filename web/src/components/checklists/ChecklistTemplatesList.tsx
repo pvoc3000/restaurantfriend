@@ -13,7 +13,6 @@ import {
   weekdaySetLabel,
   type ChecklistKind,
 } from "@/lib/checklists";
-import { NewChecklistTemplate } from "./NewChecklistTemplate";
 
 const WIDTHS_KEY = "rf.checklistTemplates.columnWidths.v1";
 
@@ -31,7 +30,7 @@ export type TemplateRow = {
 const KINDS: ChecklistKind[] = ["checklist", "walkthrough", "inspection"];
 
 /**
- * The master lists.
+ * The templates.
  *
  * ONE dimension — kind — so it is a `TabPicker` and not `ui/FilterMenus`, which
  * is for three or more ANDed together. The counts sit on the tabs and describe
@@ -43,14 +42,10 @@ const KINDS: ChecklistKind[] = ["checklist", "walkthrough", "inspection"];
  */
 export function ChecklistTemplatesList({
   rows,
-  orgId,
-  locationId,
   locationCode,
   editable,
 }: {
   rows: TemplateRow[];
-  orgId: string;
-  locationId: string;
   locationCode: string;
   editable: boolean;
 }) {
@@ -143,26 +138,13 @@ export function ChecklistTemplatesList({
 
   return (
     <div className="space-y-4">
-      {/* The create command right-aligned ABOVE the filter row — `ui/FilterMenus`'
-          `trailing` rule, which this list follows by hand because one dimension
-          keeps it a TabPicker. */}
-      {editable && (
-        <div className="flex justify-end">
-          <NewChecklistTemplate
-            orgId={orgId}
-            locationId={locationId}
-            locationCode={locationCode}
-          />
-        </div>
-      )}
-
       <div className="flex flex-wrap items-end gap-4">
         <div className="min-w-[16rem] flex-1">
           <TextInput
             value={search}
             onValueChange={setSearch}
-            placeholder="Search master lists…"
-            aria-label="Search master lists"
+            placeholder="Search templates…"
+            aria-label="Search templates"
             clearLabel="Clear the search"
           />
         </div>
@@ -191,7 +173,7 @@ export function ChecklistTemplatesList({
         defaultSort={{ key: "name" }}
         empty={
           <p className="max-w-[72ch] text-sm text-muted">
-            No master lists at {locationCode} yet. A checklist is what a
+            No templates at {locationCode} yet. A checklist is what a
             supervisor walks at the end of a shift; a walkthrough is a
             manager’s round; an inspection log records an outside visit.
           </p>

@@ -78,7 +78,7 @@ export function ChecklistPage({
         )}
         {askedFor.length === 0 && (
           <p className="max-w-[60ch] text-[14px] text-muted">
-            Master lists are set up under Locations &rsaquo; Master Lists. You can
+            Templates are set up under Locations &rsaquo; Templates. You can
             finish this report without one.
           </p>
         )}

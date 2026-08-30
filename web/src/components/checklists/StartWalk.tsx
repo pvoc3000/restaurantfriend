@@ -20,7 +20,7 @@ function isoWeekdayOf(date: string): number {
 }
 
 /**
- * Start a walk — and SNAPSHOT the master list onto it.
+ * Start a walk — and SNAPSHOT the template onto it.
  *
  * The snapshot is the single most important thing in this module. Without it,
  * rewording an item in September silently rewrites what August's supervisor is
@@ -104,7 +104,7 @@ export function StartWalk({
       ]);
 
       if (!template) {
-        setFailed("Could not read that master list.");
+        setFailed("Could not read that template.");
         return;
       }
 

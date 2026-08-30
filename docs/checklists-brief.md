@@ -180,6 +180,18 @@ Three things about it:
   different kinds of record. `/checklist-templates` (the list) is a redirect
   shim, `/location`'s pattern, because that address is in the record's own
   breadcrumb and in anything already shared.
+- **The tab is called "Templates"** (Mark, 2026-08-30), which is what the route
+  and the `?view=` parameter always said — only the visible word was out of
+  step. Renamed everywhere it shows: the tab, the breadcrumb, the create
+  command, the search box, both `loading.tsx` labels and the shift report's
+  pointer to it.
+- **There is no explanatory paragraph under the heading** (same day). Both tabs
+  are named, the counts are on them, and each list says what it holds when it is
+  empty — the sentence was telling you what the screen was already showing you.
+- **The command sits with the title**, and it is the VIEW's own: Start a walk on
+  one tab, New template on the other. Neither list renders a create command any
+  more — `/inspection-logs` shares `ChecklistsList` and puts its own Start a walk
+  beside its own heading, which is where this app keeps a screen's commands.
 - **The nav entry carries `also: ["/checklist-templates"]`**, so both the shim
   and the still-live record route light the Checklists tab. `/timesheets` does
   the same for `/pay-periods`.

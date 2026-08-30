@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 
 /**
- * The master lists moved onto `/checklists` as a tab (Mark, 2026-08-30).
+ * The templates moved onto `/checklists` as a tab (Mark, 2026-08-30).
  *
  * A redirect shim rather than a deletion — `/location`'s and `/pay-periods`'
  * pattern — because this address is in the template record's breadcrumb, in

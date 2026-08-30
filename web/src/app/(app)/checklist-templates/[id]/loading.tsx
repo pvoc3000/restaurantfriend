@@ -1,5 +1,5 @@
 import { PageLoading } from "@/components/ui/PageLoading";
 
 export default function Loading() {
-  return <PageLoading label="the master list" />;
+  return <PageLoading label="the template" />;
 }

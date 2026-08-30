@@ -13,7 +13,6 @@ import { Switch } from "@/components/ui/Switch";
 import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
 import { confirmDialog } from "@/lib/confirm";
 import { weekdaySetLabel, type ResponseType } from "@/lib/checklists";
-import { AddTemplateItem } from "./AddTemplateItem";
 
 const WIDTHS_KEY = "rf.checklistTemplateItems.columnWidths.v2";
 
@@ -45,7 +44,7 @@ const ASKS: { value: ResponseType; label: string; hint: string }[] = [
 ];
 
 /**
- * What this master list asks, in walk order.
+ * What this template asks, in walk order.
  *
  * Grouped by SHOP SECTION and sorted by the section's own walk order then the
  * item's `sort` — the same route through the building the order guide takes, so
@@ -57,16 +56,12 @@ const ASKS: { value: ResponseType; label: string; hint: string }[] = [
  */
 export function TemplateItemsTable({
   rows,
-  templateId,
-  orgId,
   editable,
   sections,
   equipment,
   positions,
 }: {
   rows: TemplateItemRow[];
-  templateId: string;
-  orgId: string;
   editable: boolean;
   sections: { id: string; display_name: string }[];
   equipment: { id: string; name: string }[];
@@ -433,21 +428,9 @@ export function TemplateItemsTable({
         // Rendered in walk order and never re-sorted by the table: the ORDER IS
         // THE DOCUMENT here, so `group` bands what `ordered` already grouped.
         group={{ label: (r) => r.section_name }}
-        leading={
-          <div className="flex w-full flex-wrap items-center justify-between gap-3">
-            <SectionHeading count={rows.length}>Items</SectionHeading>
-            {editable && (
-              <AddTemplateItem
-                templateId={templateId}
-                orgId={orgId}
-                sections={sections}
-                nextSort={
-                  rows.length === 0 ? 10 : Math.max(...rows.map((r) => r.sort)) + 10
-                }
-              />
-            )}
-          </div>
-        }
+        // Add item moved up to the record's command row (Mark, 2026-08-30), so
+        // this strip is a heading again — which is what `leading` is for.
+        leading={<SectionHeading count={rows.length}>Items</SectionHeading>}
         empty={
           <p className="max-w-[72ch] text-sm text-muted">
             Nothing on this list yet. Items are grouped by shop section, so a

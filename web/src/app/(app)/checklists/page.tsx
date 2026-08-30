@@ -17,7 +17,7 @@ import type { TemplateRow } from "@/components/checklists/ChecklistTemplatesList
 const WINDOW_DAYS = 30;
 
 /**
- * Checklists — the walks, and the master lists that produce them.
+ * Checklists — the walks, and the templates that produce them.
  *
  * ONE SCREEN since 2026-08-30 (Mark), where it was two. Both halves are fetched
  * on every load rather than per view, which costs one extra query and buys two
@@ -180,7 +180,6 @@ export default async function ChecklistsPage({
       startable={startable}
       templates={templateRows}
       today={today}
-      windowDays={WINDOW_DAYS}
       orgId={session.membership.org_id}
       locationId={active.id}
       locationCode={active.code}

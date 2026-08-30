@@ -20,7 +20,7 @@ import {
 const KINDS: ChecklistKind[] = ["checklist", "walkthrough", "inspection"];
 
 /**
- * Start a master list.
+ * Start a template.
  *
  * It asks for the ROSTER fields only — the ones the list itself groups and
  * filters by — and leaves everything else to the record's inline cells.
@@ -105,12 +105,12 @@ export function NewChecklistTemplate({
   return (
     <>
       <button type="button" className={BUTTON_CLASS} onClick={() => setOpen(true)}>
-        New master list
+        New template
       </button>
 
       {open && (
         <Dialog
-          title="New master list"
+          title="New template"
           onClose={() => {
             setOpen(false);
             reset();

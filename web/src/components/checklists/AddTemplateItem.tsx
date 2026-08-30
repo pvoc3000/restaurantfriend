@@ -17,7 +17,7 @@ const ASKS: { value: ResponseType; label: string; hint: string }[] = [
 ];
 
 /**
- * Add one question to a master list.
+ * Add one question to a template.
  *
  * IT STAYS OPEN after each add, which is `AddPoLines`' ending rather than
  * `NewChecklistTemplate`'s: you write a checklist's twenty questions in one
