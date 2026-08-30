@@ -101,21 +101,21 @@ export const SECTIONS: NavSection[] = [
       // the name of the thing they are asked about. Tidiness only — RLS is the
       // gate and each screen says so in a sentence.
       {
+        // ONE ENTRY, TWO VIEWS (Mark, 2026-08-30): "instead of having a
+        // checklist and master checklist menu options, what about just having a
+        // Checklist screen with tab picker". The walks and the master lists are
+        // the same subject at two moments, and two adjacent entries made you
+        // decide which one you wanted before you could look at either.
+        //
+        // `also` carries the retired `/checklist-templates` — a redirect shim
+        // for the list, and the still-live address of the template RECORD — so
+        // both light this tab. `/timesheets` does the same for `/pay-periods`.
         slug: "checklists",
         label: "Checklists",
         href: "/checklists",
         built: true,
+        also: ["/checklist-templates"],
         roles: ["owner", "admin", "purchaser", "supervisor"],
-      },
-      {
-        // "Master Lists", not "Master Check Lists": the band above already says
-        // Locations and the entry above already says Checklists, so this only
-        // has to say WHICH of them. The same trim that made HR's "Team Ratings"
-        // just "Events" and this section's own first entry just "All".
-        slug: "checklist-templates",
-        label: "Master Lists",
-        href: "/checklist-templates",
-        built: true,
       },
       {
         slug: "tasks",

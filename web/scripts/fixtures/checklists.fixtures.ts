@@ -36,6 +36,9 @@ import {
   templateAppliesOn,
   templatesForShift,
   weekdaySetLabel,
+  parseChecklistView,
+  checklistViewHref,
+  CHECKLIST_VIEWS,
   shiftSetLabel,
   type CheckStatus,
   type ScheduledTemplate,
@@ -367,4 +370,32 @@ test("shiftSetLabel: null is ANY SHIFT", () => {
   eq(shiftSetLabel(null, label), "Any shift");
   eq(shiftSetLabel(["closing"], label), "CLOSING");
   eq(shiftSetLabel(["opening", "closing"], label), "OPENING, CLOSING");
+});
+
+// ---------------------------------------------------------------------------
+// The two halves of one screen
+// ---------------------------------------------------------------------------
+
+test("parseChecklistView falls back to the walks, never an error", () => {
+  eq(parseChecklistView("templates"), "templates");
+  eq(parseChecklistView("walks"), "walks");
+  eq(parseChecklistView(undefined), "walks");
+  eq(parseChecklistView(""), "walks");
+  eq(parseChecklistView("nonsense"), "walks", "a stale bookmark still shows the screen");
+  eq(parseChecklistView(["templates", "walks"]), "templates", "and it takes the first");
+});
+
+test("checklistViewHref keeps ONE canonical address for the default", () => {
+  // Otherwise the nav link, the breadcrumb and a pasted URL would be three
+  // different addresses for one screen.
+  eq(checklistViewHref("walks"), "/checklists");
+  eq(checklistViewHref("templates"), "/checklists?view=templates");
+});
+
+test("every view round-trips through its own href", () => {
+  for (const v of CHECKLIST_VIEWS) {
+    const href = checklistViewHref(v);
+    const param = href.includes("?") ? href.split("view=")[1] : undefined;
+    eq(parseChecklistView(param), v, v);
+  }
 });

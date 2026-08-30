@@ -159,6 +159,41 @@ reports the worst possible verdict on a section nobody looked at.
 
 ---
 
+## Walks and master lists share ONE screen
+
+Mark, 2026-08-30: "instead of having a checklist and master checklist menu
+options, what about just having a Checklist screen with tab picker … Basically
+combine the two screens into one."
+
+They are the same subject at two moments — what gets walked, and what has been —
+and two adjacent nav entries made you decide which one you wanted before you
+could look at either. The Location section was the longest in the app at eight
+entries; it is seven now.
+
+`/events` is the precedent for the mechanism: a `TabPicker` choosing between two
+populations fetched under different rules and rendered with different columns.
+
+Three things about it:
+
+- **Only the LISTS merge.** Both records keep their own address —
+  `/checklists/[id]` and `/checklist-templates/[id]` — because they are
+  different kinds of record. `/checklist-templates` (the list) is a redirect
+  shim, `/location`'s pattern, because that address is in the record's own
+  breadcrumb and in anything already shared.
+- **The nav entry carries `also: ["/checklist-templates"]`**, so both the shim
+  and the still-live record route light the Checklists tab. `/timesheets` does
+  the same for `/pay-periods`.
+- **The view is a real navigation, not `history.replaceState`.** The two halves
+  are different queries and the server has to run the other one — `/events`'
+  split, where the date window pushes and every filter beside it replaces. The
+  tabs carry `href`, so each view is bookmarkable, and the default (`walks`)
+  writes no parameter so `/checklists` stays canonical.
+
+Both halves are fetched on every load rather than per view. That costs one query
+and buys two things: the tab counts are honest before you switch, and the walks
+view needs the templates anyway — "asked for today, not walked" is computed from
+them.
+
 ## Departures worth knowing
 
 **There is no `task_checklist_done` column**, although CLAUDE.md predicted one.

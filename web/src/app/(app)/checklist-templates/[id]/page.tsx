@@ -24,7 +24,9 @@ import {
   type TemplateItemRow,
 } from "@/components/checklists/TemplateItemsTable";
 
-const CRUMB = { href: "/checklist-templates", label: "Master lists" };
+// The list lives on `/checklists` as a tab now, so the crumb points there
+// rather than at this route's own shim — one redirect fewer on the way back.
+const CRUMB = { href: "/checklists?view=templates", label: "Master lists" };
 
 /**
  * One master list: what it is, when it is asked for, and what it asks.

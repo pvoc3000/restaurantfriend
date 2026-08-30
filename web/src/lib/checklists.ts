@@ -409,3 +409,54 @@ export function shiftSetLabel(
   if (!shifts || shifts.length === 0) return "Any shift";
   return shifts.map(label).join(", ");
 }
+
+// ---------------------------------------------------------------------------
+// The two halves of one screen
+// ---------------------------------------------------------------------------
+
+/**
+ * WALKS AND MASTER LISTS SHARE A SCREEN (Mark, 2026-08-30: "instead of having a
+ * checklist and master checklist menu options, what about just having a
+ * Checklist screen with tab picker … Basically combine the two screens").
+ *
+ * They are the same subject at two moments — what gets walked, and what has
+ * been — and two adjacent nav entries made you decide which one you wanted
+ * before you could look at either. `/events` sets the precedent for the
+ * mechanism: a `TabPicker` choosing between two populations that are fetched
+ * under different rules and rendered with different columns.
+ *
+ * The RECORDS keep their own addresses (`/checklists/[id]` and
+ * `/checklist-templates/[id]`); only the two LISTS merge.
+ */
+export type ChecklistView = "walks" | "templates";
+
+export const CHECKLIST_VIEWS: ChecklistView[] = ["walks", "templates"];
+
+export const CHECKLIST_VIEW_LABEL: Record<ChecklistView, string> = {
+  walks: "Walks",
+  // "Master lists", not "Templates": it is the word the module already uses,
+  // and neither label repeats the screen's own name the way "Checklists" would.
+  templates: "Master lists",
+};
+
+/**
+ * The view a request is asking for. Anything unrecognised falls back to the
+ * walks — a bad parameter should show you the screen, not an error.
+ */
+export function parseChecklistView(raw: string | string[] | undefined): ChecklistView {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  return (CHECKLIST_VIEWS as string[]).includes(value ?? "")
+    ? (value as ChecklistView)
+    : "walks";
+}
+
+/**
+ * The address of one view.
+ *
+ * `walks` writes NO parameter, so the plain `/checklists` stays the canonical
+ * address — which is what the nav links to and what every link already stored
+ * points at. `recipeHref`'s rule.
+ */
+export function checklistViewHref(view: ChecklistView): string {
+  return view === "walks" ? "/checklists" : `/checklists?view=${view}`;
+}

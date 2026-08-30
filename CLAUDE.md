@@ -5642,10 +5642,26 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    organised by THE WORK and every one of these is about the BUILDING — the
    same argument that put purchase requests under Purchasing. The Operations
    stubs "Check Lists" and "Master Check Lists" are gone; the Location section
-   is now All · Shop Sections · Checklists · Master Lists · Tasks ·
-   Maintenance · Inspection Logs · Equipment, and all of it sits INSIDE
-   `InactiveLocationGate` (unlike `/employees` and `/sales`, these really are
-   location-scoped: you do not walk a closing list at a shop that is shut).
+   is All · Shop Sections · Checklists · Tasks · Maintenance · Inspection Logs ·
+   Equipment, and all of it sits INSIDE `InactiveLocationGate` (unlike
+   `/employees` and `/sales`, these really are location-scoped: you do not walk
+   a closing list at a shop that is shut).
+   **THE WALKS AND THE MASTER LISTS SHARE ONE SCREEN** (Mark, 2026-08-30:
+   "instead of having a checklist and master checklist menu options, what about
+   just having a Checklist screen with tab picker … Basically combine the two
+   screens into one"). They shipped as two adjacent nav entries the day before,
+   which made you decide which one you wanted before you could look at either —
+   and they are the same subject at two moments. `/events` is the precedent for
+   the mechanism: a `TabPicker` over two populations fetched under different
+   rules and rendered with different columns. **Only the LISTS merge** — both
+   records keep their own address, `/checklist-templates` (the list) is a
+   redirect shim (`/location`'s pattern, since that address is in the record's
+   own breadcrumb), and the nav entry carries **`also: ["/checklist-templates"]`**
+   so the shim AND the still-live record route both light the tab
+   (`/timesheets`' idiom for `/pay-periods`). The view is a REAL NAVIGATION
+   rather than `history.replaceState`, because the two halves are different
+   QUERIES and the server has to run the other one — `/events`' own split — and
+   the default writes no parameter so `/checklists` stays canonical.
    **A RUN SNAPSHOTS ITS TEMPLATE** — 013's rule, and the most important thing
    here. Without it, rewording an item in September silently rewrites what
    August's supervisor is recorded as having been asked to check. The SECTION
