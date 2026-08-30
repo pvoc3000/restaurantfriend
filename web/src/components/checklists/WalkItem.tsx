@@ -247,14 +247,19 @@ export function WalkItem({
             className="h-11 w-28 border border-hairline px-2 text-[16px] tabular-nums focus:border-ink focus:outline-none disabled:opacity-50"
           />
           {row.unit && <span className="text-[14px] text-muted">{row.unit}</span>}
-          {(row.min_value != null || row.max_value != null) && (
-            <span className="text-[13px] text-muted">
-              expected {row.min_value ?? ""}–{row.max_value ?? ""}
-              {row.unit ? ` ${row.unit}` : ""}
-            </span>
-          )}
-          {outOfRange && (
+          {/* ONE MARK PER FACT. The quiet hint and the red chip say the same
+              thing, so only one of them shows: the expected range is guidance
+              while the reading is fine, and a warning once it is not. Both at
+              once read as two different complaints about one number. */}
+          {outOfRange ? (
             <span className="bg-accent px-1 text-[13px] text-white">{outOfRange}</span>
+          ) : (
+            (row.min_value != null || row.max_value != null) && (
+              <span className="text-[13px] text-muted">
+                expected {row.min_value ?? ""}–{row.max_value ?? ""}
+                {row.unit ? ` ${row.unit}` : ""}
+              </span>
+            )
           )}
         </div>
       )}

@@ -84,7 +84,7 @@ export default async function ChecklistTemplatesPage() {
         </h1>
         <p className="max-w-[72ch] text-sm text-muted">
           What a walk at {active.code} asks for. A checklist is walked at the end
-          of a shift; a walkthrough is a manager&rsquo;s round; an inspection log
+          of a shift; a walkthrough is a manager’s round; an inspection log
           records an outside visit. Items are grouped by shop section, so a walk
           follows the same route through the building as the order guide.
         </p>

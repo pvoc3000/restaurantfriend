@@ -200,6 +200,40 @@ guessing would be worse than leaving it to be set.
 
 ---
 
+## Three bugs the live walk found
+
+None of them typechecks, lints or fixture-fails. All three needed the browser.
+
+**1. An HTML entity in JSX text eats the space after an interpolated value.**
+`What a walk at {active.code} asks for` rendered as **"at DF01asks for"**. SWC
+strips the leading whitespace of a JSXText node that contains an entity, so the
+`&rsquo;` two lines further down deleted a space two lines up. Swapping the
+entity for a literal `’` fixes it, which is what this module now does
+everywhere. **This is pre-existing across the app** — `ShopSectionsTable.tsx`,
+`DerivedDay.tsx`, `RecalculateWorkdays.tsx`, `BaseUnitEditor.tsx`,
+`FixDrawer.tsx` and `PlanMatrix.tsx` all have the same shape and have not been
+swept. The rule: **use literal typographic characters in JSX text, never HTML
+entities.** `react/no-unescaped-entities` does not object to `’ “ ” —`.
+
+**2. A shared class string that carries a colour cannot be overridden.**
+`FOOTER_CELL` held `text-white` and the walk's commit appended `bg-white
+text-ink`, which rendered **white on white** — an invisible Finish button on the
+module's primary screen. Tailwind resolves competing utilities by STYLESHEET
+order, not class-string order. A shared string now states LAYOUT only and each
+caller states its own colours. Found by reading `getComputedStyle`, not by
+looking: at a glance the footer simply appears to have one button.
+
+**3. One fact, one mark.** An out-of-range reading showed the quiet
+"expected 34–40 F" hint AND the red chip saying the same thing, three
+characters apart. The hint is guidance while the reading is fine and a warning
+once it is not; both at once read as two complaints about one number.
+
+And one trap that bit the seeding script rather than the app: **PostgREST unions
+the keys across a bulk insert and sends explicit NULL for any key a row omits**,
+which defeats column DEFAULTs (`requires_photo` is `not null default false` and
+the insert failed on it). Every array insert in this module builds its rows from
+a single `.map()`, so they are uniform; an ad-hoc one must be too.
+
 ## Probes
 
 *Run these; don't trust a line in CLAUDE.md — it has been wrong in both

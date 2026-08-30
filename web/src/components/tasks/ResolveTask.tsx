@@ -77,8 +77,8 @@ export function ResolveTask({
         <p className="max-w-[52ch] text-sm text-muted">
           Cancelling is how a task is erased — there is no delete, deliberately,
           because the only record that somebody once thought this needed doing is
-          this row. Say why: &ldquo;duplicate&rdquo;, &ldquo;fixed itself&rdquo;,
-          &ldquo;not ours&rdquo;.
+          this row. Say why: “duplicate”, “fixed itself”,
+          “not ours”.
         </p>
         <label className="block space-y-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">

@@ -193,7 +193,7 @@ export function ChecklistTemplatesList({
           <p className="max-w-[72ch] text-sm text-muted">
             No master lists at {locationCode} yet. A checklist is what a
             supervisor walks at the end of a shift; a walkthrough is a
-            manager&rsquo;s round; an inspection log records an outside visit.
+            manager’s round; an inspection log records an outside visit.
           </p>
         }
       />

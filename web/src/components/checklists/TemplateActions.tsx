@@ -297,8 +297,8 @@ export function TemplateActions({
                   />
                 </div>
                 <p className="max-w-[52ch] text-[13px] text-muted">
-                  Items are matched to {targetCode}&rsquo;s shop sections by name.
-                  Anything with no match there lands in &ldquo;No section&rdquo;
+                  Items are matched to {targetCode}’s shop sections by name.
+                  Anything with no match there lands in “No section”
                   and is named afterwards. Equipment links are not carried
                   across — a fryer is a thing in one building.
                 </p>

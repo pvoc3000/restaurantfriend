@@ -10,9 +10,22 @@ import { ChecklistWalk, type WalkTask } from "./ChecklistWalk";
 import type { WalkItemRow } from "./WalkItem";
 import type { ChecklistRunData } from "@/lib/checklistRunData";
 
-/** One dress for both footer cells, so a two-across row cannot drift. */
+/**
+ * One dress for both footer cells, so a two-across row cannot drift — and it
+ * carries NO COLOUR, deliberately.
+ *
+ * It held `text-white` first, and the commit appended `bg-white text-ink` over
+ * it. That renders WHITE ON WHITE: Tailwind resolves competing utilities by
+ * STYLESHEET ORDER, not by the order they appear in a class attribute, so
+ * `text-white` won and the Finish button was invisible on a black bar. Caught
+ * by measuring the computed style rather than by looking — at a glance the
+ * footer simply appears to have one button.
+ *
+ * The rule this file now follows: a shared class string states LAYOUT, and
+ * each caller states its own colours. Nothing is overridden.
+ */
 const FOOTER_CELL =
-  "min-h-14 px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white disabled:opacity-35";
+  "min-h-14 px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] disabled:opacity-35";
 
 /**
  * The walk's own chrome: FileMaker's furniture, and the shift report runner's.
@@ -137,7 +150,7 @@ export function WalkRunner({
       <footer className="sticky bottom-0 z-20 flex items-stretch justify-end gap-px bg-ink">
         <button
           type="button"
-          className={FOOTER_CELL}
+          className={`${FOOTER_CELL} text-white hover:bg-white/10`}
           onClick={() => router.push(`/checklists/${run.id}`)}
         >
           Close
