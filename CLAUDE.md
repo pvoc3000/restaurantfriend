@@ -23,8 +23,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
   operations, keyboard-friendly. Not a mobile-first marketing site. Auth +
   location context live. Shipped: `/order-guide`, `/items` (nav
   label "Inventory") + detail, `/vendors` + detail, `/purchase-orders` + detail,
-  `/cleanup`. (Note: Next 16
+  `/cleanup` — and, since, most of the rest of the menu; the build sequence
+  below is the authority on what exists. (Note: Next 16
   renamed the middleware convention — session refresh lives in `web/src/proxy.ts`.)
+  **There are TWO route groups.** `(app)` carries the masthead, the nav, the
+  page gutter and `InactiveLocationGate`. **`(fullscreen)`** (2026-08-28) is
+  chrome-less and signed in — its layout calls `getAppSession()` itself and
+  keeps only `ConfirmProvider` and `CalcPad` — for a surface that is a TASK
+  rather than a screen: today just the shift report's runner. `proxy.ts` needs
+  no entry for it, since anything not explicitly exempted there is auth-gated.
+  It is NOT the place for a public page: `/login`, `/welcome`, `/q/[token]` and
+  `/inquiry` sit outside both groups and are exempted by name.
 - **Migration** (`migration/`): FMP data is LOADED to the hosted DB — 80 vendors,
   790 items, 2,888 vendor items, 1,237 item-locations, full PO history. Loader
   is `migration/load.mjs` (service_role, local only). Transformed JSON lives
@@ -4867,6 +4876,37 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Note 062 is RERUNNABLE where 061 is not, and its backfill is a no-op once the
    invariant holds — verified by running it twice on the Docker harness.
 
+   **070, 071, 072, 073 AND 074 ARE ALL APPLIED** (Mark, 2026-08-28/29 — the
+   shift report, its break time, its reopen, the per-shop access grid, and the
+   password-reset log). *Probe, don't read this line; it has been wrong in both
+   directions for four different migrations.*
+   For **070**: `select count(*) from shift_reports` (the tables exist), and
+   `select public.submit_shift_report(null)`, which must RAISE "No such shift
+   report" from its first statement — that proves the body runs AND its guards
+   do. For **071**: `select data_type, is_nullable from
+   information_schema.columns where table_name = 'shift_report_ratings' and
+   column_name = 'break_started_at'` → `time without time zone`, YES.
+   For **072**: `select public.reopen_shift_report(null)` raises the same way,
+   and `select count(*) from pg_proc where proname = 'reopen_shift_report'` must
+   be **1** — two would mean an argument list drifted and an overload is live
+   beside it (033's `freeze_pay_period` trap).
+   For **073**, the one that matters is the EMPTY-TABLE rule rather than the
+   table: `select public.may_work_at(o.id, m.user_id, l.id) from orgs o,
+   org_members m, locations l limit 1` must be **true** while
+   `select count(*) from location_members` is **0**. If that ever answers false
+   on an empty table, every member has just been locked out of every shop.
+   For **074**: `select count(*) from pg_policy where polrelid =
+   'public.password_reset_requests'::regclass` → **1**, SELECT only; a second
+   policy would mean somebody added a write path the service_role function is
+   supposed to be the only holder of.
+   Deploy order for the functions: `send-shift-report` and
+   `request-password-reset` are new, and **`sync-square-sales` must be
+   REDEPLOYED** for its `preview` mode or the shift report's Sales page can only
+   ever say "Square has not reported this day yet". `_shared/email.ts` gained an
+   optional `html`, and since it is compiled in AT DEPLOY TIME the other
+   consumers pick it up only when redeployed — hygiene, not a requirement, since
+   none of them passes the field.
+
    **(r) THE ROW IS A PROGRESS BAR** (Mark, 2026-08-20, after a mockup pass).
    A wash fills each row of `/special-orders` to the fraction of stages done,
    yellow at the first rung and green at the last, under a 3px rule on the row's
@@ -5319,6 +5359,265 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    numbering seeds at
    10000 (FMP max 9887; `legacy_id` is NOT unique — 5 duplicated OrderIDs);
    customers migrate WITHOUT the plain-text CC fields, ever.
+4h. ✅ **THE SUPERVISOR SHIFT REPORT — migrations 070, 071, 072, all APPLIED,
+   and WALKED against the real database 2026-08-28/29.** Mark: "It's time.
+   Everything we need is in place (except for checklists)."
+   The last daily routine still running in FileMaker. A supervisor opens a
+   full-screen, tablet-first report at the end of a shift, walks the pages that
+   shift is asked for, generates and prints tomorrow's kitchen paper on the way,
+   and sends: **management gets the version WITH staff ratings, supervisors the
+   one without.** 035 predicted this screen in as many words — it deferred the
+   ratings writer to "the PRODUCTION module's screen", and this is it. Of the
+   43,918 `kind='shift'` rows, not one had been written by this app.
+   **THE TWO ANSWERS THAT SHAPE EVERYTHING: write-through, and nothing reaches
+   the owning tables until Send.** No permanent second copy of any fact —
+   ratings become `employee_events`, counts become `production_schedule_items`
+   actuals, yields become `production_batches`, sales are READ and never
+   stored. But the report is revisable until submitted, so the three child
+   tables (`shift_report_ratings` / `_counts` / `_batches`) are the DRAFT and
+   `submit_shift_report` is the one act that flushes them. **The draft is
+   PERSISTED**, not held in a browser: pause-and-resume is one of the three
+   commands Mark specified and a dropped iPad at 9pm must not cost a shift.
+   After the flush each draft row keeps a pointer to the row it created, which
+   makes it a transcript rather than a duplicate.
+   **PAGES ARE DERIVED FROM THE SHIFT**, and the two production pages are
+   MIRRORS that never both appear (Mark, 2026-08-28, correcting his own earlier
+   note): the OPENING supervisor records what the overnight bake produced
+   (Elements made), the CLOSER records what was left of it (Premades) plus
+   sales and tomorrow's paper. Seven pages closing, five opening, **four for mid
+   and off-site** — an off-site shift has no kitchen for a batch log to be
+   about, which is 317 of FMP's 13,059 reports and a known accepted cost.
+   `pagesForShift` returns the list and the runner numbers what it is given, so
+   an opening report reads "PAGE 3 OF 5" rather than skipping.
+   **SALES ARE NOT INCOMPLETE AT 9PM — THEY ARE ABSENT, and that is better.**
+   Square's reporting day runs 1:00 AM to 12:59 AM PT and `SyncFromSquare` stops
+   at yesterday, so there is NO `daily_sales` row for today at all; nothing
+   partial can be mistaken for a settled figure. So the report **never writes a
+   sales number anywhere**: `sync-square-sales` gained a **`preview: true` mode**
+   that returns the window's rows without calling `record_daily_sales`, and its
+   role check is now mode-dependent — owner/admin to WRITE, supervisor+ to
+   PREVIEW, because reading a figure off the register in front of you is not the
+   act that feeds `tip_pools`. Verified live: $1,364.08 returned and **zero rows
+   written to `daily_sales` or `tip_pools`**. The email carries the provisional
+   figure marked provisional and keeps what it quoted in `email_receipt`; the
+   record screen renders the SETTLED figure once the sync catches up and says
+   which it is showing (`foodHandlerExpiry`'s rule). Consequence:
+   `Task_SalesData_isComplete_b` has NO counterpart — Square types it now, so
+   there is no act to complete.
+   **SPECIAL ORDERS AND PRODUCTION SCHEDULES ARE ONE PAGE.** They stopped being
+   two tasks on 2026-08-27 when `GenerateSchedules` grew the special-order pull;
+   `fetchPacketData` calls `companionScheduleIds` itself, so printing a plan
+   schedule already expands to include that night's special-order schedules.
+   FileMaker split them because FileMaker's generation did not pull. TWO task
+   flags survive, not one: a per-order kitchen document and the tray-guide
+   packet are different paper and the submit page must say which is missing.
+   **SENT AND EMAILED ARE TWO FACTS** (`sent_at` vs `emailed_at`), and keeping
+   them one column was a real hole caught in review: the flush could succeed,
+   the mail fail, and the report read "sent" with nobody told — while
+   `submit_shift_report` refuses to run twice, so there was no way back. A row
+   with one and not the other shows on the list as "Sent, but not emailed" with
+   a Resend.
+   **THE EMAIL'S PRIVACY BOUNDARY IS STRUCTURAL, NOT TESTED.**
+   `managementBody = supervisorBody + ratingsSection`, so ratings can reach the
+   supervisor version only if somebody deliberately MOVES that section, never by
+   forgetting — `gustoExport`'s discipline. The fixture (asserted against the
+   produced STRING) is a second line of defence. **Both bodies are composed in
+   the BROWSER and posted** to `send-shift-report`: `_shared` cannot import from
+   `web/`, so composing in Deno would be a second implementation of the one rule
+   that must never drift. `_shared/email.ts` gained an optional **`html`** field
+   (multipart/alternative, text part FIRST so a client picks the last it can
+   render) — optional and unset by every existing caller, the shape `messageId`
+   was added in. Verified by building the MIME in Node: both parts round-trip
+   byte-for-byte and the subject survives RFC 2047 chunking.
+   **`shift_report_ratings` HAS ITS OWN SELECT POLICY** — owner/admin OR the
+   report's author, never plain supervisor+. The two emails encode that boundary
+   and a table readable by every supervisor would undo it in one click.
+   **Migration 072 — REOPEN**, asked for within an hour of the first real send.
+   It is NOT a status flip: `submit_shift_report` INSERTS `employee_events`
+   (there is no natural key — a person can be rated twice in a day by two
+   shifts), so flipping `status` and letting somebody Send again produces a
+   SECOND rating for the same person on the same day, silently. Reopening undoes
+   the flush and leaves the DRAFT alone. **It refuses to destroy two things**,
+   both named in its receipt: a count somebody has recorded SINCE (the revert is
+   conditional on the line still holding what the flush put there — proved on
+   the harness with a line recounted to 30/1), and a premium inside a CLOSED pay
+   period. Owner/admin only; the three `task_*` flags stay, because paper that
+   came out of a printer did not go back in.
+   **Migration 071 — the break TIME.** FMP asked when, and that is the more
+   useful half: California's rule is about TIMING, so "they got a break" and "at
+   4:45pm off a 10am start" are different facts and only the second shows a late
+   meal. A `time`, nullable even when the box is ticked. **Deliberately NOT
+   wired into the premium** — whether a late meal owes one is `lib/breakRules`'
+   judgement over the punches, and the punches are not imported until the pay
+   period ends.
+   **THE ROSTER IS TYPED, and that is forced.** `timesheets` would be the
+   natural source and is unusable: punches are not imported until after the pay
+   period ends, so at 9pm tonight's own shift is not in the table (Mark,
+   2026-08-28). Names come from **`special_order_takers`** (053) and positions
+   from a distinct sweep of `employees.position` — `employees` READ is
+   owner/admin (020), so a supervisor cannot learn a colleague's name any other
+   way. That trap bit twice in test SCRIPTS during the walk: a seed joining
+   `employees` inside an impersonated block inserted ZERO rows and reported
+   success.
+   Screens: `/shift-reports` (list, attention tier, create dialog),
+   `/shift-reports/[id]` (the READ-ONLY record — the archive, and the reason
+   declining the migration is safe: without it the only way to read last Tuesday
+   is to find the email), and `/shift-reports/[id]/run` in a new
+   **`(fullscreen)` route group** — the app's FIRST chrome-less route that is
+   also signed in, its layout calling `getAppSession()` itself and keeping only
+   `ConfirmProvider` and `CalcPad`. No `proxy.ts` change: anything not
+   explicitly exempted there is already auth-gated.
+   **The attention tier is what makes it a routine rather than a form** —
+   `locations.open_days` (017, first reader ever) says which nights a shop was
+   open, so "nobody reported Tuesday" is a FACT. Found 7 real unreported nights
+   at DF01 on the first load.
+   **NO HISTORY MIGRATES** (Mark's call). FMP's `Operations/ShiftReports.mer` —
+   13,059 rows, 2017–2026, 7,334 closing / 5,403 opening / 309 off-site, median
+   557 characters of narrative, only 43 empty — stays on disk. It was still READ:
+   the six `Task_*_isComplete_b` flags and the shift vocabulary come from it.
+   **Only three task flags survive**: `narrative` being non-empty answers
+   `Task_Log`, Square answers `Task_SalesData`, and `task_checklist_done` is NOT
+   created — a column for an unbuilt feature is a claim nothing can satisfy.
+   **CHECKLISTS ARE STILL OUT**, deliberately and by Mark's scoping.
+   **What the live walk found that nothing else could** (all fixed): pressing
+   "Start the report" DID NOT NAVIGATE, because `router.refresh()` raced
+   `router.push()` across a route-group boundary — `NewPlan` does the same and
+   gets away with it inside `(app)`; the break checkbox had NO VISIBLE LABEL,
+   because `ui/Checkbox`'s `label` is the ACCESSIBLE NAME and `children` is the
+   visible one (four call sites); missing React keys on the page bodies, which
+   cross the server/client boundary in a collection; and the Premades header
+   rendering **"LEFTNOTE"**, because a `w-28` on a `th` is a suggestion an
+   auto-layout table ignores — both counting tables are `table-fixed` with a
+   colgroup now.
+   **Mark's own first send exercised the skip path on real data**: he marked
+   himself as having missed a break with no reason, and the flush skipped the
+   premium, NAMED it in the receipt, and sent anyway rather than blocking the
+   report over one incomplete row.
+   **A `→` ON THE PREMADES PAGE TAKES THE PAR** (receiving's idiom, and its
+   reason: the usual answer is "we made what we were asked to"). An arrow rather
+   than a prefilled box — a box that filled itself would make merely OPENING the
+   page look like somebody had counted. It hides once they agree.
+   **The rows are in the PRINTED SHEET's order**, not the schedule's `sort`:
+   whoever is counting is holding that sheet and reading down it.
+   `compareForPremadeSheet` is exported from `lib/productionSchedule` and
+   `rollUp` shares it rather than keeping a second copy.
+   **The generate dialog lost its shop list and all its commentary** (Mark,
+   2026-08-28: "we should be able to schedule anything that will be made at the
+   current working location. We don't care where it's sold"). `selected` still
+   carries every eligible shop to the RPC — `p_location_ids` is how the function
+   is addressed — it is just no longer a thing anybody is asked about.
+   "Print packet…" is **"Print All Documents"**; the packet parts lost their
+   hints and three were renamed to the kitchen's words rather than the schema's:
+   **Production Items Sheet, AB Items, Weekly Production**. Whichever button is
+   next is BLACK and never both — generate when the night has no schedule, print
+   once it has one.
+   **A SPECIAL ORDER'S PREMADE SHEET IS TITLED BY THE ORDER**:
+   `SPECIAL ORDER #9761` over `Wedding 8/29/2026`. `premadeSheetTitle` splits
+   the stored title with `splitScheduleTitle`, the INVERSE of `scheduleTitle`
+   and living beside it — a fixture runs a title through the composer and back,
+   so the paper and the screen cannot spell one document two ways. The FILENAME
+   follows the heading. Verified by capturing the blob, inflating the content
+   stream and decoding the hex text runs.
+   **`(fullscreen)` and `ui/PickList size="lg"`**: the runner is tablet-first —
+   44px targets, `text-[16px]` (below which iOS Safari zooms on focus), which
+   needed a real `size` prop rather than a `className` override, because
+   Tailwind resolves competing utilities by STYLESHEET order.
+   **1355 fixtures pass**, each rule checked by breaking it.
+   **Still owed:** nobody holds `purchaser` or `supervisor` as an APP ROLE yet,
+   so the no-ratings version currently reaches NOBODY. Inviting the 8 real
+   supervisors is what fills it. And what the email LOOKS LIKE when it lands is
+   the one leg no probe can settle.
+
+4i. ✅ **WHICH SHOPS A MEMBER MAY WORK AT — migration 073, APPLIED and
+   verified live 2026-08-29.** Mark: "in my FMP version of the app, I could give
+   users I granted access to the app to a permission setting, a default
+   location, and set which locations they had access to in the app."
+   001 predicted `location_members` BY NAME and this file carried it as an open
+   thread from 2026-08-01, with a note to settle one question first. That
+   question is now answered.
+   **IT IS "MAY WORK AT", NOT "MAY SEE"** (Mark's choice). It restricts which
+   shops you can SWITCH to — the masthead picker and the Locations list's Work
+   here — and therefore which shop's guide, POs, receiving and shift reports you
+   meet, because all of those follow the working location. It is **NOT a data
+   boundary**: DF02's rows stay readable to a DF01 member who goes looking, and
+   `/special-orders`, `/customers`, `/employees`, `/events` and `/sales` are all
+   deliberately ORG-WIDE. Making it a security rule means every location-scoped
+   policy in the schema AND rethinking those screens — a different and much
+   larger decision, and this table is what it would read.
+   **NO ROWS MEANS EVERY LOCATION.** The single most important rule here: an
+   empty table is what exists the moment the migration runs, so reading it as
+   "no shops" would log the company out of everywhere at once. It is per-MEMBER,
+   not table-wide — proved live, where restricting one account left the other
+   two unrestricted. `ui/PickSet` happens to have exactly those semantics, so
+   the control says "All shops" without being taught to.
+   **NO DEFAULT LOCATION COLUMN** (Mark: "it's redundant — we can get that from
+   the location already assigned to them"). `employees.main_location_id` is that
+   assignment and `last_active_location_id` carries every session after it; a
+   third column would be a second answer to a question that has one.
+   **`set_my_member_profile` NOW REFUSES a shop you may not work at.** Without
+   it the grid would be advisory — the picker hiding a shop while a hand-rolled
+   POST still switched to it. 002's body is reproduced whole (055's rule) and
+   gains one check.
+   **THE HARNESS FOUND A REAL BUG.** `may_work_at(p_org, p_user, p_location)`
+   took `p_user` but the owner/admin exemption used `user_has_role`, which is
+   hardcoded to `auth.uid()` — so asking "may Karina work at DF02?" answered
+   with the CALLER's role, and the shift report's recipient query asks exactly
+   that about every member on the list. It asks about `p_user` now, and returns
+   the same answer as superuser and from inside a session.
+   **A THIRD SESSION LIST, and picking the wrong one is a silent bug:**
+   `locations` to LOOK UP a code, `activeLocations` to ENUMERATE shops (**never**
+   narrowed by the grid — an item's per-location rows must not vanish for a
+   restricted member), `workableLocations` to offer a SWITCH.
+   Screens: the grid is on the employee record's **Admin tab as "Works at"**,
+   beside Role, because the two together are what app access means. Owner/admin
+   show as unrestricted rather than being offered a choice the database would
+   ignore. `WorkingHere` shows NOTHING on a shop you may not work at — the same
+   nothing a closed shop shows, since in both the answer is no.
+   **The shift report's supervisor email follows the grid** (Mark's answer to
+   the shop-scoping question). **Management never is**: a manager sees every
+   shop, and Mark's own employee record has no main location, so a scoped rule
+   would silently drop the OWNER off DF01's report.
+
+4j. ✅ **A WAY BACK INTO THE APP — migration 074 + `request-password-reset`,
+   APPLIED, DEPLOYED and tested 2026-08-29.** `/login` never had a forgot-
+   password link. Fine while every account belonged to Mark or Traci; not fine
+   the moment eight supervisors have logins, when the first to forget is stuck
+   until somebody runs the admin API by hand.
+   **`supabase.auth.resetPasswordForEmail` WOULD HAVE BEEN ONE LINE AND IS THE
+   WRONG LINE.** It sends through Supabase's own mailer, from a supabase.co
+   address, on a handful-per-hour quota — where every other message this app
+   sends goes out as the org through `_shared/email.ts`. A password reset is the
+   LAST message you want arriving from an address the recipient does not
+   recognise.
+   **THE ANSWER IS ALWAYS THE SAME** — 052 and 057's rule, and the whole
+   security property. Not in the body, not in the status, and **not in the
+   timing either**, which is why 074 records attempts against addresses that do
+   NOT exist: throttling only the real ones would turn the endpoint into an
+   account enumerator, because the unthrottled replies would be the fakes.
+   Verified live — known and unknown addresses returned byte-identical
+   responses, and the throttle bit on an unknown address on the fourth try.
+   **A BANNED ACCOUNT GETS NOTHING**, silently: revoking access bans the auth
+   user (4c) rather than deleting it, and access removed is not a password to
+   reset.
+   074 exists because the endpoint is PUBLIC and spends the org's Gmail quota,
+   **which is shared with purchase orders** — the first symptom of abuse would be
+   a PO that silently failed to send. Three per address per hour, thirty
+   overall. SELECT is owner/admin ("did it actually go out?" is a real support
+   question); there are **NO write policies at all**, so the service_role
+   function is the only writer (033's `timesheet_benefits` shape). Verified on
+   the harness: the owner reads it, a supervisor sees zero rows, and both
+   authenticated and anon inserts are refused.
+   **`/welcome` takes a THIRD link type.** All three — `invite`, `magiclink`,
+   `recovery` — end the same way, but the copy no longer calls a password reset
+   an "invitation". Its "nothing is verified on load" property is what let the
+   page be checked with a real token without spending it.
+   The link reuses the login form's OWN email field rather than opening a dialog
+   with a second one, sits BELOW the commit (the way out of a dead end, not a
+   second thing to choose between), and is `type="button"` or it would submit
+   the form it lives in.
+   **Known and not chased:** the reset mail goes out as `info@donutfriend.com`,
+   the same mailbox POs use. A `shift_report`-style provider key would move it.
+
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -5750,7 +6049,7 @@ weekday column, and 003 then silently made it per-vendor-item.
 
   | Reach for | Instead of | For |
   | --- | --- | --- |
-  | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary — a VALUE or a filter's VIEW; `variant="inline"` in a cell, `variant="field"` as a standalone box, `variant="masthead"` on the black bar (yellow type, no box — the working-location picker, whose dress it is; build step 4b has the reasons). Opens below the field, portals so panes can't clip it; `panelMinWidth` raises the panel's floor where the trigger is much narrower than the rows it opens |
+  | `ui/PickList` | `<select>`, free text | choosing from a known vocabulary — a VALUE or a filter's VIEW; `variant="inline"` in a cell, `variant="field"` as a standalone box, `variant="masthead"` on the black bar (yellow type, no box — the working-location picker, whose dress it is; build step 4b has the reasons). Opens below the field, portals so panes can't clip it; `panelMinWidth` raises the panel's floor where the trigger is much narrower than the rows it opens. **`size="lg"`** is the 48px/16px dress for a TABLET-FIRST surface (the shift report) — a PROP, not a `className` override, because Tailwind resolves competing utilities by STYLESHEET order so a caller's `h-12` cannot be relied on to beat the component's `h-9` |
   | `ui/Dialog` | a hand-rolled overlay | every floating dialog; pins its title bar and footer, scrolls only the middle, and neutralises the properties it inherits from its trigger. `DIALOG_CANCEL/COMMIT/DANGER_CLASS` for the footer buttons; `onSubmit` makes Enter commit (opt-in — see the Enter bullet below) |
   | `confirmDialog()` from `lib/confirm` | `window.confirm` | EVERY confirm (Mark, 2026-08-10: the browser's dialog "takes me out of the app experience"). A promise — `if (!(await confirmDialog({ title, body, tone: "danger" }))) return;` — so the handler becomes async; `splitConfirmMessage(msg)` spreads a one-string message into title + body. `ui/ConfirmDialog` is the panel and only the (app) layout touches it. Enter does NOT commit a `danger` confirm (it focuses Cancel), which is `ui/Dialog`'s rule applied |
   | `ui/MenuButton` | a button you wire to your own popup | a button that opens a short list of COMMANDS — the anchored menu with the trigger left to the caller. A menu, not a `PickList`: every row is a verb that happens once and leaves nothing selected, so the trigger's label never changes. `ui/RowMenu` is the `⋯` dress over it; a command bar passes words and `BUTTON_CLASS` |
@@ -5760,7 +6059,8 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/SectionHeading` | a hand-styled `<h2>` | the heading over a block on a detail screen (16px bold black, optional `count`) |
   | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style. Selected cell is ALWAYS black; `count` and `href` are the only options |
   | **`ui/FilterMenus`** + `lib/filterMenus` | several `TabPicker`s stacked, or a row of hand-wired `PickList`s | a list filtering on THREE OR MORE dimensions AT ONCE — a row of labelled popup menus that AND together ("FilterMenus" is the name to call it by; NOT `catalog/ListFilters`, which is the older fixed search+category+active row). A dimension declares `matches`, never a pre-filtered list, which is what makes the option counts CONDITIONED ON THE OTHER MENUS (and never on their own, or every option but the chosen one reads 0). "All" is supplied, not declared; the bar owns the result count and a Clear, because four collapsed menus can hide a list while the screen looks unfiltered. Values live in the URL via `parseFilterValues`/`filterHref` + `history.replaceState`, and a value no option offers is DROPPED rather than obeyed. ONE dimension stays a `TabPicker` — this is not a replacement for it | The **`trailing`** slot holds a list's create command and renders RIGHT-ALIGNED ON ITS OWN LINE ABOVE the menus — it rode at the END of the filter row until 2026-08-21, which reads well only while the row fits, and `/special-orders`' search box plus six menus want ~1439px against the 1376 a 1440 window gives, so on an ordinary laptop the one control you came to press had already wrapped BELOW the filters. Its own line always, rather than a breakpoint: the wrap depends on how many menus a caller declares, so any threshold is tuned to one list and wrong for the next |
-  | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear |
+  | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear. Its wrapper **SHRINK-WRAPS** so a search box's `w-72` on the input decides the width — which is why **`w-full` alone does nothing**: it resolves against a span that is itself sized by the input, and the pair settles at the input's intrinsic ~20-character width. **`fullWidth`** is how to fill a form's track, and it has to say it twice (wrapper AND input) because an input in a flex row does not stretch on its own |
+  | `ui/PickSet` | a row of checkboxes | choosing SEVERAL from a known vocabulary — the shops a member may work at, a filter over locations. **EMPTY MEANS ALL**, which is 073's own rule and why that grid needed no teaching. `boxed` is `PickList`'s prop doing PickList's job: a detail FIELD wants the hairline that blackens on hover, a filter row wants the standing black rule |
   | `ui/DateField` | `<input type="date">` | EVERY date box, the PUBLIC pages included. Carries the Safari empty-date apparatus (see the date bullet); `InlineValue kind="date"` wraps it, a create form uses it directly, and **`variant="field"`** (`PickList`'s prop name, same dense-cell-vs-form-box distinction) is the bordered `h-12`/16px dress the inquiry form wears |
   | `ui/TimeField` | `<input type="time">`, or a `TextInput` you parse | a time of day in a CREATE form, where the box starts empty and the value is required — `type="time"` yields `HH:MM` or nothing, so a half-typed value can never reach a `time` column as a cast error. It carries NO empty-state apparatus, deliberately: DateField needs one because WebKit paints TODAY into an empty date, and an empty time renders as placeholder segments. An edit-in-place cell on a value already set stays `TimeCell`, which takes free text and lets Postgres parse it. It mirrors DateField's **`variant`** for that component's own stated reason — the two sit side by side, so a bordered time beside a borderless date reads as one of them being broken |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
@@ -6017,9 +6317,14 @@ weekday column, and 003 then silently made it per-vendor-item.
   Its sub-tier's first entry is labelled **"All"**, not "Locations" — the band
   above already says it, the same trim that made HR's "Team Ratings" just
   "Events"; the SLUG is untouched, which is what the nav cookie stores.
-  Only Purchasing is built (Vendors · Inventory · Order Guide ·
-  Purchase Orders · Cleanup, Mark's order); everything else lands on
-  `/soon/<section>/<sub>`, one shared placeholder. **The menu is
+  Most of the menu is built now; what is left on `/soon/<section>/<sub>` — one
+  shared placeholder — is Location's Tasks / Maintenance / Inspection Logs, HR's
+  Team Reviews, and Operations' Documents / Policies / Check Lists / Master
+  Check Lists / Tags. **`operations/shift-reports` graduated on 2026-08-28** and stays
+  under Operations: the note that used to argue for Production was about where
+  the WORK was sequenced, not where the entry belongs, and the screen is
+  organised by the shift a supervisor is closing rather than by the tables it
+  writes. **The menu is
   `web/src/lib/nav.ts`** — a screen ships by getting a real `href` there and
   nothing else moves. Home and Settings are utility ICONS, not tabs, so they
   light no tab and the second band hides entirely on those routes.
@@ -7389,16 +7694,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   row where most cells write org-wide and one writes only for your shop. That
   has to be visible in the table, or it becomes the next "I edited this and it
   only changed here".
-- **Per-location app access is deferred, and Mark wants to revisit it**
-  (2026-08-01: "defer for now but it is something I definitely want to
-  revisit"). FMP's ADMIN tab had a DEFAULT LOCATION and an ACCESS LOCATIONS
-  checkbox grid per user; today every member can work at every location and
-  only their ROLE limits them. 001 anticipated this — "per-location roles can
-  be added later (`location_members`) without disturbing this" — but it now
-  touches more than it did: `getAppSession`'s two lists, the `/locations` list
-  that grants Work here, and every location-scoped screen. Don't build it
-  speculatively; when it comes back, ask whether the rule is "may work at" or
-  "may see", because they are different tables.
+- ~~**Per-location app access is deferred.**~~ **RESOLVED 2026-08-29 —
+  built (migration 073).** It came back, the "may work at" vs "may see"
+  question this note said to ask was asked, and Mark chose **may work at**.
+  See build step 4i for what that means and what it deliberately does not do.
+  **The half that is still open is "MAY SEE"**, and it is a much larger
+  decision rather than a follow-up: it would mean every location-scoped policy
+  in the schema, and rethinking `/special-orders`, `/customers`, `/employees`,
+  `/events` and `/sales`, which all treat location as a FILTER rather than a
+  scope on purpose. `location_members` is the table it would read. Don't build
+  it speculatively; ask what problem it is solving first, because "a supervisor
+  should not read another shop's numbers at all" is a claim about people rather
+  than about software.
 - **`REQUIRED_ONBOARDING_KINDS` now matches FMP's own value list**
   (`web/src/lib/employeeDocuments.ts`) — Application, W-4, I-9, I-9 documents,
   food handler card, handbook, **Orientation**, notice to employee, with the
@@ -7464,4 +7771,11 @@ made it a small feature rather than a project: the invoice was already in the
 system, the PO line already snapshotted the vendor's SKU to join on, and the
 price-reconciliation band was already the place an answer could land. See build
 step 4.
+**CHECKLISTS are deferred and were scoped out deliberately** (Mark,
+2026-08-28), which is why the shift report's submit page carries no line for
+them and why `task_checklist_done` does not exist as a column — a column for an
+unbuilt feature is a claim nothing can satisfy. FMP's version generated a
+list of things to check around the shop before leaving, walked and ticked off.
+Two nav stubs are already waiting for it (Operations › Check Lists and Master
+Check Lists), and when it lands the shift report gains a page and one flag.
 When in doubt whether a feature belongs, check the spec's kill list or ask Mark.
