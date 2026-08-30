@@ -286,10 +286,6 @@ export default async function ChecklistTemplatePage({
             )}
           </dd>
         </dl>
-        <p className="max-w-[60ch] text-[12px] text-muted">
-          A list with no days set is never offered automatically — that is what a
-          walkthrough and an inspection are, started by hand when somebody walks.
-        </p>
       </section>
 
       <TemplateItemsTable
