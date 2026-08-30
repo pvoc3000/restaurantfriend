@@ -4842,6 +4842,30 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    NOT rerunnable: `drop index production_schedule_items_line` fails a second
    time, which is the signal it already ran.
 
+   **075, 076, 077 AND 078 ARE ALL APPLIED** (Mark, 2026-08-29/30 — facility
+   checks). *Probe, don't read this line; it has been wrong in both directions
+   for four different migrations.* Four probes, because they do four things:
+   `select count(*) from equipment` and `… from location_tasks` (075's tables);
+   `select polname, polcmd from pg_policy where polrelid =
+   'public.location_tasks'::regclass` → **THREE** rows and NO delete, or
+   somebody added an eraser that bypasses the reason;
+   `select id, public from storage.buckets where id = 'facility-photos'` → one
+   row, public **FALSE**, since a public bucket here is a data leak; and 078's
+   `select column_name, is_nullable from information_schema.columns where
+   column_name in ('guidance','position') and table_name in
+   ('checklist_template_items','checklist_run_items')` → **FOUR** rows, every
+   one YES.
+   The one that would be SILENT if it broke is 076's empty-array refusal, which
+   is what was wrong first:
+   `insert into checklist_templates (org_id, location_id, kind, name, weekdays)
+   select id, (select id from locations limit 1), 'checklist', 'x',
+   '{}'::smallint[] from orgs limit 1;` must **ERROR**. If it inserts, the check
+   is using `array_length` again — which returns NULL for an empty array, and a
+   CHECK passes on NULL.
+   Order is load-bearing: **075 → 076 → 077 → 078**. 076's
+   `checklist_run_items.task_id` references a table 075 creates, 077's photos
+   reference both, and 078 alters 076's tables. None is rerunnable.
+
    **060 IS APPLIED** (Mark, 2026-08-22 — the request's details box).
    *Probe, don't read this line.* `select column_name, is_nullable from
    information_schema.columns where table_name = 'purchase_requests' and
@@ -5619,8 +5643,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the same mailbox POs use. A `shift_report`-style provider key would move it.
 
 4k. 🚧 **FACILITY CHECKS — checklists, walkthroughs, tasks, maintenance,
-   inspections and equipment (migrations 075, 076, 077 — ALL THREE NEED
-   APPLYING, in that order).** Mark, 2026-08-29: "we kind of need to think of
+   inspections and equipment (migrations 075, 076, 077, 078 — ALL FOUR APPLIED
+   2026-08-29/30). *Probe, don't read this line.*** Mark, 2026-08-29: "we kind of need to think of
    checklists, tasks, and maintenance requests as one, interconnected and
    interdependent module."
    **Read `docs/checklists-brief.md` before designing or touching any of it** —
@@ -5738,24 +5762,89 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    has one, which is 016's trap. The submit page says "3 of 27 checklist items
    have not been looked at" instead. `submit_shift_report` and
    `reopen_shift_report` are UNTOUCHED: two acts, not one.
-   Screens: `/checklist-templates` + record (duplicate-to-another-shop maps
-   sections BY DISPLAY NAME, names what didn't map, and arrives INACTIVE —
-   `PlanDetail`'s duplicate with the one thing that build didn't need);
-   `/checklists` list + `/checklists/[id]` (read-only archive) + the walk at
+   Screens: **`/checklists` IS ONE SCREEN OF TWO VIEWS** — Checklists |
+   Templates, a `TabPicker` over two populations fetched under different rules
+   and rendered with different columns (`/events`' precedent). They shipped as
+   two adjacent nav entries on 2026-08-29 and merged the next day (Mark: "what
+   about just having a Checklist screen with tab picker … combine the two
+   screens into one"), because deciding which of two menu items you wanted came
+   before you could look at either. **Only the LISTS merged**: both records keep
+   their own address, `/checklist-templates` (the list) is a redirect shim
+   (`/location`'s pattern, since that address is in the record's own
+   breadcrumb), and the nav entry carries **`also: ["/checklist-templates"]`** so
+   the shim AND the still-live record route both light the tab. The view is a
+   REAL NAVIGATION rather than `history.replaceState` — the two halves are
+   different QUERIES — and the default writes no parameter so `/checklists`
+   stays canonical.
+   Plus `/checklists/[id]` (read-only archive) + the runner at
    `/checklists/[id]/run` in the `(fullscreen)` group (the order guide's posture
    — one scrolling document, black shop-section bands in the shop's own walk
    order, 44px targets, `text-[16px]`, every tap writing immediately);
-   `/tasks` + `/maintenance-requests` (one table, two doors); `/equipment` +
-   record with its reading history; `/inspection-logs`.
+   `/checklist-templates/[id]` (duplicate-to-another-shop maps sections BY
+   DISPLAY NAME, names what didn't map, and arrives INACTIVE — `PlanDetail`'s
+   duplicate with the one thing that build didn't need); `/tasks` +
+   `/maintenance-requests` (one table, two doors); `/equipment` + record with
+   its reading history; `/inspection-logs`.
+   **"WALK" WAS A WORD THIS MODULE INVENTED** and is gone from every visible
+   string (Mark, 2026-08-30). The tab is **Checklists**, the command **New
+   checklist**, the second view **Templates** — which is what the route and the
+   `?view=` parameter always said, so only the words were out of step. The tab
+   echoing the screen's own name was the deliberate trade: a supervisor says
+   they are doing the checklist, and a tab nobody recognises costs more. The KEY
+   stays `walks` and is invisible (it is the default view, so only
+   `?view=templates` reaches an address bar). **The command's noun is a PROP**,
+   because `/inspection-logs` renders the same control and "New checklist" there
+   would name the wrong record; and **the runner names its KIND** off the run's
+   snapshotted `kind`, since one hardcoded noun would be wrong on two of three.
    `ChecklistWalk` is ONE COMPONENT WITH TWO DOORS — standalone and as a page of
    the shift-report runner, which gained `checklist` in `pagesForShift` for every
    shift (closing 8 pages, opening 6, mid and off-site 5).
+   **078 — A CHECKLIST ITEM SAYS FOUR THINGS AND 076 MODELLED TWO**, which two
+   real DF01 documents settled and no amount of design would have. The paper has
+   a checkbox, the instruction, a WHO (Baker, Fryer, Assistant Baker,
+   Supervisor) and a NOTE ("water emptied", "replace filter on Tue/Fri/Sun"). So
+   `guidance` and `position`, both nullable on the template item and both
+   SNAPSHOTTED onto the run item. Of 105 real items 23 name a position and 16
+   carry a note — most have neither, which is why neither has a default.
+   **`position` is the ROSTER vocabulary** (`employees.position`), NOT
+   `org_members.role`: the two overlap on "Supervisor" and mean different things
+   by it. A hint, never a gate.
+   **THE SECTION VOCABULARIES DO NOT MATCH, and the brief was wrong to claim a
+   walk follows the order guide's route.** DF01's 72 shop sections are SHELVES
+   for counting stock — "Walk In R1 S3", "FOH Cab 2" — where the checklists walk
+   ROOMS. Only OFFICE matched. Mark's call: use the area-level sections that
+   already exist, add seven FOH sub-areas at **60.1–60.7** inside FOH's own
+   60–69 band, plus one new "Outside" at 0; mop room → Kitchen Dish Pit
+   ("basically in the dish pit"). They add nothing to the order guide — a
+   section with no inventory renders no band there.
+   **DF01's REAL OPENING AND CLOSING LISTS ARE LOADED** (2026-08-30) —
+   `migration/load-df01-checklists.mjs`, 8 new shop sections, 2 templates, 105
+   items, transcribed with `pdftotext -layout` rather than retyped by eye.
+   Three of Mark's own typos are VERBATIM ("fillout out complely", "santized",
+   "toilet bush"): correcting somebody's document while copying it is not a
+   thing to do quietly. The loader is dry-run by default and idempotent —
+   re-running REPLACES a template's items rather than doubling them, which is
+   safe because a run snapshots its own copy.
+   **KNOWN AND UNANSWERED: the walk order does not match the paper.**
+   Between-section order comes from `shop_sections.sort_order`, which is the
+   ORDER GUIDE's route — Kitchen(10), Bathroom(50), FOH(60), Office(90), i.e.
+   back-to-front, because that is how you count stock — where the closing list
+   goes front-to-back. Fixing it means moving existing sections (which moves the
+   order guide) or giving a template its own section ordering. Ask before either.
    **NOT BUILT and named so nobody thinks it was forgotten:** a cadence engine
    (PM wants three shapes and a general scheduler is where this metastasizes), a
    checklist PDF and therefore its attachment to the shift-report email, the
-   `choice` response type's option editor, cost-per-asset, and an editor on the
-   run record (read-only on purpose — one write path, and the walk is it).
-   Verified: **all 77 migrations replay on the Docker harness**, every constraint
+   `choice` response type's option editor, cost-per-asset
+   (`location_tasks.vendor_invoice_id` is the seam and has NO reader), an editor
+   on the run record (read-only on purpose — one write path, and the runner is
+   it), TASK PHOTOS (`facility_photos.task_id` exists and nothing writes it),
+   equipment DELETE, and everything an inspection log wants beyond a filtered
+   list — the inspector's document, findings with deadlines, permit expiry.
+   **And WALKTHROUGHS HAVE NEVER BEEN RUN**: the kind exists, per-item scoring
+   is built and fixture-tested, but no walkthrough template exists, so the path
+   from "manager scores an item" to "task lands on tonight's checklist" has only
+   ever been exercised on a hand-made run.
+   Verified: **every migration replays on the Docker harness**, every constraint
    refuses what it should (checked by asserting the refusal, which is what found
    the `cardinality` bug), and as REAL AUTHENTICATED ROLES a supervisor reads a
    colleague's run and **updates 0 rows with NO error**, a staffer sees 0 runs
@@ -5763,13 +5852,30 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    supervisor's update changes 0, an author's write to a SUBMITTED run changes 0
    and a delete removes 0 — all silently — an owner always writes, `anon` sees
    nothing, and a junk storage path is refused by the POLICY rather than raising
-   a cast error. **1,413 fixtures pass**, 58 new, each rule checked by BREAKING
+   a cast error. **1,416 fixtures pass**, 61 new, each rule checked by BREAKING
    it (the ISO weekday, the after-midnight rollover, the out-of-range issue, the
    unscored-section null, the carry-forward order, cancelled-counted-as-open and
-   the silent age label all go red).
-   **NOT YET WALKED IN A BROWSER** — the migrations are unapplied and the test
-   pane has no signed-in session. Everything above is harness, typecheck, lint
-   and fixture evidence.
+   the silent age label all go red). All **78 migrations** replay clean.
+   **WALKED END TO END against the real DF01 data 2026-08-30 and left as found.**
+   What that proved beyond the harness: the UI wrote `weekdays [6,7]` and
+   `shifts ['closing']`, so the ISO mapping holds through a real picker; Sunday
+   matched and the "asked for today — not started" band appeared; the snapshot
+   took 4 of 5 items, leaving off the Monday-only one; **44°F against 34–40
+   raised the issue BY ITSELF and wrote its own note**; raising a task linked it
+   so the item reads "Reported"; the carried-over band appeared at the top of
+   the next walk immediately; the readiness confirm named what was outstanding
+   and let me through; and Finish left for the archive.
+   **THREE BUGS ONLY RENDERING COULD CATCH**, none of which typechecks, lints or
+   fixture-fails — see `docs/checklists-brief.md` for each:
+   an HTML ENTITY IN JSX TEXT EATING THE SPACE after an interpolated value (a
+   whole-app trap, now a convention below); a shared class string carrying
+   `text-white` that the commit appended `text-ink` to, rendering the runner's
+   **Finish button WHITE ON WHITE** — invisible, on the module's primary screen,
+   found with `getComputedStyle` because by eye the footer just looks like it
+   has one button; and the walk row OVERLAPPING ITSELF at 375px, because
+   `flex-wrap` only helps when a child can claim the next line and a `flex-1`
+   sibling has a 0 basis. That last had been true since the runner shipped and
+   was invisible because it was only ever checked at desktop width.
 
 5. SwiftUI floor app (only after 4 is proven in real use)
 
@@ -6368,6 +6474,38 @@ weekday column, and 003 then silently made it per-vendor-item.
   fields before it scrolls** — it was already scrolling and is drag-resizable,
   but it is the one place the 36px rule is visibly expensive.
 
+- **USE LITERAL TYPOGRAPHIC CHARACTERS IN JSX TEXT, NEVER HTML ENTITIES**
+  (found 2026-08-30). **SWC strips the leading whitespace of a JSXText node that
+  contains an entity**, so a `&rsquo;` anywhere in a paragraph silently deletes
+  the space after an interpolated value ELSEWHERE in the same run:
+  `What a walk at {active.code} asks for` rendered **"at DF01asks for"**, with
+  the entity two lines below the missing space. It is invisible in review — the
+  source is correct, and the same shape renders fine in a paragraph with no
+  entity, which is what makes it hard to believe. Proved by swapping `&rsquo;`
+  for `’` and diffing the compiled chunk: `"asks for…"` became `" asks for…"`.
+  Write `’ ‘ “ ” — –` directly; `react/no-unescaped-entities` does not object to
+  any of them (it only wants `' " > }` escaped).
+  **STILL PRESENT IN SIX SHIPPED FILES and not swept**: `ShopSectionsTable`
+  (its empty state reads "at DF01yet"), `DerivedDay`, `RecalculateWorkdays`,
+  `BaseUnitEditor`, `FixDrawer`, `PlanMatrix`. Fix them as you touch those
+  screens. Find candidates with a `{expr} word` on one line whose text run also
+  holds an entity.
+- **A SHARED CLASS STRING STATES LAYOUT; EACH CALLER STATES ITS OWN COLOURS**
+  (2026-08-30). Tailwind resolves competing utilities by STYLESHEET order, which
+  this file already says in four places — the new corollary is that a shared
+  constant must therefore not CARRY a colour, because appending one at the call
+  site does not override it. A `FOOTER_CELL` holding `text-white` with
+  `bg-white text-ink` appended shipped a WHITE-ON-WHITE commit button on the
+  checklist runner's black footer: invisible, and at a glance the footer simply
+  looks like it has one button. Caught by reading `getComputedStyle`, not by
+  looking. Measure a colour you composed; do not trust the class string.
+- **`flex-wrap` ONLY HELPS WHEN A CHILD CAN CLAIM THE NEXT LINE** (2026-08-30).
+  A `flex-1` child has a basis of 0, so a `shrink-0` sibling that wraps
+  INTERNALLY keeps its full width and squeezes the flexible one to nothing —
+  the two then render on top of each other. The checklist runner's rows did
+  this at 375px from the day they shipped, invisible because the screen was only
+  ever checked at desktop width. `flex-col sm:flex-row` is the fix, and
+  **checking every new row at 375 is the habit**.
 - **YELLOW IS A FILL, NEVER AN INK — do not use `text-mark` on a light
   background** (Mark, 2026-08-22: "I find yellow text hard to read… a yellow
   filled square works as an attention signal, but not yellow text"). This is a
@@ -7924,11 +8062,14 @@ made it a small feature rather than a project: the invoice was already in the
 system, the PO line already snapshotted the vendor's SKU to join on, and the
 price-reconciliation band was already the place an answer could land. See build
 step 4.
-~~**CHECKLISTS are deferred**~~ **BUILT 2026-08-29** — migrations 075–077, see
-build step 4k and `docs/checklists-brief.md`. They came back a day after being
-scoped out, as one module with tasks, maintenance requests, inspections and a
-new equipment register, and moved from Operations to the LOCATION section.
-The shift report gained its page and NO flag: `task_checklist_done` still does
-not exist, because with checklists as rows the question it would answer is
-observable from a linked run.
+~~**CHECKLISTS are deferred**~~ **BUILT 2026-08-29/30** — migrations 075–078,
+see build step 4k, `docs/checklists-brief.md` for the decisions and
+`docs/checklists-handoff.md` for what is still outstanding. They came back a day
+after being scoped out, as one module with tasks, maintenance requests,
+inspections and a new equipment register, and moved from Operations to the
+LOCATION section. The shift report gained its page and NO flag:
+`task_checklist_done` still does not exist, because with checklists as rows the
+question it would answer is observable from a linked run.
+**It is NOT finished**: a flagged issue does not yet reach the emailed shift
+report, which is the requirement the module was asked for. See the handoff.
 When in doubt whether a feature belongs, check the spec's kill list or ask Mark.
