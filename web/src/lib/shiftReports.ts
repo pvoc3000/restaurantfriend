@@ -27,6 +27,7 @@ export type ShiftReportPage =
   | "sales"
   | "premades"
   | "elements"
+  | "checklist"
   | "report"
   | "tomorrow"
   | "submit";
@@ -38,6 +39,7 @@ export const PAGE_TITLE: Record<ShiftReportPage, string> = {
   sales: "Sales",
   premades: "Premades",
   elements: "Elements made",
+  checklist: "Checklist",
   report: "Report",
   tomorrow: "Tomorrow's paper",
   submit: "Submit",
@@ -48,6 +50,7 @@ const CLOSING_PAGES: ShiftReportPage[] = [
   "ratings",
   "sales",
   "premades",
+  "checklist",
   "report",
   "tomorrow",
   "submit",
@@ -57,12 +60,19 @@ const OPENING_PAGES: ShiftReportPage[] = [
   "info",
   "ratings",
   "elements",
+  "checklist",
   "report",
   "submit",
 ];
 
 /** Mid and off-site: no kitchen, no till to close. */
-const SHORT_PAGES: ShiftReportPage[] = ["info", "ratings", "report", "submit"];
+const SHORT_PAGES: ShiftReportPage[] = [
+  "info",
+  "ratings",
+  "checklist",
+  "report",
+  "submit",
+];
 
 /**
  * Which pages this shift gets. The runner numbers whatever it is given, so an
@@ -112,6 +122,21 @@ export type ReadinessInput = {
   scheduledLines: number;
   countedBatches: number;
   scheduledBatches: number;
+  /**
+   * The walk linked to this report, if there is one.
+   *
+   * DELIBERATELY NOT A `task_checklist_done` FLAG. 070 created its three
+   * `task_*` columns because each is "an act NOTHING ELSE CAN OBSERVE" — and
+   * with checklists as rows, whether the checklist was done IS observable: a
+   * linked run, submitted. A boolean beside it would be a second answer to a
+   * question that has one, which is 016's `nextDeliveryDate` trap. So the
+   * caller counts the rows and this says what they come to.
+   *
+   * `null` means no walk is linked, which is different from one that is empty.
+   */
+  checklist: { outstanding: number; total: number; finished: boolean } | null;
+  /** A list this shift is asked for that nobody has started. */
+  checklistNotStarted: boolean;
 };
 
 export function submitReadiness(input: ReadinessInput): string[] {
@@ -142,6 +167,21 @@ export function submitReadiness(input: ReadinessInput): string[] {
     caveats.push(
       `${left} of ${input.scheduledBatches} ${left === 1 ? "batch has" : "batches have"} no yield recorded.`
     );
+  }
+
+  if (pages.includes("checklist")) {
+    if (input.checklistNotStarted) {
+      caveats.push("The checklist for this shift has not been started.");
+    } else if (input.checklist) {
+      const { outstanding, total, finished } = input.checklist;
+      if (outstanding > 0) {
+        caveats.push(
+          `${outstanding} of ${total} checklist ${outstanding === 1 ? "item has" : "items have"} not been looked at.`
+        );
+      } else if (!finished) {
+        caveats.push("The checklist is answered but has not been finished.");
+      }
+    }
   }
 
   if (pages.includes("tomorrow")) {

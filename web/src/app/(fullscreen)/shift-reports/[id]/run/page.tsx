@@ -3,7 +3,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canEnterCounts, canReadHr } from "@/lib/roles";
-import { daysBefore } from "@/lib/today";
+import { daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { compareForPremadeSheet } from "@/lib/productionSchedule";
 import {
   pagesForShift,
@@ -11,6 +11,9 @@ import {
   type ShiftReportPage,
   type ShiftSlot,
 } from "@/lib/shiftReports";
+import { loadChecklistRun } from "@/lib/checklistRunData";
+import { outstandingCount, templatesForShift } from "@/lib/checklists";
+import { ChecklistPage } from "@/components/operations/pages/ChecklistPage";
 import { ShiftReportRunner } from "@/components/operations/ShiftReportRunner";
 import { InfoPage } from "@/components/operations/pages/InfoPage";
 import { RatingsPage, type RatingRow } from "@/components/operations/pages/RatingsPage";
@@ -115,6 +118,53 @@ export default async function RunShiftReportPage({
   const shift = report.shift as ShiftSlot;
   const pages = pagesForShift(shift);
   const wants = (p: ShiftReportPage) => pages.includes(p);
+  const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
+
+  // ── The checklist linked to this report ─────────────────────────────────
+  //
+  // The link is an FK on the RUN, never a (location, date, shift) tuple: 070
+  // declined a unique constraint on that tuple because a handover legitimately
+  // produces two reports for one night, so the tuple does not identify one and
+  // a join on it would attach a walk to the wrong report.
+  const { data: linkedRuns } = await supabase
+    .from("checklist_runs")
+    .select("id, title, status")
+    .eq("shift_report_id", id)
+    .order("started_at");
+
+  const linkedRun = (linkedRuns ?? [])[0] ?? null;
+
+  // What this shift is ASKED for, so "nobody started it" is a fact rather than
+  // an absence — the same argument the list's attention band makes.
+  const { data: shiftTemplates } = await supabase
+    .from("checklist_templates")
+    .select("id, kind, name, weekdays, shifts, is_active")
+    .eq("location_id", report.location_id as string)
+    .eq("is_active", true);
+
+  const reportWeekday =
+    ((new Date(`${report.report_date as string}T00:00:00Z`).getUTCDay() + 6) % 7) + 1;
+  const askedFor = templatesForShift(
+    (shiftTemplates ?? []).map((t) => ({
+      id: t.id as string,
+      kind: t.kind as "checklist" | "walkthrough" | "inspection",
+      is_active: t.is_active as boolean,
+      weekdays: (t.weekdays as number[] | null) ?? null,
+      shifts: (t.shifts as string[] | null) ?? null,
+    })),
+    reportWeekday,
+    shift,
+  );
+
+  const walk = linkedRun ? await loadChecklistRun(supabase, linkedRun.id as string) : null;
+  const walkItems = walk?.data?.items ?? [];
+  const checklistReadinessInput = walk?.data
+    ? {
+        outstanding: outstandingCount(walkItems),
+        total: walkItems.length,
+        finished: walk.data.run.status === "submitted",
+      }
+    : null;
   const reportDate = report.report_date as string;
   const nextDay = (report.next_production_date as string | null) ?? null;
   const kitchenId = (report.kitchen_location_id as string) ?? (report.location_id as string);
@@ -390,10 +440,34 @@ export default async function RunShiftReportPage({
           scheduledLines: premadeRows.length,
           countedBatches: elementRows.filter((r) => r.yieldCount !== null).length,
           scheduledBatches: elementRows.length,
+          // DERIVED, never a `task_checklist_done` column — see the note on
+          // `ReadinessInput.checklist`.
+          checklist: checklistReadinessInput,
+          checklistNotStarted: !linkedRun && askedFor.length > 0,
         }}
       />
     ),
   };
+
+  if (wants("checklist")) {
+    bodies.checklist = (
+      <ChecklistPage
+        key="checklist"
+        reportId={id}
+        orgId={report.org_id as string}
+        locationId={report.location_id as string}
+        reportDate={reportDate}
+        shift={shift}
+        run={walk?.data ?? null}
+        askedFor={askedFor.map((t) => {
+          const row = (shiftTemplates ?? []).find((x) => x.id === t.id);
+          return { id: t.id, name: (row?.name as string) ?? "" };
+        })}
+        today={today}
+        editable={editable}
+      />
+    );
+  }
 
   if (wants("sales")) {
     bodies.sales = (

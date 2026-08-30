@@ -1,0 +1,132 @@
+import { createClient } from "@/lib/supabase/server";
+import { getAppSession } from "@/lib/session";
+import { canResolveTasks } from "@/lib/roles";
+import { serverTimeZone, todayInTimeZone } from "@/lib/today";
+import type { TaskKind } from "@/lib/facilityTasks";
+import { TasksScreen, type TaskRow } from "./TasksScreen";
+
+/**
+ * The server half of BOTH task screens.
+ *
+ * One loader, because `/tasks` and `/maintenance-requests` are one table seen
+ * through `kind` — and two copies of this query is how they would start
+ * disagreeing about what a task is.
+ */
+export async function TasksPage({
+  kind,
+  openRowKey,
+}: {
+  kind: TaskKind;
+  openRowKey?: string;
+}) {
+  const session = await getAppSession();
+  const supabase = await createClient();
+  const active = session.activeLocation;
+
+  if (!active) {
+    return <p className="text-sm text-muted">No location is set up for this org yet.</p>;
+  }
+
+  const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
+
+  const [{ data: tasks, error }, { data: equipment }, { data: sections }] =
+    await Promise.all([
+      supabase
+        .from("location_tasks")
+        .select(
+          "id, kind, title, details, status, priority, target_shift, due_on, carry_forward, created_at, equipment_id, shop_section_id, source_run_item_id",
+        )
+        .eq("location_id", active.id)
+        .eq("kind", kind)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("equipment")
+        .select("id, name")
+        .eq("location_id", active.id)
+        .eq("is_active", true)
+        .order("name"),
+      supabase
+        .from("shop_sections")
+        .select("id, display_name")
+        .eq("location_id", active.id)
+        .order("sort_order"),
+    ]);
+
+  if (error) {
+    return (
+      <p className="max-w-[72ch] text-sm text-accent">
+        Could not load them: {error.message}
+        {error.message.includes("location_tasks") &&
+          " — migration 075 has not been applied yet."}
+      </p>
+    );
+  }
+
+  const equipmentName = new Map(
+    (equipment ?? []).map((e) => [e.id as string, e.name as string]),
+  );
+  const sectionName = new Map(
+    (sections ?? []).map((s) => [s.id as string, s.display_name as string]),
+  );
+
+  const rows: TaskRow[] = (tasks ?? []).map((t) => ({
+    id: t.id as string,
+    kind: t.kind as TaskKind,
+    title: t.title as string,
+    details: (t.details as string | null) ?? null,
+    status: t.status as TaskRow["status"],
+    priority: t.priority as TaskRow["priority"],
+    target_shift: (t.target_shift as string | null) ?? null,
+    due_on: (t.due_on as string | null) ?? null,
+    carry_forward: t.carry_forward as boolean,
+    created_at: t.created_at as string,
+    equipment_id: (t.equipment_id as string | null) ?? null,
+    equipment_name: t.equipment_id
+      ? (equipmentName.get(t.equipment_id as string) ?? null)
+      : null,
+    shop_section_id: (t.shop_section_id as string | null) ?? null,
+    section_name: t.shop_section_id
+      ? (sectionName.get(t.shop_section_id as string) ?? null)
+      : null,
+    from_walk: t.source_run_item_id != null,
+  }));
+
+  const heading = kind === "maintenance" ? "Maintenance" : "Tasks";
+
+  return (
+    <div className="space-y-6">
+      <div className="space-y-1">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          {heading}
+        </h1>
+        <p className="max-w-[72ch] text-sm text-muted">
+          {kind === "maintenance"
+            ? `What needs a vendor at ${active.code} — the plumber, the fridge engineer. ` +
+              "Anything the crew can fix belongs on Tasks."
+            : `What is outstanding at ${active.code}. Anything carried forward appears on ` +
+              "every walk until it is done, and gets louder the longer it waits."}
+        </p>
+      </div>
+
+      <TasksScreen
+        key={`${active.id}:${kind}`}
+        rows={rows}
+        kind={kind}
+        today={today}
+        orgId={session.membership.org_id}
+        locationId={active.id}
+        locationCode={active.code}
+        editable={canResolveTasks(session.membership.role)}
+        equipment={(equipment ?? []).map((e) => ({
+          id: e.id as string,
+          name: e.name as string,
+        }))}
+        sections={(sections ?? []).map((s) => ({
+          id: s.id as string,
+          display_name: s.display_name as string,
+        }))}
+        openRowKey={openRowKey}
+      />
+    </div>
+  );
+}

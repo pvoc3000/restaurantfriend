@@ -174,3 +174,51 @@ export const canRunPayroll = canManageMembers;
  * first — a supervisor resolving requests is the obvious candidate.
  */
 export const canResolveRequests = canWriteCatalog;
+
+/**
+ * Walk a checklist, work a task — migrations 075 and 076, whose policies name
+ * this same set on every verb.
+ *
+ * The same set as `canEnterCounts` today, and named separately for this file's
+ * own stated reason: "may record what came out of the mixer" and "may record
+ * that the walk-in is at 44 degrees" are different questions with the same
+ * answer today, and one of them will move first.
+ *
+ * Note what it does NOT gate. READING the templates and the equipment register
+ * is membership-only, because everyone should be able to see what they will be
+ * asked and to resolve the name of the thing they are asked about. Only the
+ * WALK is here.
+ */
+export function canWalkChecklists(role: Role): boolean {
+  return (
+    role === "owner" ||
+    role === "admin" ||
+    role === "purchaser" ||
+    role === "supervisor"
+  );
+}
+
+/**
+ * Edit the master checklists and the equipment register — 076's
+ * `checklist_templates_write` and 075's `equipment_write`.
+ *
+ * Mark, 2026-08-29: "Managers and purchasers should be able to edit the master
+ * lists." That is `canWriteCatalog`'s set exactly, and the reasoning is the
+ * same one that put the catalog there: a master checklist IS a catalog, and
+ * maintaining it is the same kind of act as maintaining an item.
+ *
+ * Named separately anyway, per the convention above — a supervisor who
+ * maintains their own shop's list is the obvious candidate to move first.
+ */
+export const canEditChecklists = canWriteCatalog;
+
+/**
+ * Close, cancel or reassign a task. 075's `location_tasks_update`.
+ *
+ * DELIBERATELY the same as `canWalkChecklists` and NOT `canWriteCatalog`: a
+ * task is worked by whoever is on tonight, so the supervisor who boils out the
+ * fryer is by definition not the manager who raised it. Gating the close at
+ * purchaser+ would leave the carried-forward list unclearable by the only
+ * people standing in front of it.
+ */
+export const canResolveTasks = canWalkChecklists;

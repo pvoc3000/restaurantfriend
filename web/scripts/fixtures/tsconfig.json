@@ -19,6 +19,8 @@
     "../../src/lib/anchoredPanel.ts",
     "../../src/lib/employees.ts",
     "../../src/lib/employeeEvents.ts",
+    "../../src/lib/checklists.ts",
+    "../../src/lib/facilityTasks.ts",
     "../../src/lib/columnVisibility.ts",
     "../../src/lib/receiving.ts",
     "../../src/lib/invoiceMatch.ts",

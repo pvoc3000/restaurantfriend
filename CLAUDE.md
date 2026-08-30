@@ -5618,6 +5618,131 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **Known and not chased:** the reset mail goes out as `info@donutfriend.com`,
    the same mailbox POs use. A `shift_report`-style provider key would move it.
 
+4k. 🚧 **FACILITY CHECKS — checklists, walkthroughs, tasks, maintenance,
+   inspections and equipment (migrations 075, 076, 077 — ALL THREE NEED
+   APPLYING, in that order).** Mark, 2026-08-29: "we kind of need to think of
+   checklists, tasks, and maintenance requests as one, interconnected and
+   interdependent module."
+   **Read `docs/checklists-brief.md` before designing or touching any of it** —
+   it carries the decisions, the traps and the probes.
+   FMP's closing routine had a piece the app didn't: a list the supervisor
+   walks at the end of a shift, grouped by shop section, ticked off,
+   photographed, with anything wrong flagged into the emailed report. It was
+   scoped out of the shift report on 2026-08-28 and four nav stubs were waiting
+   for it.
+   **THEY ARE ONE MACHINE — observation → finding → work → verification.** A
+   checklist run, a manager's WALKTHROUGH and an INSPECTION LOG are all
+   observations (one template/run family, told apart by `kind`); a TASK and a
+   MAINTENANCE REQUEST are the same work at two levels of escalation (one
+   table, one `kind`). 035's merge precedent in Mark's own words — "Events
+   already had different types, what's one more" — and 051's `kind` column. Six
+   nav entries over two spines.
+   **CHECKLISTS MOVED FROM OPERATIONS TO THE LOCATION SECTION** (Mark: "I sort
+   of feel I misplaced the location of checklists in the menu"). The nav is
+   organised by THE WORK and every one of these is about the BUILDING — the
+   same argument that put purchase requests under Purchasing. The Operations
+   stubs "Check Lists" and "Master Check Lists" are gone; the Location section
+   is now All · Shop Sections · Checklists · Master Lists · Tasks ·
+   Maintenance · Inspection Logs · Equipment, and all of it sits INSIDE
+   `InactiveLocationGate` (unlike `/employees` and `/sales`, these really are
+   location-scoped: you do not walk a closing list at a shop that is shut).
+   **A RUN SNAPSHOTS ITS TEMPLATE** — 013's rule, and the most important thing
+   here. Without it, rewording an item in September silently rewrites what
+   August's supervisor is recorded as having been asked to check. The SECTION
+   NAME is snapshotted as text beside the id, so a shelf renamed or deleted next
+   month cannot rewrite or blank last month's walk.
+   **A CHECK IS FOUR STATES** — pending / done / issue / n/a, the order guide's
+   three-state lesson widened by one. Pressing the state an item is already in
+   returns it to pending, which is the only undo.
+   **AN ITEM CAN ASK FOR A NUMBER, AND AN OUT-OF-RANGE READING RAISES THE ISSUE
+   BY ITSELF** (Mark: "having the supervisors enter fridge temperatures would be
+   pretty awesome"). That is the one place this module lets the app decide
+   anything, and the line is worth keeping: **the app must never decide what
+   counts as dirty, and it can absolutely decide what counts as above 40°F.** It
+   writes a note naming the value, because 076 refuses an issue with no note and
+   the constraint should be met by a true sentence rather than an empty string.
+   **EQUIPMENT IS THE MISSING NOUN.** Without it a task says "the fryer" as a
+   STRING and nothing can aggregate — no repair history, no per-unit trend, no
+   cost per asset. With it, a reading belongs to THAT walk-in and "this one has
+   crept 36 → 39 over six weeks" is a failing compressor visible before it
+   fails. `warranty_ends_on` reuses 034's expiry vocabulary whole, null meaning
+   "does not lapse". `vendor_invoice_id` is the money seam and has no reader.
+   **THE SHIFT-REPORT LINK IS AN FK, NEVER A (location, date, shift) TUPLE.**
+   070 declined a unique constraint on that tuple because a HANDOVER
+   legitimately produces two closing reports for one night — so the tuple does
+   not identify a report and a join on it would attach a walk to the wrong one.
+   **THE BUSINESS DATE IS THE MODULE'S HIGHEST-RISK BUG.** A closing walk
+   finished at 1:15am belongs to YESTERDAY, and `current_date` is UTC, so after
+   4pm Pacific it is already tomorrow. `businessDateFor` in `lib/checklists` is
+   the one rule, derived in the org's timezone and passed in; nothing in
+   075–077 calls `current_date`. Closing only, 5am cutoff, editable.
+   **THE CARRY-FORWARD HAD TO GET LOUDER.** Mark's best idea here — a manager
+   flags the dirty fryer on a walkthrough and it appears on every subsequent
+   supervisor's checklist until it is done — has one failure mode, and
+   `lib/facilityTasks` is aimed at it: a task appearing IDENTICALLY for thirty
+   nights is one people learn to scroll past, which trains them to skim the
+   section that also holds tonight's real work. So a task is its OWN RECORD with
+   one identity and one close (never a row copied onto thirty nights), it AGES
+   visibly, somebody other than tonight's supervisor can close it or promote it
+   to maintenance so it LEAVES the nightly list, and after a week
+   `staleTaskBanner` surfaces it where a manager reads.
+   **CANCELLING NEEDS A REASON AND FINISHING DOES NOT** — 032's shape, the
+   requirement riding the DECISION. There is NO delete policy on
+   `location_tasks`: cancelling is the eraser (059's rule), so a `delete` from
+   the app removes 0 rows and returns NO error and the screen must never offer
+   one.
+   **SCORING IS PER ITEM** (Mark's call over per-section) with three mitigations
+   against the measured all-fives hazard — 89% of FMP's 40,793 shift ratings are
+   a 5: the score is optional with "not scored" resting, pressing it again
+   clears it, and the section roll-up is DERIVED from whatever was scored. A
+   section with nothing scored is NULL, never zero — zero is a real score in
+   035's range and defaulting to it reports the worst possible verdict on a
+   section nobody looked at.
+   **`cardinality`, NEVER `array_length(x, 1)`** — caught on the harness by
+   asserting a refusal rather than assuming it. `array_length('{}', 1)` returns
+   NULL rather than 0, so the predicate is NULL, and **a CHECK CONSTRAINT PASSES
+   ON NULL**: the empty array sailed straight through. Written that way first.
+   **DEPARTURE, DELIBERATE: there is no `task_checklist_done` column**, although
+   this file predicted one. 070's own comment says its three `task_*` flags
+   exist because each is "an act NOTHING ELSE CAN OBSERVE" — and with checklists
+   as rows, whether the checklist was done IS observable (a linked run,
+   submitted). A boolean beside it would be a second answer to a question that
+   has one, which is 016's trap. The submit page says "3 of 27 checklist items
+   have not been looked at" instead. `submit_shift_report` and
+   `reopen_shift_report` are UNTOUCHED: two acts, not one.
+   Screens: `/checklist-templates` + record (duplicate-to-another-shop maps
+   sections BY DISPLAY NAME, names what didn't map, and arrives INACTIVE —
+   `PlanDetail`'s duplicate with the one thing that build didn't need);
+   `/checklists` list + `/checklists/[id]` (read-only archive) + the walk at
+   `/checklists/[id]/run` in the `(fullscreen)` group (the order guide's posture
+   — one scrolling document, black shop-section bands in the shop's own walk
+   order, 44px targets, `text-[16px]`, every tap writing immediately);
+   `/tasks` + `/maintenance-requests` (one table, two doors); `/equipment` +
+   record with its reading history; `/inspection-logs`.
+   `ChecklistWalk` is ONE COMPONENT WITH TWO DOORS — standalone and as a page of
+   the shift-report runner, which gained `checklist` in `pagesForShift` for every
+   shift (closing 8 pages, opening 6, mid and off-site 5).
+   **NOT BUILT and named so nobody thinks it was forgotten:** a cadence engine
+   (PM wants three shapes and a general scheduler is where this metastasizes), a
+   checklist PDF and therefore its attachment to the shift-report email, the
+   `choice` response type's option editor, cost-per-asset, and an editor on the
+   run record (read-only on purpose — one write path, and the walk is it).
+   Verified: **all 77 migrations replay on the Docker harness**, every constraint
+   refuses what it should (checked by asserting the refusal, which is what found
+   the `cardinality` bug), and as REAL AUTHENTICATED ROLES a supervisor reads a
+   colleague's run and **updates 0 rows with NO error**, a staffer sees 0 runs
+   and 0 tasks while reading the templates, a purchaser edits a master where a
+   supervisor's update changes 0, an author's write to a SUBMITTED run changes 0
+   and a delete removes 0 — all silently — an owner always writes, `anon` sees
+   nothing, and a junk storage path is refused by the POLICY rather than raising
+   a cast error. **1,413 fixtures pass**, 58 new, each rule checked by BREAKING
+   it (the ISO weekday, the after-midnight rollover, the out-of-range issue, the
+   unscored-section null, the carry-forward order, cancelled-counted-as-open and
+   the silent age label all go red).
+   **NOT YET WALKED IN A BROWSER** — the migrations are unapplied and the test
+   pane has no signed-in session. Everything above is harness, typecheck, lint
+   and fixture evidence.
+
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -7771,11 +7896,11 @@ made it a small feature rather than a project: the invoice was already in the
 system, the PO line already snapshotted the vendor's SKU to join on, and the
 price-reconciliation band was already the place an answer could land. See build
 step 4.
-**CHECKLISTS are deferred and were scoped out deliberately** (Mark,
-2026-08-28), which is why the shift report's submit page carries no line for
-them and why `task_checklist_done` does not exist as a column — a column for an
-unbuilt feature is a claim nothing can satisfy. FMP's version generated a
-list of things to check around the shop before leaving, walked and ticked off.
-Two nav stubs are already waiting for it (Operations › Check Lists and Master
-Check Lists), and when it lands the shift report gains a page and one flag.
+~~**CHECKLISTS are deferred**~~ **BUILT 2026-08-29** — migrations 075–077, see
+build step 4k and `docs/checklists-brief.md`. They came back a day after being
+scoped out, as one module with tasks, maintenance requests, inspections and a
+new equipment register, and moved from Operations to the LOCATION section.
+The shift report gained its page and NO flag: `task_checklist_done` still does
+not exist, because with checklists as rows the question it would answer is
+observable from a linked run.
 When in doubt whether a feature belongs, check the spec's kill list or ask Mark.

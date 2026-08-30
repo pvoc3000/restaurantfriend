@@ -19,11 +19,13 @@ import {
 // pagesForShift — the mirror rule
 // ---------------------------------------------------------------------------
 
-test("closing gets seven pages, opening five, mid and off-site four", () => {
-  eq(pagesForShift("closing").length, 7, "closing");
-  eq(pagesForShift("opening").length, 5, "opening");
-  eq(pagesForShift("mid").length, 4, "mid");
-  eq(pagesForShift("off_site").length, 4, "off_site");
+test("closing gets eight pages, opening six, mid and off-site five", () => {
+  // Each gained ONE when the checklist page landed (2026-08-29): every shift
+  // can be asked for a walk, including a mid.
+  eq(pagesForShift("closing").length, 8, "closing");
+  eq(pagesForShift("opening").length, 6, "opening");
+  eq(pagesForShift("mid").length, 5, "mid");
+  eq(pagesForShift("off_site").length, 5, "off_site");
 });
 
 test("PREMADES AND ELEMENTS ARE MIRRORS — never both, never neither by accident", () => {
@@ -38,10 +40,11 @@ test("PREMADES AND ELEMENTS ARE MIRRORS — never both, never neither by acciden
   no(pagesForShift("opening").includes("premades"), "nothing is left over at 6am");
 });
 
-test("every shift gets the four that are always there", () => {
+test("every shift gets the five that are always there", () => {
   for (const shift of ["closing", "opening", "mid", "off_site"] as const) {
     const pages = pagesForShift(shift);
-    for (const must of ["info", "ratings", "report", "submit"] as const) {
+    // FIVE now: every shift can be asked for a checklist, including a mid.
+    for (const must of ["info", "ratings", "checklist", "report", "submit"] as const) {
       ok(pages.includes(must), `${shift} is missing ${must}`);
     }
   }
@@ -57,12 +60,12 @@ test("only closing carries sales and tomorrow's paper", () => {
 test("pagesForShift returns a COPY — a caller sorting it cannot corrupt the next", () => {
   const first = pagesForShift("closing");
   first.length = 0;
-  eq(pagesForShift("closing").length, 7, "second call");
+  eq(pagesForShift("closing").length, 8, "second call");
 });
 
 test("the banner numbers what it was given", () => {
   const pages = pagesForShift("opening");
-  eq(pageBanner(pages[2], 2, pages.length), "Shift report — page 3 of 5 — Elements made");
+  eq(pageBanner(pages[2], 2, pages.length), "Shift report — page 3 of 6 — Elements made");
 });
 
 // ---------------------------------------------------------------------------
@@ -81,6 +84,8 @@ const READY: ReadinessInput = {
   scheduledLines: 12,
   countedBatches: 0,
   scheduledBatches: 0,
+  checklist: { outstanding: 0, total: 14, finished: true },
+  checklistNotStarted: false,
 };
 
 test("a finished closing report has nothing outstanding", () => {
@@ -509,4 +514,49 @@ test("a special order with an empty title falls back to the shop heading", () =>
       `title ${JSON.stringify(title)}`
     );
   }
+});
+
+
+// ---------------------------------------------------------------------------
+// The checklist page — derived, never a `task_checklist_done` flag
+// ---------------------------------------------------------------------------
+
+test("a checklist nobody started is NAMED", () => {
+  const out = submitReadiness({
+    ...READY,
+    checklist: null,
+    checklistNotStarted: true,
+  });
+  eq(out, ["The checklist for this shift has not been started."]);
+});
+
+test("an unwalked checklist names how much is left", () => {
+  const out = submitReadiness({
+    ...READY,
+    checklist: { outstanding: 6, total: 27, finished: false },
+  });
+  eq(out, ["6 of 27 checklist items have not been looked at."]);
+});
+
+test("one outstanding item reads in the singular", () => {
+  const out = submitReadiness({
+    ...READY,
+    checklist: { outstanding: 1, total: 27, finished: false },
+  });
+  eq(out, ["1 of 27 checklist item has not been looked at."]);
+});
+
+test("answered but not finished is its own sentence", () => {
+  // Different from unwalked: everything was looked at, nobody pressed Finish.
+  const out = submitReadiness({
+    ...READY,
+    checklist: { outstanding: 0, total: 27, finished: false },
+  });
+  eq(out, ["The checklist is answered but has not been finished."]);
+});
+
+test("a report with NO checklist linked and none asked for says nothing", () => {
+  // The common case for a shop that has not written a master list yet — the
+  // page must not nag about a feature nobody is using.
+  eq(submitReadiness({ ...READY, checklist: null, checklistNotStarted: false }), []);
 });

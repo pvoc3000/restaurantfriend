@@ -7,6 +7,8 @@ import "./breakPunches.fixtures";
 import "./calcPad.fixtures";
 import "./batchLogFilters.fixtures";
 import "./breakRules.fixtures";
+import "./checklists.fixtures";
+import "./facilityTasks.fixtures";
 import "./columnOrder.fixtures";
 import "./columnVisibility.fixtures";
 import "./rowDrag.fixtures";

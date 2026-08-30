@@ -76,9 +76,71 @@ export const SECTIONS: NavSection[] = [
         href: "/shop-sections",
         built: true,
       },
-      stub("location", "tasks", "Tasks"),
-      stub("location", "maintenance-requests", "Maintenance Requests"),
-      stub("location", "inspection-logs", "Inspection Logs"),
+      // ── The facility-checks module (migrations 075–077) ────────────────
+      //
+      // Checklists came HERE from Operations (Mark, 2026-08-29: "I sort of feel
+      // I misplaced the location of checklists in the menu and they should
+      // probably be part of the location menu set"). The two stubs that used to
+      // sit under Operations — "Check Lists" and "Master Check Lists" — are
+      // gone, and this is the rule the nav has always followed rather than a
+      // change of mind: the menu is organised by THE WORK, and every entry
+      // below is about the BUILDING. That is the same argument that put
+      // purchase requests under Purchasing, where the work is the catalog and
+      // the order.
+      //
+      // They are one module in four costumes — a checklist run, a walkthrough
+      // and an inspection are all OBSERVATIONS, and a task and a maintenance
+      // request are the same WORK at two levels of escalation — so they sit
+      // together and read in the order you meet them: walk the list, maintain
+      // the list, work what came out of it, then the register of things the
+      // whole module points at.
+      //
+      // supervisor+ on the three that write; Master Lists and Equipment are
+      // unrestricted because their READ is membership (076/075's own RLS), and
+      // everyone should be able to see what they will be asked and to resolve
+      // the name of the thing they are asked about. Tidiness only — RLS is the
+      // gate and each screen says so in a sentence.
+      {
+        slug: "checklists",
+        label: "Checklists",
+        href: "/checklists",
+        built: true,
+        roles: ["owner", "admin", "purchaser", "supervisor"],
+      },
+      {
+        // "Master Lists", not "Master Check Lists": the band above already says
+        // Locations and the entry above already says Checklists, so this only
+        // has to say WHICH of them. The same trim that made HR's "Team Ratings"
+        // just "Events" and this section's own first entry just "All".
+        slug: "checklist-templates",
+        label: "Master Lists",
+        href: "/checklist-templates",
+        built: true,
+      },
+      {
+        slug: "tasks",
+        label: "Tasks",
+        href: "/tasks",
+        built: true,
+        roles: ["owner", "admin", "purchaser", "supervisor"],
+      },
+      {
+        // "Maintenance", not "Maintenance Requests" — same trim. The SLUG keeps
+        // FileMaker's word because the `rf.nav` cookie stores it.
+        slug: "maintenance-requests",
+        label: "Maintenance",
+        href: "/maintenance-requests",
+        built: true,
+        roles: ["owner", "admin", "purchaser", "supervisor"],
+      },
+      {
+        slug: "inspection-logs",
+        label: "Inspection Logs",
+        href: "/inspection-logs",
+        built: true,
+        roles: ["owner", "admin", "purchaser", "supervisor"],
+      },
+      { slug: "equipment", label: "Equipment", href: "/equipment", built: true },
     ],
   },
   {
@@ -189,8 +251,10 @@ export const SECTIONS: NavSection[] = [
       { slug: "sales", label: "Sales", href: "/sales", built: true },
       stub("operations", "documents", "Documents"),
       stub("operations", "policies", "Policies"),
-      stub("operations", "check-lists", "Check Lists"),
-      stub("operations", "master-check-lists", "Master Check Lists"),
+      // "Check Lists" and "Master Check Lists" USED TO SIT HERE and moved to
+      // the Locations section on 2026-08-29 when they were built — see the note
+      // there. A checklist is about the building, and this section is about the
+      // day's numbers and the shift.
       stub("operations", "tags", "Tags"),
       // The production price grid (decision 10). It lives under Operations
       // because that is the slot FileMaker's own price screen occupied, and
