@@ -15,7 +15,7 @@ import { confirmDialog } from "@/lib/confirm";
 import { weekdaySetLabel, type ResponseType } from "@/lib/checklists";
 import { AddTemplateItem } from "./AddTemplateItem";
 
-const WIDTHS_KEY = "rf.checklistTemplateItems.columnWidths.v1";
+const WIDTHS_KEY = "rf.checklistTemplateItems.columnWidths.v2";
 
 export type TemplateItemRow = {
   id: string;
@@ -205,7 +205,7 @@ export function TemplateItemsTable({
     {
       key: "section",
       label: "Section",
-      width: 210,
+      width: 200,
       sortValue: (r) => r.section_name,
       render: (r) =>
         editable ? (
@@ -225,7 +225,7 @@ export function TemplateItemsTable({
     {
       key: "response_type",
       label: "Answer",
-      width: 120,
+      width: 110,
       sortValue: (r) => r.response_type,
       render: (r) =>
         editable ? (
@@ -248,7 +248,8 @@ export function TemplateItemsTable({
     {
       key: "expected",
       label: "Expected",
-      width: 230,
+      width: 200,
+      hideWhenCompact: true,
       // The range is only meaningful for a number, and the whole point of it is
       // that an out-of-range reading raises the issue by itself. On any other
       // kind of item the cell says nothing rather than offering three boxes
@@ -426,7 +427,7 @@ export function TemplateItemsTable({
         rows={ordered}
         columns={columns}
         rowKey={(r) => r.id}
-        compactBelow={1280}
+        compactBelow={1440}
         storageKey={WIDTHS_KEY}
         columnChooser
         // Rendered in walk order and never re-sorted by the table: the ORDER IS

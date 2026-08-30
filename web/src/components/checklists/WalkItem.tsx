@@ -197,7 +197,13 @@ export function WalkItem({
 
   return (
     <li className="space-y-3 p-3">
-      <div className="flex flex-wrap items-start justify-between gap-3">
+      {/* STACKED ON A PHONE, side by side from `sm` up.
+          `flex-wrap` alone was not enough and looked like it was: the text is
+          `flex-1`, so its basis is 0, and the button cluster — which wraps
+          INTERNALLY — kept its full width and squeezed the prompt to nothing,
+          rendering the two on top of each other at 375px. Wrapping a flex row
+          only helps when a child can actually claim the next line. */}
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:justify-between">
         <div className="min-w-0 flex-1">
           <p className="text-[16px] leading-snug">{row.prompt}</p>
           {/* 078's two columns, in the paper's own order: WHO, then HOW you
@@ -218,7 +224,13 @@ export function WalkItem({
           )}
         </div>
 
-        <div className="flex shrink-0 flex-wrap gap-2">
+        {/* PHOTO SITS WITH THE STATES, not on a line of its own.
+            Measured on the real 35-item opening list: its own line cost 56px a
+            row, 125px against 69px, and a 70-item closing walk 10,000px of
+            thumb against 5,500. It is MORE visible here, not less — which
+            matters, because a control that vanishes cannot be told from a
+            feature that does not exist. */}
+        <div className="flex w-full shrink-0 flex-wrap items-start gap-2 sm:w-auto">
           {STATE_BUTTONS.map((b) => {
             const on = row.status === b.status;
             const danger = b.status === "issue";
@@ -241,6 +253,32 @@ export function WalkItem({
               </button>
             );
           })}
+          {writable && (
+            <>
+              <input
+                ref={fileInput}
+                type="file"
+                // NO `capture` attribute, deliberately: without it iOS offers
+                // Photo Library / Take Photo / Choose File in one sheet, and the
+                // named formats are what ask it to transcode HEIC on the way out.
+                accept={PHOTO_ACCEPT_ATTR}
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = "";
+                  if (f) void addPhoto(f);
+                }}
+              />
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => fileInput.current?.click()}
+                className={`${TAP} ml-2 border-hairline bg-white text-ink hover:border-ink disabled:opacity-35`}
+              >
+                {busy ? "…" : "Photo"}
+              </button>
+            </>
+          )}
         </div>
       </div>
 
@@ -342,55 +380,31 @@ export function WalkItem({
         />
       )}
 
-      <div className="flex flex-wrap items-center gap-3">
-        {row.photos.map((p) =>
-          p.url ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              key={p.id}
-              src={p.url}
-              alt=""
-              className="h-16 w-16 border border-hairline object-cover"
+      {(row.photos.length > 0 || (row.status === "issue" && writable)) && (
+        <div className="flex flex-wrap items-center gap-3">
+          {row.photos.map((p) =>
+            p.url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={p.id}
+                src={p.url}
+                alt=""
+                className="h-16 w-16 border border-hairline object-cover"
+              />
+            ) : null,
+          )}
+          {row.status === "issue" && writable && (
+            <RaiseTaskFromIssue
+              runItemId={row.id}
+              orgId={orgId}
+              locationId={locationId}
+              prompt={row.prompt}
+              note={row.note}
+              taskId={row.task_id}
             />
-          ) : null,
-        )}
-        {writable && (
-          <>
-            <input
-              ref={fileInput}
-              type="file"
-              // NO `capture` attribute, deliberately: without it iOS offers
-              // Photo Library / Take Photo / Choose File in one sheet, and the
-              // named formats are what ask it to transcode HEIC on the way out.
-              accept={PHOTO_ACCEPT_ATTR}
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                e.target.value = "";
-                if (f) void addPhoto(f);
-              }}
-            />
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => fileInput.current?.click()}
-              className={`${TAP} border-ink bg-white text-ink hover:bg-ink hover:text-white disabled:opacity-35`}
-            >
-              {busy ? "Adding…" : "Photo"}
-            </button>
-          </>
-        )}
-        {row.status === "issue" && writable && (
-          <RaiseTaskFromIssue
-            runItemId={row.id}
-            orgId={orgId}
-            locationId={locationId}
-            prompt={row.prompt}
-            note={row.note}
-            taskId={row.task_id}
-          />
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </li>
   );
 }

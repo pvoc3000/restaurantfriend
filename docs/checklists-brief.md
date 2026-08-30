@@ -313,6 +313,23 @@ inline edit.
 idempotent (re-running replaces a template's items rather than doubling them,
 which is safe because a run snapshots its own copy), and `--wipe` to remove both.
 
+## Two things loading 105 real items found
+
+**The walk row was HALF AGAIN too tall.** The Photo button had a line of its
+own: 125px a row, and a 70-item closing walk was 10,000px of thumb. Moved into
+the state cluster it is 69px and 5,500 — and it is MORE visible there, not less,
+which matters because a control that vanishes cannot be told from a feature that
+does not exist. It wears a hairline border where the three states wear ink, so
+it does not read as a fourth state.
+
+**The walk row overlapped itself on a phone, and `flex-wrap` looked like it was
+handling it.** The prompt is `flex-1`, so its basis is 0; the button cluster
+wraps INTERNALLY, kept its full width, and squeezed the text to nothing —
+rendering the two on top of each other at 375px. Wrapping a flex row only helps
+when a child can actually claim the next line. It is `flex-col sm:flex-row` now.
+Worth remembering as a class: **this had been true since the walk shipped, and
+was invisible because it was only ever checked at desktop width.**
+
 ## Probes
 
 *Run these; don't trust a line in CLAUDE.md — it has been wrong in both
