@@ -5649,18 +5649,70 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    interdependent module."
    **Read `docs/checklists-brief.md` before designing or touching any of it** —
    it carries the decisions, the traps and the probes — and
-   **`docs/checklists-handoff.md` for what is still OUTSTANDING**, which starts
-   with the two things that are actually wrong.
-   **THE MODULE DOES NOT YET DO THE THING IT WAS ASKED FOR.** Mark's first
-   sentence was "anything flagged as an issue on a checklist would be included
-   in the report that gets emailed", and it isn't: the checklist reaches the
-   shift report's PAGES and its READINESS, but `supervisorBody` has no
-   checklist section, so nothing about a flagged issue leaves the building. It
-   was in the approved plan and did not get built. Second: `/checklists/[id]`
-   offers **Reopen** on a submitted record and NOTHING anywhere sets a run back
-   to `open`, so the button lands you on a read-only screen — rename it "View"
-   or build a real reopen (076's policy already allows owner/admin, so no
-   migration), and ask which.
+   **`docs/checklists-handoff.md` for what is still OUTSTANDING**.
+   **BOTH OF THOSE ARE FIXED 2026-08-30, and NO MIGRATION WAS NEEDED** —
+   everything below was already permitted by 076's and 077's policies.
+   **THE EMAIL CARRIES THE CHECKLIST.** `checklistSection` in
+   `lib/shiftReports`, called from `supervisorBody`, so management gets it
+   through `managementBody`'s identity and can get it no other way — the
+   existing composition fixture is what enforces that placement, and needed no
+   edit. **A CLEAN NIGHT SAYS SO** rather than going quiet: silence is reserved
+   for the one case where no list is linked AND none was asked for, so an
+   un-adopted shop's email is byte-identical to before. If the section vanished
+   on a clean night nobody could tell CLEAN from NOBODY WALKED from THE FEATURE
+   BROKE, and once absence is routine the loud not-started case stops being
+   loud. **`position` (078) IS DELIBERATELY NOT CARRIED** into `EmailReport`:
+   it draws on the same vocabulary as `shift_report_ratings.position`
+   ("Sr. DF"), so it would trip the privacy sweep for a reason that has nothing
+   to do with a person.
+   **"REOPEN" NO LONGER LIES**: the link reads **View** once submitted and an
+   owner/admin **Reopen** stands beside it (Mark's call over the rename). A
+   PLAIN UPDATE, not an RPC — 072's `reopen_shift_report` is a definer *because
+   submitting flushed rows into other tables*, and a checklist run flushes
+   nothing. Do not "fix" it into an RPC.
+   **THREE BUGS THE HANDOFF DID NOT KNOW ABOUT, all found by pressing the
+   buttons, all fixed.** The first is the one that mattered:
+   **A WALK WITH AN UNSECTIONED ITEM SNAPSHOTTED NO ITEMS AT ALL.**
+   `checklist_run_items.sort` is `numeric(8, 2)` — 999999.99 — and both snapshot
+   callers inlined `(sectionOrder.get(id) ?? 9999) * 1000 + sort`, which is
+   9,999,010. The insert failed, the RUN had already been created, and you got
+   an empty checklist with an error in a dialog. Invisible on DF01's real lists,
+   where every item has a section; certain on the first template anybody types
+   in a hurry. Now ONE clamped `runItemSort` in `lib/checklists` used by both,
+   pinned by a fixture that goes red the moment the sentinel is put back.
+   Then: **`loadChecklistRun` fetched `facility_photos` ORG-WIDE and
+   unpaginated**, so on the day the org filed its thousandth photo a walk's own
+   pictures would have started disappearing with no error (PostgREST's silent
+   1,000-row cap); and **`/inspection-logs`' `already_run_today` compared a RUN
+   id to a TEMPLATE id**, so it was always false. Both list screens also swept
+   every run item in the org on each page load; all three are scoped now.
+   **ALSO SHIPPED**: task photos (`facility_photos.task_id` had no writer, and
+   its DELETE is the first caller `WRITE_ORDER_NOTE`'s row-then-object order has
+   ever had anywhere in the app); the **checklist PDF**; `choice` FINISHED — the
+   type picker routes to a dialog writing `response_type` and `choices` in ONE
+   statement, since 076 refuses a choice with no options, and the editor is in
+   the ROW MENU as well as the Expected cell because that column is
+   `hideWhenCompact` at 1440 and so is absent on a 1280 laptop; the three
+   transcribed typos corrected in the live rows AND the loader; and "walk"
+   removed from the last three visible strings it had survived in.
+   **@react-pdf's BUNDLED HELVETICA IS WinAnsi AND EMITS NOTHING FOR A CHARACTER
+   IT CANNOT PLACE** — no box, no question mark. `expected 34–40 °F` printed as
+   **"expected 3440 °F"**, which does not lose the range, it replaces it with a
+   different number, on the page you hand a health inspector. The same trap cost
+   the recipe sheet its `≥` once already. `ChecklistPdf` has a `pdfText()`
+   sanitizer while `readingLabel` keeps its en dash for the screen and the email.
+   **Verify a PDF by inflating its content stream, never by looking at it.**
+   **1,436 fixtures pass**, and the whole module was WALKED against the live
+   database 2026-08-30 and left as found (0 runs, 0 tasks, 0 photos): a
+   walkthrough scored, an out-of-range reading raising its own issue, a task
+   raised from it and appearing in the carried-over band of that night's
+   CLOSING checklist, a photo attached and removed, the PDF's text runs decoded,
+   Reopen clearing `submitted_at` with every answer intact, and the real email
+   rendered over live rows in Node — HTML and `toText` both.
+   **DF01 Manager Walkthrough IS LEFT ON THE LIVE DATABASE and its three items
+   are PLACEHOLDERS** invented for that test. It is never offered automatically
+   (`weekdays` null), so it is harmless — replace the items before treating it
+   as a real list.
    FMP's closing routine had a piece the app didn't: a list the supervisor
    walks at the end of a shift, grouped by shop section, ticked off,
    photographed, with anything wrong flagged into the emailed report. It was
@@ -5831,19 +5883,16 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    back-to-front, because that is how you count stock — where the closing list
    goes front-to-back. Fixing it means moving existing sections (which moves the
    order guide) or giving a template its own section ordering. Ask before either.
-   **NOT BUILT and named so nobody thinks it was forgotten:** a cadence engine
-   (PM wants three shapes and a general scheduler is where this metastasizes), a
-   checklist PDF and therefore its attachment to the shift-report email, the
-   `choice` response type's option editor, cost-per-asset
-   (`location_tasks.vendor_invoice_id` is the seam and has NO reader), an editor
-   on the run record (read-only on purpose — one write path, and the runner is
-   it), TASK PHOTOS (`facility_photos.task_id` exists and nothing writes it),
-   equipment DELETE, and everything an inspection log wants beyond a filtered
-   list — the inspector's document, findings with deadlines, permit expiry.
-   **And WALKTHROUGHS HAVE NEVER BEEN RUN**: the kind exists, per-item scoring
-   is built and fixture-tested, but no walkthrough template exists, so the path
-   from "manager scores an item" to "task lands on tonight's checklist" has only
-   ever been exercised on a hand-made run.
+   **STILL NOT BUILT, named so nobody thinks it was forgotten:** a cadence
+   engine (PM wants three shapes and a general scheduler is where this
+   metastasizes), PHOTOGRAPHS IN THE PDF (@react-pdf fetching signed URLs is a
+   real risk and the document is useful without them — a second pass),
+   cost-per-asset (`location_tasks.vendor_invoice_id` is the seam and has NO
+   reader), an editor on the run record (read-only on purpose — one write path,
+   and the runner is it), equipment DELETE, and everything an inspection log
+   wants beyond a filtered list — the inspector's document, findings with
+   deadlines, permit expiry. The checklist PDF is NOT attached to the
+   shift-report email; the email carries the findings as text instead.
    Verified: **every migration replays on the Docker harness**, every constraint
    refuses what it should (checked by asserting the refusal, which is what found
    the `cardinality` bug), and as REAL AUTHENTICATED ROLES a supervisor reads a
@@ -5852,7 +5901,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    supervisor's update changes 0, an author's write to a SUBMITTED run changes 0
    and a delete removes 0 — all silently — an owner always writes, `anon` sees
    nothing, and a junk storage path is refused by the POLICY rather than raising
-   a cast error. **1,416 fixtures pass**, 61 new, each rule checked by BREAKING
+   a cast error. **1,436 fixtures pass** (1,416 at first ship), each rule checked by BREAKING
    it (the ISO weekday, the after-midnight rollover, the out-of-range issue, the
    unscored-section null, the carry-forward order, cancelled-counted-as-open and
    the silent age label all go red). All **78 migrations** replay clean.
@@ -8070,6 +8119,6 @@ inspections and a new equipment register, and moved from Operations to the
 LOCATION section. The shift report gained its page and NO flag:
 `task_checklist_done` still does not exist, because with checklists as rows the
 question it would answer is observable from a linked run.
-**It is NOT finished**: a flagged issue does not yet reach the emailed shift
-report, which is the requirement the module was asked for. See the handoff.
+**A flagged issue now reaches the emailed shift report** (2026-08-30), which is
+the requirement the module was asked for. See the handoff for what remains.
 When in doubt whether a feature belongs, check the spec's kill list or ask Mark.

@@ -9,7 +9,7 @@ import { PickList } from "@/components/ui/PickList";
 import { DateField } from "@/components/ui/DateField";
 import { BOXED_FIELD, BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SHIFT_SLOT_LABEL, SHIFT_SLOT_OPTIONS } from "@/lib/employeeEvents";
-import { businessDateFor, itemAppliesOn } from "@/lib/checklists";
+import { businessDateFor, itemAppliesOn, runItemSort } from "@/lib/checklists";
 import type { StartableTemplate } from "./ChecklistsList";
 
 /** ISO weekday (1 = Monday) of a YYYY-MM-DD string, pinned to UTC so it does
@@ -178,12 +178,10 @@ export function StartWalk({
           // The walk's own order is the SHOP's: the shelf's walk position
           // first, the item's own sort within it. Composed into one number so
           // the run needs no join to render in order.
-          sort:
-            (i.shop_section_id
-              ? (sectionOrder.get(i.shop_section_id as string) ?? 9999)
-              : 9999) *
-              1000 +
-            Math.min(999, Number(i.sort)),
+          sort: runItemSort(
+            i.shop_section_id ? sectionOrder.get(i.shop_section_id as string) : null,
+            Number(i.sort),
+          ),
           response_type: i.response_type,
           unit: i.unit,
           min_value: i.min_value,

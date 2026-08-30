@@ -13,6 +13,8 @@ import { Switch } from "@/components/ui/Switch";
 import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
 import { confirmDialog } from "@/lib/confirm";
 import { weekdaySetLabel, type ResponseType } from "@/lib/checklists";
+import { PickList } from "@/components/ui/PickList";
+import { ChoiceOptionsDialog } from "./ChoiceOptionsDialog";
 
 const WIDTHS_KEY = "rf.checklistTemplateItems.columnWidths.v2";
 
@@ -44,6 +46,17 @@ const ASKS: { value: ResponseType; label: string; hint: string }[] = [
 ];
 
 /**
+ * CHOOSING "Choice" DOES NOT WRITE — it opens the options dialog, which writes
+ * the kind and its options in one statement.
+ *
+ * 076 refuses a `choice` item carrying no options, so an inline pick that set
+ * `response_type` alone would bounce a raw 23514 into the cell. The list still
+ * OFFERS all four, because the cell has to be able to render "Choice" on a row
+ * that already is one; what differs is where the pick goes.
+ */
+const CHOICE_NEEDS_OPTIONS: ResponseType = "choice";
+
+/**
  * What this template asks, in walk order.
  *
  * Grouped by SHOP SECTION and sorted by the section's own walk order then the
@@ -71,6 +84,7 @@ export function TemplateItemsTable({
   const supabase = createClient();
   const [failed, setFailed] = useState<string | null>(null);
   const [daysFor, setDaysFor] = useState<TemplateItemRow | null>(null);
+  const [choicesFor, setChoicesFor] = useState<TemplateItemRow | null>(null);
   const [, startTransition] = useTransition();
 
   // Walk order: the section's position first, then the item's own sort. Both
@@ -126,6 +140,20 @@ export function TemplateItemsTable({
       }
       router.refresh();
     });
+  }
+
+  async function setAsk(row: TemplateItemRow, next: ResponseType) {
+    setFailed(null);
+    const { data, error } = await supabase
+      .from("checklist_template_items")
+      .update({ response_type: next })
+      .eq("id", row.id)
+      .select("id");
+    if (error) return setFailed(error.message);
+    if (!data || data.length === 0) {
+      return setFailed("Nothing was changed — you may not have permission.");
+    }
+    router.refresh();
   }
 
   async function setPhoto(row: TemplateItemRow, next: boolean) {
@@ -224,14 +252,14 @@ export function TemplateItemsTable({
       sortValue: (r) => r.response_type,
       render: (r) =>
         editable ? (
-          <InlineValue
-            table="checklist_template_items"
-            id={r.id}
-            column="response_type"
+          <PickList
             value={r.response_type}
-            kind="pick"
-            nullable={false}
             options={ASKS}
+            onPick={(next) => {
+              if (next === r.response_type) return;
+              if (next === CHOICE_NEEDS_OPTIONS) return setChoicesFor(r);
+              void setAsk(r, next as ResponseType);
+            }}
             ariaLabel={`Answer type for ${r.prompt}`}
           />
         ) : (
@@ -248,8 +276,23 @@ export function TemplateItemsTable({
       // The range is only meaningful for a number, and the whole point of it is
       // that an out-of-range reading raises the issue by itself. On any other
       // kind of item the cell says nothing rather than offering three boxes
-      // that would never be read.
+      // that would never be read — EXCEPT a choice, whose answers are the same
+      // kind of fact and belong in the same column.
       render: (r) => {
+        if (r.response_type === "choice") {
+          const listed = (r.choices ?? []).join(" · ");
+          return editable ? (
+            <button
+              type="button"
+              className="max-w-full truncate text-left underline decoration-dotted underline-offset-2 hover:decoration-solid"
+              onClick={() => setChoicesFor(r)}
+            >
+              {listed || "set the answers"}
+            </button>
+          ) : (
+            <span className={READ_ONLY_VALUE}>{listed || "—"}</span>
+          );
+        }
         if (r.response_type !== "number") return <span className="text-faint">—</span>;
         if (!editable) {
           const lo = r.min_value ?? "";
@@ -406,6 +449,14 @@ export function TemplateItemsTable({
           <RowMenu
             label={`Commands for ${r.prompt}`}
             items={[
+              // ALSO IN THE MENU, not only in the Expected cell. That column is
+              // `hideWhenCompact`, and the compact tier bites at 1280 — an
+              // ordinary laptop — so on the width most people read this at, the
+              // cell affordance is simply not on screen. The menu column never
+              // hides. (Found by rendering it; the cell alone typechecks fine.)
+              ...(r.response_type === "choice"
+                ? [{ label: "Answers…", onSelect: () => setChoicesFor(r) }]
+                : []),
               { label: "Days…", onSelect: () => setDaysFor(r) },
               { label: "Remove", onSelect: () => void remove(r), danger: true },
             ]}
@@ -438,6 +489,10 @@ export function TemplateItemsTable({
           </p>
         }
       />
+
+      {choicesFor && (
+        <ChoiceOptionsDialog row={choicesFor} onClose={() => setChoicesFor(null)} />
+      )}
 
       {daysFor && (
         <Dialog

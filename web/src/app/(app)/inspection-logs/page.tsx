@@ -34,7 +34,7 @@ export default async function InspectionLogsPage() {
   const [{ data: runs, error }, { data: templates }] = await Promise.all([
     supabase
       .from("checklist_runs")
-      .select("id, kind, title, business_date, shift, status, shift_report_id")
+      .select("id, kind, title, business_date, shift, status, template_id, shift_report_id")
       .eq("location_id", active.id)
       .eq("kind", "inspection")
       .order("business_date", { ascending: false }),
@@ -57,20 +57,22 @@ export default async function InspectionLogsPage() {
     );
   }
 
-  const runIds = new Set((runs ?? []).map((r) => r.id as string));
+  // SCOPED to the runs on screen, then paginated — /checklists' own note says
+  // why both halves are needed.
+  const runIds = (runs ?? []).map((r) => r.id as string);
   const total = new Map<string, number>();
   const done = new Map<string, number>();
   const issues = new Map<string, number>();
-  for (let from = 0; ; from += 1000) {
+  for (let from = 0; runIds.length > 0; from += 1000) {
     const { data, error: itemError } = await supabase
       .from("checklist_run_items")
       .select("run_id, status")
+      .in("run_id", runIds)
       .order("id")
       .range(from, from + 999);
     if (itemError) break;
     for (const row of data ?? []) {
       const rid = row.run_id as string;
-      if (!runIds.has(rid)) continue;
       total.set(rid, (total.get(rid) ?? 0) + 1);
       if (row.status !== "pending") done.set(rid, (done.get(rid) ?? 0) + 1);
       if (row.status === "issue") issues.set(rid, (issues.get(rid) ?? 0) + 1);
@@ -99,8 +101,11 @@ export default async function InspectionLogsPage() {
     kind: "inspection",
     shifts: (t.shifts as string[] | null) ?? null,
     asked_today: false,
+    // `r.template_id`, not `r.id` — this compared a RUN id against a TEMPLATE
+    // id, so it was always false and the list never once said an inspection had
+    // already been done today.
     already_run_today: (runs ?? []).some(
-      (r) => r.business_date === today && r.id === t.id,
+      (r) => r.business_date === today && r.template_id === t.id,
     ),
   }));
 

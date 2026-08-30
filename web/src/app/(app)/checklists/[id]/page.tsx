@@ -2,10 +2,12 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWalkChecklists } from "@/lib/roles";
+import { canWalkChecklists, canReopenChecklistRun } from "@/lib/roles";
 import { loadChecklistRun } from "@/lib/checklistRunData";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { ReopenChecklistRun } from "@/components/checklists/ReopenChecklistRun";
+import { PrintChecklist } from "@/components/checklists/PrintChecklist";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { parseTrail } from "@/lib/breadcrumbs";
 import type { RawSearchParams } from "@/lib/itemFilters";
@@ -14,6 +16,7 @@ import {
   CHECKLIST_KIND_LABEL,
   CHECK_STATUS_LABEL,
   progressLabel,
+  readingLabel,
   sectionScores,
   type ChecklistKind,
 } from "@/lib/checklists";
@@ -55,6 +58,19 @@ export default async function ChecklistRunRecordPage({
   const locationCode =
     session.locations.find((l) => l.id === run.location_id)?.code ?? "";
   const editable = canWalkChecklists(session.membership.role);
+  const canReopen = canReopenChecklistRun(session.membership.role);
+
+  // Who walked it, for the printed document. `org_members` is readable by every
+  // member (001's `members_read`), so this needs no definer — unlike a name off
+  // `employees`, which 020 gates to owner/admin.
+  const walkerId = run.started_by ?? run.created_by;
+  const { data: walker } = walkerId
+    ? await supabase
+        .from("org_members")
+        .select("display_name")
+        .eq("user_id", walkerId)
+        .maybeSingle()
+    : { data: null };
   const isWalkthrough = run.kind === "walkthrough";
   const scores = isWalkthrough ? sectionScores(items) : [];
   const issues = items.filter((i) => i.status === "issue");
@@ -86,11 +102,54 @@ export default async function ChecklistRunRecordPage({
             {run.status === "open" ? " · unfinished" : ""}
           </p>
         </div>
-        {editable && (
-          <Link href={`/checklists/${id}/run`} className={`${BUTTON_CLASS} shrink-0`}>
-            {run.status === "open" ? "Continue" : "Reopen"}
-          </Link>
-        )}
+        <div className="flex shrink-0 flex-wrap items-start gap-3">
+          {editable && (
+            <Link href={`/checklists/${id}/run`} className={BUTTON_CLASS}>
+              {/* "View", not "Reopen" — the runner renders a finished record
+                  READ-ONLY, so the old label promised something the screen it
+                  led to could not do. Reopening is the command beside it. */}
+              {run.status === "open" ? "Continue" : "View"}
+            </Link>
+          )}
+          <PrintChecklist
+            data={{
+              orgName: session.orgName,
+              kindLabel: CHECKLIST_KIND_LABEL[run.kind as ChecklistKind],
+              title: run.title,
+              locationCode,
+              businessDate: run.business_date,
+              shiftLabel: run.shift
+                ? (SHIFT_SLOT_LABEL[run.shift as never] ?? run.shift)
+                : null,
+              status: run.status === "open" ? "open" : "submitted",
+              walkedBy: (walker?.display_name as string | null) ?? null,
+              submittedAt: run.submitted_at ? run.submitted_at.slice(0, 10) : null,
+              printedOn: new Date().toISOString().slice(0, 10),
+              items: items.map((i) => ({
+                status: i.status,
+                prompt: i.prompt,
+                sectionName: i.section_name,
+                guidance: i.guidance,
+                position: i.position,
+                equipmentName: i.equipment_name,
+                note: i.note,
+                valueText: i.value_text,
+                valueNumber: i.value_number,
+                unit: i.unit,
+                expected: readingLabel(i, i.value_number),
+                score: i.score,
+              })),
+            }}
+          />
+          {run.status !== "open" && canReopen && (
+            <ReopenChecklistRun
+              runId={id}
+              title={run.title}
+              submittedAt={run.submitted_at}
+              issueCount={issues.length}
+            />
+          )}
+        </div>
       </div>
 
       {issues.length > 0 && (

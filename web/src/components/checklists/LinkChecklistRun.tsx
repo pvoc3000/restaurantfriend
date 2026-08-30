@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { itemAppliesOn } from "@/lib/checklists";
+import { itemAppliesOn, runItemSort } from "@/lib/checklists";
 
 /**
  * Start the shift's checklist FROM the report, and link it.
@@ -115,12 +115,10 @@ export function LinkChecklistRun({
             ? (sectionName.get(i.shop_section_id as string) ?? null)
             : null,
           shop_section_id: i.shop_section_id,
-          sort:
-            (i.shop_section_id
-              ? (sectionOrder.get(i.shop_section_id as string) ?? 9999)
-              : 9999) *
-              1000 +
-            Math.min(999, Number(i.sort)),
+          sort: runItemSort(
+            i.shop_section_id ? sectionOrder.get(i.shop_section_id as string) : null,
+            Number(i.sort),
+          ),
           response_type: i.response_type,
           unit: i.unit,
           min_value: i.min_value,

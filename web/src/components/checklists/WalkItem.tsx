@@ -313,6 +313,52 @@ export function WalkItem({
         </div>
       )}
 
+      {/* CHOICE — a button row, one per stored option.
+          The four state buttons above keep their meaning: this records WHICH,
+          they record whether it was looked at and whether it is a problem. So
+          picking an answer marks the item `done` only when it is still
+          `pending`; on a row already flagged as an issue it records the answer
+          and LEAVES the flag, because "Broken" is exactly the answer somebody
+          flags. Pressing the answer it already has clears it, which is the
+          undo the state buttons use and the only one there is.
+
+          A row with no options renders nothing, which cannot happen through the
+          app — 076 refuses a choice item with none — but a defensive `?? []`
+          costs less than a walk that crashes at a delivery. */}
+      {row.response_type === "choice" && (row.choices ?? []).length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {(row.choices ?? []).map((choice) => {
+            const on = row.value_text === choice;
+            return (
+              <button
+                key={choice}
+                type="button"
+                disabled={!writable}
+                aria-pressed={on}
+                onClick={() =>
+                  startTransition(async () => {
+                    const next = on ? null : choice;
+                    await write({
+                      value_text: next,
+                      ...(next !== null && row.status === "pending"
+                        ? { status: "done" as CheckStatus }
+                        : {}),
+                    });
+                  })
+                }
+                className={`${TAP} ${
+                  on
+                    ? "border-ink bg-ink text-white"
+                    : "border-hairline bg-white text-ink hover:border-ink"
+                } disabled:opacity-35`}
+              >
+                {choice}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
       {row.response_type === "text" && (
         <input
           value={row.value_text ?? ""}

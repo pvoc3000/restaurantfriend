@@ -199,6 +199,23 @@ export function canWalkChecklists(role: Role): boolean {
 }
 
 /**
+ * Take a FINISHED checklist back to open.
+ *
+ * 076's own words: "Owner/admin may correct a submitted one; that is the
+ * closed-pay-period rule applied here." Its UPDATE policy already permits
+ * exactly this, so nothing in the schema moves — but a supervisor who walked
+ * the list is deliberately not offered it, because a completed walk is the
+ * record that a named person made a claim at a time.
+ *
+ * Named separately from `canManageMembers` on `canReadHr`'s reasoning: "may
+ * grant app access" and "may unfinish somebody's walk" are different questions
+ * that happen to have the same answer today, and one of them will move first.
+ */
+export function canReopenChecklistRun(role: Role): boolean {
+  return role === "owner" || role === "admin";
+}
+
+/**
  * Edit the master checklists and the equipment register — 076's
  * `checklist_templates_write` and 075's `equipment_write`.
  *

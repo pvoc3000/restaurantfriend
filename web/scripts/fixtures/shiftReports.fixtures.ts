@@ -11,6 +11,7 @@ import {
   ratingsSection,
   salesLine,
   emailSubject,
+  checklistSection,
   type ReadinessInput,
   type EmailReport,
 } from "../../src/lib/shiftReports";
@@ -293,6 +294,50 @@ const REPORT: EmailReport = {
   lastYearNetCents: 171399,
   premades: [{ name: "Angry Samoa", par: 12, made: 12, leftover: 3 }],
   elements: [],
+  // A realistic checklist ON THE SHARED REPORT, deliberately: it is what makes
+  // the privacy sweep, the composition identity and the style sweep below
+  // cover the new markup without any of those three being edited.
+  checklist: {
+    kind: "checklist",
+    title: "DF02 Closing",
+    finished: true,
+    items: [
+      {
+        status: "done",
+        prompt: "Lobby swept",
+        sectionName: "FOH",
+        equipmentName: null,
+        note: null,
+        valueNumber: null,
+        unit: null,
+        minValue: null,
+        maxValue: null,
+      },
+      {
+        status: "issue",
+        prompt: "Fridge temperature",
+        sectionName: "Kitchen",
+        equipmentName: "Walk-in #2",
+        note: "Compressor icing again",
+        valueNumber: 46,
+        unit: "°F",
+        minValue: 34,
+        maxValue: 40,
+      },
+      {
+        status: "na",
+        prompt: "Patio tables wiped",
+        sectionName: "FOH",
+        equipmentName: null,
+        note: "Patio closed for the night",
+        valueNumber: null,
+        unit: null,
+        minValue: null,
+        maxValue: null,
+      },
+    ],
+  },
+  checklistNotStarted: false,
   ratings: [
     {
       employeeName: "Abigail Morales",
@@ -335,6 +380,10 @@ test("both emails carry the shift facts a supervisor needs", () => {
     ok(body.includes("Footwork today"), "the narrative");
     ok(body.includes("Angry Samoa"), "the premades");
     ok(body.includes("$1,333.07"), "net sales");
+    // A SECOND, INDEPENDENT GUARD ON PLACEMENT: move the checklist section into
+    // `managementBody` and the supervisor iteration of this loop fails.
+    ok(body.includes("Compressor icing again"), "the flagged issue");
+    ok(body.includes("expected 34–40 °F"), "the bound it missed");
   }
 });
 
@@ -342,6 +391,128 @@ test("a report with no ratings produces an EMPTY section, not an empty table", (
   const bare = { ...REPORT, ratings: [] };
   eq(ratingsSection(bare), "");
   eq(managementBody(bare), `${supervisorBody(bare)}\n`);
+});
+
+// ---------------------------------------------------------------------------
+// THE CHECKLIST SECTION — the reason the facility-checks module exists
+// ---------------------------------------------------------------------------
+// Mark, 2026-08-29: "anything flagged as an issue on a checklist would be
+// included in the report that gets emailed". Every test here is asserted
+// against the PRODUCED STRING rather than an object shape — `gustoExport`'s
+// sick-hours discipline, because a shape assertion lets a rename pass while the
+// thing quietly comes back or quietly goes away.
+
+test("A FLAGGED ISSUE REACHES BOTH EMAILS, WORD FOR WORD", () => {
+  for (const body of [supervisorBody(REPORT), managementBody(REPORT)]) {
+    ok(body.includes("Compressor icing again"), "the note the supervisor typed");
+    ok(body.includes("Fridge temperature"), "the prompt");
+    ok(body.includes("Walk-in #2"), "the equipment it is about");
+    ok(body.includes("Kitchen"), "the section it is in");
+  }
+});
+
+test("AN OUT-OF-RANGE READING PRINTS THE NUMBER AND THE BOUND", () => {
+  // "out of range" tells you nothing; 46 against 34–40 tells you how far off.
+  const body = supervisorBody(REPORT);
+  ok(body.includes("46 °F"), body);
+  ok(body.includes("expected 34–40 °F"), "the bound, from readingLabel itself");
+});
+
+test("N/A IS NOT AN ISSUE — and is not silently swallowed either", () => {
+  const body = supervisorBody(REPORT);
+  no(body.includes("Patio closed for the night"), "an n/a note was listed as a finding");
+  no(body.includes("Patio tables wiped"), "an n/a item was listed as a finding");
+  ok(body.includes("1 not applicable"), "an n/a must still be counted out loud");
+  ok(body.includes("3 of 3 checked"), body);
+});
+
+test("A CLEAN CHECKLIST SAYS SO — SILENCE IS NOT AN ALL-CLEAR", () => {
+  // If the section vanished on a clean night, a reader could not tell CLEAN
+  // from NOBODY WALKED from THE FEATURE BROKE.
+  const clean: EmailReport = {
+    ...REPORT,
+    checklist: {
+      ...REPORT.checklist!,
+      items: REPORT.checklist!.items.filter((i) => i.status === "done"),
+    },
+  };
+  const section = checklistSection(clean);
+  no(section === "", "a checklist that found nothing must still say it happened");
+  ok(section.includes("Nothing was flagged."), section);
+  ok(supervisorBody(clean).includes("Nothing was flagged."), "and it reaches the email");
+});
+
+test("A CHECKLIST NOBODY STARTED CAN NEVER READ AS A CLEAN ONE", () => {
+  const none: EmailReport = { ...REPORT, checklist: null, checklistNotStarted: true };
+  const section = checklistSection(none);
+  ok(section.includes("was not started"), section);
+  no(section.includes("Nothing was flagged"), "not started must never read as all-clear");
+});
+
+test("A SHOP WITH NO CHECKLIST AT ALL IS SILENT", () => {
+  // The common case for a shop that has not written a master list. Its email
+  // must be byte-identical to the one it got before this feature existed.
+  const none: EmailReport = { ...REPORT, checklist: null, checklistNotStarted: false };
+  eq(checklistSection(none), "");
+  no(supervisorBody(none).toLowerCase().includes("checklist"), "it nags");
+});
+
+test("THE EMAIL AND THE SUBMIT PAGE AGREE ABOUT 'NOT STARTED'", () => {
+  // One question, two surfaces. If either condition drifts this fails, rather
+  // than the screen and the email quietly disagreeing about the same night.
+  for (const notStarted of [true, false]) {
+    const onScreen = submitReadiness({
+      ...READY,
+      checklist: null,
+      checklistNotStarted: notStarted,
+    }).some((c) => c.includes("has not been started"));
+    const inEmail = checklistSection({
+      ...REPORT,
+      checklist: null,
+      checklistNotStarted: notStarted,
+    }).includes("was not started");
+    eq(onScreen, inEmail, `checklistNotStarted=${notStarted}`);
+  }
+});
+
+test("AN UNFINISHED CHECKLIST SAYS SO, AND STILL REPORTS WHAT IT FOUND", () => {
+  const half: EmailReport = {
+    ...REPORT,
+    checklist: { ...REPORT.checklist!, finished: false },
+  };
+  const body = supervisorBody(half);
+  ok(body.includes("was not finished"), body);
+  ok(body.includes("Compressor icing again"), "a partial walk's findings are still findings");
+});
+
+test("AN EMPTY RUN DOES NOT CLAIM A CLEAN ONE", () => {
+  // Every item narrowed out by weekday. 0 of 0 is not an all-clear.
+  const empty: EmailReport = {
+    ...REPORT,
+    checklist: { ...REPORT.checklist!, items: [] },
+  };
+  const section = checklistSection(empty);
+  no(section.includes("Nothing was flagged"), "0 of 0 is not an all-clear");
+  ok(section.includes("no items"), section);
+});
+
+test("A CHECKLIST NOTE IS SOMEBODY'S FREE TEXT", () => {
+  const nasty: EmailReport = {
+    ...REPORT,
+    checklist: {
+      ...REPORT.checklist!,
+      items: REPORT.checklist!.items.map((i) =>
+        i.status === "issue" ? { ...i, note: 'Broken <script>alert("x")</script>' } : i
+      ),
+    },
+  };
+  const body = supervisorBody(nasty);
+  no(body.includes("<script>"), "a script tag survived into the email");
+  ok(body.includes("&lt;script&gt;"), "escaped, not stripped");
+});
+
+test("the supervisor body carries the section VERBATIM", () => {
+  ok(supervisorBody(REPORT).includes(checklistSection(REPORT)));
 });
 
 test("HTML is escaped — a narrative is somebody's free text", () => {

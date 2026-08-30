@@ -29,6 +29,7 @@ export type ChecklistRunData = {
     notes: string | null;
     shift_report_id: string | null;
     created_by: string | null;
+    started_by: string | null;
     submitted_at: string | null;
   };
   items: WalkItemRow[];
@@ -42,7 +43,7 @@ export async function loadChecklistRun(
   const { data: run, error } = await supabase
     .from("checklist_runs")
     .select(
-      "id, org_id, location_id, template_id, kind, title, business_date, shift, status, notes, shift_report_id, created_by, submitted_at",
+      "id, org_id, location_id, template_id, kind, title, business_date, shift, status, notes, shift_report_id, created_by, started_by, submitted_at",
     )
     .eq("id", runId)
     .maybeSingle();
@@ -50,37 +51,45 @@ export async function loadChecklistRun(
   if (error) return { data: null, error: error.message };
   if (!run) return { data: null, error: null };
 
-  const [{ data: items }, { data: photos }, { data: equipment }, { data: tasks }] =
-    await Promise.all([
-      supabase
-        .from("checklist_run_items")
-        .select(
-          "id, prompt, section_name, sort, response_type, unit, min_value, max_value, choices, requires_photo, equipment_id, guidance, position, status, value_number, value_text, score, note, task_id",
-        )
-        .eq("run_id", runId)
-        .order("sort"),
-      supabase
-        .from("facility_photos")
-        .select("id, run_item_id, storage_path")
-        .not("run_item_id", "is", null),
-      supabase
-        .from("equipment")
-        .select("id, name")
-        .eq("location_id", run.location_id as string),
-      supabase
-        .from("location_tasks")
-        .select(
-          "id, title, details, status, carry_forward, target_shift, due_on, created_at, priority",
-        )
-        .eq("location_id", run.location_id as string)
-        .in("status", ["open", "in_progress"]),
-    ]);
+  // The items come FIRST and alone, because the photo query needs their ids.
+  // It used to ask for every photo in the org (`.not("run_item_id", "is",
+  // null)`) and filter in JS — and PostgREST caps a select at 1,000 rows with
+  // NO ERROR, so on the day the org filed its thousandth photo a walk's own
+  // photographs would have started disappearing off its record with nothing to
+  // see. Scoped, the query returns at most one run's worth.
+  const { data: items } = await supabase
+    .from("checklist_run_items")
+    .select(
+      "id, prompt, section_name, sort, response_type, unit, min_value, max_value, choices, requires_photo, equipment_id, guidance, position, status, value_number, value_text, score, note, task_id",
+    )
+    .eq("run_id", runId)
+    .order("sort");
+
+  const itemIds = (items ?? []).map((i) => i.id as string);
+
+  const [{ data: photos }, { data: equipment }, { data: tasks }] = await Promise.all([
+    itemIds.length === 0
+      ? Promise.resolve({ data: [] as { id: string; run_item_id: string; storage_path: string }[] })
+      : supabase
+          .from("facility_photos")
+          .select("id, run_item_id, storage_path")
+          .in("run_item_id", itemIds),
+    supabase
+      .from("equipment")
+      .select("id, name")
+      .eq("location_id", run.location_id as string),
+    supabase
+      .from("location_tasks")
+      .select(
+        "id, title, details, status, carry_forward, target_shift, due_on, created_at, priority",
+      )
+      .eq("location_id", run.location_id as string)
+      .in("status", ["open", "in_progress"]),
+  ]);
 
   // Signed URLs are minted SERVER-SIDE in ONE batch — one round trip instead of
   // one per photo, and a URL built to expire should not outlive the page.
-  const paths = (photos ?? [])
-    .filter((p) => (items ?? []).some((i) => i.id === p.run_item_id))
-    .map((p) => p.storage_path as string);
+  const paths = (photos ?? []).map((p) => p.storage_path as string);
   const signed = new Map<string, string>();
   if (paths.length > 0) {
     const { data: urls } = await supabase.storage

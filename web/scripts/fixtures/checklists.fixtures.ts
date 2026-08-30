@@ -40,6 +40,9 @@ import {
   checklistViewHref,
   CHECKLIST_VIEWS,
   shiftSetLabel,
+  parseChoiceOptions,
+  runItemSort,
+  choiceOptionsText,
   type CheckStatus,
   type ScheduledTemplate,
 } from "../../src/lib/checklists";
@@ -398,4 +401,83 @@ test("every view round-trips through its own href", () => {
     const param = href.includes("?") ? href.split("view=")[1] : undefined;
     eq(parseChecklistView(param), v, v);
   }
+});
+
+// ---------------------------------------------------------------------------
+// Choice items — the options 076 refuses to let a choice item live without
+// ---------------------------------------------------------------------------
+
+test("options are trimmed, and a trailing comma is how anybody types a list", () => {
+  eq(parseChoiceOptions("Clean, Needs attention, Broken"), [
+    "Clean",
+    "Needs attention",
+    "Broken",
+  ]);
+  eq(parseChoiceOptions("Clean, Broken,"), ["Clean", "Broken"]);
+  eq(parseChoiceOptions("  Clean ,,  Broken  "), ["Clean", "Broken"]);
+});
+
+test("ORDER IS PRESERVED — it is the order the buttons appear in", () => {
+  eq(parseChoiceOptions("Broken, Clean"), ["Broken", "Clean"]);
+});
+
+test("a repeat is collapsed, keeping the FIRST position", () => {
+  // Two identical options are a button you cannot tell from the one beside it.
+  eq(parseChoiceOptions("Clean, Broken, Clean"), ["Clean", "Broken"]);
+});
+
+test("NOTHING TYPED MEANS NO OPTIONS — which is what the dialog must refuse", () => {
+  // 076's `checklist_template_items_choices_when_choice` demands at least one,
+  // so an empty parse is the condition that disables the commit. If this ever
+  // returned `[""]` the CHECK would pass and the walk would render a nameless
+  // button.
+  eq(parseChoiceOptions(""), []);
+  eq(parseChoiceOptions("   "), []);
+  eq(parseChoiceOptions(",,,"), []);
+});
+
+test("the text round-trips, so editing a stored set does not rewrite it", () => {
+  const stored = ["Clean", "Needs attention", "Broken"];
+  eq(parseChoiceOptions(choiceOptionsText(stored)), stored);
+  eq(choiceOptionsText(null), "");
+});
+
+// ---------------------------------------------------------------------------
+// runItemSort — the walk's order, and the overflow that hid inside it
+// ---------------------------------------------------------------------------
+
+test("THE SORT NEVER OVERFLOWS numeric(8, 2) — the bug this function exists for", () => {
+  // 999999.99 is the column's ceiling. The old inline expression used 9999 as
+  // the no-section sentinel, so 9999 * 1000 + 10 = 9,999,010 was refused by
+  // Postgres — and because the RUN had already been inserted, an item with no
+  // shop section produced a walk with NO ITEMS AT ALL.
+  const CEILING = 999999.99;
+  for (const section of [null, undefined, 0, 1, 80, 997, 998, 9999, 1e9]) {
+    for (const item of [0, 10, 999, 1000, 99999]) {
+      const v = runItemSort(section as number | null, item);
+      ok(v <= CEILING, `${section}/${item} produced ${v}, over the column ceiling`);
+      ok(v >= 0, `${section}/${item} produced ${v}`);
+    }
+  }
+});
+
+test("the shelf decides first, the item's own sort only within it", () => {
+  eq(runItemSort(0, 10), 10);
+  eq(runItemSort(1, 10), 1010);
+  eq(runItemSort(2, 0), 2000);
+  ok(runItemSort(1, 999) < runItemSort(2, 0), "a later shelf always sorts after an earlier one");
+});
+
+test("NO SECTION SORTS LAST — `lib/tableSort`'s empty-last rule", () => {
+  ok(runItemSort(null, 0) > runItemSort(997, 999), "an unsectioned item must sink");
+  eq(runItemSort(null, 10), runItemSort(undefined, 10));
+});
+
+test("a fractional sort is truncated, because the composition needs whole numbers", () => {
+  // `shop_sections.sort_order` is numeric and FMP fills it with 09.5, so a
+  // fraction really does arrive here. Truncated rather than rounded, so 999.5
+  // cannot become 1000 and roll into the next shelf.
+  eq(runItemSort(1, 10.7), 1010);
+  eq(runItemSort(1.9, 10), 1010);
+  eq(runItemSort(0, 999.9), 999);
 });

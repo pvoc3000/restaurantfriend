@@ -1,71 +1,73 @@
 # Facility checks — where a next session picks up
 
-Written 2026-08-30, at the end of the build. Read
-**`docs/checklists-brief.md`** first — it carries the decisions, the traps and
-the probes. This document is only *what is not done*, and it starts with the
-two things that are actually wrong.
+Written 2026-08-30 at the end of the build; **rewritten the same day** after the
+follow-up session closed most of it. Read **`docs/checklists-brief.md`** first —
+it carries the decisions, the traps and the probes. This document is only *what
+is not done*.
 
 ---
 
-## Start here: the module does not yet do the thing it was asked for
+## Both of the things that were wrong are fixed
 
-Mark's first sentence, 2026-08-29:
+**The email carries the checklist.** `checklistSection` in
+`web/src/lib/shiftReports.ts`, called from `supervisorBody` — so management gets
+it through that function's identity and cannot get it any other way. A clean
+night says `Nothing was flagged.` rather than going quiet, a checklist nobody
+started says so in `S.mark`, and a shop with no list at all is silent so its
+email is byte-identical to before the feature. Pinned by 11 new fixtures against
+the produced STRING; verified over live rows in Node, HTML and `toText` both.
 
-> "Anything flagged as an issue on a checklist would be included in the report
-> that gets emailed."
+**"Reopen" no longer lies.** The link reads **View** once submitted, and a
+separate owner/admin **Reopen** command sits beside it (`ReopenChecklistRun`) —
+Mark's call over the rename. A plain update, not an RPC: 072's
+`reopen_shift_report` is a definer *because submitting flushed rows into other
+tables*, and a checklist run flushes nothing. `.select("id")` and a row count,
+because 076 says a write matching no policy changes zero rows and returns no
+error.
 
-**It isn't.** The checklist reaches the shift report's *pages* and its
-*readiness* — the submit page says `6 of 27 checklist items have not been
-looked at` — but `supervisorBody` in `web/src/lib/shiftReports.ts` has no
-checklist section at all, so nothing about a flagged issue leaves the building.
-This was in the approved plan and did not get built.
+## Three bugs the first handoff did not know about, all fixed
 
-**What it needs.** A section in `supervisorBody`, never in `managementBody`.
-That function's whole security property is the identity
+1. **A walk with an unsectioned item snapshotted NO ITEMS.** `checklist_run_items.sort`
+   is `numeric(8, 2)`, and both snapshot callers inlined
+   `(sectionOrder.get(id) ?? 9999) * 1000 + sort` — 9,999,010, an overflow. The
+   run was already inserted, so you got an empty checklist and an error in a
+   dialog. Invisible on DF01's real lists, where every item has a section;
+   certain on the first template anybody types in a hurry. Now one clamped
+   `runItemSort` in `lib/checklists`, used by both, fixture-pinned in a test that
+   goes red if the sentinel is put back.
+2. **A run's photos vanished once the org had 1,000 of any.**
+   `loadChecklistRun` fetched `facility_photos` org-wide and unpaginated;
+   PostgREST truncates at 1,000 with no error. Now scoped `.in("run_item_id", …)`.
+3. **`/inspection-logs` `already_run_today` compared a run id to a template id**,
+   so it was always false. Both list screens also swept every run item in the org
+   on each page load; now scoped to the rows on screen.
 
-```ts
-managementBody(r) === supervisorBody(r) + ratingsSection(r)
-```
+## What else this round shipped
 
-so anything added to the supervisor half reaches management for free, and
-nothing added to the management half can ever leak the other way. Put the
-issues in `supervisorBody` — both audiences want them — and assert the result
-against the produced STRING, the way `gustoExport`'s sick-hours fixture does.
-
-The data is already assembled: the runner's page loads the run through
-`loadChecklistRun`, and `EmailReport` is composed on the server in
-`app/(fullscreen)/shift-reports/[id]/run/page.tsx`. It needs the issues added
-to that type and rendered in the body.
-
-## And one button lies
-
-`/checklists/[id]` shows **Reopen** on a submitted record and links to
-`/checklists/[id]/run` — which renders read-only, because `WalkRunner` gates
-every control on `isOpen`. **Nothing anywhere sets a submitted run back to
-`open`.** The only `status: "open"` writes are on create.
-
-Two honest fixes, and the choice matters:
-
-- **Rename it "View"** — one line, and defensible: a finished record is a
-  document, which is what `checklist_runs` has no delete policy for.
-- **Build a real reopen**, owner/admin only. 076's update policy already allows
-  it (`user_has_role(org_id, array['owner','admin'])` in both USING and WITH
-  CHECK), so it needs no migration. If you do this, look at
-  `reopen_shift_report` (072) first — it exists because flipping a status
-  without undoing what the submit did produced silent duplicates. A checklist
-  run flushes nothing, so the same trap does not apply, but the reasoning is
-  worth reading before deciding.
-
-Ask Mark which. My instinct is the rename, because a walk that can be reopened
-freely is a walk whose timestamps stop meaning anything.
-
----
+- **Task photos** (`TaskPhotos`) — `facility_photos.task_id` had no writer. Upload
+  = Storage then row, delete = row then object, and **delete is the first caller
+  that ordering has ever had anywhere in the app.**
+- **The checklist PDF** (`pdf/ChecklistPdf`) — issues first, then the sections.
+  Its own hyphenation callback at module scope, and a `pdfText()` sanitizer,
+  because @react-pdf's bundled WinAnsi Helvetica **silently drops the en dash**:
+  `expected 34–40 °F` printed as **"expected 3440 °F"** on the page you hand an
+  inspector. Same trap that once cost the recipe sheet its `≥`. Caught by
+  inflating the content stream of a real render.
+- **`choice` is finished.** The type picker routes to a dialog that writes
+  `response_type` and `choices` in ONE statement (076 refuses a choice with no
+  options), and `WalkItem` renders a button row. The editor is also in the
+  **row menu**, not only the Expected cell — that column is `hideWhenCompact` at
+  1440, so on a 1280 laptop the cell affordance is not on screen.
+- **The three typos are corrected** in the live rows and in the loader.
+- **"Walk" is gone from the last three visible strings** it had survived in —
+  a column header, an empty state, and one of this round's own.
 
 ## What is built and live
 
-Migrations **075–078, all applied**. 78 migrations replay clean on the Docker
-harness. **1,416 fixtures pass.** 20 components across
-`components/checklists/`, `components/tasks/`, `components/equipment/`.
+Migrations **075–078, all applied**, and this round needed **no new one** —
+everything it does was already permitted by 076's and 077's policies. **1,436
+fixtures pass** (1,416 before). 24 components across `components/checklists/`,
+`components/tasks/`, `components/equipment/`.
 
 | Screen | State |
 | --- | --- |
@@ -78,66 +80,61 @@ harness. **1,416 fixtures pass.** 20 components across
 | `/inspection-logs` | The runs table filtered to `kind = 'inspection'` |
 | Shift report | A `checklist` page on every shift, plus readiness |
 
-**Live data:** DF01 Opening (35 items) and DF01 Closing (70 items), loaded from
-Mark's own PDFs by `migration/load-df01-checklists.mjs`. Everything else is at
-zero — no runs, no tasks, no equipment, no photos. **Nothing has been used in
-anger yet**, which is the most important caveat in this document: every rule
-below has been exercised on the harness and in one throwaway walk, and none of
-it has survived a real Tuesday.
+**Live data:** DF01 Opening (35 items) and DF01 Closing (70 items) from Mark's
+own PDFs, plus **DF01 Manager Walkthrough (3 placeholder items)** — see §1
+below. Everything else is at zero: no runs, no tasks, no equipment, no photos.
+The 2026-08-30 verification created a walkthrough run, a closing run, a task and
+a photo, exercised all of them, and deleted every one.
+
+**Still nothing has been used in anger**, which remains the most important
+caveat here. Every rule has now been exercised on the harness AND walked
+end to end against the live database — but none of it has survived a real
+Tuesday, and the three bugs above are what one afternoon of actually pressing
+the buttons turned up.
 
 ---
 
 ## Not built, in the order I would do them
 
-### 1. The email (see above). Everything else is optional; this is not.
+### 1. Walkthroughs — RUN ONCE, now, but never in anger
+The whole path was walked end to end on 2026-08-30 and it works: a manager
+scores an item, an out-of-range reading raises its own issue, a task is raised
+from it, and that task appears in the carried-over band at the top of **that
+night's closing checklist**. Every step is verified.
 
-### 2. Walkthroughs have never been run
-The kind exists, per-item scoring is built and fixture-tested, `sectionScores`
-derives the roll-up, and the carry-forward works — but **no walkthrough
-template exists**, so the whole path from "manager scores an item" to "task
-lands on tonight's checklist" has only ever been exercised with a hand-made
-run. Make one at DF01 and walk it before trusting it.
+**`DF01 Manager Walkthrough` is left on the live database and its three items
+are PLACEHOLDERS somebody invented for that test** — "Front of house
+presentation", "Walk-in temperature" (34–40 °F, so it demonstrates the
+auto-issue), "Fryer oil condition" (a `choice`, so it demonstrates that). It is
+never offered automatically (`weekdays` null, which is what a manager's round
+wants), so it is harmless — but replace the items with real ones before anybody
+treats it as a real list.
 
-### 3. Task photos
-`facility_photos.task_id` exists, 077's check enforces exactly one owner, and
-**no UI writes it.** Photos only attach to checklist answers today. A
-maintenance request with a photo of the broken thing is the obvious want, and
-`WalkItem`'s `addPhoto` is the code to copy — the two write orders are opposite
-on purpose and `lib/facilityPhotos` says why.
-
-### 4. Inspection logs are a filtered list and nothing more
+### 2. Inspection logs are a filtered list and nothing more
 The brief says an inspection wants three things a checklist does not: **the
 inspector's own document**, **findings with deadlines**, and **permit expiry**.
 None is built. All three have machinery waiting — `facility_photos` for the
 document, `location_tasks.due_on` for the deadlines, and 034's `expiryState`
 (already used on `equipment.warranty_ends_on`) for the expiry.
 
-### 5. The checklist PDF
-Named in the plan, not built. It matters for the same reason the email does:
-the paper is what a health inspector asks for. `PoPdfDocs.tsx` and
-`SpecialOrderPdfs.tsx` are the template, and their hard-won traps are recorded
-in `docs/checklists-brief.md` — register the no-op hyphenation callback at
-module scope, and do not make a `fixed` table header on a document whose last
-page is totals.
+### 3. Photographs are not in the PDF
+`ChecklistPdf` prints the answers and not the pictures. @react-pdf fetching
+signed URLs is a real risk and the document is useful without them, so it was
+deliberately left for a second pass. A photograph of the thing is most of what
+a finding is worth.
 
-### 6. `choice` items cannot be created
-`response_type = 'choice'` is a real column value, 076 refuses one with no
-options, and **no screen collects the options** — which is why
-`AddTemplateItem` deliberately does not offer the kind. It needs an editor for
-`choices text[]` on the row before the kind can be offered.
-
-### 7. Equipment has no delete
+### 4. Equipment has no delete
 Only an active toggle. Fine for now — 023's lesson is that deletion is for the
 typo, not the thing — but a mistyped fryer is currently permanent. Copy
 `EmployeeActions`' confirm, which counts what it would take with it.
 
-### 8. Cost per asset
+### 5. Cost per asset
 `location_tasks.vendor_invoice_id` is the seam and **has no reader**. Once a
 repair bill is linked, "this compressor has cost £2,400 in eight months" is a
 join away. That is the argument for replacing a machine, and nobody in the
 business can make it today.
 
-### 9. No cadence engine
+### 6. No cadence engine
 Preventive maintenance — monthly hood filters, quarterly descale, annual
 extinguisher — wants exactly three shapes: a weekday set (built), every N days,
 and monthly on the Nth. **Keep it to three.** A general scheduler is where a
@@ -157,11 +154,6 @@ in a different order from the paper he handed over.
 Neither fix is mine to choose: move existing sections (which moves the order
 guide with them), or give a template its own section ordering independent of
 the shelf walk. He has been told and has not answered.
-
-**Three typos are transcribed verbatim** from his PDFs — "Production logs
-fillout out complely", "wiped and santized", "use toilet bush". Each is one
-inline edit. They were left because correcting somebody's document while
-copying it is not a thing to do quietly.
 
 **`checklist_run_tasks` is write-only.** `ChecklistWalk` upserts a row whenever
 somebody acts on a carried-forward task, and nothing reads it. It exists so
@@ -213,6 +205,16 @@ index, not the argument.
 - **PostgREST unions the keys across a bulk insert** and sends explicit NULL for
   any key a row omits, defeating column defaults. Build array payloads from one
   `.map()`.
+- **`numeric(8, 2)` holds 999999.99, and an overflow is an insert that fails
+  AFTER its parent succeeded.** See bug 1 above. Any composed sort key wants a
+  clamp and a fixture, not a comment.
+- **@react-pdf's bundled Helvetica is WinAnsi and emits nothing for a character
+  it cannot place** — no box, no question mark. An en dash turns `34–40` into
+  `3440`. Verify a PDF by inflating its content stream, never by looking at it.
+- **A dialog handed a row object holds a snapshot.** `router.refresh()` hands
+  down fresh rows and the open panel keeps the old ones, so a photo you just
+  added does not appear — which reads as the upload having failed. Keep the ID
+  in state and look the row up each render.
 - **The browser pane lies.** It goes hidden on its own and every
   `getBoundingClientRect` then reads 0; it also paints stale frames mid-recompile
   that look entirely plausible. Check `innerWidth !== 0` and measure the DOM

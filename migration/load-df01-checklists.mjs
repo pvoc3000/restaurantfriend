@@ -1,11 +1,16 @@
 /**
  * DF01's opening and closing checklists, from Mark's own PDFs (2026-08-30).
  *
- * Transcribed VERBATIM from `pdftotext -layout` rather than retyped by eye, so
- * the prompts are exactly what the paper says — including two typos ("fillout
- * out complely", "santized", "toilet bush") and the "Opening:" / "EoS:"
- * prefixes the opening list carries. Correcting somebody's own document while
- * copying it is not a thing to do quietly; they are one inline edit each.
+ * Transcribed from `pdftotext -layout` rather than retyped by eye, so the
+ * prompts are what the paper says — including the "Opening:" / "EoS:" prefixes
+ * the opening list carries.
+ *
+ * THREE OF THE PAPER'S OWN TYPOS ARE CORRECTED, and only because Mark asked
+ * (2026-08-30): "fillout out complely" -> "filled out completely", "santized"
+ * -> "sanitized", "toilet bush" -> "toilet brush". They shipped verbatim first,
+ * because correcting somebody's document while copying it is not a thing to do
+ * quietly. If this loader is ever re-run against a fresh export, check whether
+ * the paper has caught up before letting it reintroduce them.
  *
  * WHAT IT WRITES
  *   · 8 new shop sections — "Outside", and seven FOH stations (Mark's call:
@@ -133,8 +138,7 @@ const OPENING = {
       ["Trash removed"],
       ["Dishes done and put away"],
       ["Floors swept and mopped", null, "under tables and ingredient bins"],
-      // "fillout out complely" is the paper's own typo, kept verbatim.
-      ["Production logs fillout out complely", "Baker"],
+      ["Production logs filled out completely", "Baker"],
       ["Deliveries dated and put away (FIFO)", null, "double check walk in"],
       ["Cold brew made/diluted", null, "if needed"],
     ]],
@@ -157,8 +161,7 @@ const CLOSING = {
     ["LOBBY", [
       ["Trash cans by door changed.", null, "Sunday: wipe inside of cabinet thoroughly"],
       ["Sneeze guards cleaned and sanitized", null, "Sunday: wipe down baseboards"],
-      // "santized" is the paper's own typo, kept verbatim.
-      ["Barrier above donut display wiped and santized"],
+      ["Barrier above donut display wiped and sanitized"],
       ["Customer side of POS wiped down"],
       ["Beverage merchandiser restocked"],
       ["Floors swept and mopped"],
@@ -215,8 +218,7 @@ const CLOSING = {
     ]],
     ["BATHROOM", [
       ["Wipe down paper towel dispenser, sink, mirror, soap dispenser, trashcan and handicap rails."],
-      // "toilet bush" is the paper's own typo, kept verbatim.
-      ["Toilet cleaned inside and out, use toilet bush."],
+      ["Toilet cleaned inside and out, use toilet brush."],
       ["Walls underneath paper towel dispenser and soap dispenser wiped thoroughly."],
       ["Trash changed."],
       ["Paper towels and soap re-filled."],

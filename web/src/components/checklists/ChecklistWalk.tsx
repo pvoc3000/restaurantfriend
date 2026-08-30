@@ -200,7 +200,7 @@ export function ChecklistWalk({
       {bands.length === 0 && (
         <p className="text-[16px] text-muted">
           {tier === "remaining"
-            ? "Nothing left on this walk."
+            ? "Nothing left on this list."
             : tier === "issues"
               ? "Nothing flagged."
               : "This walk has no items."}

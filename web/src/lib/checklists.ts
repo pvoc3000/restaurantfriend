@@ -216,6 +216,84 @@ export function statusForReading(item: RangeSpec, value: number | null): CheckSt
 }
 
 // ---------------------------------------------------------------------------
+// The walk's own order
+// ---------------------------------------------------------------------------
+
+/**
+ * `checklist_run_items.sort` is `numeric(8, 2)`, so it holds at most
+ * **999999.99**. Everything below is that one fact.
+ */
+const RUN_SORT_MAX_SECTION = 997;
+const RUN_SORT_NO_SECTION = 998;
+const RUN_SORT_MAX_ITEM = 999;
+
+/**
+ * Where an item sits in the walk, composed into ONE number.
+ *
+ * The walk's order is the SHOP's: the shelf's position first, the item's own
+ * `sort` within it. Composed rather than joined so a run can be rendered in
+ * order without reaching back to `shop_sections` — which it must not do anyway,
+ * since a run snapshots its section as text and the shelf may since have moved.
+ *
+ * IT IS CLAMPED, AND THAT IS THE WHOLE POINT OF THIS FUNCTION EXISTING.
+ * Both callers used to inline `(sectionOrder.get(id) ?? 9999) * 1000 + sort`,
+ * and 9999 × 1000 is 9,999,000 — an overflow of a `numeric(8, 2)` column. The
+ * insert failed with "numeric field overflow", `StartWalk` reported it in the
+ * dialog, and the run was already created, so **an item with no shop section
+ * produced a walk with NO ITEMS AT ALL**. Invisible on the real DF01 lists,
+ * where every item has a section; certain on the first template anybody types
+ * in a hurry. Found by starting one.
+ *
+ * A section with no known position sorts LAST, which is `lib/tableSort`'s
+ * empty-last rule and the reason the sentinel is the largest value here.
+ */
+export function runItemSort(
+  sectionIndex: number | null | undefined,
+  itemSort: number,
+): number {
+  const section =
+    sectionIndex == null
+      ? RUN_SORT_NO_SECTION
+      : Math.min(Math.max(0, Math.trunc(sectionIndex)), RUN_SORT_MAX_SECTION);
+  const within = Math.min(Math.max(0, Math.trunc(itemSort)), RUN_SORT_MAX_ITEM);
+  return section * 1000 + within;
+}
+
+// ---------------------------------------------------------------------------
+// Choice items
+// ---------------------------------------------------------------------------
+
+/**
+ * The options on a `choice` item, typed as one comma-separated line.
+ *
+ * A SET, not a fixed-width strip — so this is deliberately NOT `InlineValue`'s
+ * `arrayColumn`/`arrayIndex` slot idiom, which exists for `par_by_weekday` and
+ * the recipe scale columns, where slot n means something. `TemplateShiftSet`
+ * makes the same argument. Somebody adding a fourth answer should type a comma,
+ * not find an empty fourth box.
+ *
+ * Blanks are dropped and repeats are collapsed, both keeping FIRST position:
+ * a trailing comma is how anybody types a list, and two identical options are a
+ * button you cannot tell from the button beside it. Order is preserved because
+ * it is the order they will be shown in.
+ */
+export function parseChoiceOptions(raw: string): string[] {
+  const out: string[] = [];
+  for (const part of raw.split(",")) {
+    const value = part.trim();
+    if (value === "") continue;
+    if (out.includes(value)) continue;
+    out.push(value);
+  }
+  return out;
+}
+
+/** The inverse, for putting a stored set back in the box. */
+export function choiceOptionsText(choices: readonly string[] | null): string {
+  return (choices ?? []).join(", ");
+}
+
+// ---------------------------------------------------------------------------
 // Readiness
 // ---------------------------------------------------------------------------
 

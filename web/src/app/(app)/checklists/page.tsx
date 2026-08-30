@@ -73,22 +73,31 @@ export default async function ChecklistsPage({
   }
 
   // Per-run progress and per-template item counts, both tallied from one narrow
-  // column each. PAGINATED: PostgREST caps a page at 1,000 silently, and a
-  // truncated count reads exactly like a real one.
-  const runIds = new Set((runs ?? []).map((r) => r.id as string));
+  // column each.
+  //
+  // SCOPED TO THE ROWS ON SCREEN, then paginated. Both sweeps used to ask for
+  // every run item and every template item in the ORG and throw most of it away
+  // in JS — correct, because they page, but the cost grows with the whole of
+  // history rather than with the window, and a 70-item closing list at two
+  // shops is ~2,000 rows a fortnight. Pagination stays because a scoped query
+  // can still exceed 1,000 (a 30-day window holds thousands of answers) and
+  // PostgREST truncates at that with NO ERROR, so a short count reads exactly
+  // like a real one.
+  const runIds = (runs ?? []).map((r) => r.id as string);
+  const templateIds = (allTemplates ?? []).map((t) => t.id as string);
   const total = new Map<string, number>();
   const done = new Map<string, number>();
   const issues = new Map<string, number>();
-  for (let from = 0; ; from += 1000) {
+  for (let from = 0; runIds.length > 0; from += 1000) {
     const { data, error: itemError } = await supabase
       .from("checklist_run_items")
       .select("run_id, status")
+      .in("run_id", runIds)
       .order("id")
       .range(from, from + 999);
     if (itemError) break;
     for (const row of data ?? []) {
       const rid = row.run_id as string;
-      if (!runIds.has(rid)) continue;
       total.set(rid, (total.get(rid) ?? 0) + 1);
       if (row.status !== "pending") done.set(rid, (done.get(rid) ?? 0) + 1);
       if (row.status === "issue") issues.set(rid, (issues.get(rid) ?? 0) + 1);
@@ -97,10 +106,11 @@ export default async function ChecklistsPage({
   }
 
   const itemCounts = new Map<string, number>();
-  for (let from = 0; ; from += 1000) {
+  for (let from = 0; templateIds.length > 0; from += 1000) {
     const { data, error: countError } = await supabase
       .from("checklist_template_items")
       .select("template_id")
+      .in("template_id", templateIds)
       .eq("is_active", true)
       .order("id")
       .range(from, from + 999);

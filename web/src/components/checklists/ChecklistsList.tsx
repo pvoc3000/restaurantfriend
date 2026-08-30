@@ -71,7 +71,11 @@ export function ChecklistsList({
     },
     {
       key: "title",
-      label: "Walk",
+      // NOT "Walk". That word was one this module invented and Mark took it out
+      // of every visible string on 2026-08-30; this column header survived the
+      // sweep. "Name" rather than "Checklist", because /inspection-logs renders
+      // the same table and the Kind column beside it already says which.
+      label: "Name",
       width: 320,
       pinned: true,
       sortValue: (r) => r.title,

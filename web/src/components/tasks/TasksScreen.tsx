@@ -8,6 +8,7 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
 import { RowMenu } from "@/components/ui/RowMenu";
+import { TaskPhotos, type TaskPhoto } from "./TaskPhotos";
 import { SHIFT_SLOT_LABEL, SHIFT_SLOT_OPTIONS } from "@/lib/employeeEvents";
 import {
   TASK_PRIORITY_LABEL,
@@ -39,6 +40,7 @@ export type TaskRow = {
   shop_section_id: string | null;
   section_name: string | null;
   from_walk: boolean;
+  photos: TaskPhoto[];
 };
 
 /**
@@ -78,6 +80,13 @@ export function TasksScreen({
   const [tier, setTier] = useState<"open" | "done" | "all">("open");
   const [failed, setFailed] = useState<string | null>(null);
   const [resolving, setResolving] = useState<TaskRow | null>(null);
+  // THE ID, NOT THE ROW. `router.refresh()` re-renders the server component and
+  // hands down fresh `rows`, but a captured row object is a snapshot taken when
+  // the dialog opened — so a photo you had just added did not appear until you
+  // closed and reopened it, which reads as the upload having failed. Looking
+  // the row up each render is what makes the panel live.
+  const [photosForId, setPhotosForId] = useState<string | null>(null);
+  const photosFor = photosForId ? (rows.find((r) => r.id === photosForId) ?? null) : null;
   const [, startTransition] = useTransition();
 
   const searched = useMemo(() => {
@@ -350,6 +359,13 @@ export function TasksScreen({
           <RowMenu
             label={`Commands for ${r.title}`}
             items={[
+              {
+                // OFFERED WHETHER OR NOT IT IS OPEN. A photo of what was fixed
+                // is worth as much as one of what was broken, and a finished
+                // task is the record somebody will read next year.
+                label: r.photos.length === 0 ? "Photos…" : `Photos (${r.photos.length})…`,
+                onSelect: () => setPhotosForId(r.id),
+              },
               ...(isTaskOpen(r)
                 ? [
                     { label: "Mark done", onSelect: () => void markDone(r) },
@@ -446,6 +462,15 @@ export function TasksScreen({
           </p>
         }
       />
+
+      {photosFor && (
+        <TaskPhotos
+          task={photosFor}
+          orgId={orgId}
+          photos={photosFor.photos}
+          onClose={() => setPhotosForId(null)}
+        />
+      )}
 
       {resolving && (
         <ResolveTask

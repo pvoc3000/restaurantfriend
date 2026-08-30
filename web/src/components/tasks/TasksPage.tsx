@@ -3,6 +3,7 @@ import { getAppSession } from "@/lib/session";
 import { canResolveTasks } from "@/lib/roles";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { TaskKind } from "@/lib/facilityTasks";
+import { PHOTO_BUCKET, PHOTO_URL_TTL_SECONDS } from "@/lib/facilityPhotos";
 import { TasksScreen, type TaskRow } from "./TasksScreen";
 
 /**
@@ -62,6 +63,43 @@ export async function TasksPage({
     );
   }
 
+  // The photos, SCOPED to the tasks on screen and signed in ONE batch —
+  // `loadChecklistRun`'s shape, and its lesson: an org-wide select is capped at
+  // 1,000 rows by PostgREST with no error, so a shop's older photographs would
+  // simply stop appearing one day with nothing to see.
+  const taskIds = (tasks ?? []).map((t) => t.id as string);
+  const { data: photoRows } =
+    taskIds.length === 0
+      ? { data: [] as Record<string, unknown>[] }
+      : await supabase
+          .from("facility_photos")
+          .select("id, task_id, storage_path, file_name")
+          .in("task_id", taskIds);
+
+  const signed = new Map<string, string>();
+  const paths = (photoRows ?? []).map((p) => p.storage_path as string);
+  if (paths.length > 0) {
+    const { data: urls } = await supabase.storage
+      .from(PHOTO_BUCKET)
+      .createSignedUrls(paths, PHOTO_URL_TTL_SECONDS);
+    for (const u of urls ?? []) {
+      if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+    }
+  }
+
+  const photosByTask = new Map<string, TaskRow["photos"]>();
+  for (const p of photoRows ?? []) {
+    const tid = p.task_id as string;
+    const list = photosByTask.get(tid) ?? [];
+    list.push({
+      id: p.id as string,
+      storage_path: p.storage_path as string,
+      file_name: (p.file_name as string | null) ?? null,
+      url: signed.get(p.storage_path as string) ?? null,
+    });
+    photosByTask.set(tid, list);
+  }
+
   const equipmentName = new Map(
     (equipment ?? []).map((e) => [e.id as string, e.name as string]),
   );
@@ -89,6 +127,7 @@ export async function TasksPage({
       ? (sectionName.get(t.shop_section_id as string) ?? null)
       : null,
     from_walk: t.source_run_item_id != null,
+    photos: photosByTask.get(t.id as string) ?? [],
   }));
 
   const heading = kind === "maintenance" ? "Maintenance" : "Tasks";

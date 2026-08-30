@@ -9,6 +9,13 @@
 
 import type { ShiftSlot } from "./employeeEvents";
 import { SHIFT_SLOT_LABEL } from "./employeeEvents";
+import {
+  CHECKLIST_KIND_LABEL,
+  outstandingCount,
+  readingLabel,
+  type CheckStatus,
+  type ChecklistKind,
+} from "./checklists";
 
 export type { ShiftSlot };
 export { SHIFT_SLOT_LABEL };
@@ -276,6 +283,32 @@ export type EmailRating = {
   breakReason: string | null;
 };
 
+/**
+ * One answer from the checklist, as the EMAIL needs it.
+ *
+ * A separate pure type rather than reusing `WalkItemRow`: that one lives in a
+ * client component and carries photos, choices, ids and `scored`, none of which
+ * an email has any use for. `EmailRating` sets the precedent — the email's
+ * shape is declared where the email is composed.
+ *
+ * `position` (078 — whose job the item is) IS DELIBERATELY ABSENT. It draws on
+ * the same vocabulary as `shift_report_ratings.position` ("Sr. DF"), so
+ * carrying it would put that string in the supervisor body for a reason that
+ * has nothing to do with a person. It says who should do a thing, not what is
+ * wrong. `checked_by` never reaches the client at all.
+ */
+export type EmailChecklistItem = {
+  status: CheckStatus;
+  prompt: string;
+  sectionName: string | null;
+  equipmentName: string | null;
+  note: string | null;
+  valueNumber: number | null;
+  unit: string | null;
+  minValue: number | null;
+  maxValue: number | null;
+};
+
 export type EmailReport = {
   orgName: string;
   locationCode: string;
@@ -293,6 +326,29 @@ export type EmailReport = {
   premades: { name: string; par: number | null; made: number | null; leftover: number | null }[];
   elements: { name: string; yield: string | null; status: string | null }[];
   ratings: EmailRating[];
+  /**
+   * The checklist linked to this report. `ReadinessInput.checklist`'s shape and
+   * for its reason: `null` means no checklist is linked, which is different
+   * from one that is empty, and different again from one nobody started.
+   *
+   * It carries the ITEMS rather than a pre-filtered list of issues. If the page
+   * filtered, then "an issue goes in the email and an n/a does not" would live
+   * in a server component `npm run fixtures` cannot reach — `gustoExport`'s
+   * discipline, where the pure function decides and the caller only projects.
+   *
+   * `finished` stays a field because it is NOT derivable: a checklist can be
+   * fully answered and never submitted. `outstanding` and `total` are derivable
+   * and deliberately absent, or they would be a second answer to a question
+   * that has one (016's `nextDeliveryDate` trap).
+   */
+  checklist: {
+    kind: ChecklistKind;
+    title: string;
+    finished: boolean;
+    items: EmailChecklistItem[];
+  } | null;
+  /** A list this shift is asked for that nobody has started. */
+  checklistNotStarted: boolean;
 };
 
 /**
@@ -366,6 +422,115 @@ export function salesLine(report: EmailReport): string {
 }
 
 /**
+ * What the checklist found — the reason this module exists.
+ *
+ * Mark's first sentence about facility checks (2026-08-29) was "anything
+ * flagged as an issue on a checklist would be included in the report that gets
+ * emailed", and for a day it was the one thing the module did not do.
+ *
+ * IT LIVES IN THE SUPERVISOR BODY, so management gets it for free through
+ * `managementBody`'s identity. The alternative — a section beside
+ * `ratingsSection` — would mean the supervisors who open at 6am are the only
+ * people who never hear that the walk-in is broken, which inverts the feature.
+ * Nothing here can carry an employee name structurally: a section is a room, a
+ * prompt is template copy, `equipment_name` is a machine, and `checked_by` is
+ * never selected. The one free-text field is `note`, and its readers can
+ * already read it on /checklists.
+ *
+ * A CLEAN NIGHT SAYS SO RATHER THAN GOING QUIET. `printedPoDisagreement` stays
+ * silent when a vendor printed no number because an absent answer is not a
+ * disagreement; this is the opposite case. Somebody walked 27 items and found
+ * nothing, and that is evidence — it is what gives the flagged nights their
+ * meaning. If the section vanished on a clean night a reader could not tell
+ * CLEAN from NOBODY WALKED from THE FEATURE BROKE, and once absence is routine
+ * for benign reasons the loud not-started case stops being loud.
+ *
+ * The silence is reserved for exactly one case: no checklist linked and none
+ * asked for. That is the shop nobody has written a master list for, and an
+ * email is the wrong place to nag about a feature that is not in use.
+ */
+export function checklistSection(report: EmailReport): string {
+  const list = report.checklist;
+
+  if (!list) {
+    if (!report.checklistNotStarted) return "";
+    return [
+      `<h3 style="${S.h3}">Checklist</h3>`,
+      `<p><span style="${S.mark}">The checklist for this shift was not started.</span></p>`,
+    ].join("\n");
+  }
+
+  const total = list.items.length;
+  // `progressLabel`'s own definition of looked-at: anything but pending. One
+  // rule across the runner, the submit page and the email.
+  const looked = total - outstandingCount(list.items);
+  const na = list.items.filter((i) => i.status === "na").length;
+  const issues = list.items.filter((i) => i.status === "issue");
+
+  const account = [`${looked} of ${total} checked`];
+  if (na > 0) account.push(`${na} not applicable`);
+
+  const parts = [
+    `<h3 style="${S.h3}">${esc(CHECKLIST_KIND_LABEL[list.kind])}</h3>`,
+    `<p style="${S.muted}">${esc(list.title)} · ${account.join(" · ")}</p>`,
+  ];
+
+  if (!list.finished) {
+    // Its own sentence at full contrast rather than folded into the muted line:
+    // `S.mark` is a FILL, and #666 on #fef08a does not measure.
+    parts.push(
+      `<p><span style="${S.mark}">This checklist was not finished.</span></p>`
+    );
+  }
+
+  if (total === 0) {
+    // Every item narrowed out by weekday. "Nothing was flagged" would be a true
+    // sentence here that reads as an all-clear.
+    parts.push("<p>This checklist had no items.</p>");
+    return parts.join("\n");
+  }
+
+  if (issues.length === 0) {
+    parts.push("<p>Nothing was flagged.</p>");
+    return parts.join("\n");
+  }
+
+  parts.push(
+    `<table style="${S.table}"><tr>` +
+      `<th style="${S.th}">Where</th><th style="${S.th}">What</th>` +
+      `<th style="${S.th}">Reading</th><th style="${S.th}">Note</th></tr>`
+  );
+  for (const i of issues) {
+    // The BOUND, not "out of range" — `readingLabel`'s whole point, and calling
+    // it here rather than pre-formatting in the page is what keeps the sentence
+    // pinned by a fixture.
+    const expected = readingLabel(
+      { min_value: i.minValue, max_value: i.maxValue, unit: i.unit },
+      i.valueNumber
+    );
+    const reading =
+      i.valueNumber === null
+        ? "—"
+        : `${i.valueNumber}${i.unit ? ` ${esc(i.unit)}` : ""}` +
+          (expected ? ` <span style="${S.mark}">${esc(expected)}</span>` : "");
+    parts.push(
+      `<tr><td style="${S.td}">${esc(i.sectionName ?? "—")}</td>` +
+        `<td style="${S.td}">${esc(i.prompt)}` +
+        (i.equipmentName
+          ? ` <span style="${S.muted}">(${esc(i.equipmentName)})</span>`
+          : "") +
+        `</td><td style="${S.td}">${reading}</td>` +
+        // No em-dash fallback, matching `ratingsSection`: 076's CHECK guarantees
+        // words on an issue, so an empty cell here means it was bypassed and
+        // should look wrong.
+        `<td style="${S.td}">${esc(i.note ?? "")}</td></tr>`
+    );
+  }
+  parts.push("</table>");
+  return parts.join("\n");
+}
+
+/**
  * THE SUPERVISOR VERSION — everything except the ratings.
  *
  * This is the base, and `managementBody` is this PLUS a ratings section. The
@@ -388,6 +553,12 @@ export function supervisorBody(report: EmailReport): string {
     parts.push(`<h3 style="${S.h3}">How the shift went</h3>`);
     parts.push(`<p style="white-space:normal">${esc(report.narrative).replace(/\n/g, "<br>")}</p>`);
   }
+
+  // Before Sales, deliberately: the narrative is how the shift went in prose
+  // and this is the same thing in facts, and a manager scanning a phone reads
+  // the first screen. A broken walk-in is on no dashboard; net sales is.
+  const checklist = checklistSection(report);
+  if (checklist !== "") parts.push(checklist);
 
   parts.push(`<h3 style="${S.h3}">Sales</h3>`);
   parts.push(salesLine(report));

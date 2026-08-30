@@ -12,7 +12,11 @@ import {
   type ShiftSlot,
 } from "@/lib/shiftReports";
 import { loadChecklistRun } from "@/lib/checklistRunData";
-import { outstandingCount, templatesForShift } from "@/lib/checklists";
+import {
+  outstandingCount,
+  templatesForShift,
+  type ChecklistKind,
+} from "@/lib/checklists";
 import { ChecklistPage } from "@/components/operations/pages/ChecklistPage";
 import { ShiftReportRunner } from "@/components/operations/ShiftReportRunner";
 import { InfoPage } from "@/components/operations/pages/InfoPage";
@@ -158,13 +162,46 @@ export default async function RunShiftReportPage({
 
   const walk = linkedRun ? await loadChecklistRun(supabase, linkedRun.id as string) : null;
   const walkItems = walk?.data?.items ?? [];
-  const checklistReadinessInput = walk?.data
+
+  // ONE object, two consumers. `finished` and "not started" are each one
+  // expression, so the submit page's caveat and the emailed section cannot come
+  // to different answers about the same night — which is the whole reason
+  // `EmailReport` mirrors `ReadinessInput`'s two-field shape.
+  //
+  // A PROJECTION, not a decision: what counts as an issue, what an n/a does and
+  // what an empty run says are all decided in `lib/shiftReports`, where the
+  // fixtures can reach them. `position` and `checked_by` are not carried — see
+  // `EmailChecklistItem`. The items are NOT re-sorted: `loadChecklistRun`
+  // orders by `sort`, which is the walk's order and therefore the screen's, so
+  // when the walk-order question is settled one fix moves all three surfaces.
+  const emailChecklist: EmailReport["checklist"] = walk?.data
+    ? {
+        kind: walk.data.run.kind as ChecklistKind,
+        title: walk.data.run.title,
+        finished: walk.data.run.status === "submitted",
+        items: walkItems.map((i) => ({
+          status: i.status,
+          prompt: i.prompt,
+          sectionName: i.section_name,
+          equipmentName: i.equipment_name,
+          note: i.note,
+          valueNumber: i.value_number,
+          unit: i.unit,
+          minValue: i.min_value,
+          maxValue: i.max_value,
+        })),
+      }
+    : null;
+
+  const checklistReadinessInput = emailChecklist
     ? {
         outstanding: outstandingCount(walkItems),
         total: walkItems.length,
-        finished: walk.data.run.status === "submitted",
+        finished: emailChecklist.finished,
       }
     : null;
+
+  const checklistNotStarted = !linkedRun && askedFor.length > 0;
   const reportDate = report.report_date as string;
   const nextDay = (report.next_production_date as string | null) ?? null;
   const kitchenId = (report.kitchen_location_id as string) ?? (report.location_id as string);
@@ -443,7 +480,7 @@ export default async function RunShiftReportPage({
           // DERIVED, never a `task_checklist_done` column — see the note on
           // `ReadinessInput.checklist`.
           checklist: checklistReadinessInput,
-          checklistNotStarted: !linkedRun && askedFor.length > 0,
+          checklistNotStarted,
         }}
       />
     ),
@@ -577,6 +614,8 @@ export default async function RunShiftReportPage({
       gotBreak: r.gotBreak,
       breakReason: r.breakReason,
     })),
+    checklist: emailChecklist,
+    checklistNotStarted,
   };
 
   return (
