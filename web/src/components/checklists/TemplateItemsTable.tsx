@@ -107,8 +107,8 @@ export function TemplateItemsTable({
     const ok = await confirmDialog({
       title: "Remove this item?",
       body:
-        `“${row.prompt}” comes off this list. Walks already recorded keep their ` +
-        "own copy of the question, so nothing that has been walked changes.",
+        `“${row.prompt}” comes off this template. Anything already recorded ` +
+        "keeps its own copy of the question, so nothing already done changes.",
       tone: "danger",
       confirmLabel: "Remove it",
     });

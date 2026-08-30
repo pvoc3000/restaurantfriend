@@ -433,7 +433,15 @@ export type ChecklistView = "walks" | "templates";
 export const CHECKLIST_VIEWS: ChecklistView[] = ["walks", "templates"];
 
 export const CHECKLIST_VIEW_LABEL: Record<ChecklistView, string> = {
-  walks: "Walks",
+  // "Checklists" (Mark, 2026-08-30), not "Walks". It repeats the screen's own
+  // name, which is why it was "Walks" first — and that was the wrong trade:
+  // "walk" is a word this module invented, where a supervisor says they are
+  // doing the checklist. A tab that echoes the heading costs nothing next to a
+  // tab nobody recognises.
+  //
+  // The KEY stays `walks`, and it is invisible: it is the default view, so it
+  // writes no parameter and only `?view=templates` is ever in an address bar.
+  walks: "Checklists",
   // "Templates" (Mark, 2026-08-30), which is also what the route and the
   // `?view=` parameter have always said — only the visible word was out of
   // step. Neither label repeats the screen's own name the way "Checklists"

@@ -57,6 +57,11 @@ export function WalkRunner({
   const [busy, startTransition] = useTransition();
 
   const isOpen = run.status === "open";
+  // The runner serves checklists, walkthroughs AND inspection logs, so its copy
+  // names the KIND rather than assuming one — "Finish this checklist?" would be
+  // wrong on two of the three. `run.kind` is snapshotted, so it says what this
+  // record IS rather than what its template happens to be now.
+  const noun = CHECKLIST_KIND_LABEL[run.kind as ChecklistKind].toLowerCase();
   const done = items.filter((i) => i.status !== "pending").length;
 
   async function finish() {
@@ -74,11 +79,11 @@ export function WalkRunner({
     // names something and then blocks you is how people learn to stop reading
     // confirms.
     const ok = await confirmDialog({
-      title: "Finish this walk?",
+      title: `Finish this ${noun}?`,
       body:
         outstanding.length > 0
           ? `Still outstanding:\n\n${outstanding.map((s) => `· ${s}`).join("\n")}\n\n` +
-            "You can finish anyway — the walk records what you found, including what you did not get to."
+            `You can finish anyway — the ${noun} records what you found, including what you did not get to.`
           : "Everything on the list has been answered.",
       confirmLabel: "Finish it",
     });
@@ -102,7 +107,7 @@ export function WalkRunner({
         .select("id");
 
       if (error || !data || data.length === 0) {
-        setFailed(error?.message ?? "The walk was not finished — nothing changed.");
+        setFailed(error?.message ?? `The ${noun} was not finished — nothing changed.`);
         return;
       }
       // Finishing IS the end of the task, so it leaves. Staying put would make
@@ -130,8 +135,9 @@ export function WalkRunner({
       <main className="flex-1 px-4 py-6">
         {!isOpen && (
           <p className="mb-6 border-2 border-hairline p-3 text-[15px]">
-            This walk was finished on {run.submitted_at?.slice(0, 10) ?? "an earlier day"}.
-            It reads, but it does not change.
+            This {noun} was finished on{" "}
+            {run.submitted_at?.slice(0, 10) ?? "an earlier day"}. It reads, but it
+            does not change.
           </p>
         )}
         {failed && <p className="mb-4 text-sm text-accent">{failed}</p>}

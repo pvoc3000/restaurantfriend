@@ -123,6 +123,7 @@ export default async function InspectionLogsPage() {
             today={today}
             orgId={session.membership.org_id}
             locationId={active.id}
+            noun="inspection log"
           />
         )}
       </div>

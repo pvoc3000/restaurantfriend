@@ -3,7 +3,6 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWalkChecklists } from "@/lib/roles";
-import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { loadChecklistRun } from "@/lib/checklistRunData";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -22,11 +21,11 @@ import {
 const CRUMB = { href: "/checklists", label: "Checklists" };
 
 /**
- * One walk, as a record.
+ * One checklist, walkthrough or inspection, as a record.
  *
- * READ-ONLY, deliberately: there is ONE write path and the walk is it. A second
- * editor here would be two places to correct one answer, and the fastest route
- * to fixing a mistake is to reopen the walk — which is a link, not a form.
+ * READ-ONLY, deliberately: there is ONE write path and the runner is it. A
+ * second editor here would be two places to correct one answer, and the fastest
+ * route to fixing a mistake is to reopen it — which is a link, not a form.
  */
 export default async function ChecklistRunRecordPage({
   params,
@@ -45,7 +44,7 @@ export default async function ChecklistRunRecordPage({
   if (error) {
     return (
       <p className="max-w-[72ch] text-sm text-accent">
-        Could not load this walk: {error}
+        Could not load this record: {error}
       </p>
     );
   }
@@ -53,7 +52,6 @@ export default async function ChecklistRunRecordPage({
 
   const { run, items } = data;
   const trail = parseTrail(rawParams, CRUMB);
-  const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
   const locationCode =
     session.locations.find((l) => l.id === run.location_id)?.code ?? "";
   const editable = canWalkChecklists(session.membership.role);
@@ -90,7 +88,7 @@ export default async function ChecklistRunRecordPage({
         </div>
         {editable && (
           <Link href={`/checklists/${id}/run`} className={`${BUTTON_CLASS} shrink-0`}>
-            {run.status === "open" ? "Continue the walk" : "Reopen the walk"}
+            {run.status === "open" ? "Continue" : "Reopen"}
           </Link>
         )}
       </div>
@@ -138,7 +136,7 @@ export default async function ChecklistRunRecordPage({
       )}
 
       <section className="space-y-6">
-        <SectionHeading count={items.length}>What was walked</SectionHeading>
+        <SectionHeading count={items.length}>What was checked</SectionHeading>
         {bands.map((band) => (
           <div key={band.section}>
             <h3 className="bg-ink px-3 py-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-white">
@@ -199,7 +197,6 @@ export default async function ChecklistRunRecordPage({
         )}
       </section>
 
-      <p className="text-[12px] text-muted">Today is {today}.</p>
     </div>
   );
 }

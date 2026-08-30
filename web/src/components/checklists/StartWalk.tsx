@@ -37,11 +37,22 @@ export function StartWalk({
   today,
   orgId,
   locationId,
+  noun = "checklist",
 }: {
   templates: StartableTemplate[];
   today: string;
   orgId: string;
   locationId: string;
+  /**
+   * What this screen calls the thing being started (Mark, 2026-08-30: "New
+   * Checklist").
+   *
+   * A prop rather than a constant because `/inspection-logs` renders this same
+   * command, and "New checklist" on a screen of inspection logs would be a
+   * button that names the wrong record. The two screens are one component and
+   * two vocabularies.
+   */
+  noun?: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -212,12 +223,12 @@ export function StartWalk({
   return (
     <>
       <button type="button" className={BUTTON_CLASS} onClick={openDialog}>
-        Start a walk
+        New {noun}
       </button>
 
       {open && (
         <Dialog
-          title="Start a walk"
+          title={`New ${noun}`}
           onClose={() => setOpen(false)}
           width="max-w-lg"
           busy={busy}
@@ -245,20 +256,20 @@ export function StartWalk({
           <div className="space-y-5">
             <div className="space-y-1.5">
               <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                Which list
+                Which template
               </span>
               <PickList
                 variant="field"
                 value={templateId}
-                ariaLabel="Which list"
+                ariaLabel="Which template"
                 boxed={BOXED_FIELDS}
                 className={field}
-                placeholder="Choose a list"
+                placeholder="Choose a template"
                 options={offered.map((t) => ({
                   value: t.id,
                   label: t.name,
                   hint: t.already_run_today
-                    ? "already walked today"
+                    ? "already used today"
                     : t.asked_today
                       ? "asked for today"
                       : undefined,
@@ -272,7 +283,7 @@ export function StartWalk({
                 // finished data is still wrong as a constraint.
                 <p className="text-[12px]">
                   <span className="bg-mark-fill px-1">
-                    This list has already been walked today.
+                    This template has already been used today.
                   </span>{" "}
                   Starting another is fine — a handover produces two.
                 </p>
@@ -312,8 +323,8 @@ export function StartWalk({
                 boxed={BOXED_FIELDS}
               />
               <p className="text-[12px] text-muted">
-                A closing walk finished after midnight belongs to the day before,
-                which is what this is already set to.
+                A closing shift finished after midnight belongs to the day
+                before, which is what this is already set to.
               </p>
             </div>
 

@@ -193,9 +193,9 @@ export function TemplateActions({
       body:
         itemCount > 0
           ? `This removes the list and its ${itemCount} item${itemCount === 1 ? "" : "s"}. ` +
-            "Walks already recorded against it keep their own copy of every question, " +
-            "so nothing that has been walked is lost — but a list with runs behind it " +
-            "cannot be deleted at all, and should be made inactive instead."
+            "Anything already recorded against it keeps its own copy of every " +
+            "question, so nothing already done is lost — but a template with records " +
+            "behind it cannot be deleted at all, and should be made inactive instead."
           : "This list has no items yet.",
       tone: "danger",
       confirmLabel: "Delete it",
@@ -214,7 +214,7 @@ export function TemplateActions({
       if (error) {
         setFailed(
           error.message.includes("violates foreign key")
-            ? "This list has walks recorded against it, so it cannot be deleted. Make it inactive instead."
+            ? "This template has records against it, so it cannot be deleted. Make it inactive instead."
             : error.message,
         );
         return;

@@ -148,7 +148,7 @@ export function ChecklistsList({
       {outstanding.length > 0 && (
         <section className="border-2 border-hairline p-3">
           <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-            Asked for today — not walked
+            Asked for today — not started
           </h2>
           <ul className="space-y-1 text-sm">
             {outstanding.map((t) => (
@@ -162,7 +162,7 @@ export function ChecklistsList({
 
       <div className="flex flex-wrap items-end gap-4">
         <TabPicker
-          ariaLabel="Which walks"
+          ariaLabel="Which ones"
           value={tier}
           options={[
             {
@@ -192,7 +192,7 @@ export function ChecklistsList({
           <p className="max-w-[72ch] text-sm text-muted">
             {tier === "open"
               ? "Nothing unfinished at " + locationCode + "."
-              : `No walks recorded at ${locationCode} in this window.`}
+              : `Nothing recorded at ${locationCode} in this window.`}
           </p>
         }
       />
