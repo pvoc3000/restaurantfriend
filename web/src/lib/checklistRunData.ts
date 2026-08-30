@@ -55,7 +55,7 @@ export async function loadChecklistRun(
       supabase
         .from("checklist_run_items")
         .select(
-          "id, prompt, section_name, sort, response_type, unit, min_value, max_value, choices, requires_photo, equipment_id, status, value_number, value_text, score, note, task_id",
+          "id, prompt, section_name, sort, response_type, unit, min_value, max_value, choices, requires_photo, equipment_id, guidance, position, status, value_number, value_text, score, note, task_id",
         )
         .eq("run_id", runId)
         .order("sort"),
@@ -109,6 +109,8 @@ export async function loadChecklistRun(
     equipment_name: i.equipment_id
       ? (equipmentName.get(i.equipment_id as string) ?? null)
       : null,
+    guidance: (i.guidance as string | null) ?? null,
+    position: (i.position as string | null) ?? null,
     status: i.status as WalkItemRow["status"],
     value_number: i.value_number == null ? null : Number(i.value_number),
     value_text: (i.value_text as string | null) ?? null,

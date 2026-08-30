@@ -29,6 +29,9 @@ export type WalkItemRow = {
   requires_photo: boolean;
   equipment_id: string | null;
   equipment_name: string | null;
+  /** 078: how you know it is done, and whose job it is. Both optional. */
+  guidance: string | null;
+  position: string | null;
   status: CheckStatus;
   value_number: number | null;
   value_text: string | null;
@@ -197,8 +200,16 @@ export function WalkItem({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-[16px] leading-snug">{row.prompt}</p>
-          {row.equipment_name && (
-            <p className="text-[13px] text-muted">{row.equipment_name}</p>
+          {/* 078's two columns, in the paper's own order: WHO, then HOW you
+              know it is done. Both quiet — the instruction is what you read,
+              and these are what you read when the instruction is not enough. */}
+          {(row.position || row.equipment_name) && (
+            <p className="text-[13px] text-muted">
+              {[row.position, row.equipment_name].filter(Boolean).join(" · ")}
+            </p>
+          )}
+          {row.guidance && (
+            <p className="text-[13px] text-muted">{row.guidance}</p>
           )}
           {row.requires_photo && row.photos.length === 0 && (
             <span className="mt-1 inline-block bg-mark-fill px-1 text-[12px]">

@@ -50,7 +50,7 @@ export function LinkChecklistRun({
         supabase
           .from("checklist_template_items")
           .select(
-            "id, shop_section_id, sort, prompt, response_type, unit, min_value, max_value, choices, equipment_id, requires_photo, weekdays, is_active",
+            "id, shop_section_id, sort, prompt, response_type, unit, min_value, max_value, choices, equipment_id, requires_photo, weekdays, is_active, guidance, position",
           )
           .eq("template_id", templateId)
           .order("sort"),
@@ -128,6 +128,8 @@ export function LinkChecklistRun({
           choices: i.choices,
           requires_photo: i.requires_photo,
           equipment_id: i.equipment_id,
+          guidance: i.guidance,
+          position: i.position,
           status: "pending",
         }));
 

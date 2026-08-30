@@ -58,7 +58,7 @@ export default async function ChecklistTemplatePage({
       supabase
         .from("checklist_template_items")
         .select(
-          "id, shop_section_id, sort, prompt, response_type, unit, min_value, max_value, choices, equipment_id, requires_photo, weekdays, is_active",
+          "id, shop_section_id, sort, prompt, response_type, unit, min_value, max_value, choices, equipment_id, requires_photo, weekdays, is_active, guidance, position",
         )
         .eq("template_id", id)
         .order("sort"),
@@ -116,6 +116,8 @@ export default async function ChecklistTemplatePage({
     requires_photo: i.requires_photo as boolean,
     weekdays: (i.weekdays as number[] | null) ?? null,
     is_active: i.is_active as boolean,
+    guidance: (i.guidance as string | null) ?? null,
+    position: (i.position as string | null) ?? null,
   }));
 
   const field = BOXED_FIELDS ? BOXED_FIELD : "";
@@ -287,6 +289,11 @@ export default async function ChecklistTemplatePage({
           id: e.id as string,
           name: e.name as string,
         }))}
+        // The roster words already in use on this list, so the picker offers a
+        // spelling before anybody types a second one. `allowNew` keeps it open.
+        positions={[
+          ...new Set(rows.map((r) => r.position).filter(Boolean) as string[]),
+        ].sort()}
       />
     </div>
   );

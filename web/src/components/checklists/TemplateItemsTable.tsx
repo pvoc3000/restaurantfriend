@@ -32,6 +32,9 @@ export type TemplateItemRow = {
   requires_photo: boolean;
   weekdays: number[] | null;
   is_active: boolean;
+  /** 078: how you know it is done, and whose job it is. Both optional. */
+  guidance: string | null;
+  position: string | null;
 };
 
 const ASKS: { value: ResponseType; label: string; hint: string }[] = [
@@ -59,6 +62,7 @@ export function TemplateItemsTable({
   editable,
   sections,
   equipment,
+  positions,
 }: {
   rows: TemplateItemRow[];
   templateId: string;
@@ -66,6 +70,7 @@ export function TemplateItemsTable({
   editable: boolean;
   sections: { id: string; display_name: string }[];
   equipment: { id: string; name: string }[];
+  positions: string[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -295,6 +300,49 @@ export function TemplateItemsTable({
           </div>
         );
       },
+    },
+    {
+      key: "position",
+      label: "Who",
+      width: 150,
+      sortValue: (r) => r.position ?? "",
+      // The ROSTER vocabulary — Baker, Fryer, Supervisor — not org_members.role.
+      // `allowNew` because the next position must not need a migration, and a
+      // list offers the spelling before somebody types a second one.
+      render: (r) =>
+        editable ? (
+          <InlineValue
+            table="checklist_template_items"
+            id={r.id}
+            column="position"
+            value={r.position}
+            kind="pick"
+            allowNew
+            ariaLabel={`Who does ${r.prompt}`}
+            options={positions.map((p) => ({ value: p, label: p }))}
+          />
+        ) : (
+          <span className={READ_ONLY_VALUE}>{r.position ?? ""}</span>
+        ),
+    },
+    {
+      key: "guidance",
+      label: "How you know",
+      width: 280,
+      sortValue: (r) => r.guidance ?? "",
+      render: (r) =>
+        editable ? (
+          <InlineValue
+            table="checklist_template_items"
+            id={r.id}
+            column="guidance"
+            value={r.guidance}
+            multiline
+            ariaLabel={`How you know ${r.prompt} is done`}
+          />
+        ) : (
+          <span className={READ_ONLY_VALUE}>{r.guidance ?? ""}</span>
+        ),
     },
     {
       key: "equipment_id",

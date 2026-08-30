@@ -81,7 +81,7 @@ export function TemplateActions({
           supabase
             .from("checklist_template_items")
             .select(
-              "shop_section_id, sort, prompt, response_type, unit, min_value, max_value, choices, requires_photo, weekdays, is_active",
+              "shop_section_id, sort, prompt, response_type, unit, min_value, max_value, choices, requires_photo, weekdays, is_active, guidance, position",
             )
             .eq("template_id", templateId)
             .order("sort"),
@@ -151,6 +151,8 @@ export function TemplateActions({
         requires_photo: i.requires_photo,
         weekdays: i.weekdays,
         is_active: i.is_active,
+        guidance: i.guidance,
+        position: i.position,
       }));
 
       if (payload.length > 0) {

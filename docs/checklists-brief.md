@@ -269,6 +269,50 @@ which defeats column DEFAULTs (`requires_photo` is `not null default false` and
 the insert failed on it). Every array insert in this module builds its rows from
 a single `.map()`, so they are uniform; an ad-hoc one must be too.
 
+## What two real checklists taught (2026-08-30)
+
+Mark supplied DF01's actual opening and closing lists as PDFs. Three things they
+settled that no amount of design could have:
+
+**A checklist item says FOUR things, and 076 modelled two.** The paper has a
+checkbox, the instruction, a WHO (Baker, Fryer, Assistant Baker, Supervisor) and
+a NOTE ("water emptied", "replace filter on Tue/Fri/Sun", "including shelving
+above"). Migration **078** adds `guidance` and `position`, both nullable on the
+template item and both snapshotted onto the run item. Of 105 real items, 23 name
+a position and 16 carry a note — so most rows have neither, which is why neither
+column has a default.
+
+`position` is the ROSTER vocabulary (`employees.position`), **not**
+`org_members.role` — the two overlap on the word "Supervisor" and mean different
+things by it. It is a HINT and never a gate: a checklist that refused a tick
+because the closer was covering the baker's shift would be worse than useless.
+
+**The section vocabularies do not match, and the brief was wrong about it.**
+This document claimed "a walk follows the same route through the building as the
+order guide". DF01's 72 shop sections are SHELVES for counting stock — "Walk In
+R1 S3", "FOH Cab 2" — while the checklists walk ROOMS. Only OFFICE matched.
+Mark's call (2026-08-30) was to use the area-level sections that already exist
+and to add FOH sub-areas rather than a new vocabulary: seven stations at
+sort_order 60.1–60.7, inside FOH's own 60–69 band, plus one new "Outside". Mop
+room → Kitchen Dish Pit, "basically in the dish pit".
+
+**Known consequence, not yet resolved:** between-section order comes from
+`shop_sections.sort_order`, which is the ORDER GUIDE's walk — Kitchen(10),
+Bathroom(50), FOH(60), Office(90), i.e. back-to-front. The paper closes
+front-to-back: lobby, register, stations, then BOH. So the walk presents the
+same items in a different order from the paper. Fixing it means either moving
+existing sections (which would move the order guide) or giving a template its
+own section ordering. Ask before doing either.
+
+**A typo in somebody's own document stays.** "Production logs fillout out
+complely", "wiped and santized", "use toilet bush" are transcribed verbatim.
+Correcting a document while copying it is not a thing to do quietly; each is one
+inline edit.
+
+`migration/load-df01-checklists.mjs` is the loader — dry run by default,
+idempotent (re-running replaces a template's items rather than doubling them,
+which is safe because a run snapshots its own copy), and `--wipe` to remove both.
+
 ## Probes
 
 *Run these; don't trust a line in CLAUDE.md — it has been wrong in both
