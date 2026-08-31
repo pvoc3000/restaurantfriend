@@ -1091,7 +1091,17 @@ export function OrderGuide({
                             Anything added to this row from now on inherits
                             that: it can be as long as it likes, and it will be
                             clipped rather than pushing the walk sideways. */}
-                        <div className="flex w-0 min-w-full items-baseline gap-4 border-b-2 border-ink px-4 pb-2 max-[1180px]:px-2 max-[880px]:px-1">
+                        {/* items-END, not baseline (Mark, 2026-08-31). Baseline is right while
+                            every child is one line, and wrong the moment the
+                            last-purchase label is a paragraph: a flex item's
+                            baseline is its FIRST line, so the label pinned its
+                            top to the title and hung the rest below — which is
+                            what "bottom aligned" was asked for instead. On the
+                            bottom edge the block grows UPWARD and its last line
+                            stays beside the name. `align-self: last baseline`
+                            would express this exactly and is not safe at the
+                            Safari 16.4 floor. */}
+                        <div className="flex w-0 min-w-full items-end gap-4 border-b-2 border-ink px-4 pb-2 max-[1180px]:px-2 max-[880px]:px-1">
                           {/* items-BASELINE here too, with the triangle opted OUT via self-center.
                             A flex container's baseline comes from its first
                             item that PARTICIPATES in baseline alignment, and
@@ -1187,11 +1197,34 @@ export function OrderGuide({
                               name, which is what it is.
 
                               Quiet, and it never competes: it is context, not
-                              the decision. `truncate` with a shrink of 3 so it
-                              gives way three times faster than the item name —
-                              a vendor description is arbitrary text and this
-                              header is one line. */}
-                          <span className="min-w-0 shrink-[3] truncate text-xs tracking-[0.02em] text-muted">
+                              the decision. A shrink of 3 so it gives way three
+                              times faster than the item name — a vendor
+                              description is arbitrary text.
+
+                              NARROW AND SEVERAL LINES DEEP, NOT ONE LONG ONE
+                              (Mark, 2026-08-31: it "takes up too much space and
+                              causes the inventory item to get truncated…
+                              especially on tablets"). Measured at 820, the
+                              portrait iPad this is walked on: the label was
+                              taking ~420px of a 768px row and the item NAME —
+                              the thing you scan for down the walk — was reading
+                              "COCOA POWDER, DUT…". One line meant its width was
+                              set by the longest vendor description in the
+                              catalog, which is arbitrary text nobody chose.
+                              Capped at 12rem it wraps instead: two lines for
+                              most, three for the longest, and the name gets
+                              every pixel it gives up.
+
+                              `line-clamp-3` rather than a fourth line, because
+                              past three the block is taller than the 22px title
+                              it hangs off and starts to read as the row's
+                              content rather than its footnote.
+
+                              Bottom alignment is the ROW's (`items-end`, see
+                              there) rather than a `self-end` here, because the
+                              par marker needs it too — its own bottom is what
+                              the title is level with. */}
+                          <span className="line-clamp-3 min-w-0 max-w-[12rem] shrink-[3] text-[11px] leading-[1.25] tracking-[0.02em] text-muted">
                             {/* Suppressed entirely when the view is unreadable,
                                 because `lastPurchaseLabel` renders a missing
                                 row as "never ordered here" — true when the view
