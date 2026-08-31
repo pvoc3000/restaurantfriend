@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { ChecklistWalk } from "@/components/checklists/ChecklistWalk";
+import { FinishChecklist } from "@/components/checklists/FinishChecklist";
 import { LinkChecklistRun } from "@/components/checklists/LinkChecklistRun";
 import { progressLabel } from "@/lib/checklists";
 import type { ShiftSlot } from "@/lib/shiftReports";
@@ -18,8 +18,16 @@ import type { ChecklistRunData } from "@/lib/checklistRunData";
  * to prevent.
  *
  * So `ChecklistWalk` is mounted with no chrome of its own, exactly as it is at
- * `/checklists/[id]/run`, and this page adds only the sentence that says which
- * walk it is.
+ * `/checklists/[id]/run`, and this page adds the sentence that says which
+ * checklist it is — and the one command that chrome was carrying.
+ *
+ * FINISHING HAS TO BE POSSIBLE FROM HERE, and for a while it was not (Mark,
+ * 2026-08-30). `WalkRunner`'s footer owned the button, this page mounts only
+ * the body, and the sole route out was an "open it full screen" link — so
+ * finishing meant leaving the report you were in the middle of writing. The
+ * act lives in `FinishChecklist` now and both surfaces call it; that link is
+ * gone (Mark, same day), which also retires the one control on this page that
+ * threw away where you were.
  *
  * TWO ACTS, NOT ONE. Finishing the walk submits the RUN; submitting the report
  * sends. Neither triggers the other, and `submit_shift_report` is untouched —
@@ -78,8 +86,8 @@ export function ChecklistPage({
         )}
         {askedFor.length === 0 && (
           <p className="max-w-[60ch] text-[14px] text-muted">
-            Templates are set up under Locations &rsaquo; Templates. You can
-            finish this report without one.
+            Master lists are set up under Facilities › Checklists › Templates.
+            You can finish this report without one.
           </p>
         )}
       </div>
@@ -107,11 +115,21 @@ export function ChecklistPage({
         isOpen={run.run.status === "open"}
       />
 
-      <p className="text-[14px] text-muted">
-        <Link href={`/checklists/${run.run.id}/run`} className={BUTTON_CLASS}>
-          Open it full screen
-        </Link>
-      </p>
+      {editable && run.run.status === "open" && (
+        // An ORDINARY command, not a filled one: this report's single outcome
+        // is Send, on its submit page, and finishing the checklist is one step
+        // on the way. `PRIMARY_BUTTON_CLASS` is for the act a screen exists
+        // for, and on this screen that is not this.
+        <div className="flex justify-end">
+          <FinishChecklist
+            runId={run.run.id}
+            noun="checklist"
+            items={run.items}
+            className={BUTTON_CLASS}
+            label="Finish the checklist"
+          />
+        </div>
+      )}
     </div>
   );
 }

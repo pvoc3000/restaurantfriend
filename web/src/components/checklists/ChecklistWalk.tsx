@@ -70,8 +70,14 @@ export function ChecklistWalk({
    * Remaining is exactly All, with Issues a subset of Done — where the strict
    * reading would strand every `na` item in no tier but All.
    */
+  // IT OPENS ON ALL (Mark, 2026-08-30), not on Remaining. A list that hides the
+  // items you have already answered reads as a shorter list than the one you
+  // are holding, and on a 70-item closing routine the rows moving out from
+  // under you as you tick is exactly the thing that loses your place. The other
+  // three tiers are for looking something up; the walk itself is the whole list
+  // in the shop's own order.
   const [tier, setTier] = useState<"all" | "done" | "remaining" | "issues">(
-    "remaining",
+    "all",
   );
   const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();

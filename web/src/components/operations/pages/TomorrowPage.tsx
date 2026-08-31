@@ -28,7 +28,7 @@ export type TomorrowSchedule = {
 };
 
 /**
- * Tomorrow's paper — FMP's pages 8 and 9, merged.
+ * Tomorrow's production — FMP's pages 8 and 9, merged.
  *
  * They stopped being two tasks on 2026-08-27, when `GenerateSchedules` grew the
  * special-order pull: generating a night already offers that night's ready
@@ -139,7 +139,7 @@ export function TomorrowPage({
           Special orders for {nextProductionDate}
         </SectionHeading>
         {orders.length === 0 ? (
-          <p className="text-sm text-muted">Nothing is due at {kitchenCode} that day.</p>
+          <p className="text-sm text-muted">None.</p>
         ) : (
           <ul className="divide-y divide-hairline border border-hairline">
             {orders.map((o) => (
@@ -177,9 +177,7 @@ export function TomorrowPage({
           Production schedules for {nextProductionDate}
         </SectionHeading>
         {schedules.length === 0 ? (
-          <p className="text-sm text-muted">
-            No schedule has been generated for that night yet.
-          </p>
+          <p className="text-sm text-muted">None.</p>
         ) : (
           <ul className="divide-y divide-hairline border border-hairline">
             {/* A PRINT PER ROW (Mark, 2026-08-29), the special orders' shape

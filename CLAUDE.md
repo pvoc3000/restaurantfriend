@@ -5770,6 +5770,33 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `PRIMARY_BUTTON_CLASS`'s own "only ever right CONDITIONALLY" rule, the same
    shape as /timesheets filling Import while the pay period is empty.
 
+   **THE WALK OPENS ON `All`** (Mark, 2026-08-30), not on Remaining. A list that
+   hides the items you have already answered reads as a shorter list than the
+   one you are holding, and on a 70-item closing routine the rows moving out
+   from under you as you tick is what loses your place. The other three tiers
+   are for looking something up; the walk itself is the whole list in the shop's
+   own order.
+   **YOU COULD NOT FINISH A CHECKLIST FROM INSIDE THE SHIFT REPORT** (Mark,
+   2026-08-30). `WalkRunner`'s footer owned the button and `ChecklistPage`
+   mounts only `ChecklistWalk`, the body — so from the report you could answer
+   every item and the run stayed `open`, the submit page went on saying "the
+   checklist is answered but has not been finished", and the only way out was an
+   "Open it full screen" link, finishing there, and coming back to a report you
+   had left. **The act is `components/checklists/FinishChecklist` now** and both
+   surfaces call it — extracted rather than copied, because it carries a
+   confirm, a readiness list, a findings sentence and a row-count check, two of
+   which have been got wrong once each already. **What it does NOT own is where
+   you go afterwards**: the full-screen runner LEAVES on success (finishing is
+   the end of that task) while the embedded one must not navigate at all, hence
+   `onFinished`. **"Open it full screen" is GONE** (Mark, same day) — with
+   Finish here it was the one control on the page that threw away where you
+   were. The embedded button is ORDINARY, not filled: this report's single
+   outcome is Send on its submit page, and finishing the checklist is a step on
+   the way.
+   Page 7 of the shift report is **"Tomorrow's production"** (was "Tomorrow's
+   paper"), and both of its empty states are just **"None."** — a heading that
+   already names the shop and the date does not need a sentence repeating them.
+
    **THE RUNNER'S FOOTER IS WHITE AND ITS COMMIT IS BLACK** (Mark, 2026-08-30).
    It was a black bar with the colours inverted — a white Finish on black —
    which said the right thing backwards and made this the one screen in the app

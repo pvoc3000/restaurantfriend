@@ -1,17 +1,10 @@
 "use client";
 
-import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { confirmDialog } from "@/lib/confirm";
-import {
-  checklistReadiness,
-  checklistIssueCount,
-  CHECKLIST_KIND_LABEL,
-  type ChecklistKind,
-} from "@/lib/checklists";
+import { CHECKLIST_KIND_LABEL, type ChecklistKind } from "@/lib/checklists";
 import { SHIFT_SLOT_LABEL } from "@/lib/employeeEvents";
 import { ChecklistWalk, type WalkTask } from "./ChecklistWalk";
+import { FinishChecklist } from "./FinishChecklist";
 import type { WalkItemRow } from "./WalkItem";
 import type { ChecklistRunData } from "@/lib/checklistRunData";
 
@@ -61,9 +54,6 @@ export function WalkRunner({
   editable: boolean;
 }) {
   const router = useRouter();
-  const supabase = createClient();
-  const [failed, setFailed] = useState<string | null>(null);
-  const [busy, startTransition] = useTransition();
 
   const isOpen = run.status === "open";
   // The runner serves checklists, walkthroughs AND inspection logs, so its copy
@@ -91,73 +81,6 @@ export function WalkRunner({
    */
   const nothingOutstanding = done === items.length && items.length > 0;
 
-  async function finish() {
-    const outstanding = checklistReadiness(
-      items.map((i) => ({
-        status: i.status,
-        requires_photo: i.requires_photo,
-        photoCount: i.photos.length,
-      })),
-    );
-
-    // WHAT WAS FOUND IS NOT WHAT IS OUTSTANDING. The findings are stated as a
-    // fact — `salesNote`'s "INFORMATION, never a caveat" — because a flagged
-    // item has been dealt with as far as a checklist can deal with it, and the
-    // report is where it goes next.
-    const found = checklistIssueCount(items);
-    const findings =
-      found > 0
-        ? `${found === 1 ? "1 issue is" : `${found} issues are`} flagged, and ${
-            found === 1 ? "it goes" : "they go"
-          } in the report.`
-        : null;
-
-    // `closeReadiness`'s rule and its reason: it NAMES what is unresolved and
-    // then LETS YOU THROUGH. Gate finishing on a complete set and the night the
-    // walk-in floods is a walk that is never finished — and a confirm that
-    // names something and then blocks you is how people learn to stop reading
-    // confirms.
-    const ok = await confirmDialog({
-      title: `Finish this ${noun}?`,
-      body: [
-        outstanding.length > 0
-          ? `Still outstanding:\n\n${outstanding.map((s) => `· ${s}`).join("\n")}\n\n` +
-            `You can finish anyway — the ${noun} records what you found, including what you did not get to.`
-          : `Everything on the list has been answered.`,
-        findings,
-      ]
-        .filter(Boolean)
-        .join("\n\n"),
-      confirmLabel: "Finish it",
-    });
-    if (!ok) return;
-
-    setFailed(null);
-    startTransition(async () => {
-      const uid = (await supabase.auth.getUser()).data.user?.id ?? null;
-      const { data, error } = await supabase
-        .from("checklist_runs")
-        .update({
-          status: "submitted",
-          submitted_at: new Date().toISOString(),
-          submitted_by: uid,
-        })
-        .eq("id", run.id)
-        // An update matching no policy changes nothing and returns NO error, so
-        // a bare write would report a cheerful success AND navigate — which
-        // reads exactly like the walk having been filed. The receiving screen's
-        // Finalize learned this the same way.
-        .select("id");
-
-      if (error || !data || data.length === 0) {
-        setFailed(error?.message ?? `The ${noun} was not finished — nothing changed.`);
-        return;
-      }
-      // Finishing IS the end of the task, so it leaves. Staying put would make
-      // you press Close afterwards for the same destination.
-      router.push(`/checklists/${run.id}`);
-    });
-  }
 
   return (
     <>
@@ -183,7 +106,6 @@ export function WalkRunner({
             does not change.
           </p>
         )}
-        {failed && <p className="mb-4 text-sm text-accent">{failed}</p>}
         <ChecklistWalk
           runId={run.id}
           orgId={orgId}
@@ -226,18 +148,20 @@ export function WalkRunner({
           Close
         </button>
         {isOpen && editable && (
-          <button
-            type="button"
-            onClick={finish}
-            disabled={busy}
+          <FinishChecklist
+            runId={run.id}
+            noun={noun}
+            items={items}
             className={`${FOOTER_CELL} ${
               nothingOutstanding
                 ? "bg-ink text-white hover:bg-white hover:text-ink"
                 : "bg-white text-ink hover:bg-ink hover:text-white"
             }`}
-          >
-            {busy ? "Finishing…" : "Finish"}
-          </button>
+            // Finishing IS the end of this task, so the full-screen runner
+            // LEAVES. Staying put would make you press Close afterwards for the
+            // same destination.
+            onFinished={() => router.push(`/checklists/${run.id}`)}
+          />
         )}
       </footer>
     </>

@@ -48,7 +48,7 @@ export const PAGE_TITLE: Record<ShiftReportPage, string> = {
   elements: "Elements made",
   checklist: "Checklist",
   report: "Report",
-  tomorrow: "Tomorrow's paper",
+  tomorrow: "Tomorrow's production",
   submit: "Submit",
 };
 
