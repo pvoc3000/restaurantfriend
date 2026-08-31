@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { money } from "@/lib/purchaseOrders";
 import {
   extractionNotes,
@@ -88,6 +89,12 @@ export function InvoiceSummary({
    *  where it's actually needed. */
   addItemSlot?: React.ReactNode;
 }) {
+  // Collapsed by default and per mount, which is right: it resets when a
+  // different document is read, and a remembered preference for a caveat you
+  // open once a month is machinery nobody asked for.
+  const [notesOpen, setNotesOpen] = useState(false);
+  const notes = extractionNotes(extraction);
+
   const matched = match.matches.filter((m) => m.invoice !== null).length;
   const guessed = match.matches.filter((m) => m.by === "description").length;
   const notOnInvoice = match.matches.length - matched;
@@ -243,19 +250,66 @@ export function InvoiceSummary({
       <p className="text-xs text-muted">
         Read from {fileName ?? "the attachment"}
         {model && ` by ${model}`}. Nothing here reaches the order until you take
-        it, and the order isn&rsquo;t done until you Finalize.
+        it, and the order isn’t done until you Finalize.
       </p>
 
       {/* The reader's caveats — what it couldn't make out, and what it had to
           judge. Not an error: a line explaining that a rate is printed per case
           while the quantity is in pieces is the reader being careful, and it's
-          the difference between a number you can trust and one you can't. */}
-      {extractionNotes(extraction) && (
-        <div className="border border-ink bg-[var(--rf-yellow-200)] px-3 py-2 text-ink">
-          <p className="text-[12px] font-semibold uppercase tracking-[0.12em]">
-            Reader&rsquo;s notes
-          </p>
-          <p className="mt-1">{extractionNotes(extraction)}</p>
+          the difference between a number you can trust and one you can't.
+          
+          COLLAPSED, BEHIND A CARET, AND NOT AN OVERLAY (Mark, 2026-08-31: "a
+          lot of noise… for the most part it's unnecessary, but it's still there
+          if we need it", then offering either). A disclosure wins here for a
+          reason particular to this screen: an overlay would cover the invoice
+          AND the lines, which are the two documents you are standing there
+          comparing, and it would have to be dismissed before you could go back
+          to counting. It also costs nothing to expand — the split row MEASURES
+          whatever sits above it and a ResizeObserver keeps that honest as bands
+          come and go, which is the case this band is named in.
+          
+          The trigger is quiet, reading like the small-caps labels beside it
+          rather than wearing the yellow: the fill means "worth your eye", and
+          on a note that is usually a rate-per-case caveat that is a claim it
+          cannot keep. The CONTENT keeps the fill, because opened, it is. */}
+      {notes && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setNotesOpen((o) => !o)}
+            aria-expanded={notesOpen}
+            className="flex items-center gap-1.5 text-[12px] uppercase tracking-[0.12em] text-subtle hover:text-ink"
+          >
+            {/* ▶ (U+25B6), NOT ▸ (U+25B8), and the GLYPH is doing most of the
+                work here rather than the font size (Mark, 2026-08-31: "too
+                small… make it 3 or 4 times larger", then "too big… split the
+                difference"). Measured as INK rather than em box, which is the
+                whole point: ▸ at the label's own 12px paints 4×5 PIXELS, and to
+                reach even 11px of ink it would need a ~60px font — a line box
+                several times the height of the band it sits in. ▶ paints 12×11
+                at 18px.
+
+                18px is the SPLIT: 5px of ink to 17px (▶ at 26px, which read as
+                too big) puts the midpoint at 11. It costs the button one pixel
+                over the original 17 — the size it was always going to be is the
+                one where the character is the right character. It is also the
+                order guide's own disclosure triangle, so the app has one shape
+                for this. Reach for the bigger glyph before the bigger size. */}
+            <span
+              aria-hidden
+              className={`inline-block text-[18px] leading-none transition-transform ${
+                notesOpen ? "rotate-90" : ""
+              }`}
+            >
+              ▶
+            </span>
+            Reader’s notes
+          </button>
+          {notesOpen && (
+            <p className="mt-1 border border-ink bg-[var(--rf-yellow-200)] px-3 py-2 text-ink">
+              {notes}
+            </p>
+          )}
         </div>
       )}
 
