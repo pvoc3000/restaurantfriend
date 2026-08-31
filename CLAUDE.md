@@ -302,11 +302,28 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    THE CATALOG — arbitrary text nobody chose — and it won. Measured at 820, the
    portrait iPad this is walked on: the label took ~420px of a 768px row and the
    item name, the thing you scan for down the walk, read "COCOA POWDER, DUT…".
-   Capped at **12rem** and clamped to **three lines** it wraps instead, and the
-   name gets every pixel it gives up. Measured over all 261 item headers at 768,
-   820 and 1280: **0 names clipped** (from routinely clipped), 164 labels at two
-   lines and 97 at three, and only **3 hit the clamp** and ellipsise — so the
-   third line is a backstop rather than the normal case.
+   **THE NAME NOW TAKES WHAT IT NEEDS AND THE LABEL TAKES THE REST** (Mark's
+   second pass, same day: "make the inventory item as wide as it needs to be,
+   whatever that is, and use the remaining space on that line"). The name group
+   is `shrink-0` at its natural width, the label is `flex-1`, and the 12rem cap
+   that stood here in between is GONE — it was only ever a way of bounding the
+   label without knowing what the name wanted. `line-clamp-3` stays as the
+   wrap-don't-truncate rule.
+   Measured over all 261 item headers: **0 names clipped at any width**, and
+   with the row's full leftover the label needs only ONE line on 261 of 261 at
+   1280 and 1440, 226 of 261 at 820, 220 at 768 — so **every row is back to its
+   original 38px** (one three-line straggler at 768).
+   **`max-w-[75%]` on the name group is a safety valve, not a working limit** —
+   the widest name group is 430px, which is 57% of the row at 768, the narrowest
+   width this is really used at. It cannot bite until about a 550px window, and
+   what it prevents is a pathologically long name pushing the label to nothing
+   and the par off the screen; the link keeps `truncate` as that failure, which
+   is the old behaviour and a graceful one.
+   **MEASURE A TITLE AS RENDERED, never with a probe span carrying only `font`.**
+   The name is `tracking-[0.06em]` and the `font` shorthand does NOT include
+   letter-spacing, so a probe reported 309px for a name that really occupies
+   390 — which is how the cap first got set to 60% with a three-point margin
+   against the real widest name.
    **THE ROW IS `items-end` NOW, NOT `items-baseline`**, which is the half worth
    understanding. Baseline is right while every child is one line and wrong the
    moment one is a paragraph: a flex item's baseline is its FIRST line, so the

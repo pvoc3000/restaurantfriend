@@ -1127,7 +1127,7 @@ export function OrderGuide({
                               last-purchase label following the name comes along
                               for free — "the whole inventory item line" — while
                               the ml-auto par marker stays pinned right. */}
-                          <span className="-ml-1.5 flex min-w-0 items-baseline gap-3">
+                          <span className="-ml-1.5 flex min-w-0 max-w-[75%] shrink-0 items-baseline gap-3">
                             {/* The day's other sources for THIS item, without
                                 leaving Favorites (see applyExpansions).
 
@@ -1201,30 +1201,59 @@ export function OrderGuide({
                               times faster than the item name — a vendor
                               description is arbitrary text.
 
-                              NARROW AND SEVERAL LINES DEEP, NOT ONE LONG ONE
-                              (Mark, 2026-08-31: it "takes up too much space and
-                              causes the inventory item to get truncated…
-                              especially on tablets"). Measured at 820, the
-                              portrait iPad this is walked on: the label was
-                              taking ~420px of a 768px row and the item NAME —
-                              the thing you scan for down the walk — was reading
-                              "COCOA POWDER, DUT…". One line meant its width was
-                              set by the longest vendor description in the
-                              catalog, which is arbitrary text nobody chose.
-                              Capped at 12rem it wraps instead: two lines for
-                              most, three for the longest, and the name gets
-                              every pixel it gives up.
+                              THE NAME TAKES WHAT IT NEEDS AND THIS TAKES THE
+                              REST (Mark, 2026-08-31, in two passes). First: the
+                              label "takes up too much space and causes the
+                              inventory item to get truncated… especially on
+                              tablets" — measured at 820, the portrait iPad this
+                              is walked on, it was taking ~420px of a 768px row
+                              and the item NAME, the thing you scan for down the
+                              walk, read "COCOA POWDER, DUT…". As one `truncate`
+                              line its width was set by the longest VENDOR
+                              DESCRIPTION in the catalog, which is arbitrary text
+                              nobody chose, and it won.
+
+                              Then: "make the inventory item as wide as it needs
+                              to be, whatever that is, and use the remaining
+                              space on that line". So the name group is
+                              `shrink-0` at its natural width and this is
+                              `flex-1` — the leftover, whatever that is. A 12rem
+                              cap stood here in between and is gone; it was only
+                              ever a way of bounding the label without knowing
+                              what the name wanted.
+
+                              Measured over all 261 headers AS RENDERED: the
+                              widest name group is 430px ("Flour, Mix, Raised,
+                              Non-Vegan" plus the triangle), which is 57% of the
+                              row at 768 — the portrait iPad, and the narrowest
+                              width this is really used at. `max-w-[75%]` is
+                              therefore a safety valve rather than a working
+                              limit: it cannot bite until about a 550px window,
+                              and it is what stops a pathologically long name
+                              pushing the label to nothing and the par off the
+                              screen. The link keeps `truncate` as the failure
+                              when it does, which is the old behaviour and a
+                              graceful one.
+
+                              Measure this as RENDERED, never with a probe span
+                              carrying only `font`: the title is
+                              `tracking-[0.06em]` and the `font` shorthand does
+                              not include letter-spacing, so a probe reports
+                              309px for a name that really occupies 390 — which
+                              is how the cap first got set to 60% with a
+                              three-point margin.
 
                               `line-clamp-3` rather than a fourth line, because
                               past three the block is taller than the 22px title
                               it hangs off and starts to read as the row's
-                              content rather than its footnote.
+                              content rather than its footnote. With the row's
+                              full leftover most labels now fit on ONE.
 
                               Bottom alignment is the ROW's (`items-end`, see
                               there) rather than a `self-end` here, because the
                               par marker needs it too — its own bottom is what
                               the title is level with. */}
-                          <span className="line-clamp-3 min-w-0 max-w-[12rem] shrink-[3] text-[11px] leading-[1.25] tracking-[0.02em] text-muted">
+                          <span className="line-clamp-3 min-w-0 flex-1 text-[11px] leading-[1.25] tracking-[0.02em] text-muted">
                             {/* Suppressed entirely when the view is unreadable,
                                 because `lastPurchaseLabel` renders a missing
                                 row as "never ordered here" — true when the view
