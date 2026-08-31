@@ -5,7 +5,7 @@ import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { TaskKind } from "@/lib/facilityTasks";
 import { PHOTO_BUCKET, PHOTO_URL_TTL_SECONDS } from "@/lib/facilityPhotos";
 import { NewTask } from "./NewTask";
-import { TasksScreen, type TaskRow } from "./TasksScreen";
+import { TasksScreen, type Assignee, type TaskRow } from "./TasksScreen";
 
 /**
  * The server half of BOTH task screens.
@@ -36,7 +36,7 @@ export async function TasksPage({
       supabase
         .from("location_tasks")
         .select(
-          "id, kind, title, details, status, priority, target_shift, due_on, carry_forward, created_at, equipment_id, shop_section_id, source_run_item_id",
+          "id, kind, title, details, status, priority, target_shift, due_on, carry_forward, created_at, equipment_id, shop_section_id, source_run_item_id, assigned_to",
         )
         .eq("location_id", active.id)
         .eq("kind", kind)
@@ -54,12 +54,36 @@ export async function TasksPage({
         .order("sort_order"),
     ]);
 
+  // WHO A TASK CAN BE HANDED TO (079). `org_members`, not `employees`: a
+  // checklist is walked by somebody signed in, and 001's `members_read` shows
+  // every member of your own org, so this needs no definer function — unlike
+  // 053's `special_order_takers`, which exists because `employees` READ is
+  // owner/admin. A member with no `display_name` has been invited and has never
+  // signed in; they are still offered, named by their id's head, because
+  // withholding them would make the list quietly incomplete.
+  const { data: members } = await supabase
+    .from("org_members")
+    .select("user_id, display_name, role");
+
+  const assignees: Assignee[] = (members ?? [])
+    .filter((m) => canResolveTasks(m.role as never))
+    .map((m) => ({
+      user_id: m.user_id as string,
+      name:
+        (m.display_name as string | null)?.trim() ||
+        `Member ${(m.user_id as string).slice(0, 8)}`,
+    }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+
   if (error) {
     return (
       <p className="max-w-[72ch] text-sm text-accent">
         Could not load them: {error.message}
-        {error.message.includes("location_tasks") &&
-          " — migration 075 has not been applied yet."}
+        {/assigned_to/.test(error.message)
+          ? " — migration 079 has not been applied yet."
+          : error.message.includes("location_tasks")
+            ? " — migration 075 has not been applied yet."
+            : null}
       </p>
     );
   }
@@ -128,6 +152,7 @@ export async function TasksPage({
       ? (sectionName.get(t.shop_section_id as string) ?? null)
       : null,
     from_walk: t.source_run_item_id != null,
+    assigned_to: (t.assigned_to as string | null) ?? null,
     photos: photosByTask.get(t.id as string) ?? [],
   }));
 
@@ -173,6 +198,7 @@ export async function TasksPage({
             locationId={active.id}
             equipment={equipmentOptions}
             sections={sectionOptions}
+            assignees={assignees}
           />
         )}
       </div>
@@ -190,6 +216,7 @@ export async function TasksPage({
           id: s.id,
           display_name: s.display_name,
         }))}
+        assignees={assignees}
         openRowKey={openRowKey}
       />
     </div>

@@ -11,6 +11,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { BOXED_FIELD, BOXED_FIELDS, FORM_TEXTAREA } from "@/components/ui/fieldMetrics";
 import { SHIFT_SLOT_LABEL, SHIFT_SLOT_OPTIONS } from "@/lib/employeeEvents";
 import { TASK_PRIORITY_LABEL, type TaskKind, type TaskPriority } from "@/lib/facilityTasks";
+import type { Assignee } from "./TasksScreen";
 
 /**
  * File a task by hand — the third door into the table, beside a checklist issue
@@ -22,12 +23,14 @@ export function NewTask({
   locationId,
   equipment,
   sections,
+  assignees,
 }: {
   kind: TaskKind;
   orgId: string;
   locationId: string;
   equipment: { id: string; name: string; shop_section_id: string | null }[];
   sections: { id: string; display_name: string }[];
+  assignees: Assignee[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -45,6 +48,10 @@ export function NewTask({
   // `createSpecialOrder` seeding a contact: filled once, never slaved.
   const [sectionWasFilled, setSectionWasFilled] = useState(false);
   const [carry, setCarry] = useState(true);
+  // 079. Empty is the resting state and means anybody's, which is what most
+  // tasks are — so this is never required and never defaults to whoever is
+  // filing it: "I noticed this" and "I will do this" are different claims.
+  const [assignedTo, setAssignedTo] = useState("");
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
 
@@ -68,6 +75,7 @@ export function NewTask({
           equipment_id: equipmentId || null,
           shop_section_id: sectionId || null,
           carry_forward: carry,
+          assigned_to: assignedTo || null,
           created_by: uid,
         })
         .select("id");
@@ -78,6 +86,7 @@ export function NewTask({
       setOpen(false);
       setTitle("");
       setDetails("");
+      setAssignedTo("");
       router.refresh();
     });
   }
@@ -183,6 +192,33 @@ export function NewTask({
                   onPick={setShift}
                 />
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                Assigned to
+              </span>
+              <PickList
+                variant="field"
+                value={assignedTo}
+                ariaLabel="Assigned to"
+                boxed={BOXED_FIELDS}
+                className={field}
+                options={[
+                  { value: "", label: "Anybody" },
+                  ...assignees.map((a) => ({ value: a.user_id, label: a.name })),
+                ]}
+                onPick={setAssignedTo}
+              />
+              {assignedTo && carry ? (
+                // Said where the decision is made, because it is not obvious
+                // from the two controls: assigning NARROWS the carry-forward
+                // rather than adding to it, so a job handed to one person stops
+                // appearing in front of everybody else.
+                <p className="text-[12px] text-muted">
+                  It will appear on their checklist only.
+                </p>
+              ) : null}
             </div>
 
             <div className="grid grid-cols-2 gap-4">

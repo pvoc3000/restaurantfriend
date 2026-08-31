@@ -15,7 +15,13 @@ import {
 import { taskAgeLabel, taskTone, type CarryableTask } from "@/lib/facilityTasks";
 import { WalkItem, type WalkItemRow } from "./WalkItem";
 
-export type WalkTask = CarryableTask & { title: string; details: string | null };
+export type WalkTask = CarryableTask & {
+  title: string;
+  details: string | null;
+  /** 079, resolved by `loadChecklistRun`: whose it is, in words, or null when
+   *  it is anybody's. Only ever set when that is worth saying — see there. */
+  assigned_label?: string | null;
+};
 
 /**
  * THE WALK — one scrolling document, black shop-section bands, big targets, and
@@ -38,6 +44,7 @@ export function ChecklistWalk({
   locationId,
   items,
   tasks,
+  taskWarning = null,
   today,
   editable,
   isOpen,
@@ -48,6 +55,9 @@ export function ChecklistWalk({
   locationId: string;
   items: WalkItemRow[];
   tasks: WalkTask[];
+  /** Set when the carried-over band could not be read — see `loadChecklistRun`.
+   *  An empty band would otherwise assert that nothing is outstanding. */
+  taskWarning?: string | null;
   today: string;
   editable: boolean;
   /** A submitted run is a document: it reads, it does not write. */
@@ -147,6 +157,12 @@ export function ChecklistWalk({
           Carried-forward tasks band the TOP of the walk, which is the order
           guide's `GuideBand` idiom and its reason: you read this before you
           start, which is when it can still change what you do. */}
+      {taskWarning && (
+        <p className="text-sm">
+          <span className="bg-mark-fill px-1">{taskWarning}</span>
+        </p>
+      )}
+
       {tasks.length > 0 && (
         <section className="border-2 border-hairline p-3">
           <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
@@ -191,6 +207,14 @@ export function ChecklistWalk({
                         }`}
                       >
                         {age}
+                      </span>
+                    )}
+                    {t.assigned_label && (
+                      // Plain ink, not a mark: whose a job is is context, not a
+                      // warning, and spending the mark colour here would put it
+                      // beside the age chip that has actually earned it.
+                      <span className="ml-2 text-[12px] text-muted">
+                        {t.assigned_label}
                       </span>
                     )}
                   </span>

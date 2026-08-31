@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { PHOTO_BUCKET, PHOTO_URL_TTL_SECONDS } from "./facilityPhotos";
-import { openTasksForRun } from "./facilityTasks";
+import { assignmentIsOrphaned, openTasksForRun } from "./facilityTasks";
 import type { WalkItemRow } from "@/components/checklists/WalkItem";
 import type { WalkTask } from "@/components/checklists/ChecklistWalk";
 
@@ -34,11 +34,34 @@ export type ChecklistRunData = {
   };
   items: WalkItemRow[];
   tasks: WalkTask[];
+  /**
+   * Why the carried-over band cannot be trusted, or null.
+   *
+   * The tasks query is deliberately NOT folded into this loader's own `error`:
+   * a failure there must not blank a walk whose ITEMS are the point. But it
+   * must not be swallowed either — an empty band asserts that nothing is
+   * outstanding at this shop, and that is the one claim the carry-forward
+   * exists to make. `PlanDetail`'s rule for an unapplied migration, applied to
+   * a band rather than a matrix.
+   */
+  taskWarning: string | null;
 };
 
 export async function loadChecklistRun(
   supabase: SupabaseClient,
   runId: string,
+  /**
+   * WHO IS LOOKING. 079: an assigned task appears on that person's checklist
+   * and nobody else's, so the carried-task band depends on the reader.
+   *
+   * The VIEWER, deliberately, not the run's `started_by`: the band is derived
+   * live rather than snapshotted (it is the shop's open tasks right now, not
+   * part of the submitted document), and "my checklist" means the list in front
+   * of me. Nothing downstream depends on it either — the emailed report's
+   * checklist section is built from `checklist_run_items`, so what a reader
+   * sees here cannot change what anybody is sent.
+   */
+  viewerId: string | null,
 ): Promise<{ data: ChecklistRunData | null; error: string | null }> {
   const { data: run, error } = await supabase
     .from("checklist_runs")
@@ -67,7 +90,12 @@ export async function loadChecklistRun(
 
   const itemIds = (items ?? []).map((i) => i.id as string);
 
-  const [{ data: photos }, { data: equipment }, { data: tasks }] = await Promise.all([
+  const [
+    { data: photos },
+    { data: equipment },
+    { data: tasks, error: tasksError },
+    { data: members },
+  ] = await Promise.all([
     itemIds.length === 0
       ? Promise.resolve({ data: [] as { id: string; run_item_id: string; storage_path: string }[] })
       : supabase
@@ -81,10 +109,18 @@ export async function loadChecklistRun(
     supabase
       .from("location_tasks")
       .select(
-        "id, title, details, status, carry_forward, target_shift, due_on, created_at, priority",
+        "id, title, details, status, carry_forward, target_shift, due_on, created_at, priority, assigned_to",
       )
       .eq("location_id", run.location_id as string)
       .in("status", ["open", "in_progress"]),
+    // The roster, for TWO reasons and both are 079's: it names the assignee on
+    // a row, and it is what tells an assignment to somebody who has LEFT from
+    // one to somebody who is simply not you. Revoking access bans an auth user
+    // rather than deleting it, so the column outlives the login — and without
+    // this set those tasks would drop off every checklist in the shop with
+    // nothing to see. 001's `members_read` shows every member of your own org,
+    // so this needs no definer function.
+    supabase.from("org_members").select("user_id, display_name"),
   ]);
 
   // Signed URLs are minted SERVER-SIDE in ONE batch — one round trip instead of
@@ -139,23 +175,57 @@ export async function loadChecklistRun(
     scored: run.kind === "walkthrough",
   }));
 
+  const memberName = new Map<string, string | null>(
+    (members ?? []).map((m) => [
+      m.user_id as string,
+      (m.display_name as string | null) ?? null,
+    ]),
+  );
+  const memberIds = new Set(memberName.keys());
+
   const carried = openTasksForRun(
-    (tasks ?? []).map((t) => ({
-      id: t.id as string,
-      title: t.title as string,
-      details: (t.details as string | null) ?? null,
-      status: t.status as WalkTask["status"],
-      carry_forward: t.carry_forward as boolean,
-      target_shift: (t.target_shift as string | null) ?? null,
-      due_on: (t.due_on as string | null) ?? null,
-      created_at: t.created_at as string,
-      priority: t.priority as WalkTask["priority"],
-    })),
+    (tasks ?? []).map((t) => {
+      const assigned = (t.assigned_to as string | null) ?? null;
+      return {
+        id: t.id as string,
+        title: t.title as string,
+        details: (t.details as string | null) ?? null,
+        status: t.status as WalkTask["status"],
+        carry_forward: t.carry_forward as boolean,
+        target_shift: (t.target_shift as string | null) ?? null,
+        due_on: (t.due_on as string | null) ?? null,
+        created_at: t.created_at as string,
+        priority: t.priority as WalkTask["priority"],
+        assigned_to: assigned,
+        // Named only when it is somebody ELSE's doing — a row on your own
+        // checklist saying "assigned to you" is the screen telling you where
+        // you are standing. The orphan says so instead, because "this was
+        // Karina's and Karina has gone" is why it is in front of you at all.
+        assigned_label: assigned
+          ? assignmentIsOrphaned({ assigned_to: assigned }, memberIds)
+            ? "was assigned to somebody who has left"
+            : assigned === viewerId
+              ? "yours"
+              : (memberName.get(assigned) ?? "assigned")
+          : null,
+      };
+    }),
     (run.shift as WalkTask["target_shift"]) as never,
+    { viewerId, memberIds },
   );
 
   return {
-    data: { run: run as ChecklistRunData["run"], items: rows, tasks: carried },
+    data: {
+      run: run as ChecklistRunData["run"],
+      items: rows,
+      tasks: carried,
+      taskWarning: tasksError
+        ? `Carried-over tasks could not be read: ${tasksError.message}` +
+          (/assigned_to/.test(tasksError.message)
+            ? " — migration 079 has not been applied yet."
+            : "")
+        : null,
+    },
     error: null,
   };
 }

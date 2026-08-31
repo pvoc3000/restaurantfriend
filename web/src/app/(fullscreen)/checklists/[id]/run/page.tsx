@@ -23,7 +23,7 @@ export default async function ChecklistRunPage({
   const session = await getAppSession();
   const supabase = await createClient();
 
-  const { data, error } = await loadChecklistRun(supabase, id);
+  const { data, error } = await loadChecklistRun(supabase, id, session.userId);
 
   if (error) {
     return (
@@ -38,7 +38,7 @@ export default async function ChecklistRunPage({
   }
   if (!data) notFound();
 
-  const { run, items, tasks } = data;
+  const { run, items, tasks, taskWarning } = data;
   const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
   const locationCode =
     session.locations.find((l) => l.id === run.location_id)?.code ?? "";
@@ -48,6 +48,7 @@ export default async function ChecklistRunPage({
       run={run}
       items={items}
       tasks={tasks}
+      taskWarning={taskWarning}
       today={today}
       locationCode={locationCode}
       orgId={session.membership.org_id}

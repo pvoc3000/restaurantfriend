@@ -39,8 +39,14 @@ export type TaskRow = {
   shop_section_id: string | null;
   section_name: string | null;
   from_walk: boolean;
+  /** 079 — an `org_members.user_id`, or null for anybody. */
+  assigned_to: string | null;
   photos: TaskPhoto[];
 };
+
+/** Somebody a task can be handed to: an app user, because a checklist is walked
+ *  by somebody signed in. See 079's header. */
+export type Assignee = { user_id: string; name: string };
 
 /**
  * Tasks and maintenance requests — ONE table, two screens, told apart by `kind`.
@@ -59,6 +65,7 @@ export function TasksScreen({
   editable,
   equipment,
   sections,
+  assignees,
   openRowKey,
 }: {
   rows: TaskRow[];
@@ -69,6 +76,7 @@ export function TasksScreen({
   editable: boolean;
   equipment: { id: string; name: string }[];
   sections: { id: string; display_name: string }[];
+  assignees: Assignee[];
   openRowKey?: string;
 }) {
   const router = useRouter();
@@ -86,6 +94,11 @@ export function TasksScreen({
   const photosFor = photosForId ? (rows.find((r) => r.id === photosForId) ?? null) : null;
   const [, startTransition] = useTransition();
 
+  const assigneeName = useMemo(
+    () => new Map(assignees.map((a) => [a.user_id, a.name])),
+    [assignees],
+  );
+
   const searched = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
@@ -93,9 +106,10 @@ export function TasksScreen({
       (r) =>
         r.title.toLowerCase().includes(q) ||
         (r.details ?? "").toLowerCase().includes(q) ||
-        (r.equipment_name ?? "").toLowerCase().includes(q),
+        (r.equipment_name ?? "").toLowerCase().includes(q) ||
+        (assigneeName.get(r.assigned_to ?? "") ?? "").toLowerCase().includes(q),
     );
-  }, [rows, search]);
+  }, [rows, search, assigneeName]);
 
   const shown = useMemo(() => {
     if (tier === "all") return searched;
@@ -161,7 +175,7 @@ export function TasksScreen({
     {
       key: "title",
       label: kind === "maintenance" ? "What needs doing" : "Task",
-      width: 380,
+      width: 330,
       pinned: true,
       sortValue: (r) => r.title,
       render: (r) => (
@@ -241,7 +255,7 @@ export function TasksScreen({
     {
       key: "equipment",
       label: "About",
-      width: 200,
+      width: 180,
       hideWhenCompact: true,
       sortValue: (r) => r.equipment_name ?? "",
       render: (r) =>
@@ -265,7 +279,7 @@ export function TasksScreen({
     {
       key: "section",
       label: "Where",
-      width: 190,
+      width: 170,
       hideWhenCompact: true,
       sortValue: (r) => r.section_name ?? "",
       render: (r) =>
@@ -314,6 +328,35 @@ export function TasksScreen({
             {r.target_shift
               ? (SHIFT_SLOT_LABEL[r.target_shift as never] ?? r.target_shift)
               : "Any shift"}
+          </span>
+        ),
+    },
+    {
+      key: "assigned_to",
+      label: "Assigned",
+      width: 150,
+      // Sorted by the NAME, never the uuid — sorting by the raw column would
+      // group the rows by something the reader cannot see. Unassigned sinks
+      // last, which is `lib/tableSort`'s empty rule and the right one here:
+      // "anybody's" is the resting state, not a person.
+      sortValue: (r) => (r.assigned_to ? (assigneeName.get(r.assigned_to) ?? "") : ""),
+      render: (r) =>
+        editable ? (
+          <InlineValue
+            table="location_tasks"
+            id={r.id}
+            column="assigned_to"
+            value={r.assigned_to ?? ""}
+            kind="pick"
+            ariaLabel={`Who ${r.title} is for`}
+            options={[
+              { value: "", label: "Anybody" },
+              ...assignees.map((a) => ({ value: a.user_id, label: a.name })),
+            ]}
+          />
+        ) : (
+          <span className={READ_ONLY_VALUE}>
+            {r.assigned_to ? (assigneeName.get(r.assigned_to) ?? "Somebody") : "Anybody"}
           </span>
         ),
     },
@@ -435,7 +478,7 @@ export function TasksScreen({
         columns={columns}
         rowKey={(r) => r.id}
         compactBelow={1280}
-        storageKey={`rf.${kind === "maintenance" ? "maintenance" : "tasks"}.columnWidths.v1`}
+        storageKey={`rf.${kind === "maintenance" ? "maintenance" : "tasks"}.columnWidths.v2`}
         columnChooser
         openRowKey={openRowKey}
         defaultSort={{ key: "age" }}

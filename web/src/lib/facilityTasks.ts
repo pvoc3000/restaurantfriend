@@ -69,7 +69,61 @@ export type CarryableTask = {
   due_on: string | null;
   created_at: string;
   priority: TaskPriority;
+  /** 079. An app user (`org_members.user_id`), or null for anybody. */
+  assigned_to?: string | null;
 };
+
+/**
+ * Who is looking, and who still works here.
+ *
+ * `memberIds` is the org's CURRENT membership, and it is not bookkeeping: 079's
+ * column has no `on delete` clause because revoking access BANS an auth user
+ * rather than deleting it (4c), so an assignment outlives the person's login.
+ * Without this set, the day somebody leaves every task assigned to them stops
+ * appearing on any checklist at all — silently, which is the one failure this
+ * whole module is built to prevent. An orphaned assignment falls back to
+ * everybody.
+ *
+ * Omit it and no orphan check runs, which is the right behaviour for a caller
+ * that genuinely does not have the roster: an assigned task then simply belongs
+ * to its assignee.
+ */
+export type TaskViewer = {
+  /** The signed-in user, or null when nobody is (a printed sheet). */
+  viewerId: string | null;
+  memberIds?: ReadonlySet<string>;
+};
+
+/**
+ * Is this task in front of THIS person?
+ *
+ * Three answers, in order, and the order is the whole rule:
+ *   · unassigned  — anybody's, which is the resting state and most tasks.
+ *   · orphaned    — assigned to somebody who is no longer a member, so it goes
+ *                   back to being anybody's rather than disappearing.
+ *   · assigned    — theirs alone.
+ *
+ * A null viewer (nobody signed in) sees only the unassigned and the orphaned:
+ * "this is for Karina" is a true thing to leave off a sheet nobody's name is on.
+ */
+export function taskIsFor(
+  task: { assigned_to?: string | null },
+  viewer: TaskViewer,
+): boolean {
+  const to = task.assigned_to ?? null;
+  if (to === null) return true;
+  if (viewer.memberIds && !viewer.memberIds.has(to)) return true;
+  return to === viewer.viewerId;
+}
+
+/** Assigned to somebody who has left — the case `taskIsFor` reopens to all. */
+export function assignmentIsOrphaned(
+  task: { assigned_to?: string | null },
+  memberIds: ReadonlySet<string>,
+): boolean {
+  const to = task.assigned_to ?? null;
+  return to !== null && !memberIds.has(to);
+}
 
 /**
  * Which open tasks go in front of tonight's supervisor.
@@ -82,6 +136,9 @@ export type CarryableTask = {
  *   · TARGET SHIFT — "boil out the fryer before morning" is the closing shift's
  *     job and "call the linen company" is anybody's, so null means any and a
  *     named shift means only that one.
+ *   · ASSIGNMENT (079) — "when assigned they only appear on that person's
+ *     checklist". `taskIsFor` carries the orphan rule with it, which is why the
+ *     viewer is a whole object rather than an id.
  *
  * Order: the oldest first, because the point of the band is the thing that has
  * been ignored longest. Priority breaks ties — a high-priority job raised today
@@ -91,12 +148,18 @@ export type CarryableTask = {
 export function openTasksForRun<T extends CarryableTask>(
   tasks: T[],
   shift: ShiftSlot | null,
+  // REQUIRED, with no default. A default of "nobody" would hide every assigned
+  // task from a caller that simply forgot to pass one — silently, which is the
+  // failure this file exists to prevent. A compile error is the cheaper way to
+  // find out.
+  viewer: TaskViewer,
 ): T[] {
   const rank: Record<TaskPriority, number> = { high: 0, normal: 1, low: 2 };
   return tasks
     .filter((t) => isTaskOpen(t))
     .filter((t) => t.carry_forward)
     .filter((t) => !t.target_shift || !shift || t.target_shift === shift)
+    .filter((t) => taskIsFor(t, viewer))
     .sort((a, b) => {
       if (a.created_at !== b.created_at) return a.created_at < b.created_at ? -1 : 1;
       const r = rank[a.priority] - rank[b.priority];

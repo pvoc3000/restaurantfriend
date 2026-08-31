@@ -42,7 +42,7 @@ export default async function ChecklistRunRecordPage({
   const session = await getAppSession();
   const supabase = await createClient();
 
-  const { data, error } = await loadChecklistRun(supabase, id);
+  const { data, error } = await loadChecklistRun(supabase, id, session.userId);
 
   if (error) {
     return (

@@ -110,6 +110,7 @@ export function ChecklistPage({
         locationId={locationId}
         items={run.items}
         tasks={run.tasks}
+        taskWarning={run.taskWarning}
         today={today}
         editable={editable}
         isOpen={run.run.status === "open"}

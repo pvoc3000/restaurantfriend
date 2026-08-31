@@ -22,8 +22,10 @@ import {
   daysBetween,
   isTaskOpen,
   issueAlreadyRaised,
+  assignmentIsOrphaned,
   openTasksForRun,
   staleTaskBanner,
+  taskIsFor,
   taskAge,
   taskAgeLabel,
   taskTitleFromIssue,
@@ -41,6 +43,9 @@ const task = (over: Partial<CarryableTask> = {}): CarryableTask => ({
   priority: "normal",
   ...over,
 });
+
+/** Nobody in particular is walking — the shape every pre-079 case assumed. */
+const ANYBODY = { viewerId: "karina", memberIds: new Set(["karina", "levi"]) };
 
 // ---------------------------------------------------------------------------
 // Open
@@ -65,7 +70,7 @@ test("openTasksForRun: only open, carried-forward tasks appear", () => {
     task({ id: "cancelled", status: "cancelled" }),
     task({ id: "not-carried", carry_forward: false }),
   ];
-  eq(openTasksForRun(tasks, "closing").map((t) => t.id), ["open"]);
+  eq(openTasksForRun(tasks, "closing", ANYBODY).map((t) => t.id), ["open"]);
 });
 
 test("openTasksForRun: a task aimed at CLOSING does not appear on the opening list", () => {
@@ -73,14 +78,14 @@ test("openTasksForRun: a task aimed at CLOSING does not appear on the opening li
     task({ id: "any", target_shift: null }),
     task({ id: "closing-only", target_shift: "closing" }),
   ];
-  eq(openTasksForRun(tasks, "closing").map((t) => t.id).sort(), ["any", "closing-only"]);
-  eq(openTasksForRun(tasks, "opening").map((t) => t.id), ["any"]);
+  eq(openTasksForRun(tasks, "closing", ANYBODY).map((t) => t.id).sort(), ["any", "closing-only"]);
+  eq(openTasksForRun(tasks, "opening", ANYBODY).map((t) => t.id), ["any"]);
 });
 
 test("openTasksForRun: a run with NO shift sees everything", () => {
   // A walkthrough has no shift, and it should still show the backlog.
   const tasks = [task({ id: "a", target_shift: "closing" }), task({ id: "b" })];
-  eq(openTasksForRun(tasks, null).map((t) => t.id).sort(), ["a", "b"]);
+  eq(openTasksForRun(tasks, null, ANYBODY).map((t) => t.id).sort(), ["a", "b"]);
 });
 
 test("openTasksForRun: OLDEST first — the point of the band is what's been ignored longest", () => {
@@ -89,7 +94,7 @@ test("openTasksForRun: OLDEST first — the point of the band is what's been ign
     task({ id: "old", created_at: "2026-08-20" }),
     task({ id: "mid", created_at: "2026-08-24" }),
   ];
-  eq(openTasksForRun(tasks, "closing").map((t) => t.id), ["old", "mid", "new"]);
+  eq(openTasksForRun(tasks, "closing", ANYBODY).map((t) => t.id), ["old", "mid", "new"]);
 });
 
 test("openTasksForRun: priority breaks a tie, and only a tie", () => {
@@ -99,7 +104,7 @@ test("openTasksForRun: priority breaks a tie, and only a tie", () => {
     task({ id: "low-old", created_at: "2026-08-20", priority: "low" }),
   ];
   // Age wins over priority; within one day, high leads.
-  eq(openTasksForRun(tasks, "closing").map((t) => t.id), [
+  eq(openTasksForRun(tasks, "closing", ANYBODY).map((t) => t.id), [
     "low-old",
     "high-today",
     "low-today",
@@ -194,4 +199,97 @@ test("taskTitleFromIssue reads as a job, not a fragment", () => {
 test("issueAlreadyRaised stops three supervisors filing three tasks", () => {
   no(issueAlreadyRaised({ task_id: null }));
   ok(issueAlreadyRaised({ task_id: "abc" }));
+});
+
+// ---------------------------------------------------------------------------
+// Assignment (079)
+// ---------------------------------------------------------------------------
+
+test("taskIsFor: unassigned is everybody's", () => {
+  const members = new Set(["karina", "levi"]);
+  ok(taskIsFor({ assigned_to: null }, { viewerId: "karina", memberIds: members }));
+  ok(taskIsFor({}, { viewerId: "karina", memberIds: members }), "absent reads as null");
+  ok(taskIsFor({ assigned_to: null }, { viewerId: null, memberIds: members }));
+});
+
+test("taskIsFor: an assigned task is that person's and nobody else's", () => {
+  const members = new Set(["karina", "levi"]);
+  ok(taskIsFor({ assigned_to: "karina" }, { viewerId: "karina", memberIds: members }));
+  no(taskIsFor({ assigned_to: "karina" }, { viewerId: "levi", memberIds: members }));
+  no(
+    taskIsFor({ assigned_to: "karina" }, { viewerId: null, memberIds: members }),
+    "nobody signed in is not everybody"
+  );
+});
+
+test("taskIsFor: an assignment to somebody who has LEFT goes back to everybody", () => {
+  // 079 has no `on delete` clause because revoking access BANS an auth user
+  // rather than deleting it — so without this rule every task assigned to a
+  // leaver drops off every checklist in the shop, silently. This is the single
+  // most important case in this file.
+  const members = new Set(["karina", "levi"]);
+  ok(taskIsFor({ assigned_to: "departed" }, { viewerId: "karina", memberIds: members }));
+  ok(taskIsFor({ assigned_to: "departed" }, { viewerId: "levi", memberIds: members }));
+  ok(taskIsFor({ assigned_to: "departed" }, { viewerId: null, memberIds: members }));
+});
+
+test("taskIsFor: with NO roster, an assignment is simply its assignee's", () => {
+  // A caller that genuinely has no membership list cannot tell a leaver from a
+  // colleague, and must not guess in either direction.
+  ok(taskIsFor({ assigned_to: "karina" }, { viewerId: "karina" }));
+  no(taskIsFor({ assigned_to: "karina" }, { viewerId: "levi" }));
+});
+
+test("assignmentIsOrphaned: only an assignment, and only to a non-member", () => {
+  const members = new Set(["karina"]);
+  no(assignmentIsOrphaned({ assigned_to: null }, members));
+  no(assignmentIsOrphaned({ assigned_to: "karina" }, members));
+  ok(assignmentIsOrphaned({ assigned_to: "departed" }, members));
+});
+
+test("openTasksForRun: an assigned task appears on that person's checklist only", () => {
+  const tasks = [
+    task({ id: "anybody" }),
+    task({ id: "karinas", assigned_to: "karina" }),
+    task({ id: "levis", assigned_to: "levi" }),
+  ];
+  const members = new Set(["karina", "levi"]);
+  eq(
+    openTasksForRun(tasks, "closing", { viewerId: "karina", memberIds: members })
+      .map((t) => t.id)
+      .sort(),
+    ["anybody", "karinas"]
+  );
+  eq(
+    openTasksForRun(tasks, "closing", { viewerId: "levi", memberIds: members })
+      .map((t) => t.id)
+      .sort(),
+    ["anybody", "levis"]
+  );
+});
+
+test("openTasksForRun: assignment NARROWS, it does not reorder", () => {
+  // Age still decides. An assignment is a filter, not a promotion.
+  const tasks = [
+    task({ id: "new-mine", created_at: "2026-08-28", assigned_to: "karina" }),
+    task({ id: "old-anybody", created_at: "2026-08-20" }),
+  ];
+  eq(
+    openTasksForRun(tasks, "closing", {
+      viewerId: "karina",
+      memberIds: new Set(["karina"]),
+    }).map((t) => t.id),
+    ["old-anybody", "new-mine"]
+  );
+});
+
+test("openTasksForRun: a leaver's task still reaches tonight's supervisor", () => {
+  const tasks = [task({ id: "orphan", assigned_to: "departed" })];
+  eq(
+    openTasksForRun(tasks, "closing", {
+      viewerId: "karina",
+      memberIds: new Set(["karina"]),
+    }).map((t) => t.id),
+    ["orphan"]
+  );
 });

@@ -160,7 +160,7 @@ export default async function RunShiftReportPage({
     shift,
   );
 
-  const walk = linkedRun ? await loadChecklistRun(supabase, linkedRun.id as string) : null;
+  const walk = linkedRun ? await loadChecklistRun(supabase, linkedRun.id as string, session.userId) : null;
   const walkItems = walk?.data?.items ?? [];
 
   // ONE object, two consumers. `finished` and "not started" are each one

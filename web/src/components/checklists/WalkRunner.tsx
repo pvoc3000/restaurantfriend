@@ -40,6 +40,7 @@ export function WalkRunner({
   run,
   items,
   tasks,
+  taskWarning,
   today,
   locationCode,
   orgId,
@@ -48,6 +49,7 @@ export function WalkRunner({
   run: ChecklistRunData["run"];
   items: WalkItemRow[];
   tasks: WalkTask[];
+  taskWarning: string | null;
   today: string;
   locationCode: string;
   orgId: string;
@@ -112,6 +114,7 @@ export function WalkRunner({
           locationId={run.location_id}
           items={items}
           tasks={tasks}
+          taskWarning={taskWarning}
           today={today}
           editable={editable}
           isOpen={isOpen}
