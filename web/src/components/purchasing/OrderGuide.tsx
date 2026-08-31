@@ -1252,8 +1252,37 @@ export function OrderGuide({
                               Bottom alignment is the ROW's (`items-end`, see
                               there) rather than a `self-end` here, because the
                               par marker needs it too — its own bottom is what
-                              the title is level with. */}
-                          <span className="line-clamp-3 min-w-0 flex-1 text-[11px] leading-[1.25] tracking-[0.02em] text-muted">
+                              the title is level with.
+
+                              `bottom-[2.75px]` IS THE DIFFERENCE BETWEEN
+                              ALIGNING BOXES AND ALIGNING TEXT (Mark, 2026-08-31: "the
+                              bottoms… don't appear to be aligned"). `items-end`
+                              levels the BOXES, and a line box carries descender
+                              space below its baseline in proportion to its font
+                              size — so at 22px against 11px the two baselines
+                              came out 2.75px apart while their boxes were level
+                              to half a pixel. Measured, not guessed: both line
+                              heights are 1.25, so the space below each baseline
+                              is F × (1.25 − ascent − descent) / 2 + F × descent,
+                              which is simply proportional to F, and the gap is
+                              (22 − 11) × 0.25. **Re-measure it if either font
+                              size or either line-height moves** — put a
+                              zero-sized inline-block at the end of each and
+                              compare its bottom, which is the baseline.
+
+                              A RELATIVE OFFSET, not a margin: a margin is
+                              layout, so on the rows where this block wraps it
+                              made the row 2px taller for a purely optical
+                              correction. `relative` moves the paint and leaves
+                              the box where it was, so every row keeps the
+                              height it had.
+
+                              `align-self: last baseline` is what this means and
+                              is not used: at the Safari 16.4 floor its fallback
+                              behaviour and its baseline-group semantics beside
+                              an `items-end` sibling are not something that can
+                              be verified from here. */}
+                          <span className="relative bottom-[2.75px] line-clamp-3 min-w-0 flex-1 text-[11px] leading-[1.25] tracking-[0.02em] text-muted">
                             {/* Suppressed entirely when the view is unreadable,
                                 because `lastPurchaseLabel` renders a missing
                                 row as "never ordered here" — true when the view

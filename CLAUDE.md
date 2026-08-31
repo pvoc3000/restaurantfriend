@@ -319,6 +319,23 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    what it prevents is a pathologically long name pushing the label to nothing
    and the par off the screen; the link keeps `truncate` as that failure, which
    is the old behaviour and a graceful one.
+   **`items-end` LEVELS BOXES, NOT TEXT — the label carries
+   `relative bottom-[2.75px]`** (Mark, 2026-08-31: "the bottoms… don't appear to
+   be aligned"). A line box holds descender space below its baseline in
+   proportion to its font size, so at 22px against 11px the two BASELINES sat
+   2.75px apart while their BOXES were level to half a pixel — which is why the
+   earlier "261 of 261 bottoms level" passed and the screen still looked wrong.
+   That check measured `getBoundingClientRect().bottom`; **measure the baseline
+   instead, by appending a zero-sized `inline-block` and reading its bottom.**
+   Both line-heights are 1.25, so the space below each baseline is proportional
+   to the font size and the gap is exactly `(22 − 11) × 0.25`. Re-measure it if
+   either size or either line-height moves.
+   A RELATIVE OFFSET, not a margin: a margin is layout, so on the rows where the
+   block wraps it made the row 2px taller for a purely optical correction.
+   Verified 0.00px on all 261 headers at 768, 820 and 1280, with every row at
+   its original 38px. `align-self: last baseline` is what this means and is not
+   used — at the Safari 16.4 floor its fallback and its baseline-group semantics
+   beside an `items-end` sibling cannot be verified from here.
    **MEASURE A TITLE AS RENDERED, never with a probe span carrying only `font`.**
    The name is `tracking-[0.06em]` and the `font` shorthand does NOT include
    letter-spacing, so a probe reported 309px for a name that really occupies
