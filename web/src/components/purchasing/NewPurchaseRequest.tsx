@@ -3,6 +3,7 @@
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { FORM_TEXTAREA } from "@/components/ui/fieldMetrics";
 import {
   Dialog,
   DIALOG_CANCEL_CLASS,
@@ -192,7 +193,7 @@ export function NewPurchaseRequest({
                 disabled={pending}
                 onChange={(e) => setText(e.target.value)}
                 placeholder="The big rainbow sprinkles"
-                className="w-full border border-ink bg-white px-2 py-1 text-sm outline-none focus:border-2"
+                className={FORM_TEXTAREA}
               />
             </Field>
 
@@ -208,7 +209,7 @@ export function NewPurchaseRequest({
                 disabled={pending}
                 onChange={(e) => setDetails(e.target.value)}
                 placeholder="The ones we use on the Bacon Maple, not the little ones. Saturday is busy."
-                className="w-full border border-ink bg-white px-2 py-1 text-sm outline-none focus:border-2"
+                className={FORM_TEXTAREA}
               />
             </Field>
 

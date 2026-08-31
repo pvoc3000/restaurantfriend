@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { FORM_TEXTAREA } from "@/components/ui/fieldMetrics";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_DANGER_CLASS } from "@/components/ui/Dialog";
 
 /**
@@ -90,7 +91,7 @@ export function ResolveTask({
             rows={3}
             autoFocus
             aria-label="Why this task is being cancelled"
-            className="w-full border border-ink bg-white px-2 py-1 text-sm outline-none focus:border-2"
+            className={FORM_TEXTAREA}
           />
         </label>
         {failed && <p className="text-sm text-accent">{failed}</p>}

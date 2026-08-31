@@ -3,6 +3,7 @@
 import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { FORM_TEXTAREA } from "@/components/ui/fieldMetrics";
 import {
   Dialog,
   DIALOG_CANCEL_CLASS,
@@ -276,7 +277,7 @@ export function RequestActions({
                       ? "Duplicate — already asked"
                       : "We're switching brands, don't reorder"
                 }
-                className="w-full border border-ink bg-white px-2 py-1 text-sm outline-none focus:border-2"
+                className={FORM_TEXTAREA}
               />
             </Field>
 

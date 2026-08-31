@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
+import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { MenuButton } from "@/components/ui/MenuButton";
@@ -416,7 +417,7 @@ export function SendDocument({
                 rows={12}
                 disabled={busy !== null}
                 onChange={(e) => setCompose({ ...compose, body: e.target.value })}
-                className="border border-ink bg-white px-2 py-1 outline-none focus:border-2"
+                className={FORM_FIELD_DRESS}
               />
             </div>
 

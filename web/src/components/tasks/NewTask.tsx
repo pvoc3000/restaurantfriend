@@ -8,7 +8,7 @@ import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
 import { Checkbox } from "@/components/ui/Checkbox";
-import { BOXED_FIELD, BOXED_FIELDS } from "@/components/ui/fieldMetrics";
+import { BOXED_FIELD, BOXED_FIELDS, FORM_TEXTAREA } from "@/components/ui/fieldMetrics";
 import { SHIFT_SLOT_LABEL, SHIFT_SLOT_OPTIONS } from "@/lib/employeeEvents";
 import { TASK_PRIORITY_LABEL, type TaskKind, type TaskPriority } from "@/lib/facilityTasks";
 
@@ -141,7 +141,7 @@ export function NewTask({
                 onChange={(e) => setDetails(e.target.value)}
                 rows={3}
                 aria-label="Details"
-                className="w-full border border-ink bg-white px-2 py-1 text-sm outline-none focus:border-2"
+                className={FORM_TEXTAREA}
               />
             </label>
 

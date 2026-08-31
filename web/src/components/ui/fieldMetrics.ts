@@ -120,3 +120,41 @@ export const EMPTY_FIELD_DASH = "—";
 export function fieldPlaceholder(placeholder: string, boxed: boolean): string {
   return boxed && placeholder === EMPTY_FIELD_DASH ? "" : placeholder;
 }
+
+/**
+ * THE DRESS A FORM FIELD IN A DIALOG WEARS — border, ground, focus, padding.
+ *
+ * Extracted 2026-08-30 because it had already drifted once and the drift was
+ * visible: `NewTask` and `ResolveTask` wrote `border-hairline` where every
+ * field beside them was `border-ink`, so the Details box on the new maintenance
+ * request read as disabled (Mark: "most fields have black borders, details is
+ * grey"). Seven call sites had typed the same string by hand; two of them had
+ * typed it wrong.
+ *
+ * IT CARRIES THE COLOURS ON PURPOSE, which is the opposite of the rule a
+ * white-on-white Finish button taught the same week ("a shared class string
+ * states layout; each caller states its own colours"). That rule is about a
+ * constant whose colour a caller must be able to OVERRIDE — and it cannot, since
+ * Tailwind resolves competing utilities by stylesheet order rather than
+ * class-string order. Here the colours are exactly what must never vary, and
+ * nothing overrides them. The corollary of the same fact still binds: **the
+ * padding here cannot be overridden either**, so a field that genuinely wants
+ * different padding writes its own dress rather than composing from this one.
+ * The public pages do — `/inquiry`, `/welcome`, `/q/[token]` and `/login` are
+ * `px-3` at `text-[16px]`, the threshold below which iOS Safari zooms the page
+ * on focus, and they are a different surface with a different reason.
+ *
+ * It deliberately sets NO width and NO font size. The PO and special-order
+ * compose panels put their body in a label/field grid, which supplies the width
+ * and lets the field inherit 16px — a big writing surface for a message you are
+ * about to send, and not a thing to shrink by folding a `text-sm` in here.
+ */
+export const FORM_FIELD_DRESS =
+  "border border-ink bg-white px-2 py-1 outline-none focus:border-2";
+
+/**
+ * The ordinary multiline field in a create dialog: the dress, filling its
+ * track, at the app's 14px form size. Five call sites and byte-identical
+ * across all of them, which is what makes it a constant rather than a pattern.
+ */
+export const FORM_TEXTAREA = `w-full ${FORM_FIELD_DRESS} text-sm`;

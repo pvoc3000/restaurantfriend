@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
 import { TextInput } from "@/components/ui/TextInput";
 import {
   Dialog,
@@ -430,7 +431,7 @@ export function ProcessPo({
               rows={7}
               disabled={busy !== null}
               onChange={(e) => setCompose({ ...compose, body: e.target.value })}
-              className="border border-ink bg-white px-2 py-1 outline-none focus:border-2"
+              className={FORM_FIELD_DRESS}
             />
           </div>
 
