@@ -21,7 +21,6 @@ import {
   type TaskPriority,
   type TaskStatus,
 } from "@/lib/facilityTasks";
-import { NewTask } from "./NewTask";
 import { ResolveTask } from "./ResolveTask";
 
 export type TaskRow = {
@@ -56,7 +55,6 @@ export function TasksScreen({
   kind,
   today,
   orgId,
-  locationId,
   locationCode,
   editable,
   equipment,
@@ -67,7 +65,6 @@ export function TasksScreen({
   kind: TaskKind;
   today: string;
   orgId: string;
-  locationId: string;
   locationCode: string;
   editable: boolean;
   equipment: { id: string; name: string }[];
@@ -185,7 +182,7 @@ export function TasksScreen({
             <span className="block text-[13px] text-muted">{r.details}</span>
           )}
           {r.from_walk && (
-            <span className="block text-[12px] text-muted">raised on a walk</span>
+            <span className="block text-[12px] text-muted">raised on a checklist</span>
           )}
         </span>
       ),
@@ -403,18 +400,6 @@ export function TasksScreen({
 
       {failed && <p className="text-sm text-accent">{failed}</p>}
 
-      {editable && (
-        <div className="flex justify-end">
-          <NewTask
-            kind={kind}
-            orgId={orgId}
-            locationId={locationId}
-            equipment={equipment}
-            sections={sections}
-          />
-        </div>
-      )}
-
       <div className="flex flex-wrap items-end gap-4">
         <div className="min-w-[16rem] flex-1">
           <TextInput
@@ -458,7 +443,7 @@ export function TasksScreen({
           <p className="max-w-[72ch] text-sm text-muted">
             {kind === "maintenance"
               ? `Nothing needs a vendor at ${locationCode}.`
-              : `Nothing outstanding at ${locationCode}. Flag something on a walk and it lands here.`}
+              : `Nothing outstanding at ${locationCode}. Flag something on a checklist and it lands here.`}
           </p>
         }
       />

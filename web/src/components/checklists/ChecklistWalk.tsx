@@ -41,6 +41,7 @@ export function ChecklistWalk({
   today,
   editable,
   isOpen,
+  noun = "checklist",
 }: {
   runId: string;
   orgId: string;
@@ -51,6 +52,12 @@ export function ChecklistWalk({
   editable: boolean;
   /** A submitted run is a document: it reads, it does not write. */
   isOpen: boolean;
+  /**
+   * What this record is CALLED, lowercase — `WalkRunner` reads it off the run's
+   * snapshotted `kind`, so an inspection log does not call itself a checklist.
+   * Defaults for the shift report's page, which only ever shows a checklist.
+   */
+  noun?: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -200,10 +207,10 @@ export function ChecklistWalk({
       {bands.length === 0 && (
         <p className="text-[16px] text-muted">
           {tier === "remaining"
-            ? "Nothing left on this list."
+            ? `Nothing left on this ${noun}.`
             : tier === "issues"
               ? "Nothing flagged."
-              : "This walk has no items."}
+              : `This ${noun} has no items.`}
         </p>
       )}
 

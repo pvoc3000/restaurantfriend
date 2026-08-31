@@ -252,7 +252,7 @@ export default async function ChecklistRunRecordPage({
           </div>
         ))}
         {items.length === 0 && (
-          <p className="text-sm text-muted">This walk has no items.</p>
+          <p className="text-sm text-muted">This checklist has no items.</p>
         )}
       </section>
 

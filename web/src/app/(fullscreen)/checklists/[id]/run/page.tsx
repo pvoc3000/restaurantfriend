@@ -29,7 +29,7 @@ export default async function ChecklistRunPage({
     return (
       <div className="p-8">
         <p className="max-w-[72ch] text-sm text-accent">
-          Could not open this walk: {error}
+          Could not open this checklist: {error}
           {/checklist_runs|facility_photos|location_tasks/.test(error) &&
             " — migrations 075–077 may not have been applied yet."}
         </p>

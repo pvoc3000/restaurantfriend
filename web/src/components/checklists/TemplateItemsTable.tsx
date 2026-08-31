@@ -485,7 +485,8 @@ export function TemplateItemsTable({
         empty={
           <p className="max-w-[72ch] text-sm text-muted">
             Nothing on this list yet. Items are grouped by shop section, so a
-            walk follows the same route through the building as the order guide.
+            checklist follows the same route through the building as the order
+            guide.
           </p>
         }
       />

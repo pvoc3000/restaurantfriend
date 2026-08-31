@@ -140,7 +140,7 @@ export function StartWalk({
         .single();
 
       if (runError || !run) {
-        setFailed(runError?.message ?? "The walk was not started.");
+        setFailed(runError?.message ?? `The ${noun} was not started.`);
         return;
       }
 
@@ -201,7 +201,7 @@ export function StartWalk({
           .select("id");
         if (itemsError || !written) {
           setFailed(
-            `The walk was started but its items were not: ${itemsError?.message ?? "no rows"}`,
+            `The ${noun} was started but its items were not: ${itemsError?.message ?? "no rows"}`,
           );
           return;
         }

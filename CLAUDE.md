@@ -5694,7 +5694,46 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the ROW MENU as well as the Expected cell because that column is
    `hideWhenCompact` at 1440 and so is absent on a 1280 laptop; the three
    transcribed typos corrected in the live rows AND the loader; and "walk"
-   removed from the last three visible strings it had survived in.
+   removed from the visible strings it had survived in.
+   **"WALK" IS GONE AS A NOUN, EVERYWHERE** (Mark, 2026-08-30, after asking for
+   a sweep): a full pass over the module — checklists, TASKS, equipment and the
+   shift report's checklist page, two independent passes so an apostrophe
+   swallowing a line in one could not hide it from both — found FIFTEEN
+   user-facing uses, and **four of them were on the Tasks screens**, which the
+   first sweep never opened. The twelve NOUNS are now "checklist"; the three
+   VERBS stay, because "what a supervisor walks at the end of a shift" is
+   ordinary English rather than a coined record type. `ChecklistWalk` gained a
+   `noun` prop for the two it needed, threaded from `WalkRunner`, which already
+   derives it from the run's snapshotted kind — so an inspection log does not
+   call itself a checklist. Component names, `canWalkChecklists` and the
+   `?view=walks` key are untouched and invisible; "Walkthrough" is the kind's
+   own label and "walk-in" is a fridge.
+   **THE CREATE COMMAND SITS BESIDE THE TITLE ON EVERY LIST IN THIS MODULE**
+   (Mark, 2026-08-30, naming `/maintenance-requests`, `/tasks` and `/equipment`
+   one after another). `/checklists` and `/inspection-logs` already did it; the
+   other three kept theirs in a `justify-end` row above the filters, where a
+   create command reads as one more filter. Moving them left three dead props
+   behind (`locationId` twice, `orgId` once), removed rather than left as
+   unreachable wiring.
+   **AND THE TASKS DIALOGS' TEXTAREAS WERE GREY** where every field beside them
+   was black (Mark, 2026-08-30: "most fields have black borders, details is
+   grey"). `NewTask` and `ResolveTask` were the only two form textareas in the
+   app dressed in `border-hairline` — `NewPurchaseRequest`, `RequestActions`,
+   `ProcessPo`, `SendDocument` and `InquiryForm` all use `border-ink`, which is
+   also what `TextInput` and `PickList variant="field"` sit at. A grey box next
+   to a black one reads as a disabled field. (The runner's and the shift
+   report's inputs keep `border-hairline hover:border-ink` — that is the
+   tablet-first dense dress, a different surface.)
+   **PICKING A PIECE OF EQUIPMENT FILLS IN WHERE IT STANDS** (Mark, same day).
+   `NewTask` takes `shop_section_id` on its equipment options now and fills the
+   Where field from it — but only when that field is EMPTY or holds a value the
+   dialog itself put there, tracked by `sectionWasFilled`. A section somebody
+   chose is never overwritten, while changing equipment does move one that was
+   autofilled; clearing the equipment leaves the section alone, since "where" is
+   still true of the job once it stops being about a particular machine.
+   `createSpecialOrder`'s seed-once-never-slave shape. Verified against Mark's
+   own equipment: Coffee Grinder → FOH, changing to 20 QT Mixer → Kitchen, then
+   Office chosen by hand → survives a change to Espresso Machine.
    **@react-pdf's BUNDLED HELVETICA IS WinAnsi AND EMITS NOTHING FOR A CHARACTER
    IT CANNOT PLACE** — no box, no question mark. `expected 34–40 °F` printed as
    **"expected 3440 °F"**, which does not lose the range, it replaces it with a
@@ -6644,7 +6683,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   Six sections, **every one of them an ordinary tab** — white when you are on
   it, white/60 otherwise; no TAB carries colour in either band. The masthead's
   one yellow is the working-location picker in the right-hand column.
-  **The first is "Locations" and is no longer special** (Mark, 2026-08-27). It
+  **The first is "Facilities"** (Mark, 2026-08-30) — renamed from "Locations",
+  which was right while a location record and its shop sections were all the
+  section held. Since 075–078 it also carries checklists, tasks, maintenance,
+  inspections and the equipment register, every one of them about the BUILDING;
+  a tier-1 tab names the work, and the work is looking after the place. **The
+  SLUG stays `location`** — that is what the `rf.nav` cookie stores, so renaming
+  it would drop everybody's remembered sub-section.
+  Its sub-tier's first entry went back to **"Locations"** the same day, undoing
+  the 2026-08-27 trim to "All": that trim's argument was that the band above
+  already said Locations so the sub only had to say WHICH of them, and it dies
+  with the rename — "All" under "Facilities" names nothing.
+  **It is no longer special** (Mark, 2026-08-27). It
   wore the ACTIVE LOCATION CODE from 2026-08-01, when the masthead switcher was
   deleted and the tab became the only place the code stayed on screen; it was
   additionally YELLOW from every other section (Mark, 2026-08-06) because it was
@@ -6654,9 +6704,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   and the yellow** (`components/WorkingLocation` — build step 4b), so
   the tab went back to naming the list it leads to, and each colour still means
   exactly one thing: white "you are here", yellow "this is the shop".
-  Its sub-tier's first entry is labelled **"All"**, not "Locations" — the band
-  above already says it, the same trim that made HR's "Team Ratings" just
-  "Events"; the SLUG is untouched, which is what the nav cookie stores.
+
   Most of the menu is built now; what is left on `/soon/<section>/<sub>` — one
   shared placeholder — is Location's Tasks / Maintenance / Inspection Logs, HR's
   Team Reviews, and Operations' Documents / Policies / Check Lists / Master

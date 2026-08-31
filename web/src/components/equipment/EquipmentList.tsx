@@ -7,7 +7,6 @@ import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { TextInput } from "@/components/ui/TextInput";
 import { expiryState } from "@/lib/employeeDocuments";
-import { NewEquipment } from "./NewEquipment";
 
 const WIDTHS_KEY = "rf.equipment.columnWidths.v1";
 
@@ -31,8 +30,6 @@ export type EquipmentRow = {
 export function EquipmentList({
   rows,
   today,
-  orgId,
-  locationId,
   locationCode,
   editable,
   sections,
@@ -40,8 +37,6 @@ export function EquipmentList({
 }: {
   rows: EquipmentRow[];
   today: string;
-  orgId: string;
-  locationId: string;
   locationCode: string;
   editable: boolean;
   sections: { id: string; display_name: string }[];
@@ -198,17 +193,6 @@ export function EquipmentList({
 
   return (
     <div className="space-y-4">
-      {editable && (
-        <div className="flex justify-end">
-          <NewEquipment
-            orgId={orgId}
-            locationId={locationId}
-            sections={sections}
-            kinds={kinds}
-          />
-        </div>
-      )}
-
       <div className="flex flex-wrap items-end gap-4">
         <div className="min-w-[16rem] flex-1">
           <TextInput

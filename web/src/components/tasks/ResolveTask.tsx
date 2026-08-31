@@ -90,7 +90,7 @@ export function ResolveTask({
             rows={3}
             autoFocus
             aria-label="Why this task is being cancelled"
-            className="w-full border border-hairline p-2 text-sm focus:border-ink focus:outline-none"
+            className="w-full border border-ink bg-white px-2 py-1 text-sm outline-none focus:border-2"
           />
         </label>
         {failed && <p className="text-sm text-accent">{failed}</p>}

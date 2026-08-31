@@ -3,6 +3,7 @@ import { getAppSession } from "@/lib/session";
 import { canEditChecklists } from "@/lib/roles";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { EquipmentList, type EquipmentRow } from "@/components/equipment/EquipmentList";
+import { NewEquipment } from "@/components/equipment/NewEquipment";
 
 /**
  * The equipment register — the noun the rest of this module points at.
@@ -85,31 +86,50 @@ export default async function EquipmentPage() {
     open_tasks: openTasks.get(e.id as string) ?? 0,
   }));
 
+  // The two the create dialog needs, derived HERE now that the command lives
+  // beside the title. `kinds` is the vocabulary already in use at this shop — a
+  // known set that legitimately grows, which is what the picker's `allowNew` is
+  // for; `EquipmentList` derives the same list for its filter, off the same
+  // rows, so the two cannot disagree.
+  const sectionOptions = (sections ?? []).map((s) => ({
+    id: s.id as string,
+    display_name: s.display_name as string,
+  }));
+  const kindOptions = [
+    ...new Set(rows.map((r) => r.kind).filter(Boolean) as string[]),
+  ].sort();
+
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Equipment
-        </h1>
-        <p className="max-w-[72ch] text-sm text-muted">
-          What stands at {active.code}. A checklist item can be about one of
-          these, which is what turns a reading into a trend and a repair into a
-          history. A warranty with no date set simply never lapses.
-        </p>
+      {/* Beside the title, like `/checklists` and `/inspection-logs`. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Equipment
+          </h1>
+          <p className="max-w-[72ch] text-sm text-muted">
+            What stands at {active.code}. A checklist item can be about one of
+            these, which is what turns a reading into a trend and a repair into
+            a history. A warranty with no date set simply never lapses.
+          </p>
+        </div>
+        {editable && (
+          <NewEquipment
+            orgId={session.membership.org_id}
+            locationId={active.id}
+            sections={sectionOptions}
+            kinds={kindOptions}
+          />
+        )}
       </div>
 
       <EquipmentList
         key={active.id}
         rows={rows}
         today={today}
-        orgId={session.membership.org_id}
-        locationId={active.id}
         locationCode={active.code}
         editable={editable}
-        sections={(sections ?? []).map((s) => ({
-          id: s.id as string,
-          display_name: s.display_name as string,
-        }))}
+        sections={sectionOptions}
         vendors={(vendors ?? []).map((v) => ({
           id: v.id as string,
           name: v.name as string,

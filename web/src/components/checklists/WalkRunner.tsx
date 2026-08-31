@@ -150,6 +150,7 @@ export function WalkRunner({
           today={today}
           editable={editable}
           isOpen={isOpen}
+          noun={noun}
         />
       </main>
 

@@ -52,24 +52,35 @@ function stub(section: string, slug: string, label: string): NavSub {
 export const SECTIONS: NavSection[] = [
   {
     slug: "location",
-    // Just the word (Mark, 2026-08-27). This tab wore the active location's
-    // CODE from 2026-08-01, when the masthead switcher was deleted and the tab
-    // became the only place the code stayed on screen. The switcher is back —
-    // `components/WorkingLocation`, at the far right of the same row — so the
-    // code is stated by the control that SETS it, and a tab that named a shop
-    // while leading to a list of all six can go back to naming the list.
-    label: "Locations",
+    // FACILITIES (Mark, 2026-08-30), which is what the section grew into. It
+    // was "Locations" while a location record and its shop sections were all it
+    // held; since 075–078 it also carries checklists, tasks, maintenance,
+    // inspections and the equipment register — every one of them about the
+    // BUILDING rather than about the shop as a row in a table. A tier-1 tab
+    // names the work, and the work here is looking after the place.
+    //
+    // (This tab also wore the active location's CODE from 2026-08-01, when the
+    // masthead switcher was deleted and it became the only place the code
+    // stayed on screen. The switcher came back on 2026-08-27 —
+    // `components/WorkingLocation`, far right of the same row — so the code is
+    // stated by the control that SETS it.)
+    //
+    // THE SLUG STAYS `location`, which is what the `rf.nav` cookie stores and
+    // what `sectionForPath` matches on. Renaming a label is free; renaming a
+    // slug drops everybody's remembered sub-section.
+    label: "Facilities",
     subs: [
       // A list of all six, and one of the two places the working location is
       // chosen (Mark, 2026-08-01) — this replaced the masthead switcher, which
       // came back beside it on 2026-08-27. It used to be a singular, id-less
       // /location showing whichever one you were working at.
       //
-      // Labelled "All", not "Locations" (Mark, 2026-08-27): the band above it
-      // says Locations, so the sub only has to say WHICH of them — the same
-      // trim that made HR's "Team Ratings" just "Events". The slug is
-      // untouched, which is what the nav cookie stores.
-      { slug: "locations", label: "All", href: "/locations", built: true },
+      // "Locations" again, and NOT "All" (Mark, 2026-08-30). It was trimmed to
+      // "All" on 2026-08-27 on the argument that the band above already said
+      // Locations, so the sub only had to say WHICH of them — HR's "Team
+      // Ratings" → "Events" trim. That argument dies with the rename: the band
+      // now says Facilities, and "All" underneath it names nothing at all.
+      { slug: "locations", label: "Locations", href: "/locations", built: true },
       {
         slug: "shop-sections",
         label: "Shop Sections",

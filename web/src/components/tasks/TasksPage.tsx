@@ -4,6 +4,7 @@ import { canResolveTasks } from "@/lib/roles";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { TaskKind } from "@/lib/facilityTasks";
 import { PHOTO_BUCKET, PHOTO_URL_TTL_SECONDS } from "@/lib/facilityPhotos";
+import { NewTask } from "./NewTask";
 import { TasksScreen, type TaskRow } from "./TasksScreen";
 
 /**
@@ -42,7 +43,7 @@ export async function TasksPage({
         .order("created_at", { ascending: false }),
       supabase
         .from("equipment")
-        .select("id, name")
+        .select("id, name, shop_section_id")
         .eq("location_id", active.id)
         .eq("is_active", true)
         .order("name"),
@@ -132,19 +133,48 @@ export async function TasksPage({
 
   const heading = kind === "maintenance" ? "Maintenance" : "Tasks";
 
+  // ONE projection for both consumers. The create dialog needs the equipment's
+  // own section, so that picking a fryer can fill in where the fryer stands.
+  const equipmentOptions = (equipment ?? []).map((e) => ({
+    id: e.id as string,
+    name: e.name as string,
+    shop_section_id: (e.shop_section_id as string | null) ?? null,
+  }));
+  const sectionOptions = (sections ?? []).map((s) => ({
+    id: s.id as string,
+    display_name: s.display_name as string,
+  }));
+
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          {heading}
-        </h1>
-        <p className="max-w-[72ch] text-sm text-muted">
-          {kind === "maintenance"
-            ? `What needs a vendor at ${active.code} — the plumber, the fridge engineer. ` +
-              "Anything the crew can fix belongs on Tasks."
-            : `What is outstanding at ${active.code}. Anything carried forward appears on ` +
-              "every walk until it is done, and gets louder the longer it waits."}
-        </p>
+      {/* The create command sits BESIDE THE TITLE, which is what `/checklists`
+          and `/inspection-logs` already did — this screen and `/equipment` were
+          the two that kept it in a `justify-end` row above the filters, where
+          it reads as one more filter. `items-start` so it lines up with the top
+          of the heading rather than centring against a block whose height
+          changes with the description. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            {heading}
+          </h1>
+          <p className="max-w-[72ch] text-sm text-muted">
+            {kind === "maintenance"
+              ? `What needs a vendor at ${active.code} — the plumber, the fridge engineer. ` +
+                "Anything the crew can fix belongs on Tasks."
+              : `What is outstanding at ${active.code}. Anything carried forward appears on ` +
+                "every checklist until it is done, and gets louder the longer it waits."}
+          </p>
+        </div>
+        {canResolveTasks(session.membership.role) && (
+          <NewTask
+            kind={kind}
+            orgId={session.membership.org_id}
+            locationId={active.id}
+            equipment={equipmentOptions}
+            sections={sectionOptions}
+          />
+        )}
       </div>
 
       <TasksScreen
@@ -153,16 +183,12 @@ export async function TasksPage({
         kind={kind}
         today={today}
         orgId={session.membership.org_id}
-        locationId={active.id}
         locationCode={active.code}
         editable={canResolveTasks(session.membership.role)}
-        equipment={(equipment ?? []).map((e) => ({
-          id: e.id as string,
-          name: e.name as string,
-        }))}
-        sections={(sections ?? []).map((s) => ({
-          id: s.id as string,
-          display_name: s.display_name as string,
+        equipment={equipmentOptions}
+        sections={sectionOptions.map((s) => ({
+          id: s.id,
+          display_name: s.display_name,
         }))}
         openRowKey={openRowKey}
       />

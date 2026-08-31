@@ -85,7 +85,7 @@ export function LinkChecklistRun({
         .single();
 
       if (error || !run) {
-        setFailed(error?.message ?? "The walk was not started.");
+        setFailed(error?.message ?? "The checklist was not started.");
         return;
       }
 
@@ -137,7 +137,7 @@ export function LinkChecklistRun({
           .insert(payload)
           .select("id");
         if (itemsError) {
-          setFailed(`The walk was started but its items were not: ${itemsError.message}`);
+          setFailed(`The checklist was started but its items were not: ${itemsError.message}`);
           return;
         }
       }

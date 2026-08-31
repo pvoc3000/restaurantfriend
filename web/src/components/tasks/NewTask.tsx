@@ -26,7 +26,7 @@ export function NewTask({
   kind: TaskKind;
   orgId: string;
   locationId: string;
-  equipment: { id: string; name: string }[];
+  equipment: { id: string; name: string; shop_section_id: string | null }[];
   sections: { id: string; display_name: string }[];
 }) {
   const router = useRouter();
@@ -38,6 +38,12 @@ export function NewTask({
   const [shift, setShift] = useState("");
   const [equipmentId, setEquipmentId] = useState("");
   const [sectionId, setSectionId] = useState("");
+  // Whether the section on screen was filled in BY US rather than chosen.
+  // Picking a fryer fills in where the fryer stands (Mark, 2026-08-30) — but a
+  // section somebody typed is theirs, so it is never overwritten, and changing
+  // equipment only moves a section this flag says we put there. Same shape as
+  // `createSpecialOrder` seeding a contact: filled once, never slaved.
+  const [sectionWasFilled, setSectionWasFilled] = useState(false);
   const [carry, setCarry] = useState(true);
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
@@ -135,7 +141,7 @@ export function NewTask({
                 onChange={(e) => setDetails(e.target.value)}
                 rows={3}
                 aria-label="Details"
-                className="w-full border border-hairline p-2 text-sm focus:border-ink focus:outline-none"
+                className="w-full border border-ink bg-white px-2 py-1 text-sm outline-none focus:border-2"
               />
             </label>
 
@@ -194,7 +200,18 @@ export function NewTask({
                     { value: "", label: "Nothing in particular" },
                     ...equipment.map((e) => ({ value: e.id, label: e.name })),
                   ]}
-                  onPick={setEquipmentId}
+                  onPick={(next) => {
+                    setEquipmentId(next);
+                    const where = equipment.find((e) => e.id === next)?.shop_section_id;
+                    // Only when the field is empty or holds a value we put
+                    // there. Clearing the equipment leaves the section alone:
+                    // "where" is still true of the job even once it stops being
+                    // about a particular machine.
+                    if (where && (sectionId === "" || sectionWasFilled)) {
+                      setSectionId(where);
+                      setSectionWasFilled(true);
+                    }
+                  }}
                 />
               </div>
               <div className="space-y-1.5">
@@ -211,13 +228,16 @@ export function NewTask({
                     { value: "", label: "No section" },
                     ...sections.map((s) => ({ value: s.id, label: s.display_name })),
                   ]}
-                  onPick={setSectionId}
+                  onPick={(next) => {
+                    setSectionId(next);
+                    setSectionWasFilled(false);
+                  }}
                 />
               </div>
             </div>
 
             <Checkbox checked={carry} onChange={setCarry} label="Carry it forward">
-              Put it on every walk until it is done
+              Put it on every checklist until it is done
             </Checkbox>
 
             {failed && <p className="text-sm text-accent">{failed}</p>}
