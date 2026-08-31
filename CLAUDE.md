@@ -119,6 +119,80 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    order history and feed "last ordered"); PO detail lines get a purchaser+
    selection column with the same confirm-gated delete (received quantities
    named).
+   **THE PO LIST'S ROWS HAVE THEIR OWN ⋯ MENU** (Mark, 2026-08-31) — Preview
+   purchase order · Download purchase order · Delete purchase order. All three
+   existed only on the SELECTION BAR, so acting on one order meant ticking it,
+   reading a bar written for a batch, and remembering to untick. `renderPoPdf`
+   and `deleteOrders` are ONE implementation behind both doors, taking the ids
+   as a parameter — which matters most for the confirm and for the popup rule,
+   both of which are the kind of thing remembered in one copy and forgotten in
+   the other. **`openWindowNow` is still inside the click gesture from a
+   RowMenu**, because `MenuButton` closes synchronously; a window opened after
+   an await is silently blocked. The single-order confirm NAMES the order
+   ("Delete purchase order 132-181227-01 and its lines?"), since from a row menu
+   "1 purchase order" is a worse answer to "which one?" than the number on the
+   row you just pressed.
+   **The delete now `.select()`s its own result** — the batch one never did, so
+   below purchaser+ it removed zero rows, returned NO error and reported a
+   cheerful success (the employee-delete lesson, latent here since the bar
+   shipped). Both doors now say how many were actually deleted.
+   **THE COLUMN WAS PAID FOR, AND EVERY PIXEL OF IT WAS MEASURED.** Widths are
+   WEIGHTS, so what a column resolves to depends on the table's total: at 1280 —
+   the tight case, since `compactBelow` has not fired — `TasksScreen`'s weight of
+   50 came out a 42px cell holding a 36px button. The total stays at the 1338 the
+   storageKey note tuned this table to, which is what keeps every untouched
+   column at exactly the pixels it had. **The factor is 0.874 px per weight**, and
+   guessing it wrong is what made the first two passes clip; the third measured
+   it off a column that had not moved. Slack came from Lines and Files (whose own
+   LABEL is the binding constraint, so their spare is structural rather than a
+   fact about today's data), the two money columns, Sent via, and Vendor — whose
+   cells are proper nouns where an ellipsis is idiomatic. NOTHING came from
+   Status, which had zero spare ("RECEIVED" fills its chip exactly), or from the
+   two DATE columns, which had 2px each and are what you read this list for.
+   Verified at 1440 (nothing clipped), 1280 (only the longest vendor name
+   truncates, by 15px) and 1100 (compact, ten columns, nothing clipped, no page
+   overflow) — and the baseline was measured first, so every clip found was
+   known to be one this change had caused.
+   **Harness note that cost two passes**: after `resize_window` the table
+   re-renders but the compact tier does not re-evaluate until a reload, so a
+   post-resize reading shows the OLD column set. And a hidden pane reports every
+   rect as 0 — check `innerWidth !== 0` before believing any geometry.
+   **THE RECEIVING SCREEN'S READER'S NOTES ARE A DISCLOSURE, NOT AN OVERLAY**
+   (Mark, 2026-08-31: "a lot of noise… for the most part it's unnecessary, but
+   it's still there if we need it", offering either a pop-up or a caret and
+   asking which is better). Measured on the live database: **39 of 40 stored
+   extractions carry notes**, and they run to five lines — so on nearly every
+   invoice a full-width yellow block sat between the summary and the split row.
+   The caret wins for a reason particular to THIS screen: an overlay would cover
+   the invoice AND the lines, which are the two documents you are standing there
+   comparing, and it would have to be dismissed before you could go back to
+   counting. It also costs nothing to expand, because the split row MEASURES
+   whatever sits above it and a ResizeObserver keeps that honest as bands come
+   and go — the invoice band growing with the reader's notes is the case that
+   measurement is named for. The trigger's WORDS are quiet, reading like the
+   small-caps labels beside them rather than wearing the yellow: the fill means
+   "worth your eye", and on a note that is usually a rate-per-case caveat that
+   is a claim it cannot keep. The CONTENT keeps the fill, because opened, it is.
+   **Its caret is ▶ (U+25B6) at 18px, and the GLYPH is doing most of that work
+   rather than the font size** (Mark, 2026-08-31, in two passes: "too small…
+   make it 3 or 4 times larger", then "too big… split the difference").
+   Measured as INK rather than em box, which is the whole point: ▸ (U+25B8) at
+   the label's own 12px paints **4×5 PIXELS**, so scaling THAT character to a
+   readable mark would have needed a ~60px font — a line box several times the
+   height of the band it sits in. ▶ paints **12×11 at 18px**, the midpoint
+   between 5px of ink and the 17px that read as too big, and it costs the button
+   ONE pixel over the original 17. The size it was always going to be is the one
+   where the character is the right character. It is also the order guide's own
+   disclosure triangle, so the app has one shape for this.
+   **Reach for the bigger GLYPH before the bigger size** — for box-drawing
+   characters the em box and the ink are only loosely related, so measure what
+   is painted (draw it to a canvas and find the alpha bounds) rather than
+   trusting `font-size`. Collapsed per
+   mount, deliberately — it resets when a different document is read, and a
+   remembered preference for something opened once a month is machinery nobody
+   asked for. Measured at a 720px viewport: collapsed the page is one viewport
+   (31px of residue), expanded it scrolls 133px because the split row hits its
+   documented 280px floor.
    **Mark received writes QUANTITIES, not just the status** (2026-07-28): the
    list's Received column flags any received PO whose total falls short of what
    was ordered, so a status-only "received" would paint every order red for a
@@ -221,6 +295,28 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    lines don't qualify (an explicit no produces nothing); Skipped is unaffected,
    being untouched-only. The search box still narrows everything, expansions
    included.
+   **THE LAST-PURCHASE LABEL IS A NARROW BLOCK, NOT A LONG LINE** (Mark,
+   2026-08-31: it "takes up too much space and causes the inventory item to get
+   truncated… especially on tablets"). It shipped as one `truncate` line beside
+   the name, which meant its width was set by THE LONGEST VENDOR DESCRIPTION IN
+   THE CATALOG — arbitrary text nobody chose — and it won. Measured at 820, the
+   portrait iPad this is walked on: the label took ~420px of a 768px row and the
+   item name, the thing you scan for down the walk, read "COCOA POWDER, DUT…".
+   Capped at **12rem** and clamped to **three lines** it wraps instead, and the
+   name gets every pixel it gives up. Measured over all 261 item headers at 768,
+   820 and 1280: **0 names clipped** (from routinely clipped), 164 labels at two
+   lines and 97 at three, and only **3 hit the clamp** and ellipsise — so the
+   third line is a backstop rather than the normal case.
+   **THE ROW IS `items-end` NOW, NOT `items-baseline`**, which is the half worth
+   understanding. Baseline is right while every child is one line and wrong the
+   moment one is a paragraph: a flex item's baseline is its FIRST line, so the
+   label pinned its top to the title and hung the rest below — which is the
+   opposite of the "bottom aligned" Mark asked for. On the bottom edge the block
+   grows UPWARD and its last line stays beside the name; verified 261 of 261
+   bottoms level to within 1px at every width. `align-self: last baseline` says
+   this exactly and is not safe at the Safari 16.4 floor.
+   Known cost, and it is small: a two-line label fits the existing 38px header
+   row, so **164 of 261 rows cost nothing**; the 97 three-line ones grow to 51px.
    Shipped 2026-07-26: **Clear guide** — an ActionBar command (left of Generate
    POs, never the primary cell) that resets the whole day at this location to
    untouched: quantities entered, quantities explicitly zeroed, AND on-hand
@@ -5413,11 +5509,14 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    about, which is 317 of FMP's 13,059 reports and a known accepted cost.
    `pagesForShift` returns the list and the runner numbers what it is given, so
    an opening report reads "PAGE 3 OF 5" rather than skipping.
-   **SALES ARE NOT INCOMPLETE AT 9PM — THEY ARE ABSENT, and that is better.**
-   Square's reporting day runs 1:00 AM to 12:59 AM PT and `SyncFromSquare` stops
-   at yesterday, so there is NO `daily_sales` row for today at all; nothing
-   partial can be mistaken for a settled figure. So the report **never writes a
-   sales number anywhere**: `sync-square-sales` gained a **`preview: true` mode**
+   **THE SHIFT REPORT NEVER WRITES A SALES NUMBER ANYWHERE.** (This paragraph
+   used to open "SALES ARE NOT INCOMPLETE AT 9PM — THEY ARE ABSENT, and that is
+   better", because `SyncFromSquare` stopped at yesterday so there was no
+   `daily_sales` row for today at all. **Mark reversed that on 2026-08-31** —
+   see "PARTIAL DAYS ARE LOADED AND MARKED" below — so today's row now usually
+   exists. Nothing here changes: the report still reads rather than writes, and
+   still says which figure it is showing.) Square's reporting day runs 1:00 AM
+   to 12:59 AM PT. `sync-square-sales` gained a **`preview: true` mode**
    that returns the window's rows without calling `record_daily_sales`, and its
    role check is now mode-dependent — owner/admin to WRITE, supervisor+ to
    PREVIEW, because reading a figure off the register in front of you is not the
@@ -6056,6 +6155,18 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    so the item reads "Reported"; the carried-over band appeared at the top of
    the next walk immediately; the readiness confirm named what was outstanding
    and let me through; and Finish left for the archive.
+   **THE MISSING-NIGHTS NOTE IS ONE STATEMENT IN WHICHEVER PLACE CAN BE SEEN**
+   (Mark, 2026-08-31: "in place of the empty table, why not put the text above
+   there instead?"). `/shift-reports`' Needs-attention count is flagged reports
+   PLUS nights the shop was open and nobody reported — and those nights have no
+   ROW, they are a band above the table. So with nothing flagged, the tab read
+   5 over a table reading "Nothing needs attention", which is the screen
+   contradicting itself; the first fix put a second sentence in the empty slot
+   pointing AT the band, which is one fact stated twice an inch apart. Now
+   `gapsNote` renders in the table's own empty slot when there are no rows, and
+   ABOVE the table when there are — never both, because when rows exist the
+   empty slot does not. Verified both ways at 1440, the second by temporarily
+   flagging every report (tab 7, note above, two rows beneath).
    **THREE BUGS ONLY RENDERING COULD CATCH**, none of which typechecks, lints or
    fixture-fails — see `docs/checklists-brief.md` for each:
    an HTML ENTITY IN JSX TEXT EATING THE SPACE after an interpolated value (a
@@ -6067,6 +6178,108 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `flex-wrap` only helps when a child can claim the next line and a `flex-1`
    sibling has a 0 basis. That last had been true since the runner shipped and
    was invisible because it was only ever checked at desktop width.
+
+   **A TASK CAN BE SOMEBODY'S — migration 079, APPLIED 2026-08-31.** *Probe,
+   don't read this line; it has been wrong in both directions for four different
+   migrations.* Mark, 2026-08-31: "Tasks should be assignable to someone. Not
+   mandatory, but when assigned they only appear on that person's checklist."
+   **IT POINTS AT AN APP USER, NOT AN EMPLOYEE**, and that is the decision to
+   understand before touching any of it. The effect asked for is about WHOSE
+   CHECKLIST a job appears on, and a checklist is walked by somebody signed in
+   (`checklist_runs.started_by` is an auth user). Assigning to an `employees`
+   row would let a shop hand work to the overnight baker, who has an HR record
+   and no login (044's distinction) — and the job would then appear on NOBODY's
+   checklist while looking assigned. The roster is `org_members`, which 001's
+   `members_read` already shows to every member, so this needs **no definer
+   function** — unlike 044's `production_operators` and 053's
+   `special_order_takers`, which exist only because `employees` READ is
+   owner/admin.
+   **THE ORPHAN RULE IS THE ONE TO KEEP IF THIS IS EVER REWRITTEN.** 079 has no
+   `on delete` clause, matching `created_by` beside it, because revoking access
+   BANS an auth user rather than deleting it (4c) — so an assignment outlives
+   the login. `taskIsFor` therefore shows a task whose assignee is no longer a
+   member to EVERYBODY: without it, the day somebody leaves, every job assigned
+   to them drops off every checklist in the shop, silently, which is the exact
+   failure the carry-forward exists to prevent. `openTasksForRun` takes a
+   `TaskViewer` (viewer id + the current membership) and it is **required with
+   no default** — a default of "nobody" would hide every assigned task from a
+   caller that merely forgot to pass one.
+   **The viewer, never the run's `started_by`**: the band is derived live rather
+   than snapshotted, and nothing downstream depends on it — the emailed report's
+   checklist section is built from `checklist_run_items`, so what one reader
+   sees cannot change what anybody is sent.
+   No policy change: 075 is supervisor+ on every verb because a task is a
+   supervisor's own record end to end (a ROW rule, therefore a policy), and this
+   is one more column on that row. Anybody who can edit a task can assign it,
+   including to somebody else, which is what "hand this to Karina" means.
+   UI: an **Assigned** column on `/tasks` and `/maintenance-requests` (inline
+   `kind="pick"`, "Anybody" resting, sorted by the NAME and not the uuid; widths
+   key bumped to **v2**), an **Assigned to** field on the create dialog that says
+   in words what assigning DOES ("It will appear on their checklist only"), and
+   a quiet label on the walk's carried-over row — named only when it is somebody
+   ELSE's, since a row on your own checklist saying "assigned to you" is the
+   screen telling you where you are standing. Until 079 is applied both screens
+   SAY SO by name (`/tasks` names 079 rather than 075, and the walk carries a
+   `taskWarning` rather than an empty band, which would assert that nothing is
+   outstanding). Probes: `select column_name, is_nullable from
+   information_schema.columns where table_name = 'location_tasks' and
+   column_name = 'assigned_to'` (one row, YES), and `select count(*) from
+   pg_policy where polrelid = 'public.location_tasks'::regclass` — still
+   **THREE**, none of them a delete, or somebody has added an eraser that
+   bypasses the reason.
+   Verified: all **79 migrations** replay on the Docker harness, and as real
+   authenticated roles a supervisor assigns a task to a COLLEAGUE and hands it
+   back while a staffer sees 0, updates 0 and **deletes 0 with NO error**, and
+   `anon` sees 0. **1454 fixtures pass**, 15 new, each rule checked by breaking
+   it — dropping the orphan clause turns 2 red and dropping the assignment
+   filter turns 1.
+   **WALKED AGAINST THE LIVE DATABASE THE SAME DAY AND LEFT AS FOUND** (both
+   real DF01 tasks back to `assigned_to` null). What that proved beyond the
+   harness, on Mark's own session: the picker offered Anybody · Mark · Test ·
+   Traci — the three members, sorted by name, all supervisor+ — and writing
+   through it landed; with the chemicals task assigned to **Test**, its uuid AND
+   its title were both ABSENT from Mark's own run at
+   `/checklists/[id]/run` while the unassigned one stayed; reassigned to
+   **Mark**, it came back reading `Carried over — 2` with a quiet **yours**
+   beside it and nothing beside the unassigned one. Note the archive record at
+   `/checklists/[id]` renders no carried band at all — the band is the RUNNER's,
+   which is where to look when verifying this.
+
+   **PARTIAL DAYS ARE LOADED AND MARKED** (Mark, 2026-08-31: "at one point I
+   made the decision to not load partial sales data in Sales. I take that back.
+   Let's go back to loading all sales data and making a note when a day's data
+   is incomplete."). `SyncFromSquare` stopped at YESTERDAY from 2026-08-28, on
+   the reasoning that a part-day "lands in the table looking exactly as
+   authoritative as the fourteen complete days beside it". That was right about
+   the RISK and wrong about the remedy — today's takings are the figure a
+   manager most wants at 4pm, and the answer to a number needing a caveat is the
+   caveat rather than the absence. The pull now runs through TODAY.
+   **THE CAVEAT IS ANSWERED FROM `synced_at`, NEVER FROM THE CALENDAR**, and
+   that is the whole of the care. `isDayComplete` in `lib/sales` asks whether the
+   pull happened after the end of the reporting day it covers (Square's runs
+   01:00 – 00:59 PT, hence `REPORTING_DAY_ROLLOVER_HOUR`). "Is this date today?"
+   goes stale by itself: a row pulled at 4pm Tuesday and never pulled again is a
+   part-day forever, and a date test would quietly call it settled by Thursday.
+   A **manual** row (065's `source`) is always complete — somebody typed it
+   deliberately — and a row with no `synced_at` is treated as complete rather
+   than smeared with a warning nothing can clear.
+   Two surfaces: a **part day** chip in the day table's Pulled column, which is
+   the column that already reports a figure's PROVENANCE and where the `edited`
+   mark lives; and a sentence under the summary beside the gap line, kept
+   separate from it because a day nobody pulled and a day still being taken are
+   different problems and only one is fixed by pressing Sync. **`missingDays`
+   still stops at YESTERDAY** — a missing today is not a hole in the history, it
+   is a day nobody has synced yet, and reporting it every morning is what
+   teaches people to stop reading that line.
+   Measured through the real rule over the live table (read-only, paginated on a
+   UNIQUE order — ordering by `business_date` alone gave 8,432 rows holding
+   8,429 distinct ids, which is the audit trap this file already documents):
+   **8,432 rows, 0 incomplete**, so nothing in eleven years of history is
+   retroactively marked. The rendering was proved by temporarily moving the
+   rollover hour to 23, which correctly painted 2 chips and the sentence naming
+   both shop-days. 8 fixtures, checked by breaking it — a calendar-date test
+   fails the 00:00–00:59 sliver, and hardcoding UTC fails that and the
+   org-timezone case.
 
 5. SwiftUI floor app (only after 4 is proven in real use)
 
