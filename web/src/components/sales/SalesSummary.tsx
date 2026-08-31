@@ -16,6 +16,9 @@ export type SalesSummaryData = {
   vsPrevious: Comparison;
   vsLastYear: Comparison;
   gaps: { locationCode: string; business_date: string }[];
+  /** Shop-days pulled before their reporting day had ended — real figures that
+   *  are not final yet. See `isDayComplete`. */
+  unfinished: { locationCode: string; business_date: string }[];
 };
 
 /**
@@ -99,6 +102,32 @@ export function SalesSummary({ summary }: { summary: SalesSummaryData }) {
       {summary.fellBack ? (
         <p className="text-xs text-muted">
           No pay period covers today, so this is the last 14 days instead.
+        </p>
+      ) : null}
+
+      {summary.unfinished.length ? (
+        // Mark, 2026-08-31: load every day and NOTE the incomplete ones. This
+        // is that note, and it belongs beside the gap line rather than in it —
+        // a day nobody pulled and a day still being taken are different
+        // problems with different answers, and only one of them is fixed by
+        // pressing Sync.
+        <p className="text-xs">
+          <span className="bg-mark-fill px-1">
+            {summary.unfinished.length === 1
+              ? "1 shop-day was still being taken when it was pulled"
+              : `${summary.unfinished.length} shop-days were still being taken when they were pulled`}
+          </span>{" "}
+          <span className="text-muted">
+            — the figures above include a part-day for{" "}
+            {summary.unfinished
+              .slice(0, 4)
+              .map((d) => `${d.locationCode} ${d.business_date}`)
+              .join(", ")}
+            {summary.unfinished.length > 4
+              ? ` and ${summary.unfinished.length - 4} more`
+              : ""}
+            . Syncing again once the day is over settles them.
+          </span>
         </p>
       ) : null}
 

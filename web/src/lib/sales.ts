@@ -132,6 +132,77 @@ export function isPartial(range: DateRange, today: string): boolean {
   return today < range.to;
 }
 
+// ---------------------------------------------------------------------------
+// A day that is still being taken
+// ---------------------------------------------------------------------------
+
+/**
+ * The hour Square's reporting day ROLLS OVER, local to the org.
+ *
+ * Mark's dashboard runs 1:00 AM – 12:59 AM PT, which is on every export it
+ * produces and is documented on `daily_sales.business_date`. So the reporting
+ * day named D is still being taken until 01:00 on D+1, and a figure pulled
+ * before then is a part-day.
+ */
+export const REPORTING_DAY_ROLLOVER_HOUR = 1;
+
+/**
+ * Was this shop-day FINISHED when we pulled it?
+ *
+ * Mark, 2026-08-31, reversing his own 2026-08-28 call: load every day including
+ * the one still being taken, and say when a figure is incomplete. The earlier
+ * decision stopped the sync at yesterday, on the reasoning that a part-day
+ * "lands in the table looking exactly as authoritative as the fourteen complete
+ * days beside it". That reasoning was right about the RISK and wrong about the
+ * remedy — today's takings are the figure a manager most wants at 4pm, and the
+ * cure for a number that needs a caveat is the caveat, not the absence.
+ *
+ * IT IS ANSWERED FROM `synced_at`, NOT FROM THE CALENDAR, and that is the whole
+ * of the care. "Is this date today?" goes stale by itself: a row pulled at 4pm
+ * on Tuesday and never pulled again is a part-day forever, and by Thursday a
+ * date test calls it complete while it still holds nine hours of a fourteen-hour
+ * day. Comparing the pull against the day's own end is true whenever it is
+ * asked.
+ *
+ * A MANUAL ROW IS ALWAYS COMPLETE (065's `source`): somebody typed it
+ * deliberately for a day Square could not answer for, so there is no pull to be
+ * early. A row with no `synced_at` at all cannot be judged, and is treated as
+ * complete rather than smeared with a warning nothing can clear.
+ */
+export function isDayComplete(
+  day: Pick<SalesDay, "business_date" | "syncedAt"> & { source?: string },
+  timeZone: string
+): boolean {
+  if (day.source && day.source !== "square") return true;
+  if (!day.syncedAt) return true;
+
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    hourCycle: "h23",
+  }).formatToParts(new Date(day.syncedAt));
+
+  const at = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  const pulledOn = `${at("year")}-${at("month")}-${at("day")}`;
+  const pulledHour = Number(at("hour"));
+
+  const endsOn = addDays(day.business_date, 1);
+  if (pulledOn > endsOn) return true;
+  if (pulledOn < endsOn) return false;
+  return pulledHour >= REPORTING_DAY_ROLLOVER_HOUR;
+}
+
+/** The shop-days on screen whose figure is not final yet. */
+export function incompleteDays(
+  days: readonly SalesDay[],
+  timeZone: string
+): SalesDay[] {
+  return days.filter((d) => !isDayComplete(d, timeZone));
+}
+
 /**
  * The first `days` of a range — the like-for-like basis for a period still
  * running. Seven days in, we compare against the previous period's FIRST seven

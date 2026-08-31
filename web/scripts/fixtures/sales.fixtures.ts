@@ -25,6 +25,8 @@ import {
   isPartial,
   openingSlice,
   expectsSalesOn,
+  isDayComplete,
+  incompleteDays,
   type SalesDay,
 } from "../../src/lib/sales";
 import { isoWeekday, daysBetween } from "../../src/lib/payPeriods";
@@ -545,4 +547,82 @@ test("every range has a label", () => {
   // rather than rendering "undefined" beside a percentage — this pins that the
   // two lists stay the same length if anyone widens one with a cast.
   for (const k of SALES_RANGES) ok(SALES_PREVIOUS_LABEL[k]?.length, `label for ${k}`);
+});
+
+// ---------------------------------------------------------------------------
+// A day still being taken (Mark, 2026-08-31)
+// ---------------------------------------------------------------------------
+//
+// The sync used to stop at yesterday so that no part-day could reach the table.
+// It no longer does, so the caveat has to be real. Every case below is stated
+// in PACIFIC time, because Square's reporting day is 01:00 – 00:59 PT and the
+// answer must not depend on the reader's machine.
+
+const LA = "America/Los_Angeles";
+
+const pulled = (businessDate: string, syncedAt: string, source = "square"): SalesDay => ({
+  location_id: "df01",
+  locationCode: "DF01",
+  business_date: businessDate,
+  netSalesCents: 100_000,
+  tipsCents: 10_000,
+  syncedAt,
+  source,
+});
+
+test("isDayComplete: pulled while the shop was still trading is NOT complete", () => {
+  // 4pm Pacific on the day itself = 23:00Z.
+  ok(!isDayComplete(pulled("2026-08-31", "2026-08-31T23:00:00Z"), LA));
+});
+
+test("isDayComplete: pulled after the reporting day rolled over IS complete", () => {
+  // Square's day for 08-31 ends at 00:59 PT on 09-01, so 01:00 PT (08:00Z) is
+  // the first settled moment.
+  ok(isDayComplete(pulled("2026-08-31", "2026-09-01T08:00:00Z"), LA));
+  ok(isDayComplete(pulled("2026-08-31", "2026-09-03T19:00:00Z"), LA));
+});
+
+test("isDayComplete: the 00:00–00:59 sliver still belongs to the previous day", () => {
+  // 00:30 PT on 09-01 is 07:30Z, and is still inside 08-31's reporting day —
+  // which is exactly the hour `daily_sales.business_date` documents. A naive
+  // "the pull is on a later calendar date" test calls this complete.
+  ok(!isDayComplete(pulled("2026-08-31", "2026-09-01T07:30:00Z"), LA));
+});
+
+test("isDayComplete: a stale pull stays incomplete FOREVER, which a date test cannot say", () => {
+  // Pulled at 4pm Tuesday, never pulled again. On Thursday the row still holds
+  // four hours of a fourteen-hour day, and "is business_date today?" would by
+  // then report it as settled. This is the reason the rule reads `synced_at`.
+  ok(!isDayComplete(pulled("2026-08-25", "2026-08-25T23:00:00Z"), LA));
+});
+
+test("isDayComplete: a MANUAL row is complete whenever it was written", () => {
+  // 065's corrected day: somebody typed it for a day Square could not answer
+  // for, so there is no pull to be early.
+  ok(isDayComplete(pulled("2026-08-31", "2026-08-31T23:00:00Z", "manual"), LA));
+});
+
+test("isDayComplete: a row with no synced_at is not smeared with a warning", () => {
+  ok(isDayComplete({ business_date: "2026-08-31", syncedAt: null }, LA));
+});
+
+test("isDayComplete: the ORG's zone decides, not the host's", () => {
+  // 23:00Z on 08-31 is 4pm in Los Angeles (still trading) and already 09-01 in
+  // Auckland. Reading the same row through the wrong zone flips the answer.
+  const row = pulled("2026-08-31", "2026-08-31T23:00:00Z");
+  ok(!isDayComplete(row, LA));
+  ok(isDayComplete(row, "Pacific/Auckland"));
+});
+
+test("incompleteDays: only the unfinished ones, in the order given", () => {
+  const rows = [
+    pulled("2026-08-29", "2026-08-30T18:00:00Z"),
+    pulled("2026-08-30", "2026-08-30T22:00:00Z"),
+    pulled("2026-08-31", "2026-08-31T23:00:00Z"),
+  ];
+  eq(
+    incompleteDays(rows, LA).map((d) => d.business_date),
+    ["2026-08-30", "2026-08-31"]
+  );
+  eq(incompleteDays([], LA), []);
 });

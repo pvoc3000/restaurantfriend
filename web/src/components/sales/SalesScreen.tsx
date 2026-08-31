@@ -17,6 +17,8 @@ import {
   sumSales,
   daysIn,
   compareTotals,
+  incompleteDays,
+  isDayComplete,
   missingDays,
   type DateRange,
   type SalesDay,
@@ -55,6 +57,7 @@ export function SalesScreen({
   shops,
   initialPicked,
   yesterday,
+  timeZone,
   params,
 }: {
   /** Owner/admin — migration 065 re-checks it inside the function. */
@@ -73,6 +76,9 @@ export function SalesScreen({
   shops: SalesLocation[];
   initialPicked: string[];
   yesterday: string;
+  /** The ORG's zone — `isDayComplete` needs it to know when a reporting day
+   *  ended, and a browser in another zone would answer differently. */
+  timeZone: string;
   params: RawSearchParams;
 }) {
   const router = useRouter();
@@ -118,10 +124,18 @@ export function SalesScreen({
       current: totals,
       vsPrevious: compareTotals(totals, sumSales(daysIn(visible, prevRange)), prevRange),
       vsLastYear: compareTotals(totals, sumSales(daysIn(visible, yearRange)), yearRange),
+      // A missing TODAY is still not a gap. It is not a hole in the history,
+      // it is a day nobody has pressed Sync for yet — and reporting it every
+      // morning is what teaches people to stop reading this line. What the
+      // sync now brings back for today is covered by `unfinished` instead.
       gaps: missingDays(current, shopsInScope, elapsed, yesterday),
+      unfinished: incompleteDays(current, timeZone).map((d) => ({
+        locationCode: d.locationCode,
+        business_date: d.business_date,
+      })),
     };
   }, [visible, shopsInScope, elapsed, elapsedDays, partial, prevRange, yearRange,
-      rangeLabel, fellBack, yesterday, range, rangeKey]);
+      rangeLabel, fellBack, yesterday, range, rangeKey, timeZone]);
 
   const supabase = createClient();
 
@@ -294,6 +308,17 @@ export function SalesScreen({
                 revert
               </button>
             ) : null}
+          </span>
+        ) : !isDayComplete(r, timeZone) ? (
+          // PULLED WHILE THE DAY WAS STILL RUNNING. The figure is real and it
+          // is not final, which is a different thing from both "settled" and
+          // "edited" — so it is marked here, in the column that already reports
+          // where a number came from, rather than beside the money.
+          <span className="flex items-center gap-2">
+            <span className="bg-mark-fill px-1 text-[11px]">part day</span>
+            <span className="text-muted tabular-nums">
+              {r.syncedAt ? r.syncedAt.slice(0, 10) : ""}
+            </span>
           </span>
         ) : (
           <span className="text-muted tabular-nums">

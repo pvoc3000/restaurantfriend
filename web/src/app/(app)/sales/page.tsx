@@ -210,6 +210,7 @@ export default async function SalesPage({
         elapsed={elapsed}
         elapsedDays={elapsedDays}
         partial={isPartial(resolved.range, today)}
+        timeZone={timeZone}
         prevRange={openingSlice(previousRange(resolved.range), elapsedDays)}
         yearRange={openingSlice(lastYearRange(resolved.range), elapsedDays)}
         rangeKey={rangeKey}

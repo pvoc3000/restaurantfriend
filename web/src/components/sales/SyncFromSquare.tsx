@@ -23,22 +23,24 @@ import { addDays } from "@/lib/payPeriods";
  * for free, and migration 063's upsert makes a part-finished backfill harmless
  * — re-running a month re-lands it.
  *
- * COMPLETE DAYS ONLY — the pull STOPS AT YESTERDAY (Mark, 2026-08-28). The
- * shops are still trading today, so today's figure is a part-day: it lands in
- * the table looking exactly as authoritative as the fourteen complete days
- * beside it, drags every average down, and turns each comparison into
- * thirteen-and-a-bit days against fourteen. Worse, it is WRONG RATHER THAN
- * MISSING — pulling it again tomorrow corrects it, but nothing on the screen
- * says which of the two you are looking at.
+ * EVERY DAY, INCLUDING THE ONE STILL BEING TAKEN (Mark, 2026-08-31, reversing
+ * his own 2026-08-28 call: "I take that back. Let's go back to loading all
+ * sales data and making a note when a day's data is incomplete.").
  *
- * It costs nothing, because the rest of the screen already draws the line in
- * the same place: `missingDays` is passed YESTERDAY as its `through`, so a day
- * with no row is only reported as a gap once it is over. Today was never
- * counted as missing, and now it is never half-filled either.
+ * The pull used to stop at YESTERDAY, because today's figure is a part-day that
+ * "lands in the table looking exactly as authoritative as the fourteen complete
+ * days beside it". That was right about the risk and wrong about the remedy:
+ * today's takings are the figure a manager most wants at 4pm, and the answer to
+ * a number needing a caveat is the caveat rather than the absence.
  *
- * Yesterday in the ORG's calendar, never the browser's — `today` arrives from
- * `todayInTimeZone` on the server for that reason, and `addDays` is plain
- * string arithmetic (`new Date("2026-08-28")` is UTC midnight).
+ * So the caveat is real and lives in ONE place — `isDayComplete` in
+ * `lib/sales`, which compares a row's `synced_at` against the end of the
+ * reporting day it covers. That is deliberately not "is this date today": a row
+ * pulled at 4pm on Tuesday and never pulled again is a part-day forever, and a
+ * date test would quietly call it settled by Thursday.
+ *
+ * `today` is the ORG's calendar day, never the browser's — it arrives from
+ * `todayInTimeZone` on the server for that reason.
  *
  * Owner/admin only. `record_daily_sales` re-checks that itself; this just keeps
  * the button off a screen where pressing it could only fail.
@@ -51,9 +53,6 @@ export function SyncFromSquare({ today }: { today: string }) {
   const [result, setResult] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [failed, setFailed] = useState<string | null>(null);
-
-  /** The last day the shops have finished trading. */
-  const lastComplete = addDays(today, -1);
 
   async function run(months: { from: string; to: string }[], what: string) {
     setBusy(what);
@@ -141,9 +140,10 @@ export function SyncFromSquare({ today }: { today: string }) {
           onClick={() => {
             // The ordinary case: this month and last, which covers every day
             // anybody is likely to be looking at and re-pulls recent days in
-            // case a tip settled late — ending YESTERDAY, see the header.
+            // case a tip settled late — up to and including TODAY, whose figure
+            // the screen then marks as still being taken.
             const from = addDays(`${today.slice(0, 7)}-01`, -1);
-            void run(monthsBetween(`${from.slice(0, 7)}-01`, lastComplete), "Syncing");
+            void run(monthsBetween(`${from.slice(0, 7)}-01`, today), "Syncing");
           }}
         >
           Sync from Square
@@ -155,11 +155,11 @@ export function SyncFromSquare({ today }: { today: string }) {
 
       {failed ? <p className="text-xs text-accent">{failed}</p> : null}
       {result && !failed ? (
-        // The end date is NAMED. Somebody who presses this at 4pm and then
-        // looks for today's takings needs to be told they were not asked for,
-        // or the sync reads as having quietly failed on its most recent day.
+        // The end date is NAMED, and so is what today's figure is worth: a pull
+        // at 4pm gets four hours of trading, and somebody reading the total
+        // straight afterwards should not have to work that out.
         <p className="text-xs text-muted">
-          {result} Complete days only, up to {lastComplete}.
+          {result} Up to {today}, whose figure is still being taken.
         </p>
       ) : null}
 
