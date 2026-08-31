@@ -24,6 +24,7 @@ import {
   assessReading,
   businessDateFor,
   checklistReadiness,
+  checklistIssueCount,
   duplicateReceipt,
   itemAppliesOn,
   outstandingCount,
@@ -235,7 +236,7 @@ test("checklistReadiness: a finished walk has nothing to say", () => {
   eq(checklistReadiness([item("done"), item("done")]), []);
 });
 
-test("checklistReadiness names untouched items, missing photos and issues", () => {
+test("checklistReadiness names untouched items and missing photos", () => {
   eq(
     checklistReadiness([
       item("pending"),
@@ -243,8 +244,24 @@ test("checklistReadiness names untouched items, missing photos and issues", () =
       item("issue", true, 0),
       item("done"),
     ]),
-    ["2 items not looked at yet", "1 item still wants a photo", "1 issue flagged"],
+    ["2 items not looked at yet", "1 item still wants a photo"],
   );
+});
+
+test("A FLAGGED ISSUE IS NOT OUTSTANDING — it is what the walk was FOR", () => {
+  // Mark, 2026-08-30: "if everything is either marked done or flagged, then
+  // there aren't any outstanding issues." An item looked at, found broken and
+  // written up is as answered as an item gets; the confirm states the findings
+  // separately as a fact, `salesNote`'s "INFORMATION, never a caveat".
+  eq(checklistReadiness([item("done"), item("issue"), item("na")]), []);
+  eq(checklistIssueCount([item("done"), item("issue"), item("na")]), 1);
+});
+
+test("a flagged item still wants its photo, if it was asked for one", () => {
+  // The photo is a separate obligation: somebody asked for evidence and there
+  // is none. Only the ISSUE stopped being a caveat.
+  eq(checklistReadiness([item("issue", true, 0)]), ["1 item still wants a photo"]);
+  eq(checklistReadiness([item("issue", true, 1)]), []);
 });
 
 test("checklistReadiness: singular and plural both read correctly", () => {

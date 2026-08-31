@@ -329,11 +329,23 @@ export function checklistReadiness(items: RunItemLike[]): string[] {
         : `${unphotographed} items still want a photo`,
     );
   }
-  const issues = items.filter((i) => i.status === "issue").length;
-  if (issues > 0) {
-    out.push(`${issues} issue${issues === 1 ? "" : "s"} flagged`);
-  }
+  // A FLAGGED ISSUE IS NOT OUTSTANDING, and listing one here was wrong (Mark,
+  // 2026-08-30: "if everything is either marked done or flagged, then there
+  // aren't any outstanding issues"). He is right, and the distinction is the
+  // module's whole posture: a checklist's job is to FIND what is wrong, not to
+  // fix it. An item you looked at, found broken and wrote a note about is as
+  // answered as an item gets — telling its author they have not finished is
+  // telling somebody who did the job properly that they didn't.
+  //
+  // It is stated as INFORMATION by the caller instead, which is `salesNote`'s
+  // rule in this same codebase: "INFORMATION, never a caveat", for a fact that
+  // needs saying but names no act anybody still has to perform.
   return out;
+}
+
+/** How many findings the run is carrying — a FACT about it, not a caveat. */
+export function checklistIssueCount(items: { status: CheckStatus }[]): number {
+  return items.filter((i) => i.status === "issue").length;
 }
 
 /** `3 of 27 done` — the shift report's submit page and the list both say this. */

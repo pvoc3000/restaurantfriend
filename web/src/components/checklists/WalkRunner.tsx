@@ -4,7 +4,12 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/lib/confirm";
-import { checklistReadiness, CHECKLIST_KIND_LABEL, type ChecklistKind } from "@/lib/checklists";
+import {
+  checklistReadiness,
+  checklistIssueCount,
+  CHECKLIST_KIND_LABEL,
+  type ChecklistKind,
+} from "@/lib/checklists";
 import { SHIFT_SLOT_LABEL } from "@/lib/employeeEvents";
 import { ChecklistWalk, type WalkTask } from "./ChecklistWalk";
 import type { WalkItemRow } from "./WalkItem";
@@ -67,6 +72,24 @@ export function WalkRunner({
   // record IS rather than what its template happens to be now.
   const noun = CHECKLIST_KIND_LABEL[run.kind as ChecklistKind].toLowerCase();
   const done = items.filter((i) => i.status !== "pending").length;
+  /**
+   * Whether Finish is the screen's PRIMARY act yet — the fill, not the gate.
+   *
+   * Mark asked whether Finish should only work once nothing is outstanding
+   * (2026-08-30). It should not: `checklistReadiness` is built on
+   * `closeReadiness`'s posture and says why in its own words — gate finishing on
+   * a complete set and the night the walk-in floods is a report that never gets
+   * sent. Gating it would also tax every legitimately unanswerable item with an
+   * N/A *and a note* before anybody could submit, and would leave a supervisor
+   * at 68 of 70 unable to record the two issues they did find.
+   *
+   * So the button stays pressable and the WEIGHT carries the message instead:
+   * ordinary while anything is unlooked-at, filled once it is the obvious last
+   * act. `PRIMARY_BUTTON_CLASS`'s own rule — "only ever right CONDITIONALLY,
+   * never as a screen's standing primary" — and the same shape as /timesheets
+   * filling Import while the pay period is empty and Close once it has shifts.
+   */
+  const nothingOutstanding = done === items.length && items.length > 0;
 
   async function finish() {
     const outstanding = checklistReadiness(
@@ -77,6 +100,18 @@ export function WalkRunner({
       })),
     );
 
+    // WHAT WAS FOUND IS NOT WHAT IS OUTSTANDING. The findings are stated as a
+    // fact — `salesNote`'s "INFORMATION, never a caveat" — because a flagged
+    // item has been dealt with as far as a checklist can deal with it, and the
+    // report is where it goes next.
+    const found = checklistIssueCount(items);
+    const findings =
+      found > 0
+        ? `${found === 1 ? "1 issue is" : `${found} issues are`} flagged, and ${
+            found === 1 ? "it goes" : "they go"
+          } in the report.`
+        : null;
+
     // `closeReadiness`'s rule and its reason: it NAMES what is unresolved and
     // then LETS YOU THROUGH. Gate finishing on a complete set and the night the
     // walk-in floods is a walk that is never finished — and a confirm that
@@ -84,11 +119,15 @@ export function WalkRunner({
     // confirms.
     const ok = await confirmDialog({
       title: `Finish this ${noun}?`,
-      body:
+      body: [
         outstanding.length > 0
           ? `Still outstanding:\n\n${outstanding.map((s) => `· ${s}`).join("\n")}\n\n` +
             `You can finish anyway — the ${noun} records what you found, including what you did not get to.`
-          : "Everything on the list has been answered.",
+          : `Everything on the list has been answered.`,
+        findings,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
       confirmLabel: "Finish it",
     });
     if (!ok) return;
@@ -175,8 +214,9 @@ export function WalkRunner({
           bar the band separated itself; on a white one, nothing does.
 
           Both buttons are ONE BOX — same border, same height, only the fill
-          differs — so the pair reads as a pair and the right edge does not move
-          when Finish is absent on a submitted run. `WorkingHere`'s rule. */}
+          differs — so the pair reads as a pair, the right edge does not move
+          when Finish is absent on a submitted run, and Finish taking or losing
+          its fill changes nothing about the geometry. `WorkingHere`'s rule. */}
       <footer className="sticky bottom-0 z-20 flex items-center justify-end gap-3 border-t border-hairline bg-white px-4 py-3">
         <button
           type="button"
@@ -190,7 +230,11 @@ export function WalkRunner({
             type="button"
             onClick={finish}
             disabled={busy}
-            className={`${FOOTER_CELL} bg-ink text-white hover:bg-white hover:text-ink`}
+            className={`${FOOTER_CELL} ${
+              nothingOutstanding
+                ? "bg-ink text-white hover:bg-white hover:text-ink"
+                : "bg-white text-ink hover:bg-ink hover:text-white"
+            }`}
           >
             {busy ? "Finishing…" : "Finish"}
           </button>

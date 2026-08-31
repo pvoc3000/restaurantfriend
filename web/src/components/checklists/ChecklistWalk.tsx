@@ -61,7 +61,18 @@ export function ChecklistWalk({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [tier, setTier] = useState<"remaining" | "issues" | "all">("remaining");
+  /**
+   * DONE MEANS ANSWERED — anything not `pending` — and not the `done` STATUS.
+   *
+   * That is `progressLabel`'s own definition, and the count it prints sits on
+   * this very row: "13 of 70 done". Two numbers a hand's breadth apart must not
+   * disagree about one word. It also makes the tiers reconcile — Done +
+   * Remaining is exactly All, with Issues a subset of Done — where the strict
+   * reading would strand every `na` item in no tier but All.
+   */
+  const [tier, setTier] = useState<"all" | "done" | "remaining" | "issues">(
+    "remaining",
+  );
   const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -70,6 +81,7 @@ export function ChecklistWalk({
   const shown = useMemo(() => {
     if (tier === "all") return items;
     if (tier === "issues") return items.filter((i) => i.status === "issue");
+    if (tier === "done") return items.filter((i) => i.status !== "pending");
     return items.filter((i) => i.status === "pending");
   }, [items, tier]);
 
@@ -190,14 +202,18 @@ export function ChecklistWalk({
         <TabPicker
           ariaLabel="Which items"
           value={tier}
+          // Mark's order (2026-08-30): the whole list, what is behind you, what
+          // is in front of you, then what needs somebody. Widest to narrowest,
+          // and the two you move between while walking sit next to each other.
           options={[
+            { key: "all", label: "All", count: items.length },
+            { key: "done", label: "Done", count: items.length - remaining },
             { key: "remaining", label: "Remaining", count: remaining },
             {
               key: "issues",
               label: "Issues",
               count: items.filter((i) => i.status === "issue").length,
             },
-            { key: "all", label: "All", count: items.length },
           ]}
           onChange={(v) => setTier(v as typeof tier)}
         />
@@ -210,7 +226,9 @@ export function ChecklistWalk({
             ? `Nothing left on this ${noun}.`
             : tier === "issues"
               ? "Nothing flagged."
-              : `This ${noun} has no items.`}
+              : tier === "done"
+                ? "Nothing has been checked yet."
+                : `This ${noun} has no items.`}
         </p>
       )}
 

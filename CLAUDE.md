@@ -5737,6 +5737,39 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    other case and a real one. N/A asks "Why not?" where Issue asks "What is
    wrong?".
 
+   **THE TIER PICKER IS All - Done - Remaining - Issues** (Mark's order,
+   2026-08-30) — the whole list, what is behind you, what is in front of you,
+   then what needs somebody, widest to narrowest, with the two you move between
+   while walking side by side. **`Done` MEANS ANSWERED, not the `done` STATUS**:
+   that is `progressLabel`'s own definition and its count sits on the SAME ROW
+   ("13 of 70 done"), so two numbers a hand's breadth apart cannot disagree
+   about one word. It also makes the tiers reconcile — Done + Remaining is
+   exactly All, Issues a subset of Done — where the strict reading would strand
+   every `na` item in no tier but All.
+   **A FLAGGED ISSUE IS NOT OUTSTANDING** (Mark, 2026-08-30: "if everything is
+   either marked done or flagged, then there aren't any outstanding issues. The
+   box says items flagged are outstanding issues and I disagree"). He is right,
+   and it goes to the module's posture: a checklist's job is to FIND what is
+   wrong, not to fix it, so an item looked at, found broken and written up is as
+   answered as an item gets — and telling its author they have not finished
+   tells somebody who did the job properly that they didn't. `checklistReadiness`
+   no longer counts them; the confirm states them as INFORMATION beside the
+   caveats ("1 issue is flagged, and it goes in the report"), which is
+   `salesNote`'s rule in this same codebase. **A flagged item still wants its
+   PHOTO** if one was asked for — that is a separate obligation, evidence
+   somebody asked for and did not get, and only the issue stopped being a caveat.
+   **FINISH IS BLACK ONLY ONCE NOTHING IS OUTSTANDING, AND IS NEVER GATED ON IT.**
+   Mark asked whether it should only work at Remaining 0 and was talked out of
+   it: `checklistReadiness` is built on `closeReadiness`'s posture and says why
+   in its own words — gate finishing on a complete set and the night the walk-in
+   floods is a report that never gets sent. Gating would also tax every
+   legitimately unanswerable item with an N/A *and a note* before anybody could
+   submit, and leave a supervisor at 68 of 70 unable to record the two issues
+   they did find. So the WEIGHT carries the message instead: ordinary while
+   anything is unlooked-at, filled once it is the obvious last act —
+   `PRIMARY_BUTTON_CLASS`'s own "only ever right CONDITIONALLY" rule, the same
+   shape as /timesheets filling Import while the pay period is empty.
+
    **THE RUNNER'S FOOTER IS WHITE AND ITS COMMIT IS BLACK** (Mark, 2026-08-30).
    It was a black bar with the colours inverted — a white Finish on black —
    which said the right thing backwards and made this the one screen in the app
