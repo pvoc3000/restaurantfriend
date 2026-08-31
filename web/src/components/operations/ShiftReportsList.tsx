@@ -246,19 +246,50 @@ export function ShiftReportsList({
     },
   ];
 
+  // The nights this shop was open and nobody reported. Held as a value rather
+  // than written inline because it renders in TWO places and never both — see
+  // where it is used.
+  const gapsNote =
+    gaps.length > 0 ? (
+      <p className="text-sm">
+        <span className="bg-mark-fill px-1">
+          {gaps.length === 1 ? "One night" : `${gaps.length} nights`} at {locationCode} closed
+          with no report
+        </span>{" "}
+        <span className="text-muted">— {gaps.join(", ")}</span>
+      </p>
+    ) : null;
+
   return (
     <div className="space-y-4">
+      {/* Beside the title, like `/checklists` and `/equipment`: in a
+          `justify-end` row above the filters a create command reads as one
+          more filter. `items-start`, so it lines up with the TOP of the
+          heading and stays put if the title ever wraps. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          Shift Reports
+        </h1>
+        <NewShiftReport
+          orgId={orgId}
+          locationId={locationId}
+          locationCode={locationCode}
+          today={today}
+          takers={takers}
+          existing={rows.map((r) => ({ date: r.reportDate, shift: r.shift }))}
+        />
+      </div>
+
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
 
-      {tier === "attention" && gaps.length > 0 ? (
-        <p className="text-sm">
-          <span className="bg-mark-fill px-1">
-            {gaps.length === 1 ? "One night" : `${gaps.length} nights`} at {locationCode} closed
-            with no report
-          </span>{" "}
-          <span className="text-muted">— {gaps.join(", ")}</span>
-        </p>
-      ) : null}
+      {/* ONE STATEMENT, IN WHICHEVER PLACE CAN BE SEEN. The missing nights are
+          counted on the tab and have no row to show, so with no flagged report
+          under it the table's own empty slot is where they belong — a band
+          saying "5 nights" over a table saying "nothing needs attention" is the
+          screen contradicting itself, and a band plus a sentence pointing AT
+          the band is the same fact twice, an inch apart. Above the table only
+          when there are rows, because then the empty slot does not exist. */}
+      {tier === "attention" && visible.length > 0 ? gapsNote : null}
 
       <DataTable
         rows={visible}
@@ -270,43 +301,31 @@ export function ShiftReportsList({
         columnChooser
         empty={
           tier === "attention" ? (
-            <p className="text-sm text-muted">Nothing needs attention.</p>
+            (gapsNote ?? <p className="text-sm text-muted">Nothing needs attention.</p>)
           ) : (
             <p className="text-sm text-muted">No shift reports here yet.</p>
           )
         }
         leading={
-          <div className="space-y-3">
-            <div className="flex justify-end">
-              <NewShiftReport
-                orgId={orgId}
-                locationId={locationId}
-                locationCode={locationCode}
-                today={today}
-                takers={takers}
-                existing={rows.map((r) => ({ date: r.reportDate, shift: r.shift }))}
-              />
-            </div>
-            <div className="flex flex-wrap items-end gap-3">
-              <TabPicker
-                ariaLabel="Which shift reports"
-                value={tier}
-                onChange={setTier}
-                options={[
-                  { key: "attention", label: "Needs attention", count: attentionCount },
-                  { key: "draft", label: "Drafts" },
-                  { key: "sent", label: "Sent" },
-                  { key: "all", label: "All" },
-                ]}
-              />
-              <TextInput
-                value={search}
-                onValueChange={setSearch}
-                placeholder="Search the reports…"
-                clearLabel="Clear the search"
-                className="w-72"
-              />
-            </div>
+          <div className="flex flex-wrap items-end gap-3">
+            <TabPicker
+              ariaLabel="Which shift reports"
+              value={tier}
+              onChange={setTier}
+              options={[
+                { key: "attention", label: "Needs attention", count: attentionCount },
+                { key: "draft", label: "Drafts" },
+                { key: "sent", label: "Sent" },
+                { key: "all", label: "All" },
+              ]}
+            />
+            <TextInput
+              value={search}
+              onValueChange={setSearch}
+              placeholder="Search the reports…"
+              clearLabel="Clear the search"
+              className="w-72"
+            />
           </div>
         }
       />
