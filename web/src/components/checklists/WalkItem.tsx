@@ -89,6 +89,23 @@ export function WalkItem({
     row.value_number == null ? "" : String(row.value_number),
   );
   const [busy, setBusy] = useState(false);
+  /**
+   * The status this row is WAITING FOR A NOTE before it can take.
+   *
+   * 076 refuses an `issue` or an `na` carrying no note, and the note has to
+   * travel in the SAME statement as the status — so the button cannot simply
+   * write. It used to REFUSE instead, with "say what is wrong before flagging
+   * it", and the note box only rendered on a row that was ALREADY flagged: a
+   * deadlock in which the module's central act was impossible on any row that
+   * did not already have a note (Mark, 2026-08-30, walking a real list). The
+   * only issues that could exist were the ones an out-of-range reading raised
+   * for itself, which write their own note — which is why the verification walk
+   * sailed past it.
+   *
+   * So the button ARMS the row and the note commits it. Both still land in one
+   * statement, which is the constraint that started all this.
+   */
+  const [arming, setArming] = useState<CheckStatus | null>(null);
   const [, startTransition] = useTransition();
 
   const outOfRange = readingLabel(row, row.value_number);
@@ -122,9 +139,13 @@ export function WalkItem({
     // the SAME statement. Bouncing a raw 23514 back at somebody standing in a
     // walk-in is the one refusal an inline control cannot explain.
     if ((target === "issue" || target === "na") && !note.trim()) {
-      onError("Say what is wrong before flagging it — an issue needs a note.");
+      // OPEN THE BOX, do not refuse. The note field mounts armed and focused,
+      // and writing both columns is its job.
+      onError(null);
+      setArming(target);
       return;
     }
+    setArming(null);
     startTransition(async () => {
       await write({
         status: target,
@@ -232,7 +253,11 @@ export function WalkItem({
             feature that does not exist. */}
         <div className="flex w-full shrink-0 flex-wrap items-start gap-2 sm:w-auto">
           {STATE_BUTTONS.map((b) => {
-            const on = row.status === b.status;
+            // An ARMED button reads as pressed, because it has been — the tap
+            // landed and the row is waiting on the note under it. Showing it
+            // inert would look like the press had done nothing, which is what
+            // the refusal it replaced already felt like.
+            const on = row.status === b.status || arming === b.status;
             const danger = b.status === "issue";
             return (
               <button
@@ -403,13 +428,41 @@ export function WalkItem({
         </div>
       )}
 
-      {(needsNote || note) && (
+      {(arming || needsNote || note) && (
         <textarea
           value={note}
           disabled={!writable}
+          // ONLY when the box has just been ARMED. It mounts at that moment, so
+          // the attribute fires exactly once and the tablet's keyboard comes up
+          // with it — where on page load `arming` is null, so a row that merely
+          // carries an old note does not steal focus.
+          autoFocus={arming !== null}
           onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => {
+            // ⌘↵ commits, `InlineValue`'s multiline convention — so the note can
+            // be finished without hunting for somewhere neutral to tap.
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+              e.preventDefault();
+              e.currentTarget.blur();
+            }
+          }}
           onBlur={() => {
+            if (arming) {
+              const target = arming;
+              setArming(null);
+              // An empty box is somebody changing their mind, not an error: the
+              // status was never written, so there is nothing to complain about
+              // and nothing to undo.
+              if (!note.trim()) return;
+              startTransition(async () => {
+                await write({ status: target, note: note.trim() });
+              });
+              return;
+            }
             if ((note.trim() || null) === (row.note ?? null)) return;
+            // Clearing the note on a row that IS flagged is the other case, and
+            // it really is a refusal — the status is already written, and 076
+            // would bounce the update.
             if (needsNote && !note.trim()) {
               onError("An issue needs a note saying what is wrong.");
               setNote(row.note ?? "");
@@ -420,7 +473,9 @@ export function WalkItem({
             });
           }}
           rows={2}
-          placeholder="What is wrong?"
+          placeholder={
+            (arming ?? row.status) === "na" ? "Why not?" : "What is wrong?"
+          }
           aria-label={`Note for ${row.prompt}`}
           className="w-full border border-hairline p-2 text-[16px] focus:border-ink focus:outline-none disabled:opacity-50"
         />

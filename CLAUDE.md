@@ -5715,6 +5715,28 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    create command reads as one more filter. Moving them left three dead props
    behind (`locationId` twice, `orgId` once), removed rather than left as
    unreachable wiring.
+   **FLAGGING AN ISSUE BY HAND WAS IMPOSSIBLE** (Mark, 2026-08-30, walking a
+   real list: "I get a message 'Say what is wrong before flagging it' but I see
+   no way to add a note"). A deadlock, and on the module's central act:
+   `needsNote` gated the note box on `row.status` ALREADY being `issue` or
+   `na`, while `setStatus` refused to SET either without a note — so on any row
+   that did not already carry one there was nothing to type in. The only issues
+   that could exist were the ones an out-of-range reading raises for itself,
+   which write their own note; **which is exactly why the verification walk
+   sailed past it** — it flagged by typing 46 °F, the one path that works.
+   **THE BUTTON NOW ARMS THE ROW AND THE NOTE COMMITS IT.** Pressing Issue or
+   N/A opens the box focused (`autoFocus` fires because the box MOUNTS at that
+   moment, and `arming` is null on page load so a row carrying an old note never
+   steals focus), shows the button as pressed — it was, and looking inert is what
+   the refusal already felt like — and writes status and note in ONE statement on
+   blur or ⌘↵. Both columns together is the constraint that started this: 076
+   refuses either state with no note, and a raw 23514 is the one refusal an
+   inline control cannot explain. **Blurring with an EMPTY box cancels silently**,
+   because nothing was written and changing your mind is not an error; clearing
+   the note on a row that IS flagged still refuses and reverts, which is the
+   other case and a real one. N/A asks "Why not?" where Issue asks "What is
+   wrong?".
+
    **THE RUNNER'S FOOTER IS WHITE AND ITS COMMIT IS BLACK** (Mark, 2026-08-30).
    It was a black bar with the colours inverted — a white Finish on black —
    which said the right thing backwards and made this the one screen in the app
