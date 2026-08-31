@@ -42,6 +42,7 @@ import { withFrom } from "@/lib/breadcrumbs";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { RowMenu } from "@/components/ui/RowMenu";
 import type { PoListRow } from "@/app/(app)/purchase-orders/page";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
@@ -316,9 +317,25 @@ export function PurchaseOrderList({
    * the only place that pulls it — see `ProcessPo.downloadPdf`.
    */
   async function batchPdf(kind: "po" | "shopping", mode: "open" | "download") {
+    await renderPoPdf(kind, mode, [...checked]);
+  }
+
+  /**
+   * The renderer both doors share — the selection bar, and a single row's own
+   * ⋯ menu. `ids` is the only difference between them, and it is a parameter
+   * rather than a second copy of this because the popup rule below is the kind
+   * of thing that gets remembered in one place and forgotten in the other.
+   */
+  async function renderPoPdf(
+    kind: "po" | "shopping",
+    mode: "open" | "download",
+    ids: string[]
+  ) {
+    if (ids.length === 0) return;
     // Opened before any await, while the click gesture still counts — a popup
     // opened after async work is silently blocked. `MenuButton` closes
-    // synchronously inside the click, so this is still inside the gesture.
+    // synchronously inside the click, so this is still inside the gesture, and
+    // that is as true of a RowMenu as of the command bar's own button.
     const win = mode === "open" ? openWindowNow() : null;
     setBatchBusy(`${kind}:${mode}`);
     setBatchError(null);
@@ -326,7 +343,7 @@ export function PurchaseOrderList({
       const [{ pdf }, docs, { org, pos }] = await Promise.all([
         import("@react-pdf/renderer"),
         import("./pdf/PoPdfDocs"),
-        fetchPoDocData(supabase, [...checked]),
+        fetchPoDocData(supabase, ids),
       ]);
       pos.sort((a, b) => a.po_number.localeCompare(b.po_number, undefined, { numeric: true }));
       const Doc = kind === "po" ? docs.PoPdf : docs.ShoppingListPdf;
@@ -343,40 +360,86 @@ export function PurchaseOrderList({
   }
 
   /**
-   * Delete the selection, PO lines cascading with their orders. Drafts are
-   * the expected case; anything already sent/received is order HISTORY (and
-   * feeds "last ordered"), so the confirm names those separately before
-   * anything irreversible happens.
+   * Delete orders, PO lines cascading with them. ONE implementation behind BOTH
+   * doors — the selection bar and a row's own ⋯ menu — because the thing that
+   * matters here is the confirm, and two copies of it would drift into
+   * disagreeing about what deleting a sent order costs.
+   *
+   * Drafts are the expected case; anything already sent or received is order
+   * HISTORY (and feeds "last ordered"), so the confirm names those separately
+   * before anything irreversible happens. A single order is named outright,
+   * since from a row menu "1 purchase order" is a worse answer to "which one?"
+   * than the number on the row you just pressed.
    */
-  async function batchDelete() {
-    const selected = orders.filter((po) => checked.has(po.id));
+  async function deleteOrders(selected: PoListRow[]): Promise<boolean> {
+    if (selected.length === 0) return false;
     const nonDraft = selected.filter((po) => po.status !== "draft");
     const message =
-      `Delete ${selected.length} purchase order${selected.length === 1 ? "" : "s"}` +
-      ` and ${selected.length === 1 ? "its" : "their"} lines?` +
+      (selected.length === 1
+        ? `Delete purchase order ${selected[0].po_number} and its lines?`
+        : `Delete ${selected.length} purchase orders and their lines?`) +
       (nonDraft.length > 0
-        ? `\n\nWARNING: ${nonDraft.length} of them ${
-            nonDraft.length === 1 ? "is" : "are"
-          } not a draft (${[...new Set(nonDraft.map((po) => po.status))].join(", ")}).` +
+        ? (selected.length === 1
+            ? `\n\nWARNING: it is ${nonDraft[0].status}, not a draft.`
+            : `\n\nWARNING: ${nonDraft.length} of them ${
+                nonDraft.length === 1 ? "is" : "are"
+              } not a draft (${[...new Set(nonDraft.map((po) => po.status))].join(", ")}).`) +
           " Deleting sent or received orders erases order history permanently."
         : "\n\nThis cannot be undone.");
-    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Delete", tone: "danger" }))) return;
+    if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Delete", tone: "danger" })))
+      return false;
 
     setBatchBusy("delete");
     setBatchError(null);
     try {
-      const { error } = await supabase
+      // `.select()` ON A DELETE. With no matching RLS policy Postgres removes
+      // ZERO ROWS and PostgREST returns NO ERROR, so a bare delete reports a
+      // cheerful success and the order is still there after the refresh — the
+      // employee-delete lesson, and the reason below purchaser+ this has to
+      // fail out loud rather than quietly.
+      const { data, error } = await supabase
         .from("purchase_orders")
         .delete()
-        .in("id", [...checked]);
+        .in(
+          "id",
+          selected.map((po) => po.id)
+        )
+        .select("id");
       if (error) throw new Error(error.message);
+      if ((data?.length ?? 0) < selected.length) {
+        throw new Error(
+          data?.length
+            ? `Only ${data.length} of ${selected.length} were deleted — the rest are not yours to delete.`
+            : "Nothing was deleted. Purchase orders are a purchaser's to remove."
+        );
+      }
       setChecked(new Set());
-      router.refresh();
+      return true;
     } catch (e) {
       setBatchError(e instanceof Error ? e.message : String(e));
+      return false;
     } finally {
       setBatchBusy(null);
     }
+  }
+
+  /** The selection bar's door onto `deleteOrders`. */
+  async function batchDelete() {
+    if (await deleteOrders(orders.filter((po) => checked.has(po.id)))) router.refresh();
+  }
+
+  /**
+   * Delete ONE order, from its own row menu.
+   *
+   * The selection bar could already do this and the row could not, so removing
+   * a single order meant ticking it, reading a bar written for a batch, and
+   * remembering to untick. It goes through `deleteOrders` with the batch, which
+   * is what keeps the two confirms from drifting into disagreeing about what
+   * deleting a sent order costs.
+   */
+  async function deleteOne(po: PoListRow) {
+    setBatchError(null);
+    if (await deleteOrders([po])) router.refresh();
   }
 
   /** Drafts only — sent_via comes from each vendor's order type. */
@@ -535,7 +598,7 @@ export function PurchaseOrderList({
       // 240 → 210. The widest column and the one with the most slack: the
       // longest vendor name in the catalog is "Trinity Oil & Grease Recycling",
       // which truncated at 240 as well.
-      width: 210,
+      width: 181,
       sortValue: (po) => po.vendors?.name ?? null,
       render: (po) =>
         po.vendors ? (
@@ -569,7 +632,7 @@ export function PurchaseOrderList({
       key: "sent_via",
       label: "Sent via",
       // 120 → 110. The values are one short word — gmail, resend, phone.
-      width: 110,
+      width: 103,
       hideWhenCompact: true,
       sortValue: (po) => po.sent_via,
       render: (po) => <span className="text-muted">{po.sent_via ?? "—"}</span>,
@@ -586,7 +649,7 @@ export function PurchaseOrderList({
     {
       key: "lines",
       label: "Lines",
-      width: 85,
+      width: 78,
       hideWhenCompact: true,
       align: "right",
       sortValue: (po) => po.line_count,
@@ -595,7 +658,7 @@ export function PurchaseOrderList({
     {
       key: "total",
       label: "Ordered",
-      width: 130,
+      width: 117,
       align: "right",
       sortValue: (po) => po.ordered_total,
       render: (po) => <span className="text-body">{money(po.ordered_total)}</span>,
@@ -603,7 +666,7 @@ export function PurchaseOrderList({
     {
       key: "received_total",
       label: "Received",
-      width: 130,
+      width: 121,
       align: "right",
       sortValue: (po) => po.received_total,
       render: (po) => (
@@ -626,7 +689,7 @@ export function PurchaseOrderList({
     {
       key: "attachments",
       label: "Files",
-      width: 80,
+      width: 75,
       align: "right",
       sortValue: (po) => po.attachment_count,
       render: (po) =>
@@ -635,6 +698,67 @@ export function PurchaseOrderList({
         ) : (
           <span className="tabular-nums text-muted">{po.attachment_count}</span>
         ),
+    },
+    // The row's own commands. Unlabelled and last, so it stays out of the
+    // Columns menu — it is a control rather than a field.
+    //
+    // 58, and every pixel of it was MEASURED rather than chosen. Widths are
+    // WEIGHTS, so what a column resolves to depends on the table's total: at
+    // 1280 (the tight case — `compactBelow` has not fired yet) a weight of 50
+    // is a 42px cell holding a 36px button, and `TasksScreen`'s 50 works only
+    // because that table's total is smaller.
+    //
+    // The total stays at the 1338 the storageKey note tuned this table to,
+    // which is what keeps every column NOT named here at exactly the pixels it
+    // had before — the factor does not move. The 58 was paid for out of
+    // measured slack at 1280: Lines and Files had 21px and 22px spare (their
+    // content is one or two digits and their own LABEL is the binding
+    // constraint, so that slack is structural rather than a fact about
+    // today's data), the two money columns 17px and 13px, Sent via 8px, and
+    // the rest came from Vendor, whose cells are proper nouns where an
+    // ellipsis is idiomatic. Nothing was taken from Status, which had ZERO
+    // spare — "RECEIVED" fills its chip exactly — or from the two DATE
+    // columns, which had 2px and are the thing you read this list for.
+    //
+    // NOT role-gated, matching the selection bar directly above it: this list
+    // takes no role prop, RLS is the gate, and `deleteOrders` now checks its
+    // own row count so a refusal is a sentence rather than a silent success.
+    {
+      key: "menu",
+      label: "",
+      width: 70,
+      render: (po) => (
+        <RowMenu
+          label={`Commands for ${po.po_number}`}
+          items={[
+            {
+              label: "Preview purchase order",
+              hint: "Opens for reading or printing",
+              disabled: batchBusy !== null,
+              onSelect: () => void renderPoPdf("po", "open", [po.id]),
+            },
+            {
+              // The FILENAME as the hint, which is what the command bar's own
+              // download items do: a preview tab cannot be named (its blob URL
+              // is a UUID), so the name is the whole difference between the two
+              // verbs and is worth showing before you press one.
+              label: "Download purchase order",
+              hint: poDocumentFileName("po", [po.po_number]),
+              disabled: batchBusy !== null,
+              onSelect: () => void renderPoPdf("po", "download", [po.id]),
+            },
+            {
+              label: "Delete purchase order",
+              hint:
+                po.status === "draft"
+                  ? "and its lines"
+                  : `it is ${po.status} — this erases order history`,
+              danger: true,
+              onSelect: () => void deleteOne(po),
+            },
+          ]}
+        />
+      ),
     },
   ];
 
