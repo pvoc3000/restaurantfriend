@@ -11,28 +11,32 @@ import type { WalkItemRow } from "./WalkItem";
 import type { ChecklistRunData } from "@/lib/checklistRunData";
 
 /**
- * One dress for both footer cells, so a two-across row cannot drift — and it
- * carries NO COLOUR, deliberately.
+ * One dress for both footer buttons, so the pair cannot drift — and it carries
+ * NO COLOUR, deliberately.
  *
- * It held `text-white` first, and the commit appended `bg-white text-ink` over
+ * It held `text-white` once, and the commit appended `bg-white text-ink` over
  * it. That renders WHITE ON WHITE: Tailwind resolves competing utilities by
  * STYLESHEET ORDER, not by the order they appear in a class attribute, so
- * `text-white` won and the Finish button was invisible on a black bar. Caught
- * by measuring the computed style rather than by looking — at a glance the
- * footer simply appears to have one button.
+ * `text-white` won and the Finish button was invisible. Caught by measuring the
+ * computed style rather than by looking — at a glance the footer simply appears
+ * to have one button. The rule this file follows: a shared class string states
+ * LAYOUT, each caller states its own colours, nothing is overridden.
  *
- * The rule this file now follows: a shared class string states LAYOUT, and
- * each caller states its own colours. Nothing is overridden.
+ * IT IS NOT `BUTTON_CLASS` / `PRIMARY_BUTTON_CLASS`, whose colours and hovers
+ * these two borrow, because those are `h-9` at 12px — the DESK metrics. This
+ * screen is tablet-first, where 36px is under the 44px a thumb wants, so the
+ * sizing is its own and only the dress is shared.
  */
 const FOOTER_CELL =
-  "min-h-14 px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] disabled:opacity-35";
+  "inline-flex min-h-14 items-center justify-center border border-ink px-6 py-3 text-sm font-bold uppercase tracking-[0.08em] transition-colors disabled:opacity-35";
 
 /**
  * The walk's own chrome: FileMaker's furniture, and the shift report runner's.
  *
- * A black band naming the walk and its progress, the scrolling body, and a
- * black footer of two commands. `ChecklistWalk` is the body and knows nothing
- * about any of this, which is what lets the shift report mount it as a page.
+ * A black band naming the checklist and its progress, the scrolling body, and a
+ * white footer of two commands under a hairline. `ChecklistWalk` is the body and
+ * knows nothing about any of this, which is what lets the shift report mount it
+ * as a page.
  */
 export function WalkRunner({
   run,
@@ -154,26 +158,39 @@ export function WalkRunner({
         />
       </main>
 
-      <footer className="sticky bottom-0 z-20 flex items-stretch justify-end gap-px bg-ink">
+      {/* A WHITE FOOTER, and the commit is BLACK the ordinary way round (Mark,
+          2026-08-30). It was a black bar with the colours inverted — white
+          Finish on black — which said the same thing backwards and made this
+          the one screen in the app where the important button is the pale one.
+          Now it matches the receiving screen exactly, which is this footer's
+          closest sibling: `Close` beside a black `Complete`, an escape beside a
+          commit rather than a row of peers. That is the panel-commit exception
+          (`PRIMARY_BUTTON_CLASS`'s own case) applied to a screen that behaves
+          like a panel, because a run produces ONE outcome.
+
+          THE TOP RULE IS NOT OPTIONAL — Mark asked, and the app has already
+          answered it twice: `SpecialOrdersList`'s pinned legend draws one for
+          the stated reason that "without a top rule the rows scroll up into an
+          unmarked white band", and a hairline is the weight it uses. On a black
+          bar the band separated itself; on a white one, nothing does.
+
+          Both buttons are ONE BOX — same border, same height, only the fill
+          differs — so the pair reads as a pair and the right edge does not move
+          when Finish is absent on a submitted run. `WorkingHere`'s rule. */}
+      <footer className="sticky bottom-0 z-20 flex items-center justify-end gap-3 border-t border-hairline bg-white px-4 py-3">
         <button
           type="button"
-          className={`${FOOTER_CELL} text-white hover:bg-white/10`}
+          className={`${FOOTER_CELL} bg-white text-ink hover:bg-ink hover:text-white`}
           onClick={() => router.push(`/checklists/${run.id}`)}
         >
           Close
         </button>
         {isOpen && editable && (
-          // BLACK on black is nothing, so the commit is the INVERSE here: the
-          // one outcome this screen exists to produce is picked out in white,
-          // which is the panel-commit exception (`DIALOG_COMMIT_CLASS`) applied
-          // to a screen that behaves like a panel — an escape beside a commit
-          // rather than a row of peers. Receiving's `Complete` made the same
-          // call in the same words.
           <button
             type="button"
             onClick={finish}
             disabled={busy}
-            className={`${FOOTER_CELL} bg-white text-ink hover:bg-white/85`}
+            className={`${FOOTER_CELL} bg-ink text-white hover:bg-white hover:text-ink`}
           >
             {busy ? "Finishing…" : "Finish"}
           </button>

@@ -5715,6 +5715,27 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    create command reads as one more filter. Moving them left three dead props
    behind (`locationId` twice, `orgId` once), removed rather than left as
    unreachable wiring.
+   **THE RUNNER'S FOOTER IS WHITE AND ITS COMMIT IS BLACK** (Mark, 2026-08-30).
+   It was a black bar with the colours inverted — a white Finish on black —
+   which said the right thing backwards and made this the one screen in the app
+   where the important button is the pale one. It now matches the RECEIVING
+   SCREEN, which is its closest sibling: `Close` beside a black commit, an
+   escape beside a commit rather than a row of peers, which is the panel-commit
+   exception applied to a screen that behaves like a panel because a run
+   produces ONE outcome.
+   **THE TOP RULE IS NOT OPTIONAL** — Mark asked whether it needed one, and the
+   app had already answered twice: `SpecialOrdersList`'s pinned legend draws a
+   `border-t border-hairline` for the stated reason that "without a top rule the
+   rows scroll up into an unmarked white band", and `ui/StickyFooter` deliberately
+   contributes position and a white backdrop and NOTHING ELSE, leaving the frame
+   to the caller. On a black bar the band separated itself; on a white one
+   nothing does.
+   Both buttons are ONE BOX — same border, same 56px height, only the fill
+   differs (`WorkingHere`'s rule) — and the sizing is the runner's own rather
+   than `BUTTON_CLASS`/`PRIMARY_BUTTON_CLASS`, whose colours and hover
+   inversions they borrow: those are `h-9` at 12px, the DESK metrics, and this
+   screen is tablet-first where 36px is under the 44px a thumb wants.
+
    **AND THE TASKS DIALOGS' TEXTAREAS WERE GREY** where every field beside them
    was black (Mark, 2026-08-30: "most fields have black borders, details is
    grey"). `NewTask` and `ResolveTask` were the only two form textareas in the
