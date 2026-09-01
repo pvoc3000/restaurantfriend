@@ -352,7 +352,16 @@ export function PrintPacket({
                       and with none you want the answer you came for rather than
                       the numeral zero. */}
                   {p.key === "special" ? (
-                    <span className="text-muted">
+                    /* PUSHED TO THE RIGHT EDGE (Mark, 2026-09-01: "if there's a
+                       dot between 'special orders' and 'nothing to print' I
+                       don't see it" — there wasn't one, only a flex gap).
+                       `ml-auto` separates them by the whole width of the row,
+                       which is more separation than any character could be, and
+                       it makes the annotation a COLUMN: with four rows saying
+                       nothing there, the one that speaks is the only ink on
+                       that edge. A middot was the other candidate and is three
+                       pixels of ink — the same failure one size up. */
+                    <span className="ml-auto text-muted">
                       {orderIds.length === 0
                         ? "Nothing to print"
                         : `${orderIds.length} ${orderIds.length === 1 ? "order" : "orders"}`}
