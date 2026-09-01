@@ -303,24 +303,28 @@ export function pushedLabel(external_ref: AccountingRef | null | undefined): str
 // Which account a vendor's bills post to
 // ---------------------------------------------------------------------------
 
-/**
- * The vendor's side of the mapping: who they are in QuickBooks, and — since
- * migration 082 — which account their bills post to.
- */
-export type VendorAccounting = {
-  external_ref: AccountingRef | null;
-  expense_account_ref: string | null;
-  expense_account_name: string | null;
-};
-
 /** The QBO Vendor id, or null when nobody has mapped this vendor yet. */
 export function qboVendorId(external_ref: AccountingRef | null | undefined): string | null {
   const id = external_ref?.qbo?.id?.trim();
   return id ? id : null;
 }
 
-/** 083's row: this vendor, at this shop. */
+/**
+ * Everything QuickBooks knows about one vendor at one shop.
+ *
+ * ALL OF IT LIVES HERE (Mark, 2026-09-01: "All QBO settings should be in the
+ * Vendor per location config. Even the Vendor.") — the mapping in 026's
+ * `external_ref`, which was added for exactly this and had never had a reader,
+ * and the three settings 083 added beside it. One screen, one row, one place to
+ * look.
+ *
+ * `vendors.external_ref` (081) and `vendors.expense_account_ref` (082) are
+ * consequently UNREAD. They are left in place rather than dropped: the columns
+ * cost nothing, and a migration whose only purpose is tidiness is a migration
+ * that can go wrong for no gain.
+ */
 export type VendorLocationAccounting = {
+  external_ref: AccountingRef | null;
   expense_account_ref: string | null;
   expense_account_name: string | null;
   qbo_location_ref: string | null;
@@ -333,7 +337,7 @@ export type ResolvedAccount = {
   ref: string;
   name: string | null;
   /** Which level answered — what the screen says beside the field. */
-  source: "vendor_location" | "vendor" | "org";
+  source: "vendor_location" | "org";
 };
 
 /**
@@ -355,10 +359,6 @@ export function expenseAccountFor(
     | Pick<VendorLocationAccounting, "expense_account_ref" | "expense_account_name">
     | null
     | undefined,
-  vendor:
-    | Pick<VendorAccounting, "expense_account_ref" | "expense_account_name">
-    | null
-    | undefined,
   orgDefault: { ref: string | null; name?: string | null } | null | undefined
 ): ResolvedAccount | null {
   const atShop = vendorLocation?.expense_account_ref?.trim();
@@ -369,10 +369,8 @@ export function expenseAccountFor(
       source: "vendor_location",
     };
   }
-  const own = vendor?.expense_account_ref?.trim();
-  if (own) {
-    return { ref: own, name: vendor?.expense_account_name?.trim() || null, source: "vendor" };
-  }
+  // The org's floor, from Settings → Accounting, so a vendor nobody has
+  // configured still posts somewhere rather than refusing.
   const fallback = orgDefault?.ref?.trim();
   if (fallback) {
     return { ref: fallback, name: orgDefault?.name?.trim() || null, source: "org" };

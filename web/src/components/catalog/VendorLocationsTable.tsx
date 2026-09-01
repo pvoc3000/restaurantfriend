@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { invokeQbo } from "@/lib/qboClient";
 import { splitAccountName } from "@/lib/quickbooks";
+import { PickList } from "@/components/ui/PickList";
 import { money, HERE_BADGE_CLASS } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
 import { InlineValue } from "./InlineValue";
@@ -20,6 +21,7 @@ function daysKey(list: number[] | null) {
 export type VendorLocationRow = {
   id: string;
   location_id: string;
+  external_ref: { qbo?: { id?: string } } | null;
   expense_account_ref: string | null;
   expense_account_name: string | null;
   qbo_location_ref: string | null;
@@ -54,6 +56,62 @@ function repSummary(row: VendorLocationRow) {
  * Editable in place (spec §4.8 puts this on the vendor screen); writes go
  * through RLS, which requires purchaser or above.
  */
+function VendorQboLink({
+  rowId,
+  value,
+  options,
+  placeholder,
+}: {
+  rowId: string;
+  value: string | null;
+  options: { id: string; name: string }[];
+  placeholder: string;
+}) {
+  const supabase = createClient();
+  const [picked, setPicked] = useState(value);
+  const [error, setError] = useState<string | null>(null);
+
+  async function pick(next: string | null) {
+    setError(null);
+    // The whole `qbo` branch as an OBJECT, so an id can never outlive what it
+    // was chosen as — and so the column holds jsonb rather than a string that
+    // merely looks like it.
+    const { data, error: writeError } = await supabase
+      .from("vendor_locations")
+      .update({ external_ref: next ? { qbo: { id: next } } : {} })
+      .eq("id", rowId)
+      .select("id");
+    if (writeError) {
+      setError(writeError.message);
+      return;
+    }
+    // Row count, not the absence of an error: below purchaser+ the policy
+    // matches nothing and PostgREST still reports success.
+    if (!data || data.length === 0) {
+      setError("That wasn't saved — changing a vendor is open to purchasers and above.");
+      return;
+    }
+    setPicked(next);
+  }
+
+  return (
+    <>
+      <PickList
+        variant="inline"
+        ariaLabel="Which QuickBooks vendor this is at this shop"
+        value={picked}
+        placeholder={placeholder}
+        options={options.map((o) => ({ value: o.id, label: o.name }))}
+        onPick={(next) => void pick(next)}
+        clearable
+        clearLabel="Not linked"
+        panelMinWidth={320}
+      />
+      {error && <p className="text-[12px] text-accent">{error}</p>}
+    </>
+  );
+}
+
 export function VendorLocationsTable({
   qboConnected = false,
   rows,
@@ -72,6 +130,7 @@ export function VendorLocationsTable({
 }) {
   const supabase = createClient();
   const [qbo, setQbo] = useState<{
+    vendors: { id: string; name: string }[];
     accounts: { id: string; name: string }[];
     classes: { id: string; name: string }[];
     departments: { id: string; name: string }[];
@@ -84,13 +143,15 @@ export function VendorLocationsTable({
     if (!qboConnected) return;
     let cancelled = false;
     void (async () => {
-      const [a, c, d] = await Promise.all([
+      const [a, c, d, v] = await Promise.all([
         invokeQbo(supabase, { mode: "accounts" }),
         invokeQbo(supabase, { mode: "classes" }),
         invokeQbo(supabase, { mode: "departments" }),
+        invokeQbo(supabase, { mode: "vendors" }),
       ]);
       if (cancelled) return;
       setQbo({
+        vendors: (v.data?.vendors ?? []) as { id: string; name: string }[],
         accounts: (a.data?.accounts ?? []) as { id: string; name: string }[],
         classes: (c.data?.classes ?? []) as { id: string; name: string }[],
         departments: (d.data?.departments ?? []) as { id: string; name: string }[],
@@ -273,6 +334,24 @@ export function VendorLocationsTable({
                   QuickBooks
                 </dt>
 
+                <dt className="py-0.5 text-subtle">Vendor</dt>
+                <dd>
+                  {/* 026's `external_ref`, which was added for a per-location
+                      company file and had never had a reader. Mark, 2026-09-01:
+                      every QuickBooks setting belongs on this row, the mapping
+                      included. `vendors.external_ref` is now the unused one. */}
+                  <VendorQboLink
+                    rowId={r.id}
+                    value={r.external_ref?.qbo?.id ?? null}
+                    options={qbo?.vendors ?? []}
+                    placeholder={pickerPlaceholder(
+                      qbo?.vendors,
+                      "No vendors in QuickBooks",
+                      "Not linked"
+                    )}
+                  />
+                </dd>
+
                 <dt className="py-0.5 text-subtle">Account</dt>
                 <dd>
                   <InlineValue
@@ -285,7 +364,7 @@ export function VendorLocationsTable({
                     placeholder={pickerPlaceholder(
                       qbo?.accounts,
                       "No expense accounts in QuickBooks",
-                      "Use the vendor's"
+                      "Use the org default"
                     )}
                     ariaLabel="Expense account for this vendor at this shop"
                     options={(qbo?.accounts ?? []).map((a) => {

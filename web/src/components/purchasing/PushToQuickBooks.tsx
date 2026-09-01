@@ -37,8 +37,6 @@ type Ctx = {
   connected: boolean;
   orgAccount: { ref: string | null; name: string | null } | null;
   vendorName: string;
-  vendorRef: string | null;
-  vendorAccount: { expense_account_ref: string | null; expense_account_name: string | null };
   /** 083's row for THIS invoice's shop. Null when nobody has configured the
    *  vendor there — or when the migration is not applied yet. */
   atShop: VendorLocationAccounting | null;
@@ -85,11 +83,7 @@ export function PushToQuickBooks({
   const readContext = useCallback(async (): Promise<Ctx> => {
     const [conn, vendor, invoice, atShop] = await Promise.all([
       supabase.rpc("accounting_connection_status", { p_org: orgId }),
-      supabase
-        .from("vendors")
-        .select("name, external_ref, expense_account_ref, expense_account_name")
-        .eq("id", vendorId)
-        .maybeSingle(),
+      supabase.from("vendors").select("name").eq("id", vendorId).maybeSingle(),
       supabase.from("vendor_invoices").select("external_ref").eq("id", invoiceId).maybeSingle(),
       // Separate and allowed to fail: these columns arrive with 083, and
       // folding them into a query the rest of the block depends on would take
@@ -97,7 +91,7 @@ export function PushToQuickBooks({
       supabase
         .from("vendor_locations")
         .select(
-          "expense_account_ref, expense_account_name, qbo_location_ref, qbo_location_name, qbo_class_ref, qbo_class_name"
+          "external_ref, expense_account_ref, expense_account_name, qbo_location_ref, qbo_location_name, qbo_class_ref, qbo_class_name"
         )
         .eq("vendor_id", vendorId)
         .eq("location_id", locationId)
@@ -116,11 +110,6 @@ export function PushToQuickBooks({
         ? { ref: row.bill_expense_account_ref ?? null, name: row.bill_expense_account_name ?? null }
         : null,
       vendorName: (vendor.data?.name as string) ?? "this vendor",
-      vendorRef: qboVendorId((vendor.data?.external_ref ?? null) as AccountingRef | null),
-      vendorAccount: {
-        expense_account_ref: (vendor.data?.expense_account_ref as string | null) ?? null,
-        expense_account_name: (vendor.data?.expense_account_name as string | null) ?? null,
-      },
       atShop: (atShop.data ?? null) as VendorLocationAccounting | null,
       schemaError: atShop.error?.message ?? null,
       invoiceRef: (invoice.data?.external_ref ?? null) as AccountingRef | null,
@@ -142,7 +131,9 @@ export function PushToQuickBooks({
   // place to advertise a feature nobody has set up.
   if (!ctx || !ctx.connected) return null;
 
-  const account = expenseAccountFor(ctx.atShop, ctx.vendorAccount, ctx.orgAccount);
+  const account = expenseAccountFor(ctx.atShop, ctx.orgAccount);
+  // The mapping is the SHOP's now, not the vendor's — 026's column, finally read.
+  const vendorRef = qboVendorId(ctx.atShop?.external_ref ?? null);
   const tracking = qboTrackingFor(ctx.atShop);
   const billInvoice: BillInvoice = {
     id: invoiceId,
@@ -156,7 +147,7 @@ export function PushToQuickBooks({
   };
   const refusals = billPushRefusals({
     invoice: billInvoice,
-    vendorRef: ctx.vendorRef,
+    vendorRef,
     vendorName: ctx.vendorName,
     accountRef: account?.ref ?? null,
   });
@@ -165,7 +156,7 @@ export function PushToQuickBooks({
   async function push() {
     const { entity, body: payload } = buildBillPayload({
       invoice: billInvoice,
-      vendorRef: ctx!.vendorRef,
+      vendorRef,
       vendorName: ctx!.vendorName,
       accountRef: account!.ref,
       department: tracking.location,

@@ -305,7 +305,7 @@ Deno.serve(async (req) => {
 
       const { data: invoice, error: invErr } = await supabase
         .from("vendor_invoices")
-        .select("id, org_id, vendor_id, status, total, is_credit, invoice_number, external_ref")
+        .select("id, org_id, vendor_id, location_id, status, total, is_credit, invoice_number, external_ref")
         .eq("id", req.invoice_id)
         .maybeSingle();
       if (invErr) return json(500, { error: invErr.message });
@@ -321,18 +321,24 @@ Deno.serve(async (req) => {
         return json(400, { error: `A ${invoice.is_credit ? "credit" : "bill"} posts as ${wanted}` });
       }
 
-      // The vendor mapping, and the account it posts to. Both are read here
+      // The mapping is the SHOP's, not the vendor's (Mark, 2026-09-01: every
+      // QuickBooks setting lives on the vendor's per-location row). Read here
       // rather than trusted from the payload.
-      const { data: vendor } = await supabase
-        .from("vendors")
-        .select("name, external_ref")
-        .eq("id", invoice.vendor_id)
-        .maybeSingle();
-      const vendorRef = (vendor?.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id ?? null;
+      const [{ data: vendor }, { data: atShop }] = await Promise.all([
+        supabase.from("vendors").select("name").eq("id", invoice.vendor_id).maybeSingle(),
+        supabase
+          .from("vendor_locations")
+          .select("external_ref")
+          .eq("vendor_id", invoice.vendor_id)
+          .eq("location_id", invoice.location_id)
+          .maybeSingle(),
+      ]);
+      const vendorRef =
+        (atShop?.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id ?? null;
       if (!vendorRef) {
         return json(400, {
-          error: `No QuickBooks vendor is linked to ${vendor?.name ?? "this vendor"}. ` +
-            "Pick one on the vendor's record.",
+          error: `No QuickBooks vendor is linked to ${vendor?.name ?? "this vendor"} at this ` +
+            "shop. Set it on the vendor's record, under that location.",
         });
       }
 

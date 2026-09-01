@@ -292,11 +292,8 @@ test("the entity path is what QBO's URL wants", () => {
 // ---------------------------------------------------------------------------
 
 const ORG = { ref: "80", name: "Cost of Goods Sold" };
-const BAKER = {
-  expense_account_ref: "91",
-  expense_account_name: "Cost of Goods Sold:Baker Items COGs",
-};
 const NO_VL = {
+  external_ref: null,
   expense_account_ref: null,
   expense_account_name: null,
   qbo_location_ref: null,
@@ -305,41 +302,35 @@ const NO_VL = {
   qbo_class_name: null,
 };
 
-test("the account cascades vendor-location, then vendor, then org", () => {
-  // Mark's case, at the grain he asked for: this vendor at this shop wins,
-  // then what the vendor posts to anywhere, then the connection's default.
+test("the account is this vendor at this shop, then the org's floor", () => {
+  // Mark, 2026-09-01: every QuickBooks setting lives on the vendor's
+  // per-location row. The org default in Settings is the only thing under it,
+  // so a vendor nobody has configured still posts somewhere.
   eq(
-    expenseAccountFor({ expense_account_ref: "95", expense_account_name: "…:Produce Items COGs" }, BAKER, ORG),
-    { ref: "95", name: "…:Produce Items COGs", source: "vendor_location" },
+    expenseAccountFor(
+      { expense_account_ref: "91", expense_account_name: "Cost of Goods Sold:Baker Items COGs" },
+      ORG
+    ),
+    { ref: "91", name: "Cost of Goods Sold:Baker Items COGs", source: "vendor_location" },
     "the shop's own"
   );
   eq(
-    expenseAccountFor(NO_VL, BAKER, ORG),
-    { ref: "91", name: "Cost of Goods Sold:Baker Items COGs", source: "vendor" },
-    "falls to the vendor"
-  );
-  eq(
-    expenseAccountFor(NO_VL, null, ORG),
+    expenseAccountFor(NO_VL, ORG),
     { ref: "80", name: "Cost of Goods Sold", source: "org" },
     "falls to the org"
   );
-  eq(expenseAccountFor(null, null, null), null, "nothing anywhere");
+  eq(expenseAccountFor(null, null), null, "nothing anywhere");
 });
 
-test("a BLANK at any tier falls through rather than posting nowhere", () => {
-  // An emptied field leaves "" behind. Treating it as a value would send an
-  // empty ref, which QuickBooks refuses — after the bill is half-built.
+test("a BLANK falls through rather than posting nowhere", () => {
+  // An emptied field leaves "" behind; sending it would be an empty ref that
+  // QuickBooks refuses, after the bill is half-built.
   eq(
-    expenseAccountFor({ expense_account_ref: "  ", expense_account_name: "" }, BAKER, ORG)?.source,
-    "vendor",
+    expenseAccountFor({ expense_account_ref: "  ", expense_account_name: "" }, ORG)?.source,
+    "org",
     "blank at the shop"
   );
-  eq(
-    expenseAccountFor(NO_VL, { expense_account_ref: " ", expense_account_name: "" }, ORG)?.source,
-    "org",
-    "blank at the vendor"
-  );
-  eq(expenseAccountFor(NO_VL, null, { ref: " " }), null, "blank at the org");
+  eq(expenseAccountFor(NO_VL, { ref: " " }), null, "blank at the org");
 });
 
 test("nothing set anywhere is refused BY NAME rather than guessed", () => {
@@ -349,7 +340,7 @@ test("nothing set anywhere is refused BY NAME rather than guessed", () => {
   );
 });
 
-test("Location and Class are ONE tier — set here or not sent", () => {
+test("Location and Class are set on the row or not sent", () => {
   // Deliberately no fallback: an org-wide default location would put every
   // shop's bills in the same place, which is the opposite of tracking them.
   const set = qboTrackingFor({
@@ -369,6 +360,15 @@ test("Location and Class are ONE tier — set here or not sent", () => {
   eq(qboTrackingFor({ ...NO_VL, qbo_class_ref: "   " }).klass, null, "blank is not a value");
 });
 
+test("the QuickBooks vendor is read from the SHOP's row, not the vendor", () => {
+  // 026 added `vendor_locations.external_ref` for exactly this and it had never
+  // had a reader; `vendors.external_ref` is now the unused one.
+  eq(qboVendorId({ qbo: { id: "58" } }), "58", "mapped");
+  eq(qboVendorId({ qbo: { id: "  " } }), null, "blank is unmapped");
+  eq(qboVendorId(null), null, "no row");
+  eq(qboVendorId(NO_VL.external_ref), null, "row with nothing set");
+});
+
 test("ClassRef rides the LINE and DepartmentRef the HEADER", () => {
   // The one detail QuickBooks punishes silently: a Bill takes its class per
   // expense line, and a ClassRef on the header is accepted and ignored.
@@ -379,7 +379,6 @@ test("ClassRef rides the LINE and DepartmentRef the HEADER", () => {
   });
   eq((body.DepartmentRef as Record<string, unknown>).value, "3", "department on the header");
   no("ClassRef" in body, "class is NOT on the header");
-
   const line = (body.Line as Record<string, unknown>[])[0];
   const detail = line.AccountBasedExpenseLineDetail as Record<string, unknown>;
   eq((detail.ClassRef as Record<string, unknown>).value, "7", "class on the line");
@@ -391,12 +390,6 @@ test("neither is sent when unset", () => {
   const detail = (body.Line as Record<string, unknown>[])[0]
     .AccountBasedExpenseLineDetail as Record<string, unknown>;
   no("ClassRef" in detail, "no class");
-});
-
-test("the vendor mapping is read from external_ref", () => {
-  eq(qboVendorId({ qbo: { id: "58" } }), "58", "mapped");
-  eq(qboVendorId({ qbo: { id: "  " } }), null, "blank is unmapped");
-  eq(qboVendorId(null), null, "nothing");
 });
 
 test("a sub-account keeps its parent", () => {

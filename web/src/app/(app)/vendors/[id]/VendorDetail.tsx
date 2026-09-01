@@ -18,8 +18,6 @@ import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { VendorFields } from "@/components/catalog/VendorFields";
-import { VendorAccounting } from "@/components/catalog/VendorAccounting";
-import type { AccountingRef } from "@/lib/quickbooks";
 import { VENDOR_TABS, VENDOR_TAB_LABEL, parseVendorTab, vendorTabHref } from "@/lib/vendors";
 
 type VendorLocationRow = {
@@ -84,7 +82,6 @@ export async function VendorDetail({
     { data: vendorItems, error: viError },
     { data: typeRows },
     { data: qboRows },
-    { data: vendorQbo, error: vendorQboError },
     { data: locationQbo },
   ] =
     await Promise.all([
@@ -111,20 +108,15 @@ export async function VendorDetail({
       // move ItemDetail makes for the item category picker).
       wantsItems ? SKIP : supabase.from("vendors").select("vendor_type"),
       supabase.rpc("accounting_connection_status", { p_org: session.membership.org_id }),
-      // SEPARATE, and allowed to fail: `expense_account_ref` arrives with
-      // migration 082, and folding it into the vendor select above would take
-      // the whole record down until that is applied rather than just this
-      // block. The roster's document query has the same shape and the same
-      // reason.
-      supabase
-        .from("vendors")
-        .select("external_ref, expense_account_ref, expense_account_name")
-        .eq("id", id)
-        .maybeSingle(),
+      // SEPARATE, and allowed to fail: these columns arrive with migration 083,
+      // and folding them into the vendor select above would take the whole
+      // record down until it is applied rather than just the QuickBooks
+      // pickers. `vendors.external_ref` and `vendors.expense_account_ref` are
+      // deliberately NOT read — every QuickBooks setting is on the row below.
       supabase
         .from("vendor_locations")
         .select(
-          "id, expense_account_ref, expense_account_name, qbo_location_ref, qbo_location_name, qbo_class_ref, qbo_class_name"
+          "id, external_ref, expense_account_ref, expense_account_name, qbo_location_ref, qbo_location_name, qbo_class_ref, qbo_class_name"
         )
         .eq("vendor_id", id),
     ]);
@@ -143,12 +135,6 @@ export async function VendorDetail({
     ? (qboRows[0] as { status?: string; bill_expense_account_ref?: string | null;
                        bill_expense_account_name?: string | null } | undefined)
     : undefined;
-  const qboMapping = (vendorQbo ?? null) as {
-    external_ref: AccountingRef | null;
-    expense_account_ref: string | null;
-    expense_account_name: string | null;
-  } | null;
-
   const qboDefault =
     qboRow?.status === "connected"
       ? {
@@ -160,7 +146,7 @@ export async function VendorDetail({
   // Merged onto the rows rather than selected with them, so an unapplied 083
   // costs the QuickBooks pickers and nothing else.
   const qboByRow = Object.fromEntries(
-    ((locationQbo ?? []) as Record<string, string | null>[]).map((r) => [r.id, r])
+    ((locationQbo ?? []) as Record<string, unknown>[]).map((r) => [r.id as string, r])
   );
 
   const vendorTypes = [
@@ -302,17 +288,6 @@ export async function VendorDetail({
             <>
               <VendorFields vendor={v} vendorTypes={vendorTypes} />
 
-              <VendorAccounting
-                vendor={{
-                  id: v.id,
-                  name: v.name,
-                  external_ref: qboMapping?.external_ref ?? null,
-                  expense_account_ref: qboMapping?.expense_account_ref ?? null,
-                  expense_account_name: qboMapping?.expense_account_name ?? null,
-                }}
-                orgDefault={qboDefault}
-                schemaError={vendorQboError?.message ?? null}
-              />
 
               {/* The heading rides in the table's own strip, opposite the columns
                   eye (Mark, 2026-08-01: it "could come closer to the table") — the
@@ -322,12 +297,14 @@ export async function VendorDetail({
                 <VendorLocationsTable
                   rows={v.vendor_locations.map((row) => ({
                     ...row,
-                    expense_account_ref: qboByRow[row.id]?.expense_account_ref ?? null,
-                    expense_account_name: qboByRow[row.id]?.expense_account_name ?? null,
-                    qbo_location_ref: qboByRow[row.id]?.qbo_location_ref ?? null,
-                    qbo_location_name: qboByRow[row.id]?.qbo_location_name ?? null,
-                    qbo_class_ref: qboByRow[row.id]?.qbo_class_ref ?? null,
-                    qbo_class_name: qboByRow[row.id]?.qbo_class_name ?? null,
+                    external_ref:
+                      (qboByRow[row.id]?.external_ref as { qbo?: { id?: string } } | null) ?? null,
+                    expense_account_ref: (qboByRow[row.id]?.expense_account_ref as string | null) ?? null,
+                    expense_account_name: (qboByRow[row.id]?.expense_account_name as string | null) ?? null,
+                    qbo_location_ref: (qboByRow[row.id]?.qbo_location_ref as string | null) ?? null,
+                    qbo_location_name: (qboByRow[row.id]?.qbo_location_name as string | null) ?? null,
+                    qbo_class_ref: (qboByRow[row.id]?.qbo_class_ref as string | null) ?? null,
+                    qbo_class_name: (qboByRow[row.id]?.qbo_class_name as string | null) ?? null,
                   }))}
                   qboConnected={qboDefault !== null}
                   codeById={Object.fromEntries(codeById)}
