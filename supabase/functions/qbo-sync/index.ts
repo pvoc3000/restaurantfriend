@@ -365,6 +365,33 @@ Deno.serve(async (req) => {
       })) as Record<string, Record<string, unknown>>;
 
       const doc = saved?.[req.entity];
+
+      // WHAT QUICKBOOKS KEPT, not what we sent. It accepts a DepartmentRef or a
+      // ClassRef and SILENTLY DISCARDS it when the matching preference is off —
+      // measured on Mark's own first bill, where the class stuck and the
+      // location vanished with a 200 and no fault. A push that reports success
+      // while quietly dropping half the coding is the exact shape this app
+      // spends its time refusing, so the answer is checked rather than assumed.
+      const warnings: string[] = [];
+      const sentDept = (req.payload as { DepartmentRef?: unknown }).DepartmentRef;
+      if (sentDept && !doc?.DepartmentRef) {
+        warnings.push(
+          "QuickBooks did not keep the location. Turn on Track locations in " +
+            "Account and settings → Advanced → Categories, then push again."
+        );
+      }
+      const sentLine = (req.payload.Line as Record<string, Record<string, unknown>>[] | undefined)?.[0];
+      const sentClass = (sentLine?.AccountBasedExpenseLineDetail as Record<string, unknown> | undefined)
+        ?.ClassRef;
+      const savedLine = (doc?.Line as Record<string, Record<string, unknown>>[] | undefined)?.[0];
+      const savedClass = (savedLine?.AccountBasedExpenseLineDetail as Record<string, unknown> | undefined)
+        ?.ClassRef;
+      if (sentClass && !savedClass) {
+        warnings.push(
+          "QuickBooks did not keep the class. Turn on Track classes in " +
+            "Account and settings → Advanced → Categories, then push again."
+        );
+      }
       if (!doc?.Id || doc?.SyncToken === undefined || doc?.SyncToken === null) {
         return json(502, {
           error: "QuickBooks saved the document but did not return an id and sync token.",
@@ -407,6 +434,7 @@ Deno.serve(async (req) => {
 
       return json(200, {
         entity: req.entity,
+        warnings,
         qbo_id: String(doc.Id),
         doc_number: ref.qbo.doc_number,
         sync_token: ref.qbo.sync_token,
@@ -437,6 +465,19 @@ Deno.serve(async (req) => {
     // company does not use.
     if (mode === "classes" || mode === "departments") {
       const entity = mode === "classes" ? "Class" : "Department";
+      // The RECORDS existing is not the same as the FEATURE being on — Mark's
+      // sandbox had DF01 and DF02 as Departments with TrackDepartments false,
+      // so the picker looked ready and every bill silently lost its location.
+      const prefs = (await qboFetch(
+        admin,
+        conn,
+        `query?query=${encodeURIComponent("select * from Preferences")}`
+      )) as { QueryResponse?: { Preferences?: { AccountingInfoPrefs?: Record<string, unknown> }[] } };
+      const acct = prefs.QueryResponse?.Preferences?.[0]?.AccountingInfoPrefs ?? {};
+      const enabled =
+        mode === "departments"
+          ? acct.TrackDepartments === true
+          : acct.ClassTrackingPerTxn === true || acct.ClassTrackingPerTxnLine === true;
       const q = `select Id, Name, FullyQualifiedName from ${entity} where Active = true maxresults 1000`;
       const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
         QueryResponse?: Record<string, Row[]>;
@@ -446,7 +487,7 @@ Deno.serve(async (req) => {
         name: String(r.FullyQualifiedName ?? r.Name ?? ""),
       }));
       rows.sort((a, b) => a.name.localeCompare(b.name));
-      return json(200, { [mode]: rows });
+      return json(200, { [mode]: rows, enabled });
     }
 
     if (mode === "items") {

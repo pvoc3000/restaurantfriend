@@ -134,6 +134,15 @@ export function VendorLocationsTable({
     accounts: { id: string; name: string }[];
     classes: { id: string; name: string }[];
     departments: { id: string; name: string }[];
+    /** Whether QuickBooks will actually KEEP a DepartmentRef. The records
+     *  existing is not the same as the feature being on, and when it is off
+     *  QuickBooks drops the location with a 200 and no fault.
+     *
+     *  Deliberately NOT done for classes: the same Preferences call reported
+     *  both class flags false on a company where a ClassRef demonstrably
+     *  stored, so gating that picker on them would say "off" about something
+     *  that works. For classes the post-push check is the honest mechanism. */
+    departmentsEnabled: boolean;
   } | null>(null);
 
   // ONE fetch for the whole table rather than one per expanded row: the three
@@ -155,6 +164,7 @@ export function VendorLocationsTable({
         accounts: (a.data?.accounts ?? []) as { id: string; name: string }[],
         classes: (c.data?.classes ?? []) as { id: string; name: string }[],
         departments: (d.data?.departments ?? []) as { id: string; name: string }[],
+        departmentsEnabled: d.data?.enabled === true,
       });
     })();
     return () => {
@@ -387,11 +397,15 @@ export function VendorLocationsTable({
                     value={r.qbo_location_ref}
                     kind="pick"
                     clearable
-                    placeholder={pickerPlaceholder(
-                      qbo?.departments,
-                      "Location tracking is off in QuickBooks",
-                      "None"
-                    )}
+                    placeholder={
+                      qbo && !qbo.departmentsEnabled
+                        ? "Track locations is off in QuickBooks"
+                        : pickerPlaceholder(
+                            qbo?.departments,
+                            "No locations in QuickBooks",
+                            "None"
+                          )
+                    }
                     ariaLabel="QuickBooks location for bills from this vendor at this shop"
                     options={(qbo?.departments ?? []).map((d) => ({ value: d.id, label: d.name }))}
                     alsoUpdate={(next) => ({

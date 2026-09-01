@@ -79,6 +79,7 @@ export function PushToQuickBooks({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   const readContext = useCallback(async (): Promise<Ctx> => {
     const [conn, vendor, invoice, atShop] = await Promise.all([
@@ -178,6 +179,7 @@ export function PushToQuickBooks({
 
     setBusy(true);
     setError(null);
+    setWarnings([]);
     const { data, message } = await invokeQbo(supabase, {
       mode: "push_bill",
       invoice_id: invoiceId,
@@ -189,6 +191,7 @@ export function PushToQuickBooks({
       setError(message);
       return;
     }
+    setWarnings((data?.warnings as string[]) ?? []);
     setSent(
       `${data?.updated ? "Updated" : "Sent"} as ${entity} ${
         (data?.doc_number as string) ?? (data?.qbo_id as string)
@@ -230,6 +233,15 @@ export function PushToQuickBooks({
         </p>
       )}
       {sent && <p className="text-[13px] text-muted">{sent}</p>}
+      {/* The bill IS in QuickBooks — this is not an error. It is the coding
+          QuickBooks accepted and then dropped, which it does with a 200 and no
+          fault when the matching preference is off. Yellow: worth your eye,
+          not something that went wrong. */}
+      {warnings.map((w) => (
+        <p key={w} className="max-w-2xl bg-mark-fill px-2 py-1 text-[13px] text-ink">
+          {w}
+        </p>
+      ))}
       {error && <p className="text-[13px] text-accent">{error}</p>}
     </div>
   );
