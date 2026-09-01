@@ -3,7 +3,7 @@
 import { useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { confirmDialog } from "@/lib/confirm";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import {
   pagesForShift,
@@ -88,19 +88,104 @@ export function ShiftReportRunner({
   // rather than quoting a figure nobody looked at.
   const liveSales = useSyncExternalStore(subscribeSales, salesSnapshot, serverSalesSnapshot);
 
+  // Your own draft, which is exactly what 070's delete policy allows and what
+  // `editable` already means upstream. `canSend` carries that same value; the
+  // two acts have the same owner, which is the point.
+  const canDiscard = canSend && !isSent;
+  const hasChecklist = checklistRun !== null;
+
   const page = order[index];
   const first = index === 0;
   const last = index === order.length - 1;
 
+  /**
+   * DISCARD THE REPORT — which is what "Cancel" now means (Mark, 2026-09-01,
+   * having asked "what's the difference between cancel and pause and close?").
+   *
+   * There was none. Both called `router.push("/shift-reports")`; Cancel simply
+   * asked first, in a confirm whose own text explained that nothing would be
+   * lost. So the footer had two cells for one act and the word "Cancel" was the
+   * only thing on this screen promising an undo the app did not have.
+   *
+   * It has one now. Deleting the report row is enough and the schema says so:
+   * 070 gives all three draft tables `on delete cascade`, while 076 makes
+   * `checklist_runs.shift_report_id` `on delete set null` — so THE CHECKLIST
+   * SURVIVES, unlinked. That is right rather than incidental: a walk somebody
+   * did is their record of what they found, and it should not evaporate
+   * because the report that would have carried it was binned.
+   *
+   * ONLY YOUR OWN DRAFT. 070's delete policy is owner/admin, or a draft you
+   * created — and this offers only the second, so a sent report is a document
+   * here whoever you are. Everything else gets the plain leave that
+   * "Pause & close" gives, under a label that says so.
+   */
   async function cancel() {
+    if (!canDiscard) {
+      router.push("/shift-reports");
+      return;
+    }
+
+    // COUNTED AT CLICK TIME, not from the page's own props. A confirm about
+    // deleting things has to name what is actually there, and the runner's copy
+    // is as old as its last render — somebody may have counted a case since.
+    const [ratings, counts, batches] = await Promise.all([
+      supabase
+        .from("shift_report_ratings")
+        .select("*", { count: "exact", head: true })
+        .eq("report_id", reportId),
+      supabase
+        .from("shift_report_counts")
+        .select("*", { count: "exact", head: true })
+        .eq("report_id", reportId),
+      supabase
+        .from("shift_report_batches")
+        .select("*", { count: "exact", head: true })
+        .eq("report_id", reportId),
+    ]);
+
+    const holds = [
+      [ratings.count ?? 0, "rating", "ratings"],
+      [counts.count ?? 0, "count", "counts"],
+      [batches.count ?? 0, "batch yield", "batch yields"],
+    ]
+      .filter(([n]) => (n as number) > 0)
+      .map(([n, one, many]) => `${n} ${n === 1 ? one : many}`);
+
     const ok = await confirmDialog({
-      ...splitConfirmMessage(
-        "Leave this report? Everything typed so far is saved as a draft, so you can pick it up " +
-          "again from the list. Nothing has been written to the schedule or to anybody's record."
-      ),
-      confirmLabel: "Leave it",
+      title: "Discard this report?",
+      body:
+        (holds.length > 0
+          ? `The report and ${holds.join(", ")} are deleted. `
+          : "The report is deleted. ") +
+        "Nothing was ever written to the schedule or to anybody's record, so " +
+        "there is nothing else to undo." +
+        (hasChecklist
+          ? " The checklist stays — it is its own record and unlinks rather than going with this."
+          : ""),
+      confirmLabel: "Discard",
+      tone: "danger",
     });
-    if (ok) router.push("/shift-reports");
+    if (!ok) return;
+
+    setFailed(null);
+    // `.select()` and the row count: a delete matching no policy removes
+    // nothing and PostgREST returns NO error, so a bare one would report a
+    // cheerful success AND navigate — which reads exactly like the report
+    // having been binned.
+    const { data, error } = await supabase
+      .from("shift_reports")
+      .delete()
+      .eq("id", reportId)
+      .select("id");
+
+    if (error || !data || data.length === 0) {
+      setFailed(
+        error?.message ??
+          "The report was not discarded — nothing changed. A report is discarded by whoever started it, and only while it is a draft."
+      );
+      return;
+    }
+    router.push("/shift-reports");
   }
 
   function pause() {
@@ -270,13 +355,20 @@ export function ShiftReportRunner({
           shifts under a thumb. 44px targets throughout — this is read at arm's
           length by somebody who is tired. */}
       <footer className="sticky bottom-0 grid grid-cols-4 divide-x divide-white/20 border-t border-white/20 bg-ink">
+        {/* ONE CELL, TWO HONEST WORDS. On your own draft this really does
+            cancel the report, so it says Cancel; on a sent one, or somebody
+            else's, there is nothing to discard and it is the same plain leave
+            that Pause & close gives — so it says Close rather than offering an
+            act it will not perform. The word is fixed for the whole visit: a
+            report's status cannot change under you here, because Send
+            navigates away. */}
         <button
           type="button"
           className={FOOTER_CELL}
           onClick={() => void cancel()}
           disabled={busy !== null}
         >
-          Cancel
+          {canDiscard ? "Cancel" : "Close"}
         </button>
         <button
           type="button"
