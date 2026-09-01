@@ -357,6 +357,34 @@ export type EmailReport = {
   } | null;
   /** A list this shift is asked for that nobody has started. */
   checklistNotStarted: boolean;
+  /**
+   * What the submit page said was still outstanding, verbatim.
+   *
+   * WHY THE EMAIL CARRIES IT (Mark, 2026-09-01, asking "what's the logic of
+   * allowing a supervisor to submit a report when it's clearly incomplete?").
+   *
+   * The permissiveness is deliberate and stays: `closeReadiness`'s rule, and
+   * its reason is that gating INVERTS the failure. The nights a report is
+   * incomplete are the nights the printer jammed or the shop got slammed —
+   * exactly the nights management most needs to hear about — and blocking the
+   * send does not produce a complete report, it produces no report at all,
+   * closing the one channel that would have carried the bad news.
+   *
+   * But that only holds if the incompleteness TRAVELS, and it did not:
+   * `submitReadiness` had one caller, the screen. A supervisor saw four
+   * outstanding items, pressed Send, and management received something that
+   * read as finished. Told, and nobody downstream told.
+   *
+   * COMPUTED ONCE, SERVER-SIDE, AND HANDED TO BOTH. The page renders this same
+   * array rather than calling `submitReadiness` again, so the email cannot say
+   * something different from what the person was looking at when they pressed
+   * the button. That is the whole claim it makes.
+   *
+   * COUNTS ONLY, no names and no scores — so it belongs in `supervisorBody`
+   * and management inherits it, without touching the privacy boundary that
+   * separates the two versions.
+   */
+  outstanding: string[];
 };
 
 /**
@@ -584,6 +612,21 @@ export function supervisorBody(report: EmailReport): string {
       );
     }
     parts.push("</table>");
+  }
+
+  if (report.outstanding.length > 0) {
+    // LAST, and that placement is the argument. Everything above is what the
+    // shift DID; this is what it did not get to, and reading it first would
+    // colour a report that is mostly a night's work. A manager who scans one
+    // screen has already seen the narrative and the checklist findings — the
+    // two things that need acting on tonight — and this is the footnote that
+    // stops the rest reading as complete.
+    parts.push(`<h3 style="${S.h3}">Still outstanding</h3>`);
+    parts.push(`<ul style="margin:0 0 12px 0;padding-left:20px">`);
+    for (const o of report.outstanding) {
+      parts.push(`<li style="${S.muted}">${esc(o)}</li>`);
+    }
+    parts.push(`</ul>`);
   }
 
   if (report.elements.length > 0) {

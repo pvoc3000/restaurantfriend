@@ -8,7 +8,9 @@ import { compareForPremadeSheet } from "@/lib/productionSchedule";
 import { isDayComplete } from "@/lib/sales";
 import {
   pagesForShift,
+  submitReadiness,
   type EmailReport,
+  type ReadinessInput,
   type ShiftReportPage,
   type ShiftSlot,
 } from "@/lib/shiftReports";
@@ -474,6 +476,42 @@ export default async function RunShiftReportPage({
     printedAt: (s.printed_at as string | null) ?? null,
   }));
 
+  const netSalesCents = (settledToday ?? storedToday)?.netCents ?? null;
+
+  /**
+   * WHAT IS STILL OUTSTANDING — computed ONCE, read by the submit page AND by
+   * the email (Mark, 2026-09-01).
+   *
+   * One call rather than two, for the reason `checklistReadinessInput` above is
+   * one object: the page and the email must not be able to come to different
+   * answers about the same night. What the email reports is exactly what the
+   * person was looking at when they pressed Send.
+   *
+   * It is as fresh as this render, which is the same freshness the page has —
+   * every write on every page calls `router.refresh()`, so the two are rebuilt
+   * together. Nothing the SEND itself does can invalidate it either: finishing
+   * the checklist changes no caveat, because the "answered but not finished"
+   * one was retired when sending started doing that.
+   */
+  const readinessInput: ReadinessInput = {
+    shift,
+    narrative: (report.narrative as string | null) ?? null,
+    ratingCount: ratingRows.length,
+    taskRatingsDone: report.task_ratings_done as boolean,
+    taskSpecialOrdersDone: report.task_special_orders_done as boolean,
+    taskSchedulesDone: report.task_schedules_done as boolean,
+    netSalesCents,
+    countedLines: premadeRows.filter((r) => r.made !== null || r.leftover !== null).length,
+    scheduledLines: premadeRows.length,
+    countedBatches: elementRows.filter((r) => r.yieldCount !== null).length,
+    scheduledBatches: elementRows.length,
+    // DERIVED, never a `task_checklist_done` column — see the note on
+    // `ReadinessInput.checklist`.
+    checklist: checklistReadinessInput,
+    checklistNotStarted,
+  };
+  const outstanding = submitReadiness(readinessInput);
+
   const bodies: Partial<Record<ShiftReportPage, React.ReactNode>> = {
     info: (
       <InfoPage
@@ -509,28 +547,7 @@ export default async function RunShiftReportPage({
         editable={editable}
       />
     ),
-    submit: (
-      <SubmitPage
-        key="submit"
-        readiness={{
-          shift,
-          narrative: (report.narrative as string | null) ?? null,
-          ratingCount: ratingRows.length,
-          taskRatingsDone: report.task_ratings_done as boolean,
-          taskSpecialOrdersDone: report.task_special_orders_done as boolean,
-          taskSchedulesDone: report.task_schedules_done as boolean,
-          netSalesCents: (settledToday ?? storedToday)?.netCents ?? null,
-          countedLines: premadeRows.filter((r) => r.made !== null || r.leftover !== null).length,
-          scheduledLines: premadeRows.length,
-          countedBatches: elementRows.filter((r) => r.yieldCount !== null).length,
-          scheduledBatches: elementRows.length,
-          // DERIVED, never a `task_checklist_done` column — see the note on
-          // `ReadinessInput.checklist`.
-          checklist: checklistReadinessInput,
-          checklistNotStarted,
-        }}
-      />
-    ),
+    submit: <SubmitPage key="submit" outstanding={outstanding} netSalesCents={netSalesCents} />,
   };
 
   if (wants("checklist")) {
@@ -643,7 +660,7 @@ export default async function RunShiftReportPage({
       ? nameById.get(report.supervisor_employee_id as string) ?? null
       : null,
     narrative: (report.narrative as string | null) ?? null,
-    netSalesCents: (settledToday ?? storedToday)?.netCents ?? null,
+    netSalesCents,
     tipsCents: (settledToday ?? storedToday)?.tipsCents ?? null,
     // A stored part-day is quoted AS a part-day. The runner overrides all three
     // of these at Send from whatever the Sales page is actually showing.
@@ -671,6 +688,7 @@ export default async function RunShiftReportPage({
     })),
     checklist: emailChecklist,
     checklistNotStarted,
+    outstanding,
   };
 
   // 1-based in the URL because that is what the page band counts in; clamped

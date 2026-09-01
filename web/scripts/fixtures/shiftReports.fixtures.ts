@@ -294,6 +294,15 @@ const REPORT: EmailReport = {
   lastYearNetCents: 171399,
   premades: [{ name: "Angry Samoa", par: 12, made: 12, leftover: 3 }],
   elements: [],
+  // A realistic outstanding list, ON THE SHARED REPORT for the same reason the
+  // checklist is: the privacy sweep, the composition identity and the style
+  // sweep below then cover this markup too, without any of the three being
+  // edited. It is counts only — no names, no scores — which is exactly why it
+  // is allowed to live in `supervisorBody`.
+  outstanding: [
+    "No staff have been rated.",
+    "2 of 14 premade lines have no count.",
+  ],
   // A realistic checklist ON THE SHARED REPORT, deliberately: it is what makes
   // the privacy sweep, the composition identity and the style sweep below
   // cover the new markup without any of those three being edited.
@@ -384,6 +393,39 @@ test("both emails carry the shift facts a supervisor needs", () => {
     // `managementBody` and the supervisor iteration of this loop fails.
     ok(body.includes("Compressor icing again"), "the flagged issue");
     ok(body.includes("expected 34–40 °F"), "the bound it missed");
+  }
+});
+
+test("WHAT WAS OUTSTANDING TRAVELS — both emails carry it", () => {
+  // Mark, 2026-09-01: "what's the logic of allowing a supervisor to submit a
+  // report when it's clearly incomplete?" The permissiveness is deliberate —
+  // gating the send does not produce a complete report, it produces no report —
+  // and it is only safe if the incompleteness reaches somebody. It did not:
+  // `submitReadiness` had one caller, the screen. This is that hole closed.
+  for (const body of [supervisorBody(REPORT), managementBody(REPORT)]) {
+    ok(body.includes("Still outstanding"), "the heading");
+    ok(body.includes("No staff have been rated."), "the first item");
+    ok(body.includes("2 of 14 premade lines have no count."), "the second");
+  }
+});
+
+test("a clean night says NOTHING about outstanding", () => {
+  // The section is absent, not an empty list — a heading over nothing reads as
+  // a thing that failed to load, and on a night where everything was done the
+  // report should simply not raise the subject.
+  const clean = { ...REPORT, outstanding: [] };
+  no(supervisorBody(clean).includes("Still outstanding"), "heading on a clean night");
+});
+
+test("the outstanding list is COUNTS, so it may live in the supervisor email", () => {
+  // The privacy sweep above is what actually enforces this, and it passes only
+  // because `submitReadiness` never has a name to leak — every caveat it builds
+  // is a count or a fact about the report. Stated here so that a future caveat
+  // written with somebody's name in it fails a test that says why.
+  const body = supervisorBody(REPORT);
+  for (const line of REPORT.outstanding) {
+    ok(body.includes(line), `the caveat "${line}" reached the supervisor email`);
+    no(/[A-Z][a-z]+ [A-Z][a-z]+/.test(line.replace(/^\d+ of \d+ /, "")), `"${line}" looks like it names a person`);
   }
 });
 

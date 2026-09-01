@@ -1,4 +1,4 @@
-import { submitReadiness, salesNote, type ReadinessInput } from "@/lib/shiftReports";
+import { salesNote } from "@/lib/shiftReports";
 
 /**
  * The readiness page — FMP's last one, minus checklists and minus sales.
@@ -27,12 +27,23 @@ import { submitReadiness, salesNote, type ReadinessInput } from "@/lib/shiftRepo
  * of what a last page should be, and is why it stopped being a client
  * component.
  */
-export function SubmitPage({ readiness }: { readiness: ReadinessInput }) {
-  const caveats = submitReadiness(readiness);
+export function SubmitPage({
+  outstanding,
+  netSalesCents,
+}: {
+  /**
+   * Already computed — see the note where it is. The page renders the SAME
+   * array the email sends, rather than calling `submitReadiness` a second time,
+   * so the two cannot disagree about one night.
+   */
+  outstanding: string[];
+  netSalesCents: number | null;
+}) {
+  const caveats = outstanding;
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
-      <p className="text-sm text-muted">{salesNote(readiness.netSalesCents)}</p>
+      <p className="text-sm text-muted">{salesNote(netSalesCents)}</p>
 
       {caveats.length > 0 ? (
         <div className="space-y-2 border border-hairline p-4">
