@@ -101,6 +101,24 @@ export function VendorLocationsTable({
     };
   }, [qboConnected, supabase]);
 
+  /**
+   * What the trigger says when there is nothing to choose.
+   *
+   * An empty picker offering "None" is indistinguishable from a broken one —
+   * the same failure the settings and vendor blocks already had. Class and
+   * Location tracking are Plus features that must also be TURNED ON in
+   * QuickBooks' own settings, so an empty list is usually a switch somebody
+   * has not flipped rather than an error, and saying which saves the hunt.
+   */
+  function pickerPlaceholder(
+    list: { id: string }[] | undefined,
+    empty: string,
+    resting: string
+  ): string {
+    if (!qbo) return "Reading QuickBooks…";
+    return list && list.length > 0 ? resting : empty;
+  }
+
   const columns: DataColumn<VendorLocationRow>[] = [
     // Active leads on every catalog table (Mark, 2026-07-23).
     {
@@ -264,7 +282,11 @@ export function VendorLocationsTable({
                     value={r.expense_account_ref}
                     kind="pick"
                     clearable
-                    placeholder={qbo ? "Use the vendor's" : "Reading QuickBooks…"}
+                    placeholder={pickerPlaceholder(
+                      qbo?.accounts,
+                      "No expense accounts in QuickBooks",
+                      "Use the vendor's"
+                    )}
                     ariaLabel="Expense account for this vendor at this shop"
                     options={(qbo?.accounts ?? []).map((a) => {
                       const { parent, leaf } = splitAccountName(a.name);
@@ -286,7 +308,11 @@ export function VendorLocationsTable({
                     value={r.qbo_location_ref}
                     kind="pick"
                     clearable
-                    placeholder={qbo ? "None" : "Reading QuickBooks…"}
+                    placeholder={pickerPlaceholder(
+                      qbo?.departments,
+                      "Location tracking is off in QuickBooks",
+                      "None"
+                    )}
                     ariaLabel="QuickBooks location for bills from this vendor at this shop"
                     options={(qbo?.departments ?? []).map((d) => ({ value: d.id, label: d.name }))}
                     alsoUpdate={(next) => ({
@@ -305,7 +331,11 @@ export function VendorLocationsTable({
                     value={r.qbo_class_ref}
                     kind="pick"
                     clearable
-                    placeholder={qbo ? "None" : "Reading QuickBooks…"}
+                    placeholder={pickerPlaceholder(
+                      qbo?.classes,
+                      "Class tracking is off in QuickBooks",
+                      "None"
+                    )}
                     ariaLabel="QuickBooks class for bills from this vendor at this shop"
                     options={(qbo?.classes ?? []).map((c) => ({ value: c.id, label: c.name }))}
                     alsoUpdate={(next) => ({
