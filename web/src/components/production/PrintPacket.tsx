@@ -62,7 +62,7 @@ const SAVEABLE = new Set<PacketPart>(["premade", "baker", "fryer", "decorator"])
 
 export function PrintPacket({
   scheduleIds,
-  specialOrderIds = [],
+  specialOrderIds,
   printedOn,
   stampable,
   label = "Print All Documents",
@@ -80,9 +80,20 @@ export function PrintPacket({
    * sheets in the packet, leave thirty-one out, and call the result "all
    * documents". `ProductionPacketPdf.orders` carries the same note.
    *
-   * Empty (the default) means this caller has no orders to offer, and the part
-   * is not shown at all — `/schedules` and a single schedule's record are about
-   * production, not about a customer's order.
+   * UNDEFINED AND EMPTY ARE DIFFERENT ANSWERS, and the distinction is the whole
+   * reason this is not defaulted.
+   *
+   * `undefined` means this caller has nothing to do with special orders —
+   * `/schedules` and a single schedule's record are about production, not about
+   * a customer's order — so the part is not offered at all.
+   *
+   * `[]` means somebody LOOKED and tomorrow has none. That is worth saying
+   * (Mark, 2026-09-01: "even if there aren't any special orders to print, let's
+   * show the option but say 'None' after it so it's clear the app isn't
+   * forgetting something"), and it is what lets the page itself stop listing
+   * them: with the row always present, this dialog is the one place that
+   * speaks about special orders, and silence there would be the absence that
+   * looks like completeness all over again.
    */
   specialOrderIds?: string[];
   /** The org's calendar day, for the kitchen sheets' AS OF line and stamp. */
@@ -105,11 +116,12 @@ export function PrintPacket({
   const supabase = createClient();
   const router = useRouter();
 
-  // What THIS caller can offer. The special-orders part only exists where there
-  // are special orders; on `/schedules` the list is four rows as before.
-  const offered = PACKET_PARTS.filter(
-    (p) => p.key !== "special" || specialOrderIds.length > 0
-  );
+  // What THIS caller can offer. The special-orders row appears whenever the
+  // caller deals in them AT ALL — including when the answer is none — and never
+  // on `/schedules`, which is four rows as before.
+  const offersSpecial = specialOrderIds !== undefined;
+  const orderIds = specialOrderIds ?? [];
+  const offered = PACKET_PARTS.filter((p) => p.key !== "special" || offersSpecial);
   const [open, setOpen] = useState(false);
   const [parts, setParts] = useState<PacketPart[]>(() => offered.map((p) => p.key));
   const [pending, start] = useTransition();
@@ -144,13 +156,13 @@ export function PrintPacket({
       try {
         // The orders are fetched only when their part is ticked — an unticked
         // checklist row should not cost a query over `special_order_items`.
-        const wantOrders = parts.includes("special") && specialOrderIds.length > 0;
+        const wantOrders = parts.includes("special") && orderIds.length > 0;
 
         const [{ pdf }, docs, fetched, orderDocs] = await Promise.all([
           import("@react-pdf/renderer"),
           import("./pdf/ProductionPacketPdfs"),
           fetchPacketData(supabase, scheduleIds),
-          wantOrders ? fetchOrderDocData(supabase, specialOrderIds) : null,
+          wantOrders ? fetchOrderDocData(supabase, orderIds) : null,
         ]);
 
         // THE ORG'S DAY WINS OVER THE PACKET'S OWN, when a caller supplies one.
@@ -223,7 +235,7 @@ export function PrintPacket({
             // in this module records that, never the day the thing is FOR.
             // Falls back to the packet's own date for a caller supplying none.
             .update({ order_printed_at: packet.printedOn })
-            .in("id", specialOrderIds)
+            .in("id", orderIds)
             // THE "ONLY WHERE EMPTY" TEST IS POSTGRES', not a filter over what
             // the page happened to be holding. The screen's copy of
             // `order_printed_at` is as old as its last render, so a sheet
@@ -254,7 +266,7 @@ export function PrintPacket({
         // has orders and nothing generated (measured: 0 of 9 upcoming orders
         // are scheduled), and on that night this button used to be dead while
         // there were plainly sheets to print.
-        disabled={scheduleIds.length === 0 && specialOrderIds.length === 0}
+        disabled={scheduleIds.length === 0 && orderIds.length === 0}
         className={`${primary ? PRIMARY_BUTTON_CLASS : BUTTON_CLASS} shrink-0`}
       >
         {label}
@@ -313,17 +325,28 @@ export function PrintPacket({
                   <Checkbox
                     checked={parts.includes(p.key)}
                     onChange={() => toggle(p.key)}
+                    // NOTHING TO CHOOSE IS NOT A CHOICE. The row stays, ticked,
+                    // so the packet still reads as covering special orders —
+                    // and it is disabled, because unticking "none" would be a
+                    // decision about nothing. `NewTimesheet`'s rule: disable
+                    // rather than hide, since a control that vanishes cannot be
+                    // told from a feature that is not there.
+                    disabled={p.key === "special" && orderIds.length === 0}
                     label={`Include the ${p.label}`}
                     size={18}
                   />
                   <span className="font-medium">{p.label}</span>
                   {/* COUNTED, because this is the one part whose size is not
                       implied by the nights you selected — the others are one
-                      document per schedule or per kitchen. */}
+                      document per schedule or per kitchen. And it says NONE
+                      rather than going quiet, which is the point of it: an
+                      absent row and a row reading none are the same picture to
+                      somebody wondering whether the app looked. */}
                   {p.key === "special" ? (
                     <span className="text-muted">
-                      {specialOrderIds.length}{" "}
-                      {specialOrderIds.length === 1 ? "order" : "orders"}
+                      {orderIds.length === 0
+                        ? "None"
+                        : `${orderIds.length} ${orderIds.length === 1 ? "order" : "orders"}`}
                     </span>
                   ) : null}
                 </li>

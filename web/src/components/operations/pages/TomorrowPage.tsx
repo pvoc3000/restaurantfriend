@@ -1,23 +1,24 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { GenerateSchedules } from "@/components/production/GenerateSchedules";
 import { PrintPacket } from "@/components/production/PrintPacket";
-import { openWindowNow, showBlob } from "@/lib/poProcessing";
-import { fetchOrderDocData, documentFileName } from "@/lib/specialOrderDocs";
 
-export type TomorrowOrder = {
-  id: string;
-  number: string;
-  title: string | null;
-  eventTime: string | null;
-  printedAt: string | null;
-};
+/**
+ * One special order tomorrow — AN ID AND NOTHING ELSE.
+ *
+ * It carried a number, a title, a time and a printed date while this page
+ * listed them. It no longer does (Mark, 2026-09-01: "we no longer need the
+ * special orders section on page 7"), because Print All Documents prints them
+ * and its dialog names the count — so the list was a second place saying what
+ * the packet already says. What the page still needs is which orders to hand
+ * the packet.
+ */
+export type TomorrowOrder = { id: string };
 
 export type TomorrowSchedule = {
   id: string;
@@ -40,7 +41,17 @@ export type TomorrowSchedule = {
  *
  * TWO TASK FLAGS SURVIVE, not one: a per-order kitchen document and the tray
  * guide packet are different pieces of paper, and the submit page has to be
- * able to say which one was not printed.
+ * able to say which one was not printed. Only ONE of them is set here now —
+ * Print All Documents ticks both, and `task_special_orders_done` keeps its own
+ * control on the submit page, which is where it was always also offered.
+ *
+ * THE SPECIAL ORDERS SECTION IS GONE (Mark, 2026-09-01). Once the packet
+ * printed them, the list was a second place saying what the dialog says, with
+ * its own Print buttons for a job the one button now does. What went with it,
+ * so it can be judged rather than rediscovered: the per-order REPRINT, and the
+ * only place on this page naming WHICH orders tomorrow holds and at what time.
+ * The dialog names the count and says "None" when there are none, which is what
+ * makes the silence here honest rather than an omission.
  *
  * THIS PAGE IS EXEMPT from "nothing writes until Send", and obviously so —
  * generating a schedule and stamping a printed order are ACTS, not report
@@ -56,7 +67,6 @@ export function TomorrowPage({
   plans,
   orders,
   schedules,
-  specialOrdersDone,
   schedulesDone,
   editable,
   stampable,
@@ -69,16 +79,15 @@ export function TomorrowPage({
   kitchenCode: string;
   locations: { id: string; code: string; name: string }[];
   plans: React.ComponentProps<typeof GenerateSchedules>["plans"];
+  /** Tomorrow's special orders — the packet prints them; see `TomorrowOrder`. */
   orders: TomorrowOrder[];
   schedules: TomorrowSchedule[];
-  specialOrdersDone: boolean;
   schedulesDone: boolean;
   editable: boolean;
   stampable: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
   function flag(column: string, value: boolean) {
@@ -92,48 +101,6 @@ export function TomorrowPage({
     });
   }
 
-  async function printOrder(order: TomorrowOrder) {
-    // Synchronously, BEFORE any await: a window.open after one is silently
-    // blocked, which is the oldest gotcha in this codebase.
-    const win = openWindowNow();
-    try {
-      const [{ pdf }, docs, data] = await Promise.all([
-        import("@react-pdf/renderer"),
-        import("@/components/specialOrders/pdf/SpecialOrderPdfs"),
-        fetchOrderDocData(supabase, [order.id]),
-      ]);
-      const blob = await pdf(
-        // `null` approval, then today: AS OF is the day the sheet prints.
-        docs.documentElement("order", data.orders, data.org, null, today)
-      ).toBlob();
-      showBlob(win, blob, documentFileName("order", order.number, nextProductionDate ?? ""));
-
-      // The stamp the kitchen document has always carried. Only when empty: a
-      // second copy printed next week is not a second print, and overwriting
-      // would move the date the record already claims.
-      //
-      // `today`, NOT `nextProductionDate` (corrected 2026-09-01). It recorded
-      // the day the sheet was FOR rather than the day it printed, which every
-      // other stage date in this module gets the other way round — and once
-      // the packet started stamping the same column, two writers disagreeing
-      // about what the date means was a drift worth closing rather than
-      // documenting. It also has a reader: `order_printed_at` is the sixth rung
-      // of the progress ladder, so a sheet printed today for a wedding in
-      // December was marking the order complete three months early.
-      if (order.printedAt === null) {
-        await supabase
-          .from("special_orders")
-          .update({ order_printed_at: today })
-          .eq("id", order.id)
-          .select("id");
-        router.refresh();
-      }
-    } catch (e) {
-      win?.close();
-      setFailed((e as Error).message);
-    }
-  }
-
   if (!nextProductionDate) {
     return (
       <p className="mx-auto max-w-3xl text-sm">
@@ -145,54 +112,6 @@ export function TomorrowPage({
 
   return (
     <div className="mx-auto max-w-4xl space-y-12">
-      {failed ? <p className="text-sm text-accent">{failed}</p> : null}
-
-      <section className="space-y-4">
-        <SectionHeading count={orders.length}>
-          Special orders for {nextProductionDate}
-        </SectionHeading>
-        {orders.length === 0 ? (
-          <p className="text-sm text-muted">None.</p>
-        ) : (
-          <ul className="divide-y divide-hairline border border-hairline">
-            {orders.map((o) => (
-              <li key={o.id} className="flex items-center gap-4 px-4 py-3">
-                <span className="flex-1 text-[15px]">
-                  #{o.number}
-                  {o.title ? ` — ${o.title}` : ""}
-                  {o.eventTime ? <span className="text-muted"> ({o.eventTime})</span> : null}
-                </span>
-                {o.printedAt ? (
-                  <span className="text-xs text-muted">printed {o.printedAt}</span>
-                ) : null}
-                <button
-                  type="button"
-                  className={BUTTON_CLASS}
-                  onClick={() => void printOrder(o)}
-                >
-                  {o.printedAt ? "Print again" : "Print"}
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-        {orders.length > 0 ? (
-          /* Said once, here, because the row buttons above look like the only
-             way. They are not the way any more — they are the way to reprint
-             ONE, which is the same job the per-schedule buttons below do. */
-          <p className="text-sm text-muted">
-            Print All Documents, below, includes all of these &mdash; the
-            buttons above are for reprinting one.
-          </p>
-        ) : null}
-        <Checkbox
-          checked={specialOrdersDone}
-          disabled={!editable}
-          onChange={(next) => flag("task_special_orders_done", next)}
-        >
-          Tomorrow&rsquo;s special orders are printed
-        </Checkbox>
-      </section>
 
       <section className="space-y-4">
         <SectionHeading count={schedules.length}>

@@ -292,10 +292,12 @@ export default async function RunShiftReportPage({
     wants("tomorrow") && nextDay
       ? supabase
           .from("special_orders")
-          .select("id, number, title, event_time, order_printed_at")
+          // ONLY THE ID. The page stopped listing these (see `TomorrowOrder`);
+          // what it does with them is hand them to the packet, which fetches
+          // each order's document data itself.
+          .select("id")
           .eq("kind", "order")
           .eq("event_date", nextDay)
-          .order("event_time")
       : SKIP,
     wants("tomorrow") && nextDay
       ? supabase
@@ -459,13 +461,7 @@ export default async function RunShiftReportPage({
   const settledToday = todayIsSettled ? storedToday : null;
 
   const orders: TomorrowOrder[] = ((tomorrowOrders as Record<string, unknown>[] | null) ?? []).map(
-    (o) => ({
-      id: o.id as string,
-      number: o.number as string,
-      title: (o.title as string | null) ?? null,
-      eventTime: (o.event_time as string | null)?.slice(0, 5) ?? null,
-      printedAt: (o.order_printed_at as string | null) ?? null,
-    })
+    (o) => ({ id: o.id as string })
   );
 
   const schedules: TomorrowSchedule[] = (
@@ -626,7 +622,6 @@ export default async function RunShiftReportPage({
         }
         orders={orders}
         schedules={schedules}
-        specialOrdersDone={report.task_special_orders_done as boolean}
         schedulesDone={report.task_schedules_done as boolean}
         editable={editable}
         // Stamping `printed_at` goes through `mark_schedule_printed`, which is
