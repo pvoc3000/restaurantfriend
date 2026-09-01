@@ -54,8 +54,22 @@ export default async function proxy(request: NextRequest) {
   // definer RPCs from migration 057 (list the shops, create a lead) and nothing
   // else. Every table policy still names supervisor+.
   const isInquiryPage = request.nextUrl.pathname.startsWith("/inquiry");
+  // The two documents Intuit requires at a public https URL before it will
+  // issue production keys, and the reviewers who fetch them have no account.
+  //
+  // Of the five exemptions here this is the one that needs the least argument:
+  // the others reach definer RPCs, and these pages reach NOTHING. They are
+  // static text with no query, no form and no parameter.
+  const isLegalPage = request.nextUrl.pathname.startsWith("/legal");
 
-  if (!user && !isLoginPage && !isWelcomePage && !isQuotePage && !isInquiryPage) {
+  if (
+    !user &&
+    !isLoginPage &&
+    !isWelcomePage &&
+    !isQuotePage &&
+    !isInquiryPage &&
+    !isLegalPage
+  ) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/login";
     redirectUrl.search = "";
