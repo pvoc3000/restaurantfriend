@@ -497,6 +497,7 @@ export default async function RunShiftReportPage({
         rows={ratingRows}
         roster={roster}
         positions={positions}
+        ratingsDone={report.task_ratings_done as boolean}
         editable={editable}
       />
     ),
@@ -511,8 +512,6 @@ export default async function RunShiftReportPage({
     submit: (
       <SubmitPage
         key="submit"
-        reportId={id}
-        editable={editable}
         readiness={{
           shift,
           narrative: (report.narrative as string | null) ?? null,

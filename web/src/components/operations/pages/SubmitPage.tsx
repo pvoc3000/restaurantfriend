@@ -1,9 +1,3 @@
-"use client";
-
-import { useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
-import { Checkbox } from "@/components/ui/Checkbox";
 import { submitReadiness, salesNote, type ReadinessInput } from "@/lib/shiftReports";
 
 /**
@@ -12,97 +6,32 @@ import { submitReadiness, salesNote, type ReadinessInput } from "@/lib/shiftRepo
  * It NAMES what is unresolved and then lets you through, which is
  * `closeReadiness`'s rule and its reason: gate a shift report on a complete set
  * and the night the printer jams is a report that never gets sent, which is how
- * a status stops meaning anything.
+ * a status stops meaning anything. A supervisor standing in a shop at 11pm can
+ * be prevented from sending, or can be told what is missing; only one of those
+ * gets the night's information to anybody.
  *
- * FMP had six lines. `Task_Log` is answered by the narrative existing,
- * `Task_SalesData` by Square typing the figure, and `Task_Checklist` has no
- * feature behind it yet — so three flags and two derivations.
+ * THE CHECKBOXES ARE GONE (Mark, 2026-09-01: "both kind of accomplish the same
+ * thing, but I think the 'Still outstanding' text is more informative and
+ * better"). They were four rows restating, in weaker form, what the list
+ * beneath them already said in sentences — and the list says MORE: the
+ * uncounted premade lines, the batches with no yield, the checklist, all of
+ * which no checkbox covered. One of the four could not even be pressed.
+ *
+ * Where the state went, since two of those boxes were the only WRITER of a
+ * `task_*` flag on this screen: each flag is now ticked where its work happens.
+ * `task_schedules_done` and `task_special_orders_done` were already on page 7
+ * and on the packet; `task_ratings_done` moved to the ratings page, which is
+ * where somebody can say they have finished rating.
+ *
+ * SO THIS PAGE WRITES NOTHING NOW. It reads, and it sends — which is the whole
+ * of what a last page should be, and is why it stopped being a client
+ * component.
  */
-export function SubmitPage({
-  reportId,
-  readiness,
-  editable,
-}: {
-  reportId: string;
-  readiness: ReadinessInput;
-  editable: boolean;
-}) {
-  const router = useRouter();
-  const supabase = createClient();
-  const [, startTransition] = useTransition();
-
+export function SubmitPage({ readiness }: { readiness: ReadinessInput }) {
   const caveats = submitReadiness(readiness);
-
-  function flag(column: string, value: boolean) {
-    startTransition(async () => {
-      await supabase
-        .from("shift_reports")
-        .update({ [column]: value })
-        .eq("id", reportId)
-        .select("id");
-      router.refresh();
-    });
-  }
-
-  const lines: { label: string; done: boolean; toggle?: string }[] = [
-    {
-      label: "Staff reviews",
-      done: readiness.taskRatingsDone,
-      toggle: "task_ratings_done",
-    },
-    {
-      label: "Complete shift report",
-      done: (readiness.narrative ?? "").trim() !== "",
-    },
-  ];
-
-  if (readiness.shift === "closing") {
-    lines.push(
-      {
-        label: "Print tomorrow's special orders",
-        done: readiness.taskSpecialOrdersDone,
-        toggle: "task_special_orders_done",
-      },
-      {
-        label: "Print tomorrow's production logs",
-        done: readiness.taskSchedulesDone,
-        toggle: "task_schedules_done",
-      }
-    );
-  }
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
-      <ul className="space-y-3">
-        {lines.map((l) => (
-          <li key={l.label} className="flex items-center gap-4">
-            {l.toggle ? (
-              <Checkbox
-                checked={l.done}
-                disabled={!editable}
-                onChange={(next) => flag(l.toggle as string, next)}
-              >
-                {l.label}
-              </Checkbox>
-            ) : (
-              // A DERIVED line still looks like the others (Mark, 2026-08-28:
-              // "the 'complete shift report' checkbox looks different from the
-              // others"). It was drawn as ☑︎/☐︎ glyphs because nothing here is
-              // clickable — the narrative existing is what ticks it — and that
-              // made the one line nobody sets the one line that looks wrong.
-              //
-              // It is the real control now, disabled: same box, same label, same
-              // baseline. Disabled reads as "this one answers itself", which is
-              // true, and it is what `NewTimesheet` settled — a control that
-              // looks DIFFERENT cannot be told from one that is broken.
-              <Checkbox checked={l.done} disabled onChange={() => {}}>
-                {l.label}
-              </Checkbox>
-            )}
-          </li>
-        ))}
-      </ul>
-
       <p className="text-sm text-muted">{salesNote(readiness.netSalesCents)}</p>
 
       {caveats.length > 0 ? (
