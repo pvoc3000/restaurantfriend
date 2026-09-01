@@ -92,6 +92,7 @@ export function AccountingSettings({
   const [environment, setEnvironment] = useState(initialStatus?.environment ?? "sandbox");
 
   const callback = params.get("quickbooks");
+  const remapped = params.get("remapped") === "1";
   const callbackReason = params.get("reason");
 
   /** Re-read after a write. Called from handlers, never from an effect. */
@@ -220,7 +221,12 @@ export function AccountingSettings({
 
       {callback === "connected" && (
         <p className="max-w-2xl bg-mark-fill px-2 py-1 text-[13px] text-ink">
-          QuickBooks is connected.
+          {remapped
+            ? "QuickBooks is connected to a different company, so the expense " +
+              "account here and every vendor's own mapping were cleared — their " +
+              "ids belonged to the old company file. Set them again below and on " +
+              "each vendor."
+            : "QuickBooks is connected."}
         </p>
       )}
       {callback === "error" && (

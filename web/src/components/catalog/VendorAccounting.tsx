@@ -131,6 +131,32 @@ export function VendorAccounting({
     }
   }
 
+  /**
+   * The options, and — until QuickBooks answers — the ONE option we already
+   * know about.
+   *
+   * A `PickList` with a value and no matching option renders the raw value, so
+   * for the second or two before the accounts arrive the field read "80": an
+   * internal QuickBooks id, on a screen, where an account name belongs. The
+   * snapshot `_name` migration 082 stores exists precisely so we never have to
+   * show an id, and this is the first thing that needed it.
+   */
+  const accountOptions = (
+    accounts ??
+    (accountRef ? [{ id: accountRef, name: accountName ?? accountRef }] : [])
+  ).map((a) => {
+    const { parent, leaf } = splitAccountName(a.name);
+    // The leaf reads as the label and its parent as the group, so
+    // "Baker Items COGs" is never mistaken for a top-level account and every
+    // child is filed under its own parent.
+    return {
+      value: a.id,
+      label: leaf,
+      hint: (a as Choice).type,
+      group: parent ?? "Top level",
+    };
+  });
+
   const resolved = expenseAccountFor(
     { expense_account_ref: accountRef, expense_account_name: accountName },
     orgDefault
@@ -160,9 +186,14 @@ export function VendorAccounting({
                 boxed={BOXED_FIELDS}
                 ariaLabel="Which QuickBooks vendor this is"
                 disabled={busy}
-                value={mappedId}
+                // Held back until the list can NAME it: with no snapshot to
+                // fall back on, a value with no matching option would render
+                // the bare QuickBooks vendor id.
+                value={qboVendors ? mappedId : null}
                 options={(qboVendors ?? []).map((v) => ({ value: v.id, label: v.name }))}
-                placeholder={qboVendors ? "Not linked" : "Reading QuickBooks…"}
+                placeholder={
+                  qboVendors ? "Not linked" : mappedId ? "Reading QuickBooks…" : "Not linked"
+                }
                 onPick={(next) => void pickVendor(next)}
                 clearable
                 clearLabel="Not linked"
@@ -178,18 +209,7 @@ export function VendorAccounting({
                 ariaLabel="Expense account this vendor's bills post to"
                 disabled={busy}
                 value={accountRef}
-                options={(accounts ?? []).map((a) => {
-                  const { parent, leaf } = splitAccountName(a.name);
-                  // The leaf reads as the label and its parent as the hint, so
-                  // "Baker Items COGs" is never mistaken for a top-level account
-                  // — and `group` files every child under its own parent.
-                  return {
-                    value: a.id,
-                    label: leaf,
-                    hint: a.type,
-                    group: parent ?? "Top level",
-                  };
-                })}
+                options={accountOptions}
                 placeholder={
                   accounts
                     ? inherited

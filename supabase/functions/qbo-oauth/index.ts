@@ -89,7 +89,7 @@ Deno.serve(async (req) => {
     .update({ oauth_state: null, oauth_state_expires_at: null })
     .eq("oauth_state", state)
     .gt("oauth_state_expires_at", new Date().toISOString())
-    .select("id, org_id");
+    .select("id, org_id, realm_id");
 
   if (claimError) {
     return back({ quickbooks: "error", reason: "lookup_failed" });
@@ -100,7 +100,7 @@ Deno.serve(async (req) => {
     return back({ quickbooks: "error", reason: "expired" });
   }
 
-  const row = claimed[0] as { id: string; org_id: string };
+  const row = claimed[0] as { id: string; org_id: string; realm_id: string | null };
 
   let token;
   try {
@@ -140,5 +140,38 @@ Deno.serve(async (req) => {
     return back({ quickbooks: "error", reason: "not_saved" });
   }
 
-  return back({ quickbooks: "connected" });
+  // A DIFFERENT COMPANY FILE MEANS EVERY STORED ACCOUNT ID IS NOW WRONG.
+  //
+  // `vendors.expense_account_ref` (082) and the QBO vendor id in
+  // `vendors.external_ref` (081) are ids INSIDE one realm. Point the app at
+  // another company — sandbox to production, most obviously — and id "80" is
+  // either a different account or none at all, so a bill posts somewhere
+  // nobody chose and every screen still looks settled. That is the failure
+  // 081 put the connection's own defaults on the connection row to avoid; the
+  // per-vendor overrides live on `vendors` and cannot be cleared that way.
+  //
+  // Only on a CHANGE. Reconnecting the same realm — an expired token, a
+  // revoke at Intuit — must not throw away mappings that are still correct.
+  const realmChanged = row.realm_id !== null && row.realm_id !== realmId;
+  if (realmChanged) {
+    await admin
+      .from("accounting_connections")
+      .update({ bill_expense_account_ref: null, bill_expense_account_name: null,
+                invoice_item_ref: null, invoice_item_name: null })
+      .eq("id", row.id);
+    await admin
+      .from("vendors")
+      .update({ expense_account_ref: null, expense_account_name: null,
+                external_ref: {} })
+      .eq("org_id", row.org_id)
+      .neq("external_ref", "{}");
+    // and the ones that carry only an account override
+    await admin
+      .from("vendors")
+      .update({ expense_account_ref: null, expense_account_name: null })
+      .eq("org_id", row.org_id)
+      .not("expense_account_ref", "is", null);
+  }
+
+  return back({ quickbooks: "connected", ...(realmChanged ? { remapped: "1" } : {}) });
 });
