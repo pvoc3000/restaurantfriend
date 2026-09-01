@@ -1,6 +1,4 @@
-import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { ChecklistWalk } from "@/components/checklists/ChecklistWalk";
-import { FinishChecklist } from "@/components/checklists/FinishChecklist";
 import { LinkChecklistRun } from "@/components/checklists/LinkChecklistRun";
 import { progressLabel } from "@/lib/checklists";
 import type { ShiftSlot } from "@/lib/shiftReports";
@@ -21,20 +19,29 @@ import type { ChecklistRunData } from "@/lib/checklistRunData";
  * `/checklists/[id]/run`, and this page adds the sentence that says which
  * checklist it is — and the one command that chrome was carrying.
  *
- * FINISHING HAS TO BE POSSIBLE FROM HERE, and for a while it was not (Mark,
- * 2026-08-30). `WalkRunner`'s footer owned the button, this page mounts only
- * the body, and the sole route out was an "open it full screen" link — so
- * finishing meant leaving the report you were in the middle of writing. The
- * act lives in `FinishChecklist` now and both surfaces call it; that link is
- * gone (Mark, same day), which also retires the one control on this page that
- * threw away where you were.
+ * THERE IS NO FINISH BUTTON HERE ANY MORE (Mark, 2026-09-01: "have the
+ * checklist finished automatically when the shift report is completed. It feels
+ * like an unnecessary extra step to the user"). He is right, and the reason is
+ * the same one that put the button here in the first place: this checklist
+ * belongs to THIS report, so the report being finished is the checklist being
+ * finished. Two commits for one decision is a step, not a safeguard.
  *
- * TWO ACTS, NOT ONE. Finishing the walk submits the RUN; submitting the report
- * sends. Neither triggers the other, and `submit_shift_report` is untouched —
- * both it and `reopen_shift_report` are applied definer functions, and 072
- * exists precisely because flipping a status without undoing a flush duplicates
- * records silently. The submit page NAMES an unfinished checklist and lets you
- * through.
+ * A short history, because the button was itself a fix and this is not a
+ * revert of it. `WalkRunner`'s footer used to own the act, so from inside a
+ * report there was NO WAY to finish a run at all (Mark, 2026-08-30) — you left
+ * the report, finished it full-screen, and came back. `FinishChecklist` was
+ * extracted so both surfaces could offer it. It is still there, still the one
+ * implementation, and still the ONLY route for a standalone walk at
+ * `/checklists/[id]/run`, which has no report to be finished by.
+ *
+ * WHAT THE CONFIRM DID, AND WHERE IT WENT. `FinishChecklist` names what is
+ * outstanding and then lets you through. The submit page does exactly that
+ * already — it lists how many items nobody looked at — so nothing is lost. Its
+ * one caveat that HAS gone is "answered but has not been finished", which is no
+ * longer true of anything: see `submitReadiness`.
+ *
+ * The act itself lives in `ShiftReportRunner.send`, between the flush and the
+ * mail — not inside `submit_shift_report`, and that file says why.
  */
 export function ChecklistPage({
   reportId,
@@ -117,19 +124,12 @@ export function ChecklistPage({
       />
 
       {editable && run.run.status === "open" && (
-        // An ORDINARY command, not a filled one: this report's single outcome
-        // is Send, on its submit page, and finishing the checklist is one step
-        // on the way. `PRIMARY_BUTTON_CLASS` is for the act a screen exists
-        // for, and on this screen that is not this.
-        <div className="flex justify-end">
-          <FinishChecklist
-            runId={run.run.id}
-            noun="checklist"
-            items={run.items}
-            className={BUTTON_CLASS}
-            label="Finish the checklist"
-          />
-        </div>
+        /* Said once, quietly, where the missing button was. Without it the page
+           looks like a checklist you can fill in and never close — which is the
+           reading the button existed to prevent. */
+        <p className="text-right text-[14px] text-muted">
+          Sending the report finishes this checklist.
+        </p>
       )}
     </div>
   );

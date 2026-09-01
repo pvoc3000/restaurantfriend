@@ -558,7 +558,21 @@ function KitchenBox({
  * `Misc` lines never reach it (decision 5, enforced in `sizeClassGroups`), so
  * an order carrying a $75 delivery fee prints its donuts and not the fee.
  */
-export function KitchenOrderPdf({ orders }: { orders: OrderDocData[]; org?: DocOrg }) {
+export function KitchenOrderPdf({
+  orders,
+  printedOn,
+}: {
+  orders: OrderDocData[];
+  org?: DocOrg;
+  /**
+   * The org's calendar day, as `YYYY-MM-DD` — what AS OF means.
+   *
+   * Passed in rather than taken from `new Date()` here, for `lib/today`'s
+   * reason: a browser in another zone, or a UTC host, dates the sheet to
+   * tomorrow after 4pm Pacific. Both callers already hold the org's own today.
+   */
+  printedOn?: string;
+}) {
   return (
     <Document>
       {orders.map((order) => {
@@ -583,7 +597,16 @@ export function KitchenOrderPdf({ orders }: { orders: OrderDocData[]; org?: DocO
               </View>
               <View>
                 <Text style={styles.orderNumber}>ORDER #{order.number}</Text>
-                <Text style={styles.asOf}>AS OF {usDate(order.event_date)}</Text>
+                {/* AS OF IS THE DAY THIS CAME OFF THE PRINTER (Mark,
+                    2026-09-01), not the day of the event. The event date is on
+                    this page twice already — in the DAY OF WEEK box on the left
+                    and in EVENT INFO below — so printing it a third time under
+                    the order number said nothing, while the question AS OF
+                    actually answers is "how current is the sheet in my hand?".
+                    An order is a working document and its lines change; a
+                    decorator holding two copies needs to know which is the
+                    later one. */}
+                <Text style={styles.asOf}>AS OF {usDate(printedOn ?? order.event_date)}</Text>
               </View>
             </View>
 
@@ -800,9 +823,12 @@ export function documentElement(
   kind: DocumentKind,
   orders: OrderDocData[],
   org: DocOrg,
-  approval?: { name: string; at: string; reference: string } | null
+  approval?: { name: string; at: string; reference: string } | null,
+  /** The org's today, for the kitchen sheet's AS OF line. */
+  printedOn?: string
 ) {
-  if (kind === "order") return <KitchenOrderPdf orders={orders} org={org} />;
+  if (kind === "order")
+    return <KitchenOrderPdf orders={orders} org={org} printedOn={printedOn} />;
   return <OrderDocumentPdf orders={orders} org={org} kind={kind} approval={approval} />;
 }
 

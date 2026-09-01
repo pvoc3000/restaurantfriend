@@ -180,14 +180,22 @@ export function submitReadiness(input: ReadinessInput): string[] {
     if (input.checklistNotStarted) {
       caveats.push("The checklist for this shift has not been started.");
     } else if (input.checklist) {
-      const { outstanding, total, finished } = input.checklist;
+      const { outstanding, total } = input.checklist;
       if (outstanding > 0) {
         caveats.push(
           `${outstanding} of ${total} checklist ${outstanding === 1 ? "item has" : "items have"} not been looked at.`
         );
-      } else if (!finished) {
-        caveats.push("The checklist is answered but has not been finished.");
       }
+      // NO "answered but not finished" CAVEAT ANY MORE (Mark, 2026-09-01).
+      // Sending the report finishes the run, so an open-but-answered checklist
+      // is not something outstanding for the reader — it is something this very
+      // button is about to do. Naming it would be the failure `closeReadiness`
+      // warns about in reverse: a list that reports as unresolved a thing the
+      // screen resolves for you teaches people to stop reading the list.
+      //
+      // `checklist.finished` stays on the type. It is still read by the EMAIL,
+      // where "was this finished" is a fact about the document being described
+      // rather than a prompt.
     }
   }
 

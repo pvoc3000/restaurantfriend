@@ -717,13 +717,30 @@ test("one outstanding item reads in the singular", () => {
   eq(out, ["1 of 27 checklist item has not been looked at."]);
 });
 
-test("answered but not finished is its own sentence", () => {
-  // Different from unwalked: everything was looked at, nobody pressed Finish.
+test("answered but not finished says NOTHING — sending finishes it", () => {
+  // Mark, 2026-09-01: the checklist page's Finish button is gone and sending
+  // the report submits the run. So "answered but not finished" is no longer
+  // outstanding work; it is the next half-second. Naming it would report as
+  // unresolved a thing this very button resolves.
+  //
+  // Checked by BREAKING it: put the `else if (!finished)` branch back and this
+  // goes red.
   const out = submitReadiness({
     ...READY,
     checklist: { outstanding: 0, total: 27, finished: false },
   });
-  eq(out, ["The checklist is answered but has not been finished."]);
+  eq(out, []);
+});
+
+test("an unfinished checklist with work left still names the work", () => {
+  // The half that survives, and the distinction that matters: how much has not
+  // been LOOKED AT is a fact about the shift, where "not finished" was a fact
+  // about a button.
+  const out = submitReadiness({
+    ...READY,
+    checklist: { outstanding: 3, total: 27, finished: false },
+  });
+  eq(out, ["3 of 27 checklist items have not been looked at."]);
 });
 
 test("a report with NO checklist linked and none asked for says nothing", () => {

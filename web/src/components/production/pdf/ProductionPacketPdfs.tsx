@@ -44,16 +44,21 @@ export type PacketPart =
 // anybody who works here. A caption under every row of a checklist is a second
 // thing to read on the way to a decision that is already obvious.
 //
-// The three sheet names are Mark's own words, not ours: "element" is the
-// schema's vocabulary and not the kitchen's.
+// WHAT THE DIALOG OFFERS, WHICH IS NO LONGER EVERYTHING IT CAN RENDER (Mark,
+// 2026-09-01: "remove the 'production items sheet' 'AB Items' and 'weekly
+// production' options from the checkbox list"). Four parts, not seven.
+//
+// The three RENDERERS are deliberately left in place — `DonutSheetPage` and
+// `RhythmSheetPage` are still reached through `parts`, and `PacketPart` still
+// names all seven. They are what `_production.mer` was read for, and putting a
+// row back is one line here rather than a rebuild. Nothing passes those keys
+// today, so they are unreachable from the app; that is a known cost of keeping
+// the door rather than the corridor.
 export const PACKET_PARTS: { key: PacketPart; label: string }[] = [
   { key: "premade", label: "Premade schedule" },
   { key: "baker", label: "Baker tray guide" },
   { key: "fryer", label: "Fryer tray guide" },
   { key: "decorator", label: "Decorator tray guide" },
-  { key: "donut", label: "Production Items Sheet" },
-  { key: "ab", label: "AB Items" },
-  { key: "weekly", label: "Weekly Production" },
 ];
 
 const INK = "#111";

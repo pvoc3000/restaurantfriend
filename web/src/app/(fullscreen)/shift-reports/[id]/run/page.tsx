@@ -5,6 +5,7 @@ import { getAppSession } from "@/lib/session";
 import { canEnterCounts, canReadHr } from "@/lib/roles";
 import { daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { compareForPremadeSheet } from "@/lib/productionSchedule";
+import { isDayComplete } from "@/lib/sales";
 import {
   pagesForShift,
   type EmailReport,
@@ -76,10 +77,22 @@ const SKIP = { data: null, error: null } as const;
 
 export default async function RunShiftReportPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  /**
+   * `?page=2` — where to open, 1-based.
+   *
+   * Only the create dialog passes it, and it passes 2 because page 1 restates
+   * that dialog (Mark, 2026-09-01). A parameter rather than a rule inside the
+   * runner, because "skip the first page" is true of the moment a report is
+   * CREATED and false of resuming one: coming back to a paused report should
+   * land where it always has.
+   */
+  searchParams: Promise<{ page?: string }>;
 }) {
   const { id } = await params;
+  const { page: pageParam } = await searchParams;
   const session = await getAppSession();
   const supabase = await createClient();
   const role = session.membership.role;
@@ -122,7 +135,8 @@ export default async function RunShiftReportPage({
   const shift = report.shift as ShiftSlot;
   const pages = pagesForShift(shift);
   const wants = (p: ShiftReportPage) => pages.includes(p);
-  const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
+  const timeZone = session.orgSettings.timezone ?? serverTimeZone();
+  const today = todayInTimeZone(timeZone);
 
   // ── The checklist linked to this report ─────────────────────────────────
   //
@@ -223,6 +237,7 @@ export default async function RunShiftReportPage({
 
   const [
     { data: takers },
+    { data: supervisorRows },
     { data: positionRows },
     { data: ratings },
     { data: todaySchedule },
@@ -233,6 +248,11 @@ export default async function RunShiftReportPage({
     { data: plans },
   ] = await Promise.all([
     supabase.rpc("special_order_takers", { p_org_id: report.org_id }),
+    // Supervisors and managers only, for page 1's picker — migration 080. The
+    // FULL roster above stays: it resolves the name of whoever is recorded,
+    // including somebody this filter drops, and the ratings page needs all of
+    // it. See `InfoPage` for why the recorded person is always offered.
+    supabase.rpc("shift_supervisors", { p_org_id: report.org_id }),
     // The shop's own position vocabulary. `employees.position` is the third of
     // the three this schema carries and the one that holds the abbreviations a
     // supervisor actually writes — "DF", "Sr. DF" — where `timesheets.position`
@@ -261,7 +281,11 @@ export default async function RunShiftReportPage({
     wants("sales")
       ? supabase
           .from("daily_sales")
-          .select("business_date, net_sales_cents, tips_cents")
+          // `synced_at` and `source` are what `isDayComplete` needs. Since
+          // 2026-08-31 the sync loads TODAY as a part-day, so a stored row for
+          // this date is no longer proof the day is closed — without these two
+          // columns a nine-hour figure renders exactly like a settled one.
+          .select("business_date, net_sales_cents, tips_cents, synced_at, source")
           .eq("location_id", report.location_id)
           .in("business_date", [reportDate, lastWeekDate, lastYearDate])
       : SKIP,
@@ -294,6 +318,9 @@ export default async function RunShiftReportPage({
     value: t.id,
     label: t.name,
   }));
+  const supervisorRoster = (
+    (supervisorRows as { id: string; name: string }[] | null) ?? []
+  ).map((t) => ({ value: t.id, label: t.name }));
 
   // Distinct and sorted here rather than in SQL: PostgREST has no DISTINCT, and
   // 445 rows of one short column is cheaper to de-duplicate than to think about.
@@ -399,13 +426,37 @@ export default async function RunShiftReportPage({
   }
 
   // ---- sales: three settled days, of which today is usually absent --------
+  const salesRows = (salesDays as Record<string, unknown>[] | null) ?? [];
   const salesByDate = new Map(
-    ((salesDays as Record<string, unknown>[] | null) ?? []).map((s) => [
+    salesRows.map((s) => [
       s.business_date as string,
       { netCents: Number(s.net_sales_cents), tipsCents: Number(s.tips_cents) },
     ])
   );
-  const settledToday = salesByDate.get(reportDate) ?? null;
+  const storedToday = salesByDate.get(reportDate) ?? null;
+
+  /**
+   * Is the row we have for TODAY actually finished?
+   *
+   * `isDayComplete` answers it from `synced_at` rather than from the calendar,
+   * which is that function's own point: a row pulled at 4pm and never pulled
+   * again is a part-day forever, and a date test would call it settled by
+   * Thursday. A row that is NOT complete is still worth showing — it is today's
+   * takings so far — but it must not be shown as though Square had closed the
+   * day, and the Sales page still asks Square for a fresher figure over it.
+   */
+  const todayRow = salesRows.find((r) => r.business_date === reportDate);
+  const todayIsSettled =
+    todayRow !== undefined &&
+    isDayComplete(
+      {
+        business_date: reportDate,
+        syncedAt: (todayRow.synced_at as string | null) ?? null,
+        source: (todayRow.source as string | undefined) ?? undefined,
+      },
+      timeZone
+    );
+  const settledToday = todayIsSettled ? storedToday : null;
 
   const orders: TomorrowOrder[] = ((tomorrowOrders as Record<string, unknown>[] | null) ?? []).map(
     (o) => ({
@@ -437,6 +488,7 @@ export default async function RunShiftReportPage({
         supervisorId={(report.supervisor_employee_id as string | null) ?? null}
         nextProductionDate={nextDay}
         locationCode={locationCode}
+        supervisors={supervisorRoster}
         takers={roster}
         editable={editable}
       />
@@ -472,7 +524,7 @@ export default async function RunShiftReportPage({
           taskRatingsDone: report.task_ratings_done as boolean,
           taskSpecialOrdersDone: report.task_special_orders_done as boolean,
           taskSchedulesDone: report.task_schedules_done as boolean,
-          netSalesCents: settledToday?.netCents ?? null,
+          netSalesCents: (settledToday ?? storedToday)?.netCents ?? null,
           countedLines: premadeRows.filter((r) => r.made !== null || r.leftover !== null).length,
           scheduledLines: premadeRows.length,
           countedBatches: elementRows.filter((r) => r.yieldCount !== null).length,
@@ -514,10 +566,14 @@ export default async function RunShiftReportPage({
         locationId={report.location_id as string}
         reportDate={reportDate}
         settled={settledToday}
+        // Today's row when there IS one but it is not finished. The page shows
+        // it immediately, marked provisional, and still asks Square over it.
+        partial={todayIsSettled ? null : storedToday}
         lastWeek={salesByDate.get(lastWeekDate) ?? { netCents: null, tipsCents: null }}
         lastWeekDate={lastWeekDate}
         lastYear={salesByDate.get(lastYearDate) ?? { netCents: null, tipsCents: null }}
         lastYearDate={lastYearDate}
+        editable={editable}
       />
     );
   }
@@ -553,6 +609,9 @@ export default async function RunShiftReportPage({
         key="tomorrow"
         reportId={id}
         nextProductionDate={nextDay}
+        // The org's calendar day, for the kitchen order's AS OF line — that is
+        // the day the sheet came off the printer, not the day of the event.
+        today={today}
         kitchenId={kitchenId}
         kitchenCode={kitchenCode}
         locations={session.activeLocations.map((l) => ({
@@ -590,9 +649,11 @@ export default async function RunShiftReportPage({
       ? nameById.get(report.supervisor_employee_id as string) ?? null
       : null,
     narrative: (report.narrative as string | null) ?? null,
-    netSalesCents: settledToday?.netCents ?? null,
-    tipsCents: settledToday?.tipsCents ?? null,
-    salesAreProvisional: false,
+    netSalesCents: (settledToday ?? storedToday)?.netCents ?? null,
+    tipsCents: (settledToday ?? storedToday)?.tipsCents ?? null,
+    // A stored part-day is quoted AS a part-day. The runner overrides all three
+    // of these at Send from whatever the Sales page is actually showing.
+    salesAreProvisional: settledToday === null && storedToday !== null,
     lastWeekNetCents: salesByDate.get(lastWeekDate)?.netCents ?? null,
     lastYearNetCents: salesByDate.get(lastYearDate)?.netCents ?? null,
     premades: premadeRows.map((r) => ({
@@ -618,6 +679,11 @@ export default async function RunShiftReportPage({
     checklistNotStarted,
   };
 
+  // 1-based in the URL because that is what the page band counts in; clamped
+  // by the runner, which is the only thing that knows how many pages this
+  // shift has.
+  const openAt = Number(pageParam);
+
   return (
     <ShiftReportRunner
       reportId={id}
@@ -626,6 +692,17 @@ export default async function RunShiftReportPage({
       canSend={canSend}
       emailReport={emailReport}
       pages={bodies}
+      openAtPage={Number.isFinite(openAt) ? openAt : null}
+      // Sending FINISHES the checklist (Mark, 2026-09-01), so the runner needs
+      // to know whether there is one and whether it is still open. Only the id
+      // and the status: the confirm that used to stand between the two acts is
+      // gone with the button, and everything it named — what is outstanding,
+      // what was found — is on the submit page already.
+      checklistRun={
+        linkedRun && linkedRun.status === "open"
+          ? { id: linkedRun.id as string, title: linkedRun.title as string }
+          : null
+      }
     />
   );
 }

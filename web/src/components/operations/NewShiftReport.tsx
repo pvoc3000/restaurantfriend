@@ -17,23 +17,49 @@ const SHIFT_OPTIONS: PickOption[] = (
 /**
  * Starting a shift report.
  *
- * Asks the FMP page-1 fields and nothing else — the rest is the report itself.
- * `NewPlan`'s create-then-go shape: insert, take the id, and land the person on
- * the runner, because "New report" and "start filling it in" are one act.
+ * Asks the FMP page-1 fields MINUS THE SUPERVISOR — the rest is the report
+ * itself. `NewPlan`'s create-then-go shape: insert, take the id, and land the
+ * person on the runner, because "New report" and "start filling it in" are one
+ * act.
+ *
+ * IT NEVER ASKS WHO YOU ARE (Mark, 2026-09-01: "why are we setting the
+ * supervisor who's filling out the report? Why not just use whoever is logged
+ * in?"). Migration 080's `my_employee_id` resolves the signed-in member to
+ * their employee row — `employees` READ is owner/admin, so a supervisor cannot
+ * do that any other way — and the id is written with the row.
+ *
+ * Measured before the change: 3 of 3 app users are linked to an employee
+ * record, so this really does fill itself for everybody rather than for one
+ * person with the rest silently getting nothing; and 4 of the 5 real reports
+ * already had supervisor = author.
+ *
+ * THE FIFTH IS WHY THE FIELD SURVIVES ON PAGE 1. Mark filed the 2026-08-28
+ * closing report for somebody else, which is a handover — the same case 070
+ * declined a unique constraint over. The default is the login; the correction
+ * is one page away. A null `myEmployeeId` (a login with no HR record) simply
+ * leaves the column null, which is what that picker is for.
+ *
+ * IT LANDS ON PAGE 2 (Mark, same day): page 1 restates this dialog, so
+ * arriving on it means reading the same five facts twice in ten seconds. Back
+ * still reaches it — this skips a page rather than hiding one.
  */
 export function NewShiftReport({
   orgId,
   locationId,
   locationCode,
   today,
-  takers,
+  myEmployeeId,
   existing,
 }: {
   orgId: string;
   locationId: string;
   locationCode: string;
   today: string;
-  takers: PickOption[];
+  /**
+   * The signed-in member's own `employees.id`, from migration 080's
+   * `my_employee_id`, or null when their login has no HR record.
+   */
+  myEmployeeId: string | null;
   existing: { date: string; shift: ShiftSlot }[];
 }) {
   const router = useRouter();
@@ -41,7 +67,6 @@ export function NewShiftReport({
   const [open, setOpen] = useState(false);
   const [date, setDate] = useState<string | null>(today);
   const [shift, setShift] = useState<ShiftSlot>("closing");
-  const [supervisor, setSupervisor] = useState<string | null>(null);
   const [nextDay, setNextDay] = useState<string | null>(daysBefore(today, -1));
   const [failed, setFailed] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -66,7 +91,9 @@ export function NewShiftReport({
           kitchen_location_id: locationId,
           report_date: date,
           shift,
-          supervisor_employee_id: supervisor,
+          // Whoever is logged in, resolved once on the server. Null is a real
+          // answer and not a failure — see the note at the top.
+          supervisor_employee_id: myEmployeeId,
           next_production_date: nextDay,
           created_by: (await supabase.auth.getUser()).data.user?.id ?? null,
         })
@@ -85,7 +112,7 @@ export function NewShiftReport({
       // can land after the push and put the old tree back — the screen simply
       // does not change when you press the button. There is nothing to refresh
       // anyway: we are leaving, and the list re-fetches on the way back.
-      router.push(`/shift-reports/${data.id}/run`);
+      router.push(`/shift-reports/${data.id}/run?page=2`);
     });
   }
 
@@ -163,23 +190,6 @@ export function NewShiftReport({
             </label>
 
             <div className="space-y-1.5">
-              <span className="block text-xs font-semibold uppercase tracking-[0.08em]">
-                Supervisor
-              </span>
-              <PickList
-                value={supervisor}
-                options={takers}
-                onPick={setSupervisor}
-                placeholder="Who ran the shift"
-                variant="field"
-                size="lg"
-                boxed
-                className="w-full"
-                ariaLabel="The supervisor who ran this shift"
-              />
-            </div>
-
-            <div className="space-y-1.5">
               <span className="block text-xs font-semibold uppercase tracking-[0.08em]">Shift</span>
               <PickList
                 value={shift}
@@ -202,6 +212,20 @@ export function NewShiftReport({
                 </p>
               ) : null}
             </div>
+
+            {/* ONE TRUE SENTENCE COVERING TWO CAUSES. `myEmployeeId` is null
+                either because this login has no HR record or because migration
+                080 has not been applied — and in both cases the consequence is
+                the same and is the only thing worth saying: the report starts
+                with no supervisor, and page 1 is where you set one. Silence
+                here would read as the field having filled itself. */}
+            {myEmployeeId === null ? (
+              <p className="text-sm text-muted">
+                This report will start with no supervisor named — your login
+                isn&rsquo;t linked to an employee record. You can set one on the
+                first page.
+              </p>
+            ) : null}
 
             <label className="block space-y-1.5">
               <span className="text-xs font-semibold uppercase tracking-[0.08em]">

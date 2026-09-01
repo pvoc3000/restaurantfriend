@@ -42,7 +42,12 @@ export default async function ShiftReportsPage() {
   const today = todayInTimeZone(timeZone);
   const from = daysBefore(today, WINDOW_DAYS);
 
-  const [{ data: reports, error }, { data: takers }, { data: shop }] = await Promise.all([
+  const [
+    { data: reports, error },
+    { data: takers },
+    { data: myEmployeeId },
+    { data: shop },
+  ] = await Promise.all([
     supabase
       .from("shift_reports")
       // ONE STRING LITERAL, never a concatenation: supabase-js parses this at
@@ -55,9 +60,16 @@ export default async function ShiftReportsPage() {
       .gte("report_date", from)
       .order("report_date", { ascending: false }),
     // `employees` READ is owner/admin (020), so a supervisor can only learn a
-    // colleague's name through this definer — 053's function, the same one the
-    // create dialog picks from.
+    // colleague's name through this definer — 053's function. It is what turns
+    // each row's `supervisor_employee_id` into a name; nothing picks from it
+    // here any more.
     supabase.rpc("special_order_takers", { p_org_id: session.membership.org_id }),
+    // Who the CREATE dialog will name as the shift's supervisor: whoever is
+    // logged in (Mark, 2026-09-01). Migration 080 — `employees.user_id` is the
+    // link and `employees` READ is owner/admin, so a supervisor can resolve
+    // their own row only through a definer. Null when a login has no HR record,
+    // which leaves the column null and page 1's picker as the way to set it.
+    supabase.rpc("my_employee_id", { p_org_id: session.membership.org_id }),
     // 017's column, and this is its first reader. It is what makes "nobody
     // reported Tuesday" a fact rather than a suspicion: the shop either was or
     // was not open that weekday.
@@ -106,10 +118,7 @@ export default async function ShiftReportsPage() {
       locationId={active.id}
       locationCode={active.code}
       openDays={(shop?.open_days as number[] | null) ?? []}
-      takers={((takers as { id: string; name: string }[] | null) ?? []).map((t) => ({
-        value: t.id,
-        label: t.name,
-      }))}
+      myEmployeeId={(myEmployeeId as string | null) ?? null}
     />
   );
 }

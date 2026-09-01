@@ -49,6 +49,7 @@ export type TomorrowSchedule = {
 export function TomorrowPage({
   reportId,
   nextProductionDate,
+  today,
   kitchenId,
   kitchenCode,
   locations,
@@ -62,6 +63,8 @@ export function TomorrowPage({
 }: {
   reportId: string;
   nextProductionDate: string | null;
+  /** The org's calendar day — the kitchen sheet's AS OF line. */
+  today: string;
   kitchenId: string;
   kitchenCode: string;
   locations: { id: string; code: string; name: string }[];
@@ -100,7 +103,8 @@ export function TomorrowPage({
         fetchOrderDocData(supabase, [order.id]),
       ]);
       const blob = await pdf(
-        docs.documentElement("order", data.orders, data.org)
+        // `null` approval, then today: AS OF is the day the sheet prints.
+        docs.documentElement("order", data.orders, data.org, null, today)
       ).toBlob();
       showBlob(win, blob, documentFileName("order", order.number, nextProductionDate ?? ""));
 

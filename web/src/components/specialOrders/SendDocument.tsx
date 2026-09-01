@@ -141,7 +141,11 @@ export function SendDocument({
     ]);
     if (data.orders.length === 0) throw new Error("Order not found");
     const order = data.orders[0];
-    const blob = await pdf(docs.documentElement(k, [order], data.org)).toBlob();
+    // The org's own today, for the kitchen sheet's AS OF line — the same value
+    // the file name already falls back to.
+    const blob = await pdf(
+      docs.documentElement(k, [order], data.org, null, today)
+    ).toBlob();
     return { blob, order, org: data.org };
   }
 

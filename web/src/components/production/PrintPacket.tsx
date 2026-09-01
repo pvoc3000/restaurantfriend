@@ -171,7 +171,7 @@ export function PrintPacket({
 
       {open && (
         <Dialog
-          title="Print the packet"
+          title="Print Documents"
           onClose={() => setOpen(false)}
           busy={pending}
           footer={
@@ -198,20 +198,23 @@ export function PrintPacket({
           {failed ? <p className="mt-2 text-sm text-accent">{failed}</p> : null}
 
           <div className="mt-3 space-y-4">
-            <p className="text-sm text-muted">
-              One file for {scheduleIds.length}{" "}
-              {scheduleIds.length === 1 ? "night" : "nights"}
-              {companions > 0 ? (
-                <>
-                  , including{" "}
-                  <span className="bg-mark-fill px-1">
-                    {companions} special-order{" "}
-                    {companions === 1 ? "schedule" : "schedules"}
-                  </span>
-                </>
-              ) : null}
-              .
-            </p>
+            {/* THE "one file for N nights" SENTENCE IS GONE (Mark, 2026-09-01).
+                You reached this dialog by selecting those nights, so it told
+                you what you had just done.
+
+                WHAT SURVIVES IS THE HALF YOU DID NOT DO. Decision 11 pulls in
+                the night's special-order schedules whether or not you ticked
+                them — that is the point of it — so the count of what is coming
+                along is the one thing here nobody chose and could not
+                otherwise know. It renders only when there is one. */}
+            {companions > 0 ? (
+              <p className="text-sm">
+                <span className="bg-mark-fill px-1">
+                  Including {companions} special-order{" "}
+                  {companions === 1 ? "schedule" : "schedules"}
+                </span>
+              </p>
+            ) : null}
 
             <ul className="divide-y divide-hairline border border-ink">
               {PACKET_PARTS.map((p) => (

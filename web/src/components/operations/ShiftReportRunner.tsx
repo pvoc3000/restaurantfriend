@@ -42,6 +42,8 @@ export function ShiftReportRunner({
   canSend,
   emailReport,
   pages,
+  openAtPage,
+  checklistRun,
 }: {
   reportId: string;
   shift: ShiftSlot;
@@ -54,11 +56,29 @@ export function ShiftReportRunner({
   emailReport: EmailReport;
   /** One rendered body per page, built by the server component. */
   pages: Partial<Record<ShiftReportPage, React.ReactNode>>;
+  /**
+   * Where to open, 1-based, or null for the first page.
+   *
+   * The create dialog passes 2, because page 1 restates it. Clamped here
+   * rather than at the caller: only this component knows how many pages this
+   * shift is asked for, and a report whose shift has since been corrected to
+   * `off_site` has fewer of them.
+   */
+  openAtPage: number | null;
+  /**
+   * The checklist linked to this report, ONLY while it is still open.
+   *
+   * Null when there is none or it is already finished, which is what makes
+   * `finishChecklist` below safe to call unconditionally on send.
+   */
+  checklistRun: { id: string; title: string } | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const order = pagesForShift(shift);
-  const [index, setIndex] = useState(0);
+  const [index, setIndex] = useState(() =>
+    openAtPage === null ? 0 : Math.min(Math.max(openAtPage - 1, 0), order.length - 1)
+  );
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -103,7 +123,54 @@ export function ShiftReportRunner({
         return;
       }
 
-      // 2. The mail. SEPARATE, because "the facts were committed" and "the team
+      // 2. THE CHECKLIST IS FINISHED BY FINISHING THE REPORT (Mark,
+      //    2026-09-01: it "feels like an unnecessary extra step"). The page's
+      //    own Finish button is gone; this is where the run is submitted.
+      //
+      //    AFTER the flush and BEFORE the mail, which is the only order that
+      //    works: the email quotes whether the checklist was finished, so
+      //    doing it afterwards would send "this checklist was not finished"
+      //    about one that just had been.
+      //
+      //    NOT folded into `submit_shift_report`. That is an applied definer
+      //    function and 072's `reopen_shift_report` exists to undo exactly what
+      //    it flushes; teaching it to submit a run would mean teaching the
+      //    reopen to reopen one, and reopening a checklist is a decision
+      //    somebody makes about the checklist. `ReopenChecklistRun` is that
+      //    door and stays it.
+      //
+      //    A SEPARATE STATEMENT, so a refusal here cannot un-send a report
+      //    whose facts are already committed — the same reasoning as the mail
+      //    below. 076's update policy is supervisor+ AND `created_by =
+      //    auth.uid()`, so a run somebody ELSE started refuses this, changing
+      //    zero rows and returning no error. Hence `.select()` and the count:
+      //    the alternative is a cheerful success over a checklist still marked
+      //    open.
+      let checklistFinished = false;
+      let checklistWarning: string | null = null;
+      if (checklistRun) {
+        setBusy("Finishing the checklist…");
+        const { data: finished, error: finishError } = await supabase
+          .from("checklist_runs")
+          .update({
+            status: "submitted",
+            submitted_at: new Date().toISOString(),
+            submitted_by: (await supabase.auth.getUser()).data.user?.id ?? null,
+          })
+          .eq("id", checklistRun.id)
+          .select("id");
+
+        if (finishError || !finished || finished.length === 0) {
+          checklistWarning =
+            finishError?.message ??
+            `“${checklistRun.title}” was not finished — a checklist is finished by whoever started it. ` +
+              "You can finish it from Facilities › Checklists.";
+        } else {
+          checklistFinished = true;
+        }
+      }
+
+      // 3. The mail. SEPARATE, because "the facts were committed" and "the team
       //    was told" are two facts — a failure here leaves a report that is
       //    sent and not emailed, which the list offers to resend rather than
       //    losing. So a mail failure is reported and the send still stands.
@@ -114,7 +181,7 @@ export function ShiftReportRunner({
       //    that the supervisor version carries no names or scores. This is
       //    `send-po-email`'s shape: the client composes, the function sends.
       setBusy("Emailing the team…");
-      const forEmail: EmailReport = liveSales?.reportId === reportId
+      const withSales: EmailReport = liveSales?.reportId === reportId
         ? {
             ...emailReport,
             netSalesCents: liveSales.netCents,
@@ -122,6 +189,14 @@ export function ShiftReportRunner({
             salesAreProvisional: liveSales.provisional,
           }
         : emailReport;
+
+      // The run was open when the server rendered this and is submitted now, so
+      // the payload has to say so — otherwise the section reads "This checklist
+      // was not finished" about the one this very act just finished.
+      const forEmail: EmailReport =
+        checklistFinished && withSales.checklist
+          ? { ...withSales, checklist: { ...withSales.checklist, finished: true } }
+          : withSales;
 
       const { error: mailError } = await supabase.functions.invoke("send-shift-report", {
         body: {
@@ -139,8 +214,18 @@ export function ShiftReportRunner({
       if (mailError) {
         setFailed(
           `The report was recorded, but the email did not go out: ${mailError.message}. ` +
-            "It is on the list as “Sent, but not emailed” — you can resend it from there."
+            "It is on the list as “Sent, but not emailed” — you can resend it from there." +
+            (checklistWarning ? ` Also: ${checklistWarning}` : "")
         );
+        router.refresh();
+        return;
+      }
+
+      // A checklist that refused to close is worth stopping for: the report is
+      // sent either way, but leaving without saying so would leave a run open
+      // that nobody is going to come back to.
+      if (checklistWarning) {
+        setFailed(`The report was sent. ${checklistWarning}`);
         router.refresh();
         return;
       }

@@ -17,7 +17,6 @@ import {
   type ShiftSlot,
 } from "@/lib/shiftReports";
 import { daysBefore } from "@/lib/today";
-import type { PickOption } from "@/components/ui/PickList";
 
 export type ShiftReportRow = {
   id: string;
@@ -53,7 +52,7 @@ export function ShiftReportsList({
   locationId,
   locationCode,
   openDays,
-  takers,
+  myEmployeeId,
 }: {
   rows: ShiftReportRow[];
   today: string;
@@ -61,7 +60,8 @@ export function ShiftReportsList({
   locationId: string;
   locationCode: string;
   openDays: number[];
-  takers: PickOption[];
+  /** The signed-in member's own employee id — migration 080. */
+  myEmployeeId: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -275,7 +275,7 @@ export function ShiftReportsList({
           locationId={locationId}
           locationCode={locationCode}
           today={today}
-          takers={takers}
+          myEmployeeId={myEmployeeId}
           existing={rows.map((r) => ({ date: r.reportDate, shift: r.shift }))}
         />
       </div>

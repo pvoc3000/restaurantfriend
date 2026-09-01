@@ -158,7 +158,20 @@ export function GenerateSchedules({
   const [start, setStart] = useState<string | null>(today);
   const [days, setDays] = useState("1");
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [ignoreSpecial, setIgnoreSpecial] = useState(false);
+  /**
+   * INCLUDE, NOT IGNORE (Mark, 2026-09-01: "conceptually there's something
+   * wrong with the 'ignore special orders' checkbox … let's make it 'Include
+   * special orders' and make it selected by default").
+   *
+   * He is right, and the wrongness is that the box was a NEGATION resting at
+   * false — so the resting state meant "do not ignore", which is a double
+   * negative the reader has to unpick to learn that special orders ARE coming.
+   * Stated positively, ticked, it says what will happen.
+   *
+   * The RPC argument keeps its own name and polarity: `p_ignore_special_orders`
+   * is 040's parameter and this is a label, not a schema change.
+   */
+  const [includeSpecial, setIncludeSpecial] = useState(true);
   const [running, setRunning] = useState(false);
   const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -175,7 +188,7 @@ export function GenerateSchedules({
     setError(null);
     setStart(today);
     setDays("1");
-    setIgnoreSpecial(false);
+    setIncludeSpecial(true);
     // Every shop this kitchen sells THROUGH, preselected. Unlike the PO
     // generator there is no per-location guard to encode here — an
     // already-generated day is reported by the function itself rather than
@@ -344,7 +357,7 @@ export function GenerateSchedules({
         p_start: start,
         p_days: Number(days),
         p_location_ids: [...selected],
-        p_ignore_special_orders: ignoreSpecial,
+        p_ignore_special_orders: !includeSpecial,
         p_replace: replace,
         p_allow_actuals: allowActuals,
       });
@@ -377,7 +390,7 @@ export function GenerateSchedules({
      * -------------------------------------------------------------------- */
     const done: Pulled[] = [];
     const failed: Pulled[] = [];
-    if (!ignoreSpecial) {
+    if (includeSpecial) {
       for (const c of candidates ?? []) {
         if (!pullIds.has(c.order.id) || !c.order.event_date) continue;
         const entry = {
@@ -424,9 +437,9 @@ export function GenerateSchedules({
   const withheld = inRun.filter((c) => c.readiness.state === "not_ready");
   /** Orders actually ticked and in this run — what makes a shopless run worth
    *  pressing. */
-  const pullCount = ignoreSpecial
-    ? 0
-    : offered.filter((c) => pullIds.has(c.order.id)).length;
+  const pullCount = includeSpecial
+    ? offered.filter((c) => pullIds.has(c.order.id)).length
+    : 0;
 
   const withheldSentence =
     withheld.length === 0
@@ -602,7 +615,7 @@ export function GenerateSchedules({
                           <Checkbox
                             checked={pullIds.has(c.order.id)}
                             onChange={() => togglePull(c.order.id)}
-                            disabled={ignoreSpecial}
+                            disabled={!includeSpecial}
                             label={`Schedule order ${c.order.number}`}
                             size={18}
                           />
@@ -639,12 +652,12 @@ export function GenerateSchedules({
 
               <div className="flex items-start gap-3">
                 <Checkbox
-                  checked={ignoreSpecial}
-                  onChange={() => setIgnoreSpecial((v) => !v)}
-                  label="Ignore special orders"
+                  checked={includeSpecial}
+                  onChange={() => setIncludeSpecial((v) => !v)}
+                  label="Include special orders"
                   size={18}
                 />
-                <span className="text-sm">Ignore special orders</span>
+                <span className="text-sm">Include special orders</span>
               </div>
             </div>
           )}

@@ -22,6 +22,22 @@ const SHIFT_OPTIONS: PickOption[] = (
  *
  * Changing the SHIFT here re-derives the whole page set, so an opening report
  * corrected to closing grows the sales, premades and paper pages immediately.
+ *
+ * THE SUPERVISOR PICKER OFFERS SUPERVISORS AND MANAGERS ONLY (Mark,
+ * 2026-09-01) — migration 080's `shift_supervisors`, 11 of the 28 people the
+ * full roster returns. On a list of 28 the commonest way to fill this field
+ * wrongly is to pick the name above or below the right one.
+ *
+ * The report already arrives with the login's own employee named, so this is
+ * the CORRECTION rather than the entry: a handover, or a manager filing for
+ * somebody. One of the five real reports is exactly that.
+ *
+ * WHOEVER IS ALREADY RECORDED IS ALWAYS OFFERED, even when the filter would not
+ * have — somebody who has since changed position or left the company. A
+ * `PickList` renders a value with no matching option as its RAW UUID, so
+ * dropping them would not merely hide the name, it would put a uuid on the
+ * screen. `WorkingLocation`'s rule: the current value is listed, hinted, and
+ * never silently absent.
  */
 export function InfoPage({
   reportId,
@@ -30,6 +46,7 @@ export function InfoPage({
   supervisorId,
   nextProductionDate,
   locationCode,
+  supervisors,
   takers,
   editable,
 }: {
@@ -39,12 +56,31 @@ export function InfoPage({
   supervisorId: string | null;
   nextProductionDate: string | null;
   locationCode: string;
+  /** Supervisors and managers — migration 080's `shift_supervisors`. */
+  supervisors: PickOption[];
+  /** The WHOLE non-inactive roster, for resolving a name the filter drops. */
   takers: PickOption[];
   editable: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const [, startTransition] = useTransition();
+
+  // The filtered list, plus whoever is recorded if the filter would drop them.
+  // `takers` is the full roster, so the appended row carries a NAME rather than
+  // the uuid `PickList` would otherwise print.
+  const supervisorOptions: PickOption[] =
+    supervisorId === null || supervisors.some((o) => o.value === supervisorId)
+      ? supervisors
+      : [
+          ...supervisors,
+          {
+            value: supervisorId,
+            label:
+              takers.find((t) => t.value === supervisorId)?.label ?? "Somebody else",
+            hint: "already recorded",
+          },
+        ];
 
   function save(patch: Record<string, string | null>) {
     startTransition(async () => {
@@ -88,7 +124,7 @@ export function InfoPage({
         <FieldLabel>Supervisor</FieldLabel>
         <PickList
           value={supervisorId}
-          options={takers}
+          options={supervisorOptions}
           onPick={(next) => save({ supervisor_employee_id: next })}
           placeholder="Who ran the shift"
           variant="field"
