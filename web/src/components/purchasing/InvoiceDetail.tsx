@@ -39,6 +39,7 @@ import type { SignedAttachment } from "@/lib/attachments";
 import { DocumentPane } from "./DocumentPane";
 import { useAttachmentActions } from "./useAttachmentActions";
 import { InvoiceFooter } from "./InvoiceFooter";
+import { PushToQuickBooks } from "./PushToQuickBooks";
 import { attachmentRejection, type AttachmentKind } from "@/lib/attachments";
 
 type InvoiceRecord = VendorInvoice & {
@@ -872,6 +873,21 @@ export function InvoiceDetail({
           />
         </div>
       </div>
+
+      <PushToQuickBooks
+        invoiceId={invoice.id}
+        vendorId={invoice.vendor_id}
+        orgId={orgId}
+        status={invoice.status}
+        total={invoice.total}
+        isCredit={invoice.is_credit}
+        invoiceNumber={invoice.invoice_number}
+        invoiceDate={invoice.invoice_date}
+        dueDate={invoice.due_date}
+        canPush={canEdit}
+        supabase={supabase}
+        onDone={() => router.refresh()}
+      />
 
       <InvoiceFooter
         invoiceId={invoice.id}

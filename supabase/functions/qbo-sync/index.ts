@@ -16,6 +16,7 @@
 //   accounts       → expense accounts (fully qualified), for the pickers
 //   vendors        → QBO vendors, for the mapping picker on a vendor record
 //   items          → service items, for the settings picker
+//   push_bill      → send one approved invoice to QuickBooks as a Bill
 //   disconnect     → revoke at Intuit and forget the token (owner/admin)
 //
 // Disconnect lives HERE and not on `qbo-oauth` deliberately: that function is
@@ -270,6 +271,139 @@ Deno.serve(async (req) => {
       });
       accounts.sort((a, b) => a.name.localeCompare(b.name));
       return json(200, { accounts });
+    }
+
+    // -----------------------------------------------------------------------
+    // push_bill — one approved invoice becomes a Bill (or a VendorCredit)
+    // -----------------------------------------------------------------------
+    //
+    // THE BROWSER BUILDS THE PAYLOAD AND THIS VALIDATES IT, which is
+    // `freeze_pay_period`'s shape: the rule lives once, in the pure,
+    // fixture-tested `web/src/lib/quickbooks.ts`, and a Deno twin of it here
+    // would be 016's `nextDeliveryDate` trap on money going into somebody's
+    // books. `send-po-email` already takes a client-rendered document the same
+    // way.
+    //
+    // What that costs is that a caller could craft a payload, so every claim in
+    // it is checked against the invoice it names — amount, vendor, entity and
+    // status — read through the CALLER's client so RLS decides what they can
+    // see in the first place.
+    if (mode === "push_bill") {
+      const req = body as unknown as {
+        invoice_id?: string;
+        entity?: string;
+        payload?: Record<string, unknown>;
+      };
+      if (!req.invoice_id || !req.entity || !req.payload) {
+        return json(400, { error: "missing invoice_id, entity or payload" });
+      }
+      if (req.entity !== "Bill" && req.entity !== "VendorCredit") {
+        return json(400, { error: `unknown entity: ${req.entity}` });
+      }
+
+      const { data: invoice, error: invErr } = await supabase
+        .from("vendor_invoices")
+        .select("id, org_id, vendor_id, status, total, is_credit, invoice_number, external_ref")
+        .eq("id", req.invoice_id)
+        .maybeSingle();
+      if (invErr) return json(500, { error: invErr.message });
+      if (!invoice) return json(404, { error: "No such invoice" });
+
+      if (invoice.status !== "approved") {
+        return json(400, {
+          error: "Only an approved invoice goes to QuickBooks — approve it first.",
+        });
+      }
+      const wanted = invoice.is_credit ? "VendorCredit" : "Bill";
+      if (req.entity !== wanted) {
+        return json(400, { error: `A ${invoice.is_credit ? "credit" : "bill"} posts as ${wanted}` });
+      }
+
+      // The vendor mapping, and the account it posts to. Both are read here
+      // rather than trusted from the payload.
+      const { data: vendor } = await supabase
+        .from("vendors")
+        .select("name, external_ref")
+        .eq("id", invoice.vendor_id)
+        .maybeSingle();
+      const vendorRef = (vendor?.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id ?? null;
+      if (!vendorRef) {
+        return json(400, {
+          error: `No QuickBooks vendor is linked to ${vendor?.name ?? "this vendor"}. ` +
+            "Pick one on the vendor's record.",
+        });
+      }
+
+      const line = (req.payload.Line as Record<string, unknown>[] | undefined)?.[0];
+      const sentRef = (req.payload.VendorRef as { value?: string } | undefined)?.value;
+      const sentAmount = Number(line?.Amount);
+      const invoiceTotal = Number(invoice.total);
+
+      if (sentRef !== vendorRef) {
+        return json(400, { error: "The payload names a different QuickBooks vendor." });
+      }
+      // Half a cent, matching the app's own money epsilon.
+      if (!Number.isFinite(sentAmount) || Math.abs(sentAmount - invoiceTotal) > 0.005) {
+        return json(400, {
+          error: `The payload's amount (${sentAmount}) does not match the invoice total (${invoiceTotal}).`,
+        });
+      }
+
+      const conn = await loadConnection(admin, orgId);
+      const path = req.entity.toLowerCase();
+      const saved = (await qboFetch(admin, conn, path, {
+        method: "POST",
+        body: JSON.stringify(req.payload),
+      })) as Record<string, Record<string, unknown>>;
+
+      const doc = saved?.[req.entity];
+      if (!doc?.Id || doc?.SyncToken === undefined || doc?.SyncToken === null) {
+        return json(502, {
+          error: "QuickBooks saved the document but did not return an id and sync token.",
+        });
+      }
+
+      // Through the CALLER's client and the definer RPC, never a direct update:
+      // `vendor_invoices_update` is purchaser+ with no column restriction, so
+      // `external_ref` is writable straight through PostgREST otherwise (081).
+      const ref = {
+        qbo: {
+          id: String(doc.Id),
+          sync_token: String(doc.SyncToken),
+          doc_number: doc.DocNumber === undefined || doc.DocNumber === null
+            ? null
+            : String(doc.DocNumber),
+          entity: req.entity,
+        },
+      };
+      const { data: recorded, error: recErr } = await supabase.rpc("record_accounting_push", {
+        p_invoice: invoice.id,
+        p_ref: ref,
+      });
+      if (recErr) return json(500, { error: recErr.message, qbo_id: String(doc.Id) });
+      // Row count, not the absence of an error — and this one matters more than
+      // most: the document IS in QuickBooks now, so a silent failure here means
+      // the next push creates a SECOND one.
+      if (!Array.isArray(recorded) || recorded.length === 0) {
+        return json(500, {
+          error: "It reached QuickBooks but could not be recorded here, so pushing " +
+            `again would duplicate it. Its QuickBooks id is ${doc.Id}.`,
+          qbo_id: String(doc.Id),
+        });
+      }
+
+      await admin
+        .from("accounting_connections")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", conn.id);
+
+      return json(200, {
+        entity: req.entity,
+        qbo_id: String(doc.Id),
+        doc_number: ref.qbo.doc_number,
+        sync_token: ref.qbo.sync_token,
+        updated: Boolean((req.payload as { Id?: string }).Id),
+      });
     }
 
     if (mode === "vendors") {
