@@ -203,6 +203,34 @@ export async function loadConnection(
 }
 
 // ---------------------------------------------------------------------------
+// Diagnostics
+// ---------------------------------------------------------------------------
+
+/**
+ * Intuit's own transaction id for a call, from the `intuit_tid` response
+ * header (confirmed against a real 400: lower case, underscore).
+ *
+ * Intuit asks integrators to capture it and they are right to: it is what
+ * their support team traces a failing call by, and without it a report is "it
+ * didn't work on Tuesday". It rides in the error message a person sees, so the
+ * sentence they copy to us already contains it.
+ */
+function intuitTid(res: Response): string | null {
+  return res.headers.get("intuit_tid");
+}
+
+/**
+ * One structured line per failure, to the function log.
+ *
+ * NEVER the token, the client secret, or a request body — a bill's contents
+ * are the org's business and a log is a different audience. Enough to trace:
+ * what we were doing, what Intuit said, and Intuit's own id for the call.
+ */
+function logFailure(where: string, detail: Record<string, unknown>): void {
+  console.error(JSON.stringify({ at: "qbo", where, ...detail }));
+}
+
+// ---------------------------------------------------------------------------
 // Tokens
 // ---------------------------------------------------------------------------
 
@@ -226,6 +254,7 @@ async function postToken(body: URLSearchParams): Promise<TokenResponse> {
   });
 
   const text = await res.text();
+  const tid = intuitTid(res);
   if (res.ok) return JSON.parse(text) as TokenResponse;
 
   // Report the SHAPE of what went wrong, never the value — `squareFailure`'s
@@ -237,6 +266,8 @@ async function postToken(body: URLSearchParams): Promise<TokenResponse> {
   } catch {
     parsed = null;
   }
+
+  logFailure("token", { status: res.status, error: parsed?.error ?? null, intuit_tid: tid });
 
   if (parsed?.error === "invalid_grant") {
     throw new QboError(
@@ -254,7 +285,10 @@ async function postToken(body: URLSearchParams): Promise<TokenResponse> {
   }
 
   const detail = parsed?.error_description ?? parsed?.error ?? text.slice(0, 300);
-  throw new QboError(`QuickBooks refused the token request (${res.status}): ${detail}`, 502);
+  throw new QboError(
+    `QuickBooks refused the token request (${res.status}): ${detail}${tidSuffix(tid)}`,
+    502
+  );
 }
 
 /** The authorization-code exchange, run once per connect by `qbo-oauth`. */
@@ -408,10 +442,22 @@ export async function qboFetch(
   });
 
   const text = await res.text();
+  const tid = intuitTid(res);
   if (res.ok) return text ? JSON.parse(text) : null;
 
+  logFailure("api", {
+    path: path.split("?")[0],
+    status: res.status,
+    intuit_tid: tid,
+    fault: faultMessage(text, res.status),
+  });
+
   if (res.status === 401) {
-    await markDisconnected(admin, conn.org_id, "QuickBooks rejected the access token.");
+    await markDisconnected(
+      admin,
+      conn.org_id,
+      `QuickBooks rejected the access token.${tidSuffix(tid)}`
+    );
     throw new QboError(
       "QuickBooks rejected the connection. Reconnect it in Settings → Accounting.",
       400
@@ -424,7 +470,16 @@ export async function qboFetch(
     );
   }
 
-  throw new QboError(`QuickBooks refused the request: ${faultMessage(text, res.status)}`, 502);
+  throw new QboError(
+    `QuickBooks refused the request: ${faultMessage(text, res.status)}${tidSuffix(tid)}`,
+    502
+  );
+}
+
+/** Appended to what a person reads, because the id is only useful if it
+ *  reaches whoever opens the support ticket. */
+function tidSuffix(tid: string | null): string {
+  return tid ? ` [intuit_tid ${tid}]` : "";
 }
 
 /** QBO wraps every refusal in a Fault; the useful sentence is inside it, and

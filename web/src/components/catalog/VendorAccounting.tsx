@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { invokeQbo } from "@/lib/qboClient";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { PickList } from "@/components/ui/PickList";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
@@ -74,10 +75,15 @@ export function VendorAccounting({
     let cancelled = false;
     void (async () => {
       const [v, a] = await Promise.all([
-        supabase.functions.invoke("qbo-sync", { body: { mode: "vendors" } }),
-        supabase.functions.invoke("qbo-sync", { body: { mode: "accounts" } }),
+        invokeQbo(supabase, { mode: "vendors" }),
+        invokeQbo(supabase, { mode: "accounts" }),
       ]);
       if (cancelled) return;
+      // A failure here used to be dropped on the floor, which left both pickers
+      // empty with nothing said — indistinguishable from QuickBooks having
+      // nothing to offer.
+      const failure = v.message ?? a.message;
+      if (failure) setError(failure);
       if (v.data?.vendors) setQboVendors(v.data.vendors as Choice[]);
       if (a.data?.accounts) setAccounts(a.data.accounts as Choice[]);
     })();

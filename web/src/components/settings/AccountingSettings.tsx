@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { invokeQbo } from "@/lib/qboClient";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { PickList } from "@/components/ui/PickList";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
@@ -109,26 +110,11 @@ export function AccountingSettings({
     if (row?.environment) setEnvironment(row.environment);
   }, [orgId, supabase]);
 
-  /**
-   * The SDK reports only "Edge Function returned a non-2xx status code" unless
-   * you reach into FunctionsHttpError.context and re-parse the body — where the
-   * real sentence lives. Without this every carefully worded QboError is
-   * invisible.
-   */
   const call = useCallback(
     async (body: Record<string, unknown>): Promise<Record<string, unknown> | null> => {
-      const { data, error: fnError } = await supabase.functions.invoke("qbo-sync", { body });
-      if (!fnError) return (data ?? {}) as Record<string, unknown>;
-      let message = fnError.message;
-      try {
-        const ctx = (fnError as { context?: Response }).context;
-        const parsed = await ctx?.json();
-        if (parsed?.error) message = parsed.error;
-      } catch {
-        /* keep the generic message */
-      }
-      setError(message);
-      return null;
+      const { data, message } = await invokeQbo(supabase, body);
+      if (message) setError(message);
+      return data;
     },
     [supabase]
   );
@@ -145,10 +131,14 @@ export function AccountingSettings({
     let cancelled = false;
     void (async () => {
       const [meta, accts] = await Promise.all([
-        supabase.functions.invoke("qbo-sync", { body: { mode: "meta" } }),
-        supabase.functions.invoke("qbo-sync", { body: { mode: "accounts" } }),
+        invokeQbo(supabase, { mode: "meta" }),
+        invokeQbo(supabase, { mode: "accounts" }),
       ]);
       if (cancelled) return;
+      // Same rule as the vendor block: a dropped failure here leaves a picker
+      // with no options and no reason, which reads as nothing being wrong.
+      const failure = meta.message ?? accts.message;
+      if (failure) setError(failure);
       if (meta.data?.company_name) setCompany(meta.data.company_name as string);
       if (accts.data?.accounts) setAccounts(accts.data.accounts as Choice[]);
     })();
