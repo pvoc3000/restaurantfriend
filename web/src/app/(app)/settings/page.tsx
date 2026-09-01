@@ -48,22 +48,26 @@ export default async function SettingsPage() {
         </h1>
         <p className="max-w-2xl text-sm text-muted">
           {editable
-            ? "What this business says to its customers, and what it is connected to. Everything here is saved as you type."
-            : "What this business says to its customers, and what it is connected to. Changing these is open to managers and the owner."}
+            ? "What this business is connected to, and what it says to its customers. Everything here is saved as you type."
+            : "What this business is connected to, and what it says to its customers. Changing these is open to managers and the owner."}
         </p>
       </div>
 
-      <SpecialOrderSettings
+      {/* FIRST, deliberately. Everything below is copy that gets tuned; this is
+          the one block with a command and a status, and it is what somebody
+          opens this screen to do once. Appended at the bottom it sat six
+          viewports down behind six message templates. */}
+      <AccountingSettings
         orgId={session.membership.org_id}
-        settings={session.orgSettings as Record<string, unknown>}
         editable={editable}
+        initialStatus={accounting}
       />
 
       <div className="border-t border-hairline pt-8">
-        <AccountingSettings
+        <SpecialOrderSettings
           orgId={session.membership.org_id}
+          settings={session.orgSettings as Record<string, unknown>}
           editable={editable}
-          initialStatus={accounting}
         />
       </div>
 

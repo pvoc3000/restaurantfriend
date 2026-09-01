@@ -89,7 +89,6 @@ export function AccountingSettings({
   const [error, setError] = useState<string | null>(null);
   const [company, setCompany] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Choice[] | null>(null);
-  const [items, setItems] = useState<Choice[] | null>(null);
   const [environment, setEnvironment] = useState(initialStatus?.environment ?? "sandbox");
 
   const callback = params.get("quickbooks");
@@ -135,14 +134,22 @@ export function AccountingSettings({
 
   const connected = status?.status === "connected";
 
-  // The company name proves the connection actually works, which a stored row
-  // does not — and it is the one thing a person recognises.
+  // Everything the connected state needs, in one pass. The company name proves
+  // the connection actually works, which a stored row does not; the accounts
+  // fill the picker, which is the only thing left to set. Two round trips on a
+  // screen nobody opens twice a month, against a control that otherwise reads
+  // as broken until you notice a button beside it.
   useEffect(() => {
     if (!connected) return;
     let cancelled = false;
     void (async () => {
-      const { data } = await supabase.functions.invoke("qbo-sync", { body: { mode: "meta" } });
-      if (!cancelled && data?.company_name) setCompany(data.company_name as string);
+      const [meta, accts] = await Promise.all([
+        supabase.functions.invoke("qbo-sync", { body: { mode: "meta" } }),
+        supabase.functions.invoke("qbo-sync", { body: { mode: "accounts" } }),
+      ]);
+      if (cancelled) return;
+      if (meta.data?.company_name) setCompany(meta.data.company_name as string);
+      if (accts.data?.accounts) setAccounts(accts.data.accounts as Choice[]);
     })();
     return () => {
       cancelled = true;
@@ -177,22 +184,11 @@ export function AccountingSettings({
     if (!res) return;
     setCompany(null);
     setAccounts(null);
-    setItems(null);
     await loadStatus();
     router.refresh();
   }
 
-  async function loadChoices() {
-    if (accounts && items) return;
-    setBusy("choices");
-    setError(null);
-    const [a, i] = await Promise.all([call({ mode: "accounts" }), call({ mode: "items" })]);
-    setBusy(null);
-    if (a?.accounts) setAccounts(a.accounts as Choice[]);
-    if (i?.items) setItems(i.items as Choice[]);
-  }
-
-  async function setDefault(kind: "bill" | "item", choice: Choice | null) {
+  async function setDefault(kind: "bill", choice: Choice | null) {
     setBusy("defaults");
     setError(null);
     const patch =
@@ -292,7 +288,7 @@ export function AccountingSettings({
               ariaLabel="Expense account bills post to"
               disabled={!editable || busy !== null}
               value={status?.bill_expense_account_ref ?? null}
-              placeholder={accounts ? "Choose an account" : "Load accounts…"}
+              placeholder={accounts ? "Choose an account" : "Reading QuickBooks…"}
               options={(accounts ?? []).map((a) => ({
                 value: a.id,
                 label: a.name,
@@ -304,36 +300,6 @@ export function AccountingSettings({
               panelMinWidth={320}
             />
           </div>
-          {!accounts && editable && (
-            <button
-              type="button"
-              className={BUTTON_CLASS}
-              disabled={busy !== null}
-              onClick={() => void loadChoices()}
-            >
-              {busy === "choices" ? "Loading…" : "Load from QuickBooks"}
-            </button>
-          )}
-          {items && (
-            <div className="flex items-baseline justify-between gap-6">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                Invoice item
-              </span>
-              <PickList
-                variant="field"
-                boxed
-                ariaLabel="Item customer invoices use"
-                disabled={!editable || busy !== null}
-                value={status?.invoice_item_ref ?? null}
-                placeholder="Choose an item"
-                options={items.map((i) => ({ value: i.id, label: i.name, hint: i.type }))}
-                onPick={(next) =>
-                  void setDefault("item", items.find((i) => i.id === next) ?? null)
-                }
-                panelMinWidth={320}
-              />
-            </div>
-          )}
         </div>
       )}
 
