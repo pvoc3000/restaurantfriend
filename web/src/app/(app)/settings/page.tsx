@@ -1,7 +1,9 @@
 import { getAppSession } from "@/lib/session";
+import { createClient } from "@/lib/supabase/server";
 import { canManageMembers } from "@/lib/roles";
 import { ShiftReportSettings } from "@/components/settings/ShiftReportSettings";
 import { SpecialOrderSettings } from "@/components/settings/SpecialOrderSettings";
+import { AccountingSettings, type AccountingStatus } from "@/components/settings/AccountingSettings";
 
 /**
  * Where the masthead's gear points, and what it had been promising since the
@@ -28,6 +30,16 @@ export default async function SettingsPage() {
 
   const editable = canManageMembers(session.membership.role);
 
+  // Read on the SERVER, like every other block on this screen. The token row
+  // itself is unreadable — 081 gave it zero policies — so this definer function
+  // is the only way to learn anything about the connection, and it returns the
+  // realm and the dates and never a credential.
+  const supabase = await createClient();
+  const { data: qbo } = await supabase.rpc("accounting_connection_status", {
+    p_org: session.membership.org_id,
+  });
+  const accounting = Array.isArray(qbo) ? ((qbo[0] as AccountingStatus | undefined) ?? null) : null;
+
   return (
     <div className="space-y-16">
       <div className="space-y-2">
@@ -36,8 +48,8 @@ export default async function SettingsPage() {
         </h1>
         <p className="max-w-2xl text-sm text-muted">
           {editable
-            ? "What this business says to its customers. Everything here is saved as you type."
-            : "What this business says to its customers. Changing these is open to managers and the owner."}
+            ? "What this business says to its customers, and what it is connected to. Everything here is saved as you type."
+            : "What this business says to its customers, and what it is connected to. Changing these is open to managers and the owner."}
         </p>
       </div>
 
@@ -46,6 +58,14 @@ export default async function SettingsPage() {
         settings={session.orgSettings as Record<string, unknown>}
         editable={editable}
       />
+
+      <div className="border-t border-hairline pt-8">
+        <AccountingSettings
+          orgId={session.membership.org_id}
+          editable={editable}
+          initialStatus={accounting}
+        />
+      </div>
 
       <div className="border-t border-hairline pt-8">
         <ShiftReportSettings
