@@ -284,3 +284,76 @@ export function pushedLabel(external_ref: AccountingRef | null | undefined): str
   const shown = qbo?.doc_number?.trim() || ref.id;
   return `In QuickBooks as ${kind} ${shown}`;
 }
+
+// ---------------------------------------------------------------------------
+// Which account a vendor's bills post to
+// ---------------------------------------------------------------------------
+
+/**
+ * The vendor's side of the mapping: who they are in QuickBooks, and — since
+ * migration 082 — which account their bills post to.
+ */
+export type VendorAccounting = {
+  external_ref: AccountingRef | null;
+  expense_account_ref: string | null;
+  expense_account_name: string | null;
+};
+
+/** The QBO Vendor id, or null when nobody has mapped this vendor yet. */
+export function qboVendorId(external_ref: AccountingRef | null | undefined): string | null {
+  const id = external_ref?.qbo?.id?.trim();
+  return id ? id : null;
+}
+
+export type ResolvedAccount = {
+  ref: string;
+  name: string | null;
+  /** Which level answered — what the vendor record says beside the field. */
+  source: "vendor" | "org";
+};
+
+/**
+ * Vendor override → org default, and null when neither is set.
+ *
+ * Design rule 6's cascade, the one this schema already uses for money
+ * (`vendor_item_location_prices` over `vendor_items.price`). Mark's case is
+ * exactly why the override exists: BakeMark's bills belong in
+ * "Cost of Goods Sold:Baker Items COGs" and Vesta's in "…:Produce Items COGs",
+ * and a single org-wide account throws that distinction away at the moment it
+ * is cheapest to keep.
+ *
+ * The vendor wins on a NON-EMPTY ref only. A blank string is what an emptied
+ * text field leaves behind, and treating it as an override would post those
+ * bills nowhere rather than falling back.
+ */
+export function expenseAccountFor(
+  vendor: Pick<VendorAccounting, "expense_account_ref" | "expense_account_name"> | null | undefined,
+  orgDefault: { ref: string | null; name?: string | null } | null | undefined
+): ResolvedAccount | null {
+  const own = vendor?.expense_account_ref?.trim();
+  if (own) {
+    return { ref: own, name: vendor?.expense_account_name?.trim() || null, source: "vendor" };
+  }
+  const fallback = orgDefault?.ref?.trim();
+  if (fallback) {
+    return { ref: fallback, name: orgDefault?.name?.trim() || null, source: "org" };
+  }
+  return null;
+}
+
+/**
+ * A sub-account reads as its LEAF in QuickBooks' `Name` and as
+ * "Cost of Goods Sold:Baker Items COGs" in `FullyQualifiedName`. We store and
+ * show the qualified form — a bare "Baker Items COGs" is indistinguishable from
+ * a top-level account, which is how a bill posts to the wrong one — and this is
+ * the pair of parts a picker renders.
+ */
+export function splitAccountName(name: string | null | undefined): {
+  parent: string | null;
+  leaf: string;
+} {
+  const n = (name ?? "").trim();
+  const at = n.lastIndexOf(":");
+  if (at < 0) return { parent: null, leaf: n };
+  return { parent: n.slice(0, at), leaf: n.slice(at + 1) };
+}

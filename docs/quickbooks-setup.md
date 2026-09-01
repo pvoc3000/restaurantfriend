@@ -111,8 +111,30 @@ You are sent to Intuit, you pick the company, and you come back to
 is fetched live, so it is proof the connection works rather than proof a row was
 written.
 
-Then **Load from QuickBooks** and choose the **expense account** bills post to.
-Every bill is sent as one line at its total against that account.
+Then choose the **expense account** bills post to. Every bill is sent as one
+line at its total against that account.
+
+---
+
+## 5. Which account a vendor posts to
+
+The account in Settings is the **default**. Each vendor may override it on its
+own record — **Vendors → the vendor → QuickBooks** — which is how BakeMark's
+bills reach `Cost of Goods Sold:Baker Items COGs` while Vesta's reach
+`Cost of Goods Sold:Produce Items COGs`. Empty means "use the default", and the
+field says which level answered so an inherited account is never mistaken for a
+chosen one.
+
+Sub-accounts are listed by their **fully qualified name**, grouped under their
+parent. That is not cosmetic: QuickBooks' `Name` for a sub-account is the leaf
+only, so a picker built on it shows "Baker Items COGs" with no parent and no way
+to tell two children of different parents apart — which is how a bill posts to
+the wrong account.
+
+The same block maps the vendor to its **QuickBooks vendor**. Bills cannot be
+sent until that is set, and the app never creates one: inventing master data
+from a sync is how duplicate name lists happen, and QuickBooks enforces a
+globally unique `DisplayName` (error 6240).
 
 ---
 

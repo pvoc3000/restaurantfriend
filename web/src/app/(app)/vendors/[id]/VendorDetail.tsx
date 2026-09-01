@@ -18,6 +18,8 @@ import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { VendorFields } from "@/components/catalog/VendorFields";
+import { VendorAccounting } from "@/components/catalog/VendorAccounting";
+import type { AccountingRef } from "@/lib/quickbooks";
 import { VENDOR_TABS, VENDOR_TAB_LABEL, parseVendorTab, vendorTabHref } from "@/lib/vendors";
 
 type VendorLocationRow = {
@@ -77,7 +79,13 @@ export async function VendorDetail({
   // Every location's config is listed (not just the active one) — the vendor's
   // account number and minimum differ per shop, and seeing them together is the
   // point of the detail screen.
-  const [{ data: vendor, error }, { data: vendorItems, error: viError }, { data: typeRows }] =
+  const [
+    { data: vendor, error },
+    { data: vendorItems, error: viError },
+    { data: typeRows },
+    { data: qboRows },
+    { data: vendorQbo, error: vendorQboError },
+  ] =
     await Promise.all([
       supabase
         .from("vendors")
@@ -101,6 +109,17 @@ export async function VendorDetail({
       // alongside the other two so it costs no extra round trip (the same
       // move ItemDetail makes for the item category picker).
       wantsItems ? SKIP : supabase.from("vendors").select("vendor_type"),
+      supabase.rpc("accounting_connection_status", { p_org: session.membership.org_id }),
+      // SEPARATE, and allowed to fail: `expense_account_ref` arrives with
+      // migration 082, and folding it into the vendor select above would take
+      // the whole record down until that is applied rather than just this
+      // block. The roster's document query has the same shape and the same
+      // reason.
+      supabase
+        .from("vendors")
+        .select("external_ref, expense_account_ref, expense_account_name")
+        .eq("id", id)
+        .maybeSingle(),
     ]);
 
   if (error) {
@@ -110,6 +129,27 @@ export async function VendorDetail({
 
   const v = vendor as unknown as Vendor;
   const items = (vendorItems ?? []) as unknown as VendorItemWithItem[];
+  // The org-wide account this vendor's own may override (082). Null when
+  // QuickBooks is not connected, which is what makes the block say so rather
+  // than offering pickers that cannot be filled.
+  const qboRow = Array.isArray(qboRows)
+    ? (qboRows[0] as { status?: string; bill_expense_account_ref?: string | null;
+                       bill_expense_account_name?: string | null } | undefined)
+    : undefined;
+  const qboMapping = (vendorQbo ?? null) as {
+    external_ref: AccountingRef | null;
+    expense_account_ref: string | null;
+    expense_account_name: string | null;
+  } | null;
+
+  const qboDefault =
+    qboRow?.status === "connected"
+      ? {
+          ref: qboRow.bill_expense_account_ref ?? null,
+          name: qboRow.bill_expense_account_name ?? null,
+        }
+      : null;
+
   const vendorTypes = [
     ...new Set(
       ((typeRows ?? []) as { vendor_type: string | null }[])
@@ -248,6 +288,18 @@ export async function VendorDetail({
           {tab === "info" && (
             <>
               <VendorFields vendor={v} vendorTypes={vendorTypes} />
+
+              <VendorAccounting
+                vendor={{
+                  id: v.id,
+                  name: v.name,
+                  external_ref: qboMapping?.external_ref ?? null,
+                  expense_account_ref: qboMapping?.expense_account_ref ?? null,
+                  expense_account_name: qboMapping?.expense_account_name ?? null,
+                }}
+                orgDefault={qboDefault}
+                schemaError={vendorQboError?.message ?? null}
+              />
 
               {/* The heading rides in the table's own strip, opposite the columns
                   eye (Mark, 2026-08-01: it "could come closer to the table") — the

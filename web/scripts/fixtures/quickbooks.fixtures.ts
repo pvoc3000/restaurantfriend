@@ -18,6 +18,9 @@ import {
   buildBillPayload,
   accountingRefFromResponse,
   pushedLabel,
+  expenseAccountFor,
+  qboVendorId,
+  splitAccountName,
   DOC_NUMBER_MAX,
   type BillInvoice,
   type BillPushInputs,
@@ -281,4 +284,83 @@ test("the pushed label reads as QuickBooks shows it", () => {
 test("the entity path is what QBO's URL wants", () => {
   eq(qboEntityPath("Bill"), "bill", "bill");
   eq(qboEntityPath("VendorCredit"), "vendorcredit", "credit");
+});
+
+// ---------------------------------------------------------------------------
+// Which account a vendor's bills post to (migration 082)
+// ---------------------------------------------------------------------------
+
+test("a vendor's own account beats the org default", () => {
+  // Mark's case: BakeMark to Baker Items COGs, everything else to the default.
+  const bakemark = {
+    expense_account_ref: "91",
+    expense_account_name: "Cost of Goods Sold:Baker Items COGs",
+  };
+  eq(
+    expenseAccountFor(bakemark, { ref: "80", name: "Cost of Goods Sold" }),
+    { ref: "91", name: "Cost of Goods Sold:Baker Items COGs", source: "vendor" },
+    "vendor wins"
+  );
+});
+
+test("a vendor with no account of its own falls back to the org default", () => {
+  eq(
+    expenseAccountFor(
+      { expense_account_ref: null, expense_account_name: null },
+      { ref: "80", name: "Cost of Goods Sold" }
+    ),
+    { ref: "80", name: "Cost of Goods Sold", source: "org" },
+    "org default"
+  );
+  eq(
+    expenseAccountFor(null, { ref: "80", name: "Cost of Goods Sold" })?.source,
+    "org",
+    "no vendor row at all"
+  );
+});
+
+test("a BLANK vendor account falls back rather than posting nowhere", () => {
+  // An emptied text field leaves "" behind. Treating that as an override would
+  // send the bill to no account at all.
+  eq(
+    expenseAccountFor(
+      { expense_account_ref: "   ", expense_account_name: "" },
+      { ref: "80", name: "Cost of Goods Sold" }
+    ),
+    { ref: "80", name: "Cost of Goods Sold", source: "org" },
+    "whitespace is not an override"
+  );
+});
+
+test("nothing set anywhere is null, not a guess", () => {
+  eq(expenseAccountFor(null, null), null, "neither");
+  eq(expenseAccountFor(null, { ref: "  " }), null, "a blank default is no default");
+  // and that null is what `billPushRefusals` turns into a sentence
+  ok(
+    billPushRefusals(inputs({ accountRef: null })).some((r) => r.includes("expense account")),
+    "refused by name"
+  );
+});
+
+test("the vendor mapping is read from external_ref", () => {
+  eq(qboVendorId({ qbo: { id: "58" } }), "58", "mapped");
+  eq(qboVendorId({ qbo: { id: "  " } }), null, "blank is unmapped");
+  eq(qboVendorId(null), null, "nothing");
+});
+
+test("a sub-account keeps its parent", () => {
+  // The whole point: a bare "Baker Items COGs" is indistinguishable from a
+  // top-level account, and that is how a bill posts to the wrong one.
+  eq(
+    splitAccountName("Cost of Goods Sold:Baker Items COGs"),
+    { parent: "Cost of Goods Sold", leaf: "Baker Items COGs" },
+    "one level"
+  );
+  eq(
+    splitAccountName("Cost of Goods Sold:Food:Produce Items COGs"),
+    { parent: "Cost of Goods Sold:Food", leaf: "Produce Items COGs" },
+    "two levels — the LAST colon splits"
+  );
+  eq(splitAccountName("Advertising"), { parent: null, leaf: "Advertising" }, "top level");
+  eq(splitAccountName(null), { parent: null, leaf: "" }, "nothing");
 });

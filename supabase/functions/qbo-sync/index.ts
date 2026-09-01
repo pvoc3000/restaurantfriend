@@ -13,7 +13,8 @@
 // Modes, all POST:
 //   authorize_url  → where to send the browser to connect (owner/admin)
 //   meta           → the connected company, which is how you prove it works
-//   accounts       → expense accounts, for the settings picker
+//   accounts       → expense accounts (fully qualified), for the pickers
+//   vendors        → QBO vendors, for the mapping picker on a vendor record
 //   items          → service items, for the settings picker
 //   disconnect     → revoke at Intuit and forget the token (owner/admin)
 //
@@ -243,21 +244,48 @@ Deno.serve(async (req) => {
       // Sold, which is the set a vendor bill can legitimately post to. Filtering
       // on AccountType instead would silently hide COGS, where most of these
       // bills belong.
+      // FULLY QUALIFIED, not `Name`. A sub-account's `Name` is the LEAF only —
+      // "Baker Items COGs" — so a chart with several COGS children renders as a
+      // list of bare names with no parent and no way to tell them apart, which
+      // is how a bill posts to the wrong account (Mark, 2026-09-01).
+      // `FullyQualifiedName` is "Cost of Goods Sold:Baker Items COGs", and
+      // sorting on it also files every child directly under its parent.
       const q =
-        `select Id, Name, AccountType, AccountSubType from Account ` +
+        `select Id, Name, FullyQualifiedName, AccountType, AccountSubType from Account ` +
         `where Classification = ${qboQuote("Expense")} and Active = true ` +
-        `maxresults 500`;
+        `maxresults 1000`;
       const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
         QueryResponse?: { Account?: Row[] };
       };
-      const accounts = (res.QueryResponse?.Account ?? []).map((a) => ({
-        id: String(a.Id),
-        name: String(a.Name ?? ""),
-        type: String(a.AccountType ?? ""),
-        sub_type: String(a.AccountSubType ?? ""),
-      }));
+      const accounts = (res.QueryResponse?.Account ?? []).map((a) => {
+        const full = String(a.FullyQualifiedName ?? a.Name ?? "");
+        return {
+          id: String(a.Id),
+          name: full,
+          leaf: String(a.Name ?? ""),
+          depth: full.split(":").length - 1,
+          type: String(a.AccountType ?? ""),
+          sub_type: String(a.AccountSubType ?? ""),
+        };
+      });
       accounts.sort((a, b) => a.name.localeCompare(b.name));
       return json(200, { accounts });
+    }
+
+    if (mode === "vendors") {
+      // We never CREATE a vendor in Mark's books — inventing master data from a
+      // sync is how duplicate name lists happen, and QBO enforces a globally
+      // unique DisplayName (error 6240). This is the list to pick from.
+      const q = `select Id, DisplayName from Vendor where Active = true maxresults 1000`;
+      const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
+        QueryResponse?: { Vendor?: Row[] };
+      };
+      const vendors = (res.QueryResponse?.Vendor ?? []).map((v) => ({
+        id: String(v.Id),
+        name: String(v.DisplayName ?? ""),
+      }));
+      vendors.sort((a, b) => a.name.localeCompare(b.name));
+      return json(200, { vendors });
     }
 
     if (mode === "items") {
