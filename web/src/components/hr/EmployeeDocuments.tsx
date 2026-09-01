@@ -20,6 +20,8 @@ import {
   fileSize,
 } from "@/lib/attachments";
 import { PickList } from "@/components/ui/PickList";
+import { DateField } from "@/components/ui/DateField";
+import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { DocumentChip } from "@/components/ui/DocumentChip";
 import { FileDropZone } from "@/components/ui/FileDropZone";
@@ -86,7 +88,6 @@ function ExpiryLine({
             column="expires_on"
             value={d.expires_on}
             kind="date"
-            collapseWhenEmpty
           />
         </span>
       ) : (
@@ -156,16 +157,59 @@ export function EmployeeDocuments({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [kind, setKind] = useState<DocumentKind>("application");
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  /**
+   * The files chosen but not yet filed, and what the dialog says about them.
+   *
+   * FILING IS A DIALOG NOW (Mark, 2026-09-01: "the app should popup a
+   * confirmation dialogue box that allows you to set the document type and the
+   * expiration date if appropriate"). Before this the kind was set by a picker
+   * in the header BEFORE choosing a file — so the commonest way to file a
+   * document wrongly was to attach one having forgotten to change it, and the
+   * mistake was invisible until you read the chip afterwards. Asked at the
+   * moment of filing, with the file's own name on screen, there is nothing to
+   * remember.
+   *
+   * THE HEADER PICKER IS GONE WITH IT. Two places to answer one question is how
+   * they drift, and the drop zone's "Drop to file as a W-4" label was a promise
+   * made by whichever of them you had not looked at.
+   *
+   * ONE KIND AND ONE DATE FOR THE WHOLE BATCH. The input is `multiple` and a
+   * drag can carry several, but dropping two documents of different kinds at
+   * once is not a thing anybody does — and the alternative, a row per file, is
+   * a form where a sentence will do. The dialog names the count.
+   */
+  const [pending, setPending] = useState<{
+    files: File[];
+    kind: DocumentKind;
+    expires: string | null;
+  } | null>(null);
 
   const status = paperworkStatus(documents, legacyFoodHandlerExpires, today);
 
-  async function upload(files: FileList | File[]) {
+  /**
+   * Files chosen — ASK before filing anything.
+   *
+   * Nothing is uploaded here. `application` is the resting kind because it is
+   * the first thing filed for a new hire, and it is offered rather than
+   * assumed; the expiry starts empty, which means "does not lapse" (034).
+   */
+  function choose(files: FileList | File[]) {
+    const chosen = Array.from(files);
+    if (chosen.length === 0) return;
     setError(null);
-    for (const file of Array.from(files)) {
+    setPending({ files: chosen, kind: "application", expires: null });
+    // Cleared NOW rather than after the upload: the input keeps its value after
+    // a pick, so choosing the same file again after cancelling would fire no
+    // change event at all and the dialog would never reopen.
+    if (fileRef.current) fileRef.current.value = "";
+  }
+
+  async function upload(files: File[], kind: DocumentKind, expires: string | null) {
+    setError(null);
+    for (const file of files) {
       setBusyLabel(`Uploading ${file.name}…`);
       const path = documentPath(orgId, employeeId, file.name);
 
@@ -183,6 +227,10 @@ export function EmployeeDocuments({
         employee_id: employeeId,
         storage_path: path,
         kind,
+        // NULL, never "", and that is 034's rule rather than tidiness: null
+        // means "this does not lapse", which is the honest reading for a W-4 or
+        // a handbook receipt, and an empty string is not a date.
+        expires_on: expires,
         file_name: file.name,
         content_type: file.type || null,
         byte_size: file.size,
@@ -197,7 +245,6 @@ export function EmployeeDocuments({
       }
     }
     setBusyLabel(null);
-    if (fileRef.current) fileRef.current.value = "";
     router.refresh();
   }
 
@@ -227,11 +274,12 @@ export function EmployeeDocuments({
   }
 
   return (
-    /* The panel WRAPS the card — see PoAttachments for why — and opens UP,
-       because this card is pinned to the foot of the window too (Mark,
-       2026-08-06). The drop zone is the card, so it is the target open or
-       closed. */
-    <RevealPanel
+    <>
+      {/* The panel WRAPS the card — see PoAttachments for why — and opens UP,
+          because this card is pinned to the foot of the window too (Mark,
+          2026-08-06). The drop zone is the card, so it is the target open or
+          closed. */}
+      <RevealPanel
       direction="up"
       label="the filed documents"
       alwaysOpen={variant === "page"}
@@ -239,8 +287,10 @@ export function EmployeeDocuments({
         <FileDropZone
           disabled={!canEdit || busyLabel !== null}
           accept={ATTACHMENT_ACCEPT}
-          label={`Drop to file as ${DOCUMENT_KIND_LABEL[kind].toLowerCase()}`}
-          onFiles={(files) => void upload(files)}
+          // No kind in the label any more: the dialog asks, so promising one
+          // here would be a promise made before the question.
+          label="Drop to file"
+          onFiles={choose}
           // The zone knows a type didn't match; only this screen knows what to
           // suggest instead, and `accept` governs the PICKER only — a drag never
           // consults it, which is why the HEIC guard has to be re-stated here.
@@ -260,19 +310,8 @@ export function EmployeeDocuments({
 
         {canEdit && (
           <span className="ml-auto flex items-center gap-3">
-            <span className="flex items-center gap-2">
-              <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-                Add as
-              </span>
-              <span className="w-48">
-                <PickList
-                  value={kind}
-                  options={DOCUMENT_KIND_OPTIONS}
-                  onPick={(next) => setKind(next as DocumentKind)}
-                  ariaLabel="Kind of document"
-                />
-              </span>
-            </span>
+            {/* No "Add as" picker beside it any more — the dialog that opens
+                when a file is chosen is where the kind is set. */}
             <button
               type="button"
               disabled={busyLabel !== null}
@@ -288,7 +327,7 @@ export function EmployeeDocuments({
               accept={ATTACHMENT_ACCEPT_ATTR}
               className="hidden"
               onChange={(e) => {
-                if (e.target.files?.length) void upload(e.target.files);
+                if (e.target.files?.length) choose(e.target.files);
               }}
             />
           </span>
@@ -399,6 +438,106 @@ export function EmployeeDocuments({
           ))}
         </ul>
       )}
-    </RevealPanel>
+      </RevealPanel>
+
+      {/* FILING A DOCUMENT ASKS WHAT IT IS (Mark, 2026-09-01).
+          
+          Enter commits, which `ui/Dialog`'s `onSubmit` is opt-in about for good
+          reason — this qualifies: one commit, nothing destructive, and the only
+          two fields are a picker and a date, neither of which owns the key.
+
+          THE EXPIRY IS ALWAYS OFFERED, never gated on the kind. 034's rule and
+          its own words: "which documents expire is a fact about the piece of
+          paper in your hand, not about the vocabulary" — a food handler card
+          issued with no printed expiry says so by staying null, and the next
+          kind that turns out to lapse needs no change here. The caption is what
+          carries the meaning of leaving it empty. */}
+      {pending ? (
+        <Dialog
+          title={
+            pending.files.length === 1
+              ? "File this document"
+              : `File ${pending.files.length} documents`
+          }
+          onClose={() => setPending(null)}
+          busy={busyLabel !== null}
+          width="max-w-md"
+          onSubmit={() => {
+            const p = pending;
+            setPending(null);
+            void upload(p.files, p.kind, p.expires);
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                className={DIALOG_CANCEL_CLASS}
+                onClick={() => setPending(null)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={DIALOG_COMMIT_CLASS}
+                onClick={() => {
+                  const p = pending;
+                  setPending(null);
+                  void upload(p.files, p.kind, p.expires);
+                }}
+              >
+                File{pending.files.length > 1 ? ` ${pending.files.length}` : ""}
+              </button>
+            </>
+          }
+        >
+          <div className="space-y-5">
+            {/* WHAT YOU PICKED, NAMED. The whole reason the question moved here
+                is that it can be answered with the file in front of you. */}
+            <ul className="space-y-0.5 text-sm">
+              {pending.files.map((f) => (
+                <li key={f.name} className="truncate" title={f.name}>
+                  {f.name}
+                  <span className="text-muted"> · {fileSize(f.size)}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="space-y-1.5">
+              <span className="block text-xs font-semibold uppercase tracking-[0.08em]">
+                Kind
+              </span>
+              <PickList
+                value={pending.kind}
+                options={DOCUMENT_KIND_OPTIONS}
+                onPick={(next) =>
+                  setPending((p) => (p ? { ...p, kind: next as DocumentKind } : p))
+                }
+                variant="field"
+                boxed
+                className="w-full"
+                ariaLabel="Kind of document"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="block text-xs font-semibold uppercase tracking-[0.08em]">
+                Expires
+              </span>
+              <DateField
+                value={pending.expires}
+                onChange={(next) => setPending((p) => (p ? { ...p, expires: next } : p))}
+                variant="field"
+                boxed
+                ariaLabel="The date this document expires"
+              />
+              <span className="block text-xs text-muted italic">
+                Leave it empty if it doesn&rsquo;t expire — most paperwork
+                doesn&rsquo;t.
+              </span>
+            </div>
+          </div>
+        </Dialog>
+      ) : null}
+    </>
   );
 }

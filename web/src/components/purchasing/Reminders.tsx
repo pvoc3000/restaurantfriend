@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { daysOverdue, type Reminder } from "@/lib/reminders";
+import { DateField } from "@/components/ui/DateField";
 import { TextInput } from "@/components/ui/TextInput";
 import {
   Dialog,
@@ -232,22 +233,32 @@ function ReminderDialog({
       }
     >
       <div className="space-y-4">
-        <label className="block space-y-1">
+        <div className="space-y-1">
           <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
             Show on
           </span>
-          <input
-            type="date"
-            value={showOn}
+          {/* `ui/DateField`, never a bare `<input type="date">` — this was the
+              last one left in the app (2026-09-01). It is the control that
+              carries the empty-date apparatus, and since the same day the one
+              that can be typed into and PASTED into; a raw input here would be
+              the one date in the app that could only be picked.
+
+              A `div` and not a `label`: the field is several elements and its
+              own input already carries the accessible name. */}
+          <DateField
+            value={showOn || null}
             disabled={busy}
-            onChange={(e) => onShowOn(e.target.value)}
-            className="h-9 border border-ink bg-white px-2 tabular-nums"
+            // The column is NOT NULL, so a cleared box means "leave it alone"
+            // rather than "no date" — `nullable={false}`'s reasoning in the one
+            // place that has no InlineValue to state it.
+            onChange={(next) => next && onShowOn(next)}
+            ariaLabel="The day this reminder shows on the guide"
           />
           <span className="block text-xs text-muted">
             It appears on this day&rsquo;s guide and stays until dismissed, so a
             date you skip doesn&rsquo;t lose it.
           </span>
-        </label>
+        </div>
 
         <label className="block space-y-1">
           <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">

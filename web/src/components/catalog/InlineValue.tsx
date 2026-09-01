@@ -277,7 +277,6 @@ export function InlineValue({
   scale,
   multiline = false,
   boxed = false,
-  collapseWhenEmpty = false,
 }: {
   table: string;
   /** The row's uuid — the identity of every table in the catalog. Omit it only
@@ -436,9 +435,6 @@ export function InlineValue({
    *  `INLINE_REST_BOXED`. For a stack of multiline notes, where the quiet cue
    *  leaves the fields indistinguishable from each other. */
   boxed?: boolean;
-  /** kind="date" only — see `DateField`. For a date cell in a narrow box, where
-   *  reserving a field's width for an empty value strands the calendar glyph. */
-  collapseWhenEmpty?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -652,7 +648,6 @@ export function InlineValue({
           ariaLabel={ariaLabel ?? column}
           className={className}
           boxed={boxed}
-          collapseWhenEmpty={collapseWhenEmpty}
           onChange={(next) => {
             if (next === null && !nullable) {
               setError("required");

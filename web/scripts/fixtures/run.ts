@@ -10,6 +10,7 @@ import "./breakRules.fixtures";
 import "./checklists.fixtures";
 import "./facilityTasks.fixtures";
 import "./columnOrder.fixtures";
+import "./dateInput.fixtures";
 import "./columnVisibility.fixtures";
 import "./rowDrag.fixtures";
 import "./pickList.fixtures";
