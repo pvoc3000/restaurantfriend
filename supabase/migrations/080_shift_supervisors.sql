@@ -93,11 +93,16 @@
 -- PROBE, don't read a note in a file:
 --
 --   select public.my_employee_id(
---     (select org_id from org_members limit 1));   -- your own employee uuid,
---                                                  -- and NULL from a
---                                                  -- service_role script,
---                                                  -- which has no auth.uid()
---                                                  -- (migration 014's footgun)
+--     (select org_id from org_members limit 1));   -- your own employee uuid
+--
+-- CORRECTED 2026-09-01, after applying: from a SERVICE_ROLE script that probe
+-- does not return null, it RAISES 'Not your organisation'. `user_org_ids()`
+-- resolves from `auth.uid()`, which service_role has none of, so the empty set
+-- fails the org guard before the lookup is ever reached — migration 014's
+-- footgun, one layer earlier than this header guessed. That raise is a PASS: it
+-- proves the body ran. To tell it apart from the function being absent, probe a
+-- deliberate typo as a control, which answers 'Could not find the function'.
+-- Only this comment changed; the SQL below is byte-identical to what was run.
 --
 --   select * from public.shift_supervisors(
 --     (select org_id from org_members limit 1));   -- 11 rows today
