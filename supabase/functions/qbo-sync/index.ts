@@ -15,6 +15,8 @@
 //   meta           → the connected company, which is how you prove it works
 //   accounts       → expense accounts (fully qualified), for the pickers
 //   vendors        → QBO vendors, for the mapping picker on a vendor record
+//   classes        → QBO Classes, for the per-shop picker (Plus and above)
+//   departments    → QBO Locations, ditto — Intuit calls them Departments
 //   items          → service items, for the settings picker
 //   push_bill      → send one approved invoice to QuickBooks as a Bill
 //   disconnect     → revoke at Intuit and forget the token (owner/admin)
@@ -420,6 +422,25 @@ Deno.serve(async (req) => {
       }));
       vendors.sort((a, b) => a.name.localeCompare(b.name));
       return json(200, { vendors });
+    }
+
+    // Class and Location tracking are PLUS-AND-ABOVE features, so an org that
+    // has not turned them on simply gets an empty list — which is why these
+    // return `[]` rather than refusing: the pickers then say there is nothing
+    // to choose instead of the screen showing an error for a feature the
+    // company does not use.
+    if (mode === "classes" || mode === "departments") {
+      const entity = mode === "classes" ? "Class" : "Department";
+      const q = `select Id, Name, FullyQualifiedName from ${entity} where Active = true maxresults 1000`;
+      const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
+        QueryResponse?: Record<string, Row[]>;
+      };
+      const rows = (res.QueryResponse?.[entity] ?? []).map((r) => ({
+        id: String(r.Id),
+        name: String(r.FullyQualifiedName ?? r.Name ?? ""),
+      }));
+      rows.sort((a, b) => a.name.localeCompare(b.name));
+      return json(200, { [mode]: rows });
     }
 
     if (mode === "items") {

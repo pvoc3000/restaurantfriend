@@ -164,6 +164,7 @@ export function VendorAccounting({
   });
 
   const resolved = expenseAccountFor(
+    null,
     { expense_account_ref: accountRef, expense_account_name: accountName },
     orgDefault
   );

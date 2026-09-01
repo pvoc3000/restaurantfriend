@@ -85,6 +85,7 @@ export async function VendorDetail({
     { data: typeRows },
     { data: qboRows },
     { data: vendorQbo, error: vendorQboError },
+    { data: locationQbo },
   ] =
     await Promise.all([
       supabase
@@ -120,6 +121,12 @@ export async function VendorDetail({
         .select("external_ref, expense_account_ref, expense_account_name")
         .eq("id", id)
         .maybeSingle(),
+      supabase
+        .from("vendor_locations")
+        .select(
+          "id, expense_account_ref, expense_account_name, qbo_location_ref, qbo_location_name, qbo_class_ref, qbo_class_name"
+        )
+        .eq("vendor_id", id),
     ]);
 
   if (error) {
@@ -149,6 +156,12 @@ export async function VendorDetail({
           name: qboRow.bill_expense_account_name ?? null,
         }
       : null;
+
+  // Merged onto the rows rather than selected with them, so an unapplied 083
+  // costs the QuickBooks pickers and nothing else.
+  const qboByRow = Object.fromEntries(
+    ((locationQbo ?? []) as Record<string, string | null>[]).map((r) => [r.id, r])
+  );
 
   const vendorTypes = [
     ...new Set(
@@ -307,7 +320,16 @@ export async function VendorDetail({
                   two apart. */}
               <section>
                 <VendorLocationsTable
-                  rows={v.vendor_locations}
+                  rows={v.vendor_locations.map((row) => ({
+                    ...row,
+                    expense_account_ref: qboByRow[row.id]?.expense_account_ref ?? null,
+                    expense_account_name: qboByRow[row.id]?.expense_account_name ?? null,
+                    qbo_location_ref: qboByRow[row.id]?.qbo_location_ref ?? null,
+                    qbo_location_name: qboByRow[row.id]?.qbo_location_name ?? null,
+                    qbo_class_ref: qboByRow[row.id]?.qbo_class_ref ?? null,
+                    qbo_class_name: qboByRow[row.id]?.qbo_class_name ?? null,
+                  }))}
+                  qboConnected={qboDefault !== null}
                   codeById={Object.fromEntries(codeById)}
                   activeLocationId={session.activeLocation?.id ?? null}
                   leading={<SectionHeading>Per-location config</SectionHeading>}

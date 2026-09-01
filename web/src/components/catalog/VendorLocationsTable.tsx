@@ -1,6 +1,9 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { invokeQbo } from "@/lib/qboClient";
+import { splitAccountName } from "@/lib/quickbooks";
 import { money, HERE_BADGE_CLASS } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
 import { InlineValue } from "./InlineValue";
@@ -17,6 +20,12 @@ function daysKey(list: number[] | null) {
 export type VendorLocationRow = {
   id: string;
   location_id: string;
+  expense_account_ref: string | null;
+  expense_account_name: string | null;
+  qbo_location_ref: string | null;
+  qbo_location_name: string | null;
+  qbo_class_ref: string | null;
+  qbo_class_name: string | null;
   account_number: string | null;
   minimum_order: number | null;
   order_days: number[] | null;
@@ -46,6 +55,7 @@ function repSummary(row: VendorLocationRow) {
  * through RLS, which requires purchaser or above.
  */
 export function VendorLocationsTable({
+  qboConnected = false,
   rows,
   codeById,
   activeLocationId,
@@ -54,9 +64,43 @@ export function VendorLocationsTable({
   rows: VendorLocationRow[];
   codeById: Record<string, string>;
   activeLocationId: string | null;
+  /** Whether to offer the QuickBooks settings at all. Read on the server, so
+   *  a disconnected org never sees three pickers it cannot fill. */
+  qboConnected?: boolean;
   /** Passed straight through to the table's strip — see DataTable's `leading`. */
   leading?: ReactNode;
 }) {
+  const supabase = createClient();
+  const [qbo, setQbo] = useState<{
+    accounts: { id: string; name: string }[];
+    classes: { id: string; name: string }[];
+    departments: { id: string; name: string }[];
+  } | null>(null);
+
+  // ONE fetch for the whole table rather than one per expanded row: the three
+  // vocabularies are the same for every shop, and a picker that loads when you
+  // open a row reads as broken for the second it takes.
+  useEffect(() => {
+    if (!qboConnected) return;
+    let cancelled = false;
+    void (async () => {
+      const [a, c, d] = await Promise.all([
+        invokeQbo(supabase, { mode: "accounts" }),
+        invokeQbo(supabase, { mode: "classes" }),
+        invokeQbo(supabase, { mode: "departments" }),
+      ]);
+      if (cancelled) return;
+      setQbo({
+        accounts: (a.data?.accounts ?? []) as { id: string; name: string }[],
+        classes: (c.data?.classes ?? []) as { id: string; name: string }[],
+        departments: (d.data?.departments ?? []) as { id: string; name: string }[],
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [qboConnected, supabase]);
+
   const columns: DataColumn<VendorLocationRow>[] = [
     // Active leads on every catalog table (Mark, 2026-07-23).
     {
@@ -199,6 +243,78 @@ export function VendorLocationsTable({
                 placeholder="none"
               />
             </dd>
+
+            {/* Migration 083. Set here rather than on the vendor because a bill
+                has to say WHICH SHOP it belongs to, and in one company file
+                that is QuickBooks' Location and Class. Each writes its `_name`
+                snapshot in the SAME statement, so renaming an account in
+                QuickBooks cannot rewrite what this row says it posts to. */}
+            {qboConnected && (
+              <>
+                <dt className="col-span-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  QuickBooks
+                </dt>
+
+                <dt className="py-0.5 text-subtle">Account</dt>
+                <dd>
+                  <InlineValue
+                    table="vendor_locations"
+                    id={r.id}
+                    column="expense_account_ref"
+                    value={r.expense_account_ref}
+                    kind="pick"
+                    clearable
+                    placeholder={qbo ? "Use the vendor's" : "Reading QuickBooks…"}
+                    ariaLabel="Expense account for this vendor at this shop"
+                    options={(qbo?.accounts ?? []).map((a) => {
+                      const { parent, leaf } = splitAccountName(a.name);
+                      return { value: a.id, label: leaf, group: parent ?? "Top level" };
+                    })}
+                    alsoUpdate={(next) => ({
+                      expense_account_name:
+                        qbo?.accounts.find((a) => a.id === next)?.name ?? null,
+                    })}
+                  />
+                </dd>
+
+                <dt className="py-0.5 text-subtle">Location</dt>
+                <dd>
+                  <InlineValue
+                    table="vendor_locations"
+                    id={r.id}
+                    column="qbo_location_ref"
+                    value={r.qbo_location_ref}
+                    kind="pick"
+                    clearable
+                    placeholder={qbo ? "None" : "Reading QuickBooks…"}
+                    ariaLabel="QuickBooks location for bills from this vendor at this shop"
+                    options={(qbo?.departments ?? []).map((d) => ({ value: d.id, label: d.name }))}
+                    alsoUpdate={(next) => ({
+                      qbo_location_name:
+                        qbo?.departments.find((d) => d.id === next)?.name ?? null,
+                    })}
+                  />
+                </dd>
+
+                <dt className="py-0.5 text-subtle">Class</dt>
+                <dd>
+                  <InlineValue
+                    table="vendor_locations"
+                    id={r.id}
+                    column="qbo_class_ref"
+                    value={r.qbo_class_ref}
+                    kind="pick"
+                    clearable
+                    placeholder={qbo ? "None" : "Reading QuickBooks…"}
+                    ariaLabel="QuickBooks class for bills from this vendor at this shop"
+                    options={(qbo?.classes ?? []).map((c) => ({ value: c.id, label: c.name }))}
+                    alsoUpdate={(next) => ({
+                      qbo_class_name: qbo?.classes.find((c) => c.id === next)?.name ?? null,
+                    })}
+                  />
+                </dd>
+              </>
+            )}
           </dl>
         ),
       }}

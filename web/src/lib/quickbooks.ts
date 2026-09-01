@@ -85,6 +85,11 @@ export type BillPushInputs = {
   accountRef: string | null;
   /** Overrides the default line description. */
   description?: string | null;
+  /** QuickBooks Location — `DepartmentRef`, on the HEADER. */
+  department?: QboRefValue | null;
+  /** QuickBooks Class — `ClassRef`, on the LINE. A bill takes its class per
+   *  line, not on the header; putting it on the header is silently ignored. */
+  klass?: QboRefValue | null;
 };
 
 /** QBO truncates past this and says nothing, so we do it deliberately. */
@@ -221,13 +226,22 @@ export function buildBillPayload(
         Amount: amount,
         DetailType: "AccountBasedExpenseLineDetail",
         Description: billLineDescription(invoice, inputs.description),
-        AccountBasedExpenseLineDetail: { AccountRef: { value: accountRef } },
+        AccountBasedExpenseLineDetail: {
+          AccountRef: { value: accountRef },
+          // ON THE LINE, deliberately. A Bill carries its class per expense
+          // line; a ClassRef on the header is accepted and ignored, which is
+          // the worst kind of wrong — it looks like it worked.
+          ...(inputs.klass ? { ClassRef: { value: inputs.klass.ref } } : {}),
+        },
       },
     ],
     // Ours, so a bill in QuickBooks can be traced back to the scan it was read
     // from. Never shown to a vendor — a Bill is not a document we send.
     PrivateNote: `restaurantfriend ${invoice.id}`,
   };
+
+  // On the HEADER, which is where a Bill takes its location.
+  if (inputs.department) body.DepartmentRef = { value: inputs.department.ref };
 
   const docNumber = docNumberFor(invoice.invoice_number);
   if (docNumber) body.DocNumber = docNumber;
@@ -305,11 +319,21 @@ export function qboVendorId(external_ref: AccountingRef | null | undefined): str
   return id ? id : null;
 }
 
+/** 083's row: this vendor, at this shop. */
+export type VendorLocationAccounting = {
+  expense_account_ref: string | null;
+  expense_account_name: string | null;
+  qbo_location_ref: string | null;
+  qbo_location_name: string | null;
+  qbo_class_ref: string | null;
+  qbo_class_name: string | null;
+};
+
 export type ResolvedAccount = {
   ref: string;
   name: string | null;
-  /** Which level answered — what the vendor record says beside the field. */
-  source: "vendor" | "org";
+  /** Which level answered — what the screen says beside the field. */
+  source: "vendor_location" | "vendor" | "org";
 };
 
 /**
@@ -327,9 +351,24 @@ export type ResolvedAccount = {
  * bills nowhere rather than falling back.
  */
 export function expenseAccountFor(
-  vendor: Pick<VendorAccounting, "expense_account_ref" | "expense_account_name"> | null | undefined,
+  vendorLocation:
+    | Pick<VendorLocationAccounting, "expense_account_ref" | "expense_account_name">
+    | null
+    | undefined,
+  vendor:
+    | Pick<VendorAccounting, "expense_account_ref" | "expense_account_name">
+    | null
+    | undefined,
   orgDefault: { ref: string | null; name?: string | null } | null | undefined
 ): ResolvedAccount | null {
+  const atShop = vendorLocation?.expense_account_ref?.trim();
+  if (atShop) {
+    return {
+      ref: atShop,
+      name: vendorLocation?.expense_account_name?.trim() || null,
+      source: "vendor_location",
+    };
+  }
   const own = vendor?.expense_account_ref?.trim();
   if (own) {
     return { ref: own, name: vendor?.expense_account_name?.trim() || null, source: "vendor" };
@@ -339,6 +378,37 @@ export function expenseAccountFor(
     return { ref: fallback, name: orgDefault?.name?.trim() || null, source: "org" };
   }
   return null;
+}
+
+/**
+ * The QuickBooks Location and Class for a bill, which is how one company file
+ * tells DF01's flour from DF02's.
+ *
+ * ONE TIER, not three (Mark's choice): set on the vendor sub-location or not
+ * sent at all. Unlike the account there is no sensible fallback — an org-wide
+ * default location would put every shop's bills in the same place, which is the
+ * exact opposite of what tracking them is for.
+ *
+ * Blank is not a value, same rule as the account: an emptied field must not
+ * send an empty ref that QuickBooks would refuse.
+ */
+export function qboTrackingFor(
+  vendorLocation: VendorLocationAccounting | null | undefined
+): { location: QboRefValue | null; klass: QboRefValue | null } {
+  return {
+    location: refOrNull(vendorLocation?.qbo_location_ref, vendorLocation?.qbo_location_name),
+    klass: refOrNull(vendorLocation?.qbo_class_ref, vendorLocation?.qbo_class_name),
+  };
+}
+
+export type QboRefValue = { ref: string; name: string | null };
+
+function refOrNull(
+  ref: string | null | undefined,
+  name: string | null | undefined
+): QboRefValue | null {
+  const r = ref?.trim();
+  return r ? { ref: r, name: name?.trim() || null } : null;
 }
 
 /**

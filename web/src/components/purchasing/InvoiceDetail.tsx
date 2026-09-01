@@ -877,6 +877,7 @@ export function InvoiceDetail({
       <PushToQuickBooks
         invoiceId={invoice.id}
         vendorId={invoice.vendor_id}
+        locationId={invoice.location_id}
         orgId={orgId}
         status={invoice.status}
         total={invoice.total}
