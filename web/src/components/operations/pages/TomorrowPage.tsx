@@ -109,12 +109,21 @@ export function TomorrowPage({
       showBlob(win, blob, documentFileName("order", order.number, nextProductionDate ?? ""));
 
       // The stamp the kitchen document has always carried. Only when empty: a
-      // second copy printed next week is not a second send, and overwriting
+      // second copy printed next week is not a second print, and overwriting
       // would move the date the record already claims.
-      if (order.printedAt === null && nextProductionDate) {
+      //
+      // `today`, NOT `nextProductionDate` (corrected 2026-09-01). It recorded
+      // the day the sheet was FOR rather than the day it printed, which every
+      // other stage date in this module gets the other way round — and once
+      // the packet started stamping the same column, two writers disagreeing
+      // about what the date means was a drift worth closing rather than
+      // documenting. It also has a reader: `order_printed_at` is the sixth rung
+      // of the progress ladder, so a sheet printed today for a wedding in
+      // December was marking the order complete three months early.
+      if (order.printedAt === null) {
         await supabase
           .from("special_orders")
-          .update({ order_printed_at: nextProductionDate })
+          .update({ order_printed_at: today })
           .eq("id", order.id)
           .select("id");
         router.refresh();
@@ -167,6 +176,15 @@ export function TomorrowPage({
             ))}
           </ul>
         )}
+        {orders.length > 0 ? (
+          /* Said once, here, because the row buttons above look like the only
+             way. They are not the way any more — they are the way to reprint
+             ONE, which is the same job the per-schedule buttons below do. */
+          <p className="text-sm text-muted">
+            Print All Documents, below, includes all of these &mdash; the
+            buttons above are for reprinting one.
+          </p>
+        ) : null}
         <Checkbox
           checked={specialOrdersDone}
           disabled={!editable}
@@ -223,16 +241,41 @@ export function TomorrowPage({
             plans={plans}
             primary={schedules.length === 0}
           />
-          {schedules.length > 0 ? (
+          {schedules.length > 0 || orders.length > 0 ? (
             <PrintPacket
               // Every schedule this KITCHEN is filling that night, special
               // orders included — which is what `schedules` already holds, and
               // `fetchPacketData` widens further through `companionScheduleIds`
               // so nothing depends on this list being complete.
               scheduleIds={schedules.map((s) => s.id)}
+              // AND THE KITCHEN ORDER SHEETS, so "Print All Documents" means
+              // it (Mark, 2026-09-01: "why not include a 'Special Orders'
+              // option … so we don't need to do it as a separate process?").
+              //
+              // THE SAME LIST THE SECTION ABOVE IS SHOWING, never the orders
+              // that happen to have a production schedule. Generating a night
+              // does pull special orders into schedules — but almost nothing is
+              // scheduled in practice (measured: 2 of the 33 orders printed
+              // since 2026-08-01), so a packet built from the schedules would
+              // print two sheets in thirty-three under a button claiming all of
+              // them.
+              specialOrderIds={orders.map((o) => o.id)}
+              printedOn={today}
               stampable={stampable}
-              primary
-              onPrinted={() => flag("task_schedules_done", true)}
+              // NEVER BOTH BLACK (Mark, 2026-08-28). This button now also
+              // appears on a night that has orders and NO schedule — where the
+              // next act is plainly still Generate, which is already filled. So
+              // the fill is on having something generated, not on the button
+              // merely being pressable.
+              primary={schedules.length > 0}
+              // BOTH FLAGS, because one act now produces both papers. They stay
+              // two columns — the submit page has to be able to say WHICH is
+              // missing when somebody prints only one from a row above — but
+              // the packet answers both at once.
+              onPrinted={() => {
+                flag("task_schedules_done", true);
+                flag("task_special_orders_done", true);
+              }}
             />
           ) : null}
         </div>

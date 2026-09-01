@@ -28,9 +28,12 @@ import {
   type ScheduleLine,
 } from "@/lib/productionSchedule";
 import { premadeSheetTitle } from "@/lib/productionPacket";
+import { kitchenOrderPages } from "@/components/specialOrders/pdf/SpecialOrderPdfs";
+import type { OrderDocData } from "@/lib/specialOrderDocs";
 import type { PacketData, PacketKitchen, PacketSchedule, SheetElement } from "@/lib/productionPacket";
 
 export type PacketPart =
+  | "special"
   | "premade"
   | "baker"
   | "fryer"
@@ -55,6 +58,10 @@ export type PacketPart =
 // today, so they are unreachable from the app; that is a known cost of keeping
 // the door rather than the corridor.
 export const PACKET_PARTS: { key: PacketPart; label: string }[] = [
+  // SPECIAL ORDERS LEAD, because they are the only pages with a customer's name
+  // on them and a time somebody is standing in the shop at. Everything below is
+  // the night's own work.
+  { key: "special", label: "Special orders" },
   { key: "premade", label: "Premade schedule" },
   { key: "baker", label: "Baker tray guide" },
   { key: "fryer", label: "Fryer tray guide" },
@@ -191,13 +198,32 @@ const styles = StyleSheet.create({
 export function ProductionPacketPdf({
   packet,
   parts,
+  orders = [],
 }: {
   packet: PacketData;
   parts: PacketPart[];
+  /**
+   * The night's special orders, as KITCHEN ORDER sheets.
+   *
+   * Passed in rather than derived from `packet.schedules`, and that is the
+   * whole of the care (Mark, 2026-09-01). A special order only appears among
+   * those schedules if somebody SCHEDULED it — and measured on the live data,
+   * of 33 orders printed since 2026-08-01 exactly 2 had a schedule, while 0 of
+   * the 9 upcoming ones do. Deriving these from the packet would therefore
+   * print two sheets in thirty-three and call itself "all documents", which is
+   * decision 11's failure with the sign flipped: an absence that looks like
+   * completeness. So the CALLER says which orders the night has, from the same
+   * list the screen is showing.
+   */
+  orders?: OrderDocData[];
 }) {
   const want = new Set(parts);
   return (
     <Document title={`Production packet ${packet.printedOn}`}>
+      {want.has("special") && orders.length > 0
+        ? kitchenOrderPages(orders, packet.printedOn)
+        : null}
+
       {want.has("premade")
         ? packet.schedules.map((s) => (
             <PremadePage key={`p-${s.id}`} schedule={s} packet={packet} />

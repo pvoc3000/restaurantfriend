@@ -569,13 +569,29 @@ export function KitchenOrderPdf({
    *
    * Passed in rather than taken from `new Date()` here, for `lib/today`'s
    * reason: a browser in another zone, or a UTC host, dates the sheet to
-   * tomorrow after 4pm Pacific. Both callers already hold the org's own today.
+   * tomorrow after 4pm Pacific. Every caller already holds the org's own today.
    */
   printedOn?: string;
 }) {
-  return (
-    <Document>
-      {orders.map((order) => {
+  return <Document>{kitchenOrderPages(orders, printedOn)}</Document>;
+}
+
+/**
+ * The same pages, WITHOUT a `<Document>` around them — so the production packet
+ * can carry them (Mark, 2026-09-01: "why not include a 'Special Orders' option
+ * … so we don't need to do it as a separate process?").
+ *
+ * A FUNCTION RETURNING AN ARRAY, not a component. `<Document>` accepts Pages
+ * and arrays of them, and `ProductionPacketPdfs` already documents that a real
+ * Fragment confuses the reconciler on some versions — which is why that file
+ * flattens its children by hand. Returning the array sidesteps the question
+ * rather than betting on it.
+ */
+export function kitchenOrderPages(
+  orders: OrderDocData[],
+  printedOn?: string
+): React.ReactElement[] {
+  return orders.map((order) => {
         const groups = sizeClassGroups(order.lines);
         const pickupTime = usTime(order.ready_by_time ?? order.event_time);
         return (
@@ -704,10 +720,8 @@ export function KitchenOrderPdf({
               fixed
             />
           </Page>
-        );
-      })}
-    </Document>
-  );
+    );
+  });
 }
 
 /* ==========================================================================
