@@ -162,24 +162,29 @@ export function PurchaseOrderDetail({
    * would be the wrong call.
    */
   async function close() {
+    // Read first: the confirm is composed out of it twice — see the receiving
+    // screen's `close`, which this mirrors deliberately.
+    const unfiled = unfiledReadings(attachments);
     // The fourth argument is how many invoices are FILED against this order.
     // PO detail does not query them, so it passes the count it can see: an
-    // attachment tagged with an invoice_id IS a filed invoice.
+    // attachment tagged with an invoice_id IS a filed invoice. The fifth is
+    // what the tick box is about to offer, so the confirm doesn't name a gap
+    // it is closing in the same breath.
     const caveats = closeReadiness(
       lines,
       attachments.length,
       order.location_id,
-      new Set(attachments.map((a) => a.invoice_id).filter(Boolean)).size
+      new Set(attachments.map((a) => a.invoice_id).filter(Boolean)).size,
+      unfiled.length
     );
     const message =
       `Close ${order.po_number}?` +
       (caveats.length > 0
         ? `\n\nStill unresolved:\n· ${caveats.join("\n· ")}\n\nClosing anyway is fine — it just means you're done with this order.`
         : "\n\nEverything is received, reconciled and filed.");
-    // The one caveat closing can SETTLE rather than merely report — the same
-    // offer the receiving screen's Complete makes, in the same words, because
-    // it is the same act reached from the other screen.
-    const unfiled = unfiledReadings(attachments);
+    // Where a bill comes from — the same offer the receiving screen's Complete
+    // makes, in the same words, because it is the same act reached from the
+    // other screen. See that one for the argument.
     const outcome = unfiled.length
       ? await confirmDialogWithOption({
           ...splitConfirmMessage(message),

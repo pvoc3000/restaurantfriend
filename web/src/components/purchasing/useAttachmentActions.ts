@@ -14,7 +14,6 @@ import {
   createInvoiceFromReading,
   type InvoiceCreationOrder,
 } from "@/lib/invoiceFromExtraction";
-import type { InvoiceExtraction } from "@/lib/invoiceExtraction";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 /**
@@ -25,6 +24,18 @@ import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
  * decision about the ACT of attaching an invoice (Mark, 2026-07-31), not about
  * a screen. If the two surfaces owned their own copies, the same gesture would
  * eventually behave differently depending on where you did it.
+ *
+ * READING AND FILING ARE TWO ACTS, AND ONLY THE FIRST HAPPENS HERE (Mark,
+ * 2026-09-01: "I don't think an invoice document should be created
+ * automatically … it should be created only once a purchase order is
+ * reconciled and closed"). Attaching an invoice has it READ, because the
+ * reading is what the receiving screen reconciles against and it is wanted the
+ * moment the document is on the order. It does not create a BILL: a record on
+ * /invoices is something somebody is going to be asked to approve and pay, and
+ * a scan taken to help count a delivery is not yet a claim that we owe
+ * anybody. The bill is offered when the order is CLOSED — a ticked line in the
+ * close confirm, which both this order's screens already make — and
+ * `fileAsInvoice` below is the standing manual route for the exceptions.
  *
  * The two write orders are opposite on purpose, and both are load-bearing:
  *
@@ -72,12 +83,12 @@ export function useAttachmentActions({
    * Have an invoice read (the `extract-invoice` edge function). It writes the
    * extraction onto the attachment row; the refresh brings it back.
    *
-   * Nothing about the ORDER changes here — an extraction is only ever a
-   * proposal to compare against, which a person then accepts line by line.
+   * NOTHING ELSE CHANGES — not the order, and since 2026-09-01 not the
+   * Invoices module either. An extraction is only ever a proposal to compare
+   * against, which a person then accepts line by line; filing it as a bill is
+   * a separate act, taken at close. See the note on the hook above.
    */
-  async function read(
-    attachment: Pick<PoAttachment, "id" | "file_name" | "invoice_id">
-  ) {
+  async function read(attachment: Pick<PoAttachment, "id" | "file_name">) {
     setPhase({ kind: "reading", label: `Reading ${attachment.file_name ?? "the invoice"}…` });
     setError(null);
     const { data, error: fnError } = await supabase.functions.invoke("extract-invoice", {
@@ -105,29 +116,6 @@ export function useAttachmentActions({
       setPhase(IDLE);
       setError(data.error);
       return;
-    }
-
-    // File the reading as an invoice RECORD — but only if this document isn't
-    // already filed as one. That check is the structural guard the design leans
-    // on instead of a unique constraint: a document row carries at most one
-    // invoice_id, so "Read again" on a filed invoice refreshes the raw reading
-    // and can never mint a second record over someone's corrections.
-    if (!attachment.invoice_id) {
-      const extraction = (data?.extraction ?? null) as InvoiceExtraction | null;
-      if (extraction) {
-        setPhase({ kind: "filing", label: "Filing it as an invoice…" });
-        const result = await createInvoiceFromReading(supabase, {
-          orgId,
-          attachmentId: attachment.id,
-          extraction,
-          order: order ?? null,
-          fallback: null,
-        });
-        // The READ still stands if filing fails, exactly as the upload stands
-        // if the read fails: the extraction is on the row, and "File as
-        // invoice" is right there to try again.
-        if ("error" in result) setError(result.error);
-      }
     }
 
     setPhase(IDLE);
@@ -190,18 +178,11 @@ export function useAttachmentActions({
       // attaching four pages as four files costs four; and a packing slip has
       // no prices to join on, so reading one buys nothing.
       //
-      // The UPLOAD stands if the read fails: the file is filed either way, and
-      // "Read invoice" is still there to try again. Losing a successfully
+      // The UPLOAD stands if the read fails: the file is stored either way,
+      // and "Read invoice" is still there to try again. Losing a successfully
       // stored invoice because a model call timed out would be the worse trade.
       if (kind === "invoice") {
-        // `invoice_id` is whatever this upload was filed under: null on a PO's
-        // Paperwork card (so the read goes on to create a record), and set when
-        // the Invoices section uploaded into an invoice that already exists.
-        await read({
-          id: row.id as string,
-          file_name: file.name,
-          invoice_id: invoiceId ?? null,
-        });
+        await read({ id: row.id as string, file_name: file.name });
       }
     }
     setPhase(IDLE);
@@ -210,12 +191,13 @@ export function useAttachmentActions({
   }
 
   /**
-   * File an ALREADY-READ document as an invoice record.
+   * File an ALREADY-READ document as an invoice record, on its own.
    *
-   * The manual counterpart to auto-filing, and it earns its place three ways:
-   * it clears the readings stored before this module existed, it recovers a
-   * read whose auto-file failed, and it handles a document filed as a `photo`
-   * that turns out to be the invoice.
+   * Closing the order is the ordinary route (see the note on the hook), and
+   * this is the standing exception to it — the bill you want on /invoices
+   * today, on an order that will not be closed for a fortnight; the document
+   * attached as a `photo` that turns out to be the invoice; the readings
+   * stored before this module existed.
    */
   async function fileAsInvoice(
     attachment: Pick<PoAttachment, "id" | "file_name" | "invoice_id" | "extraction">

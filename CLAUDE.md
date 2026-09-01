@@ -2298,6 +2298,15 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `vendor_invoice_lines`** (a bare `invoices` is a name the unbuilt Quotes &
    Orders module will want — the collision `purchase_orders` already dodged);
    and **attaching + reading an invoice on a PO files it automatically**.
+   **THAT LAST ONE WAS REVERSED 2026-09-01** (Mark, having used it: "when I
+   added a scanned invoice document to a purchase order so I could reconcile,
+   the app created an invoice record. I think this is premature … it should be
+   created only once a purchase order is reconciled and closed"). Attaching
+   still auto-READS — the reading is what receiving reconciles against, and it
+   is wanted the moment the document is on the order — and it no longer creates
+   a BILL. A record on /invoices is something somebody will be asked to approve
+   and pay, and a scan taken to help count a delivery is not yet a claim that
+   we owe anybody. See "FILING IS AN ACT OF CLOSING" below.
    **The many-to-many lives on the LINE** — `purchase_order_id` +
    `purchase_order_item_id` on `vendor_invoice_lines`, no header FK and no join
    table. It is the same granularity `matchInvoiceToOrder` already produces, so
@@ -2355,6 +2364,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    paperwork on file that isn't recorded as a bill — and it deliberately does
    NOT ask whether the bill is approved: a delivery can be complete Friday and
    the bill approved Tuesday.
+   **THAT FALLBACK IS THREE TIERS SINCE 2026-09-01**, and the middle one is now
+   the ordinary path: filed invoices, else **`billsFromReadings`** (the
+   readings on the order, joined into bills), else `latestRead`. The middle
+   tier had to exist the day filing moved to close, because until then
+   receiving could lean on the FILED records having already been joined and
+   unioned for it — `latestRead` alone reconciles against ONE document.
+   Measured on the real 132-181178-02, whose Chefs Warehouse 73535581 was
+   scanned as two pages: `billsFromReadings` gives **one bill of 11 lines,
+   the same set of printed lines the filed record actually holds**, where
+   `latestRead` alone offers 7 — so four billed lines would have read as never
+   billed. `latestRead` stays the floor and still earns it: it is the only tier
+   that covers a document read under some other KIND, which is not a bill and
+   so never becomes one above.
    **Shipped 2026-08-25 — THE INVOICE SAYS WHICH ORDER IT IS FOR, and now we
    check** (`printedPoDisagreement` in `lib/invoices`, a chip on receiving's
    `InvoiceSummary` band). The reader had captured `purchase_order_number` since
@@ -2415,6 +2437,64 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Known pane artefact, not an app bug: `router.refresh()` after a write can
    take several seconds, so a probe run 1.5s after a click reads as "nothing
    happened" — wait longer or re-navigate before concluding anything.
+   **Shipped 2026-09-01 — FILING IS AN ACT OF CLOSING** (Mark, having used it:
+   "when I added a scanned invoice document to a purchase order so I could
+   reconcile, the app created an invoice record. I think this is premature …
+   it should be created only once a purchase order is reconciled and closed …
+   perhaps with a confirmation dialogue right before so the user can choose not
+   to create an invoice"). No migration, and no new UI: **the feature he asked
+   for had been built on 2026-08-27, at his own request, and could never
+   appear.** `unfiledReadings` returns documents that are READ AND NOT YET
+   FILED, so by close time auto-filing had already consumed every one and the
+   ticked box in the close confirm was dead code on every order that had ever
+   been reconciled. Two features fighting, and the eager one won every time.
+   **READING AND FILING ARE TWO ACTS, and only the first happens on attach.**
+   Auto-read STAYS — the extraction is what the receiving screen reconciles
+   against, and it is wanted the moment the document is on the order — and the
+   ~18 lines in `useAttachmentActions.read()` that turned it into a BILL are
+   gone. The distinction is what a record MEANS: an extraction is a proposal to
+   compare against, where a row on /invoices is something somebody will be
+   asked to approve and pay, and a scan taken to help count a delivery is not
+   yet a claim that we owe anybody.
+   Almost nothing was lost, because receiving was built on the EXTRACTION and
+   not on the record — `matchesFromLinks` was already documented as preferring
+   a filed invoice with the reading as "the ordinary path", the `→` chips, the
+   price buttons, the invoice band and "Receive n from invoice" all read the
+   extraction, and MANUAL MATCH writes `product_id` onto the PO LINE, so it
+   survives with no record at all. The one real loss was the BACKORDER case,
+   which is why the fallback grew its middle tier — see `billsFromReadings`
+   above.
+   **THE CONFIRM NO LONGER ARGUES WITH ITS OWN OFFER.** `closeReadiness` takes
+   a fifth argument, the number of readings the confirm is about to offer to
+   file, and suppresses ONLY "the paperwork on file isn't recorded as a bill
+   yet" — which would otherwise fire on nearly every order, one line above the
+   ticked box that settles it. That is this module's own rule from the other
+   side: a confirm naming something the screen gives you no way to fix teaches
+   people to stop reading confirms, and so does one naming something they are
+   settling as they read it. Paperwork nobody has READ produces no offer and is
+   still named, because reading it is a step somebody has to take; "nothing
+   attached" is never suppressed, since no offer can close that gap.
+   Known and intended: **an order nobody ever closes never produces a bill.**
+   The standing "File as bill" on PO detail and "File as invoice" on the
+   document are the escape hatch, and they now appear routinely rather than
+   almost never.
+   Verified live and left exactly as found (53 invoices, 462 lines, 62
+   attachments, one storage object, status restored): a REAL invoice PDF
+   attached to 142-18017-01 through the app's own file input showed only
+   "READING …" and never "FILING IT AS AN INVOICE…", and `vendor_invoices` did
+   not move — where the old code would have minted invoice 120274 and 12 lines.
+   With that second reading of the SAME number on the order the band still read
+   **12 OF 12 LINES MATCHED**, which is `billsFromReadings`' multiset working on
+   real data: concatenating the two would have doubled every SKU, and the
+   matcher refuses a duplicate, so it would have read 0 of 12. Then the close
+   confirm on BOTH screens read "Still unresolved: · 1 line's price differs
+   from the catalog" over a ticked **"Also file invoice 120274 as a bill"**,
+   with the bill caveat correctly absent. Cancelled; nothing written.
+   **1485 fixtures pass**, 14 new, and each rule was checked by BREAKING it —
+   dropping the number grouping turns 4 red, a naive concat 2, a set instead of
+   a multiset 2 (in BOTH callers, which is what proves they share one
+   definition), losing the read order 1, the kind filter 1, joining numberless
+   readings 1, and the old caveat clause 2.
 4e. ✅ **EMPLOYEE EVENTS — migration 035, APPLIED and LOADED 2026-08-06.**
    FMP's two HR child tables merged into ONE (Mark: "In retrospect, these should
    really be all in one table: Events. What were 'ratings' are really just shift
@@ -6550,7 +6630,9 @@ has no due date, tax, freight or PO number** — those cells render as em dashes
 which is the both-sides contract working, and "Read again" is what fills them.
 And **"Read again" on a document with no `invoice_id` also FILES it**, because
 auto-file lives in `read()`; on an already-filed document it only refreshes the
-raw reading, which is the intended asymmetry.
+raw reading, which is the intended asymmetry. **NO LONGER TRUE since
+2026-09-01** — `read()` reads and does nothing else, on any document. Filing is
+an act of closing; see below.
 **023 is APPLIED** (Mark, 2026-08-02) — `employees_delete` for owner/admin,
 reversing 020's deliberate absence. See build step 4c for the argument and for
 the `.select()`-your-own-delete rule it taught. Probe with

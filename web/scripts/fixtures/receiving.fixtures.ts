@@ -229,6 +229,42 @@ test("paperwork on file but no bill recorded is its own caveat", () => {
   ]);
 });
 
+test("the confirm doesn't name a gap it is closing in the same breath", () => {
+  // Since filing moved to close (Mark, 2026-09-01) this caveat would otherwise
+  // fire on nearly every order, one line above the ticked box that settles it.
+  // A confirm arguing with its own offer is how people learn to stop reading
+  // confirms — the same fault as naming something the screen cannot fix, from
+  // the other side.
+  const line = withCatalog(poLine({ qty_received: 1, unit_price: 10 }), { price: 10 });
+  eq(closeReadiness([line], 1, LOC, 0, 1), [], "the box below is about to file it");
+});
+
+test("paperwork nobody has READ is still named — there is no offer to suppress", () => {
+  // `unfiledReadings` refuses an unread document, so the fifth argument is 0
+  // and the caveat stands. Reading it is a step somebody has to take.
+  const line = withCatalog(poLine({ qty_received: 1, unit_price: 10 }), { price: 10 });
+  eq(closeReadiness([line], 1, LOC, 0, 0), [
+    "the paperwork on file isn't recorded as a bill yet",
+  ]);
+});
+
+test("the offer suppresses ONLY the bill clause", () => {
+  // It says something about the paperwork, and nothing about the counting or
+  // the money.
+  const line = withCatalog(poLine({ unit_price: 92.8 }), { price: 68.8 });
+  eq(closeReadiness([line], 1, LOC, 0, 1), [
+    "1 line has no received quantity",
+    "1 line's price differs from the catalog",
+  ]);
+});
+
+test("nothing attached is named even if something is somehow offered", () => {
+  // The two clauses are ordered, and the first is about a gap no offer can
+  // close: you cannot file a bill from a document that isn't there.
+  const line = withCatalog(poLine({ qty_received: 1, unit_price: 10 }), { price: 10 });
+  eq(closeReadiness([line], 0, LOC, 0, 1), ["no invoice or packing slip is attached"]);
+});
+
 test("the two paperwork clauses never both fire — nothing attached wins", () => {
   const line = withCatalog(poLine({ qty_received: 1, unit_price: 10 }), { price: 10 });
   eq(closeReadiness([line], 0, LOC, 0), ["no invoice or packing slip is attached"]);

@@ -61,6 +61,17 @@ approval ships in v1 and the sync does not.
    a name the customer side will want — the same collision `purchase_orders`
    already dodged with a future `orders`.
 6. **Attaching and reading an invoice on a PO creates the record automatically.**
+   **REVERSED 2026-09-01, by Mark, after using it** ("when I added a scanned
+   invoice document to a purchase order so I could reconcile, the app created
+   an invoice record. I think this is premature … it should be created only
+   once a purchase order is reconciled and closed"). Attaching still auto-READS
+   — the extraction is what receiving reconciles against — and it no longer
+   creates a BILL. The record is offered as a ticked line in the CLOSE confirm,
+   which both the receiving screen and PO detail already made (2026-08-27);
+   until this reversal that offer could never appear, because auto-filing had
+   always consumed the reading first. `fileAsInvoice` on the document and
+   "File as bill" on PO detail remain the standing manual route. See CLAUDE.md
+   4d, "FILING IS AN ACT OF CLOSING".
 
 ### Decisions taken during the design, with their reasons
 
@@ -290,6 +301,17 @@ does not regress.** Mark started using it on 2026-08-04 and likes it.
   it sidesteps the duplicate-SKU problem. **Keep `latestRead` as the fallback** —
   that is what makes day one a no-op and what covers any attachment never filed
   as an invoice.
+  **A MIDDLE TIER WAS ADDED 2026-09-01 when filing moved to close**:
+  filed links → `billsFromReadings` (the order's readings, joined into bills by
+  printed number, each bill's pages unioned as a multiset) → `latestRead`. It
+  had to exist that day, because until then receiving could lean on the filed
+  records having been joined and unioned for it, and `latestRead` reconciles
+  against ONE document. Measured on the real two-page Chefs Warehouse 73535581:
+  one bill of 11 lines, the same printed lines the filed record holds, where
+  `latestRead` alone offers 7. The middle tier is `createInvoiceFromReading`'s
+  own join rule done in the head rather than in the database — **parity with
+  what filing would produce is the target**, and a cleverer rule here would be
+  a second answer to a question this module has already answered.
 - Unchanged and to be verified unchanged: `fillable`, `priceAction`, `skuAction`,
   `receivedClass`, `qtyLabel`, `receivingOrder`, the `→` take-it chips, the Undo
   band, the manual-match dialog, the split layout and its measurement, and the

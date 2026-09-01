@@ -61,9 +61,11 @@ export function InvoiceSummary({
   saving,
   addItemSlot,
 }: {
-  /** How many invoices are FILED against this order. Named only when it's more
-   *  than one — that's the backorder case, and the band otherwise describes
-   *  the one document on screen without qualification. */
+  /** How many BILLS the lines below are reconciled against — filed invoices
+   *  where there are any, otherwise the readings on the order joined by their
+   *  printed number. Named only when it's more than one: that's the backorder
+   *  case, and the band otherwise describes the one document on screen without
+   *  qualification. */
   invoiceCount?: number;
   /** The order being received. Compared against whatever purchase order number
    *  the invoice prints back at us — see `printedPoDisagreement`. */

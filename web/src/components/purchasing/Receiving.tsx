@@ -16,7 +16,7 @@ import {
   type AttachmentKind,
   type SignedAttachment,
 } from "@/lib/attachments";
-import { fileReadingsLabel } from "@/lib/invoices";
+import { billsFromReadings, fileReadingsLabel } from "@/lib/invoices";
 import { fileReadings } from "@/lib/invoiceFromExtraction";
 import { matchInvoiceToOrder, matchesFromLinks } from "@/lib/invoiceMatch";
 import type { OrderInvoice } from "@/lib/invoiceQueries";
@@ -155,29 +155,59 @@ export function Receiving({
   const source = useMemo(() => latestRead(attachments), [attachments]);
 
   /**
-   * The pairing this screen reconciles against.
+   * What the paperwork on this order bills, joined into bills the way filing
+   * would join them — one entry per invoice number, its pages unioned.
    *
-   * A FILED invoice wins over a fresh read of the attachment, and it is better
-   * three ways at once: it honours a manual match someone made standing at the
-   * delivery, it survives a re-read of the document, and it sidesteps the
-   * duplicate-SKU problem entirely for lines that are already decided.
+   * Since filing moved to close (2026-09-01) this is the ordinary state of an
+   * order being received: documents read, nothing recorded yet.
+   */
+  const bills = useMemo(() => billsFromReadings(attachments), [attachments]);
+
+  /**
+   * The pairing this screen reconciles against, in three tiers.
    *
-   * More than one invoice against one order is the BACKORDER case, and it needs
-   * no special handling here: each brings only the lines that point at this
-   * order, so they concatenate without competing. (Concatenating two ORDERS'
-   * lines would be wrong — see matchInvoiceToOrders — but this is one order's
-   * worth of billing, arriving in instalments.)
+   * A FILED invoice still wins, and it is better three ways at once: it honours
+   * a manual match someone made standing at the delivery, it survives a re-read
+   * of the document, and it sidesteps the duplicate-SKU problem entirely for
+   * lines that are already decided. More than one invoice against one order is
+   * the BACKORDER case and needs no special handling: each brings only the
+   * lines that point at this order, so they concatenate without competing.
+   * (Concatenating two ORDERS' lines would be wrong — see matchInvoiceToOrders
+   * — but this is one order's worth of billing, arriving in instalments.)
    *
-   * With nothing filed it falls back to `latestRead` exactly as before, which
-   * is what makes day one a no-op and what still covers an attachment nobody
-   * ever filed as an invoice.
+   * Below that, the READINGS, joined into bills and concatenated for the same
+   * reason. This tier is what receiving normally runs on now, and it is why
+   * `latestRead` alone is no longer enough: a delivery billed on two invoices
+   * would otherwise reconcile against whichever was read last and report every
+   * line of the other as never billed. Where the two bills name the same SKU
+   * the matcher refuses to pair either rather than guessing — the same answer
+   * a filed pair gives, since `matchesFromLinks` leaves a second link on one
+   * order line unclaimed.
+   *
+   * `latestRead` remains the floor, and still earns its place: it is the only
+   * tier that covers a document read under some other kind — a packing slip
+   * somebody had read — which is not a bill and so never becomes one above.
    */
   const match = useMemo(() => {
     const filed = linkedInvoices.flatMap((i) => i.lines);
     if (filed.length > 0) return matchesFromLinks(lines, filed);
+    const billed = bills.flatMap((b) => b.lines);
+    if (billed.length > 0) return matchInvoiceToOrder(lines, billed);
     if (source?.extraction) return matchInvoiceToOrder(lines, source.extraction.lines);
     return null;
-  }, [lines, source, linkedInvoices]);
+  }, [lines, source, linkedInvoices, bills]);
+
+  /**
+   * How many BILLS the rows below are reconciled against — what the band's
+   * "n invoices on this order" chip counts.
+   *
+   * It has to name the tier `match` actually came from. Counting the filed
+   * invoices unconditionally would say "1" on a delivery being reconciled
+   * against two unfiled readings, which is the one case the chip exists for.
+   */
+  const billCount = linkedInvoices.some((i) => i.lines.length > 0)
+    ? linkedInvoices.length
+    : bills.length;
 
   /** Whether anything at all is billed — what the fill control's wording and
    *  `fillable`'s never-overwrite rule both turn on. */
@@ -390,11 +420,20 @@ export function Receiving({
    * write tell you what it actually did.
    */
   async function close() {
+    // The paperwork this close can turn into a bill.
+    //
+    // Read FIRST, because the confirm is composed out of it twice: it decides
+    // whether the tick box appears, and it tells `closeReadiness` not to name
+    // a gap that box is about to settle.
+    const unfiled = unfiledReadings(attachments);
     const caveats = closeReadiness(
       lines,
       attachments.length,
       order.location_id,
-      linkedInvoices.length
+      linkedInvoices.length,
+      // What the tick box below is about to offer, so the confirm doesn't name
+      // a gap it is closing in the same breath.
+      unfiled.length
     );
     const message =
       `Close ${order.po_number}?` +
@@ -402,19 +441,23 @@ export function Receiving({
         ? `\n\nStill unresolved:\n· ${caveats.join("\n· ")}\n\nClosing anyway is fine — it just means you're done with this order.`
         : "\n\nEverything is received, reconciled and filed.");
 
-    // The one caveat this screen can now SETTLE rather than merely report
-    // (Mark, 2026-08-27: "after we reconcile/close a PO, the app could ask
-    // 'Generate an Invoice for Purchase Order X?'"). Offered as a ticked box
-    // beside the question, not as a second dialog — `whatFollows`' shape, and
-    // the reason it is one line rather than a chain: two panels for one act
-    // reads as the app second-guessing the answer you just gave.
+    // WHERE A BILL COMES FROM (Mark, 2026-08-27: "after we reconcile/close a
+    // PO, the app could ask 'Generate an Invoice for Purchase Order X?'"; and
+    // 2026-09-01, making this the ordinary route rather than a catch-up:
+    // "created only once a purchase order is reconciled and closed … perhaps
+    // with a confirmation dialogue right before so the user can choose not to
+    // create an invoice"). Offered as a ticked box beside the question, not as
+    // a second dialog — `whatFollows`' shape, and the reason it is one line
+    // rather than a chain: two panels for one act reads as the app
+    // second-guessing the answer you just gave. Ticked, because recording the
+    // bill is what usually happens; untickable, because the person closing the
+    // order is the one who knows when it isn't.
     //
     // FILE, never GENERATE. When a document is on the order the bill exists and
     // this records it; when none is, there is nothing to record and no offer is
     // made. Inventing a bill from the received quantities was considered and
     // dropped (Mark, same day): the orders with no paperwork are internal
     // transfers and prepaid online purchases, which do not produce one.
-    const unfiled = unfiledReadings(attachments);
     const outcome = unfiled.length
       ? await confirmDialogWithOption({
           ...splitConfirmMessage(message),
@@ -648,7 +691,7 @@ export function Receiving({
 
         {source?.extraction && match && (
           <InvoiceSummary
-            invoiceCount={linkedInvoices.length}
+            invoiceCount={billCount}
             poNumber={order.po_number}
             vendorName={order.vendors?.name ?? null}
             extraction={source.extraction}

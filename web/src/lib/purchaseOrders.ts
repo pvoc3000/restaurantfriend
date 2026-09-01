@@ -228,7 +228,24 @@ export function closeReadiness(
    * bill approved next Tuesday — and gating a closed order on it would put the
    * receiving screen at the mercy of the accounts calendar.
    */
-  linkedInvoiceCount = 0
+  linkedInvoiceCount = 0,
+  /**
+   * How many readings the confirm this feeds is OFFERING TO FILE in the same
+   * breath — `unfiledReadings(attachments).length` at both call sites.
+   *
+   * Since filing moved to close (2026-09-01) the "isn't recorded as a bill
+   * yet" caveat would otherwise fire on nearly every order, one line above the
+   * ticked box that settles it — the confirm naming a gap it is simultaneously
+   * offering to close, which reads as the app not knowing what it is about to
+   * do. This module's rule is that a caveat must name something the person can
+   * act on; a caveat they are acting on AS THEY READ IT is the same fault from
+   * the other side, and both teach people to stop reading confirms.
+   *
+   * It suppresses ONLY that clause and only when there is really something to
+   * file. Paperwork nobody has READ produces no offer and still gets named,
+   * which is right: reading it is a step somebody has to take.
+   */
+  offeredReadingCount = 0
 ): string[] {
   const caveats: string[] = [];
   const unreceived = lines.filter((l) => l.qty_received === null).length;
@@ -260,12 +277,13 @@ export function closeReadiness(
     );
   }
   // Two clauses, because they're two different gaps and each has its own
-  // affordance on the screen that shows it: nothing filed at all → Attach;
+  // affordance on the screen that shows it: nothing attached at all → Attach;
   // paperwork on file but no bill recorded → "File as invoice", which sits
-  // right there on the document.
+  // right there on the document — or the ticked box in this very confirm, and
+  // where that box is on offer the clause holds its tongue.
   if (attachmentCount === 0) {
     caveats.push("no invoice or packing slip is attached");
-  } else if (linkedInvoiceCount === 0) {
+  } else if (linkedInvoiceCount === 0 && offeredReadingCount === 0) {
     caveats.push("the paperwork on file isn't recorded as a bill yet");
   }
   return caveats;

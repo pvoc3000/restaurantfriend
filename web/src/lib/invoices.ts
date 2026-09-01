@@ -414,25 +414,105 @@ export function unfiledLines<T extends PrintedLine & { line_no: number | null }>
   existing: (PrintedLine & { line_no?: number | null })[],
   drafts: T[]
 ): T[] {
+  let next = existing.reduce((max, l) => Math.max(max, Number(l.line_no ?? 0)), 0);
+  return surplusLines(existing, drafts).map((draft) => ({ ...draft, line_no: ++next }));
+}
+
+/**
+ * The multiset itself, with no numbering: which of `incoming` is not already
+ * accounted for in `held`.
+ *
+ * Factored out because there are now TWO places that have to agree about when
+ * one page adds to a bill and when it merely repeats it — `unfiledLines`, which
+ * writes rows, and `billsFromReadings`, which reconciles against readings that
+ * have not been written yet. Two spellings of "the same printed line" is
+ * exactly the drift this file keeps warning about, and here it would be
+ * invisible: the two would agree on every ordinary invoice and disagree on the
+ * re-uploaded page, which is the case both exist for.
+ *
+ * Each held line is consumed at most once — see `unfiledLines` for why a
+ * multiset and not a set.
+ */
+function surplusLines<T extends PrintedLine>(
+  held: readonly PrintedLine[],
+  incoming: readonly T[]
+): T[] {
   const have = new Map<string, number>();
-  for (const line of existing) {
+  for (const line of held) {
     const key = linePrint(line);
     have.set(key, (have.get(key) ?? 0) + 1);
   }
-
-  let next = existing.reduce((max, l) => Math.max(max, Number(l.line_no ?? 0)), 0);
   const out: T[] = [];
-  for (const draft of drafts) {
-    const key = linePrint(draft);
+  for (const line of incoming) {
+    const key = linePrint(line);
     const count = have.get(key) ?? 0;
     if (count > 0) {
       have.set(key, count - 1);
       continue;
     }
-    next += 1;
-    out.push({ ...draft, line_no: next });
+    out.push(line);
   }
   return out;
+}
+
+/**
+ * The BILLS an order's paperwork amounts to, before any of it is filed.
+ *
+ * This is `createInvoiceFromReading`'s joining rule — same vendor, same number
+ * — done in the head rather than in the database, and it exists because filing
+ * moved to close (Mark, 2026-09-01). The receiving screen reconciles against
+ * whatever paperwork is on the order, and until that day it could rely on the
+ * FILED invoices to have already been joined and unioned for it. Now they have
+ * not been, so the same three facts have to be worked out from the readings:
+ *
+ *   · two DIFFERENT invoices against one order are a partial shipment, and
+ *     both are billing this delivery — `latestRead` alone would reconcile
+ *     against whichever was read last and report every line of the other as
+ *     unbilled;
+ *   · two readings of ONE number are a re-taken photo or a second page, never
+ *     a second bill;
+ *   · a second page ADDS its lines, a second copy of a page adds nothing.
+ *
+ * A reading with no printed number never joins anything — the same refusal
+ * `filedInvoiceFor` makes, and for the same reason: there is nothing to be
+ * confident on. Two numberless readings of one document therefore read as two
+ * bills, which is what the FILED path does with them too. Parity with what
+ * filing would produce is the whole target here; a cleverer rule would be a
+ * second answer to a question this module has already answered.
+ *
+ * Ordered by when each document was READ, so the pages of one bill line up the
+ * way they were attached.
+ */
+export function billsFromReadings<
+  T extends {
+    kind: string;
+    extraction: InvoiceExtraction | null;
+    extracted_at?: string | null;
+  }
+>(attachments: readonly T[]): { number: string | null; lines: InvoiceLine[] }[] {
+  const readings = attachments
+    // An INVOICE only, `unfiledReadings`' rule: a packing slip may well have
+    // been read and it is not a bill.
+    .filter((a) => a.kind === "invoice" && a.extraction !== null)
+    .sort((a, b) => (a.extracted_at ?? "").localeCompare(b.extracted_at ?? ""));
+
+  const bills: { number: string | null; lines: InvoiceLine[] }[] = [];
+  const byNumber = new Map<string, { number: string | null; lines: InvoiceLine[] }>();
+
+  for (const reading of readings) {
+    const extraction = reading.extraction as InvoiceExtraction;
+    const key = normalizeInvoiceNumber(extraction.invoice_number ?? null);
+    let bill = key === null ? undefined : byNumber.get(key);
+    if (!bill) {
+      // The number as PRINTED, like everywhere else in this module: whoever
+      // reads it is holding the paper.
+      bill = { number: extraction.invoice_number?.trim() || null, lines: [] };
+      bills.push(bill);
+      if (key !== null) byNumber.set(key, bill);
+    }
+    bill.lines.push(...surplusLines(bill.lines, extraction.lines ?? []));
+  }
+  return bills;
 }
 
 /**
