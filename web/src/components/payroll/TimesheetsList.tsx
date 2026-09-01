@@ -36,7 +36,7 @@ import { NewTimesheet } from "./NewTimesheet";
 import { formatCents } from "@/lib/tipPool";
 import {
   OT_DECISION_LABEL,
-  effectiveExclusion,
+  excludedFromTips,
   formatDecimalHours,
   otDisagreements,
   workedHours,
@@ -541,7 +541,7 @@ export function TimesheetsList({
 
   /** This shift's share of its shop-day pool, and whether it takes one at all. */
   const tipShare = (r: TimesheetRow) => ({
-    excluded: effectiveExclusion(r.exclude_tips, r.employee_excludes_tips),
+    excluded: excludedFromTips(r, r.employee_excludes_tips),
     cents:
       (r.location_id
         ? dayPools.get(`${r.location_id}|${r.business_date}`)
@@ -1185,6 +1185,15 @@ function ShiftDetail({
   benefitLines: ShiftBenefitLine[];
 }) {
   const disagreements = otDisagreements(row);
+  /**
+   * WHICH COLUMN HOLDS AN ADJUSTMENT'S HOURS is whatever `NewTimesheet`'s "Paid
+   * as" chose: sick time lands in `sick_hours`, a correction in `hours_regular`.
+   * Tested `!== null` rather than `> 0` so that correcting a sick day DOWN TO
+   * ZERO does not relabel it an Adjustment mid-edit and take its own editor off
+   * the screen.
+   */
+  const paidAsSick = row.sick_hours !== null;
+  const adjustmentHours = paidAsSick ? row.sick_hours : row.hours_regular;
   const payload = row.source_payload ?? {};
   const raw = (k: string) => {
     const v = payload[k];
@@ -1207,18 +1216,43 @@ function ShiftDetail({
           <dl className="grid grid-cols-[7rem_1fr] gap-x-3 gap-y-0.5 text-sm">
             <dt className="text-subtle">Kind</dt>
             <dd>
-              <span className="bg-mark-fill px-1">
-                {(row.sick_hours ?? 0) > 0 ? "Sick day" : "Adjustment"}
-              </span>
+              <span className="bg-mark-fill px-1">{paidAsSick ? "Sick day" : "Adjustment"}</span>
             </dd>
             <dt className="text-subtle">Punches</dt>
             <dd className="text-muted">none — paid time, not a worked shift</dd>
-            {(row.sick_hours ?? 0) > 0 && (
-              <>
-                <dt className="text-subtle">Sick hours</dt>
-                <dd className="tabular-nums">{(row.sick_hours ?? 0).toFixed(2)}</dd>
-              </>
-            )}
+            {/* EDITABLE, WHICH IT WAS NOT (Mark, 2026-09-01: "I entered a sick
+                timesheet, accidentally entered the wrong hours and want to
+                correct it"). The figure was plain text here, and the column that
+                holds it — Sick — is `hideWhenCompact`, so on any window under
+                1280 a hand-entered sick day had no editor anywhere on the
+                screen. It is the same `InlineValue` on the same column the grid
+                cell uses, so a correction made here and one made there are one
+                act. */}
+            <dt className="text-subtle">{paidAsSick ? "Sick hours" : "Paid hours"}</dt>
+            <dd className="tabular-nums">
+              {editable ? (
+                <InlineValue
+                  table="timesheets"
+                  id={row.id}
+                  column={paidAsSick ? "sick_hours" : "hours_regular"}
+                  kind="number"
+                  value={adjustmentHours}
+                  ariaLabel={paidAsSick ? "Sick hours" : "Paid hours"}
+                  // These hours ARE the row — an adjustment with none pays
+                  // nothing and says nothing — so clearing the cell asks for a
+                  // value rather than writing null. It would also flip
+                  // `paidAsSick`, relabel the row Adjustment, and move its own
+                  // editor onto a different column mid-correction. Zero is
+                  // still enterable; it is a value, not an empty box.
+                  nullable={false}
+                  format={(v) => Number(v).toFixed(2)}
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>
+                  {adjustmentHours === null ? "—" : adjustmentHours.toFixed(2)}
+                </span>
+              )}
+            </dd>
             <dt className="text-subtle">Entered</dt>
             <dd>{row.source === "manual" ? "by hand, on this screen" : row.source}</dd>
           </dl>
@@ -1227,7 +1261,7 @@ function ShiftDetail({
               the tip pool, and are DELIBERATELY absent from the Gusto file —
               Gusto pays them already, and exporting them pays the person
               twice. */}
-          {(row.sick_hours ?? 0) > 0 && (
+          {paidAsSick && (
             <p className="max-w-[40ch] pt-1 text-[12px] leading-snug text-muted">
               Sick hours earn no overtime and are kept out of the payroll export
               — Gusto pays them already.
@@ -1426,7 +1460,11 @@ function ShiftDetail({
         result={pool?.result ?? null}
         tipHours={pool?.result?.allocations.find((a) => a.id === row.id)?.tipHours ?? 0}
         allocationCents={pool?.result?.allocations.find((a) => a.id === row.id)?.cents ?? null}
-        excluded={effectiveExclusion(row.exclude_tips, row.employee_excludes_tips)}
+        excluded={excludedFromTips(row, row.employee_excludes_tips)}
+        // 028's `adjustment` kind is paid time that produced no punch, so it has
+        // no tip hours and can never take a share. The block states that instead
+        // of offering a tri-state whose third option could not take effect.
+        paidNotWorked={row.kind === "adjustment"}
         excludeTips={row.exclude_tips}
         employeeExcludesTips={row.employee_excludes_tips}
         editable={editable}

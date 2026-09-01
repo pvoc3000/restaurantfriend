@@ -11,6 +11,7 @@ import {
   sourceHours,
   otDisagreements,
   effectiveExclusion,
+  excludedFromTips,
   formatHours,
   formatDecimalHours,
   type Timesheet,
@@ -143,6 +144,33 @@ test("effectiveExclusion(false, true) === false — the THIRD state", () => {
   no(effectiveExclusion(false, true), "included despite the person-level default");
   // And the ordinary override in the other direction.
   ok(effectiveExclusion(true, false), "excluded for this shift only");
+});
+
+/* -- an adjustment is never in the pool ------------------------------------ */
+
+test("excludedFromTips: an adjustment is excluded whatever the flags say", () => {
+  // The reason it is derived rather than stored: seven real sick days were
+  // already on file carrying exclude_tips = null, and read "—" in the Tips
+  // column, which means "nobody has divided this day yet".
+  ok(excludedFromTips(sheet({ kind: "adjustment" }), false), "null flag, included person");
+  ok(excludedFromTips(sheet({ kind: "adjustment", exclude_tips: false }), false), "explicitly included");
+  ok(excludedFromTips(sheet({ kind: "adjustment", exclude_tips: true }), true), "belt and braces");
+});
+
+test("excludedFromTips: a worked shift still answers through the tri-state", () => {
+  no(excludedFromTips(sheet(), false), "ordinary shift, ordinary person");
+  ok(excludedFromTips(sheet(), true), "inherits an excluded person");
+  no(excludedFromTips(sheet({ exclude_tips: false }), true), "the THIRD state survives");
+  ok(excludedFromTips(sheet({ exclude_tips: true }), false), "excluded for this shift only");
+});
+
+test("excludedFromTips: an UNFINISHED shift is not excluded — it is unfinished", () => {
+  // Keying on "no hours" instead of on the kind would conflate the two, and
+  // report a punch nobody closed as a deliberate exclusion from the pool. 184
+  // rows in the FileMaker history have a clock-in and no clock-out.
+  const open = sheet({ clock_in: "2026-07-24T14:00:00Z", clock_out: null });
+  eq(workedHours(open), null, "no hours to divide");
+  no(excludedFromTips(open, false), "still in the pool once somebody closes it");
 });
 
 /* -- display --------------------------------------------------------------- */

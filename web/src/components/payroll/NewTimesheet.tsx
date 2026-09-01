@@ -197,6 +197,12 @@ export function NewTimesheet({
       let breakMinutes: number | null = null;
       // Sick hours are NOT worked hours: they earn no overtime, they never enter
       // the tip pool, and decision 7 keeps them out of the Gusto file entirely.
+      //
+      // `exclude_tips` is deliberately LEFT NULL. That an adjustment takes no
+      // share is a fact about the kind, not a decision anybody made, so it is
+      // derived by `excludedFromTips` — which is also right about the rows
+      // entered before this. Writing it here as well would be two answers to
+      // one question, and the one in the column would be the stale one.
       let sick: number | null = null;
       let regular = 0;
 

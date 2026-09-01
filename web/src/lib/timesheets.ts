@@ -136,6 +136,36 @@ export function effectiveExclusion(shiftFlag: boolean | null, personDefault: boo
   return shiftFlag ?? personDefault;
 }
 
+/**
+ * Whether this row takes a share of its shop-day's pool at all.
+ *
+ * THE ADJUSTMENT CASE IS STRUCTURAL, NOT A DECISION, which is why it is derived
+ * here rather than written into `exclude_tips` when the row is created (Mark,
+ * 2026-09-01: "when adding sick timesheet, tips should automatically be
+ * excluded"). A tip hour is an hour WORKED — clock to clock, minus the meal —
+ * and 028's `adjustment` kind is paid time that produced no punch, so it has
+ * none and never could. `allocateTips` has always given it nothing, by
+ * filtering on `hours > 0`; what it had no way to say was WHY, so seven real
+ * sick days read "—" in the Tips column, which means "nobody has divided this
+ * day yet".
+ *
+ * Stored, this would be two answers to one question — and the tri-state would
+ * then offer "Included despite the default" on a row that receives nothing
+ * whatever you pick. Derived, it is right about the rows already entered, and
+ * cannot be set to a lie.
+ *
+ * NOTE THE CASE THIS DELIBERATELY DOES NOT COVER: an unfinished shift (a punch
+ * in with no punch out) also has no hours and also gets nothing, and it is NOT
+ * excluded — it is not finished. Keying on zero hours would conflate the two;
+ * keying on the kind does not.
+ */
+export function excludedFromTips(
+  t: Pick<Timesheet, "kind" | "exclude_tips">,
+  personDefault: boolean
+): boolean {
+  return t.kind === "adjustment" || effectiveExclusion(t.exclude_tips, personDefault);
+}
+
 /** `1:23` from 1.383 hours — how long a shift reads, not a decimal. */
 export function formatHours(hours: number | null): string {
   if (hours === null || !Number.isFinite(hours)) return "—";

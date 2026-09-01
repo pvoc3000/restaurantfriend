@@ -240,6 +240,7 @@ export function ShiftTips({
   tipHours,
   allocationCents,
   excluded,
+  paidNotWorked,
   excludeTips,
   employeeExcludesTips,
   editable,
@@ -256,8 +257,16 @@ export function ShiftTips({
   tipHours: number;
   /** This shift's share, in cents. */
   allocationCents: number | null;
-  /** True when this shift takes nothing — by the person's default or an override. */
+  /** True when this shift takes nothing — for any of the three reasons below. */
   excluded: boolean;
+  /**
+   * 028's `adjustment` kind: paid time that produced no punch, so it has no tip
+   * hours and never could. That is a FACT about the row rather than a decision
+   * somebody made, so the block states it and withholds the tri-state — a
+   * picker offering "Included despite the default" here would change nothing
+   * whichever way it was set. See `excludedFromTips`.
+   */
+  paidNotWorked: boolean;
   /** The row's own tri-state: null inherits the person's default. */
   excludeTips: boolean | null;
   /** `employees.excludes_tips` — the durable flag the null inherits from. */
@@ -331,7 +340,11 @@ export function ShiftTips({
         )}
         <dt className="text-subtle">This shift</dt>
         <dd className="tabular-nums">
-          {excluded ? (
+          {paidNotWorked ? (
+            <span className="text-muted">
+              excluded — paid time, not hours on the floor
+            </span>
+          ) : excluded ? (
             <span className="text-muted">excluded from the pool</span>
           ) : allocationCents === null ? (
             <span className="text-faint">—</span>
@@ -351,12 +364,18 @@ export function ShiftTips({
             scanning a pay period. */}
         <dt className="text-subtle">In pool</dt>
         <dd>
-          <TipExclusion
-            timesheetId={timesheetId}
-            excludeTips={excludeTips}
-            employeeExcludesTips={employeeExcludesTips}
-            editable={editable}
-          />
+          {paidNotWorked ? (
+            <span className={`${READ_ONLY_VALUE} text-muted`}>
+              No — a tip hour is an hour worked
+            </span>
+          ) : (
+            <TipExclusion
+              timesheetId={timesheetId}
+              excludeTips={excludeTips}
+              employeeExcludesTips={employeeExcludesTips}
+              editable={editable}
+            />
+          )}
         </dd>
       </dl>
 
