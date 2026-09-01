@@ -338,14 +338,23 @@ export function PrintPacket({
                   <span className="font-medium">{p.label}</span>
                   {/* COUNTED, because this is the one part whose size is not
                       implied by the nights you selected — the others are one
-                      document per schedule or per kitchen. And it says NONE
-                      rather than going quiet, which is the point of it: an
-                      absent row and a row reading none are the same picture to
-                      somebody wondering whether the app looked. */}
+                      document per schedule or per kitchen. And it SPEAKS at
+                      zero rather than going quiet, which is the point of it: an
+                      absent row and a row reading nothing are the same picture
+                      to somebody wondering whether the app looked.
+
+                      "NOTHING TO PRINT", NOT "NONE" (Mark, 2026-09-01). Beside
+                      a TICKED box, "None" has a second reading — none INCLUDED
+                      — which is the opposite of the truth: they are included,
+                      there simply are not any. The two states are deliberately
+                      different registers, and that is the same call the PO
+                      status chips make: with orders you want to know HOW MANY,
+                      and with none you want the answer you came for rather than
+                      the numeral zero. */}
                   {p.key === "special" ? (
                     <span className="text-muted">
                       {orderIds.length === 0
-                        ? "None"
+                        ? "Nothing to print"
                         : `${orderIds.length} ${orderIds.length === 1 ? "order" : "orders"}`}
                     </span>
                   ) : null}
