@@ -77,7 +77,7 @@ const READY: ReadinessInput = {
   shift: "closing",
   narrative: "Busy but steady.",
   ratingCount: 3,
-  taskRatingsDone: true,
+  missedBreaksWithoutReason: 0,
   taskSpecialOrdersDone: true,
   taskSchedulesDone: true,
   netSalesCents: 133307,
@@ -170,17 +170,28 @@ test("no sales figure is NEVER a caveat — Square types it, there is no act to 
   eq(submitReadiness({ ...READY, netSalesCents: null }), []);
 });
 
-test("unrated staff are named whether or not anybody was rated", () => {
-  ok(
-    submitReadiness({ ...READY, taskRatingsDone: false, ratingCount: 0 })[0].includes(
-      "No staff have been rated"
-    )
-  );
-  ok(
-    submitReadiness({ ...READY, taskRatingsDone: false, ratingCount: 1 })[0].includes(
-      "1 person has"
-    )
-  );
+test("an EMPTY employee list is named; a filled one is not nagged about", () => {
+  // Mark, 2026-09-01, removing the "I've rated everybody" checkbox: "we aren't
+  // making sure the user is filling out the report completely". So the caveat
+  // is derived from the rows and fires only on the one state that IS
+  // observable — nobody added at all. One rated person is not incomplete, it is
+  // a shift with one person on it.
+  eq(submitReadiness({ ...READY, ratingCount: 0 }), ["No employees have been added."]);
+  eq(submitReadiness({ ...READY, ratingCount: 1 }), []);
+});
+
+test("A MISSED BREAK WITH NO REASON IS NAMED, because the premium is skipped", () => {
+  // Not tidiness: 032 requires a reason for an `owed` premium, so
+  // `submit_shift_report` writes NO `break_premiums` row for these and names
+  // them in a receipt nobody reads. This is an hour of somebody's pay, said
+  // before the send instead of after.
+  const one = submitReadiness({ ...READY, missedBreaksWithoutReason: 1 });
+  eq(one, [
+    "1 employee missed a break with no reason given, so that premium will not be recorded.",
+  ]);
+  const two = submitReadiness({ ...READY, missedBreaksWithoutReason: 2 });
+  ok(two[0].includes("2 employees"), two[0]);
+  ok(two[0].includes("those premiums"), two[0]);
 });
 
 // ---------------------------------------------------------------------------
@@ -292,7 +303,9 @@ const REPORT: EmailReport = {
   salesAreProvisional: true,
   lastWeekNetCents: 181519,
   lastYearNetCents: 171399,
-  premades: [{ name: "Angry Samoa", par: 12, made: 12, leftover: 3 }],
+  premades: [
+    { name: "Angry Samoa", par: 12, made: 12, leftover: 3, note: "Dropped a tray, re-fried" },
+  ],
   elements: [],
   // A realistic outstanding list, ON THE SHARED REPORT for the same reason the
   // checklist is: the privacy sweep, the composition identity and the style
@@ -393,6 +406,17 @@ test("both emails carry the shift facts a supervisor needs", () => {
     // `managementBody` and the supervisor iteration of this loop fails.
     ok(body.includes("Compressor icing again"), "the flagged issue");
     ok(body.includes("expected 34–40 °F"), "the bound it missed");
+  }
+});
+
+test("the supervisor's note on a count reaches the email", () => {
+  // Migration 081. "18 made, 0 left" and the same with "dropped a tray,
+  // re-fried" are different nights, and the second is the one worth an email.
+  // NB this is the count's note, never `production_schedule_items.note` — that
+  // one is an instruction the kitchen already worked from, and 081's header is
+  // where the distinction is written down.
+  for (const body of [supervisorBody(REPORT), managementBody(REPORT)]) {
+    ok(body.includes("Dropped a tray, re-fried"), "the note reached the email");
   }
 });
 

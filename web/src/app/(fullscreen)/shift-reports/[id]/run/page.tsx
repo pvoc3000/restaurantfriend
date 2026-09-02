@@ -66,6 +66,34 @@ async function ratingsQuery(supabase: SupabaseClient, reportId: string) {
     .order("created_at");
 }
 
+/**
+ * The draft counts, with a ONE-SHOT RETRY without `note`.
+ *
+ * 081 adds that column and migrations are applied by hand, so between a deploy
+ * and the SQL editor this select would 400 — and because the whole draft map
+ * would come back null, EVERY count already typed would render as empty. A
+ * supervisor mid-shift would reasonably conclude the report had lost their
+ * work.
+ *
+ * `ratingsQuery`'s pattern, thirty lines up and there for exactly this reason
+ * (071's `break_started_at`): ask for everything, and if the message names the
+ * new column, ask again without it. The note then reads as unrecorded, which is
+ * precisely what it is until the migration runs.
+ */
+async function countsQuery(supabase: SupabaseClient, reportId: string) {
+  const full = await supabase
+    .from("shift_report_counts")
+    .select("schedule_item_id, made, leftover, note")
+    .eq("report_id", reportId);
+
+  if (!full.error || !/note/.test(full.error.message)) return full;
+
+  return supabase
+    .from("shift_report_counts")
+    .select("schedule_item_id, made, leftover")
+    .eq("report_id", reportId);
+}
+
 /** The packet's comparator over the runner's own row shape. */
 const compareRows = (a: PremadeRow, b: PremadeRow) =>
   compareForPremadeSheet(
@@ -364,10 +392,7 @@ export default async function RunShiftReportPage({
         .select("id, item_name, item_type, subtype, par, note, sort")
         .eq("schedule_id", todaySchedule.id as string)
         .order("sort"),
-      supabase
-        .from("shift_report_counts")
-        .select("schedule_item_id, made, leftover")
-        .eq("report_id", id),
+      countsQuery(supabase, id),
     ]);
     const draftById = new Map(
       ((drafts as Record<string, unknown>[] | null) ?? []).map((d) => [
@@ -386,7 +411,10 @@ export default async function RunShiftReportPage({
         par: l.par === null ? null : Number(l.par),
         made: d?.made == null ? null : Number(d.made),
         leftover: d?.leftover == null ? null : Number(d.leftover),
+        // TWO NOTES, kept apart: the schedule's instruction and the
+        // supervisor's own. See `PremadeRow`.
         note: (l.note as string | null) ?? null,
+        countNote: (d?.note as string | null) ?? null,
       };
     });
     // THE ORDER OF THE PRINTED SHEET, not the schedule's own `sort` (Mark,
@@ -497,7 +525,13 @@ export default async function RunShiftReportPage({
     shift,
     narrative: (report.narrative as string | null) ?? null,
     ratingCount: ratingRows.length,
-    taskRatingsDone: report.task_ratings_done as boolean,
+    // The rows the flush will REFUSE to write a premium for — 032 requires a
+    // reason for `owed`, so `submit_shift_report` skips these and names them in
+    // its receipt. Counted here so the submit page and the email say it before
+    // the send rather than after.
+    missedBreaksWithoutReason: ratingRows.filter(
+      (r) => r.gotBreak === false && (r.breakReason ?? "").trim() === ""
+    ).length,
     taskSpecialOrdersDone: report.task_special_orders_done as boolean,
     taskSchedulesDone: report.task_schedules_done as boolean,
     netSalesCents,
@@ -535,7 +569,6 @@ export default async function RunShiftReportPage({
         rows={ratingRows}
         roster={roster}
         positions={positions}
-        ratingsDone={report.task_ratings_done as boolean}
         editable={editable}
       />
     ),
@@ -672,6 +705,10 @@ export default async function RunShiftReportPage({
       par: r.par,
       made: r.made,
       leftover: r.leftover,
+      // The SUPERVISOR's note, not the schedule's instruction: the email
+      // reports the night, and what the kitchen was asked to do is already on
+      // the packet they were handed.
+      note: r.countNote,
     })),
     elements: elementRows.map((r) => ({
       name: r.elementName,

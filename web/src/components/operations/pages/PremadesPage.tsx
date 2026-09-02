@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { CountField } from "./fields";
+import { CountField, TextField } from "./fields";
 
 export type PremadeRow = {
   scheduleItemId: string;
@@ -14,7 +14,20 @@ export type PremadeRow = {
   par: number | null;
   made: number | null;
   leftover: number | null;
+  /**
+   * The SCHEDULE's own note — an instruction, snapshotted at generation and
+   * printed on the packet as what the kitchen was told to make.
+   */
   note: string | null;
+  /**
+   * The SUPERVISOR's note about this count — migration 081.
+   *
+   * A different fact from `note` and kept apart from it deliberately: one is
+   * the order, the other is what happened to it. Writing the second over the
+   * first would corrupt a document somebody has already worked from, which is
+   * why 081 adds a column rather than flushing through to the schedule line.
+   */
+  countNote: string | null;
 };
 
 /**
@@ -59,7 +72,14 @@ export function PremadesPage({
         )
         .select("id");
       if (error) {
-        setFailed(error.message);
+        // Name the migration when the message names the column — the same
+        // courtesy every other screen in this app extends, and here the fix is
+        // one `alter table` rather than anything the reader did wrong.
+        setFailed(
+          /note/.test(error.message)
+            ? `${error.message} — if this names a missing column, migration 081 has not been applied yet.`
+            : error.message
+        );
         return;
       }
       setFailed(null);
@@ -155,7 +175,24 @@ export function PremadesPage({
                   ariaLabel={`Left over, ${r.name}`}
                 />
               </td>
-              <td className="py-2 pl-4 text-[15px] text-muted">{r.note ?? ""}</td>
+              {/* TWO NOTES IN ONE COLUMN'S WIDTH — PO detail's Item cell in
+                  another costume. The schedule's own note sits above as muted
+                  context (it is what the kitchen was ASKED to do, and it is
+                  worth having in front of you while you count), and the field
+                  below is the supervisor's own. Most lines have neither, so the
+                  cell is usually just the box. */}
+              <td className="py-2 pl-4 align-top">
+                {r.note ? (
+                  <p className="pb-1 text-[13px] leading-snug text-muted">{r.note}</p>
+                ) : null}
+                <TextField
+                  value={r.countNote}
+                  onCommit={(next) => save(r.scheduleItemId, { note: next })}
+                  disabled={!editable}
+                  placeholder="Note"
+                  ariaLabel={`Note, ${r.name}`}
+                />
+              </td>
             </tr>
           ))}
         </tbody>

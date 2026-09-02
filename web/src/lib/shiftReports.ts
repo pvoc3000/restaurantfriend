@@ -42,7 +42,11 @@ export type ShiftReportPage =
 /** FMP printed these in the black band: "SHIFT REPORT — PAGE 3 OF 7 — SALES". */
 export const PAGE_TITLE: Record<ShiftReportPage, string> = {
   info: "Info",
-  ratings: "Ratings",
+  // "Employees" rather than "Ratings" (Mark, 2026-09-01). The page is a list
+  // of the people who worked the shift; rating them is one of the things you do
+  // to a row, alongside the break question, and naming the page after one
+  // column made the others read as extras.
+  ratings: "Employees",
   sales: "Sales",
   premades: "Premades",
   elements: "Elements made",
@@ -120,7 +124,22 @@ export type ReadinessInput = {
   shift: ShiftSlot;
   narrative: string | null;
   ratingCount: number;
-  taskRatingsDone: boolean;
+  /**
+   * Employees marked as having missed a break with NO reason typed.
+   *
+   * A COUNT, never names — this reaches the supervisor email through
+   * `outstanding`, and that email is the one document in this app that
+   * deliberately carries no employee's name.
+   *
+   * It earns a caveat where "you have not ticked a box" no longer does, and the
+   * difference is money rather than tidiness: `submit_shift_report` REFUSES to
+   * write a `break_premiums` row without a reason — 032's constraint requires
+   * one for `owed` — so it skips the premium and names it in the receipt. A
+   * missed break with no reason is an hour of somebody's pay not recorded, and
+   * until now the only place that was said was a yellow mark on the row, which
+   * the person filing the report has already paged past.
+   */
+  missedBreaksWithoutReason: number;
   taskSpecialOrdersDone: boolean;
   taskSchedulesDone: boolean;
   /** Null when Square has not reported the day yet, which is the normal case. */
@@ -154,11 +173,27 @@ export function submitReadiness(input: ReadinessInput): string[] {
     caveats.push("The shift report itself is empty.");
   }
 
-  if (!input.taskRatingsDone) {
+  // DERIVED FROM THE ROWS, not from a flag (Mark, 2026-09-01: "I don't see the
+  // value in the checkbox 'I've rated everybody who worked the shift'. We aren't
+  // making sure the user is filling out the report completely").
+  //
+  // He is right, and it is the readiness rule applied to itself: this list
+  // exists to say what is MISSING, not to collect an acknowledgement that
+  // nothing is. "You have not ticked the box" was a caveat about the caveat.
+  // An empty page is still worth saying, because that one is observable.
+  //
+  // `task_ratings_done` therefore has no writer and no reader left. The column
+  // stays — 070 is applied and a boolean nobody sets costs nothing — but
+  // nothing in `web/src` touches it.
+  if (input.ratingCount === 0) {
+    caveats.push("No employees have been added.");
+  }
+
+  if (input.missedBreaksWithoutReason > 0) {
+    const n = input.missedBreaksWithoutReason;
     caveats.push(
-      input.ratingCount === 0
-        ? "No staff have been rated."
-        : `${input.ratingCount} ${input.ratingCount === 1 ? "person has" : "people have"} been rated, but the page is not marked done.`
+      `${n} ${n === 1 ? "employee" : "employees"} missed a break with no reason given` +
+        `, so ${n === 1 ? "that premium" : "those premiums"} will not be recorded.`
     );
   }
 
@@ -331,7 +366,14 @@ export type EmailReport = {
   salesAreProvisional: boolean;
   lastWeekNetCents: number | null;
   lastYearNetCents: number | null;
-  premades: { name: string; par: number | null; made: number | null; leftover: number | null }[];
+  premades: {
+    name: string;
+    par: number | null;
+    made: number | null;
+    leftover: number | null;
+    /** The supervisor's note about this count — migration 081. */
+    note: string | null;
+  }[];
   elements: { name: string; yield: string | null; status: string | null }[];
   ratings: EmailRating[];
   /**
@@ -603,12 +645,18 @@ export function supervisorBody(report: EmailReport): string {
     parts.push(
       `<h3 style="${S.h3}">Premades</h3><table style="${S.table}"><tr>` +
         `<th style="${S.th}">Item</th><th style="${S.thr}">Par</th>` +
-        `<th style="${S.thr}">Made</th><th style="${S.thr}">Left</th></tr>`
+        `<th style="${S.thr}">Made</th><th style="${S.thr}">Left</th>` +
+        `<th style="${S.th}">Note</th></tr>`
     );
     for (const p of report.premades) {
       parts.push(
         `<tr><td style="${S.td}">${esc(p.name)}</td><td style="${S.tdr}">${p.par ?? "—"}</td>` +
-          `<td style="${S.tdr}">${p.made ?? "—"}</td><td style="${S.tdr}">${p.leftover ?? "—"}</td></tr>`
+          `<td style="${S.tdr}">${p.made ?? "—"}</td><td style="${S.tdr}">${p.leftover ?? "—"}</td>` +
+          // The column that makes the three numbers mean something: "18 made, 0
+          // left" and the same with "dropped a tray, re-fried" are different
+          // nights. Empty is a thin space rather than an em dash — a dash in
+          // every row of a mostly-empty column is louder than the notes.
+          `<td style="${S.td}">${esc(p.note ?? "")}</td></tr>`
       );
     }
     parts.push("</table>");

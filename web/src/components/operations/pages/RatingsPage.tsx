@@ -50,7 +50,6 @@ export function RatingsPage({
   rows,
   roster,
   positions,
-  ratingsDone,
   editable,
 }: {
   reportId: string;
@@ -59,18 +58,6 @@ export function RatingsPage({
   roster: PickOption[];
   /** The shop's own vocabulary — `employees.position`, "DF", "Sr. DF". */
   positions: PickOption[];
-  /**
-   * `task_ratings_done` — "I have rated everybody I meant to".
-   *
-   * IT LIVES HERE NOW, not on the submit page (Mark, 2026-09-01, on removing
-   * that page's checkboxes). It is the one of 070's three task flags that
-   * nothing else can observe: the app knows how many ratings exist, and cannot
-   * know how many people worked, so "done" is a claim only the supervisor can
-   * make. Its two siblings are already ticked where their work happens — page 7
-   * and the packet — and this was the odd one out, asked about on a page whose
-   * job is to report rather than to collect.
-   */
-  ratingsDone: boolean;
   editable: boolean;
 }) {
   const router = useRouter();
@@ -81,24 +68,6 @@ export function RatingsPage({
 
   const rated = new Set(rows.map((r) => r.employeeId));
   const available = roster.filter((r) => !rated.has(r.value));
-
-  function setDone(next: boolean) {
-    startTransition(async () => {
-      // `.select()` like every write here: an update matching no policy changes
-      // nothing and returns NO error, so a bare one would tick a box that the
-      // next refresh puts straight back.
-      const { error } = await supabase
-        .from("shift_reports")
-        .update({ task_ratings_done: next })
-        .eq("id", reportId)
-        .select("id");
-      if (error) {
-        setFailed(error.message);
-        return;
-      }
-      router.refresh();
-    });
-  }
 
   function patch(id: string, values: Record<string, string | number | boolean | null>) {
     startTransition(async () => {
@@ -138,9 +107,51 @@ export function RatingsPage({
     <div className="mx-auto max-w-4xl space-y-6">
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
 
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted">Nobody has been rated yet.</p>
-      ) : null}
+      {/* THE COMMAND SITS TOP RIGHT (Mark, 2026-09-01), where every list in
+          this app puts its create — `New shift report`, `New timesheet`, the
+          create beside a list's title. It was at the FOOT, under the rows, so
+          on a shift with six people the way to add a seventh was below all six.
+
+          The row is always here, so nothing moves as employees are added, and
+          the picker opens IN PLACE of the button rather than beside it — the
+          same swap it always did, now at the top. */}
+      <div className="flex min-h-9 flex-wrap items-center justify-between gap-4">
+        <p className="text-sm text-muted">
+          {rows.length === 0 ? "No Employees" : ""}
+        </p>
+        {editable ? (
+          adding === null ? (
+            <button
+              type="button"
+              className={BUTTON_CLASS}
+              // Rendered and DISABLED rather than hidden once everybody is on
+              // the list — `NewTimesheet`'s rule, and here it also keeps the
+              // header from changing width as the last person is added.
+              disabled={available.length === 0}
+              title={
+                available.length === 0
+                  ? "Everybody on the roster is already on this report."
+                  : undefined
+              }
+              onClick={() => setAdding("")}
+            >
+              Add Employee
+            </button>
+          ) : (
+            <PickList
+              value={null}
+              options={available}
+              onPick={add}
+              onClose={() => setAdding(null)}
+              defaultOpen
+              placeholder="Who worked this shift?"
+              variant="field"
+              panelMinWidth={300}
+              ariaLabel="Add an employee to this report"
+            />
+          )
+        ) : null}
+      </div>
 
       {rows.map((row) => (
         <div key={row.id} className="space-y-3 border border-hairline p-4">
@@ -265,41 +276,6 @@ export function RatingsPage({
         </div>
       ))}
 
-      {editable ? (
-        /* THE ONE THING THIS PAGE CANNOT DERIVE. Everything else on the submit
-           page's outstanding list is counted from rows; this is a person saying
-           they are finished, and it is asked where the work is. */
-        <label className="flex items-center gap-3 border-t border-hairline pt-5">
-          <Checkbox
-            checked={ratingsDone}
-            onChange={(next) => setDone(next)}
-            label="Staff reviews are done"
-          />
-          <span className="text-[16px]">
-            I&rsquo;ve rated everybody who worked this shift
-          </span>
-        </label>
-      ) : null}
-
-      {editable && available.length > 0 ? (
-        adding === null ? (
-          <button type="button" className={BUTTON_CLASS} onClick={() => setAdding("")}>
-            Rate somebody
-          </button>
-        ) : (
-          <PickList
-            value={null}
-            options={available}
-            onPick={add}
-            onClose={() => setAdding(null)}
-            defaultOpen
-            placeholder="Who worked this shift?"
-            variant="field"
-            panelMinWidth={300}
-            ariaLabel="Add an employee to rate"
-          />
-        )
-      ) : null}
     </div>
   );
 }

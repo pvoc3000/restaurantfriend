@@ -68,9 +68,13 @@ export function ChecklistPage({
     return (
       <div className="space-y-4">
         <p className="max-w-[60ch] text-[16px]">
-          {askedFor.length > 0
-            ? `This shift is asked for ${askedFor.length === 1 ? "a checklist" : `${askedFor.length} checklists`}, and ${askedFor.length === 1 ? "it has" : "none has"} not been started.`
-            : "No checklist is set up for this shift at this shop."}
+          {askedFor.length === 0
+            ? "No checklist is set up for this shift at this shop."
+            : askedFor.length === 1
+              ? // It is being started as this renders, so the sentence says what
+                // is happening rather than what has not happened.
+                "This shift is asked for a checklist."
+              : `This shift is asked for ${askedFor.length} checklists, and none has been started.`}
         </p>
         {askedFor.length > 0 && (
           <ul className="space-y-1 text-[16px]">
@@ -89,6 +93,10 @@ export function ChecklistPage({
             reportDate={reportDate}
             shift={shift}
             askedFor={askedFor}
+            // ONE candidate starts itself; two are a choice. Gated on
+            // `editable` so opening somebody else's report, or a sent one,
+            // never creates a record.
+            autoStart={editable}
           />
         )}
         {askedFor.length === 0 && (

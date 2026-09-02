@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { itemAppliesOn, runItemSort } from "@/lib/checklists";
@@ -13,6 +13,21 @@ import { itemAppliesOn, runItemSort } from "@/lib/checklists";
  * report: the DATE is the report's own (so the two can never disagree about
  * which day they are, which is the module's highest-risk bug), and the new run
  * carries `shift_report_id` so the link is an FK rather than a tuple guess.
+ *
+ * IT STARTS ITSELF WHEN THERE IS EXACTLY ONE (Mark, 2026-09-01: "if there's
+ * only one suggestion, just go ahead and start it. Don't require the user to
+ * start it"). With one candidate the button asks a question that has one
+ * answer — you reached this page because the shift is asked for that list.
+ *
+ * ONLY WITH EXACTLY ONE, which is the whole guard: with two, starting one of
+ * them is a CHOICE, and picking for somebody is worse than asking.
+ *
+ * The write happens in the promise's own turn rather than synchronously in the
+ * effect body, which is what the `set-state-in-effect` lint wants and is the
+ * same shape the Sales page's auto-pull uses. `started` is a REF: it must not
+ * re-render, and it guards React's development double-invoke as well as any
+ * later re-render — two runs for one night would be two checklists and one of
+ * them orphaned.
  */
 export function LinkChecklistRun({
   reportId,
@@ -21,6 +36,7 @@ export function LinkChecklistRun({
   reportDate,
   shift,
   askedFor,
+  autoStart = false,
 }: {
   reportId: string;
   orgId: string;
@@ -28,11 +44,31 @@ export function LinkChecklistRun({
   reportDate: string;
   shift: string;
   askedFor: { id: string; name: string }[];
+  /**
+   * Start the single candidate without being asked.
+   *
+   * False on a report nobody may edit — a read-only visit must not create a
+   * record — so the caller decides rather than this inferring it.
+   */
+  autoStart?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
+  const started = useRef(false);
+
+  const only = askedFor.length === 1 ? askedFor[0] : null;
+
+  useEffect(() => {
+    if (!autoStart || !only || started.current) return;
+    started.current = true;
+    start(only.id);
+    // `start` is stable enough for this: it closes over props that cannot
+    // change without the page re-rendering from the server, and the ref makes a
+    // second call impossible either way.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoStart, only?.id]);
 
   if (askedFor.length === 0) return null;
 
@@ -143,6 +179,15 @@ export function LinkChecklistRun({
       }
       router.refresh();
     });
+  }
+
+  if (autoStart && only) {
+    return (
+      <div className="space-y-2">
+        <p className="text-[16px] text-muted">Starting {only.name}&hellip;</p>
+        {failed && <p className="text-[14px] text-accent">{failed}</p>}
+      </div>
+    );
   }
 
   return (
