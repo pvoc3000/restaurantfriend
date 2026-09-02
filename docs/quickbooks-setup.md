@@ -104,6 +104,31 @@ have just overwritten somebody's edit. Only ever once, and only on an update: a
 new document cannot be stale, and retrying one that failed for another reason
 is how you write it twice.
 
+### Where every Intuit credential lives
+
+This is the answer to Intuit's app-assessment questions, and it is written down
+because a wrong guess there cost one rejection (2026-09-02).
+
+| | where | who can read it |
+|---|---|---|
+| **client id + client secret** | Supabase **Edge Function secret** `QBO_CREDS` | only the two functions, at runtime. Never in git, never in the database, never in the web app |
+| **refresh token, access token** | one row of `accounting_connections` | **nothing but the functions.** Migration 081 gave that table RLS with **zero policies** — not even SELECT — so no signed-in role can read it; the functions reach it with the service_role key, which exists only in the function runtime |
+| **realm id** (Intuit calls it the customer id) | the same row | the same. Since **086** it is never returned to the browser at all |
+
+Three consequences worth being able to state:
+
+- **The browser is never given any of it.** `accounting_connection_status()` is
+  the only way the app learns anything about the connection, and it names its
+  columns one by one — status, environment, the chosen account/item/tax code,
+  when the sign-in expires. No token, no secret, no realm id.
+- **The client id is never in a response this app serves.** Connecting hands the
+  browser a one-time handshake token; `qbo-oauth?start=…` builds Intuit's
+  consent URL server-side and redirects. The client id appears only in the
+  address bar during the hop to Intuit, which is OAuth itself.
+- **Nothing is logged.** Failures record the HTTP status, Intuit's own
+  `intuit_tid`, the path with its query string stripped, and Intuit's fault
+  message. No credential reaches a log line.
+
 ### Switching sandbox → production
 
 Everything QuickBooks-specific is forgotten when you connect to a **different

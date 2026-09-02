@@ -30,7 +30,9 @@ import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 export type AccountingStatus = {
   provider: string;
   status: string;
-  realm_id: string | null;
+  /** Whether a company is linked. NOT the realm id, which Intuit calls a
+   *  customer id and which 086 stopped sending to the browser. */
+  connected: boolean | null;
   environment: string;
   bill_expense_account_ref: string | null;
   bill_expense_account_name: string | null;
@@ -160,10 +162,15 @@ export function AccountingSettings({
     setError(null);
     const res = await call({ mode: "authorize_url", environment });
     setBusy(null);
-    if (!res?.url) return;
-    // The current window, not a popup: this is a navigation the person asked
-    // for, and `window.open` after an await is silently blocked anyway.
-    window.location.href = res.url as string;
+    if (!res?.state) return;
+    // A HANDSHAKE TOKEN, NOT THE CONSENT URL. `qbo-oauth` builds that where the
+    // client id lives and redirects, so this app's own credentials never reach
+    // the browser — Intuit refused the production-key questionnaire over
+    // exactly that. The current window, not a popup: this is a navigation the
+    // person asked for, and `window.open` after an await is silently blocked.
+    window.location.href =
+      `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/qbo-oauth` +
+      `?start=${encodeURIComponent(res.state as string)}`;
   }
 
   async function disconnect() {
@@ -253,7 +260,12 @@ export function AccountingSettings({
                 <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                   Company
                 </dt>
-                <dd className="text-ink">{company ?? status?.realm_id ?? "—"}</dd>
+                {/* THE NAME, NEVER THE ID. It fell back to the realm id while
+                    the name was loading, so the settings screen printed
+                    "COMPANY 9341457832962518" on every fresh open. */}
+                <dd className="text-ink">
+                  {company ?? (status?.connected ? "Linked" : "—")}
+                </dd>
               </div>
               {expiry && (
                 <div className="flex items-baseline justify-between gap-6">

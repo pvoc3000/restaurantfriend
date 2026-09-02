@@ -310,18 +310,24 @@ Deno.serve(async (req) => {
       if (error) return json(400, { error: error.message });
       if (!state) return json(500, { error: "no handshake was started" });
 
-      const creds = readQboCreds();
-      const url =
-        `${INTUIT_AUTHORIZE}?` +
-        new URLSearchParams({
-          client_id: creds.client_id,
-          scope: QBO_SCOPE,
-          redirect_uri: redirectUri(),
-          response_type: "code",
-          state: state as string,
-        }).toString();
+      // THE CLIENT ID DOES NOT COME BACK WITH THIS. Until 2026-09-02 the whole
+      // Intuit consent URL was returned here, so the app's own client id sat in
+      // a JSON response, in browser memory and in devtools — which is what
+      // Intuit refused the production-key questionnaire over ("app client ID …
+      // must not be exposed within your app").
+      //
+      // The browser is handed the handshake token instead and navigates to
+      // `qbo-oauth?start=<state>`, which builds the URL server-side and
+      // redirects. The client id then appears only in the address bar during
+      // the hop to Intuit, which is the protocol itself and unavoidable — but
+      // it is never in anything this app serves.
+      //
+      // `readQboCreds()` is still called, and only to FAIL EARLY: a missing or
+      // malformed secret should be a sentence on the settings screen, not a
+      // redirect that dead-ends at Intuit.
+      readQboCreds();
 
-      return json(200, { url, environment, redirect_uri: redirectUri() });
+      return json(200, { state, environment, redirect_uri: redirectUri() });
     }
 
     // -----------------------------------------------------------------------

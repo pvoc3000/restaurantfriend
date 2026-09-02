@@ -34,7 +34,14 @@
 // shows.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { exchangeCode, QboError } from "../_shared/qbo.ts";
+import {
+  INTUIT_AUTHORIZE,
+  QBO_SCOPE,
+  QboError,
+  exchangeCode,
+  readQboCreds,
+  redirectUri,
+} from "../_shared/qbo.ts";
 
 function appUrl(): string {
   const url = Deno.env.get("APP_URL");
@@ -58,6 +65,56 @@ Deno.serve(async (req) => {
     url = new URL(req.url);
   } catch {
     return new Response("bad request", { status: 400 });
+  }
+
+  // ---------------------------------------------------------------------
+  // ?start=<state> — the hop to Intuit, built where the client id lives
+  //
+  // The browser navigates here rather than being handed the consent URL, so
+  // this app's client id is never in a response it serves, never in its
+  // JavaScript and never in devtools. Intuit refused the production-key
+  // questionnaire over exactly that (2026-09-02).
+  //
+  // THE STATE IS NOT SPENT HERE. It is the callback's to consume, in the same
+  // UPDATE that verifies it; spending it now would make the round trip fail on
+  // the way back. This only reads it, to confirm the handshake is real and
+  // still live before sending anyone to Intuit.
+  //
+  // That it needs no JWT is fine and is the same reasoning the callback rests
+  // on: knowing a uuid that `begin_accounting_connection` minted for a
+  // manager, within its ten minutes, buys nothing but a trip to Intuit's own
+  // consent screen — and the callback still has to verify the same value.
+  // ---------------------------------------------------------------------
+  const start = url.searchParams.get("start");
+  if (start) {
+    const startAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+    );
+    const { data: live } = await startAdmin
+      .from("accounting_connections")
+      .select("id")
+      .eq("oauth_state", start)
+      .gt("oauth_state_expires_at", new Date().toISOString())
+      .maybeSingle();
+    if (!live) return back({ quickbooks: "error", reason: "expired" });
+
+    let creds;
+    try {
+      creds = readQboCreds();
+    } catch {
+      return back({ quickbooks: "error", reason: "no_app_credentials" });
+    }
+    const authorize =
+      `${INTUIT_AUTHORIZE}?` +
+      new URLSearchParams({
+        client_id: creds.client_id,
+        scope: QBO_SCOPE,
+        redirect_uri: redirectUri(),
+        response_type: "code",
+        state: start,
+      }).toString();
+    return new Response(null, { status: 302, headers: { Location: authorize } });
   }
 
   // Intuit's own refusal — the person pressed Cancel, or the app is not
