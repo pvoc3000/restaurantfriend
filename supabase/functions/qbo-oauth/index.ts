@@ -210,20 +210,37 @@ Deno.serve(async (req) => {
   // Only on a CHANGE. Reconnecting the same realm — an expired token, a
   // revoke at Intuit — must not throw away mappings that are still correct.
   const realmChanged = row.realm_id !== null && row.realm_id !== realmId;
+
+  // EVERY CLEAR BELOW IS CHECKED. Each is an `await`ed write against a whole
+  // table, and a swallowed failure is the worst outcome this function has: the
+  // app would report a clean switch while a stale id still pointed at the OLD
+  // company file — so a bill would post to whatever account that id happens to
+  // name in the NEW books, and every screen would look settled. Nothing can be
+  // retried automatically once the realm has moved, so the honest thing is to
+  // say which part did not clear and let a person finish it by hand.
+  const failed: string[] = [];
+  const clear = async (what: string, run: PromiseLike<{ error: unknown }>) => {
+    const { error } = await run;
+    if (error) {
+      failed.push(what);
+      console.error(JSON.stringify({ at: "qbo", where: "remap", what, error: String(error) }));
+    }
+  };
+
   if (realmChanged) {
-    await admin
+    await clear("connection defaults", admin
       .from("accounting_connections")
       .update({ bill_expense_account_ref: null, bill_expense_account_name: null,
                 invoice_item_ref: null, invoice_item_name: null,
                 tax_code_ref: null, tax_code_name: null })
-      .eq("id", row.id);
+      .eq("id", row.id));
 
     // WHERE THE MAPPINGS ACTUALLY LIVE. 083 moved every QBO setting onto the
     // vendor's PER-SHOP row — the account, the QBO Location, the Class and the
     // QBO vendor itself — and this block was still clearing `vendors`, which
     // nothing has read since. Measured before fixing: it cleared 2 rows nobody
     // reads and left 20 live ids pointing into the old company.
-    await admin
+    await clear("vendor mappings", admin
       .from("vendor_locations")
       .update({
         expense_account_ref: null, expense_account_name: null,
@@ -231,27 +248,27 @@ Deno.serve(async (req) => {
         qbo_class_ref: null, qbo_class_name: null,
         external_ref: {},
       })
-      .eq("org_id", row.org_id);
+      .eq("org_id", row.org_id));
 
     // `vendors` is cleared too. 082's columns still exist and a stale value
     // there is only ever confusing, but this is no longer the one that matters.
-    await admin
+    await clear("vendors", admin
       .from("vendors")
       .update({ expense_account_ref: null, expense_account_name: null,
                 external_ref: {} })
       .eq("org_id", row.org_id)
-      .neq("external_ref", "{}");
-    await admin
+      .neq("external_ref", "{}"));
+    await clear("vendor accounts", admin
       .from("vendors")
       .update({ expense_account_ref: null, expense_account_name: null })
       .eq("org_id", row.org_id)
-      .not("expense_account_ref", "is", null);
+      .not("expense_account_ref", "is", null));
 
-    await admin
+    await clear("customer mappings", admin
       .from("customers")
       .update({ external_ref: {} })
       .eq("org_id", row.org_id)
-      .neq("external_ref", "{}");
+      .neq("external_ref", "{}"));
 
     // AND THE DOCUMENTS THEMSELVES, which is the half with money in it. A
     // pushed bill carries the QuickBooks id, sync token and attachment ids it
@@ -263,18 +280,26 @@ Deno.serve(async (req) => {
     // Cleared, they read as never pushed, which is the truth: in this company
     // they have not been. `synced_at` goes with them or the row claims a sync
     // that happened to somebody else's ledger.
-    await admin
+    await clear("pushed bills", admin
       .from("vendor_invoices")
       .update({ external_ref: {}, synced_at: null })
       .eq("org_id", row.org_id)
-      .not("external_ref->qbo", "is", null);
+      .not("external_ref->qbo", "is", null));
 
-    await admin
+    await clear("pushed invoices", admin
       .from("special_orders")
       .update({ external_ref: {}, synced_at: null })
       .eq("org_id", row.org_id)
-      .not("external_ref->qbo", "is", null);
+      .not("external_ref->qbo", "is", null));
   }
 
-  return back({ quickbooks: "connected", ...(realmChanged ? { remapped: "1" } : {}) });
+  return back({
+    quickbooks: "connected",
+    // "1" means every realm-scoped id was cleared. "partial" means at least one
+    // table refused, so an id from the OLD company is still on a row here and a
+    // person has to finish it — which the screen says, naming what is left.
+    ...(realmChanged
+      ? { remapped: failed.length ? "partial" : "1", ...(failed.length ? { left: failed.join(",").slice(0, 120) } : {}) }
+      : {}),
+  });
 });

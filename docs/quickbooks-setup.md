@@ -131,6 +131,34 @@ Three consequences worth being able to state:
 
 ### Switching sandbox → production
 
+In this order. Steps 1 and 2 can be done in either order but both come before 3.
+
+1. **In the Intuit app's PRODUCTION keys**, add the same redirect URI the
+   sandbox uses: `https://kltxioacvneshbyhxtaj.supabase.co/functions/v1/qbo-oauth`.
+   Production keys carry their own list; the sandbox entry does not count.
+2. **Set the secret to the production pair** and redeploy both functions:
+   ```
+   npx supabase secrets set --project-ref kltxioacvneshbyhxtaj QBO_CREDS='{"client_id":"PASTE","client_secret":"PASTE"}'
+   ```
+3. **Settings → Accounting**: set the environment picker to **Production**,
+   then press **Reconnect** and choose the real company at Intuit.
+4. **Read the banner.** "connected to a different company … were cleared" is
+   the good outcome. If it says **part of the old company's settings could not
+   be cleared**, stop and clear the named tables by hand before sending
+   anything — an uncleared id points at the sandbox and a bill would post
+   against whatever it names in the real books.
+5. **Re-choose** the expense account, invoice item and tax code; **re-map** each
+   vendor (per shop) and any customers.
+6. **Push one bill** and look at it in QuickBooks before doing the rest.
+
+**Do not press Reconnect before changing the picker.** The OAuth endpoints are
+shared between environments, so connecting with production keys while the
+environment still says sandbox SUCCEEDS at sign-in and then sends every API
+call to the sandbox host with a production realm — which fails later, and
+confusingly.
+
+
+
 Everything QuickBooks-specific is forgotten when you connect to a **different
 company**, and only then — reconnecting the same one (an expired token, a
 revoke at Intuit) keeps mappings that are still correct.

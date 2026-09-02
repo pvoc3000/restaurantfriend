@@ -100,6 +100,10 @@ export function AccountingSettings({
 
   const callback = params.get("quickbooks");
   const remapped = params.get("remapped") === "1";
+  /** At least one table refused to give up the old company's ids. Says which,
+   *  because nothing can retry it — the realm has already moved. */
+  const remapPartial = params.get("remapped") === "partial";
+  const remapLeft = params.get("left");
   const callbackReason = params.get("reason");
 
   /** Re-read after a write. Called from handlers, never from an effect. */
@@ -228,7 +232,13 @@ export function AccountingSettings({
 
       {callback === "connected" && (
         <p className="max-w-2xl bg-mark-fill px-2 py-1 text-[13px] text-ink">
-          {remapped
+          {remapPartial
+            ? `QuickBooks is connected to a different company, but part of the old ` +
+              `company's settings could not be cleared (${remapLeft ?? "unknown"}). ` +
+              `Those ids point at the OLD company file, so clear them by hand ` +
+              `before sending anything — a bill would otherwise post against ` +
+              `whatever they name here.`
+            : remapped
             ? "QuickBooks is connected to a different company, so the expense " +
               "account here and every vendor's own mapping were cleared — their " +
               "ids belonged to the old company file. Set them again below and on " +
@@ -371,7 +381,18 @@ export function AccountingSettings({
 
       {editable && (
         <div className="flex flex-wrap items-center gap-3">
-          {!connected && (
+          {/* SHOWN WHILE CONNECTED TOO, which is the whole point of it. It used
+              to render only when disconnected, so the one time anybody needs it
+              — moving a working sandbox connection to the real books — it was
+              not on screen, and Reconnect silently reused "sandbox". That fails
+              in the most confusing way available: the OAuth endpoints are
+              shared, so signing in SUCCEEDS and then every API call goes to the
+              sandbox host with a production realm.
+
+              While connected it shows what is in force; changing it takes
+              effect when Reconnect is pressed, and the status line above still
+              states the truth until then. */}
+          {(
             <PickList
               variant="field"
               boxed
