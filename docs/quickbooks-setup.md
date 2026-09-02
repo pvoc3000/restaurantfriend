@@ -104,6 +104,28 @@ have just overwritten somebody's edit. Only ever once, and only on an update: a
 new document cannot be stale, and retrying one that failed for another reason
 is how you write it twice.
 
+### Switching sandbox → production
+
+Everything QuickBooks-specific is forgotten when you connect to a **different
+company**, and only then — reconnecting the same one (an expired token, a
+revoke at Intuit) keeps mappings that are still correct.
+
+What goes: the expense account, invoice item and tax code; every vendor's
+per-shop account, Location, Class and QuickBooks vendor; every customer's
+mapping; and the QuickBooks id, version and attachment ids on every bill and
+customer invoice already pushed.
+
+**That last part is the one to understand.** An id means nothing in another
+company file. Left in place, a pushed bill still reads as "already in
+QuickBooks", so pressing Update would try to overwrite whatever document
+happens to carry that id in your real books, and the bill itself would never be
+created there. Cleared, it reads as never pushed — which is the truth — and the
+first push creates it properly.
+
+So after switching you re-choose the account, item and tax code, re-map the
+vendors and customers, and push each bill once. Nothing is destroyed here that
+was not a pointer into the sandbox.
+
 **Sandbox and production keys are different.** Switching environment means
 setting `QBO_CREDS` again with that environment's pair, and reconnecting.
 

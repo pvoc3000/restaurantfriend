@@ -160,18 +160,63 @@ Deno.serve(async (req) => {
                 invoice_item_ref: null, invoice_item_name: null,
                 tax_code_ref: null, tax_code_name: null })
       .eq("id", row.id);
+
+    // WHERE THE MAPPINGS ACTUALLY LIVE. 083 moved every QBO setting onto the
+    // vendor's PER-SHOP row — the account, the QBO Location, the Class and the
+    // QBO vendor itself — and this block was still clearing `vendors`, which
+    // nothing has read since. Measured before fixing: it cleared 2 rows nobody
+    // reads and left 20 live ids pointing into the old company.
+    await admin
+      .from("vendor_locations")
+      .update({
+        expense_account_ref: null, expense_account_name: null,
+        qbo_location_ref: null, qbo_location_name: null,
+        qbo_class_ref: null, qbo_class_name: null,
+        external_ref: {},
+      })
+      .eq("org_id", row.org_id);
+
+    // `vendors` is cleared too. 082's columns still exist and a stale value
+    // there is only ever confusing, but this is no longer the one that matters.
     await admin
       .from("vendors")
       .update({ expense_account_ref: null, expense_account_name: null,
                 external_ref: {} })
       .eq("org_id", row.org_id)
       .neq("external_ref", "{}");
-    // and the ones that carry only an account override
     await admin
       .from("vendors")
       .update({ expense_account_ref: null, expense_account_name: null })
       .eq("org_id", row.org_id)
       .not("expense_account_ref", "is", null);
+
+    await admin
+      .from("customers")
+      .update({ external_ref: {} })
+      .eq("org_id", row.org_id)
+      .neq("external_ref", "{}");
+
+    // AND THE DOCUMENTS THEMSELVES, which is the half with money in it. A
+    // pushed bill carries the QuickBooks id, sync token and attachment ids it
+    // was given — all meaningless in another company. Left alone, `pushMode`
+    // reads the id and says "update", so pressing Send would try to overwrite
+    // whatever document 145 happens to be in the NEW books, and the real bill
+    // would never be created there at all.
+    //
+    // Cleared, they read as never pushed, which is the truth: in this company
+    // they have not been. `synced_at` goes with them or the row claims a sync
+    // that happened to somebody else's ledger.
+    await admin
+      .from("vendor_invoices")
+      .update({ external_ref: {}, synced_at: null })
+      .eq("org_id", row.org_id)
+      .not("external_ref->qbo", "is", null);
+
+    await admin
+      .from("special_orders")
+      .update({ external_ref: {}, synced_at: null })
+      .eq("org_id", row.org_id)
+      .not("external_ref->qbo", "is", null);
   }
 
   return back({ quickbooks: "connected", ...(realmChanged ? { remapped: "1" } : {}) });
