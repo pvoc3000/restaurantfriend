@@ -489,6 +489,14 @@ Deno.serve(async (req) => {
       // tables in QuickBooks and cannot be asked for in one query.
       const byEntity = new Map<string, Pushed[]>();
       for (const r of pushed) {
+        // TWO-WAY ON PURPOSE, and only because this query reads
+        // `vendor_invoices`, which can hold nothing but a Bill or a
+        // VendorCredit. Widen it to `special_orders` and this line silently
+        // asks QuickBooks for every customer Invoice as a Bill and finds
+        // none — which reads as "no longer in QuickBooks", i.e. as a deleted
+        // document rather than a bug. The same ternary shipped in
+        // `pushedLabel` and mislabelled the first real invoice (2026-09-02);
+        // if A/R status pull is ever built, read the stored entity here.
         const entity = r.external_ref?.qbo?.entity === "VendorCredit" ? "VendorCredit" : "Bill";
         (byEntity.get(entity) ?? byEntity.set(entity, []).get(entity)!).push(r);
       }
