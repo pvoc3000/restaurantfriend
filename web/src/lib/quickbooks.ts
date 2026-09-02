@@ -46,8 +46,17 @@
 // Shapes
 // ---------------------------------------------------------------------------
 
-/** The two accounts-payable documents. A/R's `Invoice` arrives with phase 4. */
-export type QboEntity = "Bill" | "VendorCredit";
+/**
+ * Every QuickBooks document this app writes — the two accounts-payable ones and
+ * A/R's `Invoice`.
+ *
+ * `Invoice` was missing until 2026-09-02, a day after phase 4 shipped writing
+ * it: `qbo-sync` is Deno and imports nothing from here, so it stored an entity
+ * this union did not admit and tsc had no way to see it. Anything reading the
+ * stored value must widen WITH the writer, or the type quietly describes the
+ * data as it was rather than as it is.
+ */
+export type QboEntity = "Bill" | "VendorCredit" | "Invoice";
 
 /**
  * What we remember about a pushed document, and what `record_accounting_push`
@@ -127,7 +136,10 @@ export function billEntity(invoice: Pick<BillInvoice, "is_credit">): QboEntity {
   return invoice.is_credit ? "VendorCredit" : "Bill";
 }
 
-/** The API path segment. QBO lower-cases entity names in URLs. */
+/**
+ * The API path segment. QBO lower-cases entity names in URLs, so `VendorCredit`
+ * is `vendorcredit` — one word, no separator, which is what its own API wants.
+ */
 export function qboEntityPath(entity: QboEntity): string {
   return entity.toLowerCase();
 }
@@ -289,12 +301,26 @@ export function accountingRefFromResponse(
   return { qbo: { id, sync_token: syncToken, doc_number: docNumber, entity } };
 }
 
-/** "In QuickBooks as Bill 1043" — what the record and the list say. */
+/**
+ * "In QuickBooks as Bill 1043" — what the record and the list say.
+ *
+ * IT READS THE STORED ENTITY rather than deciding between two. Written as a
+ * `VendorCredit ? "Credit" : "Bill"` ternary when A/P was the only caller, it
+ * then labelled the first real customer invoice "Bill 8797" — the one word on
+ * the line that says which of Mark's two ledgers a document landed in, wrong.
+ * Found by pushing one (2026-09-02), not by reading.
+ *
+ * `VendorCredit` keeps its own word: it is a credit note, and "as VendorCredit
+ * 1043" reads like machine output where the rest of this sentence is English.
+ * The fallback is "Bill" only for a row written before `entity` was recorded —
+ * every one carries it today, and A/P is the older path.
+ */
 export function pushedLabel(external_ref: AccountingRef | null | undefined): string | null {
   const qbo = external_ref?.qbo;
   const ref = qboRef(external_ref);
   if (!ref) return null;
-  const kind = qbo?.entity === "VendorCredit" ? "Credit" : "Bill";
+  const entity = qbo?.entity?.trim();
+  const kind = entity === "VendorCredit" ? "Credit" : entity || "Bill";
   const shown = qbo?.doc_number?.trim() || ref.id;
   return `In QuickBooks as ${kind} ${shown}`;
 }

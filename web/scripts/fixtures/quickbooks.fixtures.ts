@@ -279,11 +279,27 @@ test("the pushed label reads as QuickBooks shows it", () => {
     "In QuickBooks as Credit 77",
     "credit falls back to the id"
   );
+  // The one that shipped wrong: a two-way ternary labelled the first real
+  // customer invoice "Bill 8797". Which ledger a document landed in is the
+  // whole content of this sentence.
+  eq(
+    pushedLabel({ qbo: { id: "155", sync_token: "0", doc_number: "8797", entity: "Invoice" } }),
+    "In QuickBooks as Invoice 8797",
+    "an invoice is not a bill"
+  );
+  // A row written before `entity` was recorded. A/P is the older path, so it
+  // is the honest guess — and the only case where a guess is made at all.
+  eq(
+    pushedLabel({ qbo: { id: "12", sync_token: "0" } }),
+    "In QuickBooks as Bill 12",
+    "no entity stored falls back to Bill"
+  );
   eq(pushedLabel(null), null, "never pushed");
 });
 
 test("the entity path is what QBO's URL wants", () => {
   eq(qboEntityPath("Bill"), "bill", "bill");
+  eq(qboEntityPath("Invoice"), "invoice", "invoice");
   eq(qboEntityPath("VendorCredit"), "vendorcredit", "credit");
 });
 
