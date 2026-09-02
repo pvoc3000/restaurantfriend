@@ -73,11 +73,31 @@ setting `QBO_CREDS` again with that environment's pair, and reconnecting.
 
 ---
 
-## 3. The migration and the deploys
+## 3. The migrations and the deploys
 
-Migration **081** first — the screen selects columns it creates, so a deploy in
-front of it renders an error instead of a settings block. Run it in the SQL
-editor; its verify block is at the bottom.
+Five, **in order**, each with its verify block at the bottom of its own file:
+
+| | what it adds | if it is missing |
+|---|---|---|
+| **081** | the connection table, its three functions, `vendors`/`customers.external_ref`, `special_orders.synced_at` | the settings block renders a Postgres error instead of a screen |
+| **082** | `vendors.expense_account_ref/_name` | nothing — **superseded by 083** and now read by nobody; kept because it ran |
+| **083** | six QBO columns on `vendor_locations` — account, location, class | the per-shop pickers on the vendor record are absent |
+| **084** | `accounting_connections.tax_code_ref/_name` | a taxable customer invoice cannot be pushed |
+| **085** | widens `accounting_connection_status()` to return 084's two columns | **084 with no 085 is the worst state**: the tax code saves, reports success, and reads back as unset — see below |
+
+**Run 081 before deploying anything** — the screen selects columns it creates,
+so a deploy in front of it renders an error instead of a settings block.
+
+**084 and 085 belong together.** 084 alone is silently half-applied: the write
+goes through `qbo-sync`, which sees the column, so Settings saves the tax code
+and says so — while every reader in the app goes through
+`accounting_connection_status()`, which 084 did not widen, so the picker goes
+back to reading *"Choose a tax code"* and the first taxable order refuses with
+*"No QuickBooks tax code is set. Choose one in Settings → Accounting"*, naming
+the screen where you just set it. If you see that sentence, 085 has not run.
+
+A zero-tax order will not show it: a push only needs a tax code when something
+on the order is taxable, so a wholesale invoice goes through either way.
 
 ```bash
 npx supabase functions deploy qbo-oauth --no-verify-jwt --project-ref kltxioacvneshbyhxtaj
