@@ -128,6 +128,41 @@ async function runAttachments(
   return out;
 }
 
+/**
+ * The document's CURRENT sync token, after attachments have touched it.
+ *
+ * ATTACHING A FILE BUMPS THE PARENT'S OWN SyncToken, and so does deleting one.
+ * The push response carries the token from BEFORE that, so recording it leaves
+ * the row exactly one behind and the next update fails with a stale-object
+ * fault (5010) — measured on Bill 145, stored 9 against a live 10, and it
+ * failed on the very next push.
+ *
+ * Only called when something was actually attached, so an ordinary push still
+ * costs one round trip.
+ */
+async function currentSyncToken(
+  admin: SupabaseClient,
+  conn: Parameters<typeof qboUpload>[1],
+  entity: string,
+  id: string,
+  fallback: string
+): Promise<string> {
+  try {
+    const sql = `select * from ${entity} where Id = '${id}'`;
+    const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(sql)}`)) as {
+      QueryResponse?: Record<string, Record<string, unknown>[]>;
+    };
+    const live = res.QueryResponse?.[entity]?.[0];
+    const token = live?.SyncToken;
+    return token === undefined || token === null ? fallback : String(token);
+  } catch {
+    // A failed re-read is not worth failing the push over: the document and its
+    // paperwork are both in QuickBooks. The row is then one behind and the next
+    // update says so in QuickBooks' own words.
+    return fallback;
+  }
+}
+
 const CORS = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
@@ -532,6 +567,11 @@ Deno.serve(async (req) => {
       const attachmentResults = attachRequests.length
         ? await runAttachments(req.entity!, String(doc.Id), attachRequests, supabase, admin, conn)
         : [];
+      if (attachRequests.length) {
+        ref.qbo.sync_token = await currentSyncToken(
+          admin, conn, req.entity!, String(doc.Id), ref.qbo.sync_token
+        );
+      }
 
       await admin
         .from("accounting_connections")
@@ -546,6 +586,9 @@ Deno.serve(async (req) => {
         sync_token: ref.qbo.sync_token,
         updated: Boolean((req.payload as { Id?: string }).Id),
         attachment_results: attachmentResults,
+        // THE WHOLE REF, so a caller recording attachments adds to what was
+        // written here rather than rebuilding it and quietly dropping a field.
+        ref,
       });
     }
 
@@ -865,6 +908,12 @@ Deno.serve(async (req) => {
       const attachmentResults = sheet?.length
         ? await runAttachments("Invoice", String(doc.Id), sheet, supabase, admin, conn)
         : [];
+      // Both the delete above and the upload bump the invoice's own token.
+      if (stale || sheet?.length) {
+        ref.qbo.sync_token = await currentSyncToken(
+          admin, conn, "Invoice", String(doc.Id), ref.qbo.sync_token
+        );
+      }
 
       return json(200, {
         entity: "Invoice",
@@ -875,6 +924,12 @@ Deno.serve(async (req) => {
         tax: theirTax,
         updated: Boolean((req.payload as { Id?: string }).Id),
         attachment_results: attachmentResults,
+        sync_token: ref.qbo.sync_token,
+        // See push_bill: the whole ref, so nothing is rebuilt from parts. This
+        // mode did not return `sync_token` at all until 2026-09-02, so a caller
+        // reconstructing the ref wrote one with NO token — and a ref without one
+        // is not an update, it is a CREATE, which duplicates the invoice.
+        ref,
       });
     }
 

@@ -289,17 +289,10 @@ export function PushToQuickBooks({
       // is writable straight through PostgREST otherwise, which is the whole
       // reason that function exists. Its merge replaces the `qbo` branch whole,
       // so the full branch goes back.
-      const ref = withAttachments(
-        {
-          qbo: {
-            id: data?.qbo_id as string,
-            sync_token: (data?.sync_token as string) ?? undefined,
-            doc_number: (data?.doc_number as string) ?? null,
-            entity,
-          },
-        },
-        added
-      );
+      // THE REF THE SERVER RECORDED, added to — never rebuilt from parts. Its
+      // `sync_token` is the one AFTER the attachment, because attaching a file
+      // bumps the bill's own token and the push response predates that.
+      const ref = withAttachments(data!.ref as AccountingRef, added);
       const { data: rec, error: refErr } = await supabase.rpc("record_accounting_push", {
         p_invoice: invoiceId,
         p_ref: ref,

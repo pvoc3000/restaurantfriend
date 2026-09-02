@@ -229,17 +229,12 @@ export function PushOrderToQuickBooks({
       else localWarnings.push(`The invoice sheet was not attached: ${read.message}`);
     }
     if (Object.keys(added).length > 0) {
-      const ref = withAttachments(
-        {
-          qbo: {
-            id: data?.qbo_id as string,
-            sync_token: (data?.sync_token as string) ?? undefined,
-            doc_number: (data?.doc_number as string) ?? null,
-            entity: "Invoice",
-          },
-        },
-        added
-      );
+      // THE REF THE SERVER RECORDED, added to — never rebuilt from parts, which
+      // is how this dropped the sync token entirely for a day: `push_invoice`
+      // did not return one, and a ref with no token is not an update, it is a
+      // CREATE. Its token is the one AFTER the delete-and-replace, both of
+      // which bump the invoice's own.
+      const ref = withAttachments(data!.ref as AccountingRef, added);
       // Its own write, because the id only exists after the upload. A failure
       // here costs one duplicated attachment on the next push, never the money.
       const { error: refErr } = await supabase

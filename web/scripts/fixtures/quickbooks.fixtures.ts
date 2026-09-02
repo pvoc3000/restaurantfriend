@@ -723,3 +723,25 @@ test("a bill's scan goes up once, however often it is pushed", () => {
   eq(attachmentsToSend(docs, both).length, 0, "a second push attaches nothing");
   eq(INVOICE_SHEET_KEY, "sheet", "the customer sheet's own key");
 });
+
+test("a ref with no sync token is a CREATE, which is why one is never rebuilt", () => {
+  // The whole reason both push modes return the ref they recorded rather than
+  // its parts. `push_invoice` returned no `sync_token` for a day, so a caller
+  // reassembling the ref wrote one without it — and this is what that means:
+  // not a failed update, a SECOND invoice in the customer's books.
+  eq(qboRef({ qbo: { id: "156" } }), null, "an id alone is not a reference");
+  eq(qboRef({ qbo: { id: "156", sync_token: "  " } }), null, "nor is a blank token");
+  eq(pushMode({ external_ref: { qbo: { id: "156" } } }), "create", "so the push CREATES");
+  eq(
+    pushMode({ external_ref: { qbo: { id: "156", sync_token: "5" } } }),
+    "update",
+    "where a whole reference updates"
+  );
+
+  // And what the fix preserves: adding attachments to the server's own ref
+  // cannot lose the token, whatever else it holds.
+  const fromServer = { qbo: { id: "156", sync_token: "7", doc_number: "8786", entity: "Invoice" as const } };
+  const after = withAttachments(fromServer, { sheet: "1000000032" });
+  eq(qboRef(after)?.syncToken, "7", "the token survives");
+  eq(pushMode({ external_ref: after }), "update", "so it is still an update");
+});
