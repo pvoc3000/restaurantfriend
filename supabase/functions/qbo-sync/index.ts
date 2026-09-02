@@ -599,6 +599,16 @@ Deno.serve(async (req) => {
       // Through the CALLER's client and the definer RPC, never a direct update:
       // `vendor_invoices_update` is purchaser+ with no column restriction, so
       // `external_ref` is writable straight through PostgREST otherwise (081).
+      // WHAT WAS ALREADY ATTACHED SURVIVES THIS WRITE. 081's merge is
+      // `external_ref || p_ref` at the TOP level, so the whole `qbo` branch is
+      // replaced — a ref built from the push response alone therefore ERASES
+      // the attachment record, and the next push, seeing nothing recorded,
+      // attaches a second copy of the same invoice. Measured on Bill 145: the
+      // second push emptied `attachments` while the file sat in QuickBooks.
+      // The same shape as the sync token a commit earlier, one level up: the
+      // server was still rebuilding a ref from parts.
+      const priorBill = (invoice.external_ref as { qbo?: { attachments?: Record<string, string> } } | null)
+        ?.qbo?.attachments;
       const ref = {
         qbo: {
           id: String(doc.Id),
@@ -607,6 +617,7 @@ Deno.serve(async (req) => {
             ? null
             : String(doc.DocNumber),
           entity: req.entity,
+          ...(priorBill && Object.keys(priorBill).length ? { attachments: priorBill } : {}),
         },
       };
       const { data: recorded, error: recErr } = await supabase.rpc("record_accounting_push", {
@@ -917,12 +928,23 @@ Deno.serve(async (req) => {
       const warnings: string[] = [];
       if (retried) warnings.push(STALE_RETRY_NOTE);
 
+      // WHAT WAS ALREADY ATTACHED SURVIVES THIS WRITE. 081's merge is
+      // `external_ref || p_ref` at the TOP level, so the whole `qbo` branch is
+      // replaced — a ref built from the push response alone therefore ERASES
+      // the attachment record, and the next push, seeing nothing recorded,
+      // attaches a second copy of the same invoice. Measured on Bill 145: the
+      // second push emptied `attachments` while the file sat in QuickBooks.
+      // The same shape as the sync token a commit earlier, one level up: the
+      // server was still rebuilding a ref from parts.
+      const priorOrder = (order.external_ref as { qbo?: { attachments?: Record<string, string> } } | null)
+        ?.qbo?.attachments;
       const ref = {
         qbo: {
           id: String(doc.Id),
           sync_token: String(doc.SyncToken),
           doc_number: doc.DocNumber === undefined || doc.DocNumber === null ? null : String(doc.DocNumber),
           entity: "Invoice",
+          ...(priorOrder && Object.keys(priorOrder).length ? { attachments: priorOrder } : {}),
         },
       };
       // `special_orders` has ordinary policies (051, supervisor+), so unlike a

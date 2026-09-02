@@ -185,8 +185,12 @@ export function PushOrderToQuickBooks({
     const localWarnings: string[] = [];
     let sheet: { key: string; file_name: string; content_type: string; metadata: unknown; pdf_base64: string } | undefined;
     try {
-      const { blob } = await renderOrderDocument(supabase, orderId, "invoice", today);
-      const fileName = documentFileName("invoice", number ?? "", invoiceDate ?? today);
+      const { blob, order: rendered } = await renderOrderDocument(supabase, orderId, "invoice", today);
+      // NAMED OFF THE RENDERED ORDER, exactly as `SendDocument` names the copy
+      // it emails — `event_date ?? today`. Naming it from a prop here produced
+      // the same document under two names, one dated the event and one dated
+      // whenever it was sent to QuickBooks.
+      const fileName = documentFileName("invoice", rendered.number, rendered.event_date ?? today);
       sheet = {
         key: INVOICE_SHEET_KEY,
         file_name: fileName,
