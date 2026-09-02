@@ -221,11 +221,21 @@ export function RatingsPage({
             />
           </div>
 
-          {/* The break question. Unticked plus a reason becomes a
-              `break_premiums` decision at Send — the supervisor's answer at the
-              shop, rather than somebody retyping it into payroll a fortnight
-              later. A reason is REQUIRED when it is unticked, which mirrors
-              032's own constraint so the database never has to refuse. */}
+          {/* The break question, and the ONE thing on this report that has to
+              be finished before it can be sent (`submitBlockers`).
+
+              IT NO LONGER PAYS ANYBODY. Migration 087 stopped the flush writing
+              a `break_premiums` row: the premium is suggested in Timesheets
+              from the PUNCHES and recorded by a human clicking, which is where
+              that judgement belongs. What is captured here is the testimony —
+              whether the meal happened, when, and if not why — because the
+              supervisor standing here is the only person who will ever know.
+
+              THE REASON BOX SHOWS WHENEVER THE BOX IS UNTICKED, including on a
+              row nobody has touched. `got_break` is three-state and a checkbox
+              is two, so an untouched row is null and looks identical to "no" —
+              and since null is what the gate counts, a supervisor would
+              otherwise be blocked by a row that looks answered. */}
           <div className="flex flex-wrap items-center gap-4 border-t border-hairline pt-3">
             <Checkbox
               checked={row.gotBreak === true}
@@ -251,10 +261,19 @@ export function RatingsPage({
                   disabled={!editable}
                   ariaLabel={`Time the break started, ${row.employeeName}`}
                 />
+                {/* REQUIRED SINCE 2026-09-02. It was optional on the reasoning
+                    that a supervisor who did not note the clock must not have to
+                    invent one — and Mark's answer is that FMP did not let the
+                    report go without it, because California's rule is about
+                    WHEN the meal began and a break with no time proves nothing
+                    about it. */}
+                {(row.breakStartedAt ?? "").trim() === "" ? (
+                  <p className="text-xs text-accent">A time is needed</p>
+                ) : null}
               </div>
             ) : null}
 
-            {row.gotBreak === false ? (
+            {row.gotBreak !== true ? (
               <div className="min-w-64 flex-1 space-y-1">
                 <TextField
                   value={row.breakReason}
@@ -264,10 +283,10 @@ export function RatingsPage({
                   ariaLabel={`Reason the break was missed, ${row.employeeName}`}
                 />
                 {(row.breakReason ?? "").trim() === "" ? (
-                  <p className="text-xs">
-                    <span className="bg-mark-fill px-1">
-                      A reason is needed, or no premium can be recorded
-                    </span>
+                  // RED, not the mark colour: this is no longer "worth your
+                  // eye", it is the thing that will stop the report being sent.
+                  <p className="text-xs text-accent">
+                    A reason is needed before this report can be sent
                   </p>
                 ) : null}
               </div>

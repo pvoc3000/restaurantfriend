@@ -189,7 +189,6 @@ export function PremadesPage({
                   value={r.countNote}
                   onCommit={(next) => save(r.scheduleItemId, { note: next })}
                   disabled={!editable}
-                  placeholder="Note"
                   ariaLabel={`Note, ${r.name}`}
                 />
               </td>

@@ -29,6 +29,7 @@ import { salesNote } from "@/lib/shiftReports";
  */
 export function SubmitPage({
   outstanding,
+  blockers,
   netSalesCents,
 }: {
   /**
@@ -37,6 +38,15 @@ export function SubmitPage({
    * so the two cannot disagree about one night.
    */
   outstanding: string[];
+  /**
+   * The one thing that stops a send — see `submitBlockers`.
+   *
+   * Kept apart from `outstanding` rather than mixed in with a flag, because
+   * the two are read differently: that list is "you can go", this one is "you
+   * cannot", and a reader must be able to tell at a glance which sentences are
+   * which. Red for the second, since here something really is wrong.
+   */
+  blockers: string[];
   netSalesCents: number | null;
 }) {
   const caveats = outstanding;
@@ -44,6 +54,25 @@ export function SubmitPage({
   return (
     <div className="mx-auto max-w-2xl space-y-8">
       <p className="text-sm text-muted">{salesNote(netSalesCents)}</p>
+
+      {blockers.length > 0 ? (
+        <div className="space-y-2 border-2 border-accent p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
+            Before this can be sent
+          </p>
+          <ul className="space-y-1 text-sm">
+            {blockers.map((b) => (
+              <li key={b} className="text-accent">
+                {b}
+              </li>
+            ))}
+          </ul>
+          <p className="text-sm text-muted">
+            Break answers are the one thing nobody can fill in later &mdash; go
+            back to Employees and finish them.
+          </p>
+        </div>
+      ) : null}
 
       {caveats.length > 0 ? (
         <div className="space-y-2 border border-hairline p-4">
@@ -61,9 +90,9 @@ export function SubmitPage({
             You can send it anyway — this is a list, not a gate.
           </p>
         </div>
-      ) : (
+      ) : blockers.length === 0 ? (
         <p className="text-sm">Everything is done. Send it.</p>
-      )}
+      ) : null}
     </div>
   );
 }

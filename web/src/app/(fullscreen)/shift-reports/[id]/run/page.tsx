@@ -8,6 +8,7 @@ import { compareForPremadeSheet } from "@/lib/productionSchedule";
 import { isDayComplete } from "@/lib/sales";
 import {
   pagesForShift,
+  submitBlockers,
   submitReadiness,
   type EmailReport,
   type ReadinessInput,
@@ -525,13 +526,21 @@ export default async function RunShiftReportPage({
     shift,
     narrative: (report.narrative as string | null) ?? null,
     ratingCount: ratingRows.length,
-    // The rows the flush will REFUSE to write a premium for — 032 requires a
-    // reason for `owed`, so `submit_shift_report` skips these and names them in
-    // its receipt. Counted here so the submit page and the email say it before
-    // the send rather than after.
-    missedBreaksWithoutReason: ratingRows.filter(
-      (r) => r.gotBreak === false && (r.breakReason ?? "").trim() === ""
-    ).length,
+    // The break answers that are not finished. These BLOCK the send — see
+    // `submitBlockers` for why this one thing does when nothing else does.
+    //
+    // `gotBreak !== true` rather than `=== false`, so an UNANSWERED row counts:
+    // the column is three-state and the checkbox only two, so a row nobody has
+    // touched is null and looks exactly like "no". Treating it as answered
+    // would let the commonest incomplete row through the one gate there is.
+    breaks: {
+      missingTime: ratingRows.filter(
+        (r) => r.gotBreak === true && (r.breakStartedAt ?? "").trim() === ""
+      ).length,
+      missingReason: ratingRows.filter(
+        (r) => r.gotBreak !== true && (r.breakReason ?? "").trim() === ""
+      ).length,
+    },
     taskSpecialOrdersDone: report.task_special_orders_done as boolean,
     taskSchedulesDone: report.task_schedules_done as boolean,
     netSalesCents,
@@ -545,6 +554,8 @@ export default async function RunShiftReportPage({
     checklistNotStarted,
   };
   const outstanding = submitReadiness(readinessInput);
+  /** The one gate — see `submitBlockers`. Read by the page AND by Send. */
+  const blockers = submitBlockers(readinessInput);
 
   const bodies: Partial<Record<ShiftReportPage, React.ReactNode>> = {
     info: (
@@ -580,7 +591,14 @@ export default async function RunShiftReportPage({
         editable={editable}
       />
     ),
-    submit: <SubmitPage key="submit" outstanding={outstanding} netSalesCents={netSalesCents} />,
+    submit: (
+      <SubmitPage
+        key="submit"
+        outstanding={outstanding}
+        blockers={blockers}
+        netSalesCents={netSalesCents}
+      />
+    ),
   };
 
   if (wants("checklist")) {
@@ -742,6 +760,7 @@ export default async function RunShiftReportPage({
       emailReport={emailReport}
       pages={bodies}
       openAtPage={Number.isFinite(openAt) ? openAt : null}
+      blockers={blockers}
       // Sending FINISHES the checklist (Mark, 2026-09-01), so the runner needs
       // to know whether there is one and whether it is still open. Only the id
       // and the status: the confirm that used to stand between the two acts is

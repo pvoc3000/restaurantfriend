@@ -43,6 +43,7 @@ export function ShiftReportRunner({
   emailReport,
   pages,
   openAtPage,
+  blockers,
   checklistRun,
 }: {
   reportId: string;
@@ -65,6 +66,17 @@ export function ShiftReportRunner({
    * `off_site` has fewer of them.
    */
   openAtPage: number | null;
+  /**
+   * What must be settled before Send will work — `submitBlockers`, which is a
+   * list of one kind of thing and is meant to stay that way.
+   *
+   * The BUTTON is the gate rather than `submit_shift_report`: a function that
+   * raised at Send would be a hard failure at the last possible moment with no
+   * way through, where a disabled button says what is wrong while there is
+   * still time to go back and fix it. The database's job here is integrity;
+   * whether tonight's paperwork is finished is a workflow rule.
+   */
+  blockers: string[];
   /**
    * The checklist linked to this report, ONLY while it is still open.
    *
@@ -391,13 +403,15 @@ export function ShiftReportRunner({
             type="button"
             className={`${FOOTER_CELL} text-mark`}
             onClick={send}
-            disabled={busy !== null || isSent || !canSend}
+            disabled={busy !== null || isSent || !canSend || blockers.length > 0}
             title={
               isSent
                 ? "This report has already been sent."
                 : !canSend
                   ? "A report is sent by whoever started it."
-                  : undefined
+                  : blockers.length > 0
+                    ? blockers.join(" ")
+                    : undefined
             }
           >
             Send

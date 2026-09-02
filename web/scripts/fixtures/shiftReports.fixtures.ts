@@ -3,6 +3,7 @@ import {
   pagesForShift,
   pageBanner,
   submitReadiness,
+  submitBlockers,
   attentionReason,
   missingNights,
   supervisorBody,
@@ -77,7 +78,7 @@ const READY: ReadinessInput = {
   shift: "closing",
   narrative: "Busy but steady.",
   ratingCount: 3,
-  missedBreaksWithoutReason: 0,
+  breaks: { missingTime: 0, missingReason: 0 },
   taskSpecialOrdersDone: true,
   taskSchedulesDone: true,
   netSalesCents: 133307,
@@ -180,18 +181,31 @@ test("an EMPTY employee list is named; a filled one is not nagged about", () => 
   eq(submitReadiness({ ...READY, ratingCount: 1 }), []);
 });
 
-test("A MISSED BREAK WITH NO REASON IS NAMED, because the premium is skipped", () => {
-  // Not tidiness: 032 requires a reason for an `owed` premium, so
-  // `submit_shift_report` writes NO `break_premiums` row for these and names
-  // them in a receipt nobody reads. This is an hour of somebody's pay, said
-  // before the send instead of after.
-  const one = submitReadiness({ ...READY, missedBreaksWithoutReason: 1 });
-  eq(one, [
-    "1 employee missed a break with no reason given, so that premium will not be recorded.",
+test("THE BREAK ANSWERS BLOCK — they are not a caveat you can send past", () => {
+  // Mark, 2026-09-02: "In FMP we wouldn't allow the report to be submitted if
+  // any employees were missing break times or a reason for missing a break."
+  // The distinction from everything in `submitReadiness` is who else could ever
+  // supply it — see `submitBlockers`.
+  const missing = { ...READY, breaks: { missingTime: 0, missingReason: 1 } };
+  eq(submitBlockers(missing), ["1 employee has no break, and no reason why."]);
+  // And it stays OUT of the advisory list, or it would read as optional in one
+  // place and required in the other.
+  eq(submitReadiness(missing), []);
+});
+
+test("a break with no time blocks too, and both count in the plural", () => {
+  eq(submitBlockers({ ...READY, breaks: { missingTime: 1, missingReason: 0 } }), [
+    "1 employee has a break with no time recorded.",
   ]);
-  const two = submitReadiness({ ...READY, missedBreaksWithoutReason: 2 });
-  ok(two[0].includes("2 employees"), two[0]);
-  ok(two[0].includes("those premiums"), two[0]);
+  const both = submitBlockers({ ...READY, breaks: { missingTime: 3, missingReason: 2 } });
+  eq(both, [
+    "2 employees have no break, and no reason why.",
+    "3 employees have a break with no time recorded.",
+  ]);
+});
+
+test("a finished report blocks on nothing", () => {
+  eq(submitBlockers(READY), []);
 });
 
 // ---------------------------------------------------------------------------

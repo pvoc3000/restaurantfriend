@@ -125,21 +125,19 @@ export type ReadinessInput = {
   narrative: string | null;
   ratingCount: number;
   /**
-   * Employees marked as having missed a break with NO reason typed.
+   * The break answers that are not finished — see `submitBlockers`.
    *
-   * A COUNT, never names — this reaches the supervisor email through
-   * `outstanding`, and that email is the one document in this app that
-   * deliberately carries no employee's name.
-   *
-   * It earns a caveat where "you have not ticked a box" no longer does, and the
-   * difference is money rather than tidiness: `submit_shift_report` REFUSES to
-   * write a `break_premiums` row without a reason — 032's constraint requires
-   * one for `owed` — so it skips the premium and names it in the receipt. A
-   * missed break with no reason is an hour of somebody's pay not recorded, and
-   * until now the only place that was said was a yellow mark on the row, which
-   * the person filing the report has already paged past.
+   * COUNTS, never names. `outstanding` reaches the supervisor email, which
+   * carries no employee's name; these do not reach it at all (you cannot send
+   * while one is outstanding), but they are counted the same way so that a
+   * later change cannot leak one by moving a field between the two lists.
    */
-  missedBreaksWithoutReason: number;
+  breaks: {
+    /** Got a break, but no time was recorded. */
+    missingTime: number;
+    /** Did not get one — or nobody said — and no reason was given. */
+    missingReason: number;
+  };
   taskSpecialOrdersDone: boolean;
   taskSchedulesDone: boolean;
   /** Null when Square has not reported the day yet, which is the normal case. */
@@ -189,13 +187,8 @@ export function submitReadiness(input: ReadinessInput): string[] {
     caveats.push("No employees have been added.");
   }
 
-  if (input.missedBreaksWithoutReason > 0) {
-    const n = input.missedBreaksWithoutReason;
-    caveats.push(
-      `${n} ${n === 1 ? "employee" : "employees"} missed a break with no reason given` +
-        `, so ${n === 1 ? "that premium" : "those premiums"} will not be recorded.`
-    );
-  }
+  // THE BREAK ANSWERS ARE NOT HERE ANY MORE — they BLOCK, so they cannot be
+  // something you send past. See `submitBlockers`.
 
   if (pages.includes("premades") && input.countedLines < input.scheduledLines) {
     const left = input.scheduledLines - input.countedLines;
@@ -244,6 +237,55 @@ export function submitReadiness(input: ReadinessInput): string[] {
   }
 
   return caveats;
+}
+
+/**
+ * What must be settled BEFORE the report can be sent — the one gate in a module
+ * built on not gating.
+ *
+ * Why this exists at all, given `submitReadiness` two functions up and its rule
+ * that naming a thing and letting you through is what keeps reports getting
+ * sent (Mark, 2026-09-02): "In FMP we wouldn't allow the report to be submitted
+ * if any employees were missing break times or a reason for missing a break.
+ * Why aren't we doing that here?"
+ *
+ * THE DISTINCTION IS WHO ELSE COULD EVER SUPPLY IT. Everything in
+ * `submitReadiness` is either derivable later or recoverable by somebody else:
+ * an uncounted premade line can be counted tomorrow, an unprinted packet can be
+ * printed, an empty narrative is a report that says little. A break answer
+ * cannot. The supervisor standing there is the ONLY person who knows whether
+ * that meal was taken and when, the punches are in Homebase and say nothing
+ * about why, and by the time payroll looks at it a fortnight later there is
+ * nobody left to ask. It is also the record California asks for.
+ *
+ * That is the test for anything else that wants to join this list: not "is it
+ * important" — everything on the other list is important — but "is this the
+ * last moment anybody can answer it".
+ *
+ * SO THIS IS DELIBERATELY SHORT, and it should stay short. A gate that grows
+ * becomes the thing `submitReadiness`' own note warns about: a night the
+ * printer jammed and the report never got sent at all.
+ *
+ * The costs, accepted with eyes open: a supervisor who genuinely cannot recall
+ * a break time cannot file until they put something in the box, and a report
+ * left with an unanswered row cannot be sent by anybody else either. FMP had
+ * both of those for thirteen years.
+ */
+export function submitBlockers(input: ReadinessInput): string[] {
+  const out: string[] = [];
+  const { missingTime, missingReason } = input.breaks;
+
+  if (missingReason > 0) {
+    out.push(
+      `${missingReason} ${missingReason === 1 ? "employee has" : "employees have"} no break, and no reason why.`
+    );
+  }
+  if (missingTime > 0) {
+    out.push(
+      `${missingTime} ${missingTime === 1 ? "employee has" : "employees have"} a break with no time recorded.`
+    );
+  }
+  return out;
 }
 
 /**
