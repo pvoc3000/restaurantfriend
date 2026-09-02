@@ -623,6 +623,9 @@ Deno.serve(async (req) => {
       const req = body as unknown as {
         order_id?: string;
         payload?: Record<string, unknown>;
+        /** Accepted and ignored since 2026-09-02 — the caller now composes the
+         *  tax warning itself (see `theirTax` below). Still declared so a page
+         *  loaded before this deploy is not refused for sending it. */
         our_tax?: number;
       };
       if (!req.order_id || !req.payload) {
@@ -678,20 +681,22 @@ Deno.serve(async (req) => {
         return json(502, { error: "QuickBooks saved the invoice but returned no id and sync token." });
       }
 
-      // The tax QuickBooks decided, against the one on the customer's copy.
-      // Its rate comes from its own setup and ours from `special_orders.
-      // tax_rate`, and nothing keeps them in step — surfacing that is the whole
-      // reason letting QuickBooks compute was acceptable.
+      // The tax QuickBooks decided. RETURNED, NOT JUDGED: whether it disagrees
+      // with the customer's copy, and how to say so, is `taxDisagreement` in
+      // `web/src/lib/quickbooks.ts`, which the caller applies to this figure.
+      //
+      // That rule was written here too until 2026-09-02, and this copy was the
+      // one that ran while the fixture-tested one had no caller at all — 016's
+      // `nextDeliveryDate` trap, where the tested implementation is not the one
+      // in force and the two drift with nothing going red. Deno cannot import
+      // from `web/`, so the cure is not a shared module: it is to stop deciding
+      // here. Only compose a warning in this function for something the CLIENT
+      // cannot see — the coding QuickBooks accepted and then dropped, which is
+      // what `push_bill`'s own warnings are, and why they stay there.
       const theirTax = Number(
         (doc.TxnTaxDetail as { TotalTax?: unknown } | undefined)?.TotalTax ?? 0
       );
       const warnings: string[] = [];
-      if (Math.abs(theirTax - Number(req.our_tax ?? 0)) >= 0.005) {
-        warnings.push(
-          `QuickBooks calculated ${theirTax.toFixed(2)} of sales tax where this order bills ` +
-            `${Number(req.our_tax ?? 0).toFixed(2)}. Its total will differ from the customer's copy.`
-        );
-      }
 
       const ref = {
         qbo: {

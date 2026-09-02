@@ -11,6 +11,7 @@ import {
   invoiceSplit,
   pushedLabel,
   qboVendorId,
+  taxDisagreement,
   type AccountingRef,
   type InvoiceOrder,
 } from "@/lib/quickbooks";
@@ -166,7 +167,13 @@ export function PushOrderToQuickBooks({
       setError(message);
       return;
     }
-    setWarnings((data?.warnings as string[]) ?? []);
+    // The tax sentence is composed HERE, from the figure QuickBooks returned,
+    // by the same fixture-tested rule the fixtures cover — `qbo-sync` had its
+    // own copy until 2026-09-02 and that copy was the one running. Its
+    // `warnings` now carry only what the server alone can see, so the two are
+    // concatenated rather than one replacing the other.
+    const theirs = taxDisagreement(totals.tax, data?.tax as number | undefined);
+    setWarnings([...((data?.warnings as string[]) ?? []), ...(theirs ? [theirs] : [])]);
     setSent(
       `${data?.updated ? "Updated" : "Sent"} as Invoice ${
         (data?.doc_number as string) ?? (data?.qbo_id as string)

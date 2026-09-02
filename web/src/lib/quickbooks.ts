@@ -633,6 +633,18 @@ export function buildInvoicePayload(
  * This is the accepted cost of letting QuickBooks compute: its rate comes from
  * its own setup, ours from `special_orders.tax_rate`, and nothing keeps them in
  * step. Surfacing the difference is the whole reason that trade was acceptable.
+ *
+ * IT IS COMPOSED HERE, BY THE CALLER OF `push_invoice`, NOT BY `qbo-sync`.
+ * The function shipped (2026-09-01) with an inline copy of this rule and this
+ * one had no caller at all — the tested implementation was not the one running,
+ * which is 016's `nextDeliveryDate` trap exactly, and the two could drift with
+ * nothing going red. `push_invoice` returns the figure QuickBooks decided and
+ * the sentence is built from it. The Deno function keeps its `warnings` array
+ * for what only IT can see — the coding QuickBooks accepted and then dropped —
+ * which is a different kind of claim and genuinely belongs server-side.
+ *
+ * The figures wear dollar signs because every other amount on that screen does,
+ * the confirm two inches above it included.
  */
 export function taxDisagreement(
   ourTax: number,
@@ -641,8 +653,9 @@ export function taxDisagreement(
   const theirs = Number(theirTax ?? 0);
   if (Math.abs(theirs - Number(ourTax)) < 0.005) return null;
   return (
-    `QuickBooks calculated ${theirs.toFixed(2)} of sales tax where this order bills ` +
-    `${Number(ourTax).toFixed(2)}. Its total will differ from the customer's copy.`
+    `QuickBooks calculated $${theirs.toFixed(2)} of sales tax where this order ` +
+    `bills $${Number(ourTax).toFixed(2)}. Its total will differ from the ` +
+    `customer's copy.`
   );
 }
 

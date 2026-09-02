@@ -162,9 +162,22 @@ export type Connection = {
   invoice_item_ref: string | null;
 };
 
+/**
+ * ONE STRING LITERAL, NEVER A CONCATENATION. supabase-js parses a select list
+ * at the TYPE level, and `"a, b" + "c"` widens to `string`, which collapses the
+ * whole row to `GenericStringError` — so every column name here goes unchecked
+ * and the `as Connection` below is a cast over nothing. It was written as two
+ * joined halves and `deno check` had been failing on that cast since it shipped
+ * (found 2026-09-02, while a different unread column was being fixed).
+ *
+ * `lib/employeeEvents`' `EVENT_SELECT` carries the same rule for the same
+ * reason; that one cost 15 tsc errors when it was written this way.
+ *
+ * The tax code is deliberately absent: the payload arrives already carrying it,
+ * so this function never needs to look it up.
+ */
 const CONNECTION_COLUMNS =
-  "id, org_id, status, realm_id, environment, refresh_token, access_token, " +
-  "access_token_expires_at, bill_expense_account_ref, invoice_item_ref";
+  "id, org_id, status, realm_id, environment, refresh_token, access_token, access_token_expires_at, bill_expense_account_ref, invoice_item_ref";
 
 /** The row, or a refusal that says how to fix it. `admin` must be a
  *  service_role client — 081's table has no policies, so nothing else can read

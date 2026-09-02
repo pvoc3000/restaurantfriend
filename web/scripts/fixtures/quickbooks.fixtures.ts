@@ -516,9 +516,18 @@ test("a wholly untaxed order omits TxnTaxDetail and sends one NON line", () => {
 test("a disagreement about tax is reported, and agreement is silent", () => {
   eq(taxDisagreement(14.37, 14.37), null, "same");
   eq(taxDisagreement(14.37, 14.371), null, "within half a cent");
-  ok(taxDisagreement(14.37, 11.79)?.includes("11.79"), "names theirs");
-  ok(taxDisagreement(14.37, 11.79)?.includes("14.37"), "and ours");
-  ok(taxDisagreement(14.37, null)?.includes("0.00"), "a missing figure is zero, and still a difference");
+  // Money reads as money — the confirm two inches above it writes "$20.75".
+  ok(taxDisagreement(14.37, 11.79)?.includes("$11.79"), "names theirs, in dollars");
+  ok(taxDisagreement(14.37, 11.79)?.includes("$14.37"), "and ours");
+  ok(taxDisagreement(14.37, null)?.includes("$0.00"), "a missing figure is zero, and still a difference");
+  // The real sandbox reading, 2026-09-02: order #8786 billed 9.5% where the
+  // sandbox's California code is 8%. This is the sentence Mark saw.
+  eq(
+    taxDisagreement(20.75, 17.47),
+    "QuickBooks calculated $17.47 of sales tax where this order bills $20.75. " +
+      "Its total will differ from the customer's copy.",
+    "the sentence, whole"
+  );
 });
 
 test("only an invoiced or committed order is sent", () => {
