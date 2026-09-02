@@ -528,7 +528,22 @@ export function InvoiceDetail({
             )}
           </div>
           <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
-            {invoice.vendors?.name ?? "No vendor"} · {locationCode}
+            {invoice.vendors ? (
+              // Underlined AT REST, not on hover: the iPad has no hover, and a
+              // link the colour of the line it sits in reads as more subtitle.
+              <Link
+                href={withFrom(`/vendors/${invoice.vendors.id}`, {
+                  href: selfHref,
+                  label: invoice.invoice_number ?? "Invoice",
+                })}
+                className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+              >
+                {invoice.vendors.name}
+              </Link>
+            ) : (
+              "No vendor"
+            )}{" "}
+            · {locationCode}
             {invoice.due_date &&
               ` · ${AGING_LABEL[agingBucket(invoice.due_date, todayLocal())]}`}
           </p>
