@@ -434,6 +434,13 @@ import {
   invoicePushRefusals,
   invoiceSplit,
   taxDisagreement,
+  attachmentRefusal,
+  attachableMetadata,
+  attachableFromResponse,
+  recordedAttachments,
+  withAttachments,
+  attachmentsToSend,
+  INVOICE_SHEET_KEY,
   type InvoiceOrder,
   type InvoicePushInputs,
 } from "../../src/lib/quickbooks";
@@ -631,4 +638,88 @@ test("a comped order does not divide by zero", () => {
   });
   eq(taxableNet, 0, "no NaN");
   eq(nonTaxableNet, 0, "no NaN");
+});
+
+// ---------------------------------------------------------------------------
+// Attachments — every case here was measured against the sandbox on 2026-09-02
+// ---------------------------------------------------------------------------
+
+test("a refused file type is named, and WebP gets its own sentence", () => {
+  eq(attachmentRefusal("application/pdf", "scan.pdf"), null, "pdf goes (measured)");
+  eq(attachmentRefusal("image/jpeg", "photo.jpg"), null, "jpeg goes (measured)");
+  eq(attachmentRefusal("IMAGE/PNG", "x.png"), null, "case and space do not decide it");
+  // MEASURED REFUSED, code 6041 — and this app's own picker offers WebP, so it
+  // is the one refusal somebody can walk into having done nothing wrong.
+  ok(attachmentRefusal("image/webp", "invoice.webp")?.includes("WebP"), "webp names itself");
+  ok(attachmentRefusal("image/webp", "invoice.webp")?.includes("invoice.webp"), "and the file");
+  ok(attachmentRefusal("application/zip", "books.zip")?.includes("application/zip"), "anything else names the type");
+  ok(attachmentRefusal(null, null)?.includes("that file"), "a nameless file still gets a sentence");
+});
+
+test("the metadata part is what the upload endpoint wants", () => {
+  const meta = attachableMetadata({
+    entity: "Bill", entityId: "145", fileName: "scan.pdf", contentType: "application/pdf",
+  });
+  eq(JSON.stringify(meta.AttachableRef[0].EntityRef), '{"type":"Bill","value":"145"}', "the ref");
+  // NEVER true: QuickBooks emails nothing on this org's behalf (decision 2), so
+  // the only thing this could do is surprise somebody who pressed send in QBO.
+  eq(meta.AttachableRef[0].IncludeOnSend, false, "never included on send");
+  eq(meta.FileName, "scan.pdf", "the name");
+  eq(meta.ContentType, "application/pdf", "the type");
+});
+
+test("a refusal arrives as HTTP 200, so the ITEM is read and not the status", () => {
+  const good = attachableFromResponse({
+    AttachableResponse: [{ Attachable: { Id: "1000000021", Size: 773217 } }],
+  });
+  ok(good.ok, "accepted");
+  eq(good.ok ? good.id : null, "1000000021", "the attachable id");
+  eq(good.ok ? good.size : null, 773217, "and its size");
+
+  // The real sandbox refusal, verbatim.
+  const bad = attachableFromResponse({
+    AttachableResponse: [{
+      Fault: { Error: [{ Message: "Invalid Uploaded File", code: "6041" }], type: "ValidationFault" },
+    }],
+  });
+  eq(bad.ok, false, "a fault inside a 200 is still a failure");
+  eq(bad.ok ? null : bad.message, "Invalid Uploaded File (6041)", "in QuickBooks' own words");
+
+  // Neither an Attachable nor a Fault — believed once, this stores nothing and
+  // reports success, so the next push attaches a second copy.
+  eq(attachableFromResponse({ AttachableResponse: [{}] }).ok, false, "no id is not success");
+  eq(attachableFromResponse({}).ok, false, "no response at all is not success");
+  eq(attachableFromResponse(null).ok, false, "null is not success");
+});
+
+test("what has already been attached is remembered per document", () => {
+  const ref = { qbo: { id: "147", sync_token: "0", attachments: { "doc-a": "1000000001" } } };
+  eq(JSON.stringify(recordedAttachments(ref)), '{"doc-a":"1000000001"}', "read back");
+  eq(JSON.stringify(recordedAttachments({ qbo: { id: "1" } })), "{}", "none yet");
+  eq(JSON.stringify(recordedAttachments(null)), "{}", "never pushed");
+
+  // MERGES. Replacing would forget the first scan the moment a second is filed.
+  const next = withAttachments(ref, { "doc-b": "1000000011" });
+  eq(
+    JSON.stringify(recordedAttachments(next)),
+    '{"doc-a":"1000000001","doc-b":"1000000011"}',
+    "the second joins the first"
+  );
+  eq(next.qbo?.id, "147", "and nothing else on the ref moves");
+});
+
+test("a bill's scan goes up once, however often it is pushed", () => {
+  const docs = [
+    { id: "doc-a", kind: "invoice" },
+    { id: "doc-b", kind: "invoice" },
+    { id: "doc-c", kind: "receipt" },
+  ];
+  // MEASURED: posting the same file twice made TWO attachments, ids ...001 and
+  // ...011. Nothing in QuickBooks stops it, so this does.
+  eq(attachmentsToSend(docs, null).map((d) => d.id).join(","), "doc-a,doc-b", "both invoices, not the receipt");
+  const after = { qbo: { id: "147", attachments: { "doc-a": "1000000001" } } };
+  eq(attachmentsToSend(docs, after).map((d) => d.id).join(","), "doc-b", "the one already up is left alone");
+  const both = { qbo: { id: "147", attachments: { "doc-a": "1", "doc-b": "2" } } };
+  eq(attachmentsToSend(docs, both).length, 0, "a second push attaches nothing");
+  eq(INVOICE_SHEET_KEY, "sheet", "the customer sheet's own key");
 });

@@ -30,6 +30,7 @@
 // by anyone who found the URL.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 import {
   INTUIT_AUTHORIZE,
   QBO_SCOPE,
@@ -37,10 +38,95 @@ import {
   loadConnection,
   qboFetch,
   qboQuote,
+  qboUpload,
   readQboCreds,
   redirectUri,
   revokeToken,
 } from "../_shared/qbo.ts";
+
+/**
+ * One file to put on the QuickBooks document that was just written.
+ *
+ * `storage_path` means the bytes are already in the private `po-attachments`
+ * bucket and are fetched through the CALLER's client, so 018's storage policy
+ * decides — `extract-invoice`'s route. `pdf_base64` means the browser rendered
+ * it just now (the customer's own invoice sheet), which is `send-po-email`'s
+ * route and the only one available for a document that exists nowhere else.
+ */
+type AttachRequest = {
+  key: string;
+  file_name: string;
+  content_type: string;
+  metadata: unknown;
+  storage_path?: string;
+  pdf_base64?: string;
+};
+
+/**
+ * Upload each file and hand back what QuickBooks said, RAW.
+ *
+ * IT DOES NOT JUDGE THE ANSWER. A refused file returns HTTP 200 with a
+ * per-item `Fault`, and reading that is `attachableFromResponse` in
+ * `web/src/lib/quickbooks.ts` — fixture-pinned against the real sandbox
+ * refusal. Interpreting it here as well would be `taxDisagreement` again, which
+ * shipped as two copies a day earlier and had to be pulled back to one.
+ *
+ * THE ENTITY REF IS OVERWRITTEN, NEVER TRUSTED. The caller composes the
+ * metadata so its shape and `IncludeOnSend: false` stay in the pure module, but
+ * the pointer is replaced with the document this request actually created —
+ * otherwise a caller could hang a file on any transaction in the company file.
+ *
+ * A FAILURE HERE IS NEVER FATAL. The bill or invoice is already in QuickBooks
+ * by the time this runs; the paperwork not following it is worth a sentence,
+ * not a 500 that reads as the push having failed.
+ */
+async function runAttachments(
+  entity: string,
+  entityId: string,
+  requests: AttachRequest[],
+  supabase: SupabaseClient,
+  admin: SupabaseClient,
+  conn: Parameters<typeof qboUpload>[1]
+): Promise<{ key: string; response?: unknown; error?: string }[]> {
+  const out: { key: string; response?: unknown; error?: string }[] = [];
+
+  for (const r of requests.slice(0, 10)) {
+    try {
+      let bytes: Uint8Array;
+      if (r.storage_path) {
+        const { data, error } = await supabase.storage
+          .from("po-attachments")
+          .download(r.storage_path);
+        if (error || !data) {
+          out.push({ key: r.key, error: `Could not read ${r.file_name}: ${error?.message ?? "no file"}` });
+          continue;
+        }
+        bytes = new Uint8Array(await data.arrayBuffer());
+      } else if (r.pdf_base64) {
+        const bin = atob(r.pdf_base64);
+        bytes = new Uint8Array(bin.length);
+        for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      } else {
+        out.push({ key: r.key, error: `Nothing to attach for ${r.file_name}.` });
+        continue;
+      }
+
+      const meta = { ...(r.metadata as Record<string, unknown>) };
+      meta.AttachableRef = [
+        { EntityRef: { type: entity, value: String(entityId) }, IncludeOnSend: false },
+      ];
+
+      const response = await qboUpload(admin, conn, meta, bytes, r.file_name, r.content_type);
+      out.push({ key: r.key, response });
+    } catch (e) {
+      out.push({
+        key: r.key,
+        error: e instanceof QboError ? e.message : `Could not attach ${r.file_name}.`,
+      });
+    }
+  }
+  return out;
+}
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -303,6 +389,10 @@ Deno.serve(async (req) => {
         invoice_id?: string;
         entity?: string;
         payload?: Record<string, unknown>;
+        /** Paperwork to put on the bill once it exists. The caller decides
+         *  WHICH — `attachmentsToSend` skips anything already up, because a
+         *  second upload of the same file makes a second copy (measured). */
+        attachments?: AttachRequest[];
       };
       if (!req.invoice_id || !req.entity || !req.payload) {
         return json(400, { error: "missing invoice_id, entity or payload" });
@@ -435,6 +525,14 @@ Deno.serve(async (req) => {
         });
       }
 
+      // The invoice scan, AFTER the bill is recorded — the document has to
+      // exist before anything can hang off it, and if this half fails the bill
+      // is still safely on the books and recorded as such.
+      const attachRequests = (req.attachments ?? []) as AttachRequest[];
+      const attachmentResults = attachRequests.length
+        ? await runAttachments(req.entity!, String(doc.Id), attachRequests, supabase, admin, conn)
+        : [];
+
       await admin
         .from("accounting_connections")
         .update({ last_used_at: new Date().toISOString() })
@@ -447,6 +545,7 @@ Deno.serve(async (req) => {
         doc_number: ref.qbo.doc_number,
         sync_token: ref.qbo.sync_token,
         updated: Boolean((req.payload as { Id?: string }).Id),
+        attachment_results: attachmentResults,
       });
     }
 
@@ -635,6 +734,12 @@ Deno.serve(async (req) => {
          *  tax warning itself (see `theirTax` below). Still declared so a page
          *  loaded before this deploy is not refused for sending it. */
         our_tax?: number;
+        /** The customer's own invoice sheet, rendered by the browser just now
+         *  and posted as base64 — `send-po-email`'s route, and the only one
+         *  available for a document that is not stored anywhere. */
+        attachments?: AttachRequest[];
+        /** The sheet already on this invoice, to remove first. See below. */
+        replace_attachable_id?: string;
       };
       if (!req.order_id || !req.payload) {
         return json(400, { error: "missing order_id or payload" });
@@ -732,6 +837,35 @@ Deno.serve(async (req) => {
         });
       }
 
+      // THE CUSTOMER SHEET IS REPLACED, NOT ADDED TO. It is rendered from the
+      // figures this push just sent, so a second push means the figures moved
+      // and the old copy now disagrees with the invoice it hangs off — the
+      // opposite of a bill's scan, which never changes and is left alone.
+      // A failed delete is ignored on purpose: somebody may have removed it in
+      // QuickBooks, and refusing to attach the new one over that would leave
+      // the invoice with no paperwork at all. Measured — deleting one that is
+      // already gone answers HTTP 400 "Object Not Found".
+      //
+      // `SyncToken: "0"` IS NOT A GUESS. QuickBooks ignores the token on an
+      // Attachable delete: a deliberately wrong "9" deleted the object anyway
+      // (measured 2026-09-02), so this needs no extra round trip to read the
+      // current one — which matters, because a stale token that DID bite would
+      // leave the old sheet in place beside the new one.
+      const stale = (req.replace_attachable_id ?? "").toString().trim();
+      if (stale) {
+        try {
+          await qboFetch(admin, conn, "attachable?operation=delete", {
+            method: "POST",
+            body: JSON.stringify({ Id: stale, SyncToken: "0" }),
+          });
+        } catch { /* it is gone, or it was never there */ }
+      }
+
+      const sheet = req.attachments as AttachRequest[] | undefined;
+      const attachmentResults = sheet?.length
+        ? await runAttachments("Invoice", String(doc.Id), sheet, supabase, admin, conn)
+        : [];
+
       return json(200, {
         entity: "Invoice",
         warnings,
@@ -740,6 +874,7 @@ Deno.serve(async (req) => {
         total: Number(doc.TotalAmt ?? 0),
         tax: theirTax,
         updated: Boolean((req.payload as { Id?: string }).Id),
+        attachment_results: attachmentResults,
       });
     }
 

@@ -69,6 +69,12 @@ export type AccountingRef = {
     sync_token?: string;
     /** What QBO shows in its own register, for the "In QuickBooks as…" line. */
     doc_number?: string | null;
+    /** Our key → the QuickBooks `Attachable` id we already sent for it, so a
+     *  re-push does not put a second copy of the same paperwork in the books.
+     *  Keyed by OUR id (a `purchase_order_attachments` row, or the literal
+     *  `INVOICE_SHEET_KEY` for the rendered customer sheet), never by filename,
+     *  which somebody can rename inside QuickBooks. */
+    attachments?: Record<string, string>;
     entity?: QboEntity;
   };
 };
@@ -699,3 +705,158 @@ export function invoiceSplit(totals: {
   const nonTaxableNet = round2(totals.total - totals.tax - taxableNet);
   return { taxableNet, nonTaxableNet };
 }
+
+// ---------------------------------------------------------------------------
+// Attachments
+// ---------------------------------------------------------------------------
+
+/**
+ * Putting the paperwork on the QuickBooks document (Mark, 2026-09-02: "we
+ * should add a copy of the invoice to the qbo bills, and a copy of the special
+ * order invoice sheet to the qbo invoice").
+ *
+ * Everything below was MEASURED against the sandbox rather than read, because
+ * Intuit's docs render client-side and could not be quoted. `POST /upload` takes
+ * multipart with two parts per file — `file_metadata_01` (JSON) and
+ * `file_content_01` (the bytes) — and answers with an `AttachableResponse`.
+ *
+ * THE TWO FINDINGS THAT SHAPE THIS CODE:
+ *
+ * 1. A SECOND UPLOAD MAKES A SECOND COPY. There is no idempotency and no
+ *    upsert: the same file posted twice came back as ids 1000000001 and
+ *    1000000011, both attached. So what has already been sent is recorded on
+ *    the document's own `external_ref`, and a re-push consults it.
+ *
+ * 2. A REFUSED FILE RETURNS HTTP 200. The fault is per-item, inside
+ *    `AttachableResponse[0].Fault` — the same shape as `extract-invoice`'s
+ *    `stop_reason: "refusal"`, where the status line is not the answer. Read
+ *    the item, never the status.
+ *
+ * And one that is latent today: `image/webp` is REFUSED (code 6041) while
+ * `ATTACHMENT_ACCEPT` offers it, so a photographed invoice saved as WebP files
+ * happily here and cannot go to QuickBooks. All 62 documents on file today are
+ * PDFs, so nobody has met it yet.
+ */
+
+/**
+ * What QuickBooks will take. `application/pdf` and `image/jpeg` are measured;
+ * the rest are Intuit's published list. Deliberately NOT a guess at everything
+ * it might accept — a type wrongly listed here fails at upload, four seconds
+ * after a bill has already reached the books, where a type wrongly missing is
+ * refused up front in a sentence naming it.
+ */
+export const QBO_ATTACHMENT_TYPES = [
+  "application/pdf",
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/tiff",
+  "image/bmp",
+] as const;
+
+/** Why this file cannot go to QuickBooks, or null when it can. */
+export function attachmentRefusal(
+  contentType: string | null | undefined,
+  fileName: string | null | undefined
+): string | null {
+  const type = (contentType ?? "").trim().toLowerCase();
+  if (QBO_ATTACHMENT_TYPES.includes(type as (typeof QBO_ATTACHMENT_TYPES)[number])) return null;
+  const name = (fileName ?? "").trim() || "that file";
+  // WebP gets its own sentence because this app's own file picker offers it,
+  // so it is the one refusal somebody can walk into by doing nothing wrong.
+  if (type === "image/webp") {
+    return `QuickBooks does not accept WebP images, so ${name} was not attached. A PDF or a JPEG would go.`;
+  }
+  return `QuickBooks does not accept ${type || "that kind of file"}, so ${name} was not attached.`;
+}
+
+/** The `file_metadata_01` part. `IncludeOnSend` is always false — QuickBooks
+ *  never emails anything on this org's behalf (decision 2), so the only thing
+ *  it could do is surprise somebody who pressed send inside QuickBooks. */
+export function attachableMetadata(input: {
+  entity: QboEntity;
+  entityId: string;
+  fileName: string;
+  contentType: string;
+}) {
+  return {
+    AttachableRef: [
+      {
+        EntityRef: { type: input.entity, value: String(input.entityId) },
+        IncludeOnSend: false,
+      },
+    ],
+    FileName: input.fileName,
+    ContentType: input.contentType,
+  };
+}
+
+/**
+ * The id QuickBooks gave the attachment — or a refusal in its own words.
+ *
+ * Reads the ITEM, not the HTTP status: a rejected file comes back 200 with a
+ * `Fault` inside the response array, so a status check alone reports success
+ * and stores nothing.
+ */
+export function attachableFromResponse(
+  json: unknown
+): { ok: true; id: string; size: number | null } | { ok: false; message: string } {
+  const item = (json as { AttachableResponse?: unknown[] } | null)?.AttachableResponse?.[0] as
+    | {
+        Attachable?: { Id?: unknown; Size?: unknown };
+        Fault?: { Error?: { Message?: string; Detail?: string; code?: string }[] };
+      }
+    | undefined;
+
+  const fault = item?.Fault?.Error?.[0];
+  if (fault) {
+    const code = fault.code ? ` (${fault.code})` : "";
+    return { ok: false, message: `${fault.Message ?? "QuickBooks refused the file"}${code}` };
+  }
+  const id = item?.Attachable?.Id;
+  if (id === undefined || id === null || String(id).trim() === "") {
+    return { ok: false, message: "QuickBooks accepted the upload but named no attachment." };
+  }
+  const size = Number(item?.Attachable?.Size);
+  return { ok: true, id: String(id), size: Number.isFinite(size) ? size : null };
+}
+
+/** What this document has already put in QuickBooks: our own key → its
+ *  Attachable id. Keyed by OUR id so a second scan filed later is known to be
+ *  new, and so nothing depends on a filename somebody may rename in QBO. */
+export function recordedAttachments(
+  external_ref: AccountingRef | null | undefined
+): Record<string, string> {
+  const map = external_ref?.qbo?.attachments;
+  return map && typeof map === "object" ? map : {};
+}
+
+/** The ref to store after attaching. Merges rather than replaces, so a
+ *  previously attached document is not forgotten by a push that adds one. */
+export function withAttachments(
+  external_ref: AccountingRef,
+  added: Record<string, string>
+): AccountingRef {
+  const qbo = external_ref.qbo ?? {};
+  return {
+    ...external_ref,
+    qbo: { ...qbo, attachments: { ...recordedAttachments(external_ref), ...added } },
+  };
+}
+
+/** Which filed documents still need to go up. A bill's scan never changes, so
+ *  one already attached is left alone — re-pushing a bill must not put a
+ *  second copy of the same invoice in the books. */
+export function attachmentsToSend<T extends { id: string; kind?: string | null }>(
+  documents: T[],
+  external_ref: AccountingRef | null | undefined,
+  kind = "invoice"
+): T[] {
+  const sent = recordedAttachments(external_ref);
+  return documents.filter((d) => (d.kind ?? "") === kind && !sent[d.id]);
+}
+
+/** The key the rendered customer sheet is recorded under. A/R attaches ONE
+ *  document and re-renders it from live figures, so it has no row id to key on
+ *  and its previous copy is replaced rather than added to. */
+export const INVOICE_SHEET_KEY = "sheet";

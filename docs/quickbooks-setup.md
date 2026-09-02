@@ -68,6 +68,27 @@ before parsing, so a newline glued to a pasted value is survivable — but a
 truncated secret still fails at Intuit with `invalid_client`, which is reported
 by name.
 
+### What goes up with a document
+
+A pushed **bill** carries whatever is filed on it as an **invoice** — a
+two-page scan is two documents and both go. A pushed **customer invoice**
+carries the invoice sheet, rendered at push time off the same component the
+customer's emailed copy comes from.
+
+Three things worth knowing, all measured against the sandbox rather than read:
+
+- **A second upload makes a second copy.** QuickBooks has no upsert for
+  attachments, so what has gone up is recorded on the document's own
+  `external_ref` and a re-push skips it. A bill's scan never changes, so it is
+  left alone; the customer sheet is re-rendered from live figures, so the old
+  one is deleted and replaced.
+- **A refused file comes back HTTP 200** with the fault inside the response
+  item. It is reported as a warning beside the push, never as a failure — by
+  then the money is already on the books.
+- **QuickBooks will not take WebP**, though the app's own Attach button offers
+  it. A photographed invoice saved as WebP files fine here and is refused
+  there, in a sentence saying so. Every document on file today is a PDF.
+
 **Sandbox and production keys are different.** Switching environment means
 setting `QBO_CREDS` again with that environment's pair, and reconnecting.
 

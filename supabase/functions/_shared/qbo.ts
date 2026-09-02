@@ -449,7 +449,15 @@ export async function qboFetch(
     headers: {
       Authorization: `Bearer ${token}`,
       Accept: "application/json",
-      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      // NOT on a multipart body: `fetch` has to set that header itself so it
+      // can put the generated boundary in it, and naming it here produces a
+      // Content-Type with no boundary at all — which QuickBooks answers with a
+      // fault about the request body rather than about the file, so it reads
+      // like a bad attachment. The upload path is the only caller that sends
+      // FormData.
+      ...(init.body && !(init.body instanceof FormData)
+        ? { "Content-Type": "application/json" }
+        : {}),
       ...(init.headers ?? {}),
     },
   });
@@ -517,4 +525,44 @@ export function faultMessage(text: string, status: number): string {
  *  Single quotes double, exactly like SQL. */
 export function qboQuote(value: string): string {
   return `'${value.replace(/'/g, "''")}'`;
+}
+
+
+/**
+ * Put one file on a QuickBooks document.
+ *
+ * `POST /upload` is multipart with two parts — `file_metadata_01` (JSON) and
+ * `file_content_01` (the bytes). It goes through `qboFetch` rather than its own
+ * `fetch` so it inherits the token refresh, the 401 → disconnected path, the
+ * rate-limit sentence and the `intuit_tid` capture; the one thing that had to
+ * change there is the Content-Type, above.
+ *
+ * IT RETURNS THE RESPONSE, IT DOES NOT JUDGE IT. A refused file comes back
+ * HTTP 200 with a per-item `Fault`, so `qboFetch` sees success — the reading is
+ * `attachableFromResponse` in `web/src/lib/quickbooks.ts`, and the caller
+ * applies it. Deciding here would put that rule in two places, which is the
+ * mistake `taxDisagreement` had to be pulled back out of a day earlier.
+ *
+ * The whole response is deliberately NOT logged or stored: it carries a
+ * `TempDownloadUri` holding an Intuit API key and a user auth token.
+ */
+export async function qboUpload(
+  admin: SupabaseClient,
+  conn: Connection,
+  metadata: unknown,
+  bytes: Uint8Array,
+  fileName: string,
+  contentType: string
+): Promise<unknown> {
+  const form = new FormData();
+  form.append(
+    "file_metadata_01",
+    new Blob([JSON.stringify(metadata)], { type: "application/json" })
+  );
+  form.append(
+    "file_content_01",
+    new Blob([bytes as BlobPart], { type: contentType }),
+    fileName
+  );
+  return await qboFetch(admin, conn, "upload", { method: "POST", body: form });
 }

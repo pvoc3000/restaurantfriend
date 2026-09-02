@@ -487,6 +487,7 @@ export async function SpecialOrderDetail({
                 status={(row.status as string | null) ?? null}
                 ignoreBalance={Boolean(row.ignore_balance)}
                 invoiceDate={(row.date_initiated as string | null) ?? null}
+                today={today}
                 customerId={(row.customer_id as string | null) ?? null}
                 customerName={customerLabel(row.customers as never) || "this customer"}
                 totals={totals}

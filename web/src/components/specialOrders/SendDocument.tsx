@@ -13,7 +13,6 @@ import {
   DOCUMENT_LABEL,
   buildDocumentEmail,
   documentFileName,
-  fetchOrderDocData,
   type DocumentKind,
   type EmailParts,
   type OrderDocData,
@@ -35,6 +34,7 @@ import {
   type WorkflowOrder,
 } from "@/lib/orderWorkflow";
 import { WorkflowOffer } from "./WorkflowOffer";
+import { renderOrderDocument } from "./renderOrderDocument";
 
 /**
  * PRODUCE AND SEND — decision 11's four documents and decision 12's compose
@@ -133,21 +133,10 @@ export function SendDocument({
     }
   }
 
-  async function render(k: DocumentKind) {
-    const [{ pdf }, docs, data] = await Promise.all([
-      import("@react-pdf/renderer"),
-      import("./pdf/SpecialOrderPdfs"),
-      fetchOrderDocData(supabase, [orderId]),
-    ]);
-    if (data.orders.length === 0) throw new Error("Order not found");
-    const order = data.orders[0];
-    // The org's own today, for the kitchen sheet's AS OF line — the same value
-    // the file name already falls back to.
-    const blob = await pdf(
-      docs.documentElement(k, [order], data.org, null, today)
-    ).toBlob();
-    return { blob, order, org: data.org };
-  }
+  // Shared with `PushOrderToQuickBooks`, which attaches this same document to
+  // the QuickBooks invoice — the customer's copy and QuickBooks' copy must be
+  // the same paper, so they must come off the same renderer.
+  const render = (k: DocumentKind) => renderOrderDocument(supabase, orderId, k, today);
 
   const preview = (k: DocumentKind) => {
     // Before any await, while the click gesture still counts. The menu closes

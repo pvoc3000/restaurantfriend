@@ -12,9 +12,16 @@ import {
   pushedLabel,
   qboVendorId,
   taxDisagreement,
+  attachableMetadata,
+  attachableFromResponse,
+  recordedAttachments,
+  withAttachments,
+  INVOICE_SHEET_KEY,
   type AccountingRef,
   type InvoiceOrder,
 } from "@/lib/quickbooks";
+import { documentFileName } from "@/lib/specialOrderDocs";
+import { renderOrderDocument, blobToBase64 } from "./renderOrderDocument";
 
 /**
  * Sending one special order to QuickBooks as an Invoice.
@@ -48,6 +55,7 @@ export function PushOrderToQuickBooks({
   status,
   ignoreBalance,
   invoiceDate,
+  today,
   customerId,
   customerName,
   totals,
@@ -61,6 +69,8 @@ export function PushOrderToQuickBooks({
   ignoreBalance: boolean;
   /** `date_initiated` — when the order was written. Not the event date. */
   invoiceDate: string | null;
+  /** The org's own calendar day, for the rendered sheet's file name. */
+  today: string;
   customerId: string | null;
   customerName: string;
   totals: Totals;
@@ -139,6 +149,12 @@ export function PushOrderToQuickBooks({
   };
   const refusals = invoicePushRefusals(inputs);
   const already = pushedLabel(ctx.orderRef);
+  /** The document id, when there is one — a placeholder for the metadata the
+   *  server overwrites anyway, and on a first push there is nothing yet. */
+  const qboRefId = ctx.orderRef?.qbo?.id ?? null;
+  /** The sheet already on this invoice, which a re-push replaces rather than
+   *  adds to: it was rendered from figures that have since moved. */
+  const previousSheet = recordedAttachments(ctx.orderRef)[INVOICE_SHEET_KEY] ?? null;
 
   async function push() {
     const { body } = buildInvoicePayload(inputs);
@@ -156,16 +172,82 @@ export function PushOrderToQuickBooks({
     setBusy(true);
     setError(null);
     setWarnings([]);
+
+    // THE CUSTOMER'S OWN INVOICE SHEET, off the same renderer that produces the
+    // copy they were emailed (Mark, 2026-09-02). Rendered NOW rather than
+    // reusing a filed one, so the paper on the QuickBooks invoice states the
+    // figures that invoice was just given — a previously emailed copy can
+    // legitimately show different ones, and hanging that off this transaction
+    // would be two documents disagreeing in the same place.
+    //
+    // A RENDER FAILURE MUST NOT STOP THE PUSH. Getting the money into the books
+    // is the point; the paperwork is worth a sentence if it does not follow.
+    const localWarnings: string[] = [];
+    let sheet: { key: string; file_name: string; content_type: string; metadata: unknown; pdf_base64: string } | undefined;
+    try {
+      const { blob } = await renderOrderDocument(supabase, orderId, "invoice", today);
+      const fileName = documentFileName("invoice", number ?? "", invoiceDate ?? today);
+      sheet = {
+        key: INVOICE_SHEET_KEY,
+        file_name: fileName,
+        content_type: "application/pdf",
+        // The entity ref is overwritten server-side with the invoice it really
+        // created — this composes the shape and `IncludeOnSend: false`.
+        metadata: attachableMetadata({
+          entity: "Invoice",
+          entityId: qboRefId ?? "0",
+          fileName,
+          contentType: "application/pdf",
+        }),
+        pdf_base64: await blobToBase64(blob),
+      };
+    } catch {
+      localWarnings.push("The invoice sheet could not be rendered, so nothing was attached in QuickBooks.");
+    }
+
     const { data, message } = await invokeQbo(supabase, {
       mode: "push_invoice",
       order_id: orderId,
       payload: body,
       our_tax: totals.tax,
+      ...(sheet ? { attachments: [sheet] } : {}),
+      ...(previousSheet ? { replace_attachable_id: previousSheet } : {}),
     });
     setBusy(false);
     if (message) {
       setError(message);
       return;
+    }
+
+    // What QuickBooks said about the file, read by the pure rule: a refusal
+    // arrives as HTTP 200 with a Fault inside, so the status told us nothing.
+    const added: Record<string, string> = {};
+    for (const r of (data?.attachment_results as { key: string; response?: unknown; error?: string }[]) ?? []) {
+      if (r.error) { localWarnings.push(r.error); continue; }
+      const read = attachableFromResponse(r.response);
+      if (read.ok) added[r.key] = read.id;
+      else localWarnings.push(`The invoice sheet was not attached: ${read.message}`);
+    }
+    if (Object.keys(added).length > 0) {
+      const ref = withAttachments(
+        {
+          qbo: {
+            id: data?.qbo_id as string,
+            sync_token: (data?.sync_token as string) ?? undefined,
+            doc_number: (data?.doc_number as string) ?? null,
+            entity: "Invoice",
+          },
+        },
+        added
+      );
+      // Its own write, because the id only exists after the upload. A failure
+      // here costs one duplicated attachment on the next push, never the money.
+      const { error: refErr } = await supabase
+        .from("special_orders")
+        .update({ external_ref: ref })
+        .eq("id", orderId)
+        .select("id");
+      if (refErr) localWarnings.push("The attachment went up but was not recorded, so pushing again would attach a second copy.");
     }
     // The tax sentence is composed HERE, from the figure QuickBooks returned,
     // by the same fixture-tested rule the fixtures cover — `qbo-sync` had its
@@ -173,7 +255,11 @@ export function PushOrderToQuickBooks({
     // `warnings` now carry only what the server alone can see, so the two are
     // concatenated rather than one replacing the other.
     const theirs = taxDisagreement(totals.tax, data?.tax as number | undefined);
-    setWarnings([...((data?.warnings as string[]) ?? []), ...(theirs ? [theirs] : [])]);
+    setWarnings([
+      ...((data?.warnings as string[]) ?? []),
+      ...(theirs ? [theirs] : []),
+      ...localWarnings,
+    ]);
     setSent(
       `${data?.updated ? "Updated" : "Sent"} as Invoice ${
         (data?.doc_number as string) ?? (data?.qbo_id as string)

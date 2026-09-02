@@ -14,6 +14,11 @@ import {
   qboTrackingFor,
   qboVendorId,
   splitAccountName,
+  attachableMetadata,
+  attachableFromResponse,
+  attachmentRefusal,
+  attachmentsToSend,
+  withAttachments,
   type AccountingRef,
   type BillInvoice,
   type VendorLocationAccounting,
@@ -43,6 +48,9 @@ type Ctx = {
   atShop: VendorLocationAccounting | null;
   schemaError: string | null;
   invoiceRef: AccountingRef | null;
+  /** What is filed on this bill. The `invoice` ones go up with it (Mark,
+   *  2026-09-02) — a two-page scan is two rows and QuickBooks should get both. */
+  documents: { id: string; kind: string | null; file_name: string | null; content_type: string | null; storage_path: string }[];
 };
 
 export function PushToQuickBooks({
@@ -87,7 +95,7 @@ export function PushToQuickBooks({
   const [balance, setBalance] = useState<{ text: string; at: string } | null>(null);
 
   const readContext = useCallback(async (): Promise<Ctx> => {
-    const [conn, vendor, invoice, atShop] = await Promise.all([
+    const [conn, vendor, invoice, atShop, docs] = await Promise.all([
       supabase.rpc("accounting_connection_status", { p_org: orgId }),
       supabase.from("vendors").select("name").eq("id", vendorId).maybeSingle(),
       supabase.from("vendor_invoices").select("external_ref").eq("id", invoiceId).maybeSingle(),
@@ -102,6 +110,10 @@ export function PushToQuickBooks({
         .eq("vendor_id", vendorId)
         .eq("location_id", locationId)
         .maybeSingle(),
+      supabase
+        .from("purchase_order_attachments")
+        .select("id, kind, file_name, content_type, storage_path")
+        .eq("invoice_id", invoiceId),
     ]);
 
     const row = Array.isArray(conn.data)
@@ -119,6 +131,7 @@ export function PushToQuickBooks({
       atShop: (atShop.data ?? null) as VendorLocationAccounting | null,
       schemaError: atShop.error?.message ?? null,
       invoiceRef: (invoice.data?.external_ref ?? null) as AccountingRef | null,
+      documents: (docs.data ?? []) as Ctx["documents"],
     };
   }, [supabase, orgId, vendorId, locationId, invoiceId]);
 
@@ -158,6 +171,9 @@ export function PushToQuickBooks({
     accountRef: account?.ref ?? null,
   });
   const already = pushedLabel(ctx.invoiceRef);
+  /** A placeholder for the metadata's entity ref, which the server overwrites
+   *  with the document it actually wrote — on a first push there is none. */
+  const qboRefId = ctx.invoiceRef?.qbo?.id ?? null;
 
   async function checkBalance() {
     setBusy(true);
@@ -220,18 +236,80 @@ export function PushToQuickBooks({
     setBusy(true);
     setError(null);
     setWarnings([]);
+
+    // THE SCAN GOES WITH THE BILL (Mark, 2026-09-02). Only what is filed as an
+    // `invoice`, and only what is not already up there: a second upload of the
+    // same file makes a SECOND attachment — QuickBooks has no upsert, measured.
+    const localWarnings: string[] = [];
+    const files = attachmentsToSend(ctx!.documents, ctx!.invoiceRef)
+      .filter((d) => {
+        const no = attachmentRefusal(d.content_type, d.file_name);
+        if (no) localWarnings.push(no);
+        return !no;
+      })
+      .map((d) => ({
+        key: d.id,
+        file_name: d.file_name ?? "invoice.pdf",
+        content_type: d.content_type ?? "application/pdf",
+        storage_path: d.storage_path,
+        // The server overwrites the entity ref with the bill it really wrote;
+        // this composes the shape and `IncludeOnSend: false`.
+        metadata: attachableMetadata({
+          entity,
+          entityId: qboRefId ?? "0",
+          fileName: d.file_name ?? "invoice.pdf",
+          contentType: d.content_type ?? "application/pdf",
+        }),
+      }));
+
     const { data, message } = await invokeQbo(supabase, {
       mode: "push_bill",
       invoice_id: invoiceId,
       entity,
       payload,
+      ...(files.length ? { attachments: files } : {}),
     });
     setBusy(false);
     if (message) {
       setError(message);
       return;
     }
-    setWarnings((data?.warnings as string[]) ?? []);
+
+    // A refusal arrives as HTTP 200 with a Fault inside the item, so the status
+    // said nothing — the pure rule reads it.
+    const added: Record<string, string> = {};
+    for (const r of (data?.attachment_results as { key: string; response?: unknown; error?: string }[]) ?? []) {
+      if (r.error) { localWarnings.push(r.error); continue; }
+      const read = attachableFromResponse(r.response);
+      if (read.ok) added[r.key] = read.id;
+      else localWarnings.push(`The invoice scan was not attached: ${read.message}`);
+    }
+    if (Object.keys(added).length > 0) {
+      // Recorded through 081's definer, like the push itself — `external_ref`
+      // is writable straight through PostgREST otherwise, which is the whole
+      // reason that function exists. Its merge replaces the `qbo` branch whole,
+      // so the full branch goes back.
+      const ref = withAttachments(
+        {
+          qbo: {
+            id: data?.qbo_id as string,
+            sync_token: (data?.sync_token as string) ?? undefined,
+            doc_number: (data?.doc_number as string) ?? null,
+            entity,
+          },
+        },
+        added
+      );
+      const { data: rec, error: refErr } = await supabase.rpc("record_accounting_push", {
+        p_invoice: invoiceId,
+        p_ref: ref,
+      });
+      if (refErr || !Array.isArray(rec) || rec.length === 0) {
+        localWarnings.push("The scan went up but was not recorded, so pushing again would attach a second copy.");
+      }
+    }
+
+    setWarnings([...((data?.warnings as string[]) ?? []), ...localWarnings]);
     setSent(
       `${data?.updated ? "Updated" : "Sent"} as ${entity} ${
         (data?.doc_number as string) ?? (data?.qbo_id as string)
