@@ -89,6 +89,21 @@ Three things worth knowing, all measured against the sandbox rather than read:
   it. A photographed invoice saved as WebP files fine here and is refused
   there, in a sentence saying so. Every document on file today is a PDF.
 
+### If somebody edits a bill inside QuickBooks
+
+Nothing breaks. An update carries the version we last saw, so a document changed
+in QuickBooks since it was last sent from here is refused the first time —
+QuickBooks calls it a stale object and words it as *"You and <a colleague> were
+working on this at the same time"*. The push re-reads the current version and
+sends again, **once**, and says so afterwards: *"This had been changed in
+QuickBooks since it was last sent from here… Your update was applied on top of
+that change."*
+
+Worth reading when you see it, because it means exactly that — your figures
+have just overwritten somebody's edit. Only ever once, and only on an update: a
+new document cannot be stale, and retrying one that failed for another reason
+is how you write it twice.
+
 **Sandbox and production keys are different.** Switching environment means
 setting `QBO_CREDS` again with that environment's pair, and reconnecting.
 

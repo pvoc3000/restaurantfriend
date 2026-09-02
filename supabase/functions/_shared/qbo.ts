@@ -51,10 +51,41 @@ import type { SupabaseClient } from "npm:@supabase/supabase-js@2";
 export class QboError extends Error {
   constructor(
     message: string,
-    readonly status: number
+    readonly status: number,
+    /** QuickBooks' own fault code, when it gave one — `5010` is the stale
+     *  object a caller can recover from by re-reading and pushing again. The
+     *  MESSAGE is for a person and must not be matched on: Intuit words 5010 as
+     *  "You and <a name> were working on this at the same time", so the name of
+     *  a colleague is part of the string. */
+    readonly faultCode: string | null = null
   ) {
     super(message);
   }
+}
+
+/** QuickBooks' fault code, or null when the body carried none. */
+export function faultCode(text: string): string | null {
+  try {
+    const body = JSON.parse(text) as {
+      Fault?: { Error?: { code?: string }[] };
+    };
+    const code = body.Fault?.Error?.[0]?.code;
+    return code ? String(code) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The document has moved since we last read it.
+ *
+ * QuickBooks answers 5010 when the SyncToken on an update is behind — somebody
+ * edited the bill inside QuickBooks, or an attachment bumped it. The document
+ * is fine and the cure is to re-read the token and push again, which is what
+ * `postWithStaleRetry` does.
+ */
+export function isStaleObject(e: unknown): boolean {
+  return e instanceof QboError && e.faultCode === "5010";
 }
 
 // ---------------------------------------------------------------------------
@@ -493,7 +524,8 @@ export async function qboFetch(
 
   throw new QboError(
     `QuickBooks refused the request: ${faultMessage(text, res.status)}${tidSuffix(tid)}`,
-    502
+    502,
+    faultCode(text)
   );
 }
 

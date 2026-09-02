@@ -38,6 +38,7 @@ import {
   loadConnection,
   qboFetch,
   qboQuote,
+  isStaleObject,
   qboUpload,
   readQboCreds,
   redirectUri,
@@ -162,6 +163,73 @@ async function currentSyncToken(
     return fallback;
   }
 }
+
+/**
+ * Post a document, and if QuickBooks says our copy is stale, re-read the token
+ * and post it once more.
+ *
+ * WHY THIS EXISTS. An update carries the `SyncToken` we last saw. Anything that
+ * touches the document in QuickBooks moves it — a bookkeeper editing the bill,
+ * or an attachment going on — and the next update is then refused with fault
+ * 5010. Before this, that was UNRECOVERABLE FROM THE APP: nothing re-read the
+ * token, so a bill somebody had edited in QuickBooks could never be updated
+ * from here again, and the message blamed a colleague by name ("You and Craig
+ * Carlson were working on this at the same time"). `lib/quickbooks.ts` has
+ * called 5010 "recoverable — re-read and push again" since the day it shipped
+ * while offering no way to do either.
+ *
+ * ONCE, AND ONLY ON AN UPDATE.
+ *   · A CREATE cannot be stale — it names no Id — and retrying one that failed
+ *     for some other reason is how you write the document twice.
+ *   · Once, not until it works: a document somebody is actively editing would
+ *     spin, and each turn of the loop is a write to a customer's books.
+ *   · Only on 5010, matched on the CODE. The message names a person and is
+ *     Intuit's to reword.
+ *
+ * The retry re-reads the token from QuickBooks rather than incrementing the one
+ * we hold: the document may have moved by several, and a guess that happens to
+ * be right is worse than one that fails, because it teaches you to trust it.
+ */
+async function postDocument(
+  admin: SupabaseClient,
+  conn: Parameters<typeof qboUpload>[1],
+  entity: string,
+  payload: Record<string, unknown>
+): Promise<{ saved: Record<string, Record<string, unknown>>; retried: boolean }> {
+  const path = entity.toLowerCase();
+  try {
+    const saved = (await qboFetch(admin, conn, path, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    })) as Record<string, Record<string, unknown>>;
+    return { saved, retried: false };
+  } catch (e) {
+    const id = payload.Id;
+    if (!isStaleObject(e) || id === undefined || id === null || String(id).trim() === "") {
+      throw e;
+    }
+    const fresh = await currentSyncToken(
+      admin, conn, entity, String(id), String(payload.SyncToken ?? "")
+    );
+    // Unchanged token means the re-read failed or told us what we already knew,
+    // and pushing the same thing again would fail the same way. Report the
+    // original refusal, which at least names the fault.
+    if (String(fresh) === String(payload.SyncToken ?? "")) throw e;
+
+    const saved = (await qboFetch(admin, conn, path, {
+      method: "POST",
+      body: JSON.stringify({ ...payload, SyncToken: String(fresh) }),
+    })) as Record<string, Record<string, unknown>>;
+    return { saved, retried: true };
+  }
+}
+
+/** Said out loud when a push had to re-read the token first: something else
+ *  moved the document, and the person should know their update landed ON TOP of
+ *  a change they have not seen. Yellow, not red — it worked. */
+const STALE_RETRY_NOTE =
+  "This had been changed in QuickBooks since it was last sent from here, so it " +
+  "was re-read first. Your update was applied on top of that change.";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -491,11 +559,7 @@ Deno.serve(async (req) => {
       }
 
       const conn = await loadConnection(admin, orgId);
-      const path = req.entity.toLowerCase();
-      const saved = (await qboFetch(admin, conn, path, {
-        method: "POST",
-        body: JSON.stringify(req.payload),
-      })) as Record<string, Record<string, unknown>>;
+      const { saved, retried } = await postDocument(admin, conn, req.entity, req.payload);
 
       const doc = saved?.[req.entity];
 
@@ -506,6 +570,7 @@ Deno.serve(async (req) => {
       // while quietly dropping half the coding is the exact shape this app
       // spends its time refusing, so the answer is checked rather than assumed.
       const warnings: string[] = [];
+      if (retried) warnings.push(STALE_RETRY_NOTE);
       const sentDept = (req.payload as { DepartmentRef?: unknown }).DepartmentRef;
       if (sentDept && !doc?.DepartmentRef) {
         warnings.push(
@@ -828,10 +893,7 @@ Deno.serve(async (req) => {
       }
 
       const conn2 = await loadConnection(admin, orgId);
-      const saved = (await qboFetch(admin, conn2, "invoice", {
-        method: "POST",
-        body: JSON.stringify(req.payload),
-      })) as Record<string, Record<string, unknown>>;
+      const { saved, retried } = await postDocument(admin, conn2, "Invoice", req.payload);
       const doc = saved?.Invoice;
       if (!doc?.Id || doc?.SyncToken === undefined || doc?.SyncToken === null) {
         return json(502, { error: "QuickBooks saved the invoice but returned no id and sync token." });
@@ -853,6 +915,7 @@ Deno.serve(async (req) => {
         (doc.TxnTaxDetail as { TotalTax?: unknown } | undefined)?.TotalTax ?? 0
       );
       const warnings: string[] = [];
+      if (retried) warnings.push(STALE_RETRY_NOTE);
 
       const ref = {
         qbo: {
