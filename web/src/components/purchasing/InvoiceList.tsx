@@ -37,9 +37,23 @@ import { makeComparator, type SortValue } from "@/lib/tableSort";
 import { withFrom } from "@/lib/breadcrumbs";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
+import { createClient } from "@/lib/supabase/client";
+import { invokeQbo } from "@/lib/qboClient";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { NewInvoice } from "./NewInvoice";
 import type { InvoiceListRow } from "@/app/(app)/invoices/page";
+
+/** One pushed document, as QuickBooks currently reports it. `missing` is its
+ *  own answer: a bill deleted or voided there must not read as paid. */
+type QboStatus = {
+  invoice_id: string;
+  qbo_id: string | null;
+  entity: string;
+  balance?: number;
+  settled?: boolean;
+  missing: boolean;
+};
 
 const INVOICE_WIDTHS_KEY = "rf.invoices.columnWidths.v1";
 
@@ -261,6 +275,39 @@ export function InvoiceList({
     [visible, checked]
   );
 
+  /**
+   * What QuickBooks says about the bills on this screen.
+   *
+   * HELD IN STATE AND NEVER STORED, and it goes when you reload. That is the
+   * point rather than a shortcut: `lib/invoices`, 025 and 051 all say payment
+   * is a fact QuickBooks owns, and a balance written into our row is stale the
+   * moment it lands while still being rendered as though it were current.
+   */
+  const [qboStatus, setQboStatus] = useState<Map<string, QboStatus> | null>(null);
+  const [qboAt, setQboAt] = useState<string | null>(null);
+  const [qboBusy, setQboBusy] = useState(false);
+  const [qboError, setQboError] = useState<string | null>(null);
+  const qboSupabase = createClient();
+
+  async function checkQuickBooks() {
+    setQboBusy(true);
+    setQboError(null);
+    const { data, message } = await invokeQbo(qboSupabase, { mode: "refresh_status" });
+    setQboBusy(false);
+    if (message) {
+      setQboError(message);
+      return;
+    }
+    const list = (data?.statuses as QboStatus[]) ?? [];
+    setQboStatus(new Map(list.map((st) => [st.invoice_id, st])));
+    setQboAt(
+      new Date(data!.checked_at as string).toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      })
+    );
+  }
+
   const columns: DataColumn<InvoiceListRow>[] = [
     {
       key: "select",
@@ -289,16 +336,33 @@ export function InvoiceList({
       pinned: true,
       width: 150,
       sortValue: (i) => i.invoice_number,
-      render: (i) => (
-        <Link
-          href={invoiceDetailHref(i.id, filters)}
-          className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-        >
-          {/* A rent bill has no number, and saying so beats an em dash you
-              can't click. */}
-          {i.invoice_number ?? <span className="text-faint">No number</span>}
-        </Link>
-      ),
+      render: (i) => {
+        // The QuickBooks line rides UNDER the number, inside this cell: the row
+        // is 56px and this was one line, so it costs no column width and none
+        // of the other twelve had to give any up.
+        const st = qboStatus?.get(i.id);
+        return (
+          <div className="flex flex-col gap-0.5">
+            <Link
+              href={invoiceDetailHref(i.id, filters)}
+              className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+            >
+              {/* A rent bill has no number, and saying so beats an em dash you
+                  can't click. */}
+              {i.invoice_number ?? <span className="text-faint">No number</span>}
+            </Link>
+            {st && (
+              <span className="text-[11px] text-faint">
+                {st.missing
+                  ? "not in QuickBooks"
+                  : st.settled
+                    ? "paid in QuickBooks"
+                    : `${money(Number(st.balance))} owed`}
+              </span>
+            )}
+          </div>
+        );
+      },
     },
     {
       key: "vendor",
@@ -600,6 +664,28 @@ export function InvoiceList({
             />
           </div>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          className={BUTTON_CLASS}
+          disabled={qboBusy}
+          onClick={() => void checkQuickBooks()}
+        >
+          {qboBusy ? "Checking QuickBooks…" : "Check QuickBooks"}
+        </button>
+        {qboStatus && (
+          <span className="text-[13px] text-muted">
+            {qboStatus.size === 0
+              ? "None of these have been sent to QuickBooks yet."
+              : `${[...qboStatus.values()].filter((s) => s.settled).length} of ${
+                  qboStatus.size
+                } paid`}
+            {qboAt && <span className="text-faint"> · as of {qboAt}</span>}
+          </span>
+        )}
+        {qboError && <span className="text-[13px] text-accent">{qboError}</span>}
       </div>
 
       {capped && (

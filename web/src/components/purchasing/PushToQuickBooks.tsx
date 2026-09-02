@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { invokeQbo } from "@/lib/qboClient";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { money } from "@/lib/purchaseOrders";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import {
   billPushRefusals,
@@ -80,6 +81,10 @@ export function PushToQuickBooks({
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  /** What QuickBooks says is still owed. HELD IN STATE AND NEVER STORED — see
+   *  `refresh_status`. It disappears on reload, which is honest: a balance kept
+   *  in our row would be stale the moment it landed and shown as if current. */
+  const [balance, setBalance] = useState<{ text: string; at: string } | null>(null);
 
   const readContext = useCallback(async (): Promise<Ctx> => {
     const [conn, vendor, invoice, atShop] = await Promise.all([
@@ -154,6 +159,41 @@ export function PushToQuickBooks({
   });
   const already = pushedLabel(ctx.invoiceRef);
 
+  async function checkBalance() {
+    setBusy(true);
+    setError(null);
+    const { data, message } = await invokeQbo(supabase, {
+      mode: "refresh_status",
+      invoice_ids: [invoiceId],
+    });
+    setBusy(false);
+    if (message) {
+      setError(message);
+      return;
+    }
+    const st = ((data?.statuses as Record<string, unknown>[]) ?? [])[0];
+    if (!st) return;
+    const at = new Date(data!.checked_at as string).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    // Missing is its own answer: a document deleted or voided in QuickBooks
+    // must not read as paid in full.
+    if (st.missing) {
+      setBalance({ text: "no longer in QuickBooks", at });
+      return;
+    }
+    const owed = Number(st.balance);
+    setBalance({
+      text: st.settled
+        ? st.entity === "VendorCredit"
+          ? "fully applied in QuickBooks"
+          : "paid in QuickBooks"
+        : `${money(owed)} still owed`,
+      at,
+    });
+  }
+
   async function push() {
     const { entity, body: payload } = buildBillPayload({
       invoice: billInvoice,
@@ -219,6 +259,16 @@ export function PushToQuickBooks({
           </button>
         )}
         {already && <span className="text-[13px] text-muted">{already}</span>}
+        {already && (
+          <button
+            type="button"
+            className="text-[13px] text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900 disabled:opacity-35"
+            disabled={busy}
+            onClick={() => void checkBalance()}
+          >
+            {busy ? "Checking…" : "Check QuickBooks"}
+          </button>
+        )}
       </div>
 
       {/* Why the button is off, in words. A disabled control explains itself
@@ -230,6 +280,11 @@ export function PushToQuickBooks({
         <p className="text-[13px] text-faint">
           Posts to {splitAccountName(account.name).leaf || account.ref}
           {account.source === "org" ? " (the org default)" : ""}.
+        </p>
+      )}
+      {balance && (
+        <p className="text-[13px] text-muted">
+          {balance.text} <span className="text-faint">· as of {balance.at}</span>
         </p>
       )}
       {sent && <p className="text-[13px] text-muted">{sent}</p>}

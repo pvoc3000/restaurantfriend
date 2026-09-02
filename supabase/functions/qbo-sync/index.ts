@@ -19,6 +19,7 @@
 //   departments    → QBO Locations, ditto — Intuit calls them Departments
 //   items          → service items, for the settings picker
 //   push_bill      → send one approved invoice to QuickBooks as a Bill
+//   refresh_status → what QuickBooks says is still owed. RETURNS, never stores
 //   disconnect     → revoke at Intuit and forget the token (owner/admin)
 //
 // Disconnect lives HERE and not on `qbo-oauth` deliberately: that function is
@@ -440,6 +441,98 @@ Deno.serve(async (req) => {
         sync_token: ref.qbo.sync_token,
         updated: Boolean((req.payload as { Id?: string }).Id),
       });
+    }
+
+    // -----------------------------------------------------------------------
+    // refresh_status — what QuickBooks says is still owed
+    // -----------------------------------------------------------------------
+    //
+    // IT RETURNS THE ANSWER AND STORES NOTHING, which is the whole design.
+    // `lib/invoices`, migration 025 and 051 all say the same thing in the same
+    // words: there is no `paid` status here, because payment is a fact
+    // QuickBooks owns and two truths about one sum of money is worse than one
+    // truth elsewhere. A balance written into our row is stale the moment it
+    // lands and is then rendered as though it were current —
+    // `sync-square-sales`' `preview` mode refuses a partial day for exactly
+    // this reason, and this is the same refusal.
+    //
+    // So the screens show it with an "as of" and it disappears on reload.
+    if (mode === "refresh_status") {
+      const wanted = (body as unknown as { invoice_ids?: string[] }).invoice_ids;
+
+      // Through the CALLER's client: RLS decides which invoices they can see,
+      // so this can never report on another org's books.
+      let q = supabase
+        .from("vendor_invoices")
+        .select("id, invoice_number, external_ref")
+        .not("external_ref->qbo->>id", "is", null);
+      if (Array.isArray(wanted) && wanted.length > 0) q = q.in("id", wanted);
+      const { data: rows, error: rowsError } = await q;
+      if (rowsError) return json(500, { error: rowsError.message });
+
+      type Pushed = { id: string; invoice_number: string | null; external_ref: { qbo?: { id?: string; entity?: string } } };
+      const pushed = (rows ?? []) as Pushed[];
+      if (pushed.length === 0) {
+        return json(200, { checked_at: new Date().toISOString(), statuses: [] });
+      }
+
+      const conn = await loadConnection(admin, orgId);
+
+      // Grouped by entity, because a Bill and a VendorCredit are different
+      // tables in QuickBooks and cannot be asked for in one query.
+      const byEntity = new Map<string, Pushed[]>();
+      for (const r of pushed) {
+        const entity = r.external_ref?.qbo?.entity === "VendorCredit" ? "VendorCredit" : "Bill";
+        (byEntity.get(entity) ?? byEntity.set(entity, []).get(entity)!).push(r);
+      }
+
+      const found = new Map<string, Record<string, unknown>>();
+      for (const [entity, group] of byEntity) {
+        // Chunked: the query is a URL, and a few hundred ids in an IN list is
+        // how you find the length limit the hard way.
+        for (let i = 0; i < group.length; i += 100) {
+          const ids = group
+            .slice(i, i + 100)
+            .map((r) => qboQuote(String(r.external_ref!.qbo!.id)))
+            .join(",");
+          const sql = `select Id, DocNumber, TotalAmt, Balance from ${entity} where Id in (${ids}) maxresults 1000`;
+          const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(sql)}`)) as {
+            QueryResponse?: Record<string, Record<string, unknown>[]>;
+          };
+          for (const doc of res.QueryResponse?.[entity] ?? []) {
+            found.set(`${entity}:${String(doc.Id)}`, doc);
+          }
+        }
+      }
+
+      const statuses = pushed.map((r) => {
+        const entity = r.external_ref?.qbo?.entity === "VendorCredit" ? "VendorCredit" : "Bill";
+        const key = `${entity}:${r.external_ref?.qbo?.id}`;
+        const doc = found.get(key);
+        // MISSING IS ITS OWN ANSWER, not a zero: a document deleted or voided
+        // in QuickBooks would otherwise read as paid in full.
+        if (!doc) {
+          return { invoice_id: r.id, qbo_id: r.external_ref?.qbo?.id ?? null, entity, missing: true };
+        }
+        const balance = Number(doc.Balance ?? 0);
+        return {
+          invoice_id: r.id,
+          qbo_id: String(doc.Id),
+          entity,
+          doc_number: doc.DocNumber === undefined || doc.DocNumber === null ? null : String(doc.DocNumber),
+          total: Number(doc.TotalAmt ?? 0),
+          balance,
+          settled: Math.abs(balance) < 0.005,
+          missing: false,
+        };
+      });
+
+      await admin
+        .from("accounting_connections")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", conn.id);
+
+      return json(200, { checked_at: new Date().toISOString(), statuses });
     }
 
     if (mode === "vendors") {
