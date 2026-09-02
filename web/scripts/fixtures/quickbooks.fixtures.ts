@@ -408,3 +408,202 @@ test("a sub-account keeps its parent", () => {
   eq(splitAccountName("Advertising"), { parent: null, leaf: "Advertising" }, "top level");
   eq(splitAccountName(null), { parent: null, leaf: "" }, "nothing");
 });
+
+// ---------------------------------------------------------------------------
+// Customer invoices (A/R)
+// ---------------------------------------------------------------------------
+
+import {
+  buildInvoicePayload,
+  invoicePushRefusals,
+  invoiceSplit,
+  taxDisagreement,
+  type InvoiceOrder,
+  type InvoicePushInputs,
+} from "../../src/lib/quickbooks";
+
+function order(over: Partial<InvoiceOrder> = {}): InvoiceOrder {
+  return {
+    id: "so-1",
+    number: "9885",
+    invoice_date: "2026-08-16",
+    due_date: "2026-08-22",
+    kind: "order",
+    status: "invoice",
+    ignore_balance: false,
+    external_ref: null,
+    ...over,
+  };
+}
+
+function ar(over: Partial<InvoicePushInputs> = {}): InvoicePushInputs {
+  return {
+    order: order(),
+    customerRef: "142",
+    customerName: "Cafe Knotted",
+    itemRef: "1",
+    taxCodeRef: "2",
+    total: 161.77,
+    tax: 14.37,
+    taxableNet: 147.4,
+    nonTaxableNet: 0,
+    ...over,
+  };
+}
+
+test("the lines are NET, and only the taxable part is marked TAX", () => {
+  // QuickBooks computes the tax from the lines it is given, and orderTotals
+  // does NOT tax delivery or rush — so one combined taxable line would have
+  // QuickBooks tax them too and inflate its figure against ours.
+  const { body } = buildInvoicePayload(ar({ taxableNet: 120, nonTaxableNet: 27.4 }));
+  const lines = body.Line as Record<string, unknown>[];
+  eq(lines.length, 2, "two lines");
+  eq(lines[0].Amount, 120, "taxable part");
+  eq(lines[1].Amount, 27.4, "delivery, rush and non-taxable items");
+  const code = (l: Record<string, unknown>) =>
+    ((l.SalesItemLineDetail as Record<string, unknown>).TaxCodeRef as Record<string, unknown>).value;
+  // A US line's code may only be TAX or NON — a real code id is refused,
+  // measured: "Valid line TaxCodes for US should be TAX or NON".
+  eq(code(lines[0]), "TAX", "taxable");
+  eq(code(lines[1]), "NON", "not taxable");
+  eq(Number(lines[0].Amount) + Number(lines[1].Amount), 147.4, "and they sum to the net");
+});
+
+test("TxnTaxDetail NAMES A CODE and supplies no figure", () => {
+  // Measured against a real company: an empty detail computed nothing, and a
+  // supplied TotalTax was either dropped or overwritten with its own rate.
+  const { body } = buildInvoicePayload(ar());
+  eq(body.TxnTaxDetail, { TxnTaxCodeRef: { value: "2" } }, "code only");
+  no(JSON.stringify(body).includes("TotalTax"), "we never state the amount");
+});
+
+test("a taxable order with no code configured is refused, an untaxed one is not", () => {
+  ok(
+    invoicePushRefusals(ar({ taxCodeRef: null })).some((r) => r.includes("tax code")),
+    "taxable order refused"
+  );
+  eq(
+    invoicePushRefusals(ar({ taxCodeRef: null, tax: 0, taxableNet: 0, nonTaxableNet: 161.77 })),
+    [],
+    "an untaxed order needs no code"
+  );
+});
+
+test("a wholly untaxed order omits TxnTaxDetail and sends one NON line", () => {
+  const { body } = buildInvoicePayload(ar({ total: 100, tax: 0, taxableNet: 0, nonTaxableNet: 100 }));
+  no("TxnTaxDetail" in body, "absent");
+  const lines = body.Line as Record<string, unknown>[];
+  eq(lines.length, 1, "the zero taxable line is not sent");
+  eq(lines[0].Amount, 100, "whole amount");
+});
+
+test("a disagreement about tax is reported, and agreement is silent", () => {
+  eq(taxDisagreement(14.37, 14.37), null, "same");
+  eq(taxDisagreement(14.37, 14.371), null, "within half a cent");
+  ok(taxDisagreement(14.37, 11.79)?.includes("11.79"), "names theirs");
+  ok(taxDisagreement(14.37, 11.79)?.includes("14.37"), "and ours");
+  ok(taxDisagreement(14.37, null)?.includes("0.00"), "a missing figure is zero, and still a difference");
+});
+
+test("only an invoiced or committed order is sent", () => {
+  for (const s of ["lead", "quote"]) {
+    ok(
+      invoicePushRefusals(ar({ order: order({ status: s }) })).some((r) =>
+        r.includes("invoiced or committed")
+      ),
+      `${s} refused`
+    );
+  }
+  ok(
+    invoicePushRefusals(ar({ order: order({ status: "cancelled" }) })).some((r) =>
+      r.includes("cancelled")
+    ),
+    "cancelled refused"
+  );
+  eq(invoicePushRefusals(ar()), [], "invoice stage passes");
+  eq(invoicePushRefusals(ar({ order: order({ status: "order" }) })), [], "committed passes");
+});
+
+test("a standing order and a template exclude themselves", () => {
+  // 051 makes `status` NULL exactly when `kind` is not `order`, so neither has
+  // a stage to be at.
+  ok(
+    invoicePushRefusals(ar({ order: order({ kind: "standing_order", status: null }) })).some((r) =>
+      r.includes("recurrence")
+    ),
+    "standing order"
+  );
+  ok(
+    invoicePushRefusals(ar({ order: order({ kind: "template", status: null }) })).some((r) =>
+      r.includes("template")
+    ),
+    "template"
+  );
+});
+
+test("a wholesale day billed by statement is not sent on its own", () => {
+  // 45 real orders carry `ignore_balance`. Sending each would invoice Cafe
+  // Knotted seven times a week for something billed once.
+  const refusals = invoicePushRefusals(ar({ order: order({ ignore_balance: true }) }));
+  ok(refusals.some((r) => r.includes("billed by statement")), "refused");
+  ok(refusals[0].includes("Cafe Knotted"), "and it names them");
+});
+
+test("an unmapped customer and a missing item are each refused by name", () => {
+  ok(
+    invoicePushRefusals(ar({ customerRef: null })).some((r) => r.includes("Cafe Knotted")),
+    "customer named"
+  );
+  ok(
+    invoicePushRefusals(ar({ itemRef: null })).some((r) => r.includes("Settings")),
+    "item points at where to fix it"
+  );
+});
+
+test("a negative total is refused rather than sent as an invoice", () => {
+  // QuickBooks models a refund as a CreditMemo — its own entity, not an
+  // invoice for minus money.
+  ok(
+    invoicePushRefusals(ar({ total: -50 })).some((r) => r.includes("credit memo")),
+    "refused"
+  );
+});
+
+test("a second push updates rather than duplicating", () => {
+  const pushed = order({ external_ref: { qbo: { id: "300", sync_token: "2" } } });
+  const { body } = buildInvoicePayload(ar({ order: pushed }));
+  eq(body.Id, "300", "Id");
+  eq(body.SyncToken, "2", "SyncToken");
+  eq(body.sparse, true, "sparse");
+});
+
+test("the split always sums to the net, however the discount fell", () => {
+  const totals = {
+    subtotal: 200, taxableSubtotal: 150, discount: 20,
+    deliveryCharge: 30, rushFee: 10, tax: 13.16, total: 233.16,
+  };
+  const { taxableNet, nonTaxableNet } = invoiceSplit(totals);
+  // 150 taxable × (180/200 kept) = 135
+  eq(taxableNet, 135, "the discounted taxable part");
+  eq(nonTaxableNet, 85, "non-taxable items, delivery and rush");
+  eq(taxableNet + nonTaxableNet, 220, "and they sum to total minus tax");
+});
+
+test("a fully taxable order with no extras puts everything on the taxable line", () => {
+  const { taxableNet, nonTaxableNet } = invoiceSplit({
+    subtotal: 100, taxableSubtotal: 100, discount: 0,
+    deliveryCharge: 0, rushFee: 0, tax: 9.75, total: 109.75,
+  });
+  eq(taxableNet, 100, "all taxable");
+  eq(nonTaxableNet, 0, "nothing else — and buildInvoicePayload omits a zero line");
+});
+
+test("a comped order does not divide by zero", () => {
+  // 82 real orders carry discount_rate = 1, a full comp.
+  const { taxableNet, nonTaxableNet } = invoiceSplit({
+    subtotal: 0, taxableSubtotal: 0, discount: 0,
+    deliveryCharge: 0, rushFee: 0, tax: 0, total: 0,
+  });
+  eq(taxableNet, 0, "no NaN");
+  eq(nonTaxableNet, 0, "no NaN");
+});

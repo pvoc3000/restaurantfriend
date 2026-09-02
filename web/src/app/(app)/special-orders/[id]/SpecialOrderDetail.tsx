@@ -48,6 +48,7 @@ import { LinkCustomer } from "@/components/specialOrders/LinkCustomer";
 import { OrderInfoLayout, OrderSplitLayout } from "@/components/specialOrders/OrderInfoLayout";
 import { OrderDocuments } from "@/components/specialOrders/OrderDocuments";
 import { SendDocument } from "@/components/specialOrders/SendDocument";
+import { PushOrderToQuickBooks } from "@/components/specialOrders/PushOrderToQuickBooks";
 import { TakenBy } from "@/components/specialOrders/TakenBy";
 import {
   SO_ATTACHMENT_BUCKET,
@@ -477,6 +478,21 @@ export async function SpecialOrderDetail({
                 order, this is what you do WITH one. Templates and standing
                 orders show nothing here: neither has an event, a customer
                 expecting a quote, or a kitchen to print for. */}
+            {kind === "order" ? (
+              <PushOrderToQuickBooks
+                orderId={id}
+                orgId={row.org_id as string}
+                number={(row.number as string | null) ?? null}
+                kind={kind}
+                status={(row.status as string | null) ?? null}
+                ignoreBalance={Boolean(row.ignore_balance)}
+                invoiceDate={(row.date_initiated as string | null) ?? null}
+                customerId={(row.customer_id as string | null) ?? null}
+                customerName={customerLabel(row.customers as never) || "this customer"}
+                totals={totals}
+                canWrite={canWrite}
+              />
+            ) : null}
             {kind === "order" ? (
               <SendDocument
                 orderId={id}

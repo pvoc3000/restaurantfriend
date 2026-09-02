@@ -19,6 +19,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { CustomerActions } from "@/components/specialOrders/CustomerActions";
+import { CustomerAccounting } from "@/components/specialOrders/CustomerAccounting";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 
 const CUSTOMERS_CRUMB = { href: "/customers", label: "Customers" };
@@ -197,6 +198,12 @@ export async function CustomerDetail({
           <Row label="ZIP"><Cell id={id} canWrite={canWrite} address={address} column="address" jsonPath={["zip"]} value={(address.zip as string) ?? null} label="ZIP" /></Row>
         </div>
       </section>
+
+      <CustomerAccounting
+        customerId={customer.id}
+        orgId={customer.org_id as string}
+        customerName={customerLabel(customer as never) || "This customer"}
+      />
 
       <section className="space-y-3">
         <SectionHeading>Notes</SectionHeading>

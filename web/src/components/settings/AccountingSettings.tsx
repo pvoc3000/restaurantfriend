@@ -36,6 +36,8 @@ export type AccountingStatus = {
   bill_expense_account_name: string | null;
   invoice_item_ref: string | null;
   invoice_item_name: string | null;
+  tax_code_ref: string | null;
+  tax_code_name: string | null;
   refresh_token_expires_at: string | null;
   connected_at: string | null;
   last_used_at: string | null;
@@ -90,6 +92,8 @@ export function AccountingSettings({
   const [error, setError] = useState<string | null>(null);
   const [company, setCompany] = useState<string | null>(null);
   const [accounts, setAccounts] = useState<Choice[] | null>(null);
+  const [items, setItems] = useState<Choice[] | null>(null);
+  const [taxCodes, setTaxCodes] = useState<Choice[] | null>(null);
   const [environment, setEnvironment] = useState(initialStatus?.environment ?? "sandbox");
 
   const callback = params.get("quickbooks");
@@ -130,14 +134,18 @@ export function AccountingSettings({
     if (!connected) return;
     let cancelled = false;
     void (async () => {
-      const [meta, accts] = await Promise.all([
+      const [meta, accts, its, codes] = await Promise.all([
         invokeQbo(supabase, { mode: "meta" }),
         invokeQbo(supabase, { mode: "accounts" }),
+        invokeQbo(supabase, { mode: "items" }),
+        invokeQbo(supabase, { mode: "tax_codes" }),
       ]);
       if (cancelled) return;
+      if (its.data?.items) setItems(its.data.items as Choice[]);
+      if (codes.data?.tax_codes) setTaxCodes(codes.data.tax_codes as Choice[]);
       // Same rule as the vendor block: a dropped failure here leaves a picker
       // with no options and no reason, which reads as nothing being wrong.
-      const failure = meta.message ?? accts.message;
+      const failure = meta.message ?? accts.message ?? its.message ?? codes.message;
       if (failure) setError(failure);
       if (meta.data?.company_name) setCompany(meta.data.company_name as string);
       if (accts.data?.accounts) setAccounts(accts.data.accounts as Choice[]);
@@ -179,7 +187,7 @@ export function AccountingSettings({
     router.refresh();
   }
 
-  async function setDefault(kind: "bill", choice: Choice | null) {
+  async function setDefault(kind: "bill" | "item" | "tax", choice: Choice | null) {
     setBusy("defaults");
     setError(null);
     const patch =
@@ -188,10 +196,12 @@ export function AccountingSettings({
             bill_expense_account_ref: choice?.id ?? null,
             bill_expense_account_name: choice?.name ?? null,
           }
-        : {
-            invoice_item_ref: choice?.id ?? null,
-            invoice_item_name: choice?.name ?? null,
-          };
+        : kind === "item"
+          ? {
+              invoice_item_ref: choice?.id ?? null,
+              invoice_item_name: choice?.name ?? null,
+            }
+          : { tax_code_ref: choice?.id ?? null, tax_code_name: choice?.name ?? null };
     const res = await call({ mode: "set_defaults", ...patch });
     setBusy(null);
     if (res) await loadStatus();
@@ -293,6 +303,52 @@ export function AccountingSettings({
               onPick={(next) =>
                 void setDefault("bill", accounts?.find((a) => a.id === next) ?? null)
               }
+              panelMinWidth={320}
+            />
+          </div>
+        </div>
+      )}
+
+      {connected && (
+        <div className="max-w-[min(42rem,max(24rem,50%))] space-y-3 border-t border-hairline pt-4">
+          <p className="text-[13px] text-muted">
+            A customer invoice is sent as its net amount under this item, and
+            QuickBooks works out the sales tax from this code — it will not
+            accept ours.
+          </p>
+          <div className="flex items-baseline justify-between gap-6">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+              Invoice item
+            </span>
+            <PickList
+              variant="field"
+              boxed
+              ariaLabel="Item customer invoices are sent under"
+              disabled={!editable || busy !== null}
+              value={status?.invoice_item_ref ?? null}
+              placeholder={items && items.length === 0 ? "No items in QuickBooks" : "Choose an item"}
+              options={(items ?? []).map((i) => ({ value: i.id, label: i.name, hint: i.type }))}
+              onPick={(next) => void setDefault("item", items?.find((i) => i.id === next) ?? null)}
+              panelMinWidth={320}
+            />
+          </div>
+          <div className="flex items-baseline justify-between gap-6">
+            <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+              Tax code
+            </span>
+            <PickList
+              variant="field"
+              boxed
+              ariaLabel="Tax code customer invoices are sent under"
+              disabled={!editable || busy !== null}
+              value={status?.tax_code_ref ?? null}
+              placeholder={
+                taxCodes && taxCodes.length === 0
+                  ? "No tax codes in QuickBooks"
+                  : "Choose a tax code"
+              }
+              options={(taxCodes ?? []).map((t) => ({ value: t.id, label: t.name }))}
+              onPick={(next) => void setDefault("tax", taxCodes?.find((t) => t.id === next) ?? null)}
               panelMinWidth={320}
             />
           </div>

@@ -157,7 +157,8 @@ Deno.serve(async (req) => {
     await admin
       .from("accounting_connections")
       .update({ bill_expense_account_ref: null, bill_expense_account_name: null,
-                invoice_item_ref: null, invoice_item_name: null })
+                invoice_item_ref: null, invoice_item_name: null,
+                tax_code_ref: null, tax_code_name: null })
       .eq("id", row.id);
     await admin
       .from("vendors")

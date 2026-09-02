@@ -425,3 +425,238 @@ export function splitAccountName(name: string | null | undefined): {
   if (at < 0) return { parent: null, leaf: n };
   return { parent: n.slice(0, at), leaf: n.slice(at + 1) };
 }
+
+
+// ---------------------------------------------------------------------------
+// Customer invoices (A/R)
+// ---------------------------------------------------------------------------
+
+/**
+ * A customer invoice, as QuickBooks needs it.
+ *
+ * ONE SUMMARY LINE, like the bill — the app keeps the twenty donut lines, the
+ * taxonomy and the document; QuickBooks gets the money.
+ *
+ * BUT THE LINE IS THE NET AMOUNT AND THE TAX IS STATED SEPARATELY (Mark,
+ * 2026-09-02). A single gross line would book the sales tax as revenue:
+ * income overstated by the tax and no liability recorded anywhere, which is
+ * wrong on the return rather than merely coarse. So the line carries
+ * `total − tax` and `TxnTaxDetail.TotalTax` carries the rest, and the two sum
+ * to what the customer was billed.
+ *
+ * `TxnTaxDetail` is also what tells QuickBooks to tax the transaction at all:
+ * its ABSENCE is read as an intent not to tax. That is why an untaxed order
+ * omits it entirely rather than sending a zero.
+ */
+export type InvoiceOrder = {
+  id: string;
+  number: string | null;
+  /** `date_initiated` — when the order was written, which is the invoice's
+   *  own date. Not the event date, which is when the donuts are due. */
+  invoice_date: string | null;
+  due_date: string | null;
+  kind: string;
+  status: string | null;
+  ignore_balance: boolean;
+  external_ref: AccountingRef | null;
+};
+
+export type InvoicePushInputs = {
+  order: InvoiceOrder;
+  /** `customers.external_ref → qbo → id`. */
+  customerRef: string | null;
+  customerName: string;
+  /** `accounting_connections.invoice_item_ref`. */
+  itemRef: string | null;
+  /**
+   * `accounting_connections.tax_code_ref` (084). QuickBooks computes the tax
+   * ITSELF from this; ours is only compared against what it decides.
+   *
+   * Null sends no `TxnTaxDetail`, which is how QuickBooks is told not to tax —
+   * and with the detail present but EMPTY it computed nothing at all, measured.
+   */
+  taxCodeRef: string | null;
+  /**
+   * From `orderTotals`. The push sends the two NET amounts and lets QuickBooks
+   * work the tax out from its own rate; `tax` is what WE billed, kept only so
+   * the push can say when the two disagree.
+   */
+  total: number;
+  tax: number;
+  /** The discounted taxable portion — what QuickBooks should tax. */
+  taxableNet: number;
+  /** Everything else net of tax: non-taxable items, delivery and rush. */
+  nonTaxableNet: number;
+};
+
+/** The statuses an order may be sent at, and why the others may not. */
+export function invoicePushRefusals(inputs: InvoicePushInputs): string[] {
+  const { order, customerRef, customerName, itemRef, total } = inputs;
+  const out: string[] = [];
+
+  // 051 makes `status` NULL exactly when `kind` is not `order`, so a template
+  // or a standing order excludes itself by having nothing to be at.
+  if (order.kind !== "order") {
+    out.push(
+      order.kind === "standing_order"
+        ? "A standing order is a recurrence, not an invoice. Send the days it produces."
+        : "A template is not an invoice."
+    );
+  } else if (order.status === "cancelled") {
+    out.push("This order was cancelled.");
+  } else if (order.status !== "invoice" && order.status !== "order") {
+    // A lead or a quote is not money anybody has agreed to pay, and putting one
+    // on the books is the A/P "approved only" rule from the other direction.
+    out.push("Only an invoiced or committed order goes to QuickBooks — it is still a " +
+      `${order.status ?? "lead"}.`);
+  }
+
+  // 45 real orders carry this. It means "billed weekly by statement, not per
+  // order", so sending each day would invoice the customer seven times a week.
+  if (order.ignore_balance) {
+    out.push(
+      `${customerName} is billed by statement rather than per order, so this day is not sent on its own.`
+    );
+  }
+  if (!customerRef) {
+    out.push(`No QuickBooks customer is linked to ${customerName}. Pick one on their record.`);
+  }
+  if (!itemRef) {
+    out.push("No QuickBooks item is set. Choose one in Settings → Accounting.");
+  }
+  // Only when there is tax to charge: an untaxed order needs no code, and
+  // demanding one would block every order for a customer who pays none.
+  if (!inputs.taxCodeRef && Number(inputs.tax) > 0) {
+    out.push("No QuickBooks tax code is set. Choose one in Settings → Accounting.");
+  }
+  if (!Number.isFinite(total)) out.push("This order has no total.");
+  else if (total < 0) {
+    // A negative total is a credit, which QuickBooks models as a CreditMemo —
+    // its own entity, not an invoice for minus money. Not built.
+    out.push("This order's total is negative. A refund is a credit memo, which is not sent yet.");
+  }
+  return out;
+}
+
+export function buildInvoicePayload(
+  inputs: InvoicePushInputs
+): { entity: "Invoice"; path: string; body: Record<string, unknown> } {
+  const refusals = invoicePushRefusals(inputs);
+  if (refusals.length > 0) throw new Error(refusals[0]);
+
+  const { order, customerRef, itemRef, taxableNet, nonTaxableNet } = inputs;
+
+  // TWO LINES, AND THE SPLIT IS THE POINT. QuickBooks computes the tax from
+  // the lines it is given, and `orderTotals` does NOT tax delivery or rush —
+  // so one combined taxable line would have QuickBooks tax them and inflate
+  // its own figure against ours. This is still one summary per document; it is
+  // a tax split, not itemisation.
+  //
+  // A US line's TaxCodeRef may only be TAX or NON — a real code id is refused
+  // ("Valid line TaxCodes for US should be TAX or NON"), measured.
+  const lines: Record<string, unknown>[] = [];
+  const push = (amount: number, taxable: boolean, label: string) => {
+    if (round2(amount) <= 0) return;
+    lines.push({
+      Amount: round2(amount),
+      DetailType: "SalesItemLineDetail",
+      Description: label,
+      SalesItemLineDetail: {
+        ItemRef: { value: itemRef },
+        TaxCodeRef: { value: taxable ? "TAX" : "NON" },
+      },
+    });
+  };
+  const name = order.number ? `Special order ${order.number}` : "Special order";
+  push(taxableNet, true, name);
+  push(nonTaxableNet, false, `${name} — not taxed`);
+
+  const body: Record<string, unknown> = {
+    CustomerRef: { value: customerRef },
+    Line: lines,
+    PrivateNote: `restaurantfriend ${order.id}`,
+  };
+
+  // NAMES A CODE, because an empty detail computed nothing — measured — and no
+  // customer in the company carried a `DefaultTaxCodeRef` to fall back on.
+  // Supplying a TotalTax instead is either dropped or overwritten, which is why
+  // this hands QuickBooks the code and lets it do the arithmetic.
+  if (round2(taxableNet) > 0 && inputs.taxCodeRef) {
+    body.TxnTaxDetail = { TxnTaxCodeRef: { value: inputs.taxCodeRef } };
+  }
+
+  const docNumber = docNumberFor(order.number);
+  if (docNumber) body.DocNumber = docNumber;
+  if (order.invoice_date) body.TxnDate = order.invoice_date;
+  if (order.due_date) body.DueDate = order.due_date;
+
+  const existing = qboRef(order.external_ref);
+  if (existing) {
+    body.Id = existing.id;
+    body.SyncToken = existing.syncToken;
+    body.sparse = true;
+  }
+
+  return { entity: "Invoice", path: "invoice", body };
+}
+
+/**
+ * What to say when QuickBooks' tax differs from the one on the document the
+ * customer holds. Null when they agree.
+ *
+ * This is the accepted cost of letting QuickBooks compute: its rate comes from
+ * its own setup, ours from `special_orders.tax_rate`, and nothing keeps them in
+ * step. Surfacing the difference is the whole reason that trade was acceptable.
+ */
+export function taxDisagreement(
+  ourTax: number,
+  theirTax: number | null | undefined
+): string | null {
+  const theirs = Number(theirTax ?? 0);
+  if (Math.abs(theirs - Number(ourTax)) < 0.005) return null;
+  return (
+    `QuickBooks calculated ${theirs.toFixed(2)} of sales tax where this order bills ` +
+    `${Number(ourTax).toFixed(2)}. Its total will differ from the customer's copy.`
+  );
+}
+
+/** Money rounds ONCE, at the edge. Two figures each rounded and then summed is
+ *  how a total ends up a cent away from the document the customer holds. */
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+
+/**
+ * The two net amounts a customer invoice is sent as.
+ *
+ * Structurally typed rather than importing `OrderTotals`, so this module stays
+ * free of `lib/specialOrders` and the fixture build stays a leaf.
+ *
+ * THE SPLIT IS THE WHOLE REASON THIS EXISTS: `orderTotals` taxes the discounted
+ * taxable subtotal and does NOT tax delivery or rush, so sending one combined
+ * taxable line would have QuickBooks tax those too and inflate its figure
+ * against the customer's copy. Verified against a real company — 120 TAX plus
+ * 27.40 NON produced tax on the 120 alone.
+ */
+export function invoiceSplit(totals: {
+  subtotal: number;
+  taxableSubtotal: number;
+  discount: number;
+  deliveryCharge: number;
+  rushFee: number;
+  tax: number;
+  total: number;
+}): { taxableNet: number; nonTaxableNet: number } {
+  const afterDiscount = totals.subtotal - totals.discount;
+  // The discount comes off proportionally across the taxable and non-taxable
+  // parts, which is what `orderTotals` does when it computes the tax — the two
+  // must use the same fraction or the split will not reproduce its figure.
+  const keptFraction = totals.subtotal > 0 ? afterDiscount / totals.subtotal : 0;
+  const taxableNet = round2(totals.taxableSubtotal * keptFraction);
+  // Everything else, by subtraction, so the two ALWAYS sum to total − tax
+  // however the discount fell. Deriving both independently is how a cent goes
+  // missing.
+  const nonTaxableNet = round2(totals.total - totals.tax - taxableNet);
+  return { taxableNet, nonTaxableNet };
+}

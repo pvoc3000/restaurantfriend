@@ -20,6 +20,9 @@
 //   items          → service items, for the settings picker
 //   push_bill      → send one approved invoice to QuickBooks as a Bill
 //   refresh_status → what QuickBooks says is still owed. RETURNS, never stores
+//   customers      → QBO customers, for the mapping picker on a customer
+//   tax_codes      → QBO tax codes, for the settings picker (084)
+//   push_invoice   → send one special order to QuickBooks as an Invoice
 //   disconnect     → revoke at Intuit and forget the token (owner/admin)
 //
 // Disconnect lives HERE and not on `qbo-oauth` deliberately: that function is
@@ -194,12 +197,16 @@ Deno.serve(async (req) => {
         bill_expense_account_name?: string | null;
         invoice_item_ref?: string | null;
         invoice_item_name?: string | null;
+        tax_code_ref?: string | null;
+        tax_code_name?: string | null;
       };
       for (const k of [
         "bill_expense_account_ref",
         "bill_expense_account_name",
         "invoice_item_ref",
         "invoice_item_name",
+        "tax_code_ref",
+        "tax_code_name",
       ] as const) {
         if (k in d) patch[k] = d[k] ?? null;
       }
@@ -581,6 +588,146 @@ Deno.serve(async (req) => {
       }));
       rows.sort((a, b) => a.name.localeCompare(b.name));
       return json(200, { [mode]: rows, enabled });
+    }
+
+    if (mode === "customers" || mode === "tax_codes") {
+      const entity = mode === "customers" ? "Customer" : "TaxCode";
+      const fields = mode === "customers" ? "Id, DisplayName" : "Id, Name";
+      const q = `select ${fields} from ${entity} where Active = true maxresults 1000`;
+      const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(q)}`)) as {
+        QueryResponse?: Record<string, Row[]>;
+      };
+      const rows = (res.QueryResponse?.[entity] ?? []).map((r) => ({
+        id: String(r.Id),
+        name: String(r.DisplayName ?? r.Name ?? ""),
+      }));
+      rows.sort((a, b) => a.name.localeCompare(b.name));
+      return json(200, { [mode]: rows });
+    }
+
+    // -----------------------------------------------------------------------
+    // push_invoice — one special order becomes a QuickBooks Invoice
+    // -----------------------------------------------------------------------
+    //
+    // THE AMOUNT IS TRUSTED FROM THE BROWSER, and that is decision 6 rather
+    // than laziness: `special_orders` has no stored total by design — every
+    // figure is derived from the lines and six inputs by `orderTotals` — so
+    // validating it here would mean a PL/pgSQL or Deno twin of that
+    // arithmetic, which is the trap decision 6 exists to prevent. The trust
+    // boundary is unchanged either way: anyone who can push can already edit
+    // the order's lines and prices, so they can make the total anything.
+    //
+    // What IS checked is every claim that could point the money somewhere
+    // else: the customer, the stage, and the statement rule.
+    if (mode === "push_invoice") {
+      const req = body as unknown as {
+        order_id?: string;
+        payload?: Record<string, unknown>;
+        our_tax?: number;
+      };
+      if (!req.order_id || !req.payload) {
+        return json(400, { error: "missing order_id or payload" });
+      }
+
+      const { data: order, error: orderErr } = await supabase
+        .from("special_orders")
+        .select("id, kind, status, ignore_balance, customer_id, number, external_ref")
+        .eq("id", req.order_id)
+        .maybeSingle();
+      if (orderErr) return json(500, { error: orderErr.message });
+      if (!order) return json(404, { error: "No such order" });
+
+      if (order.kind !== "order") {
+        return json(400, { error: "Only an order becomes an invoice." });
+      }
+      if (order.status !== "invoice" && order.status !== "order") {
+        return json(400, {
+          error: `Only an invoiced or committed order goes to QuickBooks — it is a ${order.status ?? "lead"}.`,
+        });
+      }
+      if (order.ignore_balance) {
+        return json(400, {
+          error: "This customer is billed by statement, so this day is not sent on its own.",
+        });
+      }
+      if (!order.customer_id) return json(400, { error: "This order has no customer." });
+
+      const { data: customer } = await supabase
+        .from("customers")
+        .select("external_ref")
+        .eq("id", order.customer_id)
+        .maybeSingle();
+      const customerRef =
+        (customer?.external_ref as { qbo?: { id?: string } } | null)?.qbo?.id ?? null;
+      if (!customerRef) {
+        return json(400, {
+          error: "No QuickBooks customer is linked. Pick one on the customer's record.",
+        });
+      }
+      if ((req.payload.CustomerRef as { value?: string } | undefined)?.value !== customerRef) {
+        return json(400, { error: "The payload names a different QuickBooks customer." });
+      }
+
+      const conn2 = await loadConnection(admin, orgId);
+      const saved = (await qboFetch(admin, conn2, "invoice", {
+        method: "POST",
+        body: JSON.stringify(req.payload),
+      })) as Record<string, Record<string, unknown>>;
+      const doc = saved?.Invoice;
+      if (!doc?.Id || doc?.SyncToken === undefined || doc?.SyncToken === null) {
+        return json(502, { error: "QuickBooks saved the invoice but returned no id and sync token." });
+      }
+
+      // The tax QuickBooks decided, against the one on the customer's copy.
+      // Its rate comes from its own setup and ours from `special_orders.
+      // tax_rate`, and nothing keeps them in step — surfacing that is the whole
+      // reason letting QuickBooks compute was acceptable.
+      const theirTax = Number(
+        (doc.TxnTaxDetail as { TotalTax?: unknown } | undefined)?.TotalTax ?? 0
+      );
+      const warnings: string[] = [];
+      if (Math.abs(theirTax - Number(req.our_tax ?? 0)) >= 0.005) {
+        warnings.push(
+          `QuickBooks calculated ${theirTax.toFixed(2)} of sales tax where this order bills ` +
+            `${Number(req.our_tax ?? 0).toFixed(2)}. Its total will differ from the customer's copy.`
+        );
+      }
+
+      const ref = {
+        qbo: {
+          id: String(doc.Id),
+          sync_token: String(doc.SyncToken),
+          doc_number: doc.DocNumber === undefined || doc.DocNumber === null ? null : String(doc.DocNumber),
+          entity: "Invoice",
+        },
+      };
+      // `special_orders` has ordinary policies (051, supervisor+), so unlike a
+      // vendor invoice this needs no definer — but it still checks the row
+      // count, because the document is already in QuickBooks by now and a
+      // silent failure means the next push creates a second one.
+      const { data: recorded, error: recErr } = await supabase
+        .from("special_orders")
+        .update({ external_ref: ref, synced_at: new Date().toISOString() })
+        .eq("id", order.id)
+        .select("id");
+      if (recErr) return json(500, { error: recErr.message, qbo_id: String(doc.Id) });
+      if (!recorded || recorded.length === 0) {
+        return json(500, {
+          error: "It reached QuickBooks but could not be recorded here, so pushing again " +
+            `would duplicate it. Its QuickBooks id is ${doc.Id}.`,
+          qbo_id: String(doc.Id),
+        });
+      }
+
+      return json(200, {
+        entity: "Invoice",
+        warnings,
+        qbo_id: String(doc.Id),
+        doc_number: ref.qbo.doc_number,
+        total: Number(doc.TotalAmt ?? 0),
+        tax: theirTax,
+        updated: Boolean((req.payload as { Id?: string }).Id),
+      });
     }
 
     if (mode === "items") {
