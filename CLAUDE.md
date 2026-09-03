@@ -2831,6 +2831,26 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    only it lost its border; its sibling was left exactly as it was, since he
    named the wording that identifies which band he meant precisely enough
    to tell them apart.
+
+   **Shipped 2026-09-03 — `totalDisagreement` GOES QUIET WHILE `lineSums`
+   ALREADY SPOKE** (Mark, on real invoice 15476478: "I'm getting multiple
+   similar warnings"). Two bands were both firing over the SAME pair of
+   numbers, worded almost identically — "the lines come to $216.35, where
+   the invoice says $190.95" stacked directly on "the item lines come to
+   $216.35 against a printed subtotal of $190.95". **WHY THEY COLLAPSE TO
+   ONE FACT**: with tax, freight and other all zero — the common case —
+   `computed.total` REDUCES TO `computed.subtotal`, and the document's own
+   total reduces to its own subtotal the same way, so `totalDisagreement`
+   and `lineSums.differs` end up comparing the IDENTICAL pair and saying so
+   twice. `lineSums` is the more useful of the two when both would fire —
+   it names the SUBTOTAL, which is what actually needs checking (15476478's
+   own cause: `BANANA-GREEN TIP ^ SUBSTITUTION` entered as two separate
+   lines, both $25.40) — so `totalDisagreement` is suppressed whenever
+   `lineSums.differs`, treating the subtotal mismatch as the root cause
+   rather than restating its consequence. Where the lines agree with the
+   printed subtotal but the total still doesn't — a real tax/freight/other
+   gap — `totalDisagreement` still fires on its own with something new to
+   say. Verified live: 15476478 now shows exactly one band.
 4e. ✅ **EMPLOYEE EVENTS — migration 035, APPLIED and LOADED 2026-08-06.**
    FMP's two HR child tables merged into ONE (Mark: "In retrospect, these should
    really be all in one table: Events. What were 'ratings' are really just shift

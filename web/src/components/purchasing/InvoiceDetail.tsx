@@ -354,11 +354,29 @@ export function InvoiceDetail({
    * correctly the moment a gap like Mark's is corrected. Falls back to
    * `invoice.total` for a hand-typed, lineless bill, where `computed.total`
    * is null.
+   *
+   * SUPPRESSED WHILE `lineSums.differs` (Mark, 2026-09-03, on invoice
+   * 15476478: "I'm getting multiple similar warnings"). When tax, freight
+   * and other are all zero — the common case — `computed.total` REDUCES TO
+   * `computed.subtotal`, and the document's `total` reduces to its own
+   * `subtotal` the same way, so this check and `lineSums` end up comparing
+   * the identical pair of numbers and saying so in two different sentences:
+   * "the lines come to $216.35, where the invoice says $190.95" right above
+   * "the item lines come to $216.35 against a printed subtotal of $190.95".
+   * `lineSums` is the more USEFUL of the two when both would fire — it names
+   * the SUBTOTAL, which is what actually needs checking (15476478's own
+   * cause was a banana line entered twice) — so it is treated as the root
+   * cause and this one stays quiet rather than restating it. Where lines
+   * agree with the printed subtotal but the total still doesn't — a real
+   * tax/freight/other gap — this still fires on its own with something new
+   * to say.
    */
-  const totalDisagreement = totalDisagreesWithDocument(
-    computed.total ?? invoice.total,
-    printedCharges?.total ?? null
-  );
+  const totalDisagreement = lineSums.differs
+    ? null
+    : totalDisagreesWithDocument(
+        computed.total ?? invoice.total,
+        printedCharges?.total ?? null
+      );
 
   /**
    * Write a line's quantity or price, and the arithmetic that follows from it.
