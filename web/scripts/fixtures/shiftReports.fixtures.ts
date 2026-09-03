@@ -71,7 +71,8 @@ test("the banner numbers what it was given", () => {
 });
 
 // ---------------------------------------------------------------------------
-// submitReadiness — names what is unresolved, lets you through
+// submitBlockers — what tomorrow cannot answer, so the send waits
+// submitReadiness — what tomorrow CAN, so it only gets named
 // ---------------------------------------------------------------------------
 
 const READY: ReadinessInput = {
@@ -90,24 +91,72 @@ const READY: ReadinessInput = {
   checklistNotStarted: false,
 };
 
-test("a finished closing report has nothing outstanding", () => {
+test("a finished closing report has nothing outstanding and nothing blocking", () => {
   eq(submitReadiness(READY), []);
+  eq(submitBlockers(READY), []);
+});
+
+test("THE PERISHABLE THINGS BLOCK; only the recoverable ones are advisory", () => {
+  // Mark, 2026-09-02, correcting the line this function shipped with: "an
+  // uncounted premade line cannot be counted tomorrow. The checklist can't be
+  // completed tomorrow either." Right — last night's leftovers are gone by
+  // morning and nobody can say at 9am what the walk-in read at close.
+  //
+  // So each of these BLOCKS, and none of them is a caveat any more.
+  const cases: [Partial<ReadinessInput>, string][] = [
+    [{ narrative: "  " }, "The shift report itself is empty."],
+    [{ ratingCount: 0 }, "No employees have been added."],
+    [{ countedLines: 5, scheduledLines: 32 }, "27 of 32 premade lines have no count."],
+    [{ checklistNotStarted: true, checklist: null }, "The checklist for this shift has not been started."],
+    [
+      { checklist: { outstanding: 64, total: 67, finished: false } },
+      "64 of 67 checklist items have not been looked at.",
+    ],
+  ];
+  for (const [patch, sentence] of cases) {
+    const input = { ...READY, ...patch };
+    ok(submitBlockers(input).includes(sentence), `blocked: ${sentence}`);
+    no(submitReadiness(input).includes(sentence), `and NOT merely advisory: ${sentence}`);
+  }
+});
+
+test("printing is the exception — paper can come out of a printer tomorrow", () => {
+  // The two ACTIONS, as against observations. Late is a real problem; gone is a
+  // different one, and only the second earns a gate.
+  const unprinted = { ...READY, taskSpecialOrdersDone: false, taskSchedulesDone: false };
+  eq(submitReadiness(unprinted), [
+    "Tomorrow's special orders have not been printed.",
+    "Tomorrow's production logs have not been printed.",
+  ]);
+  eq(submitBlockers(unprinted), []);
+});
+
+test("a shift that is not asked for a page is not blocked on it", () => {
+  // An opening report has no premades page, so 32 uncounted lines it never sees
+  // must not stop it — the same `pagesForShift` guard the advisory list uses.
+  const opening = {
+    ...READY,
+    shift: "opening" as const,
+    countedLines: 0,
+    scheduledLines: 32,
+  };
+  no(submitBlockers(opening).some((b) => b.includes("premade")), "premades on an opening report");
 });
 
 test("an empty narrative is named", () => {
-  const out = submitReadiness({ ...READY, narrative: "   " });
+  const out = submitBlockers({ ...READY, narrative: "   " });
   eq(out.length, 1);
   ok(out[0].includes("empty"), out[0]);
 });
 
 test("uncounted premade lines are named, with the count", () => {
-  const out = submitReadiness({ ...READY, countedLines: 9 });
+  const out = submitBlockers({ ...READY, countedLines: 9 });
   eq(out.length, 1);
   ok(out[0].includes("3 of 12"), out[0]);
 });
 
 test("one uncounted line reads singular", () => {
-  const out = submitReadiness({ ...READY, countedLines: 11 });
+  const out = submitBlockers({ ...READY, countedLines: 11 });
   ok(out[0].includes("1 of 12 premade line has"), out[0]);
 });
 
@@ -137,7 +186,7 @@ test("READINESS IS SHIFT-DEPENDENT: an opening report is complete with no paper 
 });
 
 test("an opening report IS asked about its batches", () => {
-  const out = submitReadiness({
+  const out = submitBlockers({
     ...READY,
     shift: "opening",
     taskSpecialOrdersDone: false,
@@ -177,8 +226,8 @@ test("an EMPTY employee list is named; a filled one is not nagged about", () => 
   // is derived from the rows and fires only on the one state that IS
   // observable — nobody added at all. One rated person is not incomplete, it is
   // a shift with one person on it.
-  eq(submitReadiness({ ...READY, ratingCount: 0 }), ["No employees have been added."]);
-  eq(submitReadiness({ ...READY, ratingCount: 1 }), []);
+  eq(submitBlockers({ ...READY, ratingCount: 0 }), ["No employees have been added."]);
+  eq(submitBlockers({ ...READY, ratingCount: 1 }), []);
 });
 
 test("THE BREAK ANSWERS BLOCK — they are not a caveat you can send past", () => {
@@ -541,7 +590,7 @@ test("THE EMAIL AND THE SUBMIT PAGE AGREE ABOUT 'NOT STARTED'", () => {
   // One question, two surfaces. If either condition drifts this fails, rather
   // than the screen and the email quietly disagreeing about the same night.
   for (const notStarted of [true, false]) {
-    const onScreen = submitReadiness({
+    const onScreen = submitBlockers({
       ...READY,
       checklist: null,
       checklistNotStarted: notStarted,
@@ -773,7 +822,7 @@ test("a special order with an empty title falls back to the shop heading", () =>
 // ---------------------------------------------------------------------------
 
 test("a checklist nobody started is NAMED", () => {
-  const out = submitReadiness({
+  const out = submitBlockers({
     ...READY,
     checklist: null,
     checklistNotStarted: true,
@@ -782,7 +831,7 @@ test("a checklist nobody started is NAMED", () => {
 });
 
 test("an unwalked checklist names how much is left", () => {
-  const out = submitReadiness({
+  const out = submitBlockers({
     ...READY,
     checklist: { outstanding: 6, total: 27, finished: false },
   });
@@ -790,7 +839,7 @@ test("an unwalked checklist names how much is left", () => {
 });
 
 test("one outstanding item reads in the singular", () => {
-  const out = submitReadiness({
+  const out = submitBlockers({
     ...READY,
     checklist: { outstanding: 1, total: 27, finished: false },
   });
@@ -805,7 +854,7 @@ test("answered but not finished says NOTHING — sending finishes it", () => {
   //
   // Checked by BREAKING it: put the `else if (!finished)` branch back and this
   // goes red.
-  const out = submitReadiness({
+  const out = submitBlockers({
     ...READY,
     checklist: { outstanding: 0, total: 27, finished: false },
   });
@@ -816,7 +865,7 @@ test("an unfinished checklist with work left still names the work", () => {
   // The half that survives, and the distinction that matters: how much has not
   // been LOOKED AT is a fact about the shift, where "not finished" was a fact
   // about a button.
-  const out = submitReadiness({
+  const out = submitBlockers({
     ...READY,
     checklist: { outstanding: 3, total: 27, finished: false },
   });
@@ -826,5 +875,5 @@ test("an unfinished checklist with work left still names the work", () => {
 test("a report with NO checklist linked and none asked for says nothing", () => {
   // The common case for a shop that has not written a master list yet — the
   // page must not nag about a feature nobody is using.
-  eq(submitReadiness({ ...READY, checklist: null, checklistNotStarted: false }), []);
+  eq(submitBlockers({ ...READY, checklist: null, checklistNotStarted: false }), []);
 });

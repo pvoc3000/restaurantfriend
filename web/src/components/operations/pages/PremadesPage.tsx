@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { CountField, TextField } from "./fields";
 
 export type PremadeRow = {
@@ -60,6 +61,55 @@ export function PremadesPage({
   const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
+  /** Rows with nothing in the Left column yet — what the button below fills. */
+  const uncounted = rows.filter((r) => r.leftover === null);
+
+  /**
+   * "Nothing left over" — every EMPTY Left box becomes 0, in one write.
+   *
+   * The other half of making the send gate strict (Mark, 2026-09-02). Counting
+   * is now required before a report can go, and measured over every report ever
+   * sent nobody had counted more than 13 lines of 32 — so the requirement on
+   * its own would simply have stopped reports going out. The usual answer at
+   * close is "none left" and typing it thirty-two times is the whole burden.
+   *
+   * IT NEVER OVERWRITES A COUNT — only rows where Left is empty, which is
+   * `Receive n from invoice`'s rule and for its reason: a number somebody
+   * counted is a measurement, and a batch button must not silently replace one.
+   * The label names how many it will fill, so there is no confirm to read: what
+   * it is about to do is on its face, and pressing it again does nothing.
+   *
+   * `made` is deliberately untouched — the per-row arrow already takes the par,
+   * and asserting that everything on the sheet was MADE is a different claim
+   * from saying nothing came back.
+   */
+  function nothingLeftOver() {
+    if (uncounted.length === 0) return;
+    startTransition(async () => {
+      // ONE upsert for every row. Uniform keys, which PostgREST's bulk upsert
+      // requires — and because `made` is not among them it is left alone on
+      // rows that already have one rather than being reset.
+      const { error } = await supabase
+        .from("shift_report_counts")
+        .upsert(
+          uncounted.map((r) => ({
+            org_id: orgId,
+            report_id: reportId,
+            schedule_item_id: r.scheduleItemId,
+            leftover: 0,
+          })),
+          { onConflict: "report_id,schedule_item_id" }
+        )
+        .select("id");
+      if (error) {
+        setFailed(error.message);
+        return;
+      }
+      setFailed(null);
+      router.refresh();
+    });
+  }
+
   function save(scheduleItemId: string, patch: Record<string, number | string | null>) {
     startTransition(async () => {
       // UPSERT on the pair, because most lines have no draft row until somebody
@@ -98,12 +148,29 @@ export function PremadesPage({
   return (
     <div className="mx-auto max-w-5xl space-y-4">
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
-      {scheduleTitle ? (
-        <p className="text-sm">
-          <span className="text-xs font-semibold uppercase tracking-[0.08em]">Schedule:</span>{" "}
-          {scheduleTitle}
-        </p>
-      ) : null}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        {scheduleTitle ? (
+          <p className="text-sm">
+            <span className="text-xs font-semibold uppercase tracking-[0.08em]">Schedule:</span>{" "}
+            {scheduleTitle}
+          </p>
+        ) : (
+          <span />
+        )}
+        {editable ? (
+          <button
+            type="button"
+            className={BUTTON_CLASS}
+            // Disabled rather than hidden once every row has a count, so the
+            // control does not appear and vanish as the sheet fills in.
+            disabled={uncounted.length === 0}
+            onClick={nothingLeftOver}
+          >
+            Nothing left over
+            {uncounted.length > 0 ? ` (${uncounted.length})` : ""}
+          </button>
+        ) : null}
+      </div>
 
       {/* `table-fixed` with a colgroup, or the two 112px input columns push the
           Note header into Left's and it renders as "LEFTNOTE". A `w-28` on a

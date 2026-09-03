@@ -167,66 +167,13 @@ export function submitReadiness(input: ReadinessInput): string[] {
   const pages = pagesForShift(input.shift);
   const caveats: string[] = [];
 
-  if (!input.narrative || input.narrative.trim() === "") {
-    caveats.push("The shift report itself is empty.");
-  }
-
-  // DERIVED FROM THE ROWS, not from a flag (Mark, 2026-09-01: "I don't see the
-  // value in the checkbox 'I've rated everybody who worked the shift'. We aren't
-  // making sure the user is filling out the report completely").
+  // WHAT IS LEFT HERE IS WHAT TOMORROW CAN STILL FIX, and after 2026-09-02 that
+  // is two things. Everything else moved to `submitBlockers` — see its note for
+  // the test and for why this list got so short.
   //
-  // He is right, and it is the readiness rule applied to itself: this list
-  // exists to say what is MISSING, not to collect an acknowledgement that
-  // nothing is. "You have not ticked the box" was a caveat about the caveat.
-  // An empty page is still worth saying, because that one is observable.
-  //
-  // `task_ratings_done` therefore has no writer and no reader left. The column
-  // stays — 070 is applied and a boolean nobody sets costs nothing — but
-  // nothing in `web/src` touches it.
-  if (input.ratingCount === 0) {
-    caveats.push("No employees have been added.");
-  }
-
-  // THE BREAK ANSWERS ARE NOT HERE ANY MORE — they BLOCK, so they cannot be
-  // something you send past. See `submitBlockers`.
-
-  if (pages.includes("premades") && input.countedLines < input.scheduledLines) {
-    const left = input.scheduledLines - input.countedLines;
-    caveats.push(
-      `${left} of ${input.scheduledLines} premade ${left === 1 ? "line has" : "lines have"} no count.`
-    );
-  }
-
-  if (pages.includes("elements") && input.countedBatches < input.scheduledBatches) {
-    const left = input.scheduledBatches - input.countedBatches;
-    caveats.push(
-      `${left} of ${input.scheduledBatches} ${left === 1 ? "batch has" : "batches have"} no yield recorded.`
-    );
-  }
-
-  if (pages.includes("checklist")) {
-    if (input.checklistNotStarted) {
-      caveats.push("The checklist for this shift has not been started.");
-    } else if (input.checklist) {
-      const { outstanding, total } = input.checklist;
-      if (outstanding > 0) {
-        caveats.push(
-          `${outstanding} of ${total} checklist ${outstanding === 1 ? "item has" : "items have"} not been looked at.`
-        );
-      }
-      // NO "answered but not finished" CAVEAT ANY MORE (Mark, 2026-09-01).
-      // Sending the report finishes the run, so an open-but-answered checklist
-      // is not something outstanding for the reader — it is something this very
-      // button is about to do. Naming it would be the failure `closeReadiness`
-      // warns about in reverse: a list that reports as unresolved a thing the
-      // screen resolves for you teaches people to stop reading the list.
-      //
-      // `checklist.finished` stays on the type. It is still read by the EMAIL,
-      // where "was this finished" is a fact about the document being described
-      // rather than a prompt.
-    }
-  }
-
+  // These two are ACTIONS rather than observations: paper that has not come out
+  // of a printer can come out of it at six tomorrow morning. Late, and a real
+  // problem, and not a fact that has evaporated.
   if (pages.includes("tomorrow")) {
     if (!input.taskSpecialOrdersDone) {
       caveats.push("Tomorrow's special orders have not been printed.");
@@ -240,41 +187,57 @@ export function submitReadiness(input: ReadinessInput): string[] {
 }
 
 /**
- * What must be settled BEFORE the report can be sent — the one gate in a module
- * built on not gating.
+ * What must be settled BEFORE the report can be sent.
  *
- * Why this exists at all, given `submitReadiness` two functions up and its rule
- * that naming a thing and letting you through is what keeps reports getting
- * sent (Mark, 2026-09-02): "In FMP we wouldn't allow the report to be submitted
- * if any employees were missing break times or a reason for missing a break.
- * Why aren't we doing that here?"
+ * THE TEST IS WHETHER TOMORROW CAN STILL ANSWER IT, and I got the application
+ * of that test badly wrong when this function was written — it blocked on break
+ * answers alone, on the stated grounds that "an uncounted premade line can be
+ * counted tomorrow". Mark, 2026-09-02: "an uncounted premade line cannot be
+ * counted tomorrow. The checklist can't be completed tomorrow either. I would
+ * argue most things in the report can't really be done the next day."
  *
- * THE DISTINCTION IS WHO ELSE COULD EVER SUPPLY IT. Everything in
- * `submitReadiness` is either derivable later or recoverable by somebody else:
- * an uncounted premade line can be counted tomorrow, an unprinted packet can be
- * printed, an empty narrative is a report that says little. A break answer
- * cannot. The supervisor standing there is the ONLY person who knows whether
- * that meal was taken and when, the punches are in Homebase and say nothing
- * about why, and by the time payroll looks at it a fortnight later there is
- * nobody left to ask. It is also the record California asks for.
+ * He is right and it is not close. Last night's leftovers are sold or binned by
+ * morning; nobody can say at 9am what the walk-in read at close; a batch yield
+ * is gone with the batch; who worked and how they did is memory by Thursday.
+ * The test was sound and I had applied it to one field out of six.
  *
- * That is the test for anything else that wants to join this list: not "is it
- * important" — everything on the other list is important — but "is this the
- * last moment anybody can answer it".
+ * SO THIS LIST IS NOW THE PERISHABLE ONES and `submitReadiness` keeps what is
+ * genuinely recoverable — which turns out to be two things, both ACTIONS rather
+ * than observations: paper that has not been printed can be printed at six
+ * tomorrow morning. Late, and a real problem, and not a fact that has
+ * evaporated. Sales are not on either list; Square supplies them by itself.
  *
- * SO THIS IS DELIBERATELY SHORT, and it should stay short. A gate that grows
- * becomes the thing `submitReadiness`' own note warns about: a night the
- * printer jammed and the report never got sent at all.
+ * THE MEASUREMENT THAT SHAPED THE OTHER HALF OF THIS. All four reports ever
+ * sent would have been blocked, dominated by premade counts — 6, 13 and 3 lines
+ * counted of 32, 32 and 33. So the gate alone would have stopped every report
+ * in the module's history, which is exactly the failure `submitReadiness`' rule
+ * exists to prevent, arriving through a different door. What made it affordable
+ * was the other half of the same change: `PremadesPage` gained a "Nothing left
+ * over" control, so thirty-two rows is one tap rather than thirty-two.
+ *
+ * A GATE AND ITS ERGONOMICS ARE ONE DECISION. If anything else joins this list,
+ * the question to ask with it is what it costs to satisfy on a bad night — not
+ * because the requirement is wrong, but because a requirement nobody can meet
+ * at 11pm produces no report at all, and no report is worse than a partial one.
  *
  * The costs, accepted with eyes open: a supervisor who genuinely cannot recall
  * a break time cannot file until they put something in the box, and a report
- * left with an unanswered row cannot be sent by anybody else either. FMP had
- * both of those for thirteen years.
+ * left incomplete cannot be sent by anybody else either. FMP had both of those
+ * for thirteen years.
  */
 export function submitBlockers(input: ReadinessInput): string[] {
+  const pages = pagesForShift(input.shift);
   const out: string[] = [];
-  const { missingTime, missingReason } = input.breaks;
 
+  if (!input.narrative || input.narrative.trim() === "") {
+    out.push("The shift report itself is empty.");
+  }
+
+  if (input.ratingCount === 0) {
+    out.push("No employees have been added.");
+  }
+
+  const { missingTime, missingReason } = input.breaks;
   if (missingReason > 0) {
     out.push(
       `${missingReason} ${missingReason === 1 ? "employee has" : "employees have"} no break, and no reason why.`
@@ -285,6 +248,32 @@ export function submitBlockers(input: ReadinessInput): string[] {
       `${missingTime} ${missingTime === 1 ? "employee has" : "employees have"} a break with no time recorded.`
     );
   }
+
+  if (pages.includes("premades") && input.countedLines < input.scheduledLines) {
+    const left = input.scheduledLines - input.countedLines;
+    out.push(
+      `${left} of ${input.scheduledLines} premade ${left === 1 ? "line has" : "lines have"} no count.`
+    );
+  }
+
+  if (pages.includes("elements") && input.countedBatches < input.scheduledBatches) {
+    const left = input.scheduledBatches - input.countedBatches;
+    out.push(
+      `${left} of ${input.scheduledBatches} ${left === 1 ? "batch has" : "batches have"} no yield recorded.`
+    );
+  }
+
+  if (pages.includes("checklist")) {
+    if (input.checklistNotStarted) {
+      out.push("The checklist for this shift has not been started.");
+    } else if (input.checklist && input.checklist.outstanding > 0) {
+      const { outstanding, total } = input.checklist;
+      out.push(
+        `${outstanding} of ${total} checklist ${outstanding === 1 ? "item has" : "items have"} not been looked at.`
+      );
+    }
+  }
+
   return out;
 }
 
