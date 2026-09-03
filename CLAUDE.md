@@ -6946,21 +6946,39 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    ABOVE the table when there are — never both, because when rows exist the
    empty slot does not. Verified both ways at 1440, the second by temporarily
    flagging every report (tab 7, note above, two rows beneath).
-   **PAGE 8 SAYS NOTHING IT CANNOT ACT ON** (Mark, 2026-09-03, three sentences
-   over two passes). Gone: the blockers box's "These can only be answered
-   tonight"; `salesNote`'s "Square has not reported this day yet — the figures
-   will arrive on tomorrow's sync"; and the outstanding box's "You can send it
-   anyway — this is a list, not a gate."
-   The sales one is the interesting removal, because it was the NORMAL case:
-   Square types the figure on the next day's sync, so page 8 opened by
-   describing a wait nobody is waiting on and that no act of a supervisor's can
-   end. `salesNote` returns **null** now and the page renders no line at all —
-   the only sales fact worth stating here is the one that is good news, "Sales
-   are in." The two prose lines under the boxes were each explaining the box
-   above them, which the box's own heading (red "Before this can be sent" over
-   red items, plain "Still outstanding" over yellow ones) already does; the
-   colour and the border carry the gate-versus-list distinction without a
-   sentence restating it.
+   **PAGE 8 SAYS NOTHING IT CANNOT ACT ON** (Mark, 2026-09-03, four sentences
+   over three passes). Gone: the blockers box's "These can only be answered
+   tonight"; the outstanding box's "You can send it anyway — this is a list, not
+   a gate"; and BOTH of `salesNote`'s lines, so **that function is deleted**
+   rather than left returning null.
+   The sales pair is the instructive one. "Square has not reported this day yet
+   — the figures will arrive on tomorrow's sync" was the NORMAL case, so page 8
+   opened by describing a wait nobody is waiting on and that no act of a
+   supervisor's can end; "Sales are in." then went with it, because a page
+   listing what is UNRESOLVED has nothing to say about a thing that resolved
+   itself. The figure is on page 3 and in the email. Two comments elsewhere
+   cited `salesNote` for the "INFORMATION, never a caveat" rule; the rule
+   survives, the citations now state it rather than pointing at a dead function.
+   The two prose lines under the boxes were each explaining the box above them,
+   which the box's own heading (red "Before this can be sent" over red items,
+   plain "Still outstanding" over yellow ones) already does.
+   **THE REPORT IS THE LAST PAGE BEFORE SUBMIT, ON EVERY SHIFT** (Mark, same
+   day). It was already true of opening, mid and off-site and false of CLOSING,
+   where Tomorrow's production sat between the two — so the one shift with
+   something to write was asked to write it, sent off to a printer, and then
+   shown a submit page. Everything above the report is a thing you look at or
+   count; the report is what you make of it, so it reads last and the next tap
+   sends it. Nothing depends on the order (`submitReadiness` and
+   `submitBlockers` both ask `pages.includes`, and the runner numbers what it is
+   given), which is exactly why a fixture pins it — a reorder would otherwise
+   break the rule in silence.
+   **`main` IS A FLEX COLUMN**, so a page can fill it: an empty state that is
+   the whole page centres in it (`flex flex-1 items-center justify-center`).
+   `h-full` does NOT work — main is a `flex-1` block whose height is not a
+   definite value for percentage resolution, measured at 24px inside a 595px
+   parent. The two empty states that earned it are the checklist page's "No
+   checklist is set up for this shift at this shop" and the premades page's "No
+   production schedule was generated for this shop today".
    **IT MOVED UNDER THE TAB PICKER 2026-09-03** (Mark), which retires the
    two-places arrangement above: the nights are half of the Needs-attention
    COUNT, so the sentence explaining that count belongs beneath the tab carrying
@@ -7725,6 +7743,19 @@ weekday column, and 003 then silently made it per-vendor-item.
 
 ## Conventions
 
+- **THE SCREEN EXPLAINS ITSELF. STOP WRITING HINTS** (Mark, 2026-09-03: "stop
+  adding extra comments and hints, or make them super terse at the very least.
+  Most of them have been unnecessary"). Said after a run of removals that were
+  all the same mistake: a sentence under a control describing what the control
+  plainly is. Page 8 alone carried three — one under the blockers box saying the
+  blockers were urgent, one under the outstanding box saying it was not a gate,
+  one saying Square had not reported yet. The heading, the colour and the border
+  had already said all of it.
+  Ship a line ONLY if it states a fact the reader cannot see. Not what a button
+  does, not why a rule exists, not where else in the app something lives, and
+  never a reassurance. Where a line does earn its place, write it as short as it
+  can be and stop.
+  The reasoning belongs in a code comment, where it is free.
 - **IT IS A PAY PERIOD, NEVER A "FORTNIGHT"** (Mark, 2026-08-23: "stop
   referring to pay periods as 'fortnights'. It's a pay period. say 'pay period'
   please"). This was already the rule for VISIBLE STRINGS when `/timesheets`

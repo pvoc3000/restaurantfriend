@@ -56,14 +56,28 @@ export const PAGE_TITLE: Record<ShiftReportPage, string> = {
   submit: "Submit",
 };
 
+/**
+ * THE REPORT IS THE LAST PAGE BEFORE SUBMIT, ON EVERY SHIFT (Mark,
+ * 2026-09-03). It was true of the other three lists already and false of this
+ * one, where "Tomorrow's production" sat between the two — so the closer, who
+ * is the one with something to write, was asked to write it, then sent off to
+ * a printer, and then shown a submit page. Everything above the report is a
+ * thing you look at or count; the report is what you make of it, so it reads
+ * last and the next tap sends it.
+ *
+ * Nothing is order-dependent behind this — `submitReadiness` and
+ * `submitBlockers` both ask `pages.includes(...)`, and the runner numbers
+ * whatever it is given — but a fixture pins the rule, because a future reorder
+ * would otherwise break it in silence.
+ */
 const CLOSING_PAGES: ShiftReportPage[] = [
   "info",
   "ratings",
   "sales",
   "premades",
   "checklist",
-  "report",
   "tomorrow",
+  "report",
   "submit",
 ];
 
@@ -275,22 +289,6 @@ export function submitBlockers(input: ReadinessInput): string[] {
   }
 
   return out;
-}
-
-/**
- * The sales line on the submit page. INFORMATION, never a caveat: Square types
- * the figure now, so there is no act for a supervisor to complete — which is
- * why FMP's `Task_SalesData_isComplete_b` has no counterpart in this schema.
- *
- * NULL WHEN THERE IS NO FIGURE, and the page then says nothing about sales
- * (Mark, 2026-09-03). It used to explain the absence — "Square has not reported
- * this day yet, the figures will arrive on tomorrow's sync" — which is the
- * normal case, so page 8 opened by describing a wait nobody is waiting on and
- * that no act of theirs can end. The only sales fact worth a line here is the
- * one that IS actionable in the sense of being good news: they arrived.
- */
-export function salesNote(netSalesCents: number | null): string | null {
-  return netSalesCents === null ? null : "Sales are in.";
 }
 
 // ---------------------------------------------------------------------------

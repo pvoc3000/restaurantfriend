@@ -591,14 +591,7 @@ export default async function RunShiftReportPage({
         editable={editable}
       />
     ),
-    submit: (
-      <SubmitPage
-        key="submit"
-        outstanding={outstanding}
-        blockers={blockers}
-        netSalesCents={netSalesCents}
-      />
-    ),
+    submit: <SubmitPage key="submit" outstanding={outstanding} blockers={blockers} />,
   };
 
   if (wants("checklist")) {

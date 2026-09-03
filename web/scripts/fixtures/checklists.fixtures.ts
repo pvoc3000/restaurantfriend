@@ -252,7 +252,7 @@ test("A FLAGGED ISSUE IS NOT OUTSTANDING — it is what the walk was FOR", () =>
   // Mark, 2026-08-30: "if everything is either marked done or flagged, then
   // there aren't any outstanding issues." An item looked at, found broken and
   // written up is as answered as an item gets; the confirm states the findings
-  // separately as a fact, `salesNote`'s "INFORMATION, never a caveat".
+  // separately as a fact: information, never a caveat.
   eq(checklistReadiness([item("done"), item("issue"), item("na")]), []);
   eq(checklistIssueCount([item("done"), item("issue"), item("na")]), 1);
 });

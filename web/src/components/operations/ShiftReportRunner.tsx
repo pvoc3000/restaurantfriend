@@ -343,7 +343,7 @@ export function ShiftReportRunner({
         </h1>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-6 py-8">
+      <main className="flex flex-1 flex-col overflow-y-auto px-6 py-8">
         {busy ? <ProgressBand label={busy} /> : null}
         {failed ? (
           <p className="mb-6 border border-accent px-4 py-3 text-sm text-accent">{failed}</p>

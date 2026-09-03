@@ -59,6 +59,20 @@ test("only closing carries sales and tomorrow's paper", () => {
   }
 });
 
+test("THE REPORT IS THE LAST PAGE BEFORE SUBMIT, on every shift", () => {
+  // Mark, 2026-09-03. It was already true of opening, mid and off-site and
+  // false of CLOSING, where "Tomorrow's production" sat between the two — so
+  // the one shift with something to write was asked to write it, then sent off
+  // to a printer, then shown the submit page. Nothing in the code depends on
+  // the order (both readiness functions ask `includes`), which is exactly why
+  // this needs pinning: a reorder would break the rule in silence.
+  for (const shift of ["closing", "opening", "mid", "off_site"] as const) {
+    const pages = pagesForShift(shift);
+    eq(pages[pages.length - 1], "submit", `${shift} ends on submit`);
+    eq(pages[pages.length - 2], "report", `${shift} writes the report last`);
+  }
+});
+
 test("pagesForShift returns a COPY — a caller sorting it cannot corrupt the next", () => {
   const first = pagesForShift("closing");
   first.length = 0;

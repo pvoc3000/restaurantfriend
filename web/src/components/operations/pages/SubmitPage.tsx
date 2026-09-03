@@ -1,7 +1,13 @@
-import { salesNote } from "@/lib/shiftReports";
-
 /**
  * The readiness page — FMP's last one, minus checklists and minus sales.
+ *
+ * IT SAYS NOTHING ABOUT SALES AT ALL (Mark, 2026-09-03, in two passes). The
+ * line explaining that Square had not reported yet went first — that is the
+ * NORMAL case, so the page opened by describing a wait nobody is waiting on
+ * and that no act of a supervisor's can end — and then "Sales are in." went
+ * with it, because a page listing what is UNRESOLVED has nothing to say about
+ * a thing that resolved itself. The figure is on page 3 and in the email;
+ * `salesNote` is deleted rather than left returning null.
  *
  * It NAMES what is unresolved and then lets you through, which is
  * `closeReadiness`'s rule and its reason: gate a shift report on a complete set
@@ -30,7 +36,6 @@ import { salesNote } from "@/lib/shiftReports";
 export function SubmitPage({
   outstanding,
   blockers,
-  netSalesCents,
 }: {
   /**
    * Already computed — see the note where it is. The page renders the SAME
@@ -47,15 +52,11 @@ export function SubmitPage({
    * which. Red for the second, since here something really is wrong.
    */
   blockers: string[];
-  netSalesCents: number | null;
 }) {
   const caveats = outstanding;
-  const sales = salesNote(netSalesCents);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
-      {sales ? <p className="text-sm text-muted">{sales}</p> : null}
-
       {blockers.length > 0 ? (
         <div className="space-y-2 border-2 border-accent p-4">
           <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">

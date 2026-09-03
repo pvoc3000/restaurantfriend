@@ -64,27 +64,36 @@ export function ChecklistPage({
   today: string;
   editable: boolean;
 }) {
+  // Nothing asked for and nothing linked: `LinkChecklistRun` returns null with
+  // no candidates, so this sentence is the whole page and sits in the middle of
+  // it (Mark, 2026-09-03).
+  if (!run && askedFor.length === 0) {
+    return (
+      <div className="flex flex-1 items-center justify-center">
+        <p className="max-w-[60ch] text-center text-[16px]">
+          No checklist is set up for this shift at this shop.
+        </p>
+      </div>
+    );
+  }
+
   if (!run) {
     return (
       <div className="space-y-4">
         <p className="max-w-[60ch] text-[16px]">
-          {askedFor.length === 0
-            ? "No checklist is set up for this shift at this shop."
-            : askedFor.length === 1
-              ? // It is being started as this renders, so the sentence says what
-                // is happening rather than what has not happened.
-                "This shift is asked for a checklist."
-              : `This shift is asked for ${askedFor.length} checklists, and none has been started.`}
+          {askedFor.length === 1
+            ? // It is being started as this renders, so the sentence says what
+              // is happening rather than what has not happened.
+              "This shift is asked for a checklist."
+            : `This shift is asked for ${askedFor.length} checklists, and none has been started.`}
         </p>
-        {askedFor.length > 0 && (
-          <ul className="space-y-1 text-[16px]">
-            {askedFor.map((t) => (
-              <li key={t.id}>
-                <span className="bg-mark-fill px-1">{t.name}</span>
-              </li>
-            ))}
-          </ul>
-        )}
+        <ul className="space-y-1 text-[16px]">
+          {askedFor.map((t) => (
+            <li key={t.id}>
+              <span className="bg-mark-fill px-1">{t.name}</span>
+            </li>
+          ))}
+        </ul>
         {editable && (
           <LinkChecklistRun
             reportId={reportId}
@@ -98,12 +107,6 @@ export function ChecklistPage({
             // never creates a record.
             autoStart={editable}
           />
-        )}
-        {askedFor.length === 0 && (
-          <p className="max-w-[60ch] text-[14px] text-muted">
-            Master lists are set up under Facilities › Checklists › Templates.
-            You can finish this report without one.
-          </p>
         )}
       </div>
     );

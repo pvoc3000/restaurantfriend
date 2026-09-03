@@ -56,7 +56,7 @@ export function FinishChecklist({
     );
 
     // WHAT WAS FOUND IS NOT WHAT IS OUTSTANDING. The findings are stated as a
-    // fact — `salesNote`'s "INFORMATION, never a caveat" — because a flagged
+    // fact — INFORMATION, never a caveat — because a flagged
     // item has been dealt with as far as a checklist can deal with it, and the
     // report is where it goes next.
     const found = checklistIssueCount(items);

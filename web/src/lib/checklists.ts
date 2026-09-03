@@ -337,9 +337,10 @@ export function checklistReadiness(items: RunItemLike[]): string[] {
   // answered as an item gets — telling its author they have not finished is
   // telling somebody who did the job properly that they didn't.
   //
-  // It is stated as INFORMATION by the caller instead, which is `salesNote`'s
-  // rule in this same codebase: "INFORMATION, never a caveat", for a fact that
-  // needs saying but names no act anybody still has to perform.
+  // It is stated as INFORMATION by the caller instead: a fact that needs
+  // saying but names no act anybody still has to perform. (`salesNote` was the
+  // other holder of that rule and is deleted — its own fact stopped needing
+  // saying at all.)
   return out;
 }
 
