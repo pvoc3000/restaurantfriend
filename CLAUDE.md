@@ -2820,6 +2820,25 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    fixtures pass, unchanged — `billStage` was already fixture-tested for
    the list and this is the same function reading the same shape.
 
+   **Shipped 2026-09-03 — CHECK QUICKBOOKS MOVED NEXT TO NEW INVOICE.**
+   Mark, with a screenshot: move the button beside New invoice, and drop
+   the "last checked" text under it. It had its own row below the DUE
+   filters, alone on the far left, nowhere near the screen's other
+   command; the button now sits in the search row, immediately left of
+   **New invoice** — `NewInvoice`'s own trigger already carries `ml-auto`,
+   so putting Check QuickBooks right before it in the same flex row is the
+   whole change, no wrapper needed.
+   **THE SUMMARY LINE IS GONE, THE PER-ROW ONE IS NOT** — two different
+   things read `qboStatus`/`qboAt`, and only one of them is what Mark
+   pointed at. The toolbar's "N of M paid · as of TIME" was a second,
+   coarser statement of a fact each row already carries under its own
+   invoice number (`billPaymentNote`, live-overridden by a fresh check);
+   removing the summary loses nothing the rows don't already say, closer
+   to the number it's about. `qboStatus`/`qboAt` state stays — the per-row
+   line still needs it — only the toolbar's own rendering of them is gone.
+   `qboError` moved with the button rather than being dropped: a failed
+   check still needs to say why, beside the control that caused it.
+
    **Shipped 2026-09-03 — THE BILLED/RECEIVED FLAG IS A BUTTON.** Mark: "can
    the flag that pops up when a billed qty and po received qty differ be
    turned into a button that, when pressed, updates the billed qty with the

@@ -684,6 +684,21 @@ export function InvoiceList({
             }))}
           />
 
+          {/* MOVED HERE, beside New invoice (Mark, 2026-09-03) — it had its
+              own row below the filters, on its own, which put it nowhere
+              near the other command on this screen. `NewInvoice`'s own
+              trigger carries `ml-auto`, so this sits immediately to its
+              left just by coming before it in this row. */}
+          <button
+            type="button"
+            className={BUTTON_CLASS}
+            disabled={qboBusy}
+            onClick={() => void checkQuickBooks()}
+          >
+            {qboBusy ? "Checking QuickBooks…" : "Check QuickBooks"}
+          </button>
+          {qboError && <span className="text-[13px] text-accent">{qboError}</span>}
+
           {/* The create command, right-aligned in the list's filter row — where
               New employee sits, which is the template this follows. */}
           {canEdit && (
@@ -739,28 +754,6 @@ export function InvoiceList({
             />
           </div>
         </div>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="button"
-          className={BUTTON_CLASS}
-          disabled={qboBusy}
-          onClick={() => void checkQuickBooks()}
-        >
-          {qboBusy ? "Checking QuickBooks…" : "Check QuickBooks"}
-        </button>
-        {qboStatus && (
-          <span className="text-[13px] text-muted">
-            {qboStatus.size === 0
-              ? "None of these have been sent to QuickBooks yet."
-              : `${[...qboStatus.values()].filter((s) => s.settled).length} of ${
-                  qboStatus.size
-                } paid`}
-            {qboAt && <span className="text-faint"> · as of {qboAt}</span>}
-          </span>
-        )}
-        {qboError && <span className="text-[13px] text-accent">{qboError}</span>}
       </div>
 
       {capped && (
