@@ -602,21 +602,17 @@ export function InvoiceDetail({
         const { qty: received, linked } = receivedFor(l);
         const differs =
           linked && received !== null && Math.abs(received - Number(l.qty ?? 0)) > 0.0001;
+        // THE FLAG SITS BEFORE THE VALUE, NOT AFTER (Mark, 2026-09-03) — with
+        // `justify-end`, the LAST child is the one whose right edge is pinned
+        // to the cell's own right edge; every earlier child just adds width
+        // to its left. Putting the flag after the value made the value that
+        // pinned child, so the value's own right edge — and therefore the
+        // value itself — shifted left the moment a flag appeared, breaking
+        // its alignment with every unflagged row above and below it. With the
+        // flag FIRST, the qty stays the pinned child and never moves; the
+        // flag simply grows the cell leftward when it has something to say.
         return (
           <span className="flex items-center justify-end gap-1">
-            {canEdit ? (
-              <InlineValue
-                table="vendor_invoice_lines"
-                id={l.id}
-                column="qty"
-                value={l.qty}
-                kind="number"
-                align="right"
-                onWrite={(next) => writeLineAmount(l.id, "qty", next)}
-              />
-            ) : (
-              <span className={`${READ_ONLY_VALUE} tabular-nums`}>{l.qty ?? "—"}</span>
-            )}
             {differs && (
               <span
                 className="shrink-0 bg-mark-fill px-1 text-[11px] font-semibold tabular-nums"
@@ -632,6 +628,19 @@ export function InvoiceDetail({
               >
                 uncounted
               </span>
+            )}
+            {canEdit ? (
+              <InlineValue
+                table="vendor_invoice_lines"
+                id={l.id}
+                column="qty"
+                value={l.qty}
+                kind="number"
+                align="right"
+                onWrite={(next) => writeLineAmount(l.id, "qty", next)}
+              />
+            ) : (
+              <span className={`${READ_ONLY_VALUE} tabular-nums`}>{l.qty ?? "—"}</span>
             )}
           </span>
         );
