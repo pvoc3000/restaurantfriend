@@ -2779,6 +2779,42 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    a multiset 2 (in BOTH callers, which is what proves they share one
    definition), losing the read order 1, the kind filter 1, joining numberless
    readings 1, and the old caveat clause 2.
+
+   **Shipped 2026-09-03 — THE ON-PAGE TOTAL CHECK STOPPED BEING AN OCR
+   SELF-TEST.** Mark, on a real false positive: "there's a discrepancy here.
+   If we're comparing page parts, then we should compare it to the invoice
+   subtotal and not the invoice total."
+   **WHAT WAS ACTUALLY WRONG, measured against the real data (invoice
+   15-700541 / 15-700341, both Amoretti):** the on-page band summed the
+   READING's own subtotal + tax + freight + other and compared that sum
+   against the READING's own total — an OCR SELF-CONSISTENCY check, not "does
+   our record match the document." The reading correctly captured `subtotal`
+   ($102.04) and `invoice_total` ($86.73) but never populated
+   `other_charges` — the printed page has a $15.31 credit the model simply
+   missed. **Mark had already typed -15.31 into the invoice's own Other
+   field**, correctly reconciling the STORED figures (102.04 + 0 + 0 − 15.31
+   = 86.73, exactly matching Total) — and the band kept firing anyway,
+   because it was comparing the READING's un-corrected parts (other read as
+   missing, silently treated as 0) against the READING's own total, which
+   had never agreed with itself in the first place.
+   **THE FIX WAS REUSE, NOT INVENTION** — `totalDisagreesWithDocument`
+   already existed, built for the approval caveats ("If it's off, we should
+   be warned when 'approving'", 2026-09-02), and asks the exactly-right
+   question: does `computed.total` — always FRESH, derived live from the
+   current lines and stored charges, never a cache that can go stale —
+   disagree with what the document says. The on-page band now calls it
+   directly (falling back to `invoice.total` for a hand-typed, lineless
+   bill), and the old `amounts` `useMemo` reading the extraction's four parts
+   is gone from `InvoiceDetail`. **`amountReconciliation` ITSELF IS
+   UNTOUCHED** — `approvalReadiness` still uses it, comparing STORED
+   subtotal+tax+freight+other against STORED total, which is a genuinely
+   different and still-useful question (does our own record cohere) from
+   what the on-page band now asks (does our record match the vendor's page).
+   Verified live on the real invoice: the Amounts block still shows
+   Subtotal $102.04 / Other −$15.31 / Total $86.73, and the false-positive
+   band is gone entirely. Pinned as a regression fixture reproducing the
+   exact numbers, with the OLD check's own arithmetic computed alongside it
+   to prove what it was actually testing. **1575 fixtures pass.**
 4e. ✅ **EMPLOYEE EVENTS — migration 035, APPLIED and LOADED 2026-08-06.**
    FMP's two HR child tables merged into ONE (Mark: "In retrospect, these should
    really be all in one table: Events. What were 'ratings' are really just shift

@@ -117,3 +117,36 @@ test("the page is argued with at APPROVAL, not silently", () => {
   eq(totalDisagreesWithDocument(null, 1001.26), null, "no lines");
   eq(totalDisagreesWithDocument(823.46, null), null, "no printed total");
 });
+
+test("A CORRECTION THE READING MISSED IS NOT A DISCREPANCY — real invoice 15-700541", () => {
+  // Chefs Warehouse-shaped bug, a different vendor: the OCR reading correctly
+  // captured subtotal ($102.04) AND invoice_total ($86.73), but never
+  // populated other_charges — the printed page has a $15.31 credit the model
+  // simply missed. Mark had ALREADY typed -15.31 into the invoice's own Other
+  // field to make the STORED figures reconcile, which is exactly what this
+  // fixture pins: comparing our COMPUTED total (fresh, from lines + the
+  // corrected Other) against the document's total must agree, even though
+  // the raw reading's four parts (subtotal+tax+freight+other, with other
+  // read as null) would sum to $102.04 and disagree with the reading's own
+  // $86.73 if summed directly — which is the OLD, wrong check.
+  const lines = [
+    line(2, 51.02, 102.04), // the only item line; subtotal = 102.04
+  ];
+  const correctedCharges = charges({ tax: 0, other_charges: -15.31 });
+  const computed = computedAmounts(lines, correctedCharges);
+  eq(computed.subtotal, 102.04, "subtotal, from the line");
+  eq(computed.total, 86.73, "total, once the correction is folded in");
+
+  // The document's own total, as read (or a driver's correction — same
+  // shape either way): $86.73. Computed and document now agree.
+  eq(totalDisagreesWithDocument(computed.total, 86.73), null, "no disagreement once corrected");
+
+  // And the OLD check's own arithmetic — the thing that used to fire — is
+  // shown here only to prove what it was actually testing: the READING's
+  // own un-corrected parts (other read as 0/missing) summing to $102.04
+  // against the READING's own total of $86.73. That is an OCR self-check,
+  // not a "does our record match the document" check, and it is why it kept
+  // firing after the correction was already made.
+  const uncorrectedReadingSum = 102.04 + 0 + 0 + 0; // other never read
+  ok(Math.abs(uncorrectedReadingSum - 86.73) > 0.005, "the old check's own premise, for the record");
+});

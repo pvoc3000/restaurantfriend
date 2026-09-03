@@ -14,7 +14,6 @@ import { useViewportAtLeast } from "@/lib/tableHead";
 import { money } from "@/lib/purchaseOrders";
 import {
   agingBucket,
-  amountReconciliation,
   approvalReadiness,
   findPossibleDuplicates,
   lineSumReconciliation,
@@ -243,21 +242,6 @@ export function InvoiceDetail({
   const printedCharges = shown?.extraction
     ? invoiceCharges(shown.extraction)
     : null;
-  const amounts = useMemo(
-    () =>
-      amountReconciliation(
-        printedCharges === null
-          ? { subtotal: null, tax: null, freight: null, other_charges: null, total: null }
-          : {
-              subtotal: printedCharges.subtotal,
-              tax: printedCharges.tax,
-              freight: printedCharges.freight,
-              other_charges: printedCharges.other,
-              total: printedCharges.total,
-            }
-      ),
-    [printedCharges]
-  );
   const lineSums = useMemo(
     () => lineSumReconciliation(lines, printedCharges?.subtotal ?? null),
     [lines, printedCharges]
@@ -345,6 +329,35 @@ export function InvoiceDetail({
   const computed = useMemo(
     () => computedAmounts(lines, invoice),
     [lines, invoice]
+  );
+
+  /**
+   * Does OUR total disagree with what the document says?
+   *
+   * REPLACED `amountReconciliation` HERE (Mark, 2026-09-03, from a real false
+   * positive). That check summed the READING's own subtotal + tax + freight +
+   * other and compared the sum against the READING's own total — which is
+   * really an OCR SELF-CONSISTENCY check, not "does our record match the
+   * document". It broke exactly the way self-consistency checks do: a
+   * driver's invoice priced $102.04 before a $15.31 credit landing at $86.73,
+   * where the OCR correctly read `subtotal` (102.04) and `invoice_total`
+   * (86.73) but never populated `other_charges` — so Mark had ALREADY typed
+   * -15.31 into Other, correctly reconciling the STORED figures, while this
+   * band kept comparing the READING's un-corrected four parts and reporting a
+   * "discrepancy" that no longer existed anywhere but in the stale reading.
+   *
+   * `totalDisagreesWithDocument` is the fix, and it already existed — built
+   * for the approval caveats below, never reused here until now. `computed
+   * .total` is always FRESH (derived live from the current lines and
+   * charges, never a stored cache that can go stale), so comparing it
+   * against the document's own total asks the right question and answers it
+   * correctly the moment a gap like Mark's is corrected. Falls back to
+   * `invoice.total` for a hand-typed, lineless bill, where `computed.total`
+   * is null.
+   */
+  const totalDisagreement = totalDisagreesWithDocument(
+    computed.total ?? invoice.total,
+    printedCharges?.total ?? null
   );
 
   /**
@@ -1461,18 +1474,9 @@ export function InvoiceDetail({
                 )}
               </div>
             )}
-            {amounts.differs && (
+            {totalDisagreement && (
               <p className="border border-ink bg-mark-fill px-4 py-2 text-sm">
-                The page&rsquo;s own parts add up to{" "}
-                <strong className="tabular-nums">{money(amounts.computed)}</strong>,
-                but the invoice says{" "}
-                <strong className="tabular-nums">{money(amounts.stated)}</strong>.
-                {amounts.missing.length > 0 && (
-                  <span className="text-muted">
-                    {" "}
-                    Nothing was read for {amounts.missing.join(", ")}.
-                  </span>
-                )}
+                {totalDisagreement}.
               </p>
             )}
             {lineSums.differs && (
