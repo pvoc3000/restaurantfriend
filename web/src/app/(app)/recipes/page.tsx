@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
-import { loadProductionGraph } from "@/lib/productionQueries";
+import { loadProductionGraph, loadElementOptions } from "@/lib/productionQueries";
 import { elementCost, costContext } from "@/lib/productionCost";
 import { RecipesList, type RecipeRow } from "@/components/production/RecipesList";
 import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
+import { NewRecipe } from "@/components/production/NewRecipe";
 
 /**
  * The recipe families — the kitchen binder, costed.
@@ -29,17 +30,21 @@ export default async function RecipesPage({
   // until this shop's rate turns it into money.
   const costs = costContext(session.activeLocation);
 
-  const [{ data: recipes, error }, { graph, error: graphError }] = await Promise.all([
-    supabase
-      .from("production_recipes")
-      .select(
-        `id, name, recipe_type, is_active, element_id,
-         production_elements ( id, name ),
-         production_recipe_versions ( id, version_label, is_master )`
-      )
-      .order("name"),
-    loadProductionGraph(supabase),
-  ]);
+  const [{ data: recipes, error }, { graph, error: graphError }, { options: elementOptions }] =
+    await Promise.all([
+      supabase
+        .from("production_recipes")
+        .select(
+          `id, name, recipe_type, is_active, element_id,
+           production_elements ( id, name ),
+           production_recipe_versions ( id, version_label, is_master )`
+        )
+        .order("name"),
+      loadProductionGraph(supabase),
+      // The create dialog's Makes picker. Its own helper, which already sinks
+      // retired elements under a heading rather than dropping them.
+      loadElementOptions(supabase),
+    ]);
 
   if (error || graphError) {
     const message = error?.message ?? graphError ?? "";
@@ -95,11 +100,26 @@ export default async function RecipesPage({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Recipes
-        </h1>
-        <p className="text-sm text-muted">How to make our item components.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Recipes
+          </h1>
+          <p className="text-sm text-muted">How to make our item components.</p>
+        </div>
+        {editable ? (
+          <NewRecipe
+            orgId={session.membership.org_id}
+            elements={elementOptions}
+            types={[
+              ...new Set(
+                (recipes ?? [])
+                  .map((r) => (r.recipe_type as string | null) ?? "")
+                  .filter((t) => t.trim() !== "")
+              ),
+            ].sort()}
+          />
+        ) : null}
       </div>
       <RecipesList
         rows={rows}

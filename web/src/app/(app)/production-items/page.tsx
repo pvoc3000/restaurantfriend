@@ -9,6 +9,7 @@ import {
   type ProductionItemRow,
 } from "@/components/production/ProductionItemsList";
 import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
+import { NewProductionItem } from "@/components/production/NewProductionItem";
 
 /**
  * The menu — production brief decision 4's operational taxonomy, and the
@@ -69,13 +70,36 @@ export default async function ProductionItemsPage({
     };
   });
 
+  // The six vocabularies, off the rows already loaded — 037 keeps all of them
+  // as free text with a PickList over what exists, so the options ARE the data.
+  const vocab = (pick: (r: ProductionItemRow) => string | null) =>
+    [...new Set(rows.map(pick).filter((v): v is string => !!v && v.trim() !== ""))].sort();
+
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Items
-        </h1>
-        <p className="text-sm text-muted">The items we make and sell.</p>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Items
+          </h1>
+          <p className="text-sm text-muted">The items we make and sell.</p>
+        </div>
+        {editable ? (
+          <NewProductionItem
+            orgId={session.membership.org_id}
+            types={vocab((r) => r.item_type)}
+            subtypes={vocab((r) => r.subtype)}
+            finishes={vocab((r) => r.finish)}
+            sizes={vocab((r) => r.size)}
+            priceClasses={vocab((r) => r.price_class)}
+            priceTiers={vocab((r) => r.price_tier)}
+            existing={rows.map((r) =>
+              [r.name, r.size, r.item_type, r.subtype]
+                .map((v) => (v ?? "").trim().toLowerCase())
+                .join("|")
+            )}
+          />
+        ) : null}
       </div>
       <ProductionItemsList
         rows={rows}

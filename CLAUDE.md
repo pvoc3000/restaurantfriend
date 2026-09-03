@@ -6606,6 +6606,26 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    tabs rather than at the edge. `w-72` on the input, the app's usual search
    width, which is also what left-aligned the tab pickers Mark asked about
    separately the same day.
+   **`/production-items` AND `/recipes` GAINED A CREATE COMMAND** (Mark,
+   2026-09-03) — `NewProductionItem` and `NewRecipe`, `NewElement`'s template.
+   Two things worth knowing.
+   **The item's duplicate check WARNS and never blocks**, which is 038's own
+   reasoning: it dropped `unique (org, name)` because "Angry Samoa" is four
+   different donuts, and DECLINED to replace it with a composite index on
+   (name, size, type, subtype) because those are four separate `InlineValue`
+   cells — changing a Regular to a Mini when that Mini exists would fail on the
+   first edit with no order that works. So the create says so and lets you
+   through, `findPossibleRehires`' treatment.
+   **A RECIPE IS TWO ROWS, and the second is not optional**: every reader here
+   goes through the MASTER version — costing, the printed sheet, the Costs
+   matrix, the record's default tab — so the create writes v01 and marks it
+   master in the same act. 036's partial unique index is what makes that safe.
+   If the version write fails the recipe still EXISTS, so it says what happened
+   and lands on it rather than reporting a failure over a real record.
+   **`version_label` IS STORED BARE — "01", never "v01".** Every reader
+   prefixes it (`v{version_label}` in `RecipeVersions`, `RecipeInfo`,
+   `RecipesList` and `BatchRecipe`), so a stored "v01" renders "vv01". Caught by
+   creating one and looking at it, not by reading.
    **PRODUCTION KEEPS ITS COMMANDS BESIDE THE TITLE and BOTTOM-ALIGNS them**
    (Mark, 2026-09-03, having asked for the same move and then undone it: "just
    bottom right align the existing buttons"). `items-end` on the title row, so
