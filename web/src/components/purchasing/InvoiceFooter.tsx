@@ -187,25 +187,20 @@ export function InvoiceFooter({
   const button =
     "h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
 
-  // A FRAGMENT, NOT A WRAPPER (Mark, 2026-09-02: "put the send to quickbooks
-  // button in the same div as the other action buttons so they are aligned").
-  // Two components each owning a box could only ever sit BESIDE each other;
-  // returning loose children lets the caller's one flex row hold every button,
-  // and `basis-full` drops the prose to its own line spanning them — the same
-  // trick `OrderActions` uses for its refusal sentence.
+  // ITS OWN BOX NOW, matching `PushToQuickBooks`'s shape (Mark, 2026-09-03) —
+  // a button row, then its own prose stacked beneath, in the fourth grid
+  // column `InvoiceDetail` gives it. Sharing one row with QuickBooks' buttons
+  // was the "put the send to quickbooks button in the same div" ask from
+  // 2026-09-02; putting each in its OWN box is the further step Mark asked
+  // for the next day, once four clearly separated areas turned out to matter
+  // more than one shared row of buttons.
   return (
-    <>
-      {error && <p className="order-last basis-full text-right text-sm text-accent">{error}</p>}
-        {status === "approved" && (
-          <span className="order-last basis-full text-right text-sm text-muted">
-            Approved for payment
-            {approvedAt ? ` on ${approvedAt.slice(0, 10)}` : ""}.
-          </span>
-        )}
-
-        {/* NO CLOSE (Mark, 2026-09-02). It was the escape from a footer pinned
-            to the foot of the page; with these commands level with the title
-            the breadcrumb is directly above them and says where it goes. */}
+    <div className="flex flex-col items-end gap-2">
+      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+        {/* NO CLOSE (Mark, 2026-09-02). It was the escape from a footer
+            pinned to the foot of the page; with these commands level with the
+            title the breadcrumb is directly above them and says where it
+            goes. */}
         {canEdit && status !== "void" && (
           <button
             type="button"
@@ -260,6 +255,17 @@ export function InvoiceFooter({
             {busy === "unapprove" ? "Withdrawing…" : "Withdraw approval"}
           </button>
         )}
-    </>
+      </div>
+
+      <div className="w-full space-y-1 text-right">
+        {error && <p className="text-sm text-accent">{error}</p>}
+        {status === "approved" && (
+          <span className="block text-sm text-muted">
+            Approved for payment
+            {approvedAt ? ` on ${approvedAt.slice(0, 10)}` : ""}.
+          </span>
+        )}
+      </div>
+    </div>
   );
 }

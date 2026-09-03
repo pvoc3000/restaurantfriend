@@ -461,46 +461,31 @@ export function PushToQuickBooks({
     onDone();
   }
 
-  // A FRAGMENT for `InvoiceFooter`'s reason: the caller's single flex row holds
-  // every button, so Send to QuickBooks aligns with Void, Delete and Approve
-  // instead of sitting in a box beside them. Everything that is PROSE carries
-  // `basis-full`, which drops it to its own line under the whole row (Mark,
-  // 2026-09-02: "the text … can go below it and span under all the buttons").
-  // `order-last` on everything that is PROSE, so the buttons share one line
-  // whatever order the two components are rendered in. Source order alone
-  // could not do it: this component's own refusal sits between its button and
-  // the footer's, and putting it there broke the row (measured 2026-09-02 —
-  // Send to QuickBooks at y=138, the rest at y=210).
+  // ITS OWN BOX NOW, not a fragment sharing a row with `InvoiceFooter`
+  // (Mark, 2026-09-03: "everything top aligned with clear areas for each
+  // section"). A button row, then its own prose stacked beneath — the
+  // `order-last basis-full` trick this replaced put every paragraph from
+  // BOTH components into one shared wrap-area, which is how "In QuickBooks
+  // as Bill 15501523" ended up wedged between "Update in QuickBooks" and
+  // "Forget the link" on one visual line.
   return (
-    <>
-      {/* IT IS ALREADY OVER THERE. Yellow, because this is not an error — it is
-          the normal state during the Bill.com parallel run, and the thing worth
-          your eye is that pressing Send would make a second copy. */}
-      {/* THE BUTTON STANDS WITH THE OTHER COMMANDS and its sentence goes below
-          with the other prose (Mark, 2026-09-02) — it was a button inside a
-          band, which made it a different KIND of control from Void, Delete and
-          Approve when it is the same kind: a thing you press on this record. */}
-      {proposal?.ok && !already && canPush && (
-        <button
-          type="button"
-          className={BUTTON_CLASS}
-          disabled={busy}
-          onClick={() => void link(proposal.candidate)}
-        >
-          {busy ? "Linking…" : "Link to it"}
-        </button>
-      )}
-      {proposal?.ok && !already && (
-        <div className="order-last basis-full space-y-1 bg-mark-fill px-2 py-1 text-[13px] text-ink">
-          <p>
-            QuickBooks already has this as {proposal.candidate.entity}{" "}
-            {proposal.candidate.doc_number ?? proposal.candidate.id} —{" "}
-            {proposal.candidate.vendor_name ?? "unknown vendor"} ·{" "}
-            {proposal.candidate.txn_date ?? "no date"} · ${proposal.candidate.total.toFixed(2)}.
-          </p>
-          {proposal.caveat && <p>{proposal.caveat}</p>}
-        </div>
-      )}
+    <div className="flex flex-col items-end gap-2">
+      {/* THE BUTTON ROW. Nothing here is prose — every paragraph below is
+          collected into its own stack, in the same relative order they used
+          to fall in under `order-last`. */}
+      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+        {/* IT IS ALREADY OVER THERE. The button stands with the other
+            QuickBooks commands; its sentence is in the prose stack below. */}
+        {proposal?.ok && !already && canPush && (
+          <button
+            type="button"
+            className={BUTTON_CLASS}
+            disabled={busy}
+            onClick={() => void link(proposal.candidate)}
+          >
+            {busy ? "Linking…" : "Link to it"}
+          </button>
+        )}
         {canPush && (
           <button
             type="button"
@@ -536,68 +521,86 @@ export function PushToQuickBooks({
             Forget the link
           </button>
         )}
+        {/* THE DOCUMENT IS GONE AND THE BILL IS STUCK UNTIL THIS IS PRESSED —
+            it can neither update, nor create, nor be linked while it points
+            at a dead id. */}
+        {gone && canPush && (
+          <button
+            type="button"
+            className={BUTTON_CLASS}
+            disabled={busy}
+            onClick={() => void unlink()}
+          >
+            {busy ? "Forgetting…" : "Forget the link"}
+          </button>
+        )}
+      </div>
 
-      {/* THE DOCUMENT IS GONE AND THE BILL IS STUCK UNTIL THIS IS PRESSED —
-          it can neither update, nor create, nor be linked while it points at a
-          dead id. Red rather than the mark colour: this is not "worth your eye",
-          the record here disagrees with QuickBooks and one of them is wrong. */}
-      {/* Same split as the proposal above: the command joins the row, its
-          sentence goes below with the rest. This one keeps the ACCENT border on
-          the prose — the record here disagrees with QuickBooks and one of them
-          is wrong, which is not the yellow "worth your eye". */}
-      {gone && canPush && (
-        <button
-          type="button"
-          className={BUTTON_CLASS}
-          disabled={busy}
-          onClick={() => void unlink()}
-        >
-          {busy ? "Forgetting…" : "Forget the link"}
-        </button>
-      )}
-      {gone && (
-        <div className="order-last basis-full space-y-1 border border-accent px-2 py-1 text-[13px] text-ink">
-          <p>
-            QuickBooks no longer has {already?.replace("In QuickBooks as ", "") ?? "that document"}.
-            It was deleted there, so this bill points at nothing and can be neither
-            updated nor sent until the link is forgotten.
+      {/* THE PROSE STACK. Full width of the box, so a long sentence wraps
+          inside the column rather than fighting the button row for space. */}
+      <div className="w-full space-y-1 text-right">
+        {/* Yellow, because this is not an error — it is the normal state
+            during the Bill.com parallel run, and the thing worth your eye is
+            that pressing Send would make a second copy. Left-aligned inside
+            its own filled box, unlike the plain status lines below it, since
+            a paragraph reads better ragged-right than centred on a box edge. */}
+        {proposal?.ok && !already && (
+          <div className="space-y-1 bg-mark-fill px-2 py-1 text-left text-[13px] text-ink">
+            <p>
+              QuickBooks already has this as {proposal.candidate.entity}{" "}
+              {proposal.candidate.doc_number ?? proposal.candidate.id} —{" "}
+              {proposal.candidate.vendor_name ?? "unknown vendor"} ·{" "}
+              {proposal.candidate.txn_date ?? "no date"} · $
+              {proposal.candidate.total.toFixed(2)}.
+            </p>
+            {proposal.caveat && <p>{proposal.caveat}</p>}
+          </div>
+        )}
+        {/* Red rather than the mark colour: this is not "worth your eye", the
+            record here disagrees with QuickBooks and one of them is wrong. */}
+        {gone && (
+          <div className="space-y-1 border border-accent px-2 py-1 text-left text-[13px] text-ink">
+            <p>
+              QuickBooks no longer has{" "}
+              {already?.replace("In QuickBooks as ", "") ?? "that document"}.
+              It was deleted there, so this bill points at nothing and can be
+              neither updated nor sent until the link is forgotten.
+            </p>
+          </div>
+        )}
+        {/* Why the button is off, in words. A disabled control explains
+            itself only on hover, and the iPad has none. NOT THE APPROVAL
+            REFUSAL — "Approve it first" earned its place while this block sat
+            at the foot of the page; beside the Approve button itself it is a
+            sentence explaining a button by pointing at the button next to
+            it. */}
+        {canPush && shownRefusal && (
+          <p className="text-[13px] text-muted">{shownRefusal}</p>
+        )}
+        {!refusals.length && account && !already && (
+          <p className="text-[13px] text-faint">
+            Posts to {splitAccountName(account.name).leaf || account.ref}
+            {account.source === "org" ? " (the org default)" : ""}.
           </p>
-        </div>
-      )}
-
-      {/* Why the button is off, in words. A disabled control explains itself
-          only on hover, and the iPad has none. */}
-      {/* NOT THE APPROVAL ONE (Mark, 2026-09-02). "Approve it first" earned its
-          place while this block sat at the foot of the page and the Approve
-          button was somewhere else; side by side in one row it is a sentence
-          explaining a button by pointing at the button next to it. The other
-          refusals — no vendor mapped, no expense account — still say what is
-          missing, because nothing on screen implies those. */}
-      {canPush && shownRefusal && (
-        <p className="order-last basis-full text-right text-[13px] text-muted">{shownRefusal}</p>
-      )}
-      {!refusals.length && account && !already && (
-        <p className="order-last basis-full text-right text-[13px] text-faint">
-          Posts to {splitAccountName(account.name).leaf || account.ref}
-          {account.source === "org" ? " (the org default)" : ""}.
-        </p>
-      )}
-      {balance && (
-        <p className="order-last basis-full text-right text-[13px] text-muted">
-          {balance.text} <span className="text-faint">· as of {balance.at}</span>
-        </p>
-      )}
-      {sent && <p className="order-last basis-full text-right text-[13px] text-muted">{sent}</p>}
-      {/* The bill IS in QuickBooks — this is not an error. It is the coding
-          QuickBooks accepted and then dropped, which it does with a 200 and no
-          fault when the matching preference is off. Yellow: worth your eye,
-          not something that went wrong. */}
-      {warnings.map((w) => (
-        <p key={w} className="order-last basis-full bg-mark-fill px-2 py-1 text-[13px] text-ink">
-          {w}
-        </p>
-      ))}
-      {error && <p className="order-last basis-full text-right text-[13px] text-accent">{error}</p>}
-    </>
+        )}
+        {balance && (
+          <p className="text-[13px] text-muted">
+            {balance.text}{" "}
+            <span className="text-faint">· as of {balance.at}</span>
+          </p>
+        )}
+        {sent && <p className="text-[13px] text-muted">{sent}</p>}
+        {/* The bill IS in QuickBooks — this is not an error. It is the coding
+            QuickBooks accepted and then dropped, which it does with a 200 and
+            no fault when the matching preference is off. Yellow: worth your
+            eye, not something that went wrong. */}
+        {warnings.map((w) => (
+          <p key={w} className="bg-mark-fill px-2 py-1 text-left text-[13px] text-ink">
+            {w}
+          </p>
+        ))}
+        {error && <p className="text-[13px] text-accent">{error}</p>}
+      </div>
+    </div>
   );
 }
