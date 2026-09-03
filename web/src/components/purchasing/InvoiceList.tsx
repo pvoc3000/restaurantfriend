@@ -297,8 +297,13 @@ export function InvoiceList({
    *
    * HELD IN STATE AND NEVER STORED, and it goes when you reload. That is the
    * point rather than a shortcut: `lib/invoices`, 025 and 051 all say payment
-   * is a fact QuickBooks owns, and a balance written into our row is stale the
-   * moment it lands while still being rendered as though it were current.
+   * is a fact QuickBooks owns.
+   *
+   * IT IS STORED SINCE 088, and the objection that used to live here — "a
+   * balance written into our row is stale the moment it lands while still being
+   * rendered as though it were current" — is answered rather than ignored: it
+   * is stored WITH `qbo_checked_at` and never rendered without it. This state
+   * is now only the immediate answer, before the page has re-read the row.
    */
   const [qboStatus, setQboStatus] = useState<Map<string, QboStatus> | null>(null);
   const [qboAt, setQboAt] = useState<string | null>(null);
@@ -323,6 +328,21 @@ export function InvoiceList({
         minute: "2-digit",
       })
     );
+    // WITHOUT THIS THE CHIP CANNOT MOVE. The balance was written server-side,
+    // so the rows this list is holding are the ones the last render was given —
+    // measured: QuickBooks reported "2 of 3 paid" while the tabs still read
+    // "Submitted 3", because `billStage` reads the row and the row was stale.
+    //
+    // Below purchaser+ the write changes nothing (025's policy) and the server
+    // says so in `not_stored`; the figures above are still correct for this
+    // visit, and a refresh simply brings back what is really on file.
+    if (Number(data?.stored ?? 0) > 0) router.refresh();
+    if (Number(data?.not_stored ?? 0) > 0) {
+      setQboError(
+        `${data!.not_stored} of these could not be saved, so they will be blank again ` +
+          `after a reload. Recording what QuickBooks says needs purchaser access.`
+      );
+    }
   }
 
   const columns: DataColumn<InvoiceListRow>[] = [
@@ -373,12 +393,16 @@ export function InvoiceList({
                 pressed the button and gone again on reload — which is no use in
                 a column. 088 stores it; a fresh check overrides it in place. */}
             {(() => {
+              // Worded exactly like `billPaymentNote`, so the row does not
+              // change its sentence when the refresh lands and the stored value
+              // takes over. `qboAt` is a time and the stored one is a date;
+              // that difference is honest — one is "just now".
               const live = st
                 ? st.missing
-                  ? "no longer in QuickBooks"
+                  ? `no longer in QuickBooks${qboAt ? ` · as of ${qboAt}` : ""}`
                   : st.settled
-                    ? "paid"
-                    : `${money(Number(st.balance))} owed`
+                    ? `paid${qboAt ? ` · as of ${qboAt}` : ""}`
+                    : `${money(Number(st.balance))} owed${qboAt ? ` · as of ${qboAt}` : ""}`
                 : null;
               const stored = billPaymentNote(
                 { status: i.status, linked: i.qbo_linked, qbo_balance: i.qbo_balance, qbo_checked_at: i.qbo_checked_at },
