@@ -16,7 +16,7 @@ import type { PoLine } from "./purchaseOrders";
 export const INVOICE_SELECT = `id, org_id, location_id, vendor_id, invoice_number,
    invoice_date, due_date, terms, subtotal, tax, freight, other_charges, total,
    is_credit, status, approved_at, approved_by, source, notes,
-   synced_at, financials_touched_at,
+   synced_at, financials_touched_at, external_ref, qbo_balance, qbo_checked_at,
    vendors ( id, name, order_type )`;
 
 export const INVOICE_LINE_SELECT = `id, invoice_id, purchase_order_id,
@@ -55,8 +55,20 @@ export async function fetchInvoiceWithLines(
         .order("line_no"),
     ]);
 
+  // The PRESENCE of a link, never the id — the list's own rule (086 exists to
+  // stop a QuickBooks id reaching the browser), applied here too now that the
+  // status chip needs `billStage` and not just the raw open/approved/void.
+  const { external_ref, ...rest } = (invoice ?? {}) as Record<string, unknown> & {
+    external_ref?: { qbo?: { id?: string } } | null;
+  };
+
   return {
-    invoice: (invoice ?? null) as InvoiceWithLines["invoice"],
+    invoice: invoice
+      ? ({
+          ...rest,
+          qbo_linked: Boolean(external_ref?.qbo?.id),
+        } as InvoiceWithLines["invoice"])
+      : null,
     lines: (lines ?? []) as unknown as VendorInvoiceLine[],
     error: error?.message ?? null,
     lineError: lineError?.message ?? null,

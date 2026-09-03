@@ -29,8 +29,9 @@ import {
   totalDisagreesWithDocument,
   toInvoiceLine,
   AGING_LABEL,
-  INVOICE_STATUS_CLASS,
-  INVOICE_STATUS_LABEL,
+  billStage,
+  BILL_STAGE_CLASS,
+  BILL_STAGE_LABEL,
   type LinkedOrder,
   type VendorInvoice,
   type VendorInvoiceLine,
@@ -188,6 +189,24 @@ export function InvoiceDetail({
    */
   const financialsLocked = invoice.status !== "open";
   const canEditFinancials = canEdit && !financialsLocked;
+
+  /**
+   * Open → Approved → Submitted → Paid — the LIST's own ladder (`lib/invoices`
+   * §"Where a bill has got to"), read here too now (Mark, 2026-09-03: "no
+   * matter what the status on the detail page never said 'paid'"). The
+   * header chip had stayed on the raw `status` column — open/approved/void —
+   * because this screen never fetched what the list already did:
+   * `external_ref`, `qbo_balance`, `qbo_checked_at`. It does now
+   * (`INVOICE_SELECT`), so linking, pushing, or a plain "Check QuickBooks"
+   * all move this chip the moment the page has the fresh figures — see
+   * `PushToQuickBooks`'s `onDone()` calls, which is what puts them there.
+   */
+  const stage = billStage({
+    status: invoice.status,
+    linked: invoice.qbo_linked,
+    qbo_balance: invoice.qbo_balance,
+    qbo_checked_at: invoice.qbo_checked_at,
+  });
 
   const {
     phase,
@@ -1083,9 +1102,9 @@ export function InvoiceDetail({
                 {invoice.invoice_number ?? "No number"}
               </h1>
               <span
-                className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${INVOICE_STATUS_CLASS[invoice.status]}`}
+                className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${BILL_STAGE_CLASS[stage]}`}
               >
-                {INVOICE_STATUS_LABEL[invoice.status]}
+                {BILL_STAGE_LABEL[stage]}
               </span>
               {invoice.is_credit && (
                 <span className="inline-flex h-6 items-center border border-ink bg-mark-fill px-2 text-[12px] font-semibold uppercase tracking-[0.12em]">

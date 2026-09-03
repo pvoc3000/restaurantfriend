@@ -463,10 +463,20 @@ export function PushToQuickBooks({
     if (st.missing) {
       setBalance({ text: "no longer in QuickBooks", at });
       setGone(true);
+      // The header chip reads `qbo_balance`, which this stamped null on the
+      // way to reporting "missing" — refresh so it stops claiming Paid or
+      // Submitted for a document that no longer exists.
+      onDone();
       return;
     }
     setGone(false);
     setBalance({ text: balanceLabel(st.entity as QboEntity, Number(st.balance), money), at });
+    // SAME REASON `link()` AND `sendToQuickBooks()` ALREADY DO THIS (Mark,
+    // 2026-09-03: "the status on the detail page never said 'paid'"). The
+    // header chip is `billStage`, read off `qbo_balance`/`qbo_checked_at` —
+    // this write just changed both, and a manual check is exactly the
+    // moment somebody is looking at this screen wanting the answer.
+    onDone();
   }
 
   async function push() {

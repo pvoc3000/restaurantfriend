@@ -31,25 +31,10 @@ export type InvoiceStatus = "open" | "approved" | "void";
 
 export const INVOICE_STATUS_ORDER: InvoiceStatus[] = ["open", "approved", "void"];
 
-export const INVOICE_STATUS_LABEL: Record<InvoiceStatus, string> = {
-  open: "Open",
-  approved: "Approved",
-  void: "Void",
-};
-
-/**
- * Badge colours, reusing PO_STATUS_CLASS's exact strings so the two lists read
- * as one system: `open` wears `sent`'s yellow (outstanding, worth your eye),
- * `approved` wears `received`'s green (settled), `void` keeps the faint one.
- *
- * There is no `paid`. Payment is a fact QuickBooks will own, and inventing our
- * own would give two truths about the same money — see migration 025.
- */
-export const INVOICE_STATUS_CLASS: Record<InvoiceStatus, string> = {
-  open: "border border-ink bg-[var(--rf-yellow-200)] text-ink",
-  approved: "border border-ink bg-[var(--rf-green-200)] text-ink",
-  void: "border border-neutral-300 bg-white text-faint",
-};
+// `INVOICE_STATUS_LABEL` / `INVOICE_STATUS_CLASS` (open/approved/void only, no
+// `paid`) are GONE — see below. Both status chips in the app now read
+// `billStage`, so a paid bill reads Paid wherever it's shown, not just in the
+// list.
 
 // ---------------------------------------------------------------------------
 // Shapes
@@ -100,6 +85,14 @@ export type VendorInvoice = {
    *  untouched since creation, which reads as "not stale" against a null
    *  `synced_at` too. See `pushIsStale`. */
   financials_touched_at: string | null;
+  /** Whether a QuickBooks document is linked — the PRESENCE of a link, never
+   *  the id itself: 086 exists to stop a QuickBooks id reaching the browser
+   *  in a server-rendered prop, so a caller derives this from `external_ref`
+   *  and never ships the ref whole. See `billStage`. */
+  qbo_linked: boolean;
+  /** 088's cache — see `billStage` and `billPaymentNote`. */
+  qbo_balance: number | null;
+  qbo_checked_at: string | null;
 };
 
 // ---------------------------------------------------------------------------

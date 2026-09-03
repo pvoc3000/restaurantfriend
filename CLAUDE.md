@@ -2781,6 +2781,45 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    pass**, one new (`balanceLabel`, checked against a credit, a settled
    bill, and a real balance).
 
+   **Shipped 2026-09-03 — THE DETAIL SCREEN NEVER SAID "PAID".** Mark's
+   next report, immediately: "no matter what the status on the detail page
+   never said 'paid'" — not a gap in the moment right after linking, a gap
+   ALWAYS. The header chip had stayed on the raw open/approved/void column
+   (`INVOICE_STATUS_LABEL`/`_CLASS`) because **`INVOICE_SELECT` never
+   fetched what the LIST already had** — `external_ref`, `qbo_balance`,
+   `qbo_checked_at` — so the detail screen was structurally unable to
+   compute `billStage`, the Open · Approved · Submitted · Paid ladder
+   shipped for the list on 2026-09-02. Two screens, two vocabularies, and
+   only one of them had ever been told about the other.
+   **THE PRESENCE OF A LINK, NEVER THE ID** — `fetchInvoiceWithLines` now
+   derives `qbo_linked: boolean` from `external_ref` and drops the ref
+   itself before it reaches `VendorInvoice`, the list's own rule (086
+   exists to stop a raw QuickBooks id landing in a server-rendered prop).
+   The detail screen's header chip is `BILL_STAGE_LABEL[stage]` /
+   `BILL_STAGE_CLASS[stage]` now, exactly the list's pair, off one
+   `billStage()` call built from `status`/`qbo_linked`/`qbo_balance`/
+   `qbo_checked_at`.
+   **`INVOICE_STATUS_LABEL`/`INVOICE_STATUS_CLASS` ARE GONE** — the header
+   chip was their only caller, and a comment claiming "There is no `paid`"
+   would have been sitting right beside a chip that now says Paid.
+   `InvoiceStatus`/`INVOICE_STATUS_ORDER` stay: the raw column is still
+   open/approved/void and still what `financialsLocked`/`canApprove`/Void
+   gate on — `billStage` is a VIEW of it plus QuickBooks, never a
+   replacement.
+   **`checkBalance` NOW CALLS `onDone()` TOO**, on both its exits — a
+   press of "Check QuickBooks" writes `qbo_balance`/`qbo_checked_at`
+   exactly like `link()` does, and the header chip reads those columns off
+   the SERVER-rendered `invoice` prop, so without a refresh the button
+   could update its own line of text three inches down while the big chip
+   at the top kept lying. `link()` and `sendToQuickBooks()` already called
+   it; this was the one door on the same panel that didn't.
+   Verified live on the same real Chefs Warehouse invoice — reading it
+   fresh shows **Paid** (`bg-[var(--rf-green-300)]`, the ladder's own
+   stronger green) where it read Approved before this shipped; pressing
+   Check QuickBooks round-trips cleanly and the chip stays Paid. 1576
+   fixtures pass, unchanged — `billStage` was already fixture-tested for
+   the list and this is the same function reading the same shape.
+
    **Shipped 2026-09-03 — THE BILLED/RECEIVED FLAG IS A BUTTON.** Mark: "can
    the flag that pops up when a billed qty and po received qty differ be
    turned into a button that, when pressed, updates the billed qty with the

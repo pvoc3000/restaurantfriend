@@ -75,6 +75,9 @@ function invoice(over: Partial<VendorInvoice> = {}): VendorInvoice {
     notes: null,
     synced_at: null,
     financials_touched_at: null,
+    qbo_linked: false,
+    qbo_balance: null,
+    qbo_checked_at: null,
     ...over,
   };
 }
