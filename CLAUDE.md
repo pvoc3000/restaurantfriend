@@ -2859,6 +2859,39 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    always `billStage` off the row, never this state. 1576 fixtures pass,
    unchanged.
 
+   **Shipped 2026-09-03 — THE PAIR ONLY LOOKED RIGHT AT ONE WIDTH.** Mark,
+   catching it immediately: "the check quickbooks button is placed to the
+   right of the status picker, not to the left of the new invoice
+   button… in a different section. It should be aligned to the right." He
+   was reading the SAME code the "moved next to New invoice" entry above
+   describes and getting a different screen, because that fix relied on
+   `NewInvoice`'s own baked-in `ml-auto` to do the right-aligning, with
+   Check QuickBooks sitting as a plain, unmargined sibling just before it.
+   **`ml-auto` claims ALL the row's leftover space for the item that wears
+   it — not the gap before that item, the gap before EVERYTHING up to the
+   previous auto-margined item.** So Check QuickBooks packed at its natural
+   position right after the status tabs (a small `gap-3`), and the row's
+   entire leftover width piled up as ONE gap immediately before New
+   invoice. At the narrow width this session had been testing at, that
+   leftover happened to be small enough to look like the two buttons were
+   together; at Mark's actual width there was plenty of leftover, and the
+   gap read as a different section entirely — exactly his words.
+   **THE FIX IS A WRAPPER WITH ITS OWN `ml-auto`, not a change to
+   `NewInvoice`.** `<div className="ml-auto flex items-center gap-3">`
+   around both buttons: the wrapper is sized to its own content (no
+   `flex-grow`), so it never stretches to fill the outer row — which means
+   `NewInvoice`'s inner `ml-auto` finds NOTHING left to eat inside a
+   container already sized to fit it, and computes to zero. The two
+   buttons pack together with an ordinary `gap-3`, and it's the WRAPPER's
+   own `ml-auto` that claims the outer row's leftover space and puts the
+   pair at the right edge. One point of "consume the leftover space"
+   instead of two competing for it.
+   Verified live at both a 2000px window (Mark's own width, where the bug
+   showed) and 1280px: the gap between the two buttons measures **12px
+   at both**, matching `gap-3` exactly rather than drifting with the
+   window — checked by `getBoundingClientRect`, not by eye, which is
+   exactly the measurement the first pass skipped.
+
    **Shipped 2026-09-03 — THE BILLED/RECEIVED FLAG IS A BUTTON.** Mark: "can
    the flag that pops up when a billed qty and po received qty differ be
    turned into a button that, when pressed, updates the billed qty with the

@@ -634,40 +634,56 @@ export function InvoiceList({
 
           {/* MOVED HERE, beside New invoice (Mark, 2026-09-03) — it had its
               own row below the filters, on its own, which put it nowhere
-              near the other command on this screen. `NewInvoice`'s own
-              trigger carries `ml-auto`, so this sits immediately to its
-              left just by coming before it in this row. */}
-          <button
-            type="button"
-            className={BUTTON_CLASS}
-            disabled={qboBusy}
-            onClick={() => void checkQuickBooks()}
-          >
-            {qboBusy ? "Checking QuickBooks…" : "Check QuickBooks"}
-          </button>
-          {qboError && <span className="text-[13px] text-accent">{qboError}</span>}
+              near the other command on this screen.
+              A GROUP WITH ITS OWN `ml-auto`, not `NewInvoice`'s own — that
+              button's trigger carries `ml-auto` baked in on the assumption
+              it is the only thing to the right of the search/status
+              controls, and putting Check QuickBooks as a plain sibling
+              before it read right ONLY at a width where the row happened
+              not to have much leftover space (Mark: it "is placed to the
+              right of the status picker, not to the left of the new
+              invoice button… in a different section"). Wider, that leftover
+              space is exactly what `NewInvoice`'s `ml-auto` consumes, which
+              shoves it away from Check QuickBooks rather than beside it.
+              This wrapper is the fix: sized to its own content (no
+              `flex-grow`), so `NewInvoice`'s inner `ml-auto` finds nothing
+              left to eat and the two buttons pack together with an ordinary
+              `gap-3`, while the WRAPPER's own `ml-auto` is what claims the
+              outer row's leftover space and puts the pair at the right
+              edge — at any width. */}
+          <div className="ml-auto flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              className={BUTTON_CLASS}
+              disabled={qboBusy}
+              onClick={() => void checkQuickBooks()}
+            >
+              {qboBusy ? "Checking QuickBooks…" : "Check QuickBooks"}
+            </button>
+            {qboError && <span className="text-[13px] text-accent">{qboError}</span>}
 
-          {/* The create command, right-aligned in the list's filter row — where
-              New employee sits, which is the template this follows. */}
-          {canEdit && (
-            <NewInvoice
-              orgId={orgId}
-              locationId={locationId}
-              vendors={vendors}
-              today={today}
-              // The vendor's id lives on the embed, not as its own column on
-              // the row — the duplicate check only ever compares within one
-              // vendor, so that's the shape it wants.
-              existing={invoices.map((i) => ({
-                id: i.id,
-                vendor_id: i.vendors?.id ?? "",
-                invoice_number: i.invoice_number,
-                invoice_date: i.invoice_date,
-                total: i.total,
-                status: i.status,
-              }))}
-            />
-          )}
+            {/* The create command — where New employee sits, which is the
+                template this follows. */}
+            {canEdit && (
+              <NewInvoice
+                orgId={orgId}
+                locationId={locationId}
+                vendors={vendors}
+                today={today}
+                // The vendor's id lives on the embed, not as its own column on
+                // the row — the duplicate check only ever compares within one
+                // vendor, so that's the shape it wants.
+                existing={invoices.map((i) => ({
+                  id: i.id,
+                  vendor_id: i.vendors?.id ?? "",
+                  invoice_number: i.invoice_number,
+                  invoice_date: i.invoice_date,
+                  total: i.total,
+                  status: i.status,
+                }))}
+              />
+            )}
+          </div>
         </div>
 
         <div className="flex flex-wrap items-end gap-4">
