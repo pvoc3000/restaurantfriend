@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
+import { canApprovePayment, canWriteCatalog } from "@/lib/roles";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import {
   parseInvoiceFilters,
@@ -222,6 +222,7 @@ export default async function InvoicesPage({
         inactive: v.is_active === false,
       }))}
       canEdit={canWriteCatalog(session.membership.role)}
+      canApprove={canApprovePayment(session.membership.role)}
     />
   );
 }

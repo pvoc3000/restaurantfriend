@@ -42,6 +42,7 @@ import { createClient } from "@/lib/supabase/client";
 import { invokeQbo } from "@/lib/qboClient";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { InvoiceBatchActions } from "./InvoiceBatchActions";
 import { NewInvoice } from "./NewInvoice";
 import type { InvoiceListRow } from "@/app/(app)/invoices/page";
 
@@ -160,6 +161,7 @@ export function InvoiceList({
   locationId,
   vendors,
   canEdit,
+  canApprove,
 }: {
   invoices: InvoiceListRow[];
   initialFilters: InvoiceFilters;
@@ -173,6 +175,8 @@ export function InvoiceList({
    *  plumber are the whole reason this screen can create anything. */
   vendors: { id: string; name: string; inactive?: boolean }[];
   canEdit: boolean;
+  /** Manager and Owner only — the module's own decision (025). */
+  canApprove: boolean;
 }) {
   const router = useRouter();
   // Seeded from the ADDRESS BAR where it can be read, and only from the props
@@ -329,6 +333,12 @@ export function InvoiceList({
    */
   const [qboStatus, setQboStatus] = useState<Map<string, QboStatus> | null>(null);
   const [qboAt, setQboAt] = useState<string | null>(null);
+  /** What the last bulk command did. Held HERE rather than in the bar, because
+   *  clearing the selection unmounts the bar — see `InvoiceBatchActions`. */
+  const [batchReport, setBatchReport] = useState<{
+    message: string;
+    tone: "done" | "error";
+  } | null>(null);
   const [qboBusy, setQboBusy] = useState(false);
   const [qboError, setQboError] = useState<string | null>(null);
   const qboSupabase = createClient();
@@ -760,10 +770,34 @@ export function InvoiceList({
         </p>
       )}
 
+      {/* The outcome of the last bulk command, OUTSIDE the bar it came from.
+          Cleared as soon as a new selection begins, so it can never be read as
+          being about the rows now ticked. */}
+      {batchReport && checked.size === 0 && (
+        <p
+          className={`border px-4 py-3 text-sm ${
+            batchReport.tone === "error"
+              ? "border-accent text-accent"
+              : "border-ink text-ink"
+          }`}
+        >
+          {batchReport.message}
+        </p>
+      )}
+
       {checked.size > 0 && (
         <div className="flex flex-wrap items-center gap-4 border border-ink px-4 py-3 text-sm">
           <span>{checked.size} selected</span>
           <span className="tabular-nums text-muted">{money(selectedTotal)}</span>
+          <InvoiceBatchActions
+            selected={sorted.filter((i) => checked.has(i.id))}
+            canEdit={canEdit}
+            canApprove={canApprove}
+            onReport={(message, tone) => {
+              setBatchReport({ message, tone });
+              setChecked(new Set());
+            }}
+          />
           <button
             onClick={() => setChecked(new Set())}
             className="ml-auto text-muted underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
@@ -777,8 +811,9 @@ export function InvoiceList({
         rows={sorted}
         columns={columns}
         rowKey={(i) => i.id}
-        // Twelve columns summing to 1413. The compact set drops Tax, Freight
-        // and Lines — the three a tablet can do without — bringing it to 1098.
+        // Eleven columns summing to 1338, the width the PO list's own columns
+        // were tuned to. Tax and Freight came off on 2026-09-02 and PO Date
+        // took part of what they left; the compact set drops Lines.
         compactBelow={1280}
         storageKey={INVOICE_WIDTHS_KEY}
         columnChooser
