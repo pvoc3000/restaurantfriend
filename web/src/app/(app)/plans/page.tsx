@@ -106,7 +106,7 @@ export default async function PlansPage({
           Facilities' shape and the one Mark prefers (2026-09-03) — as a sibling
           of the title ROW it inherited the page's `space-y-6` and sat 24px
           adrift of the heading it belongs to. */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
             Plans
@@ -129,37 +129,30 @@ export default async function PlansPage({
               : "."}
           </p>
         </div>
+        {editable ? (
+          <NewPlan
+            orgId={session.membership.org_id}
+            locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
+            today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
+          />
+        ) : null}
       </div>
 
-      {/* THE LIST RENDERS EVEN WHEN EMPTY, which is `/batch-logs`' shape and
-          now load-bearing: New plan lives in the list's own control row, so
-          skipping the list on an empty shop would leave no way to make the
-          first plan. The sentence above it says more than the table's own
-          empty line can. */}
       {rows.length === 0 ? (
         <p className="max-w-[80ch] text-sm text-muted">
           No plans made here yet. A plan is a shop&rsquo;s display case over a
           stretch of time — which trays hold what, on which days. Several can be
           active at once, and their union is that shop&rsquo;s menu.
         </p>
-      ) : null}
-
-      <PlansList
-        rows={rows}
-        orgId={session.membership.org_id}
-        editable={editable}
-        initialFilters={params}
-        initialSearch={parseFilterSearch(params)}
-        action={
-          editable ? (
-            <NewPlan
-              orgId={session.membership.org_id}
-              locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
-              today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
-            />
-          ) : null
-        }
-      />
+      ) : (
+        <PlansList
+          rows={rows}
+          orgId={session.membership.org_id}
+          editable={editable}
+          initialFilters={params}
+          initialSearch={parseFilterSearch(params)}
+        />
+      )}
     </div>
   );
 }

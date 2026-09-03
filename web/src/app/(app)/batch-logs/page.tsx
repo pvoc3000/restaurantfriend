@@ -139,14 +139,9 @@ export default async function BatchLogsPage({
     };
   });
 
-  // Held once: it is handed to the list in both branches below.
-  const generate = editable ? (
-    <GenerateBatches locationId={active.id} locationCode={active.code} today={today} />
-  ) : null;
-
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
             Batch Logs
@@ -158,6 +153,13 @@ export default async function BatchLogsPage({
             {active.code} · {rows.length} {rows.length === 1 ? "log" : "logs"}
           </p>
         </div>
+        {editable ? (
+          <GenerateBatches
+            locationId={active.id}
+            locationCode={active.code}
+            today={today}
+          />
+        ) : null}
       </div>
 
       {rows.length === 0 ? (
@@ -178,10 +180,10 @@ export default async function BatchLogsPage({
               No batch logs at {active.code} in this window.
             </p>
           )}
-          <BatchLogsIndex rows={rows} range={range} params={rawParams} action={generate} />
+          <BatchLogsIndex rows={rows} range={range} params={rawParams} />
         </div>
       ) : (
-        <BatchLogsIndex rows={rows} range={range} params={rawParams} action={generate} />
+        <BatchLogsIndex rows={rows} range={range} params={rawParams} />
       )}
     </div>
   );

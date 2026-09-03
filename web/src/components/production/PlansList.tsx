@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
@@ -77,7 +77,6 @@ export function PlansList({
   editable,
   initialFilters,
   initialSearch = "",
-  action,
 }: {
   rows: PlanRow[];
   orgId: string;
@@ -85,12 +84,6 @@ export function PlansList({
   /** The URL's query, raw. */
   initialFilters?: RawSearchParams;
   initialSearch?: string;
-  /**
-   * The screen's create command, right-aligned in this list's own control row
-   * (Mark, 2026-09-03, moving it down out of the title row — Facilities' shape).
-   * A NODE rather than a flag: only the page knows what to hand it.
-   */
-  action?: ReactNode;
 }) {
   const router = useRouter();
 
@@ -522,7 +515,6 @@ export function PlansList({
               count: counts[o.value],
             }))}
           />
-          {action ? <div className="ml-auto">{action}</div> : null}
         </div>
       }
     />
