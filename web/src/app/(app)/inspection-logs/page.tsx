@@ -112,16 +112,9 @@ export default async function InspectionLogsPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Inspection logs
-          </h1>
-          <p className="max-w-[72ch] text-sm text-muted">
-            Outside visits at {active.code} — the health inspector, the fire
-            marshal, pest control, the hood cleaner. Findings become tasks, and
-            anything with an expiry belongs on the equipment it certifies.
-          </p>
-        </div>
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          Inspection logs
+        </h1>
         {canWalkChecklists(session.membership.role) && (
           <StartWalk
             templates={startable}

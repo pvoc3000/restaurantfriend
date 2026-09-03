@@ -215,10 +215,7 @@ export function EquipmentList({
         defaultSort={{ key: "name" }}
         group={{ label: (r) => r.section_name ?? "No section", sortKey: "section" }}
         empty={
-          <p className="max-w-[72ch] text-sm text-muted">
-            Nothing registered at {locationCode} yet. Add the walk-ins first —
-            they are what a temperature reading needs to belong to.
-          </p>
+          <p className="text-sm text-muted">Nothing registered at {locationCode} yet.</p>
         }
       />
     </div>

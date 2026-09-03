@@ -103,16 +103,9 @@ export default async function EquipmentPage() {
     <div className="space-y-6">
       {/* Beside the title, like `/checklists` and `/inspection-logs`. */}
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Equipment
-          </h1>
-          <p className="max-w-[72ch] text-sm text-muted">
-            What stands at {active.code}. A checklist item can be about one of
-            these, which is what turns a reading into a trend and a repair into
-            a history. A warranty with no date set simply never lapses.
-          </p>
-        </div>
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          Equipment
+        </h1>
         {editable && (
           <NewEquipment
             orgId={session.membership.org_id}
