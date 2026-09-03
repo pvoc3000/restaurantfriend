@@ -850,8 +850,14 @@ export function InvoiceDetail({
           the four-box row, just nested one level deeper so the outer edges
           now correspond to real content below them. */}
       <div className="grid items-start gap-x-4 gap-y-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        {/* LEFT — identity | total, matching the document pane's width. */}
-        <div className="grid grid-cols-2 items-start gap-x-4">
+        {/* LEFT — identity | total, matching the document pane's width.
+            TOTAL IS SIZED TO ITS OWN CONTENT (`max-content`), not half the
+            column — a 50/50 split left identity with only ~257px at 1440,
+            which wraps "APPROVED" onto its own line the moment the invoice
+            number runs long (Mark, 2026-09-03: "ARINT2000689768"). Total
+            never needs more than a label and a dollar figure, so it takes
+            only that, and identity gets everything left over. */}
+        <div className="grid items-start gap-x-4 grid-cols-[minmax(0,1fr)_max-content]">
           <div>
             <div className="flex flex-wrap items-center gap-3">
               <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">

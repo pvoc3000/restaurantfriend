@@ -461,26 +461,30 @@ export function PushToQuickBooks({
     onDone();
   }
 
-  // A 2x2 GRID NOW (Mark, 2026-09-03, with a sketch):
+  // TWO PACKED ROWS, not a 2x2 GRID (Mark, 2026-09-03, on the grid's own
+  // gap: "the quickbooks buttons and prose together, not separated"). Equal
+  // grid tracks put "Update in QuickBooks" and "Check QuickBooks" a whole
+  // column-width apart, because each was right-aligned inside its OWN half
+  // of the box rather than packed against its neighbour — the same fault
+  // for "In QuickBooks as Bill X" and "Forget the link" below it.
   //
-  //   [Update in QuickBooks]     [Check QuickBooks]
-  //   In QuickBooks as Bill X    [Forget the link]
+  // A flex row with `justify-end` packs its children against each other AND
+  // the right edge in one motion, which is what a grid track cannot do
+  // without knowing the content's width in advance:
   //
-  // Column 1 is what you PRESS to change something and what that produced;
-  // column 2 is what you press to CHECK or UNDO it. Four children in DOM
-  // order fill the four cells left-to-right, top-to-bottom — no explicit
-  // grid-rows needed. `items-start` is what lets column 1's prose stack grow
-  // past a single line (a proposal banner, a warning, an error) without
-  // dragging "Forget the link" down with it: each column keeps its own top.
+  //   [Update in QuickBooks] [Check QuickBooks]
+  //   In QuickBooks as Bill X [Forget the link]
+  //
+  // Everything else — the proposal banner, the gone banner, refusals,
+  // balance, sent, warnings, error — stays a stack of full-width lines below
+  // both rows, since inlining a wrapped paragraph beside a button is what the
+  // grid was already doing badly.
   return (
-    <div className="grid grid-cols-2 items-start gap-x-3 gap-y-1">
-      {/* ROW 1, COLUMN 1 — the primary buttons. RIGHT-ALIGNED (Mark,
-          2026-09-03) — the box sits at the far edge of its own half of the
-          row, so its controls line up with that edge rather than the
-          opposite one. */}
+    <div className="flex flex-col items-end gap-1.5">
+      {/* ROW 1 — every button that DOES something, packed together. */}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {/* IT IS ALREADY OVER THERE. The button stands with Send/Update; its
-            sentence is in the prose cell below. */}
+            sentence is in the status row below. */}
         {proposal?.ok && !already && canPush && (
           <button
             type="button"
@@ -505,14 +509,10 @@ export function PushToQuickBooks({
                 : `Send to QuickBooks`}
           </button>
         )}
-      </div>
-
-      {/* ROW 1, COLUMN 2 — the secondary command: re-ask QuickBooks.
-          SAME DRESS AS "Update in QuickBooks" (Mark, 2026-09-03) — it had been
-          a quiet underline, which read as less of a real command than the
-          button beside it, though pressing it does exactly the same kind of
-          thing: talk to QuickBooks and report back what it said. */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
+        {/* SAME DRESS AS "Update in QuickBooks" (Mark, 2026-09-03) — it had
+            been a quiet underline, which read as less of a real command than
+            the button beside it, though pressing it does exactly the same
+            kind of thing: talk to QuickBooks and report back what it said. */}
         {already && (
           <button
             type="button"
@@ -525,15 +525,40 @@ export function PushToQuickBooks({
         )}
       </div>
 
-      {/* ROW 2, COLUMN 1 — what pressing column 1 produced, or why it can't
-          be pressed yet. Everything here is prose, stacked in the order it
-          used to fall under `order-last`. */}
-      {/* RIGHT-ALIGNED THROUGHOUT (Mark, 2026-09-03), the two filled
-          banners included — one alignment for the whole box rather than the
-          banners reading as a different kind of thing from the plain status
-          lines around them. */}
-      <div className="space-y-1 text-right text-[13px]">
-        {already && <p className="text-muted">{already}</p>}
+      {/* ROW 2 — what column 1 produced, packed against the one act that
+          undoes it. */}
+      {(already || (gone && canPush)) && (
+        <div className="flex flex-wrap items-center justify-end gap-2 text-[13px]">
+          {already && <span className="text-muted">{already}</span>}
+          {already && canPush && !gone && (
+            <button
+              type="button"
+              className="text-[13px] text-muted underline decoration-neutral-400 underline-offset-[3px] hover:text-ink hover:decoration-neutral-900 disabled:opacity-35"
+              disabled={busy}
+              onClick={() => void unlink()}
+            >
+              Forget the link
+            </button>
+          )}
+          {/* THE DOCUMENT IS GONE AND THE BILL IS STUCK UNTIL THIS IS
+              PRESSED — it can neither update, nor create, nor be linked
+              while it points at a dead id. A full button, not the quiet
+              underline above: this one is urgent. */}
+          {gone && canPush && (
+            <button
+              type="button"
+              className={BUTTON_CLASS}
+              disabled={busy}
+              onClick={() => void unlink()}
+            >
+              {busy ? "Forgetting…" : "Forget the link"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* EVERYTHING ELSE — full-width lines, stacked, right-aligned. */}
+      <div className="w-full space-y-1 text-right text-[13px]">
         {/* Yellow, because this is not an error — it is the normal state
             during the Bill.com parallel run, and the thing worth your eye is
             that pressing Send would make a second copy. */}
@@ -591,34 +616,6 @@ export function PushToQuickBooks({
           </p>
         ))}
         {error && <p className="text-accent">{error}</p>}
-      </div>
-
-      {/* ROW 2, COLUMN 2 — the one act that undoes column 1: forget the link.
-          Quiet (an underline) in the ordinary case; a full button when the
-          document is GONE and the bill is stuck until this is pressed —
-          it can neither update, nor create, nor be linked while it points at
-          a dead id. */}
-      <div className="text-right">
-        {already && canPush && !gone && (
-          <button
-            type="button"
-            className="text-[13px] text-muted underline decoration-neutral-400 underline-offset-[3px] hover:text-ink hover:decoration-neutral-900 disabled:opacity-35"
-            disabled={busy}
-            onClick={() => void unlink()}
-          >
-            Forget the link
-          </button>
-        )}
-        {gone && canPush && (
-          <button
-            type="button"
-            className={BUTTON_CLASS}
-            disabled={busy}
-            onClick={() => void unlink()}
-          >
-            {busy ? "Forgetting…" : "Forget the link"}
-          </button>
-        )}
       </div>
     </div>
   );
