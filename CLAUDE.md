@@ -6606,6 +6606,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    tabs rather than at the edge. `w-72` on the input, the app's usual search
    width, which is also what left-aligned the tab pickers Mark asked about
    separately the same day.
+   **PRODUCTION FOLLOWED THE SAME DAY** — New plan, Generate schedules…, New
+   element and New batch log, through the same `action` slot. Two differences
+   from Facilities, both structural rather than choices: those lists put their
+   control row in `DataTable`'s `leading` strip, which SHARES A LINE WITH THE
+   COLUMNS EYE, so a command at the end of it stops ~48px short of the table's
+   right edge instead of on it; and `ElementsList` uses `ui/FilterMenus`, whose
+   `trailing` slot is already the documented home for a create command and puts
+   it on its OWN line above the menus (matching `/employees`).
+   **AND THE LIST NOW RENDERS WHEN IT IS EMPTY** on `/plans` and `/schedules`,
+   which is not cosmetic: both used to show a paragraph INSTEAD of the list, so
+   with the command moved inside, an empty shop would have had no way to make
+   its first plan. `/batch-logs` already had that shape, which is what made the
+   hole visible. The page's own sentence still renders above it.
    **FLAGGING AN ISSUE BY HAND WAS IMPOSSIBLE** (Mark, 2026-08-30, walking a
    real list: "I get a message 'Say what is wrong before flagging it' but I see
    no way to add a note"). A deadlock, and on the module's central act:
