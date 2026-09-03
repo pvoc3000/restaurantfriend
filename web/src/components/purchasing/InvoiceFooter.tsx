@@ -187,12 +187,17 @@ export function InvoiceFooter({
   const button =
     "h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
 
+  // A FRAGMENT, NOT A WRAPPER (Mark, 2026-09-02: "put the send to quickbooks
+  // button in the same div as the other action buttons so they are aligned").
+  // Two components each owning a box could only ever sit BESIDE each other;
+  // returning loose children lets the caller's one flex row hold every button,
+  // and `basis-full` drops the prose to its own line spanning them — the same
+  // trick `OrderActions` uses for its refusal sentence.
   return (
-    <div className="space-y-2">
-      {error && <p className="text-sm text-accent">{error}</p>}
-      <div className="flex flex-wrap items-center justify-end gap-3">
+    <>
+      {error && <p className="order-last basis-full text-right text-sm text-accent">{error}</p>}
         {status === "approved" && (
-          <span className="mr-auto text-sm text-muted">
+          <span className="order-last basis-full text-right text-sm text-muted">
             Approved for payment
             {approvedAt ? ` on ${approvedAt.slice(0, 10)}` : ""}.
           </span>
@@ -255,7 +260,6 @@ export function InvoiceFooter({
             {busy === "unapprove" ? "Withdrawing…" : "Withdraw approval"}
           </button>
         )}
-      </div>
-    </div>
+    </>
   );
 }

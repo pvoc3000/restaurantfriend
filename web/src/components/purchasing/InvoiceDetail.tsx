@@ -787,9 +787,21 @@ export function InvoiceDetail({
               does not. */}
           <div className="shrink-0 space-y-2 pt-4">
             <section className="shrink-0 space-y-2">
-              <SectionHeading count={linkedOrders.length}>
-                Purchase orders
-              </SectionHeading>
+              {/* The heading and the one command on one line — which is where
+                  the rows' own Reconcile links sit, so they share a right
+                  margin and this costs no line of its own (Mark, 2026-09-02). */}
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+                <SectionHeading count={linkedOrders.length}>
+                  Purchase orders
+                </SectionHeading>
+                {canEdit && (
+                  <LinkToPo
+                    lines={lines}
+                    candidates={linkCandidates}
+                    onDone={() => router.refresh()}
+                  />
+                )}
+              </div>
 
               {/* What the page PRINTS, offered rather than taken. Yellow, because
                   it's worth your eye and not a warning. */}
@@ -864,15 +876,7 @@ export function InvoiceDetail({
                 </ul>
               )}
 
-              {canEdit && (
-                <div className="pt-1">
-                  <LinkToPo
-                    lines={lines}
-                    candidates={linkCandidates}
-                    onDone={() => router.refresh()}
-                  />
-                </div>
-              )}
+
           </section>
           </div>
         </div>

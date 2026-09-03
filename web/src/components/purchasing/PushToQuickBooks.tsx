@@ -461,13 +461,23 @@ export function PushToQuickBooks({
     onDone();
   }
 
+  // A FRAGMENT for `InvoiceFooter`'s reason: the caller's single flex row holds
+  // every button, so Send to QuickBooks aligns with Void, Delete and Approve
+  // instead of sitting in a box beside them. Everything that is PROSE carries
+  // `basis-full`, which drops it to its own line under the whole row (Mark,
+  // 2026-09-02: "the text … can go below it and span under all the buttons").
+  // `order-last` on everything that is PROSE, so the buttons share one line
+  // whatever order the two components are rendered in. Source order alone
+  // could not do it: this component's own refusal sits between its button and
+  // the footer's, and putting it there broke the row (measured 2026-09-02 —
+  // Send to QuickBooks at y=138, the rest at y=210).
   return (
-    <div className="space-y-1">
+    <>
       {/* IT IS ALREADY OVER THERE. Yellow, because this is not an error — it is
           the normal state during the Bill.com parallel run, and the thing worth
           your eye is that pressing Send would make a second copy. */}
       {proposal?.ok && !already && (
-        <div className="max-w-2xl space-y-1 bg-mark-fill px-2 py-1 text-[13px] text-ink">
+        <div className="order-last basis-full space-y-1 bg-mark-fill px-2 py-1 text-[13px] text-ink">
           <p>
             QuickBooks already has this as {proposal.candidate.entity}{" "}
             {proposal.candidate.doc_number ?? proposal.candidate.id} —{" "}
@@ -487,7 +497,6 @@ export function PushToQuickBooks({
           )}
         </div>
       )}
-      <div className="flex flex-wrap items-center gap-3">
         {canPush && (
           <button
             type="button"
@@ -523,14 +532,13 @@ export function PushToQuickBooks({
             Forget the link
           </button>
         )}
-      </div>
 
       {/* THE DOCUMENT IS GONE AND THE BILL IS STUCK UNTIL THIS IS PRESSED —
           it can neither update, nor create, nor be linked while it points at a
           dead id. Red rather than the mark colour: this is not "worth your eye",
           the record here disagrees with QuickBooks and one of them is wrong. */}
       {gone && (
-        <div className="max-w-2xl space-y-1 border border-accent px-2 py-1 text-[13px] text-ink">
+        <div className="order-last basis-full space-y-1 border border-accent px-2 py-1 text-[13px] text-ink">
           <p>
             QuickBooks no longer has {already?.replace("In QuickBooks as ", "") ?? "that document"}.
             It was deleted there, so this bill points at nothing and can be neither
@@ -558,30 +566,30 @@ export function PushToQuickBooks({
           refusals — no vendor mapped, no expense account — still say what is
           missing, because nothing on screen implies those. */}
       {canPush && shownRefusal && (
-        <p className="text-[13px] text-muted">{shownRefusal}</p>
+        <p className="order-last basis-full text-right text-[13px] text-muted">{shownRefusal}</p>
       )}
       {!refusals.length && account && !already && (
-        <p className="text-[13px] text-faint">
+        <p className="order-last basis-full text-right text-[13px] text-faint">
           Posts to {splitAccountName(account.name).leaf || account.ref}
           {account.source === "org" ? " (the org default)" : ""}.
         </p>
       )}
       {balance && (
-        <p className="text-[13px] text-muted">
+        <p className="order-last basis-full text-right text-[13px] text-muted">
           {balance.text} <span className="text-faint">· as of {balance.at}</span>
         </p>
       )}
-      {sent && <p className="text-[13px] text-muted">{sent}</p>}
+      {sent && <p className="order-last basis-full text-right text-[13px] text-muted">{sent}</p>}
       {/* The bill IS in QuickBooks — this is not an error. It is the coding
           QuickBooks accepted and then dropped, which it does with a 200 and no
           fault when the matching preference is off. Yellow: worth your eye,
           not something that went wrong. */}
       {warnings.map((w) => (
-        <p key={w} className="max-w-2xl bg-mark-fill px-2 py-1 text-[13px] text-ink">
+        <p key={w} className="order-last basis-full bg-mark-fill px-2 py-1 text-[13px] text-ink">
           {w}
         </p>
       ))}
-      {error && <p className="text-[13px] text-accent">{error}</p>}
-    </div>
+      {error && <p className="order-last basis-full text-right text-[13px] text-accent">{error}</p>}
+    </>
   );
 }

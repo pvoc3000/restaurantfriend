@@ -158,7 +158,11 @@ export function LinkToPo({
             ? "This vendor has no recent orders at this location to link to"
             : undefined
         }
-        className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+        // A TEXT BUTTON, matching the Reconcile links it now sits with (Mark,
+        // 2026-09-02) — a bordered button on a row of its own cost this column
+        // a whole line, and on a screen whose point is vertical room that is a
+        // line the lines table wanted.
+        className="text-sm text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900 disabled:opacity-35 disabled:no-underline"
       >
         Link to PO…
       </button>
