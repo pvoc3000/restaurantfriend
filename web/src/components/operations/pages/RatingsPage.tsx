@@ -268,7 +268,7 @@ export function RatingsPage({
                     WHEN the meal began and a break with no time proves nothing
                     about it. */}
                 {(row.breakStartedAt ?? "").trim() === "" ? (
-                  <p className="text-xs text-accent">A time is needed</p>
+                  <p className="text-sm text-accent">A time is needed</p>
                 ) : null}
               </div>
             ) : null}
@@ -285,7 +285,7 @@ export function RatingsPage({
                 {(row.breakReason ?? "").trim() === "" ? (
                   // RED, not the mark colour: this is no longer "worth your
                   // eye", it is the thing that will stop the report being sent.
-                  <p className="text-xs text-accent">
+                  <p className="text-sm text-accent">
                     A reason is needed before this report can be sent
                   </p>
                 ) : null}

@@ -44,7 +44,7 @@ export function ReportPage({
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <div className="text-center">
-        <p className="text-sm font-bold uppercase tracking-[0.08em]">How was the shift?</p>
+        <p className="text-[16px] font-bold uppercase tracking-[0.08em]">How was the shift?</p>
         <p className="text-sm font-semibold italic">
           (Please be polite, concise, and constructive. This is not a place to vent.)
         </p>

@@ -71,7 +71,7 @@ export function ElementsPage({
 
   if (rows.length === 0) {
     return (
-      <p className="mx-auto max-w-3xl text-sm text-muted">
+      <p className="text-center text-[16px]">
         No batch log was generated for this kitchen today, so there is nothing to record. Generate
         the week from Batch Logs and it will appear here.
       </p>
@@ -107,9 +107,9 @@ export function ElementsPage({
         <tbody>
           {rows.map((r) => (
             <tr key={r.batchId} className="border-b border-hairline/60">
-              <td className="py-2 pr-3 text-[15px] text-muted">{r.batchNumber}</td>
-              <td className="py-2 pr-3 text-[15px]">{r.elementName}</td>
-              <td className="py-2 pr-3 text-[15px] text-muted">{r.batchLabel ?? "—"}</td>
+              <td className="py-2 pr-3 text-[16px] text-muted">{r.batchNumber}</td>
+              <td className="py-2 pr-3 text-[16px]">{r.elementName}</td>
+              <td className="py-2 pr-3 text-[16px] text-muted">{r.batchLabel ?? "—"}</td>
               <td className="py-2 pr-2">
                 <CountField
                   value={r.yieldCount}

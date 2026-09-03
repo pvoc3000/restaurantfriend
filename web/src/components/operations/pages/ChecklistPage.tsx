@@ -110,7 +110,7 @@ export function ChecklistPage({
     <div className="space-y-4">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <p className="text-[16px] font-medium">{run.run.title}</p>
-        <span className="text-[14px] text-muted">
+        <span className="text-sm text-muted">
           {progressLabel(run.items)}
           {run.run.status === "submitted" ? " · finished" : ""}
         </span>
@@ -132,7 +132,7 @@ export function ChecklistPage({
         /* Said once, quietly, where the missing button was. Without it the page
            looks like a checklist you can fill in and never close — which is the
            reading the button existed to prevent. */
-        <p className="text-right text-[14px] text-muted">
+        <p className="text-right text-sm text-muted">
           Sending the report finishes this checklist.
         </p>
       )}

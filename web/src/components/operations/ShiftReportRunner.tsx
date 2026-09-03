@@ -343,7 +343,11 @@ export function ShiftReportRunner({
         </h1>
       </header>
 
-      <main className="flex-1 overflow-y-auto px-6 py-8">
+      {/* 16px IS THIS SURFACE'S BODY SIZE. The app's own base is 15px (a desk
+          size), and anything unstyled here inherits it — a `ui/Checkbox` label
+          beside 16px rows, for instance. Setting it once on main is what makes
+          the scale hold for elements no page sizes explicitly. */}
+      <main className="flex-1 overflow-y-auto px-6 py-8 text-[16px]">
         {busy ? <ProgressBand label={busy} /> : null}
         {failed ? (
           <p className="mb-6 border border-accent px-4 py-3 text-sm text-accent">{failed}</p>

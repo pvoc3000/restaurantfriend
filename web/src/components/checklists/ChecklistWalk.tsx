@@ -165,7 +165,7 @@ export function ChecklistWalk({
 
       {tasks.length > 0 && (
         <section className="border-2 border-hairline p-3">
-          <h2 className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+          <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
             Carried over — {tasks.length}
           </h2>
           <ul className="space-y-2">
@@ -179,7 +179,7 @@ export function ChecklistWalk({
                       type="button"
                       onClick={() => void actOnTask(t, t.status !== "done")}
                       aria-pressed={t.status === "done"}
-                      className={`min-h-11 shrink-0 border px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
+                      className={`min-h-11 shrink-0 border px-3 text-xs font-semibold uppercase tracking-[0.06em] transition-colors ${
                         t.status === "done"
                           ? "border-ink bg-ink text-white"
                           : "border-ink bg-white text-ink hover:bg-ink hover:text-white"
@@ -193,14 +193,14 @@ export function ChecklistWalk({
                       {t.title}
                     </span>
                     {t.details && (
-                      <span className="block text-[13px] text-muted">{t.details}</span>
+                      <span className="block text-sm text-muted">{t.details}</span>
                     )}
                     {age && (
                       // Yellow is a FILL, never an ink — `text-mark` is 1.43:1
                       // on white, which is not a legibility complaint, it is
                       // text you cannot read.
                       <span
-                        className={`mt-1 inline-block px-1 text-[12px] ${
+                        className={`mt-1 inline-block px-1 text-xs ${
                           tone === "loud"
                             ? "bg-accent text-white"
                             : "bg-mark-fill text-ink"
@@ -213,7 +213,7 @@ export function ChecklistWalk({
                       // Plain ink, not a mark: whose a job is is context, not a
                       // warning, and spending the mark colour here would put it
                       // beside the age chip that has actually earned it.
-                      <span className="ml-2 text-[12px] text-muted">
+                      <span className="ml-2 text-xs text-muted">
                         {t.assigned_label}
                       </span>
                     )}
@@ -247,7 +247,7 @@ export function ChecklistWalk({
           ]}
           onChange={(v) => setTier(v as typeof tier)}
         />
-        <span className="text-[13px] text-muted">{progressLabel(items)}</span>
+        <span className="text-sm text-muted">{progressLabel(items)}</span>
       </div>
 
       {bands.length === 0 && (
@@ -266,7 +266,7 @@ export function ChecklistWalk({
         <section key={band.section} className="space-y-0">
           {/* A band that DELIMITS is black — the mark this app uses for the
               masthead, the ActionBar and every grouped list. */}
-          <h2 className="flex items-baseline justify-between gap-3 bg-ink px-3 py-2 text-[12px] font-semibold uppercase tracking-[0.08em] text-white">
+          <h2 className="flex items-baseline justify-between gap-3 bg-ink px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-white">
             <span>{band.section}</span>
             <span className="text-white/55">
               {band.rows.filter((r) => r.status !== "pending").length} of{" "}

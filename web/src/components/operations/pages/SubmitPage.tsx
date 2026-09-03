@@ -58,7 +58,7 @@ export function SubmitPage({
   if (blockers.length + outstanding.length === 0) {
     return (
       <div className="mx-auto max-w-2xl">
-        <p className="text-sm">Everything is done. Send it.</p>
+        <p className="text-[16px]">Everything is done. Send it.</p>
       </div>
     );
   }
@@ -76,7 +76,7 @@ export function SubmitPage({
           rather than being its first line. It follows the box's job: with a
           blocker present the box is the gate and says so; with none it is a
           list. Blockers lead — you cannot leave without them. */}
-      <p className="text-center text-xs font-semibold uppercase tracking-[0.08em] text-accent">
+      <p className="text-center text-[16px] font-bold uppercase tracking-[0.08em] text-accent">
         {blocked ? "Before this can be sent" : "Still outstanding"}
       </p>
       <div
@@ -84,7 +84,7 @@ export function SubmitPage({
           blocked ? "border-2 border-accent" : "border border-hairline"
         }`}
       >
-        <ul className="space-y-1 text-sm text-accent">
+        <ul className="space-y-1 text-[16px] text-accent">
           {[...blockers, ...outstanding].map((line) => (
             <li key={line}>{line}</li>
           ))}

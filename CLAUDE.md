@@ -6988,6 +6988,24 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `submitBlockers` both ask `pages.includes`, and the runner numbers what it is
    given), which is exactly why a fixture pins it — a reorder would otherwise
    break the rule in silence.
+   **THE RUNNER HAS ONE TYPE SCALE, AND `main` SETS THE BODY SIZE** (Mark,
+   2026-09-03: "the font changes between pages 4 and 5"). It did — and between
+   most other pairs too: eight pages had grown 12 · 13 · 14 · 15 · 16 · 18 with
+   no rule, so a row was 15px on Premades, 16px on the checklist and 14px on
+   the report. The scale now: **18px** the black banner only, **16px** body —
+   every row, value, list item and input — and in-page headings at 16px bold
+   uppercase (`ui/SectionHeading`'s own size), **14px** secondary (muted notes,
+   hints, errors), **12px** uppercase small-caps labels and table column heads.
+   16px is not a taste: it is the threshold below which iOS Safari zooms a
+   focused input, so the fields were already there and the text beside them
+   should match.
+   **`text-[16px]` ON `main` IS WHAT MAKES IT HOLD.** The app's base is 15px (a
+   DESK size, `--rf-text-base`), so anything this surface does not size
+   explicitly inherits it — a `ui/Checkbox` label sat at 15 beside 16px rows.
+   Setting it once on main covers every unstyled element, now and later.
+   Deliberately NOT touched: `ui/SectionHeading`'s 13px count badge and
+   `lib/anchoredPanel`'s 9px caret, both shared with every other screen in the
+   app — this pass was the shift report, and those are a wider decision.
    **AN EMPTY STATE THAT IS THE WHOLE PAGE IS CENTRED HORIZONTALLY AND NOT
    VERTICALLY** (Mark, 2026-09-03) — a bare `text-center` paragraph at the top,
    uncapped so it stays on one line. Two of them: the checklist page's "No

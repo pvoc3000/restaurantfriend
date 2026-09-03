@@ -139,7 +139,7 @@ export function PremadesPage({
 
   if (rows.length === 0) {
     return (
-      <p className="text-center text-sm text-muted">
+      <p className="text-center text-[16px]">
         No production schedule was generated for this shop today, so there is nothing to count.
       </p>
     );
@@ -150,7 +150,7 @@ export function PremadesPage({
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
       <div className="flex flex-wrap items-center justify-between gap-3">
         {scheduleTitle ? (
-          <p className="text-sm">
+          <p className="text-[16px]">
             <span className="text-xs font-semibold uppercase tracking-[0.08em]">Schedule:</span>{" "}
             {scheduleTitle}
           </p>
@@ -201,10 +201,10 @@ export function PremadesPage({
         <tbody>
           {rows.map((r) => (
             <tr key={r.scheduleItemId} className="border-b border-hairline/60">
-              <td className="py-2 pr-3 text-[15px]">{r.itemType ?? "—"}</td>
-              <td className="py-2 pr-3 text-[15px]">{r.subtype ?? "—"}</td>
-              <td className="py-2 pr-3 text-[15px]">{r.name}</td>
-              <td className="py-2 pr-1 text-right text-[15px]">{r.par ?? "—"}</td>
+              <td className="py-2 pr-3 text-[16px]">{r.itemType ?? "—"}</td>
+              <td className="py-2 pr-3 text-[16px]">{r.subtype ?? "—"}</td>
+              <td className="py-2 pr-3 text-[16px]">{r.name}</td>
+              <td className="py-2 pr-1 text-right text-[16px]">{r.par ?? "—"}</td>
               {/* TAKE THE PAR (Mark, 2026-08-28). The receiving screen's `→`
                   idiom, and for its reason: the usual answer is "we made what
                   we were asked to", and typing it out forty times is the work.
@@ -250,7 +250,7 @@ export function PremadesPage({
                   cell is usually just the box. */}
               <td className="py-2 pl-4 align-top">
                 {r.note ? (
-                  <p className="pb-1 text-[13px] leading-snug text-muted">{r.note}</p>
+                  <p className="pb-1 text-sm leading-snug text-muted">{r.note}</p>
                 ) : null}
                 <TextField
                   value={r.countNote}

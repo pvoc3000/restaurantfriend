@@ -103,7 +103,7 @@ export function TomorrowPage({
 
   if (!nextProductionDate) {
     return (
-      <p className="mx-auto max-w-3xl text-sm">
+      <p className="text-center text-[16px]">
         <span className="bg-mark-fill px-1">No next production day is set</span>{" "}
         <span className="text-muted">— go back to page 1 and give it one.</span>
       </p>
@@ -131,10 +131,10 @@ export function TomorrowPage({
                 the row twice. */}
             {schedules.map((s) => (
               <li key={s.id} className="flex items-center gap-4 px-4 py-3">
-                <span className="w-16 text-[15px]">{s.sellsCode}</span>
-                <span className="flex-1 text-[15px]">{s.title ?? "Premade schedule"}</span>
+                <span className="w-16 text-[16px]">{s.sellsCode}</span>
+                <span className="flex-1 text-[16px]">{s.title ?? "Premade schedule"}</span>
                 {s.printedAt ? (
-                  <span className="text-xs text-muted">printed {s.printedAt.slice(0, 10)}</span>
+                  <span className="text-sm text-muted">printed {s.printedAt.slice(0, 10)}</span>
                 ) : null}
                 <PrintPacket
                   scheduleIds={[s.id]}

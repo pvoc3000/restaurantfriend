@@ -290,7 +290,7 @@ export function SalesPage({
       {busy ? <ProgressBand label="Asking Square for today's figures…" /> : null}
 
       <div className="space-y-3">
-        <p className="text-center text-sm font-bold uppercase tracking-[0.08em]">Today</p>
+        <p className="text-center text-[16px] font-bold uppercase tracking-[0.08em]">Today</p>
 
         {/* THE BOXES ARE ALWAYS THERE, whether or not Square answered. That is
             the whole point of making them typeable: the case where somebody has
@@ -330,7 +330,7 @@ export function SalesPage({
             button that asks again. */}
         {today !== null && (today.netCents !== null || today.tipsCents !== null) ? (
           provisional ? (
-            <p className="text-center text-xs">
+            <p className="text-center text-sm">
               <span className="bg-mark-fill px-1">
                 Provisional — Square closes the day at 1am
               </span>
@@ -354,7 +354,7 @@ export function SalesPage({
         )}
       </div>
 
-      <table className="w-full text-[15px]">
+      <table className="w-full text-[16px]">
         <thead>
           <tr className="border-b-2 border-ink text-xs font-semibold uppercase tracking-[0.08em]">
             <th className="py-2 text-left"> </th>
@@ -393,7 +393,7 @@ export function SalesPage({
       {/* Which days are being compared, because "last year" is 364 days back so
           the WEEKDAY aligns — `lib/sales.lastYearRange`'s own default, and a
           Saturday against a Friday would be a worse comparison than none. */}
-      <p className="text-center text-xs text-muted">
+      <p className="text-center text-sm text-muted">
         Compared against {lastWeekDate} and {lastYearDate}.
       </p>
     </div>
