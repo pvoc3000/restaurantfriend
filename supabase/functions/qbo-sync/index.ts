@@ -19,6 +19,8 @@
 //   departments    → QBO Locations, ditto — Intuit calls them Departments
 //   items          → service items, for the settings picker
 //   push_bill      → send one approved invoice to QuickBooks as a Bill
+//   find_bills     → what QuickBooks already has, so a bill can be ADOPTED
+//                    rather than created twice (the Bill.com parallel run)
 //   refresh_status → what QuickBooks says is still owed. RETURNS, never stores
 //   customers      → QBO customers, for the mapping picker on a customer
 //   tax_codes      → QBO tax codes, for the settings picker (084)
@@ -688,6 +690,77 @@ Deno.serve(async (req) => {
     // this reason, and this is the same refusal.
     //
     // So the screens show it with an "as of" and it disappears on reload.
+    // -----------------------------------------------------------------------
+    // find_bills — what QuickBooks already has under these invoices' numbers
+    //
+    // The parallel run with Bill.com: bills reach the books there and sync to
+    // QuickBooks, so nearly every invoice in this app ALREADY exists over there
+    // (measured: 51 of 52) and pushing would double it. This finds the one that
+    // is already there so it can be adopted instead.
+    //
+    // IT TAKES INVOICE IDS, NOT NUMBERS, and reads the numbers itself through
+    // the CALLER's client. A caller handing over arbitrary numbers could use
+    // this to ask what is in the books one guess at a time; ids go through RLS.
+    //
+    // IT PROPOSES NOTHING. The rule — vendor refuses, amount caveats, two
+    // matches is a hand-pick — is `proposeBillLink` in `web/src/lib`, where the
+    // fixtures can reach it. This returns candidates and stops, which is the
+    // split `taxDisagreement` had to be pulled back to.
+    // -----------------------------------------------------------------------
+    if (mode === "find_bills") {
+      const wanted = (body as unknown as { invoice_ids?: string[] }).invoice_ids;
+      let sel = supabase
+        .from("vendor_invoices")
+        .select("id, invoice_number")
+        .not("invoice_number", "is", null);
+      if (Array.isArray(wanted) && wanted.length > 0) sel = sel.in("id", wanted);
+      const { data: rows, error: rowsError } = await sel;
+      if (rowsError) return json(500, { error: rowsError.message });
+
+      const numbers = [
+        ...new Set(
+          (rows ?? [])
+            .map((r) => String((r as { invoice_number: string }).invoice_number).trim())
+            .filter(Boolean)
+        ),
+      ];
+      if (numbers.length === 0) return json(200, { candidates: [] });
+
+      const conn = await loadConnection(admin, orgId);
+      const candidates: Record<string, unknown>[] = [];
+      for (const entity of ["Bill", "VendorCredit"] as const) {
+        // Chunked because the query is a URL, and a few hundred quoted numbers
+        // is how you find the length limit the hard way.
+        for (let i = 0; i < numbers.length; i += 40) {
+          const list = numbers.slice(i, i + 40).map(qboQuote).join(",");
+          const sql = `select * from ${entity} where DocNumber in (${list}) maxresults 1000`;
+          const res = (await qboFetch(admin, conn, `query?query=${encodeURIComponent(sql)}`)) as {
+            QueryResponse?: Record<string, Record<string, unknown>[]>;
+          };
+          for (const d of res.QueryResponse?.[entity] ?? []) {
+            candidates.push({
+              id: String(d.Id),
+              sync_token: String(d.SyncToken),
+              doc_number: d.DocNumber === undefined || d.DocNumber === null ? null : String(d.DocNumber),
+              entity,
+              total: Number(d.TotalAmt ?? 0),
+              vendor_ref: (d.VendorRef as { value?: string } | undefined)?.value ?? null,
+              vendor_name: (d.VendorRef as { name?: string } | undefined)?.name ?? null,
+              txn_date: d.TxnDate === undefined || d.TxnDate === null ? null : String(d.TxnDate),
+              balance: d.Balance === undefined || d.Balance === null ? null : Number(d.Balance),
+            });
+          }
+        }
+      }
+
+      await admin
+        .from("accounting_connections")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", conn.id);
+
+      return json(200, { candidates, checked_at: new Date().toISOString() });
+    }
+
     if (mode === "refresh_status") {
       const wanted = (body as unknown as { invoice_ids?: string[] }).invoice_ids;
 

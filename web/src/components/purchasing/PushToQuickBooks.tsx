@@ -5,6 +5,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { invokeQbo } from "@/lib/qboClient";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { money } from "@/lib/purchaseOrders";
+import { normalizeInvoiceNumber } from "@/lib/invoices";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import {
   billPushRefusals,
@@ -19,6 +20,10 @@ import {
   attachmentRefusal,
   attachmentsToSend,
   withAttachments,
+  proposeBillLink,
+  linkedRef,
+  type BillLinkProposal,
+  type QboCandidate,
   type AccountingRef,
   type BillInvoice,
   type VendorLocationAccounting,
@@ -88,6 +93,8 @@ export function PushToQuickBooks({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<string | null>(null);
+  /** What QuickBooks already has under this number. Null while unasked. */
+  const [proposal, setProposal] = useState<BillLinkProposal | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   /** What QuickBooks says is still owed. HELD IN STATE AND NEVER STORED — see
    *  `refresh_status`. It disappears on reload, which is honest: a balance kept
@@ -145,6 +152,36 @@ export function PushToQuickBooks({
       cancelled = true;
     };
   }, [readContext]);
+
+  // ASKED AUTOMATICALLY, and only where it can matter: connected, approved,
+  // not already linked, and carrying a number. During the Bill.com parallel run
+  // the bill is ALREADY over there 51 times out of 52, so the default question
+  // on this screen is "which one is it", not "shall we create one" — and the
+  // cost of not asking is a duplicate in the real books.
+  useEffect(() => {
+    if (!ctx?.connected) return;
+    if (ctx.invoiceRef?.qbo?.id) return;
+    if (status !== "approved" || !invoiceNumber) return;
+    let cancelled = false;
+    void (async () => {
+      const { data, message } = await invokeQbo(supabase, {
+        mode: "find_bills",
+        invoice_ids: [invoiceId],
+      });
+      if (cancelled) return;
+      if (message) return; // silent: this is a convenience, not the screen's job
+      const found = proposeBillLink(
+        { invoice_number: invoiceNumber, total, is_credit: isCredit, external_ref: ctx.invoiceRef },
+        (data?.candidates as QboCandidate[]) ?? [],
+        qboVendorId(ctx.atShop?.external_ref ?? null),
+        normalizeInvoiceNumber
+      );
+      setProposal(found);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ctx, status, invoiceNumber, invoiceId, total, isCredit, supabase]);
 
   // Nothing at all until QuickBooks is connected: an invoice screen is not the
   // place to advertise a feature nobody has set up.
@@ -221,9 +258,19 @@ export function PushToQuickBooks({
     });
 
     const where = splitAccountName(account!.name).leaf || account!.ref;
+    // IF WE KNOW IT IS ALREADY THERE, SAY SO IN THE CONFIRM. Not a block —
+    // `closeReadiness`'s posture, name it and let you through — but this one
+    // costs a duplicate bill in the real books, so it leads and it is blunt.
+    const dup =
+      !already && proposal?.ok
+        ? `QuickBooks ALREADY HAS this as ${proposal.candidate.entity} ` +
+          `${proposal.candidate.doc_number ?? proposal.candidate.id}. Sending it makes a ` +
+          `SECOND one. Link to the existing bill instead unless you mean to duplicate it.\n\n`
+        : "";
     const ok = await confirmDialog({
       ...splitConfirmMessage(
-        `${already ? "Update" : "Send"} this ${isCredit ? "credit" : "bill"} in QuickBooks?\n\n` +
+        dup +
+          `${already ? "Update" : "Send"} this ${isCredit ? "credit" : "bill"} in QuickBooks?\n\n` +
           `${ctx!.vendorName} · ${invoiceNumber ?? "no number"} · $${Number(total).toFixed(2)}\n` +
           `Posts to ${where}${account!.source === "org" ? " (the org default)" : ""}` +
           `${tracking.location ? `\nLocation: ${tracking.location.name ?? tracking.location.ref}` : ""}` +
@@ -312,8 +359,64 @@ export function PushToQuickBooks({
     onDone();
   }
 
+  /** Adopt the bill QuickBooks already has. Writes the SAME ref a push would,
+   *  through the same definer, so everything downstream — attachments, the
+   *  balance, the "In QuickBooks as…" line — cannot tell the two apart. */
+  async function link(candidate: QboCandidate) {
+    const ok = await confirmDialog({
+      ...splitConfirmMessage(
+        `Link this bill to the one already in QuickBooks?\n\n` +
+          `${candidate.entity} ${candidate.doc_number ?? candidate.id} · ` +
+          `${candidate.vendor_name ?? "unknown vendor"} · ` +
+          `${candidate.txn_date ?? "no date"} · $${candidate.total.toFixed(2)}\n` +
+          `Nothing is created in QuickBooks. This app stops offering to send it, ` +
+          `and starts showing what it still owes.`
+      ),
+      confirmLabel: "Link",
+    });
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    const { data: rec, error: refErr } = await supabase.rpc("record_accounting_push", {
+      p_invoice: invoiceId,
+      p_ref: linkedRef(candidate),
+    });
+    setBusy(false);
+    if (refErr || !Array.isArray(rec) || rec.length === 0) {
+      setError(refErr?.message ?? "That could not be recorded here, so nothing was linked.");
+      return;
+    }
+    setProposal(null);
+    setCtx(await readContext());
+    onDone();
+  }
+
   return (
     <div className="space-y-1">
+      {/* IT IS ALREADY OVER THERE. Yellow, because this is not an error — it is
+          the normal state during the Bill.com parallel run, and the thing worth
+          your eye is that pressing Send would make a second copy. */}
+      {proposal?.ok && !already && (
+        <div className="max-w-2xl space-y-1 bg-mark-fill px-2 py-1 text-[13px] text-ink">
+          <p>
+            QuickBooks already has this as {proposal.candidate.entity}{" "}
+            {proposal.candidate.doc_number ?? proposal.candidate.id} —{" "}
+            {proposal.candidate.vendor_name ?? "unknown vendor"} ·{" "}
+            {proposal.candidate.txn_date ?? "no date"} · ${proposal.candidate.total.toFixed(2)}.
+          </p>
+          {proposal.caveat && <p>{proposal.caveat}</p>}
+          {canPush && (
+            <button
+              type="button"
+              className={BUTTON_CLASS}
+              disabled={busy}
+              onClick={() => void link(proposal.candidate)}
+            >
+              {busy ? "Linking…" : "Link to it"}
+            </button>
+          )}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-3">
         {canPush && (
           <button

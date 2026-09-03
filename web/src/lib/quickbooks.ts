@@ -860,3 +860,132 @@ export function attachmentsToSend<T extends { id: string; kind?: string | null }
  *  document and re-renders it from live figures, so it has no row id to key on
  *  and its previous copy is replaced rather than added to. */
 export const INVOICE_SHEET_KEY = "sheet";
+
+// ---------------------------------------------------------------------------
+// Adopting a bill QuickBooks already has
+// ---------------------------------------------------------------------------
+
+/**
+ * Linking one of our invoices to a Bill that is ALREADY in QuickBooks.
+ *
+ * WHY THIS EXISTS, and why it is a bridge rather than a feature. Bills reach
+ * Mark's books through **Bill.com** today, which syncs them to QuickBooks; the
+ * app is meant to replace that eventually, and until it does BOTH systems would
+ * create the same bill. Measured 2026-09-02 against the real company: **51 of
+ * our 52 unpushed invoices already exist there**, matching on number and amount,
+ * with ZERO ambiguous and ZERO unmatched. Pushing them would have doubled every
+ * one.
+ *
+ * So the app's job during the parallel run is not to CREATE the bill — that is
+ * handled — it is to find the one already there and add what only this app has:
+ * the scan, the receiving reconciliation, the per-shop coding, and what is
+ * still owed. When Bill.com goes, there is nothing left to link and this
+ * quietly stops proposing anything.
+ *
+ * IT IS A PROPOSAL AND NEVER A WRITE — `matchInvoiceToOrder`'s posture, and for
+ * a stronger reason: the wrong link silently attaches our scan to somebody
+ * else's bill and then reports its balance as ours.
+ */
+
+export type QboCandidate = {
+  id: string;
+  sync_token: string;
+  doc_number: string | null;
+  entity: QboEntity;
+  total: number;
+  vendor_ref: string | null;
+  vendor_name: string | null;
+  txn_date: string | null;
+  balance: number | null;
+};
+
+export type BillLinkProposal =
+  | { ok: true; candidate: QboCandidate; exact: boolean; caveat: string | null }
+  | { ok: false; reason: string };
+
+/**
+ * The bill in QuickBooks that IS this invoice, or why we will not say.
+ *
+ * The vendor is a REFUSAL and the amount is a CAVEAT, which is the asymmetry to
+ * keep: a number that turns up under a different vendor is a different document
+ * and linking it would be wrong, where the same number and vendor at a
+ * different amount is the case a human most needs to look at — a credit, a
+ * short delivery, or a bill somebody corrected on one side only.
+ */
+export function proposeBillLink(
+  invoice: {
+    invoice_number: string | null;
+    total: number | null;
+    is_credit: boolean;
+    external_ref?: AccountingRef | null;
+  },
+  candidates: QboCandidate[],
+  /** The QBO vendor this invoice's shop is mapped to, when it is mapped. */
+  vendorRef: string | null,
+  normalize: (raw: string | null) => string | null
+): BillLinkProposal {
+  if (qboRef(invoice.external_ref)) {
+    return { ok: false, reason: "This is already linked to QuickBooks." };
+  }
+  const number = normalize(invoice.invoice_number);
+  if (!number) {
+    return {
+      ok: false,
+      reason: "This bill has no number, so there is nothing to match it on.",
+    };
+  }
+
+  const wanted: QboEntity = invoice.is_credit ? "VendorCredit" : "Bill";
+  const matches = candidates.filter(
+    (c) => c.entity === wanted && normalize(c.doc_number) === number
+  );
+  if (matches.length === 0) {
+    return { ok: false, reason: "QuickBooks has no bill with this number." };
+  }
+
+  // The vendor decides before anything else. Two suppliers can print the same
+  // invoice number in the same month and nothing about the amount would tell
+  // you which is which.
+  const byVendor = vendorRef ? matches.filter((c) => c.vendor_ref === vendorRef) : matches;
+  if (vendorRef && byVendor.length === 0) {
+    const other = matches[0];
+    return {
+      ok: false,
+      reason:
+        `QuickBooks has ${other.entity} ${other.doc_number ?? other.id} under ` +
+        `${other.vendor_name ?? "another vendor"}, which is not the vendor this bill is mapped to.`,
+    };
+  }
+  if (byVendor.length > 1) {
+    return {
+      ok: false,
+      reason: `That number matches ${byVendor.length} documents in QuickBooks, so it has to be picked by hand.`,
+    };
+  }
+
+  const candidate = byVendor[0];
+  const ours = Number(invoice.total ?? 0);
+  const exact = Math.abs(candidate.total - ours) < 0.005;
+  return {
+    ok: true,
+    candidate,
+    exact,
+    caveat: exact
+      ? null
+      : `QuickBooks has $${candidate.total.toFixed(2)} where this bill is $${ours.toFixed(2)}.`,
+  };
+}
+
+/** The ref to store when a proposal is accepted — the same shape a push
+ *  records, so everything downstream (attachments, the balance, "In QuickBooks
+ *  as…") cannot tell an adopted bill from one we created. That is the point. */
+export function linkedRef(candidate: QboCandidate): AccountingRef {
+  return {
+    qbo: {
+      id: candidate.id,
+      sync_token: candidate.sync_token,
+      doc_number: candidate.doc_number,
+      entity: candidate.entity,
+    },
+  };
+}
