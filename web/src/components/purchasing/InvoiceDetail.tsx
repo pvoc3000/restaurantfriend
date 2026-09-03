@@ -692,9 +692,9 @@ export function InvoiceDetail({
                 disabled={takingReceivedFor === l.id}
                 onClick={() => void takeReceivedQty(l.id, received!)}
                 title={`Take the received quantity — ${received} — replacing ${l.qty ?? 0} billed`}
-                className="shrink-0 bg-mark-fill px-1 text-[11px] font-semibold tabular-nums transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+                className="shrink-0 border border-ink bg-mark-fill px-1 text-[11px] font-semibold tabular-nums transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
               >
-                {takingReceivedFor === l.id ? "Taking…" : `→ ${received}`}
+                {takingReceivedFor === l.id ? "Taking…" : `RCVD: ${received} →`}
               </button>
             )}
             {differs && !canEditFinancials && (
@@ -1475,7 +1475,7 @@ export function InvoiceDetail({
               </div>
             )}
             {totalDisagreement && (
-              <p className="border border-ink bg-mark-fill px-4 py-2 text-sm">
+              <p className="bg-mark-fill px-4 py-2 text-sm">
                 {totalDisagreement}.
               </p>
             )}

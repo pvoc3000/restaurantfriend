@@ -2815,6 +2815,22 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    band is gone entirely. Pinned as a regression fixture reproducing the
    exact numbers, with the OLD check's own arithmetic computed alongside it
    to prove what it was actually testing. **1575 fixtures pass.**
+
+   **Shipped 2026-09-03 — THE RCVD FLAG READS AS A COMMAND, NOT A LABEL**
+   (Mark, in three passes: label it "RCVD: <qty> ==>"; make the arrow the
+   real glyph, not "=="; and put a solid black border around it "to denote
+   that it's a button"). The button reads `RCVD: 5 →` now, bordered
+   `border-ink` like every other button in the app, so it visually matches
+   `takeAmendedTotal`'s own `→ $X` button rather than reading as a passive
+   yellow tag someone might mistake for decoration.
+   **THE NEW `totalDisagreement` BAND LOST ITS BORDER THE SAME DAY** (Mark,
+   seeing a real one: "the new warning… should not have a solid black
+   border around it"). It had copied the bordered `bg-mark-fill` dress every
+   OTHER caveat paragraph on this screen already wears — `lineSums.differs`
+   right beside it still has one — but this is the one Mark singled out, so
+   only it lost its border; its sibling was left exactly as it was, since he
+   named the wording that identifies which band he meant precisely enough
+   to tell them apart.
 4e. ✅ **EMPLOYEE EVENTS — migration 035, APPLIED and LOADED 2026-08-06.**
    FMP's two HR child tables merged into ONE (Mark: "In retrospect, these should
    really be all in one table: Events. What were 'ratings' are really just shift
