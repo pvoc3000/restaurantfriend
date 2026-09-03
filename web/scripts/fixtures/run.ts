@@ -58,6 +58,7 @@ import "./purchaseRequests.fixtures";
 import "./quickbooks.fixtures";
 import "./billStage.fixtures";
 import "./handAmendment.fixtures";
+import "./computedAmounts.fixtures";
 import "./recipeCosts.fixtures";
 import "./receiving.fixtures";
 import "./roles.fixtures";

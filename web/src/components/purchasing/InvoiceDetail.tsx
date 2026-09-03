@@ -22,6 +22,9 @@ import {
   printedPoNumbers,
   printedVendorDisagreement,
   signedTotal,
+  lineExtended,
+  computedAmounts,
+  totalDisagreesWithDocument,
   toInvoiceLine,
   AGING_LABEL,
   INVOICE_STATUS_CLASS,
@@ -265,6 +268,58 @@ export function InvoiceDetail({
     router.refresh();
   }
 
+  /** What the invoice adds up to from its own lines and charges. Null on a
+   *  hand-typed bill with no lines, which keeps whatever was typed. */
+  const computed = useMemo(
+    () => computedAmounts(lines, invoice),
+    [lines, invoice]
+  );
+
+  /**
+   * Write a line's quantity or price, and the arithmetic that follows from it.
+   *
+   * ONE STATEMENT FOR THE LINE — `extended` rides along, so a row can never be
+   * caught with a quantity and a stale total beside it — and then a SECOND for
+   * the invoice, because the totals live on another table and `alsoUpdate`
+   * cannot reach it.
+   *
+   * The invoice write is skipped when there is nothing to compute, which is the
+   * hand-typed bill: its total is the only figure it has.
+   */
+  async function writeLineAmount(
+    lineId: string,
+    column: "qty" | "unit_price",
+    next: unknown
+  ): Promise<{ error: string | null }> {
+    const value = next === null || next === "" ? null : Number(next);
+    const line = lines.find((l) => l.id === lineId);
+    const qty = column === "qty" ? value : (line?.qty ?? null);
+    const price = column === "unit_price" ? value : (line?.unit_price ?? null);
+
+    const { error } = await supabase
+      .from("vendor_invoice_lines")
+      .update({ [column]: value, extended: lineExtended(qty, price) })
+      .eq("id", lineId)
+      .select("id");
+    // Reported back to the cell, which reopens itself on a refusal — below
+    // purchaser+ this changes nothing and returns no error, so the row count is
+    // what says so.
+    if (error) return { error: error.message };
+
+    const after = lines.map((l) =>
+      l.id === lineId ? { ...l, qty, unit_price: price } : l
+    );
+    const sums = computedAmounts(after, invoice);
+    if (sums.total !== null) {
+      await supabase
+        .from("vendor_invoices")
+        .update({ subtotal: sums.subtotal, total: sums.total })
+        .eq("id", invoice.id)
+        .select("id");
+    }
+    return { error: null };
+  }
+
   /** Which of OUR lines the page strikes out, by the vendor's own SKU — the
    *  same key the lines were seeded under. */
   const struckSkus = useMemo(
@@ -334,18 +389,42 @@ export function InvoiceDetail({
     router.refresh();
   }
 
-  const caveats = useMemo(
-    () =>
-      approvalReadiness(
-        invoice,
-        lines,
-        matched,
-        attachments.length,
-        duplicates,
-        vendorDisagreement
-      ),
-    [invoice, lines, matched, attachments.length, duplicates, vendorDisagreement]
-  );
+  const caveats = useMemo(() => {
+    const list = approvalReadiness(
+      invoice,
+      lines,
+      matched,
+      attachments.length,
+      duplicates,
+      vendorDisagreement
+    );
+    // WHERE THE TRANSCRIPTION'S JOB WENT (Mark, 2026-09-02: "If it's off, we
+    // should be warned when 'approving' and allowed to cancel and edit").
+    //
+    // The totals are computed now, so they can no longer disagree with
+    // themselves — the only disagreement left worth raising is with the PAGE,
+    // and this is the moment for it: approving is when somebody says the bill
+    // is payable, and a difference nobody has looked at is exactly what that
+    // decision must not pass over. `approvalReadiness` already lets you through
+    // after naming what is unresolved, so cancelling and editing is what its
+    // confirm has always offered.
+    //
+    // Against the DOCUMENT's own figure — a driver's handwritten correction
+    // where there is one, else what was printed — never our own column.
+    const printed =
+      shown?.extraction?.corrected_total ?? shown?.extraction?.invoice_total ?? null;
+    const off = totalDisagreesWithDocument(computed.total, printed);
+    return off ? [...list, off] : list;
+  }, [
+    invoice,
+    lines,
+    matched,
+    attachments.length,
+    duplicates,
+    vendorDisagreement,
+    computed.total,
+    shown,
+  ]);
 
   const columns: DataColumn<VendorInvoiceLine>[] = [
     {
@@ -424,50 +503,56 @@ export function InvoiceDetail({
       // the vendor's claim, and has to be, or a line billed for goods that
       // never came would have nowhere to show up.
       label: "Billed",
-      width: 100,
+      // Wider than a bare quantity: the flag rides in this cell rather than
+      // taking a column of its own, and only appears when it has something to
+      // say. The Received column it replaces was 110.
+      width: 130,
       align: "right",
       sortValue: (l) => l.qty,
-      render: (l) =>
-        canEdit ? (
-          <InlineValue
-            table="vendor_invoice_lines"
-            id={l.id}
-            column="qty"
-            value={l.qty}
-            kind="number"
-            align="right"
-          />
-        ) : (
-          <span className={`${READ_ONLY_VALUE} tabular-nums`}>{l.qty ?? "—"}</span>
-        ),
-    },
-    {
-      key: "received",
-      label: "Received",
-      width: 110,
-      align: "right",
-      sortValue: (l) => receivedFor(l).qty,
+      // FLAGGED, NOT COLUMNED (Mark, 2026-09-02, having seen both). A column
+      // spent width on the ~95% of lines where the two agree and there is
+      // nothing to say; the flag appears only when there is, and carries the
+      // received figure with it so the column's answer is still there when it
+      // matters.
+      //
+      // "Not counted" keeps its own words rather than being folded into
+      // silence: a line nobody counted and a line that agrees are different
+      // facts, and it was the first that hid two cases of whipped topping.
       render: (l) => {
-        const { qty, linked } = receivedFor(l);
-        // Not linked to an order at all — the rent bill, a freight line. There
-        // is no delivery to compare against and an em dash would imply there
-        // was one nobody counted.
-        if (!linked) return <span className="text-faint">—</span>;
-        if (qty === null) {
-          return (
-            <span className="bg-mark-fill px-1 text-[12px] uppercase tracking-[0.06em]">
-              not counted
-            </span>
-          );
-        }
-        // YELLOW ONLY WHEN THEY DIFFER — "worth your eye", and as a FILL rather
-        // than yellow text, which is 1.43:1 on white and unreadable.
-        const differs = Math.abs(qty - Number(l.qty ?? 0)) > 0.0001;
+        const { qty: received, linked } = receivedFor(l);
+        const differs =
+          linked && received !== null && Math.abs(received - Number(l.qty ?? 0)) > 0.0001;
         return (
-          <span
-            className={`tabular-nums ${differs ? "bg-mark-fill px-1 font-semibold text-ink" : "text-muted"}`}
-          >
-            {qty}
+          <span className="flex items-center justify-end gap-1">
+            {canEdit ? (
+              <InlineValue
+                table="vendor_invoice_lines"
+                id={l.id}
+                column="qty"
+                value={l.qty}
+                kind="number"
+                align="right"
+                onWrite={(next) => writeLineAmount(l.id, "qty", next)}
+              />
+            ) : (
+              <span className={`${READ_ONLY_VALUE} tabular-nums`}>{l.qty ?? "—"}</span>
+            )}
+            {differs && (
+              <span
+                className="shrink-0 bg-mark-fill px-1 text-[11px] font-semibold tabular-nums"
+                title={`${received} received against ${l.qty ?? 0} billed`}
+              >
+                {received} rec
+              </span>
+            )}
+            {linked && received === null && (
+              <span
+                className="shrink-0 bg-mark-fill px-1 text-[11px] font-semibold uppercase"
+                title="Nobody has recorded what arrived for this line"
+              >
+                uncounted
+              </span>
+            )}
           </span>
         );
       },
@@ -487,6 +572,7 @@ export function InvoiceDetail({
             value={l.unit_price}
             kind="number"
             align="right"
+            onWrite={(next) => writeLineAmount(l.id, "unit_price", next)}
             format={(v) => money(Number(v))}
           />
         ) : (
@@ -500,23 +586,21 @@ export function InvoiceDetail({
       label: "Extended",
       width: 130,
       align: "right",
-      sortValue: (l) => l.extended,
-      render: (l) =>
-        canEdit ? (
-          <InlineValue
-            table="vendor_invoice_lines"
-            id={l.id}
-            column="extended"
-            value={l.extended}
-            kind="number"
-            align="right"
-            format={(v) => money(Number(v))}
-          />
-        ) : (
+      sortValue: (l) => lineExtended(l.qty, l.unit_price),
+      // CALCULATED, NEVER TYPED (Mark, 2026-09-02: "Extended should be
+      // calculated, full stop"). It was transcribed so a vendor's own
+      // arithmetic error stayed visible, which was true and was paid for by
+      // hand every time a quantity moved. The page's figures are not lost —
+      // they stay in the READING, and the disagreement is raised where it costs
+      // something, at approval.
+      render: (l) => {
+        const own = lineExtended(l.qty, l.unit_price);
+        return (
           <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-            {money(l.extended)}
+            {own === null ? "—" : money(own)}
           </span>
-        ),
+        );
+      },
     },
     {
       key: "po",
@@ -1006,6 +1090,17 @@ export function InvoiceDetail({
                 ] as const
               ).map(([label, column, value]) => (
                 <Field key={column} label={label}>
+                  {/* SUBTOTAL AND TOTAL ARE READ once the invoice has lines to
+                      add up — the same decision as `extended`, one level up.
+                      Tax, freight and other stay typed: they are on the page
+                      and follow from nothing. A bill with NO lines keeps every
+                      field, which is the rent bill and the plumber. */}
+                  {(column === "subtotal" || column === "total") &&
+                  computed.total !== null ? (
+                    <span className={`${READ_ONLY_VALUE} tabular-nums`}>
+                      {money(column === "subtotal" ? computed.subtotal : computed.total)}
+                    </span>
+                  ) : (
                   <Cell canEdit={canEdit} value={value === null ? null : money(value)}>
                     <InlineValue
                       boxed={BOXED_FIELDS}
@@ -1015,8 +1110,23 @@ export function InvoiceDetail({
                       value={value}
                       kind="number"
                       format={(v) => money(Number(v))}
+                      // A charge moves the total with it, in one statement.
+                      alsoUpdate={
+                        column === "tax" || column === "freight" || column === "other_charges"
+                          ? (next) => {
+                              const sums = computedAmounts(lines, {
+                                ...invoice,
+                                [column]: next === null || next === "" ? null : Number(next),
+                              });
+                              return sums.total === null
+                                ? null
+                                : { subtotal: sums.subtotal, total: sums.total };
+                            }
+                          : undefined
+                      }
                     />
                   </Cell>
+                  )}
                 </Field>
               ))}
             </dl>

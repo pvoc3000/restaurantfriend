@@ -1223,3 +1223,110 @@ export function billPaymentNote(
   if (invoice.qbo_balance <= 0.005) return `paid · as of ${when}`;
   return `${money(invoice.qbo_balance)} owed · as of ${when}`;
 }
+
+// ---------------------------------------------------------------------------
+// The arithmetic, computed rather than typed
+// ---------------------------------------------------------------------------
+
+/**
+ * A line's own money: what was billed times what it cost.
+ *
+ * COMPUTED SINCE 2026-09-02 (Mark: "Extended should be calculated, full stop").
+ * It was transcribed, on the reasoning that the record should be what the page
+ * says so a vendor's own arithmetic error stayed visible — which is true, and
+ * was paid for by hand every time a quantity changed. The page's own figures
+ * are not lost: they stay in the READING, untouched, and the disagreement is
+ * raised where it costs something, at approval.
+ *
+ * Null when either half is missing — a struck line with no price has no
+ * extended, and 0 would be a claim rather than an absence.
+ */
+export function lineExtended(
+  qty: number | null | undefined,
+  unitPrice: number | null | undefined
+): number | null {
+  if (qty === null || qty === undefined) return null;
+  if (unitPrice === null || unitPrice === undefined) return null;
+  return Math.round(Number(qty) * Number(unitPrice) * 100) / 100;
+}
+
+export type ComputedAmounts = {
+  /** The item lines' own sum, or null when there are no lines to sum. */
+  subtotal: number | null;
+  /** Subtotal plus the charges, or null when there is nothing to compute from. */
+  total: number | null;
+};
+
+/**
+ * What the invoice comes to, from its lines and its charges.
+ *
+ * ITEM LINES ONLY for the subtotal, and the exclusion is the same one
+ * `lineSumReconciliation` makes: a freight LINE and the header `freight` are one
+ * charge printed twice, so counting both doubles it.
+ *
+ * NULL WHEN THERE ARE NO LINES, which is the rent bill and every other
+ * hand-typed one-line bill. Those keep their typed total — computing 0 for them
+ * would replace a real figure with a claim that nothing is owed, and they are
+ * precisely the invoices this module exists to carry.
+ */
+export function computedAmounts(
+  lines: Pick<VendorInvoiceLine, "qty" | "unit_price" | "extended" | "kind">[],
+  charges: Pick<VendorInvoice, "tax" | "freight" | "other_charges">
+): ComputedAmounts {
+  const items = lines.filter((l) => l.kind === "item");
+  if (lines.length === 0) return { subtotal: null, total: null };
+
+  const subtotal =
+    Math.round(
+      // NO FALLBACK TO THE STORED FIGURE, and a fixture caught the version that
+      // had one: the struck cocoa line on BakeMark 452660 has a quantity of 0
+      // and no price, so it computes NOTHING — and falling back to what the
+      // page printed put its old $177.80 back into a total the driver had
+      // struck it out of. "Calculated, full stop" (Mark) means the stored
+      // column stops being consulted, or it is not calculated at all.
+      items.reduce((sum, l) => sum + (lineExtended(l.qty, l.unit_price) ?? 0), 0) * 100
+    ) / 100;
+
+  // Charge LINES are money billed too, and they are not in the subtotal — a
+  // freight line and the header `freight` are one charge printed twice, so
+  // whichever the reader found is counted once here.
+  const chargeLines = lines
+    .filter((l) => l.kind !== "item")
+    .reduce((sum, l) => sum + (lineExtended(l.qty, l.unit_price) ?? 0), 0);
+
+  const total =
+    Math.round(
+      (subtotal +
+        chargeLines +
+        Number(charges.tax ?? 0) +
+        Number(charges.freight ?? 0) +
+        Number(charges.other_charges ?? 0)) *
+        100
+    ) / 100;
+  return { subtotal, total };
+}
+
+/**
+ * What to say at APPROVAL when our arithmetic and the page disagree.
+ *
+ * This is where the transcription's job moved to (Mark, 2026-09-02: "If it's
+ * off, we should be warned when 'approving' and allowed to cancel and edit").
+ * It is the right moment for it: approving is when somebody says the bill is
+ * payable, and a difference nobody has looked at is exactly what that decision
+ * should not pass over silently.
+ *
+ * `printed` is what the DOCUMENT said — the reading's own total, or the
+ * handwritten correction where a driver left one — never our own column, which
+ * is now computed and would always agree with itself.
+ */
+export function totalDisagreesWithDocument(
+  computed: number | null,
+  printed: number | null | undefined
+): string | null {
+  if (computed === null || printed === null || printed === undefined) return null;
+  if (Math.abs(computed - Number(printed)) <= MONEY_EPSILON) return null;
+  return (
+    `The lines come to $${computed.toFixed(2)}, where the invoice says ` +
+    `$${Number(printed).toFixed(2)}`
+  );
+}
