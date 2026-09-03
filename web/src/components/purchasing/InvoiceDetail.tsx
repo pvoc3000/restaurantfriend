@@ -45,7 +45,11 @@ import { useAttachmentActions } from "./useAttachmentActions";
 import { InvoiceFooter } from "./InvoiceFooter";
 import { PushToQuickBooks } from "./PushToQuickBooks";
 import { attachmentRejection, type AttachmentKind } from "@/lib/attachments";
-import { handAmendment, amendedTotal } from "@/lib/invoiceExtraction";
+import {
+  handAmendment,
+  amendedTotal,
+  invoiceCharges,
+} from "@/lib/invoiceExtraction";
 
 type InvoiceRecord = VendorInvoice & {
   vendors: { id: string; name: string; order_type: string } | null;
@@ -186,10 +190,48 @@ export function InvoiceDetail({
     [invoice, duplicateCandidates]
   );
 
-  const amounts = useMemo(() => amountReconciliation(invoice), [invoice]);
+  /**
+   * BOTH CHECKS ASK ABOUT THE PAGE, NEVER ABOUT OUR OWN COLUMNS (Mark,
+   * 2026-09-02: "there's a warning that isn't appropriate … after I changed it
+   * back the warning didn't go away").
+   *
+   * They read `invoice.subtotal` and the stored parts until then, which was
+   * right while those were transcribed off the document and became meaningless
+   * the day the figures were computed from the lines: the stored columns are
+   * now a CACHE the list reads, maintained on every line write, so comparing
+   * the lines against them asks whether our own bookkeeping kept up. Worse, the
+   * Amounts block beside the caveat shows the COMPUTED subtotal, so the warning
+   * quoted a number that appears nowhere on screen — 15490761 read "the item
+   * lines come to $535.33 against a subtotal of $452.29" over an Amounts block
+   * saying $535.33, with no way for the reader to act on either figure.
+   *
+   * Against the READING they are facts about the document again, which is what
+   * their wording always claimed: the vendor's own foot does not add up, or the
+   * lines we hold do not come to the subtotal they printed. Both go quiet when
+   * there is no reading to compare against, which is the honest answer for a
+   * hand-typed bill.
+   */
+  const printedCharges = shown?.extraction
+    ? invoiceCharges(shown.extraction)
+    : null;
+  const amounts = useMemo(
+    () =>
+      amountReconciliation(
+        printedCharges === null
+          ? { subtotal: null, tax: null, freight: null, other_charges: null, total: null }
+          : {
+              subtotal: printedCharges.subtotal,
+              tax: printedCharges.tax,
+              freight: printedCharges.freight,
+              other_charges: printedCharges.other,
+              total: printedCharges.total,
+            }
+      ),
+    [printedCharges]
+  );
   const lineSums = useMemo(
-    () => lineSumReconciliation(lines, invoice.subtotal),
-    [lines, invoice.subtotal]
+    () => lineSumReconciliation(lines, printedCharges?.subtotal ?? null),
+    [lines, printedCharges]
   );
 
   // What the reader took off the page, when it cannot be the vendor on the
@@ -338,11 +380,22 @@ export function InvoiceDetail({
     );
     const sums = computedAmounts(after, invoice);
     if (sums.total !== null) {
-      await supabase
+      // ITS OWN ROW COUNT, like every other money write here. This one took
+      // `.select("id")` and threw the answer away, so a second statement that
+      // changed nothing — a refused write, a row that had moved — left the line
+      // correct and the invoice's cached figures behind it, which is how
+      // 15490761 came to sit at $452.29 while its own lines said $535.33 and
+      // the LIST quoted the stale one. Reported through the cell, which reopens
+      // on a refusal rather than closing over a number that did not stick.
+      const { data, error: totalsError } = await supabase
         .from("vendor_invoices")
         .update({ subtotal: sums.subtotal, total: sums.total })
         .eq("id", invoice.id)
         .select("id");
+      if (totalsError) return { error: totalsError.message };
+      if (!data || data.length === 0) {
+        return { error: "The line saved, but the invoice total did not." };
+      }
     }
     return { error: null };
   }
@@ -1280,7 +1333,7 @@ export function InvoiceDetail({
             )}
             {amounts.differs && (
               <p className="border border-ink bg-mark-fill px-4 py-2 text-sm">
-                The parts add up to{" "}
+                The page&rsquo;s own parts add up to{" "}
                 <strong className="tabular-nums">{money(amounts.computed)}</strong>,
                 but the invoice says{" "}
                 <strong className="tabular-nums">{money(amounts.stated)}</strong>.
@@ -1296,7 +1349,7 @@ export function InvoiceDetail({
               <p className="border border-ink bg-mark-fill px-4 py-2 text-sm">
                 The item lines come to{" "}
                 <strong className="tabular-nums">{money(lineSums.computed)}</strong>{" "}
-                against a subtotal of{" "}
+                against a printed subtotal of{" "}
                 <strong className="tabular-nums">{money(lineSums.stated)}</strong>.
               </p>
             )}

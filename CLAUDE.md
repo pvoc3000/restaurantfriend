@@ -2531,6 +2531,30 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    The regression fixture is the Chefs Warehouse invoice itself and it exists to
    go RED if anybody makes this a computation again; checked by breaking it, 2
    go red and reproduce the $1,952.90.
+   **BOTH AMOUNT CAVEATS ASK ABOUT THE PAGE, NEVER ABOUT OUR OWN COLUMNS**
+   (Mark, 2026-09-02, the same day: "there's a warning that isn't appropriate …
+   after I changed it back the warning didn't go away"). `amountReconciliation`
+   and `lineSumReconciliation` read the STORED columns, which was right while
+   those were transcribed off the document and became meaningless the moment the
+   figures were computed from the lines: the stored columns are now a CACHE the
+   LIST reads, maintained on every line write, so comparing the lines against
+   them asks only whether our own bookkeeping kept up. The tell is that the
+   Amounts block beside the caveat shows the COMPUTED subtotal — 15490761 read
+   *"the item lines come to $535.33 against a subtotal of $452.29"* over a block
+   saying $535.33, **naming a number that appeared nowhere on screen**, which is
+   a warning nobody can act on. Both now take the READING's own foot
+   (`invoiceCharges`), so they are facts about the document again, exactly as
+   their wording always claimed, and both go quiet on a bill with no reading.
+   **The write that maintains the cache now CHECKS ITS OWN ROW COUNT** — it took
+   `.select("id")` and discarded the answer, so a second statement that changed
+   nothing left the line right and the invoice's figures behind it, with the
+   LIST quoting the stale one. That is how 15490761 came to sit at $452.29 while
+   its own lines and its own scan both said $535.33.
+   Its cache was repaired by hand, and the guard on that repair is the rule for
+   any future one: **only where the lines AND the document agree and the cache
+   alone is the odd one out.** Where a document disagrees with its lines that is
+   a real finding — 96490390 and 120421 are two — and overwriting it with a line
+   sum would destroy the very thing the approval caveat exists to name.
    **1572 fixtures pass.**
 
    **1485 fixtures pass**, 14 new, and each rule was checked by BREAKING it —
