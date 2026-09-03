@@ -461,21 +461,23 @@ export function PushToQuickBooks({
     onDone();
   }
 
-  // ITS OWN BOX NOW, not a fragment sharing a row with `InvoiceFooter`
-  // (Mark, 2026-09-03: "everything top aligned with clear areas for each
-  // section"). A button row, then its own prose stacked beneath — the
-  // `order-last basis-full` trick this replaced put every paragraph from
-  // BOTH components into one shared wrap-area, which is how "In QuickBooks
-  // as Bill 15501523" ended up wedged between "Update in QuickBooks" and
-  // "Forget the link" on one visual line.
+  // A 2x2 GRID NOW (Mark, 2026-09-03, with a sketch):
+  //
+  //   [Update in QuickBooks]     [Check QuickBooks]
+  //   In QuickBooks as Bill X    [Forget the link]
+  //
+  // Column 1 is what you PRESS to change something and what that produced;
+  // column 2 is what you press to CHECK or UNDO it. Four children in DOM
+  // order fill the four cells left-to-right, top-to-bottom — no explicit
+  // grid-rows needed. `items-start` is what lets column 1's prose stack grow
+  // past a single line (a proposal banner, a warning, an error) without
+  // dragging "Forget the link" down with it: each column keeps its own top.
   return (
-    <div className="flex flex-col items-end gap-2">
-      {/* THE BUTTON ROW. Nothing here is prose — every paragraph below is
-          collected into its own stack, in the same relative order they used
-          to fall in under `order-last`. */}
-      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-        {/* IT IS ALREADY OVER THERE. The button stands with the other
-            QuickBooks commands; its sentence is in the prose stack below. */}
+    <div className="grid grid-cols-2 items-start gap-x-3 gap-y-1">
+      {/* ROW 1, COLUMN 1 — the primary buttons. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {/* IT IS ALREADY OVER THERE. The button stands with Send/Update; its
+            sentence is in the prose cell below. */}
         {proposal?.ok && !already && canPush && (
           <button
             type="button"
@@ -500,7 +502,10 @@ export function PushToQuickBooks({
                 : `Send to QuickBooks`}
           </button>
         )}
-        {already && <span className="text-[13px] text-muted">{already}</span>}
+      </div>
+
+      {/* ROW 1, COLUMN 2 — the secondary command: re-ask QuickBooks. */}
+      <div className="flex flex-wrap items-center gap-2">
         {already && (
           <button
             type="button"
@@ -511,41 +516,18 @@ export function PushToQuickBooks({
             {busy ? "Checking…" : "Check QuickBooks"}
           </button>
         )}
-        {already && canPush && !gone && (
-          <button
-            type="button"
-            className="text-[13px] text-muted underline decoration-neutral-400 underline-offset-[3px] hover:text-ink hover:decoration-neutral-900 disabled:opacity-35"
-            disabled={busy}
-            onClick={() => void unlink()}
-          >
-            Forget the link
-          </button>
-        )}
-        {/* THE DOCUMENT IS GONE AND THE BILL IS STUCK UNTIL THIS IS PRESSED —
-            it can neither update, nor create, nor be linked while it points
-            at a dead id. */}
-        {gone && canPush && (
-          <button
-            type="button"
-            className={BUTTON_CLASS}
-            disabled={busy}
-            onClick={() => void unlink()}
-          >
-            {busy ? "Forgetting…" : "Forget the link"}
-          </button>
-        )}
       </div>
 
-      {/* THE PROSE STACK. Full width of the box, so a long sentence wraps
-          inside the column rather than fighting the button row for space. */}
-      <div className="w-full space-y-1 text-right">
+      {/* ROW 2, COLUMN 1 — what pressing column 1 produced, or why it can't
+          be pressed yet. Everything here is prose, stacked in the order it
+          used to fall under `order-last`. */}
+      <div className="space-y-1 text-[13px]">
+        {already && <p className="text-muted">{already}</p>}
         {/* Yellow, because this is not an error — it is the normal state
             during the Bill.com parallel run, and the thing worth your eye is
-            that pressing Send would make a second copy. Left-aligned inside
-            its own filled box, unlike the plain status lines below it, since
-            a paragraph reads better ragged-right than centred on a box edge. */}
+            that pressing Send would make a second copy. */}
         {proposal?.ok && !already && (
-          <div className="space-y-1 bg-mark-fill px-2 py-1 text-left text-[13px] text-ink">
+          <div className="space-y-1 bg-mark-fill px-2 py-1 text-ink">
             <p>
               QuickBooks already has this as {proposal.candidate.entity}{" "}
               {proposal.candidate.doc_number ?? proposal.candidate.id} —{" "}
@@ -559,7 +541,7 @@ export function PushToQuickBooks({
         {/* Red rather than the mark colour: this is not "worth your eye", the
             record here disagrees with QuickBooks and one of them is wrong. */}
         {gone && (
-          <div className="space-y-1 border border-accent px-2 py-1 text-left text-[13px] text-ink">
+          <div className="space-y-1 border border-accent px-2 py-1 text-ink">
             <p>
               QuickBooks no longer has{" "}
               {already?.replace("In QuickBooks as ", "") ?? "that document"}.
@@ -574,32 +556,58 @@ export function PushToQuickBooks({
             at the foot of the page; beside the Approve button itself it is a
             sentence explaining a button by pointing at the button next to
             it. */}
-        {canPush && shownRefusal && (
-          <p className="text-[13px] text-muted">{shownRefusal}</p>
-        )}
+        {canPush && shownRefusal && <p className="text-muted">{shownRefusal}</p>}
         {!refusals.length && account && !already && (
-          <p className="text-[13px] text-faint">
+          <p className="text-faint">
             Posts to {splitAccountName(account.name).leaf || account.ref}
             {account.source === "org" ? " (the org default)" : ""}.
           </p>
         )}
         {balance && (
-          <p className="text-[13px] text-muted">
+          <p className="text-muted">
             {balance.text}{" "}
             <span className="text-faint">· as of {balance.at}</span>
           </p>
         )}
-        {sent && <p className="text-[13px] text-muted">{sent}</p>}
+        {sent && <p className="text-muted">{sent}</p>}
         {/* The bill IS in QuickBooks — this is not an error. It is the coding
             QuickBooks accepted and then dropped, which it does with a 200 and
             no fault when the matching preference is off. Yellow: worth your
             eye, not something that went wrong. */}
         {warnings.map((w) => (
-          <p key={w} className="bg-mark-fill px-2 py-1 text-left text-[13px] text-ink">
+          <p key={w} className="bg-mark-fill px-2 py-1 text-ink">
             {w}
           </p>
         ))}
-        {error && <p className="text-[13px] text-accent">{error}</p>}
+        {error && <p className="text-accent">{error}</p>}
+      </div>
+
+      {/* ROW 2, COLUMN 2 — the one act that undoes column 1: forget the link.
+          Quiet (an underline) in the ordinary case; a full button when the
+          document is GONE and the bill is stuck until this is pressed —
+          it can neither update, nor create, nor be linked while it points at
+          a dead id. */}
+      <div>
+        {already && canPush && !gone && (
+          <button
+            type="button"
+            className="text-[13px] text-muted underline decoration-neutral-400 underline-offset-[3px] hover:text-ink hover:decoration-neutral-900 disabled:opacity-35"
+            disabled={busy}
+            onClick={() => void unlink()}
+          >
+            Forget the link
+          </button>
+        )}
+        {gone && canPush && (
+          <button
+            type="button"
+            className={BUTTON_CLASS}
+            disabled={busy}
+            onClick={() => void unlink()}
+          >
+            {busy ? "Forgetting…" : "Forget the link"}
+          </button>
+        )}
       </div>
     </div>
   );

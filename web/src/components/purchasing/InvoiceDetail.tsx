@@ -829,122 +829,124 @@ export function InvoiceDetail({
         </div>
       )}
 
-      {/* FOUR INDEPENDENT BOXES, TOP-ALIGNED (Mark, 2026-09-03, with a
-          screenshot marking out the four he wanted: identity, total,
-          QuickBooks, actions — "everything top aligned with clear areas for
-          each section. And when new text pops up, the tops remain aligned
-          and things push downward").
+      {/* TWO MAIN COLUMNS, MATCHING THE CONTENT ROW BELOW — the "green boxes"
+          (Mark, 2026-09-03, correcting the four-box row: "I overlooked how
+          the elements would align vertically with that layout"). The four-box
+          row spanned the FULL page width on its own terms, so its column
+          edges had no relationship to the document pane and the Bill/Amounts
+          column beneath it — which is what "align vertically" was catching.
 
-          A single `items-start` GRID is what gives every box that property
-          for free: all four share one row, so their tops sit on the same
-          line by construction, and `items-start` stops a short box being
-          stretched to a tall neighbour's height — each grows down to its OWN
-          content, never sideways into another box's line.
+          THIS HEADER USES THE SAME `xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]`
+          TEMPLATE AS THE CONTENT GRID BELOW (`ref={rowRef}`), not a copy of
+          the numbers — it is the one thing that makes "the total's right edge
+          is the document pane's right edge" true without either grid knowing
+          the other's width. This is the 2026-09-02 convention, restored.
 
-          THIS REPLACES THE SHARED-ROW TRICK the QuickBooks and action blocks
-          used until now — one flex-wrap row holding both components' buttons,
-          with `order-last basis-full` dropping every paragraph to a shared
-          line spanning the WHOLE row. That was the actual cause of the mess
-          Mark pointed at: "In QuickBooks as Bill 15501523" landed between
-          "Update in QuickBooks" and "Forget the link" because there was only
-          ever one row and one wrap-area for both components to fight over.
-          Each of `PushToQuickBooks` and `InvoiceFooter` now returns its OWN
-          box — a button row, then its own prose stacked beneath — so neither
-          can spill into the other's space. */}
-      <div className="grid items-start gap-x-6 gap-y-3 xl:grid-cols-[minmax(0,1.4fr)_max-content_minmax(15rem,1fr)_minmax(12rem,1fr)]">
-        <div>
-          <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-              {invoice.invoice_number ?? "No number"}
-            </h1>
-            <span
-              className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${INVOICE_STATUS_CLASS[invoice.status]}`}
-            >
-              {INVOICE_STATUS_LABEL[invoice.status]}
-            </span>
-            {invoice.is_credit && (
-              <span className="inline-flex h-6 items-center border border-ink bg-mark-fill px-2 text-[12px] font-semibold uppercase tracking-[0.12em]">
-                Credit memo
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
-            {invoice.vendors ? (
-              // Underlined AT REST, not on hover: the iPad has no hover, and a
-              // link the colour of the line it sits in reads as more subtitle.
-              <Link
-                href={withFrom(`/vendors/${invoice.vendors.id}`, {
-                  href: selfHref,
-                  label: invoice.invoice_number ?? "Invoice",
-                })}
-                className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+          EACH GREEN COLUMN THEN SPLITS IN HALF — the "red boxes… half the
+          width of their parent boxes" — into its own two-cell grid:
+          identity | total on the left, QuickBooks | actions on the right.
+          `items-start` at both levels is what keeps every cell's top on the
+          same line while it grows down on its own — the same technique as
+          the four-box row, just nested one level deeper so the outer edges
+          now correspond to real content below them. */}
+      <div className="grid items-start gap-x-4 gap-y-3 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
+        {/* LEFT — identity | total, matching the document pane's width. */}
+        <div className="grid grid-cols-2 items-start gap-x-4">
+          <div>
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+                {invoice.invoice_number ?? "No number"}
+              </h1>
+              <span
+                className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${INVOICE_STATUS_CLASS[invoice.status]}`}
               >
-                {invoice.vendors.name}
-              </Link>
-            ) : (
-              "No vendor"
-            )}{" "}
-            · {locationCode}
-            {invoice.due_date &&
-              ` · ${AGING_LABEL[agingBucket(invoice.due_date, todayLocal())]}`}
-          </p>
+                {INVOICE_STATUS_LABEL[invoice.status]}
+              </span>
+              {invoice.is_credit && (
+                <span className="inline-flex h-6 items-center border border-ink bg-mark-fill px-2 text-[12px] font-semibold uppercase tracking-[0.12em]">
+                  Credit memo
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+              {invoice.vendors ? (
+                // Underlined AT REST, not on hover: the iPad has no hover, and
+                // a link the colour of the line it sits in reads as more
+                // subtitle.
+                <Link
+                  href={withFrom(`/vendors/${invoice.vendors.id}`, {
+                    href: selfHref,
+                    label: invoice.invoice_number ?? "Invoice",
+                  })}
+                  className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+                >
+                  {invoice.vendors.name}
+                </Link>
+              ) : (
+                "No vendor"
+              )}{" "}
+              · {locationCode}
+              {invoice.due_date &&
+                ` · ${AGING_LABEL[agingBucket(invoice.due_date, todayLocal())]}`}
+            </p>
+          </div>
+
+          {/* Half the left column's width, right-aligned — so its own right
+              edge lands on the document pane's right edge below it. */}
+          <div className="text-right">
+            <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+              Total
+            </div>
+            {/* THE COMPUTED FIGURE, the same one AMOUNTS shows. It read the
+                stored column until 2026-09-02 and, once the totals became
+                calculated, that put TWO different totals on one screen —
+                caught on Chefs Warehouse 73358289, whose header said $472.13
+                over an Amounts block saying $1,952.90. A screen may disagree
+                with the page; it may not disagree with itself. */}
+            <div className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
+              {money(
+                computed.total === null
+                  ? signedTotal(invoice)
+                  : invoice.is_credit
+                    ? -computed.total
+                    : computed.total
+              )}
+            </div>
+          </div>
         </div>
 
-        {/* Its own column, sized to its own content (`max-content`) so it sits
-            snug against the identity box rather than stretching to share a
-            fraction of the row with it. */}
-        <div className="text-right">
-          <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-            Total
-          </div>
-          {/* THE COMPUTED FIGURE, the same one AMOUNTS shows. It read the
-              stored column until 2026-09-02 and, once the totals became
-              calculated, that put TWO different totals on one screen —
-              caught on Chefs Warehouse 73358289, whose header said $472.13
-              over an Amounts block saying $1,952.90. A screen may disagree
-              with the page; it may not disagree with itself. */}
-          <div className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
-            {money(
-              computed.total === null
-                ? signedTotal(invoice)
-                : invoice.is_credit
-                  ? -computed.total
-                  : computed.total
-            )}
-          </div>
+        {/* RIGHT — QuickBooks | actions, matching the Bill/Amounts column's
+            width. Each renders its OWN box now (buttons, then its own prose)
+            — see `PushToQuickBooks` and `InvoiceFooter` — so this grid only
+            has to place the two boxes side by side. */}
+        <div className="grid grid-cols-2 items-start gap-x-4">
+          <PushToQuickBooks
+            invoiceId={invoice.id}
+            vendorId={invoice.vendor_id}
+            locationId={invoice.location_id}
+            orgId={orgId}
+            status={invoice.status}
+            total={invoice.total}
+            isCredit={invoice.is_credit}
+            invoiceNumber={invoice.invoice_number}
+            invoiceDate={invoice.invoice_date}
+            dueDate={invoice.due_date}
+            canPush={canEdit}
+            supabase={supabase}
+            onDone={() => router.refresh()}
+          />
+          <InvoiceFooter
+            invoiceId={invoice.id}
+            status={invoice.status}
+            approvedAt={invoice.approved_at}
+            caveats={caveats}
+            canApprove={canApprove}
+            canEdit={canEdit}
+            closeHref={closeHref}
+            supabase={supabase}
+            onDone={() => router.refresh()}
+          />
         </div>
-
-        {/* QUICKBOOKS — its own box, so its buttons never share a row with
-            the action buttons and its prose never spans past its own width. */}
-        <PushToQuickBooks
-          invoiceId={invoice.id}
-          vendorId={invoice.vendor_id}
-          locationId={invoice.location_id}
-          orgId={orgId}
-          status={invoice.status}
-          total={invoice.total}
-          isCredit={invoice.is_credit}
-          invoiceNumber={invoice.invoice_number}
-          invoiceDate={invoice.invoice_date}
-          dueDate={invoice.due_date}
-          canPush={canEdit}
-          supabase={supabase}
-          onDone={() => router.refresh()}
-        />
-
-        {/* ACTIONS — the fourth and last box, matching the QuickBooks box's
-            shape (buttons, then its own prose beneath). */}
-        <InvoiceFooter
-          invoiceId={invoice.id}
-          status={invoice.status}
-          approvedAt={invoice.approved_at}
-          caveats={caveats}
-          canApprove={canApprove}
-          canEdit={canEdit}
-          closeHref={closeHref}
-          supabase={supabase}
-          onDone={() => router.refresh()}
-        />
       </div>
 
       {(attachError || documentError || linkError) && (
