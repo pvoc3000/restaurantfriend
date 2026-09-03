@@ -95,9 +95,12 @@ export default async function RecipesPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-        Recipes
-      </h1>
+      <div className="space-y-1">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          Recipes
+        </h1>
+        <p className="text-sm text-muted">How to make our item components.</p>
+      </div>
       <RecipesList
         rows={rows}
         editable={editable}

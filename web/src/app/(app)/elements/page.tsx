@@ -86,10 +86,15 @@ export default async function ElementsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Elements
-        </h1>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Elements
+          </h1>
+          <p className="text-sm text-muted">
+            The components &amp; ingredients for the things we make.
+          </p>
+        </div>
         {editable ? (
           <NewElement orgId={session.membership.org_id} types={types} />
         ) : null}

@@ -71,9 +71,12 @@ export default async function ProductionItemsPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-        Items
-      </h1>
+      <div className="space-y-1">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          Items
+        </h1>
+        <p className="text-sm text-muted">The items we make and sell.</p>
+      </div>
       <ProductionItemsList
         rows={rows}
         editable={editable}

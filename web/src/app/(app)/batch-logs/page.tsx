@@ -141,12 +141,15 @@ export default async function BatchLogsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
             Batch Logs
           </h1>
-          <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+          <p className="text-sm text-muted">Records of when we make something.</p>
+          {/* What the screen IS, then what it is currently showing — the
+              description belongs to the title, the scope line to the list. */}
+          <p className="text-[12px] uppercase tracking-[0.12em] text-subtle">
             {active.code} · {rows.length} {rows.length === 1 ? "log" : "logs"}
           </p>
         </div>
