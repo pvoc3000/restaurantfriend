@@ -279,6 +279,34 @@ test("amounts: a whole cent out is a disagreement", () => {
   ok(check.differs);
 });
 
+test("amounts: no subtotal is UNVERIFIABLE, not a disagreement", () => {
+  // BakeMark 452660, verbatim (Mark, 2026-09-02). The reader found no subtotal
+  // and wrote `tax: 0`, which is the honest reading of an invoice printing no
+  // tax — and that one zero used to take it out of the "nothing at the foot"
+  // branch, so it reported the parts adding to $0.00 against $1,001.26 on an
+  // invoice whose seven lines sum to $1,001.26 exactly.
+  const check = amountReconciliation(
+    invoice({ subtotal: null, tax: 0, freight: null, other_charges: null, total: 1001.26 })
+  );
+  no(check.differs);
+  eq(check.computed, null, "there is nothing to add up");
+  ok(check.missing.includes("subtotal"), "and it still says the subtotal was never read");
+
+  // The same shape with every part absent — the rent bill — is unchanged.
+  const rent = amountReconciliation(
+    invoice({ subtotal: null, tax: null, freight: null, other_charges: null, total: 4200 })
+  );
+  no(rent.differs);
+  eq(rent.computed, null);
+
+  // A subtotal PRESENT and wrong is still a disagreement. The fix must not have
+  // turned the check off.
+  const wrong = amountReconciliation(
+    invoice({ subtotal: 900, tax: 0, freight: null, other_charges: null, total: 1001.26 })
+  );
+  ok(wrong.differs, "a real subtotal that does not add up still reports");
+});
+
 test("amounts: a null part counts as zero but is NAMED", () => {
   const check = amountReconciliation(
     invoice({ subtotal: 100, tax: null, freight: null, other_charges: null, total: 100 })

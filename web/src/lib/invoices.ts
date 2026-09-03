@@ -148,6 +148,20 @@ export type AmountCheck = {
  *
  * A total with no parts at all is not a disagreement — that's the rent bill,
  * and there is no claim to check.
+ *
+ * NEITHER IS A TOTAL WITH NO SUBTOTAL, which is the same statement made
+ * properly. The escape used to require all FOUR parts to be null, and a reader
+ * that writes `tax: 0` for an invoice printing no tax — which is the honest
+ * reading, and the commonest one — took the invoice out of that branch while
+ * leaving nothing to add up. BakeMark 452660 then reported "the parts add up to
+ * $0.00 against a total of $1,001.26" on an invoice whose seven lines sum to
+ * $1,001.26 exactly (Mark, 2026-09-02).
+ *
+ * The subtotal is the only part that can carry the bulk of a bill; tax, freight
+ * and other are addenda. Without it the equation is UNVERIFIABLE rather than
+ * violated, and saying so is different from crying wolf. It is still named in
+ * `missing`, so "the subtotal was never read" stays visible — which is the
+ * thing actually worth fixing on that invoice.
  */
 export function amountReconciliation(
   invoice: Pick<
@@ -165,8 +179,10 @@ export function amountReconciliation(
   const missing = parts.filter(([, v]) => v === null).map(([k]) => k);
   const stated = invoice.total === null ? null : Number(invoice.total);
 
-  // Nothing was printed at the foot at all — no claim to check.
-  if (missing.length === parts.length) {
+  // Nothing to check: either nothing was printed at the foot at all, or the one
+  // part that could carry the bill is absent. See the note above — a `tax: 0`
+  // reading used to sneak past the first test and fail the arithmetic on its own.
+  if (missing.length === parts.length || invoice.subtotal === null) {
     return { computed: null, stated, differs: false, missing: [...missing] };
   }
 
