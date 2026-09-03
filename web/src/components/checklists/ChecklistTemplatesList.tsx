@@ -172,11 +172,7 @@ export function ChecklistTemplatesList({
         columnChooser
         defaultSort={{ key: "name" }}
         empty={
-          <p className="max-w-[72ch] text-sm text-muted">
-            No templates at {locationCode} yet. A checklist is what a
-            supervisor walks at the end of a shift; a walkthrough is a
-            manager’s round; an inspection log records an outside visit.
-          </p>
+          <p className="text-sm text-muted">No templates at {locationCode} yet.</p>
         }
       />
     </div>

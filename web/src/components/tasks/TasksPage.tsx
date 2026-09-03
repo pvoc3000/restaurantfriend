@@ -183,13 +183,16 @@ export async function TasksPage({
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
             {heading}
           </h1>
-          <p className="max-w-[72ch] text-sm text-muted">
-            {kind === "maintenance"
-              ? `What needs a vendor at ${active.code} — the plumber, the fridge engineer. ` +
-                "Anything the crew can fix belongs on Tasks."
-              : `What is outstanding at ${active.code}. Anything carried forward appears on ` +
-                "every checklist until it is done, and gets louder the longer it waits."}
-          </p>
+          {/* Maintenance keeps its line because it draws the boundary between
+              two nav entries — which of the two a job belongs on is not
+              something the screen shows you. Tasks had a description of itself
+              and lost it (Mark, 2026-09-03). */}
+          {kind === "maintenance" && (
+            <p className="max-w-[72ch] text-sm text-muted">
+              What needs a vendor at {active.code} — the plumber, the fridge
+              engineer. Anything the crew can fix belongs on Tasks.
+            </p>
+          )}
         </div>
         {canResolveTasks(session.membership.role) && (
           <NewTask
