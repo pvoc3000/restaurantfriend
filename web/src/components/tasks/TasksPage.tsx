@@ -172,31 +172,27 @@ export async function TasksPage({
 
   return (
     <div className="space-y-6">
-      {/* The create command sits BESIDE THE TITLE, which is what `/checklists`
-          and `/inspection-logs` already did — this screen and `/equipment` were
-          the two that kept it in a `justify-end` row above the filters, where
-          it reads as one more filter. */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          {heading}
-        </h1>
-        {canResolveTasks(session.membership.role) && (
-          <NewTask
-            kind={kind}
-            orgId={session.membership.org_id}
-            locationId={active.id}
-            equipment={equipmentOptions}
-            sections={sectionOptions}
-            assignees={assignees}
-          />
-        )}
-      </div>
+      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+        {heading}
+      </h1>
 
       <TasksScreen
         key={`${active.id}:${kind}`}
         rows={rows}
         kind={kind}
         today={today}
+        action={
+          canResolveTasks(session.membership.role) && (
+            <NewTask
+              kind={kind}
+              orgId={session.membership.org_id}
+              locationId={active.id}
+              equipment={equipmentOptions}
+              sections={sectionOptions}
+              assignees={assignees}
+            />
+          )
+        }
         orgId={session.membership.org_id}
         locationCode={active.code}
         editable={canResolveTasks(session.membership.role)}

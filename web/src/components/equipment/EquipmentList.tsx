@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
@@ -34,6 +34,7 @@ export function EquipmentList({
   editable,
   sections,
   vendors,
+  action,
 }: {
   rows: EquipmentRow[];
   today: string;
@@ -41,6 +42,12 @@ export function EquipmentList({
   editable: boolean;
   sections: { id: string; display_name: string }[];
   vendors: { id: string; name: string }[];
+  /**
+   * The screen's create command, right-aligned at the end of this row (Mark,
+   * 2026-09-03, moving it down out of the title row). A NODE rather than a
+   * flag: only the page knows which command this list is for.
+   */
+  action?: ReactNode;
 }) {
   const [search, setSearch] = useState("");
 
@@ -194,15 +201,15 @@ export function EquipmentList({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-4">
-        <div className="min-w-[16rem] flex-1">
-          <TextInput
-            value={search}
-            onValueChange={setSearch}
-            placeholder="Search equipment…"
-            aria-label="Search equipment"
-            clearLabel="Clear the search"
-          />
-        </div>
+        <TextInput
+          value={search}
+          onValueChange={setSearch}
+          placeholder="Search equipment…"
+          aria-label="Search equipment"
+          clearLabel="Clear the search"
+          className="w-72"
+        />
+        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
       <DataTable

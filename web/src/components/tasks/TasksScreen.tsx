@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
@@ -67,6 +67,7 @@ export function TasksScreen({
   sections,
   assignees,
   openRowKey,
+  action,
 }: {
   rows: TaskRow[];
   kind: TaskKind;
@@ -78,6 +79,12 @@ export function TasksScreen({
   sections: { id: string; display_name: string }[];
   assignees: Assignee[];
   openRowKey?: string;
+  /**
+   * The screen's create command, right-aligned at the end of the filter row
+   * (Mark, 2026-09-03, moving it down out of the title row). A NODE rather than
+   * a flag: only the page knows which command this list is for.
+   */
+  action?: ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -473,6 +480,7 @@ export function TasksScreen({
           ]}
           onChange={(v) => setTier(v as typeof tier)}
         />
+        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
       <DataTable

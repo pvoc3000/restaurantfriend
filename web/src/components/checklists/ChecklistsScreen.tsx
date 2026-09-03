@@ -30,11 +30,11 @@ import { NewChecklistTemplate } from "./NewChecklistTemplate";
  * bookmark and come back to; the `onChange` is the same navigation for a plain
  * click. The DEFAULT writes no parameter, so `/checklists` stays canonical.
  *
- * THE COMMAND SITS WITH THE TITLE (Mark, 2026-08-30), which is where every
- * record screen in this app already puts its commands, and it is the VIEW's own
- * command rather than the screen's — Start a walk on one tab, New template on
- * the other. The tab decides what "new" means here, which is clarifying rather
- * than a special case.
+ * THE COMMAND SITS IN THE LIST'S OWN CONTROL ROW, right-aligned (Mark,
+ * 2026-09-03, reversing his 2026-08-30 call that it belonged beside the title).
+ * It is still the VIEW's own command rather than the screen's — Start a walk on
+ * one tab, New template on the other — so it is handed to whichever list is
+ * rendered rather than living up here.
  *
  * There is NO explanatory paragraph under the heading (Mark, same day). Both
  * tabs are named, the counts are on them, and the lists say what they hold when
@@ -68,30 +68,9 @@ export function ChecklistsScreen({
 
   return (
     <div className="space-y-6">
-      {/* `items-start`, so the command lines up with the TOP of the heading
-          rather than centring against it — the rule every other record screen
-          follows, and what keeps the row honest if the title ever wraps. */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Checklists
-        </h1>
-        {view === "walks"
-          ? canWalk && (
-              <StartWalk
-                templates={startable}
-                today={today}
-                orgId={orgId}
-                locationId={locationId}
-              />
-            )
-          : canEdit && (
-              <NewChecklistTemplate
-                orgId={orgId}
-                locationId={locationId}
-                locationCode={locationCode}
-              />
-            )}
-      </div>
+      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+        Checklists
+      </h1>
 
       <TabPicker
         ariaLabel="Which view"
@@ -110,12 +89,31 @@ export function ChecklistsScreen({
           rows={runs}
           startable={startable}
           locationCode={locationCode}
+          action={
+            canWalk && (
+              <StartWalk
+                templates={startable}
+                today={today}
+                orgId={orgId}
+                locationId={locationId}
+              />
+            )
+          }
         />
       ) : (
         <ChecklistTemplatesList
           rows={templates}
           locationCode={locationCode}
           editable={canEdit}
+          action={
+            canEdit && (
+              <NewChecklistTemplate
+                orgId={orgId}
+                locationId={locationId}
+                locationCode={locationCode}
+              />
+            )
+          }
         />
       )}
     </div>

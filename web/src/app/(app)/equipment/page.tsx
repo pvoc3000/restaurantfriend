@@ -101,20 +101,9 @@ export default async function EquipmentPage() {
 
   return (
     <div className="space-y-6">
-      {/* Beside the title, like `/checklists` and `/inspection-logs`. */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Equipment
-        </h1>
-        {editable && (
-          <NewEquipment
-            orgId={session.membership.org_id}
-            locationId={active.id}
-            sections={sectionOptions}
-            kinds={kindOptions}
-          />
-        )}
-      </div>
+      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+        Equipment
+      </h1>
 
       <EquipmentList
         key={active.id}
@@ -122,6 +111,16 @@ export default async function EquipmentPage() {
         today={today}
         locationCode={active.code}
         editable={editable}
+        action={
+          editable && (
+            <NewEquipment
+              orgId={session.membership.org_id}
+              locationId={active.id}
+              sections={sectionOptions}
+              kinds={kindOptions}
+            />
+          )
+        }
         sections={sectionOptions}
         vendors={(vendors ?? []).map((v) => ({
           id: v.id as string,

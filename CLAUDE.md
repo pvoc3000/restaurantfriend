@@ -6586,13 +6586,26 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    call itself a checklist. Component names, `canWalkChecklists` and the
    `?view=walks` key are untouched and invisible; "Walkthrough" is the kind's
    own label and "walk-in" is a fridge.
-   **THE CREATE COMMAND SITS BESIDE THE TITLE ON EVERY LIST IN THIS MODULE**
-   (Mark, 2026-08-30, naming `/maintenance-requests`, `/tasks` and `/equipment`
-   one after another). `/checklists` and `/inspection-logs` already did it; the
-   other three kept theirs in a `justify-end` row above the filters, where a
-   create command reads as one more filter. Moving them left three dead props
-   behind (`locationId` twice, `orgId` once), removed rather than left as
-   unreachable wiring.
+   **THE CREATE COMMAND SITS IN THE LIST'S OWN CONTROL ROW, RIGHT-ALIGNED**
+   (Mark, 2026-09-03), which REVERSES his 2026-08-30 call that it belonged
+   beside the title — that one was against a `justify-end` row of its own ABOVE
+   the filters, where a create command really did read as one more filter, and
+   this is a different placement: the LAST cell of the row the search box and
+   the tabs are already in, pushed to the page's right edge (measured, 1232 at
+   a 1280 window, the same edge as the columns eye below it). All five —
+   Start a walk, New template, New task, New maintenance request, New
+   inspection log, New equipment — and the title rows are now a bare `h1`.
+   **`action?: ReactNode` IS THE SLOT**, on `ChecklistsList`,
+   `ChecklistTemplatesList`, `EquipmentList` and `TasksScreen`: a NODE rather
+   than a flag, because only the page knows which command a list is for and
+   what to hand it, and the button is a client component the server page can
+   pass down as an element.
+   **The search box had to stop growing for it to work.** Three of those rows
+   put the search in a `min-w-[16rem] flex-1` wrapper, which eats every spare
+   pixel — so `ml-auto` on the command gets nothing and it lands next to the
+   tabs rather than at the edge. `w-72` on the input, the app's usual search
+   width, which is also what left-aligned the tab pickers Mark asked about
+   separately the same day.
    **FLAGGING AN ISSUE BY HAND WAS IMPOSSIBLE** (Mark, 2026-08-30, walking a
    real list: "I get a message 'Say what is wrong before flagging it' but I see
    no way to add a note"). A deadlock, and on the module's central act:

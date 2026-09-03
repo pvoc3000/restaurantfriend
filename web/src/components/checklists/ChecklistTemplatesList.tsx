@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
@@ -44,10 +44,17 @@ export function ChecklistTemplatesList({
   rows,
   locationCode,
   editable,
+  action,
 }: {
   rows: TemplateRow[];
   locationCode: string;
   editable: boolean;
+  /**
+   * The screen's create command, right-aligned at the end of this row (Mark,
+   * 2026-09-03, moving it down out of the title row). A NODE rather than a
+   * flag: only the page knows which command this list is for.
+   */
+  action?: ReactNode;
 }) {
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState<ChecklistKind | "all">("all");
@@ -139,15 +146,14 @@ export function ChecklistTemplatesList({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-4">
-        <div className="min-w-[16rem] flex-1">
-          <TextInput
-            value={search}
-            onValueChange={setSearch}
-            placeholder="Search templates…"
-            aria-label="Search templates"
-            clearLabel="Clear the search"
-          />
-        </div>
+        <TextInput
+          value={search}
+          onValueChange={setSearch}
+          placeholder="Search templates…"
+          aria-label="Search templates"
+          clearLabel="Clear the search"
+          className="w-72"
+        />
         <TabPicker
           ariaLabel="Kind"
           value={kind}
@@ -161,6 +167,7 @@ export function ChecklistTemplatesList({
           ]}
           onChange={(v) => setKind(v as ChecklistKind | "all")}
         />
+        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
       <DataTable

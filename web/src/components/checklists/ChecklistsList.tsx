@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { TabPicker } from "@/components/ui/TabPicker";
@@ -43,10 +43,18 @@ export function ChecklistsList({
   rows,
   startable,
   locationCode,
+  action,
 }: {
   rows: RunRow[];
   startable: StartableTemplate[];
   locationCode: string;
+  /**
+   * The screen's create command, right-aligned at the end of this row (Mark,
+   * 2026-09-03, moving it down out of the title row). A NODE rather than a
+   * flag: only the page knows which command this list is for, and what it may
+   * pass it.
+   */
+  action?: ReactNode;
 }) {
   const [tier, setTier] = useState<"open" | "all">("open");
 
@@ -178,6 +186,7 @@ export function ChecklistsList({
           ]}
           onChange={(v) => setTier(v as typeof tier)}
         />
+        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
       <DataTable
