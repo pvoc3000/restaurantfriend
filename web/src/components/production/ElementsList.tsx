@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
@@ -113,12 +113,19 @@ export function ElementsList({
   editable,
   initialFilters,
   initialSearch = "",
+  action,
 }: {
   rows: ElementRow[];
   editable: boolean;
   /** The URL's query, raw — validated below against the real vocabulary. */
   initialFilters?: RawSearchParams;
   initialSearch?: string;
+  /**
+   * The screen's create command, right-aligned in this list's own control row
+   * (Mark, 2026-09-03, moving it down out of the title row — Facilities' shape).
+   * A NODE rather than a flag: only the page knows what to hand it.
+   */
+  action?: ReactNode;
 }) {
   // DECLARED BEFORE THE STATE THAT IS VALIDATED AGAINST IT. `parseFilterValues`
   // needs the options to know which of the URL's values are real, and a hook's
@@ -447,6 +454,7 @@ export function ElementsList({
             dimensions={dimensions}
             values={filters}
             onChange={changeFilters}
+            trailing={action}
             leading={
               <div className="space-y-1.5">
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">

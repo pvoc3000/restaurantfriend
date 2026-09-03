@@ -95,9 +95,6 @@ export default async function ElementsPage({
             The components &amp; ingredients for the things we make.
           </p>
         </div>
-        {editable ? (
-          <NewElement orgId={session.membership.org_id} types={types} />
-        ) : null}
       </div>
 
       <ElementsList
@@ -105,6 +102,11 @@ export default async function ElementsPage({
         editable={editable}
         initialFilters={params}
         initialSearch={parseFilterSearch(params)}
+        action={
+          editable ? (
+            <NewElement orgId={session.membership.org_id} types={types} />
+          ) : null
+        }
       />
     </div>
   );

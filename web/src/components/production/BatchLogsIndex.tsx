@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import type { SortDir } from "@/lib/tableSort";
@@ -60,6 +60,7 @@ export function BatchLogsIndex({
   rows,
   range,
   params,
+  action,
 }: {
   rows: BatchLogRow[];
   /**
@@ -70,6 +71,12 @@ export function BatchLogsIndex({
   range: BatchLogRange;
   /** Whatever else is in the URL, so a range chip keeps it. */
   params: Record<string, string | string[] | undefined>;
+  /**
+   * The screen's create command, right-aligned in this list's own control row
+   * (Mark, 2026-09-03, moving it down out of the title row — Facilities' shape).
+   * A NODE rather than a flag: only the page knows what to hand it.
+   */
+  action?: ReactNode;
 }) {
   // ALL, not Open (Mark, 2026-08-09). Open was the right default while this
   // screen held one row: a log is a thing you work, so the one being worked is
@@ -314,6 +321,7 @@ export function BatchLogsIndex({
               ]}
             />
           </div>
+          {action ? <div className="ml-auto">{action}</div> : null}
         </div>
       }
     />

@@ -158,17 +158,6 @@ export default async function SchedulesPage() {
             shops to see another kitchen&rsquo;s.
           </p>
         </div>
-        {editable && kitchen ? (
-          <GenerateSchedules
-            locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
-            today={today}
-            kitchenId={kitchen.id}
-            kitchenCode={kitchen.code}
-            // Every plan, not the active ones: `sellingShopsForKitchen` decides
-            // that itself, and the dialog re-asks as the date range moves.
-            plans={plans}
-          />
-        ) : null}
       </div>
 
       {lineErr ? (
@@ -182,6 +171,8 @@ export default async function SchedulesPage() {
         </p>
       ) : null}
 
+      {/* The list renders even when empty — `/plans`' reasoning: the generate
+          command lives in its control row now. */}
       {rows.length === 0 ? (
         <p className="max-w-[80ch] text-sm text-muted">
           Nothing for the {kitchen?.code ?? "this"} kitchen in the four weeks
@@ -189,9 +180,28 @@ export default async function SchedulesPage() {
           for a date — one per shop per kitchen — and generating ahead is fine:
           par overrides written later are picked up whenever generation runs.
         </p>
-      ) : (
-        <SchedulesList rows={rows} plans={plans} stampable={countable} today={today} />
-      )}
+      ) : null}
+
+      <SchedulesList
+        rows={rows}
+        plans={plans}
+        stampable={countable}
+        today={today}
+        action={
+          editable && kitchen ? (
+            <GenerateSchedules
+              locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
+              today={today}
+              kitchenId={kitchen.id}
+              kitchenCode={kitchen.code}
+              // Every plan, not the active ones: `sellingShopsForKitchen`
+              // decides that itself, and the dialog re-asks as the date range
+              // moves.
+              plans={plans}
+            />
+          ) : null
+        }
+      />
     </div>
   );
 }

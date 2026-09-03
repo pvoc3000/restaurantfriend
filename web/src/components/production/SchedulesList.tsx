@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import type { SortDir } from "@/lib/tableSort";
@@ -76,6 +76,7 @@ export function SchedulesList({
   plans,
   stampable,
   today,
+  action,
 }: {
   rows: ScheduleRow[];
   /** Every plan, active or not — `plansInForce` decides which are in force. */
@@ -83,6 +84,12 @@ export function SchedulesList({
   /** Supervisor and up — the only thing this list writes is the print stamp. */
   stampable: boolean;
   today: string;
+  /**
+   * The screen's create command, right-aligned in this list's own control row
+   * (Mark, 2026-09-03, moving it down out of the title row — Facilities' shape).
+   * A NODE rather than a flag: only the page knows what to hand it.
+   */
+  action?: ReactNode;
 }) {
   const [tier, setTier] = useState<Tier>("upcoming");
   const [grouping, setGrouping] = useState<Grouping>("date");
@@ -397,6 +404,7 @@ export function SchedulesList({
                 ]}
               />
             </div>
+            {action ? <div className="ml-auto">{action}</div> : null}
           </div>
         }
       />
