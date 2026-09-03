@@ -928,18 +928,18 @@ export function InvoiceDetail({
 
             THE QUICKBOOKS SLOT IS WRAPPED IN ITS OWN `div` (Mark, 2026-09-03:
             "Void, Delete and Withdraw appear where the quickbook buttons
-            should be, then move into place"). `PushToQuickBooks` returns
-            `null` for its first render or two — it reads its connection
-            status over the network before it knows whether to show anything
-            — and a grid with `grid-cols-2` whose FIRST child vanishes does
-            not leave an empty slot: CSS auto-placement drops the one
-            remaining child (`InvoiceFooter`) into the FIRST track, because a
-            `null` render leaves no DOM node behind to hold that track open.
-            So Actions renders on the LEFT for a beat, then jumps right the
-            instant QuickBooks has something to say. The wrapping `div` is
-            always in the DOM regardless of what's inside it, which is what
-            keeps the track — and Actions beside it — where they belong from
-            the first frame. */}
+            should be, then move into place"). A grid with `grid-cols-2`
+            whose FIRST child has NO DOM NODE AT ALL does not leave an empty
+            slot: CSS auto-placement drops the one remaining child
+            (`InvoiceFooter`) into the FIRST track, because there is nothing
+            to hold that track open. `PushToQuickBooks` NOW renders a
+            placeholder while it decides what to show, so this no longer
+            fires on an ordinary load — but it still returns `null` outright
+            once it learns the org has no QuickBooks connection at all, and
+            THAT case would flash Actions left exactly the same way without
+            this wrapper. It costs nothing to keep either way: an always-
+            present `div` is what guarantees the track stays open regardless
+            of what, if anything, ends up inside it. */}
         <div className="grid grid-cols-2 items-start gap-x-4">
           <div>
             <PushToQuickBooks

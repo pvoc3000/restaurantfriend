@@ -187,9 +187,32 @@ export function PushToQuickBooks({
     };
   }, [ctx, status, invoiceNumber, invoiceId, total, isCredit, supabase]);
 
-  // Nothing at all until QuickBooks is connected: an invoice screen is not the
-  // place to advertise a feature nobody has set up.
-  if (!ctx || !ctx.connected) return null;
+  // STILL DECIDING — a same-shaped placeholder holds the space rather than
+  // showing nothing for the beat before the connection check resolves
+  // (Mark, 2026-09-03: "place a dummy button and prose in place just as a
+  // placeholder while the app is deciding what to actually show"). It is
+  // deliberately BLANK rather than a guess at the real label — at this point
+  // we don't yet know whether this becomes Send, Update, Link to it, or
+  // nothing at all (the org may not be connected), and a placeholder that
+  // claims a specific action would be worse than one that claims nothing.
+  // `aria-hidden` because there is no content here for a screen reader to
+  // announce, only a shape.
+  if (!ctx) {
+    return (
+      <div className="flex flex-col items-end gap-1.5" aria-hidden="true">
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+          <span className="h-9 w-40 border border-hairline bg-neutral-50" />
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+          <span className="h-[13px] w-48 bg-neutral-50" />
+        </div>
+      </div>
+    );
+  }
+
+  // NOTHING AT ALL once we know: an invoice screen is not the place to
+  // advertise a feature nobody has set up.
+  if (!ctx.connected) return null;
 
   const account = expenseAccountFor(ctx.atShop, ctx.orgAccount);
   // The mapping is the SHOP's now, not the vendor's — 026's column, finally read.
