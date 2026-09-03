@@ -474,8 +474,11 @@ export function PushToQuickBooks({
   // dragging "Forget the link" down with it: each column keeps its own top.
   return (
     <div className="grid grid-cols-2 items-start gap-x-3 gap-y-1">
-      {/* ROW 1, COLUMN 1 — the primary buttons. */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* ROW 1, COLUMN 1 — the primary buttons. RIGHT-ALIGNED (Mark,
+          2026-09-03) — the box sits at the far edge of its own half of the
+          row, so its controls line up with that edge rather than the
+          opposite one. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {/* IT IS ALREADY OVER THERE. The button stands with Send/Update; its
             sentence is in the prose cell below. */}
         {proposal?.ok && !already && canPush && (
@@ -504,12 +507,16 @@ export function PushToQuickBooks({
         )}
       </div>
 
-      {/* ROW 1, COLUMN 2 — the secondary command: re-ask QuickBooks. */}
-      <div className="flex flex-wrap items-center gap-2">
+      {/* ROW 1, COLUMN 2 — the secondary command: re-ask QuickBooks.
+          SAME DRESS AS "Update in QuickBooks" (Mark, 2026-09-03) — it had been
+          a quiet underline, which read as less of a real command than the
+          button beside it, though pressing it does exactly the same kind of
+          thing: talk to QuickBooks and report back what it said. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {already && (
           <button
             type="button"
-            className="text-[13px] text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900 disabled:opacity-35"
+            className={BUTTON_CLASS}
             disabled={busy}
             onClick={() => void checkBalance()}
           >
@@ -521,13 +528,17 @@ export function PushToQuickBooks({
       {/* ROW 2, COLUMN 1 — what pressing column 1 produced, or why it can't
           be pressed yet. Everything here is prose, stacked in the order it
           used to fall under `order-last`. */}
-      <div className="space-y-1 text-[13px]">
+      {/* RIGHT-ALIGNED THROUGHOUT (Mark, 2026-09-03), the two filled
+          banners included — one alignment for the whole box rather than the
+          banners reading as a different kind of thing from the plain status
+          lines around them. */}
+      <div className="space-y-1 text-right text-[13px]">
         {already && <p className="text-muted">{already}</p>}
         {/* Yellow, because this is not an error — it is the normal state
             during the Bill.com parallel run, and the thing worth your eye is
             that pressing Send would make a second copy. */}
         {proposal?.ok && !already && (
-          <div className="space-y-1 bg-mark-fill px-2 py-1 text-ink">
+          <div className="space-y-1 bg-mark-fill px-2 py-1 text-right text-ink">
             <p>
               QuickBooks already has this as {proposal.candidate.entity}{" "}
               {proposal.candidate.doc_number ?? proposal.candidate.id} —{" "}
@@ -541,7 +552,7 @@ export function PushToQuickBooks({
         {/* Red rather than the mark colour: this is not "worth your eye", the
             record here disagrees with QuickBooks and one of them is wrong. */}
         {gone && (
-          <div className="space-y-1 border border-accent px-2 py-1 text-ink">
+          <div className="space-y-1 border border-accent px-2 py-1 text-right text-ink">
             <p>
               QuickBooks no longer has{" "}
               {already?.replace("In QuickBooks as ", "") ?? "that document"}.
@@ -587,7 +598,7 @@ export function PushToQuickBooks({
           document is GONE and the bill is stuck until this is pressed —
           it can neither update, nor create, nor be linked while it points at
           a dead id. */}
-      <div>
+      <div className="text-right">
         {already && canPush && !gone && (
           <button
             type="button"
