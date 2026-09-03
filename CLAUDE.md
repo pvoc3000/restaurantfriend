@@ -2839,6 +2839,26 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `qboError` moved with the button rather than being dropped: a failed
    check still needs to say why, beside the control that caused it.
 
+   **Shipped 2026-09-03 — AND THE PER-ROW LINE GOES TOO.** Mark, the same
+   session: "remove the 'paid as of...' text under the invoice number. Not
+   necessary" — the thing the entry above had just argued FOR keeping. He's
+   right that it doesn't earn its place: the Status column's own chip
+   already says Paid, in the ladder colour, and a second sentence under the
+   number restating it in words was the toolbar summary's mistake at a
+   smaller size.
+   **THAT TOOK `qboStatus`/`qboAt` WITH IT, FOR REAL THIS TIME** — nothing
+   reads them any more, so the state, their setters, the local `QboStatus`
+   type, and the `billPaymentNote` import all came out rather than being
+   left as machinery with no caller. `checkQuickBooks()` is now four lines
+   shorter: ask, refresh if anything was stored, report if anything
+   wasn't — no `Map` to build for a line that no longer exists. The
+   INVOICE cell is a bare `Link` again, one line, no wrapping `div`.
+   Verified live: no `text-[11px] text-faint` span survives anywhere on the
+   list, Check QuickBooks still round-trips with no console error, and the
+   Status column's Paid/Submitted/Open chips are unaffected — they were
+   always `billStage` off the row, never this state. 1576 fixtures pass,
+   unchanged.
+
    **Shipped 2026-09-03 — THE BILLED/RECEIVED FLAG IS A BUTTON.** Mark: "can
    the flag that pops up when a billed qty and po received qty differ be
    turned into a button that, when pressed, updates the billed qty with the

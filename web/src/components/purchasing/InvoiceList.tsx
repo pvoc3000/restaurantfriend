@@ -15,7 +15,6 @@ import {
   BILL_STAGE_CLASS,
   BILL_STAGE_LABEL,
   BILL_STAGE_ORDER,
-  billPaymentNote,
   billStage,
   type AgingBucket,
 } from "@/lib/invoices";
@@ -45,17 +44,6 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { InvoiceBatchActions } from "./InvoiceBatchActions";
 import { NewInvoice } from "./NewInvoice";
 import type { InvoiceListRow } from "@/app/(app)/invoices/page";
-
-/** One pushed document, as QuickBooks currently reports it. `missing` is its
- *  own answer: a bill deleted or voided there must not read as paid. */
-type QboStatus = {
-  invoice_id: string;
-  qbo_id: string | null;
-  entity: string;
-  balance?: number;
-  settled?: boolean;
-  missing: boolean;
-};
 
 const INVOICE_WIDTHS_KEY = "rf.invoices.columnWidths.v1";
 
@@ -318,21 +306,6 @@ export function InvoiceList({
     [visible, checked]
   );
 
-  /**
-   * What QuickBooks says about the bills on this screen.
-   *
-   * HELD IN STATE AND NEVER STORED, and it goes when you reload. That is the
-   * point rather than a shortcut: `lib/invoices`, 025 and 051 all say payment
-   * is a fact QuickBooks owns.
-   *
-   * IT IS STORED SINCE 088, and the objection that used to live here — "a
-   * balance written into our row is stale the moment it lands while still being
-   * rendered as though it were current" — is answered rather than ignored: it
-   * is stored WITH `qbo_checked_at` and never rendered without it. This state
-   * is now only the immediate answer, before the page has re-read the row.
-   */
-  const [qboStatus, setQboStatus] = useState<Map<string, QboStatus> | null>(null);
-  const [qboAt, setQboAt] = useState<string | null>(null);
   /** What the last bulk command did. Held HERE rather than in the bar, because
    *  clearing the selection unmounts the bar — see `InvoiceBatchActions`. */
   const [batchReport, setBatchReport] = useState<{
@@ -343,6 +316,28 @@ export function InvoiceList({
   const [qboError, setQboError] = useState<string | null>(null);
   const qboSupabase = createClient();
 
+  /**
+   * Ask QuickBooks what these bills' balances are, write them (088), and
+   * refresh so the STORED figures land on screen.
+   *
+   * NO LOCAL PREVIEW ANY MORE (Mark, 2026-09-03: the per-row "paid · as
+   * of…" line under the invoice number "not necessary"). `refresh_status`'s
+   * response used to be held in state so a row could say what QuickBooks
+   * *just* answered before the page had re-read it; without that line to
+   * feed, there is nothing left to hold — the router refresh below is the
+   * only path a checked balance needs to reach the screen.
+   *
+   * WITHOUT THE REFRESH THE CHIP CANNOT MOVE. The balance was written
+   * server-side, so the rows this list is holding are the ones the last
+   * render was given — measured: QuickBooks reported "2 of 3 paid" while
+   * the tabs still read "Submitted 3", because `billStage` reads the row
+   * and the row was stale.
+   *
+   * Below purchaser+ the write changes nothing (025's policy) and the
+   * server says so in `not_stored`, which is the one thing still worth a
+   * sentence — the figures on screen are still correct for THIS visit, and
+   * a reload would quietly lose them.
+   */
   async function checkQuickBooks() {
     setQboBusy(true);
     setQboError(null);
@@ -352,22 +347,6 @@ export function InvoiceList({
       setQboError(message);
       return;
     }
-    const list = (data?.statuses as QboStatus[]) ?? [];
-    setQboStatus(new Map(list.map((st) => [st.invoice_id, st])));
-    setQboAt(
-      new Date(data!.checked_at as string).toLocaleTimeString([], {
-        hour: "numeric",
-        minute: "2-digit",
-      })
-    );
-    // WITHOUT THIS THE CHIP CANNOT MOVE. The balance was written server-side,
-    // so the rows this list is holding are the ones the last render was given —
-    // measured: QuickBooks reported "2 of 3 paid" while the tabs still read
-    // "Submitted 3", because `billStage` reads the row and the row was stale.
-    //
-    // Below purchaser+ the write changes nothing (025's policy) and the server
-    // says so in `not_stored`; the figures above are still correct for this
-    // visit, and a refresh simply brings back what is really on file.
     if (Number(data?.stored ?? 0) > 0) router.refresh();
     if (Number(data?.not_stored ?? 0) > 0) {
       setQboError(
@@ -405,47 +384,16 @@ export function InvoiceList({
       pinned: true,
       width: 150,
       sortValue: (i) => i.invoice_number,
-      render: (i) => {
-        // The QuickBooks line rides UNDER the number, inside this cell: the row
-        // is 56px and this was one line, so it costs no column width and none
-        // of the other twelve had to give any up.
-        const st = qboStatus?.get(i.id);
-        return (
-          <div className="flex flex-col gap-0.5">
-            <Link
-              href={invoiceDetailHref(i.id, filters)}
-              className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-            >
-              {/* A rent bill has no number, and saying so beats an em dash you
-                  can't click. */}
-              {i.invoice_number ?? <span className="text-faint">No number</span>}
-            </Link>
-            {/* WHAT WAS LAST HEARD, not only what was just asked. It used to
-                render `qboStatus` alone, so the line was blank until somebody
-                pressed the button and gone again on reload — which is no use in
-                a column. 088 stores it; a fresh check overrides it in place. */}
-            {(() => {
-              // Worded exactly like `billPaymentNote`, so the row does not
-              // change its sentence when the refresh lands and the stored value
-              // takes over. `qboAt` is a time and the stored one is a date;
-              // that difference is honest — one is "just now".
-              const live = st
-                ? st.missing
-                  ? `no longer in QuickBooks${qboAt ? ` · as of ${qboAt}` : ""}`
-                  : st.settled
-                    ? `paid${qboAt ? ` · as of ${qboAt}` : ""}`
-                    : `${money(Number(st.balance))} owed${qboAt ? ` · as of ${qboAt}` : ""}`
-                : null;
-              const stored = billPaymentNote(
-                { status: i.status, linked: i.qbo_linked, qbo_balance: i.qbo_balance, qbo_checked_at: i.qbo_checked_at },
-                money
-              );
-              const text = live ?? stored;
-              return text ? <span className="text-[11px] text-faint">{text}</span> : null;
-            })()}
-          </div>
-        );
-      },
+      render: (i) => (
+        <Link
+          href={invoiceDetailHref(i.id, filters)}
+          className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+        >
+          {/* A rent bill has no number, and saying so beats an em dash you
+              can't click. */}
+          {i.invoice_number ?? <span className="text-faint">No number</span>}
+        </Link>
+      ),
     },
     {
       key: "vendor",
