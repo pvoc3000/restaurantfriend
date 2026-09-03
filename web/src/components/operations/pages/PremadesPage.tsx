@@ -139,11 +139,9 @@ export function PremadesPage({
 
   if (rows.length === 0) {
     return (
-      <div className="flex flex-1 items-center justify-center">
-        <p className="max-w-[60ch] text-center text-sm text-muted">
-          No production schedule was generated for this shop today, so there is nothing to count.
-        </p>
-      </div>
+      <p className="text-center text-sm text-muted">
+        No production schedule was generated for this shop today, so there is nothing to count.
+      </p>
     );
   }
 

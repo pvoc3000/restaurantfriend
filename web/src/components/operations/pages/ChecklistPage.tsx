@@ -64,17 +64,11 @@ export function ChecklistPage({
   today: string;
   editable: boolean;
 }) {
-  // Nothing asked for and nothing linked: `LinkChecklistRun` returns null with
-  // no candidates, so this sentence is the whole page and sits in the middle of
-  // it (Mark, 2026-09-03).
+  // `LinkChecklistRun` returns null with no candidates, so this sentence is the
+  // whole page. Centred horizontally and NOT vertically (Mark, 2026-09-03), and
+  // uncapped so it stays on one line.
   if (!run && askedFor.length === 0) {
-    return (
-      <div className="flex flex-1 items-center justify-center">
-        <p className="max-w-[60ch] text-center text-[16px]">
-          No checklist is set up for this shift at this shop.
-        </p>
-      </div>
-    );
+    return <p className="text-center text-[16px]">No checklist is set up for this shift at this shop.</p>;
   }
 
   if (!run) {

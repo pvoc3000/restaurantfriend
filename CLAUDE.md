@@ -6974,9 +6974,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    pass), which is the mark colour doing what this file says it is for — a
    fill, never an ink — over the whole thing rather than per line. Red on
    yellow-200 measures **4.62:1**, which passes AA; worth re-measuring if
-   either token moves. The arrays stay separate in the props and in
-   `submitReadiness`/`submitBlockers` — this is a rendering decision, and the
-   email still reports only `outstanding`.
+   either token moves. **The heading sits OUTSIDE the box and centred** (his
+   fourth), so it titles the thing rather than being its first line. The arrays
+   stay separate in the props and in `submitReadiness`/`submitBlockers` — this
+   is a rendering decision, and the email still reports only `outstanding`.
    **THE REPORT IS THE LAST PAGE BEFORE SUBMIT, ON EVERY SHIFT** (Mark, same
    day). It was already true of opening, mid and off-site and false of CLOSING,
    where Tomorrow's production sat between the two — so the one shift with
@@ -6987,13 +6988,20 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `submitBlockers` both ask `pages.includes`, and the runner numbers what it is
    given), which is exactly why a fixture pins it — a reorder would otherwise
    break the rule in silence.
-   **`main` IS A FLEX COLUMN**, so a page can fill it: an empty state that is
-   the whole page centres in it (`flex flex-1 items-center justify-center`).
-   `h-full` does NOT work — main is a `flex-1` block whose height is not a
-   definite value for percentage resolution, measured at 24px inside a 595px
-   parent. The two empty states that earned it are the checklist page's "No
+   **AN EMPTY STATE THAT IS THE WHOLE PAGE IS CENTRED HORIZONTALLY AND NOT
+   VERTICALLY** (Mark, 2026-09-03) — a bare `text-center` paragraph at the top,
+   uncapped so it stays on one line. Two of them: the checklist page's "No
    checklist is set up for this shift at this shop" and the premades page's "No
    production schedule was generated for this shop today".
+   **The vertical version was built first and is instructive.** It needed
+   `main` to be a flex column so the page could claim the height — `h-full`
+   does not work, main being a `flex-1` block whose height is not a definite
+   value for percentage resolution, measured at 24px inside a 595px parent —
+   and THAT quietly narrowed all eight pages, because every page root is
+   `mx-auto max-w-*` and AUTO MARGINS ON A FLEX ITEM MAKE IT SHRINK-TO-FIT
+   (measured, 365px where 672 was right, which looks like a deliberate layout
+   rather than a fault). `main` is a plain block again and both hazards go with
+   it; widths verified afterwards at 672 / 768 / 896 as declared.
    **IT MOVED UNDER THE TAB PICKER 2026-09-03** (Mark), which retires the
    two-places arrangement above: the nights are half of the Needs-attention
    COUNT, so the sentence explaining that count belongs beneath the tab carrying

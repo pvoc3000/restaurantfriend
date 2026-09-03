@@ -64,26 +64,26 @@ export function SubmitPage({
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      {/* ONE BOX, ONE COLOUR (Mark, 2026-09-03: "we have two distinct boxes
-          when I think one would do", then "make all the text the same - red").
-          Two frames spent a heading, a border and 32px of air on a
-          gate-versus-list distinction that the SEND BUTTON already enforces —
-          it is disabled, and its tooltip names the blockers. So what is left
-          here is one list of things somebody should deal with, and the only
-          thing still telling the two kinds apart is the BORDER.
+    <div className="mx-auto max-w-2xl space-y-2">
+      {/* ONE BOX, ONE COLOUR (Mark, 2026-09-03, over four passes). Two frames
+          spent a heading, a border and 32px of air on a gate-versus-list
+          distinction that the SEND BUTTON already enforces — it is disabled,
+          and its tooltip names the blockers. So this is one list of things
+          somebody should deal with, and the only thing still telling the two
+          kinds apart is the BORDER.
 
-          The heading follows the box's job: with a blocker present the box is
-          the gate and says so; with none it is a list. Blockers lead — you
-          cannot leave without them. */}
+          The heading is OUTSIDE the box and centred, so it titles the thing
+          rather than being its first line. It follows the box's job: with a
+          blocker present the box is the gate and says so; with none it is a
+          list. Blockers lead — you cannot leave without them. */}
+      <p className="text-center text-xs font-semibold uppercase tracking-[0.08em] text-accent">
+        {blocked ? "Before this can be sent" : "Still outstanding"}
+      </p>
       <div
-        className={`space-y-2 bg-mark-fill p-4 ${
+        className={`bg-mark-fill p-4 ${
           blocked ? "border-2 border-accent" : "border border-hairline"
         }`}
       >
-        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
-          {blocked ? "Before this can be sent" : "Still outstanding"}
-        </p>
         <ul className="space-y-1 text-sm text-accent">
           {[...blockers, ...outstanding].map((line) => (
             <li key={line}>{line}</li>
