@@ -208,6 +208,35 @@ export function InvoiceDetail({
    * could only say so in a note behind a caret (Mark, 2026-09-02).
    */
   const amendment = shown?.extraction ? handAmendment(shown.extraction) : null;
+  /**
+   * What the delivery actually produced for a line, from the purchase order it
+   * is linked to.
+   *
+   * ALREADY LOADED — `PO_LINE_SELECT` carries `qty_received`, and the PO column
+   * beside this one already resolves the same line — so this costs no query.
+   *
+   * THREE ANSWERS, NOT TWO, which is why it is a column rather than a mark on
+   * the ones that disagree: a line can agree, differ, or never have been
+   * counted, and a marker that only appears on a difference cannot tell the
+   * last two apart. "Never counted" is the state that hid two cases of whipped
+   * topping (Mark, 2026-09-02).
+   */
+  function receivedFor(l: VendorInvoiceLine): { qty: number | null; linked: boolean } {
+    if (!l.purchase_order_item_id) return { qty: null, linked: false };
+    for (const order of linkedOrders) {
+      const poLine = order.lines.find((p) => p.id === l.purchase_order_item_id);
+      if (poLine) {
+        return {
+          qty: poLine.qty_received === null || poLine.qty_received === undefined
+            ? null
+            : Number(poLine.qty_received),
+          linked: true,
+        };
+      }
+    }
+    return { qty: null, linked: false };
+  }
+
   /** Which of OUR lines the page strikes out, by the vendor's own SKU — the
    *  same key the lines were seeded under. */
   const struckSkus = useMemo(
@@ -383,6 +412,37 @@ export function InvoiceDetail({
         ) : (
           <span className={`${READ_ONLY_VALUE} tabular-nums`}>{l.qty ?? "—"}</span>
         ),
+    },
+    {
+      key: "received",
+      label: "Received",
+      width: 110,
+      align: "right",
+      sortValue: (l) => receivedFor(l).qty,
+      render: (l) => {
+        const { qty, linked } = receivedFor(l);
+        // Not linked to an order at all — the rent bill, a freight line. There
+        // is no delivery to compare against and an em dash would imply there
+        // was one nobody counted.
+        if (!linked) return <span className="text-faint">—</span>;
+        if (qty === null) {
+          return (
+            <span className="bg-mark-fill px-1 text-[12px] uppercase tracking-[0.06em]">
+              not counted
+            </span>
+          );
+        }
+        // YELLOW ONLY WHEN THEY DIFFER — "worth your eye", and as a FILL rather
+        // than yellow text, which is 1.43:1 on white and unreadable.
+        const differs = Math.abs(qty - Number(l.qty ?? 0)) > 0.0001;
+        return (
+          <span
+            className={`tabular-nums ${differs ? "bg-mark-fill px-1 font-semibold text-ink" : "text-muted"}`}
+          >
+            {qty}
+          </span>
+        );
+      },
     },
     {
       key: "unit_price",
