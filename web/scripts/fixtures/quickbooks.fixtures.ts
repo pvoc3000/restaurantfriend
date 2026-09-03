@@ -443,6 +443,7 @@ import {
   INVOICE_SHEET_KEY,
   proposeBillLink,
   linkedRef,
+  balanceLabel,
   type InvoiceOrder,
   type InvoicePushInputs,
 } from "../../src/lib/quickbooks";
@@ -839,4 +840,16 @@ test("forgetting a link puts the bill back to where it can be sent or adopted", 
   eq(pushMode({ external_ref: cleared }), "create", "cleared: it can be sent afresh");
   eq(pushedLabel(cleared), null, "and claims nothing");
   ok(proposeBillLink(inv({ external_ref: cleared }), [cand()], "3054", norm).ok, "and can be adopted");
+});
+
+test("balanceLabel — a link arrives with the balance already asked for", () => {
+  const dollars = (n: number) => `$${n.toFixed(2)}`;
+  // find_bills already read Balance off the candidate; linking one is
+  // adopting a document QuickBooks has already answered about, so this is
+  // what checkBalance's own reading says too — one implementation, both
+  // doors (Mark, 2026-09-03).
+  eq(balanceLabel("Bill", 0, dollars), "paid in QuickBooks", "zero owed on a bill");
+  eq(balanceLabel("Bill", 0.004, dollars), "paid in QuickBooks", "half a cent rounds to paid");
+  eq(balanceLabel("VendorCredit", 0, dollars), "fully applied in QuickBooks", "a credit reads differently");
+  eq(balanceLabel("Bill", 472.13, dollars), "$472.13 still owed", "and a real balance names it");
 });

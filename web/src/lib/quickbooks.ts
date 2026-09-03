@@ -989,3 +989,25 @@ export function linkedRef(candidate: QboCandidate): AccountingRef {
     },
   };
 }
+
+/**
+ * The words for what QuickBooks says is owed — ONE implementation for
+ * `refresh_status`'s reading and for the balance a LINK already arrives with
+ * (Mark, 2026-09-03: "is it possible to check to see if it's paid and set
+ * the status then, rather than forcing the user to check in a separate
+ * step?"). `find_bills` already asks QuickBooks for `Balance` on every
+ * candidate it returns — accepting a proposal is adopting a document
+ * QuickBooks has already answered about, so there is nothing left to ask a
+ * second time. Half a cent, matching the `exact` check a few lines up and
+ * `MONEY_EPSILON` in lib/invoices — one epsilon for money, everywhere.
+ */
+export function balanceLabel(
+  entity: QboEntity,
+  balance: number,
+  money: (n: number) => string
+): string {
+  if (Math.abs(balance) < 0.005) {
+    return entity === "VendorCredit" ? "fully applied in QuickBooks" : "paid in QuickBooks";
+  }
+  return `${money(balance)} still owed`;
+}

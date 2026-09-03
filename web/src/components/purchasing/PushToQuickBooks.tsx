@@ -24,12 +24,20 @@ import {
   withAttachments,
   proposeBillLink,
   linkedRef,
+  balanceLabel,
   type BillLinkProposal,
   type QboCandidate,
+  type QboEntity,
   type AccountingRef,
   type BillInvoice,
   type VendorLocationAccounting,
 } from "@/lib/quickbooks";
+
+/** The clock reading beside a balance — one implementation for `checkBalance`
+ *  and `link`, which both stamp a moment QuickBooks answered as of. */
+function checkedAtLabel(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
 
 /**
  * Sending one approved invoice to QuickBooks.
@@ -449,10 +457,7 @@ export function PushToQuickBooks({
     }
     const st = ((data?.statuses as Record<string, unknown>[]) ?? [])[0];
     if (!st) return;
-    const at = new Date(data!.checked_at as string).toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-    });
+    const at = checkedAtLabel(data!.checked_at as string);
     // Missing is its own answer: a document deleted or voided in QuickBooks
     // must not read as paid in full.
     if (st.missing) {
@@ -461,15 +466,7 @@ export function PushToQuickBooks({
       return;
     }
     setGone(false);
-    const owed = Number(st.balance);
-    setBalance({
-      text: st.settled
-        ? st.entity === "VendorCredit"
-          ? "fully applied in QuickBooks"
-          : "paid in QuickBooks"
-        : `${money(owed)} still owed`,
-      at,
-    });
+    setBalance({ text: balanceLabel(st.entity as QboEntity, Number(st.balance), money), at });
   }
 
   async function push() {
@@ -550,11 +547,49 @@ export function PushToQuickBooks({
       p_invoice: invoiceId,
       p_ref: linkedRef(candidate),
     });
-    setBusy(false);
     if (refErr || !Array.isArray(rec) || rec.length === 0) {
+      setBusy(false);
       setError(refErr?.message ?? "That could not be recorded here, so nothing was linked.");
       return;
     }
+
+    // THE BALANCE ARRIVED WITH THE CANDIDATE (Mark, 2026-09-03: "is it
+    // possible to check to see if it's paid and set the status then, rather
+    // than forcing the user to check in a separate step?"). `find_bills`
+    // already asked QuickBooks for `Balance` on every candidate it offered
+    // — that is the same fact `checkBalance` would go and fetch a second
+    // time — so it is written here through the SAME plain update
+    // `refresh_status` uses on 088's cache. Not through the definer: that
+    // one exists to stop a purchaser INVENTING a QuickBooks id, and there is
+    // no equivalent risk in recording a figure QuickBooks itself just
+    // returned.
+    //
+    // Null only when QuickBooks answered with no `Balance` at all, which a
+    // real Bill or VendorCredit does not do — left for `checkBalance` rather
+    // than guessed at. And SOFT: the link itself already succeeded, so a
+    // failure here is a warning, not a reason to report the whole thing as
+    // having failed.
+    if (candidate.balance !== null) {
+      const checkedAt = new Date().toISOString();
+      const { data: cached, error: balErr } = await supabase
+        .from("vendor_invoices")
+        .update({ qbo_balance: candidate.balance, qbo_checked_at: checkedAt })
+        .eq("id", invoiceId)
+        .select("id");
+      if (balErr || !cached || cached.length === 0) {
+        setWarnings((prev) => [
+          ...prev,
+          "Linked, but the balance could not be recorded here — press Check QuickBooks to see it.",
+        ]);
+      } else {
+        setBalance({
+          text: balanceLabel(candidate.entity, candidate.balance, money),
+          at: checkedAtLabel(checkedAt),
+        });
+      }
+    }
+
+    setBusy(false);
     setProposal(null);
     setCtx(await readContext());
     onDone();

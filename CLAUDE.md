@@ -2745,6 +2745,42 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the page returns to the plain "Send to QuickBooks" state, confirming
    nothing persists from a declined offer.
 
+   **Shipped 2026-09-03 — LINKING SETS THE BALANCE, TOO.** Mark: "when
+   linking to an existing invoice, is it possible to check to see if it's
+   paid and set the status then, rather than forcing the user to check in a
+   separate step?" Linking had written only `external_ref` — the balance
+   still needed its own "Check QuickBooks" press right afterward, on a
+   figure `find_bills` had **already asked QuickBooks for**: every candidate
+   it returns carries `Balance` (`d.Balance`, read since the function was
+   written), which `proposeBillLink`/`link()` had simply never looked at.
+   **NOT THROUGH THE DEFINER** — `record_accounting_push` exists to stop a
+   purchaser INVENTING a QuickBooks id, and there is no equivalent forgery
+   risk in recording a figure QuickBooks itself just returned in the same
+   response. `link()` now follows `refresh_status`'s own precedent exactly:
+   a plain `.update({ qbo_balance, qbo_checked_at })` through the caller's
+   client, purchaser+ via ordinary RLS, the same column `refresh_status`
+   already writes that way.
+   **NULL BALANCE IS LEFT FOR `checkBalance`** rather than guessed at — a
+   real Bill or VendorCredit does not omit `Balance`, so `candidate.balance
+   === null` only if QuickBooks itself answered oddly, and the escape hatch
+   already exists on screen. **SOFT ON FAILURE**: the link itself has
+   already succeeded by the time this runs, so a refused write is a warning
+   ("press Check QuickBooks to see it"), never a reason to report the whole
+   link as having failed — the attachment-write precedent a few lines up in
+   `sendToQuickBooks`.
+   **`balanceLabel` IS THE ONE IMPLEMENTATION FOR BOTH READINGS** now, in
+   `lib/quickbooks` — `checkBalance`'s wording ("paid in QuickBooks" /
+   "fully applied in QuickBooks" for a credit / "$X still owed") had been
+   inlined only there; pulling it out is what let `link()` describe the
+   same fact the same way instead of writing a second sentence for it.
+   Verified live on the real Chefs Warehouse 73358289: forgotten, re-sent,
+   found as a duplicate, and **linked** — `qbo_balance` and `qbo_checked_at`
+   landed in the same statement as the link (`18:41:22`, seconds after
+   `record_accounting_push`'s own write), and "paid in QuickBooks · as of
+   11:41 AM" rendered immediately, with no second click. **1576 fixtures
+   pass**, one new (`balanceLabel`, checked against a credit, a settled
+   bill, and a real balance).
+
    **Shipped 2026-09-03 — THE BILLED/RECEIVED FLAG IS A BUTTON.** Mark: "can
    the flag that pops up when a billed qty and po received qty differ be
    turned into a button that, when pressed, updates the billed qty with the
