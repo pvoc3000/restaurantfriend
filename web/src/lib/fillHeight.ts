@@ -102,6 +102,19 @@ export function useFillToBottom(
     const observer = new ResizeObserver(measure);
     observer.observe(document.body);
     if (el.parentElement) observer.observe(el.parentElement);
+    // AND WHATEVER SITS ABOVE, directly. What moves this node's top is its
+    // preceding siblings, and the parent's own box is only an indirect witness
+    // to that — one that a `min-h-full` ancestor or a parent already sized by
+    // something else can swallow.
+    //
+    // It stopped being theoretical when invoice detail put its commands in the
+    // header (2026-09-02): the QuickBooks block renders NOTHING until it has
+    // asked whether QuickBooks is connected, so the header grows a beat after
+    // the first measurement and the row keeps a height taken when it sat 47px
+    // higher. Observing the thing that moved is cheaper than inferring it.
+    for (let sib = el.previousElementSibling; sib; sib = sib.previousElementSibling) {
+      observer.observe(sib);
+    }
     window.addEventListener("resize", measure);
     return () => {
       observer.disconnect();

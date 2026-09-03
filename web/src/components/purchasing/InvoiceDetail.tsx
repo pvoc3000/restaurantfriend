@@ -130,13 +130,18 @@ export function InvoiceDetail({
   // The split row fills the window down to the footer; below `xl` the columns
   // stack and the page scrolls instead, which is what stacking is for.
   const rowRef = useRef<HTMLDivElement>(null);
-  // The floor is what stops the lines table being squeezed out of existence.
-  // Bill+Amounts and Purchase orders are ~433px of fixed blocks above it, so a
-  // row shorter than that leaves the pane NOTHING: measured at a 720px window,
-  // the row computed 409px and the table rendered 0px tall while its content
-  // spilled past the column. Below this the page scrolls instead, which is the
-  // same trade receiving makes with its own 280.
-  useFillToBottom(rowRef, useViewportAtLeast(1280), 660);
+  // The floor is what stops the lines table being squeezed out of existence,
+  // and it is a MEASUREMENT of what stands above the table in this column.
+  //
+  // It was 660, taken when Bill+Amounts AND Purchase orders were both here.
+  // Purchase orders moved under the document on 2026-09-02, and a floor left
+  // at the old figure stopped being a floor and became the height: at 1440×900
+  // the row wanted 602 and took 660, so the page scrolled by 58px on a screen
+  // built not to. Re-measured with the amendment band showing — its worst
+  // case — Bill+Amounts is 351 and the gap 40, so 560 leaves the table ~170px
+  // and the row still fits a 900px window. Below it the page scrolls instead,
+  // the same trade receiving makes with its own 280.
+  useFillToBottom(rowRef, useViewportAtLeast(1280), 560);
 
   const {
     phase,
@@ -634,7 +639,14 @@ export function InvoiceDetail({
         </div>
       )}
 
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+      {/* THE SAME TWO COLUMNS AS THE ROW BELOW, so the total's right edge is the
+          document pane's right edge without either knowing the other's width
+          (Mark, 2026-09-02: it should line up with the invoice number and the
+          vendor, and with the document under it). A flex row could not do that
+          — it would have to be told a width, and then be told again whenever
+          the split changed. */}
+      <div className="grid items-end gap-x-6 gap-y-2 xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] xl:gap-x-4">
+        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-2">
         <div>
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
@@ -672,13 +684,54 @@ export function InvoiceDetail({
               ` · ${AGING_LABEL[agingBucket(invoice.due_date, todayLocal())]}`}
           </p>
         </div>
-        <div className="ml-auto text-right">
-          <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-            Total
+          {/* Level with the invoice number and the vendor, at the far edge of
+              the document column — so it reads with the paper it came off. */}
+          <div className="text-right">
+            <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+              Total
+            </div>
+            <div className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
+              {money(signedTotal(invoice))}
+            </div>
           </div>
-          <div className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
-            {money(signedTotal(invoice))}
-          </div>
+        </div>
+
+        {/* THE COMMANDS, level with the title (Mark, 2026-09-02) — where the
+            total used to sit, and where every other record screen in this app
+            keeps them. They came off the foot of the page, which is what buys
+            the lines table its height: the goal here was VERTICAL room, and a
+            pinned footer is a block the table can never grow into.
+
+            `max-w-xl` because these are not only buttons: the QuickBooks block
+            carries a link proposal and a balance in prose, and unbounded in a
+            header cell that prose sets one long line across the page. */}
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+          <PushToQuickBooks
+            invoiceId={invoice.id}
+            vendorId={invoice.vendor_id}
+            locationId={invoice.location_id}
+            orgId={orgId}
+            status={invoice.status}
+            total={invoice.total}
+            isCredit={invoice.is_credit}
+            invoiceNumber={invoice.invoice_number}
+            invoiceDate={invoice.invoice_date}
+            dueDate={invoice.due_date}
+            canPush={canEdit}
+            supabase={supabase}
+            onDone={() => router.refresh()}
+          />
+          <InvoiceFooter
+            invoiceId={invoice.id}
+            status={invoice.status}
+            approvedAt={invoice.approved_at}
+            caveats={caveats}
+            canApprove={canApprove}
+            canEdit={canEdit}
+            closeHref={closeHref}
+            supabase={supabase}
+            onDone={() => router.refresh()}
+          />
         </div>
       </div>
 
@@ -721,6 +774,107 @@ export function InvoiceDetail({
             onKindChange={setKind}
             stacked={false}
           />
+
+          {/* UNDER THE DOCUMENT, as wide as it (Mark, 2026-09-02). It was in the
+              record column, where it and Bill+Amounts were ~433px of fixed
+              blocks standing between the lines table and the top of the screen.
+              Moved here it costs the pane a little height and hands the table
+              all of its own — which was the point, the room wanted being
+              VERTICAL rather than horizontal.
+
+              `shrink-0` so it keeps its size and the PANE gives, which is the
+              right way round: a document viewer scrolls, a list of two orders
+              does not. */}
+          <div className="shrink-0 space-y-2 pt-4">
+            <section className="shrink-0 space-y-2">
+              <SectionHeading count={linkedOrders.length}>
+                Purchase orders
+              </SectionHeading>
+
+              {/* What the page PRINTS, offered rather than taken. Yellow, because
+                  it's worth your eye and not a warning. */}
+              {canEdit &&
+                printedProposals.map((p) => (
+                  <p
+                    key={p.printed}
+                    className="flex flex-wrap items-center gap-3 border border-ink bg-mark-fill px-4 py-2 text-sm"
+                  >
+                    <span>
+                      This invoice prints{" "}
+                      <strong>{p.hit!.po_number}</strong>.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => void linkPrinted(p.hit!.id)}
+                      className="h-8 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
+                    >
+                      Link
+                    </button>
+                  </p>
+                ))}
+
+              {linkedOrders.length === 0 ? (
+                // A landlord bill should not be nagged about a purchase order.
+                invoice.vendors?.order_type === "none" ? (
+                  <p className="text-sm text-muted">
+                    This vendor isn&rsquo;t ordered from, so there&rsquo;s no
+                    purchase order to link.
+                  </p>
+                ) : (
+                  <p className="text-sm text-muted">
+                    No lines on this invoice point at a purchase order yet.
+                  </p>
+                )
+              ) : (
+                <ul className="space-y-2 text-sm">
+                  {linkedOrders.map((order) => {
+                    const count = lines.filter(
+                      (l) => l.purchase_order_id === order.id
+                    ).length;
+                    return (
+                      <li
+                        key={order.id}
+                        className="flex flex-wrap items-baseline gap-x-4 border border-hairline px-4 py-2"
+                      >
+                        <Link
+                          href={withFrom(`/purchase-orders/${order.id}`, {
+                            href: selfHref,
+                            label: invoice.invoice_number ?? "Invoice",
+                          })}
+                          className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+                        >
+                          {order.po_number}
+                        </Link>
+                        <span className="text-muted">{order.order_date}</span>
+                        <span className="text-muted">
+                          {count} {count === 1 ? "line" : "lines"}
+                        </span>
+                        <Link
+                          href={withFrom(`/purchase-orders/${order.id}/receive`, {
+                            href: selfHref,
+                            label: invoice.invoice_number ?? "Invoice",
+                          })}
+                          className="ml-auto text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+                        >
+                          Reconcile
+                        </Link>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+
+              {canEdit && (
+                <div className="pt-1">
+                  <LinkToPo
+                    lines={lines}
+                    candidates={linkCandidates}
+                    onDone={() => router.refresh()}
+                  />
+                </div>
+              )}
+          </section>
+          </div>
         </div>
 
         <div className="flex min-h-0 min-w-0 flex-col gap-y-10 xl:overflow-hidden">
@@ -971,95 +1125,6 @@ export function InvoiceDetail({
           </div>
 
           {/* What it belongs to. */}
-          <section className="shrink-0 space-y-2">
-            <SectionHeading count={linkedOrders.length}>
-              Purchase orders
-            </SectionHeading>
-
-            {/* What the page PRINTS, offered rather than taken. Yellow, because
-                it's worth your eye and not a warning. */}
-            {canEdit &&
-              printedProposals.map((p) => (
-                <p
-                  key={p.printed}
-                  className="flex flex-wrap items-center gap-3 border border-ink bg-mark-fill px-4 py-2 text-sm"
-                >
-                  <span>
-                    This invoice prints{" "}
-                    <strong>{p.hit!.po_number}</strong>.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => void linkPrinted(p.hit!.id)}
-                    className="h-8 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
-                  >
-                    Link
-                  </button>
-                </p>
-              ))}
-
-            {linkedOrders.length === 0 ? (
-              // A landlord bill should not be nagged about a purchase order.
-              invoice.vendors?.order_type === "none" ? (
-                <p className="text-sm text-muted">
-                  This vendor isn&rsquo;t ordered from, so there&rsquo;s no
-                  purchase order to link.
-                </p>
-              ) : (
-                <p className="text-sm text-muted">
-                  No lines on this invoice point at a purchase order yet.
-                </p>
-              )
-            ) : (
-              <ul className="space-y-2 text-sm">
-                {linkedOrders.map((order) => {
-                  const count = lines.filter(
-                    (l) => l.purchase_order_id === order.id
-                  ).length;
-                  return (
-                    <li
-                      key={order.id}
-                      className="flex flex-wrap items-baseline gap-x-4 border border-hairline px-4 py-2"
-                    >
-                      <Link
-                        href={withFrom(`/purchase-orders/${order.id}`, {
-                          href: selfHref,
-                          label: invoice.invoice_number ?? "Invoice",
-                        })}
-                        className="text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-                      >
-                        {order.po_number}
-                      </Link>
-                      <span className="text-muted">{order.order_date}</span>
-                      <span className="text-muted">
-                        {count} {count === 1 ? "line" : "lines"}
-                      </span>
-                      <Link
-                        href={withFrom(`/purchase-orders/${order.id}/receive`, {
-                          href: selfHref,
-                          label: invoice.invoice_number ?? "Invoice",
-                        })}
-                        className="ml-auto text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-                      >
-                        Reconcile
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-
-            {canEdit && (
-              <div className="pt-1">
-                <LinkToPo
-                  lines={lines}
-                  candidates={linkCandidates}
-                  onDone={() => router.refresh()}
-                />
-              </div>
-            )}
-          </section>
-
           {/* The lines, in a pane of their own. Fifteen rows is 1,319px — more
               than the rest of the record put together — so left to run they
               are what makes this page three screens tall. Paned, the column
@@ -1092,33 +1157,6 @@ export function InvoiceDetail({
         </div>
       </div>
 
-      <PushToQuickBooks
-        invoiceId={invoice.id}
-        vendorId={invoice.vendor_id}
-        locationId={invoice.location_id}
-        orgId={orgId}
-        status={invoice.status}
-        total={invoice.total}
-        isCredit={invoice.is_credit}
-        invoiceNumber={invoice.invoice_number}
-        invoiceDate={invoice.invoice_date}
-        dueDate={invoice.due_date}
-        canPush={canEdit}
-        supabase={supabase}
-        onDone={() => router.refresh()}
-      />
-
-      <InvoiceFooter
-        invoiceId={invoice.id}
-        status={invoice.status}
-        approvedAt={invoice.approved_at}
-        caveats={caveats}
-        canApprove={canApprove}
-        canEdit={canEdit}
-        closeHref={closeHref}
-        supabase={supabase}
-        onDone={() => router.refresh()}
-      />
     </>
   );
 }

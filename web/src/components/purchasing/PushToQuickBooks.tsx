@@ -212,6 +212,10 @@ export function PushToQuickBooks({
     accountRef: account?.ref ?? null,
   });
   const already = pushedLabel(ctx.invoiceRef);
+  /** The refusal worth words. `billPushRefusals` still returns the approval one
+   *  — the BUTTON is still correctly disabled by it — this only declines to
+   *  restate it beside the control that settles it. */
+  const shownRefusal = refusals.find((r) => !/approve it first/i.test(r)) ?? null;
   /** A placeholder for the metadata's entity ref, which the server overwrites
    *  with the document it actually wrote — on a first push there is none. */
   const qboRefId = ctx.invoiceRef?.qbo?.id ?? null;
@@ -547,8 +551,14 @@ export function PushToQuickBooks({
 
       {/* Why the button is off, in words. A disabled control explains itself
           only on hover, and the iPad has none. */}
-      {canPush && refusals.length > 0 && (
-        <p className="text-[13px] text-muted">{refusals[0]}</p>
+      {/* NOT THE APPROVAL ONE (Mark, 2026-09-02). "Approve it first" earned its
+          place while this block sat at the foot of the page and the Approve
+          button was somewhere else; side by side in one row it is a sentence
+          explaining a button by pointing at the button next to it. The other
+          refusals — no vendor mapped, no expense account — still say what is
+          missing, because nothing on screen implies those. */}
+      {canPush && shownRefusal && (
+        <p className="text-[13px] text-muted">{shownRefusal}</p>
       )}
       {!refusals.length && account && !already && (
         <p className="text-[13px] text-faint">

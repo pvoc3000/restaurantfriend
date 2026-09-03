@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ATTACHMENT_BUCKET } from "@/lib/attachments";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -199,13 +198,9 @@ export function InvoiceFooter({
           </span>
         )}
 
-        <Link
-          href={closeHref}
-          className="text-sm text-muted underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-        >
-          Close
-        </Link>
-
+        {/* NO CLOSE (Mark, 2026-09-02). It was the escape from a footer pinned
+            to the foot of the page; with these commands level with the title
+            the breadcrumb is directly above them and says where it goes. */}
         {canEdit && status !== "void" && (
           <button
             type="button"
