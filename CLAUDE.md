@@ -2531,6 +2531,54 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    The regression fixture is the Chefs Warehouse invoice itself and it exists to
    go RED if anybody makes this a computation again; checked by breaking it, 2
    go red and reproduce the $1,952.90.
+   **Shipped 2026-09-02 — THE INVOICE READS WHAT THE DRIVER WROTE ON IT.** The
+   reader had SEEN the handwriting all along and buried it in a notes paragraph
+   behind a caret: BakeMark 452660 sat on screen at $1,001.26 while the page in
+   the folder said $823.46, with two cases of whipped topping struck out and a
+   credit written by hand. So the extraction schema gained
+   **`corrected_total`** on the header and **`struck_through`** on the line,
+   both OPTIONAL in TS and required in the schema — the `ship_date` shape, so
+   every reading stored before this stays valid and simply never carries them.
+   `handAmendment` derives the band from the reading and stores NOTHING, so a
+   re-read updates it and nothing has to be kept in step; it sits at the TOP
+   because it changes what the whole document means. **Taking the corrected
+   total writes ONE FIELD and deliberately not the lines** — zeroing a struck
+   line's charge is a second judgement, and a button that quietly rewrote seven
+   rows would be doing more than it says. **Needs `extract-invoice` redeployed**
+   to see either field; done 2026-09-02.
+   **Shipped the same day — THE DETAIL SCREEN IS A DOCUMENT WITH A LEDGER
+   BESIDE IT** (Mark, wanting room for the lines). The total sits at the
+   document's right edge level with the invoice number, the purchase orders
+   moved UNDER the document at its own width, and every command — Void, Delete,
+   Approve, **and Send to QuickBooks** — shares one row, with each button's
+   explanatory prose spanning BENEATH the row rather than beside its own button.
+   That prose placement is what let the QuickBooks bands split: the button joins
+   the row of peers and only the sentence stays in the yellow.
+   **`order-last basis-full` IS THE MECHANISM** — the prose is a flex sibling
+   that claims its own line, so the layout does not depend on DOM order and a
+   band can be added without re-threading the row. His ask was VERTICAL room and
+   the first pass gave horizontal (Mark: "I meant vertical, not horizontal
+   space"), which is why the row is measured with `useFillToBottom` at a **560**
+   floor — 660 became the height rather than the floor and left the page
+   scrolling 58px.
+   **A BILLED QUANTITY THAT DISAGREES WITH WHAT WE RECEIVED IS FLAGGED, NOT
+   COLUMNED** (Mark, reversing a Received column he had asked for an hour
+   earlier: "just flagging when the billed qty != received qty is better"). A
+   column spends width on every row to answer a question about a few; the flag
+   is yellow on the billed cell and names the received figure. `receivedFor`
+   reads the PO line the invoice line is already joined to, so it costs no
+   query. **A PO edited after its invoice was filed does not push anything into
+   the invoice** — they are two documents, and this is the app noticing they
+   have drifted rather than reconciling them for you.
+   **The LIST gained a PO Date column** after PO (sortable and groupable — a
+   delivery's date is what you scan a week's bills by) and **lost Tax and
+   Freight**, which were two mostly-empty columns of money nobody reconciles at
+   list level. **Bulk approve and bulk delete** joined the selection bar;
+   approve goes one-by-one through the definer RPC with each row count checked,
+   because 025's approval is a COLUMN rule and there is no batch form of it.
+   **The report lands on the LIST, not the bar** — clearing the selection
+   unmounts the bar, so a summary rendered there vanishes at the moment it is
+   read.
    **BOTH AMOUNT CAVEATS ASK ABOUT THE PAGE, NEVER ABOUT OUR OWN COLUMNS**
    (Mark, 2026-09-02, the same day: "there's a warning that isn't appropriate …
    after I changed it back the warning didn't go away"). `amountReconciliation`
@@ -6620,7 +6668,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `vendor_locations`, which is where every mapping actually lives · **084**
    `accounting_connections.tax_code_ref` · **085** widens
    `accounting_connection_status()` to RETURN 084's columns · **086** drops
-   `realm_id` from it and returns `connected`.
+   `realm_id` from it and returns `connected` · **088**
+   `vendor_invoices.qbo_balance` + `qbo_checked_at`, the A/P payment cache.
+   Probe 088 with `select column_name from information_schema.columns where
+   table_name = 'vendor_invoices' and column_name in ('qbo_balance',
+   'qbo_checked_at')` — two rows.
    **084 WITHOUT 085 IS THE WORST STATE and it shipped that way**: the write
    goes through `qbo-sync`, which sees the column, so Settings saves the tax
    code and reports success — while every reader goes through the status
@@ -6652,19 +6704,31 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    money is the shape this codebase treats as a bug. **A/P is the opposite and
    is the right place to pull** — the app has no vendor payments table by
    design, so QuickBooks is the only place that fact exists. `refresh_status`
-   already returns `Balance` and stores NOTHING; a bill's own screen says "paid
-   in QuickBooks" or what is still owed, with an "as of". Showing it on the LIST
-   is the open piece, and the decision it needs is whether to store the figure
-   WITH its `checked_at` — the rule against storing was written for a bare
-   figure rendered as current, which is a different thing.
-   **A STATUS LADDER WAS PROPOSED AND NOT BUILT** (Mark, 2026-09-02): Open ·
-   Approved · **Submitted** · **Paid**. Reasonable, with four caveats recorded
-   here so they are not re-derived — Submitted and Paid should be DERIVED
-   (`synced_at` already says submitted; a status column repeating it is two
-   answers to one question); the first three are OUR acts and always current
-   while Paid is a fact we last HEARD, so it needs its "as of"; a bill can be
-   PART paid, and "Submitted · $412 still owed" says more than a fifth rung; and
-   `void` is an exit rather than a rung, like `cancelled` on special orders.
+   already returns `Balance`. **BUILT 2026-09-02 — see the status ladder
+   below**; the decision it was waiting on was whether to store the figure WITH
+   its `checked_at`, and the answer is yes: the rule against storing was written
+   for a bare figure rendered as current, which is a different thing.
+   **SHIPPED 2026-09-02 — THE STATUS LADDER, Open · Approved · Submitted ·
+   Paid** (Mark: "when we push a bill to QBO, the status should be 'Submitted'
+   as in Submitted for payment. When it's paid, the status should be 'Paid'").
+   **THE TOP TWO RUNGS ARE DERIVED AND THERE IS NO NEW STATUS COLUMN**
+   (`billStage` in `lib/invoices`): `status` still holds only what WE decided —
+   open, approved, void — and the ladder is that plus what QuickBooks last said.
+   A status column repeating `synced_at` would be two answers to one question.
+   **`void` IS TESTED FIRST**, because it is an exit from the ladder rather than
+   a position on it, and a voided bill that still carries a link would otherwise
+   read as Submitted. **PAID IS A NUMERIC ZERO AND NOTHING ELSE** — null is
+   "nobody asked" or "QuickBooks no longer has it", neither of which is paid,
+   which is the whole of 088's tri-state.
+   **088 STORES THE BALANCE, WHICH INVERTS DECISION 7, AND `qbo_checked_at` IS
+   WHY.** That decision refused to store a QBO figure because it would be "stale
+   the moment it lands and rendered as if current" — true of a bare number, and
+   the fix is the timestamp rather than the absence: `billPaymentNote` returns
+   NOTHING without one, so no claim about payment can ever appear without the
+   day it was true. It is a CACHE OF THEIR FACT, never ours — this app still
+   records no vendor payment, which is what keeps QuickBooks the single source.
+   A bill can be PART paid, so "Submitted · $412 still owed" is a sentence
+   rather than a fifth rung.
    **"Submitted" can only ever mean ON THE BOOKS, never sent for payment** —
    QuickBooks Bill Pay is a QBO interface feature and the Accounting API can
    RECORD a `BillPayment` but not initiate one.
