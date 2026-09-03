@@ -2,6 +2,7 @@ import { test, eq } from "./harness";
 import {
   billStage,
   billPaymentNote,
+  pushIsStale,
   BILL_STAGE_LABEL,
   BILL_STAGE_ORDER,
   type BillStageInput,
@@ -87,4 +88,23 @@ test("a half-cent is not a debt", () => {
   const at = "2026-09-02T20:00:00Z";
   eq(billStage(bill({ linked: true, qbo_balance: 0.004, qbo_checked_at: at })), "paid", "under half a cent");
   eq(billStage(bill({ linked: true, qbo_balance: 0.01, qbo_checked_at: at })), "submitted", "a real cent is not paid");
+});
+
+test("pushIsStale: neither pushed nor touched is not stale", () => {
+  eq(pushIsStale({ synced_at: null, financials_touched_at: null }), false, "never pushed");
+  eq(pushIsStale({ synced_at: null, financials_touched_at: "2026-09-03T00:00:00Z" }), false, "touched but never pushed");
+  eq(pushIsStale({ synced_at: "2026-09-01T00:00:00Z", financials_touched_at: null }), false, "pushed, untouched since creation");
+});
+
+test("pushIsStale: touched after the push is stale, before it is not", () => {
+  eq(
+    pushIsStale({ synced_at: "2026-09-01T00:00:00Z", financials_touched_at: "2026-09-02T00:00:00Z" }),
+    true,
+    "edited a day after the push"
+  );
+  eq(
+    pushIsStale({ synced_at: "2026-09-02T00:00:00Z", financials_touched_at: "2026-09-01T00:00:00Z" }),
+    false,
+    "the push already covers this edit"
+  );
 });

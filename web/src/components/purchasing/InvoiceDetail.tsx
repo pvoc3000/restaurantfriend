@@ -151,6 +151,29 @@ export function InvoiceDetail({
   // the same trade receiving makes with its own 280.
   useFillToBottom(rowRef, useViewportAtLeast(1280), 560);
 
+  /**
+   * 089 (Mark, 2026-09-03: "a lot of the invoice should not be editable once
+   * it has been approved for payment… If the user wants to edit these
+   * things, they need to withdraw approval first").
+   *
+   * EDITABLE IFF status = "open" — a voided invoice locks exactly like an
+   * approved one, and Reopen is its own unlock path, the same shape as
+   * Withdraw approval. This is a UI convenience only; the real gate is the
+   * DATABASE trigger (089), which refuses the write regardless of what this
+   * constant says — a stale tab or a direct write cannot get around it. What
+   * this buys is the field rendering read-only BEFORE anyone tries, instead
+   * of erroring after.
+   *
+   * NOT the same as `canEdit`: notes and terms stay editable at any status —
+   * pure annotation, no effect on money or on what QuickBooks receives — so
+   * they keep reading plain `canEdit`. This is only for the fields the
+   * trigger actually locks: invoice_number, invoice_date, due_date, vendor,
+   * location, tax, freight, other, subtotal/total, and on a line — qty,
+   * unit_price, extended, the freight/item toggle, and the PO link.
+   */
+  const financialsLocked = invoice.status !== "open";
+  const canEditFinancials = canEdit && !financialsLocked;
+
   const {
     phase,
     busy,
@@ -629,7 +652,7 @@ export function InvoiceDetail({
                 uncounted
               </span>
             )}
-            {canEdit ? (
+            {canEditFinancials ? (
               <InlineValue
                 table="vendor_invoice_lines"
                 id={l.id}
@@ -653,7 +676,7 @@ export function InvoiceDetail({
       align: "right",
       sortValue: (l) => l.unit_price,
       render: (l) =>
-        canEdit ? (
+        canEditFinancials ? (
           <InlineValue
             table="vendor_invoice_lines"
             id={l.id}
@@ -689,7 +712,7 @@ export function InvoiceDetail({
       render: (l) => {
         const stranded =
           Number(l.qty ?? 0) === 0 && Number(l.extended ?? 0) !== 0;
-        const cell = canEdit ? (
+        const cell = canEditFinancials ? (
           <InlineValue
             table="vendor_invoice_lines"
             id={l.id}
@@ -765,19 +788,27 @@ export function InvoiceDetail({
           items={[
             {
               label: "Unlink",
-              hint: "Leave this line unattributed",
-              disabled: l.purchase_order_id === null,
+              // 089: the PO link is locked with the rest of a line's money —
+              // relinking changes what the receiving comparison is measured
+              // against, which is part of what got approved.
+              hint: financialsLocked
+                ? "Withdraw approval to change this"
+                : "Leave this line unattributed",
+              disabled: financialsLocked || l.purchase_order_id === null,
               onSelect: () => void setLineLink(l.id, null, null),
             },
             {
               label: l.kind === "freight" ? "Mark as an item" : "Mark as freight",
               // Kind is what keeps the totals honest: a freight LINE and a
               // header freight amount are the same charge printed twice, so
-              // the subtotal check counts item lines only.
-              hint:
-                l.kind === "freight"
+              // the subtotal check counts item lines only. LOCKED too — it
+              // moves money through a side door without touching qty or price.
+              hint: financialsLocked
+                ? "Withdraw approval to change this"
+                : l.kind === "freight"
                   ? "Count it toward the subtotal again"
                   : "A delivery fee or fuel surcharge",
+              disabled: financialsLocked,
               onSelect: () =>
                 void setLineKind(l.id, l.kind === "freight" ? "item" : "freight"),
             },
@@ -962,6 +993,8 @@ export function InvoiceDetail({
               invoiceNumber={invoice.invoice_number}
               invoiceDate={invoice.invoice_date}
               dueDate={invoice.due_date}
+              financialsTouchedAt={invoice.financials_touched_at}
+              syncedAt={invoice.synced_at}
               canPush={canEdit}
               supabase={supabase}
               onDone={() => router.refresh()}
@@ -1143,7 +1176,7 @@ export function InvoiceDetail({
               <SectionHeading>Bill</SectionHeading>
               <dl className={DL_CLASS}>
               <Field label="Invoice number">
-                <Cell canEdit={canEdit} value={invoice.invoice_number}>
+                <Cell canEdit={canEditFinancials} value={invoice.invoice_number}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
                     table="vendor_invoices"
@@ -1154,7 +1187,7 @@ export function InvoiceDetail({
                 </Cell>
               </Field>
               <Field label="Invoice date">
-                <Cell canEdit={canEdit} value={invoice.invoice_date}>
+                <Cell canEdit={canEditFinancials} value={invoice.invoice_date}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
                     table="vendor_invoices"
@@ -1166,7 +1199,7 @@ export function InvoiceDetail({
                 </Cell>
               </Field>
               <Field label="Due date">
-                <Cell canEdit={canEdit} value={invoice.due_date}>
+                <Cell canEdit={canEditFinancials} value={invoice.due_date}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
                     table="vendor_invoices"
@@ -1192,7 +1225,7 @@ export function InvoiceDetail({
                 </Cell>
               </Field>
               <Field label="Vendor">
-                <Cell canEdit={canEdit} value={invoice.vendors?.name ?? null}>
+                <Cell canEdit={canEditFinancials} value={invoice.vendors?.name ?? null}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
                     table="vendor_invoices"
@@ -1207,7 +1240,7 @@ export function InvoiceDetail({
                 </Cell>
               </Field>
               <Field label="Location">
-                <Cell canEdit={canEdit} value={locationCode}>
+                <Cell canEdit={canEditFinancials} value={locationCode}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
                     table="vendor_invoices"
@@ -1263,7 +1296,7 @@ export function InvoiceDetail({
                       {money(column === "subtotal" ? computed.subtotal : computed.total)}
                     </span>
                   ) : (
-                  <Cell canEdit={canEdit} value={value === null ? null : money(value)}>
+                  <Cell canEdit={canEditFinancials} value={value === null ? null : money(value)}>
                     <InlineValue
                       boxed={BOXED_FIELDS}
                       table="vendor_invoices"

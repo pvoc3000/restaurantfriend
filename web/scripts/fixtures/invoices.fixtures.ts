@@ -73,6 +73,8 @@ function invoice(over: Partial<VendorInvoice> = {}): VendorInvoice {
     approved_by: null,
     source: "manual",
     notes: null,
+    synced_at: null,
+    financials_touched_at: null,
     ...over,
   };
 }

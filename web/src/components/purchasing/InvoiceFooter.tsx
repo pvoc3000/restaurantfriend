@@ -262,7 +262,15 @@ export function InvoiceFooter({
         {status === "approved" && (
           <span className="block text-sm text-muted">
             Approved for payment
-            {approvedAt ? ` on ${approvedAt.slice(0, 10)}` : ""}.
+            {approvedAt ? ` on ${approvedAt.slice(0, 10)}` : ""}. Its figures
+            are locked — withdraw approval to edit them.
+          </span>
+        )}
+        {/* 089: void locks the same as approved, and its own unlock path is
+            Reopen — the trigger's own wording, matched here. */}
+        {status === "void" && (
+          <span className="block text-sm text-muted">
+            Void. Its figures are locked — reopen it to edit them.
           </span>
         )}
       </div>

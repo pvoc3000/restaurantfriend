@@ -1,16 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { invokeQbo } from "@/lib/qboClient";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { money } from "@/lib/purchaseOrders";
-import { normalizeInvoiceNumber } from "@/lib/invoices";
+import { normalizeInvoiceNumber, pushIsStale } from "@/lib/invoices";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import {
   billPushRefusals,
   buildBillPayload,
   expenseAccountFor,
+  type ResolvedAccount,
+  type QboRefValue,
   pushedLabel,
   qboTrackingFor,
   qboVendorId,
@@ -69,6 +71,8 @@ export function PushToQuickBooks({
   invoiceNumber,
   invoiceDate,
   dueDate,
+  financialsTouchedAt,
+  syncedAt,
   canPush,
   supabase,
   onDone,
@@ -84,6 +88,9 @@ export function PushToQuickBooks({
   invoiceNumber: string | null;
   invoiceDate: string | null;
   dueDate: string | null;
+  /** 089's pair — see `pushIsStale`. */
+  financialsTouchedAt: string | null;
+  syncedAt: string | null;
   /** purchaser+, matching what `record_accounting_push` will accept. */
   canPush: boolean;
   supabase: SupabaseClient;
@@ -104,6 +111,95 @@ export function PushToQuickBooks({
    *  from `balance` because it is the one answer that needs an ACTION rather
    *  than a figure — see `unlink`. */
   const [gone, setGone] = useState(false);
+
+  /**
+   * THE ACTIVE OFFER's trigger (Mark, 2026-09-03, on top of a passive note he
+   * already had: "how about offering to resync once the invoice is
+   * reapproved?"). Fires once, the instant `status` transitions INTO
+   * "approved" while this bill is linked, stale and pushable.
+   *
+   * HOOKS FIRST, CONDITION LATER — this has to live above the two early
+   * returns below (no `ctx` yet; not connected), because React requires every
+   * hook to run in the same order on every render. The real condition
+   * (`already`, `stale`, `refusals`) is not knowable until AFTER those
+   * returns, once `ctx` has resolved — so rather than share the main render
+   * body's locals (which don't exist yet from a hook's vantage point), the
+   * effect below recomputes the small amount of business logic itself,
+   * reading `ctx` STATE directly. A "latest ref" written during render was
+   * the first attempt and `react-hooks/refs` refuses it outright — mutating a
+   * ref outside an effect is exactly what that rule exists to catch.
+   *
+   * Seeded to the CURRENT status on mount, not null, so loading an
+   * already-approved, already-stale invoice does not itself read as a
+   * transition — only a live re-approval witnessed within this page session
+   * does. The passive note in the prose stack below covers "reloaded later,
+   * still stale"; this covers the moment the cycle actually closes.
+   */
+  const prevStatusRef = useRef(status);
+  useEffect(() => {
+    const prevStatus = prevStatusRef.current;
+    prevStatusRef.current = status;
+    if (prevStatus === "approved" || status !== "approved") return;
+    // SELF-CONTAINED, reading `ctx` STATE directly rather than the local
+    // consts the main render body derives below — those live textually AFTER
+    // this component's two early returns, and a hook (this effect) cannot,
+    // so the small amount of business logic below is recomputed rather than
+    // shared. `react-hooks/refs` refuses a "latest ref" written during render
+    // as the alternative — mutating a ref outside an effect is exactly what
+    // it exists to catch, so this effect does the whole job itself instead.
+    if (!ctx || !ctx.connected) return;
+    const already = pushedLabel(ctx.invoiceRef);
+    const stale = pushIsStale({
+      financials_touched_at: financialsTouchedAt,
+      synced_at: syncedAt,
+    });
+    if (!already || !stale || !canPush) return;
+    const account = expenseAccountFor(ctx.atShop, ctx.orgAccount);
+    const vendorRef = qboVendorId(ctx.atShop?.external_ref ?? null);
+    const refusals = billPushRefusals({
+      invoice: {
+        id: invoiceId,
+        invoice_number: invoiceNumber,
+        invoice_date: invoiceDate,
+        due_date: dueDate,
+        total,
+        is_credit: isCredit,
+        status,
+        external_ref: ctx.invoiceRef,
+      },
+      vendorRef,
+      vendorName: ctx.vendorName,
+      accountRef: account?.ref ?? null,
+    });
+    if (refusals.length > 0) return;
+    if (!account) return;
+    const tracking = qboTrackingFor(ctx.atShop);
+    const billInvoice: BillInvoice = {
+      id: invoiceId,
+      invoice_number: invoiceNumber,
+      invoice_date: invoiceDate,
+      due_date: dueDate,
+      total,
+      is_credit: isCredit,
+      status,
+      external_ref: ctx.invoiceRef,
+    };
+    // ITS OWN CONFIRM, WORDED FOR THIS MOMENT rather than `push()`'s — reusing
+    // that one would show a SECOND, differently-worded dialog asking the same
+    // question the person just answered by re-approving.
+    void (async () => {
+      const ok = await confirmDialog({
+        ...splitConfirmMessage(
+          `This bill was edited since it was sent to QuickBooks.\n\n` +
+            `Update it now to keep the two in sync?`
+        ),
+        confirmLabel: "Update in QuickBooks",
+      });
+      if (!ok) return;
+      await sendToQuickBooks({ ctx, billInvoice, account, vendorRef, tracking });
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, ctx, financialsTouchedAt, syncedAt, canPush]);
 
   const readContext = useCallback(async (): Promise<Ctx> => {
     const [conn, vendor, invoice, atShop, docs] = await Promise.all([
@@ -187,131 +283,40 @@ export function PushToQuickBooks({
     };
   }, [ctx, status, invoiceNumber, invoiceId, total, isCredit, supabase]);
 
-  // STILL DECIDING — a same-shaped placeholder holds the space rather than
-  // showing nothing for the beat before the connection check resolves
-  // (Mark, 2026-09-03: "place a dummy button and prose in place just as a
-  // placeholder while the app is deciding what to actually show"). It is
-  // deliberately BLANK rather than a guess at the real label — at this point
-  // we don't yet know whether this becomes Send, Update, Link to it, or
-  // nothing at all (the org may not be connected), and a placeholder that
-  // claims a specific action would be worse than one that claims nothing.
-  // `aria-hidden` because there is no content here for a screen reader to
-  // announce, only a shape.
-  if (!ctx) {
-    return (
-      <div className="flex flex-col items-end gap-1.5" aria-hidden="true">
-        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-          <span className="h-9 w-40 border border-hairline bg-neutral-50" />
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-          <span className="h-[13px] w-48 bg-neutral-50" />
-        </div>
-      </div>
-    );
-  }
-
-  // NOTHING AT ALL once we know: an invoice screen is not the place to
-  // advertise a feature nobody has set up.
-  if (!ctx.connected) return null;
-
-  const account = expenseAccountFor(ctx.atShop, ctx.orgAccount);
-  // The mapping is the SHOP's now, not the vendor's — 026's column, finally read.
-  const vendorRef = qboVendorId(ctx.atShop?.external_ref ?? null);
-  const tracking = qboTrackingFor(ctx.atShop);
-  const billInvoice: BillInvoice = {
-    id: invoiceId,
-    invoice_number: invoiceNumber,
-    invoice_date: invoiceDate,
-    due_date: dueDate,
-    total,
-    is_credit: isCredit,
-    status,
-    external_ref: ctx.invoiceRef,
-  };
-  const refusals = billPushRefusals({
-    invoice: billInvoice,
-    vendorRef,
-    vendorName: ctx.vendorName,
-    accountRef: account?.ref ?? null,
-  });
-  const already = pushedLabel(ctx.invoiceRef);
-  /** The refusal worth words. `billPushRefusals` still returns the approval one
-   *  — the BUTTON is still correctly disabled by it — this only declines to
-   *  restate it beside the control that settles it. */
-  const shownRefusal = refusals.find((r) => !/approve it first/i.test(r)) ?? null;
-  /** A placeholder for the metadata's entity ref, which the server overwrites
-   *  with the document it actually wrote — on a first push there is none. */
-  const qboRefId = ctx.invoiceRef?.qbo?.id ?? null;
-
-  async function checkBalance() {
-    setBusy(true);
-    setError(null);
-    const { data, message } = await invokeQbo(supabase, {
-      mode: "refresh_status",
-      invoice_ids: [invoiceId],
-    });
-    setBusy(false);
-    if (message) {
-      setError(message);
-      return;
-    }
-    const st = ((data?.statuses as Record<string, unknown>[]) ?? [])[0];
-    if (!st) return;
-    const at = new Date(data!.checked_at as string).toLocaleTimeString([], {
-      hour: "numeric",
-      minute: "2-digit",
-    });
-    // Missing is its own answer: a document deleted or voided in QuickBooks
-    // must not read as paid in full.
-    if (st.missing) {
-      setBalance({ text: "no longer in QuickBooks", at });
-      setGone(true);
-      return;
-    }
-    setGone(false);
-    const owed = Number(st.balance);
-    setBalance({
-      text: st.settled
-        ? st.entity === "VendorCredit"
-          ? "fully applied in QuickBooks"
-          : "paid in QuickBooks"
-        : `${money(owed)} still owed`,
-      at,
-    });
-  }
-
-  async function push() {
+  /**
+   * THE ACTUAL SEND, with no confirm of its own — `push()` and the
+   * re-approval offer below both confirm first, in their own words, and then
+   * call this. One implementation of the mechanics, two call sites, matching
+   * 013's precedent: a stale-figures resync and a fresh send are the same
+   * act, and duplicating the attachment/record-ref plumbing between them is
+   * exactly how the two would drift.
+   *
+   * TAKES ITS INPUTS AS PARAMETERS rather than closing over the render
+   * body's locals, which is what lets it be DECLARED HERE — above the two
+   * early returns below, alongside the hooks — while `push()` still calls it
+   * from much further down, after those returns. `ctx`/`billInvoice`/
+   * `account`/`vendorRef`/`tracking` don't exist yet from a hook's vantage
+   * point; taking them as arguments means this function doesn't need them to
+   * exist until it is actually CALLED, which both call sites already
+   * guarantee before calling it.
+   */
+  async function sendToQuickBooks(input: {
+    ctx: Ctx;
+    billInvoice: BillInvoice;
+    account: ResolvedAccount;
+    vendorRef: string | null;
+    tracking: { location: QboRefValue | null; klass: QboRefValue | null };
+  }) {
+    const { ctx: liveCtx, billInvoice, account, vendorRef, tracking } = input;
+    const qboRefId = liveCtx.invoiceRef?.qbo?.id ?? null;
     const { entity, body: payload } = buildBillPayload({
       invoice: billInvoice,
       vendorRef,
-      vendorName: ctx!.vendorName,
-      accountRef: account!.ref,
+      vendorName: liveCtx.vendorName,
+      accountRef: account.ref,
       department: tracking.location,
       klass: tracking.klass,
     });
-
-    const where = splitAccountName(account!.name).leaf || account!.ref;
-    // IF WE KNOW IT IS ALREADY THERE, SAY SO IN THE CONFIRM. Not a block —
-    // `closeReadiness`'s posture, name it and let you through — but this one
-    // costs a duplicate bill in the real books, so it leads and it is blunt.
-    const dup =
-      !already && proposal?.ok
-        ? `QuickBooks ALREADY HAS this as ${proposal.candidate.entity} ` +
-          `${proposal.candidate.doc_number ?? proposal.candidate.id}. Sending it makes a ` +
-          `SECOND one. Link to the existing bill instead unless you mean to duplicate it.\n\n`
-        : "";
-    const ok = await confirmDialog({
-      ...splitConfirmMessage(
-        dup +
-          `${already ? "Update" : "Send"} this ${isCredit ? "credit" : "bill"} in QuickBooks?\n\n` +
-          `${ctx!.vendorName} · ${invoiceNumber ?? "no number"} · $${Number(total).toFixed(2)}\n` +
-          `Posts to ${where}${account!.source === "org" ? " (the org default)" : ""}` +
-          `${tracking.location ? `\nLocation: ${tracking.location.name ?? tracking.location.ref}` : ""}` +
-          `${tracking.klass ? `\nClass: ${tracking.klass.name ?? tracking.klass.ref}` : ""}`
-      ),
-      confirmLabel: already ? "Update" : "Send",
-    });
-    if (!ok) return;
 
     setBusy(true);
     setError(null);
@@ -321,7 +326,7 @@ export function PushToQuickBooks({
     // `invoice`, and only what is not already up there: a second upload of the
     // same file makes a SECOND attachment — QuickBooks has no upsert, measured.
     const localWarnings: string[] = [];
-    const files = attachmentsToSend(ctx!.documents, ctx!.invoiceRef)
+    const files = attachmentsToSend(liveCtx.documents, liveCtx.invoiceRef)
       .filter((d) => {
         const no = attachmentRefusal(d.content_type, d.file_name);
         if (no) localWarnings.push(no);
@@ -390,6 +395,130 @@ export function PushToQuickBooks({
     );
     setCtx(await readContext());
     onDone();
+  }
+
+  // STILL DECIDING — a same-shaped placeholder holds the space rather than
+  // showing nothing for the beat before the connection check resolves
+  // (Mark, 2026-09-03: "place a dummy button and prose in place just as a
+  // placeholder while the app is deciding what to actually show"). It is
+  // deliberately BLANK rather than a guess at the real label — at this point
+  // we don't yet know whether this becomes Send, Update, Link to it, or
+  // nothing at all (the org may not be connected), and a placeholder that
+  // claims a specific action would be worse than one that claims nothing.
+  // `aria-hidden` because there is no content here for a screen reader to
+  // announce, only a shape.
+  if (!ctx) {
+    return (
+      <div className="flex flex-col items-end gap-1.5" aria-hidden="true">
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+          <span className="h-9 w-40 border border-hairline bg-neutral-50" />
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+          <span className="h-[13px] w-48 bg-neutral-50" />
+        </div>
+      </div>
+    );
+  }
+
+  // NOTHING AT ALL once we know: an invoice screen is not the place to
+  // advertise a feature nobody has set up.
+  if (!ctx.connected) return null;
+
+  const account = expenseAccountFor(ctx.atShop, ctx.orgAccount);
+  // The mapping is the SHOP's now, not the vendor's — 026's column, finally read.
+  const vendorRef = qboVendorId(ctx.atShop?.external_ref ?? null);
+  const tracking = qboTrackingFor(ctx.atShop);
+  const billInvoice: BillInvoice = {
+    id: invoiceId,
+    invoice_number: invoiceNumber,
+    invoice_date: invoiceDate,
+    due_date: dueDate,
+    total,
+    is_credit: isCredit,
+    status,
+    external_ref: ctx.invoiceRef,
+  };
+  const refusals = billPushRefusals({
+    invoice: billInvoice,
+    vendorRef,
+    vendorName: ctx.vendorName,
+    accountRef: account?.ref ?? null,
+  });
+  const already = pushedLabel(ctx.invoiceRef);
+  /** The refusal worth words. `billPushRefusals` still returns the approval one
+   *  — the BUTTON is still correctly disabled by it — this only declines to
+   *  restate it beside the control that settles it. */
+  const shownRefusal = refusals.find((r) => !/approve it first/i.test(r)) ?? null;
+  /** Edited since the last push — see `pushIsStale`. Only meaningful once
+   *  `already`, which is why every use of it below is gated on that too.
+   *  (The active-offer effect near the top of the component recomputes this
+   *  itself, from `ctx` state directly — see its own comment for why.) */
+  const stale = pushIsStale({
+    financials_touched_at: financialsTouchedAt,
+    synced_at: syncedAt,
+  });
+
+  async function checkBalance() {
+    setBusy(true);
+    setError(null);
+    const { data, message } = await invokeQbo(supabase, {
+      mode: "refresh_status",
+      invoice_ids: [invoiceId],
+    });
+    setBusy(false);
+    if (message) {
+      setError(message);
+      return;
+    }
+    const st = ((data?.statuses as Record<string, unknown>[]) ?? [])[0];
+    if (!st) return;
+    const at = new Date(data!.checked_at as string).toLocaleTimeString([], {
+      hour: "numeric",
+      minute: "2-digit",
+    });
+    // Missing is its own answer: a document deleted or voided in QuickBooks
+    // must not read as paid in full.
+    if (st.missing) {
+      setBalance({ text: "no longer in QuickBooks", at });
+      setGone(true);
+      return;
+    }
+    setGone(false);
+    const owed = Number(st.balance);
+    setBalance({
+      text: st.settled
+        ? st.entity === "VendorCredit"
+          ? "fully applied in QuickBooks"
+          : "paid in QuickBooks"
+        : `${money(owed)} still owed`,
+      at,
+    });
+  }
+
+  async function push() {
+    const where = splitAccountName(account!.name).leaf || account!.ref;
+    // IF WE KNOW IT IS ALREADY THERE, SAY SO IN THE CONFIRM. Not a block —
+    // `closeReadiness`'s posture, name it and let you through — but this one
+    // costs a duplicate bill in the real books, so it leads and it is blunt.
+    const dup =
+      !already && proposal?.ok
+        ? `QuickBooks ALREADY HAS this as ${proposal.candidate.entity} ` +
+          `${proposal.candidate.doc_number ?? proposal.candidate.id}. Sending it makes a ` +
+          `SECOND one. Link to the existing bill instead unless you mean to duplicate it.\n\n`
+        : "";
+    const ok = await confirmDialog({
+      ...splitConfirmMessage(
+        dup +
+          `${already ? "Update" : "Send"} this ${isCredit ? "credit" : "bill"} in QuickBooks?\n\n` +
+          `${ctx!.vendorName} · ${invoiceNumber ?? "no number"} · $${Number(total).toFixed(2)}\n` +
+          `Posts to ${where}${account!.source === "org" ? " (the org default)" : ""}` +
+          `${tracking.location ? `\nLocation: ${tracking.location.name ?? tracking.location.ref}` : ""}` +
+          `${tracking.klass ? `\nClass: ${tracking.klass.name ?? tracking.klass.ref}` : ""}`
+      ),
+      confirmLabel: already ? "Update" : "Send",
+    });
+    if (!ok) return;
+    await sendToQuickBooks({ ctx: ctx!, billInvoice, account: account!, vendorRef, tracking });
   }
 
   /** Adopt the bill QuickBooks already has. Writes the SAME ref a push would,
@@ -586,6 +715,17 @@ export function PushToQuickBooks({
 
       {/* EVERYTHING ELSE — full-width lines, stacked, right-aligned. */}
       <div className="w-full space-y-1 text-right text-[13px]">
+        {/* THE PASSIVE HALF of Mark's ask — the ACTIVE half is `offerResync`,
+            fired once from the effect above at the moment of re-approval.
+            This is what covers a reload afterwards, when that moment has
+            already passed: yellow, worth your eye, not an error — the same
+            "Update in QuickBooks" button above already does exactly this. */}
+        {already && stale && (
+          <p className="bg-mark-fill px-2 py-1 text-ink">
+            Edited since it was sent to QuickBooks — Update in QuickBooks to
+            keep them in sync.
+          </p>
+        )}
         {/* Yellow, because this is not an error — it is the normal state
             during the Bill.com parallel run, and the thing worth your eye is
             that pressing Send would make a second copy. */}

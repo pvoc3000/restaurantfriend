@@ -2605,6 +2605,90 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    sum would destroy the very thing the approval caveat exists to name.
    **1572 fixtures pass.**
 
+   **Shipped 2026-09-03 — AN APPROVED INVOICE'S FIGURES ARE LOCKED (migration
+   089, NEEDS APPLYING).** Mark: "I think a lot of the invoice should not be
+   editable once it has been approved for payment. The billed qty, unit price,
+   tax, freight, and other fields at the very least, and any others you
+   recommend. If the user wants to edit these things, they need to withdraw
+   approval first." Followed by the question that decided the migration's
+   second half: "what happens to invoices already sent to QBO if the user
+   edits the invoice?"
+   **A TRIGGER, NOT JUST `canEdit`** — `canEdit` has been role-only
+   (`canWriteCatalog`) since 025 and has never once asked what STATUS an
+   invoice is in, so every field has been writable straight through PostgREST
+   by any purchaser+, approved or not. RLS cannot express "you may not CHANGE
+   this column" either — `USING`/`WITH CHECK` see one row's OLD or NEW state,
+   never a comparison BETWEEN them. So the lock is a `BEFORE UPDATE` trigger on
+   `vendor_invoices`, plus a pair on `vendor_invoice_lines` (one to refuse,
+   reading the PARENT's status by subquery; one AFTER trigger to stamp the
+   parent once the write has actually gone through). **NOT ROLE-SCOPED** — an
+   owner is blocked from touching an approved bill's figures exactly as a
+   purchaser is, because the thing being prevented is changing what was
+   approved without first taking the claim back, which has nothing to do with
+   who is doing it.
+   **WHAT LOCKS: invoice_number, invoice_date, due_date, vendor_id,
+   location_id, tax, freight, other_charges, subtotal, total** on the header;
+   **qty, unit_price, extended, kind, purchase_order_id,
+   purchase_order_item_id** on a line. `kind` locks because the freight/item
+   toggle moves money through a side door — `computedAmounts` counts a
+   freight-kind line differently without touching qty or price. The PO link
+   locks because relinking a line changes what `receivedFor` is measured
+   against, which is part of what got approved. **NOT locked**: notes and
+   terms (header) — pure annotation — and product_id, description, pack
+   (line) — catalog/identity text, correctable without reopening a correctly
+   priced bill. Also untouched: attaching/reading paperwork, Void, Delete,
+   Approve, Withdraw approval, every QuickBooks action. **EDITABLE IFF
+   status = 'open'** — a VOIDED invoice locks the same as an approved one,
+   Reopen is its own unlock path, the error message says so
+   ("This invoice is void — reopen it before editing its figures" against
+   "…is approved — withdraw approval before editing its figures").
+   **`financials_touched_at` IS THE SECOND HALF OF MARK'S QUESTION.** Bumped
+   ONLY when a LOCKED column actually changes value (`is distinct from`, so
+   reasserting the same number is not a touch) — never by a notes or terms
+   edit, which is what makes comparing it against `synced_at`
+   (`pushIsStale`) precise rather than false-alarming every time someone
+   fixes a typo while the invoice happened to be open.
+   **THE ANSWER TO "WHAT HAPPENS TO A PUSHED INVOICE THAT GETS EDITED" IS
+   TWO HALVES, BOTH HIS CHOICE FROM AskUserQuestion.** The lock is most of
+   it: reaching an edit at all means an owner/admin deliberately withdrew
+   approval first, the same auditable act this app leans on everywhere else.
+   On top of that: a **passive note** in the QuickBooks box
+   ("Edited since it was sent to QuickBooks — Update in QuickBooks to keep
+   them in sync") whenever `already && stale`; and an **active offer**
+   (Mark, refining his own answer: "how about offering to resync once the
+   invoice is reapproved?") — a `confirmDialog` fired ONCE, the instant
+   `status` transitions INTO `approved` while the bill is linked, stale and
+   pushable. Accepting it calls the SAME send as the ordinary "Update in
+   QuickBooks" button — one implementation (`sendToQuickBooks`), two doors
+   (`push()`'s own confirm, and this one worded for the moment it fires in).
+   **THE ACTIVE OFFER COST A REWRITE OVER `react-hooks/refs`.** The natural
+   shape — a `useRef`/`useEffect` pair positioned where `already`/`stale`/
+   `refusals` are already in scope — sits AFTER this component's two early
+   returns (`if (!ctx) return <placeholder>`, `if (!ctx.connected) return
+   null`), which hooks cannot do: every hook must run in the same order on
+   every render. A "latest ref" written during RENDER (updated on every pass,
+   read from the effect) was the first attempt and this project's ESLint
+   config refuses it outright — `react-hooks/refs` exists specifically to
+   catch a ref mutated outside an effect. The fix: `sendToQuickBooks` takes
+   its inputs as PARAMETERS instead of closing over the render body's locals,
+   which is what lets it be DECLARED ABOVE the early returns, alongside the
+   hooks; the trigger effect (also above the returns) recomputes the small
+   amount of business logic itself, reading `ctx` STATE directly rather than
+   sharing consts that don't exist yet from a hook's vantage point.
+   **VERIFIED ON THE DOCKER HARNESS as real authenticated roles before
+   touching the live schema** (033's `freeze_pay_period` discipline, applied
+   to a trigger instead of a function): all 89 migrations replay clean; every
+   one of the 10 locked header columns and 5 locked line columns individually
+   RAISES while approved and again while void, by a real purchaser+ role
+   under RLS, not just superuser; notes/terms and product_id/description/pack
+   stay writable in both states; Reopen and Withdraw approval both restore
+   editability; reasserting an unchanged value does NOT bump
+   `financials_touched_at`; a line edit correctly stamps the PARENT row. The
+   app itself confirms the wiring is live — a request against the (not yet
+   migrated) hosted DB fails with "column vendor_invoices.financials_touched_at
+   does not exist" rather than a silent mismatch, matching 018's own
+   say-so-out-loud precedent for a pending migration. **1574 fixtures pass.**
+
    **1485 fixtures pass**, 14 new, and each rule was checked by BREAKING it —
    dropping the number grouping turns 4 red, a naive concat 2, a set instead of
    a multiset 2 (in BOTH callers, which is what proves they share one

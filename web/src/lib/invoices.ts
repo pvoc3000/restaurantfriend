@@ -94,6 +94,12 @@ export type VendorInvoice = {
   approved_by: string | null;
   source: "manual" | "extraction";
   notes: string | null;
+  synced_at: string | null;
+  /** 089's timestamp. Bumped only when a LOCKED (money-affecting) column
+   *  actually changes value — never by a notes or terms edit. Null means
+   *  untouched since creation, which reads as "not stale" against a null
+   *  `synced_at` too. See `pushIsStale`. */
+  financials_touched_at: string | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -1222,6 +1228,26 @@ export function billPaymentNote(
   if (invoice.qbo_balance === null) return `no longer in QuickBooks · as of ${when}`;
   if (invoice.qbo_balance <= 0.005) return `paid · as of ${when}`;
   return `${money(invoice.qbo_balance)} owed · as of ${when}`;
+}
+
+/**
+ * Has this bill's money changed since it was last sent to QuickBooks?
+ *
+ * 089's whole point: `financials_touched_at` is bumped ONLY by the LOCKED
+ * columns, never by a notes or terms edit, so this can't false-alarm on a
+ * typo fixed while the invoice happened to be open. Both sides are needed —
+ * nothing pushed yet (`synced_at` null) is not stale, and nothing edited
+ * since creation (`financials_touched_at` null) is not stale either, however
+ * long ago the push was.
+ */
+export function pushIsStale(
+  invoice: Pick<VendorInvoice, "synced_at" | "financials_touched_at">
+): boolean {
+  if (!invoice.synced_at || !invoice.financials_touched_at) return false;
+  return (
+    new Date(invoice.financials_touched_at).getTime() >
+    new Date(invoice.synced_at).getTime()
+  );
 }
 
 // ---------------------------------------------------------------------------

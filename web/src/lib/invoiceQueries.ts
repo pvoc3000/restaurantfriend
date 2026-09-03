@@ -16,6 +16,7 @@ import type { PoLine } from "./purchaseOrders";
 export const INVOICE_SELECT = `id, org_id, location_id, vendor_id, invoice_number,
    invoice_date, due_date, terms, subtotal, tax, freight, other_charges, total,
    is_credit, status, approved_at, approved_by, source, notes,
+   synced_at, financials_touched_at,
    vendors ( id, name, order_type )`;
 
 export const INVOICE_LINE_SELECT = `id, invoice_id, purchase_order_id,
