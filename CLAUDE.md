@@ -2711,6 +2711,40 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    for void, that means no sentence at all, which is what it always was.
    **1574 fixtures pass.**
 
+   **Shipped 2026-09-03 — THE DUPLICATE CHECK MOVED FROM LOAD TO THE CLICK**
+   (Mark: "avoid checking to see if an unlinked invoice already exists in
+   QBO if we, instead, just check when the user clicks 'send to
+   quickbooks'… then, if we find a duplicate, we offer to link it instead of
+   pushing a duplicate. If the user doesn't want to link, we don't do
+   anything… hide the 'Send to Quickbooks' button so the user can only link…
+   rename that button to 'Link to Quickbooks'"). The `find_bills` call that
+   used to fire on every page load of an approved, unlinked, numbered
+   invoice — a real network round trip nobody asked for on a screen someone
+   might not even be about to push from — now fires ONCE, inside `push()`,
+   the instant Send is clicked.
+   **FOUND MEANS STOP, NOT WARN.** The old confirm carried a "QuickBooks
+   ALREADY HAS this… makes a SECOND one… unless you mean to duplicate it"
+   caveat and then let you send anyway. There is no such path now: finding a
+   duplicate returns before the confirm ever opens, `setProposal` swaps the
+   button, and sending is gone — matching Mark's own words exactly, "we
+   don't do anything" if the offer to link is declined. **SEND ITSELF IS
+   HIDDEN, not merely joined by a Link button** — once QuickBooks says it
+   already has this bill, there is no reading of "Send" that still means
+   send.
+   **"Link to it" IS NOW "Link to QuickBooks"** everywhere it appears
+   (button label and the "Checking…"/"Linking…" busy states beside it).
+   **`checkingDuplicate` IS ITS OWN STATE, SEPARATE FROM `busy`** — the same
+   button reads "Checking…" during the lookup and "Sending…" only once it
+   actually knows there is nothing to link to, rather than one generic busy
+   label covering two different waits.
+   Verified live on the real Chefs Warehouse 73358289 (a genuine duplicate,
+   used to prove the resync feature two commits ago): a fresh load shows
+   only "Send to QuickBooks", no banner, no network call — clicking it
+   reveals "QuickBooks already has this as Bill 73358289…" with **Link to
+   QuickBooks as the only button**, no confirm dialog in between; reloading
+   the page returns to the plain "Send to QuickBooks" state, confirming
+   nothing persists from a declined offer.
+
    **Shipped 2026-09-03 — THE BILLED/RECEIVED FLAG IS A BUTTON.** Mark: "can
    the flag that pops up when a billed qty and po received qty differ be
    turned into a button that, when pressed, updates the billed qty with the

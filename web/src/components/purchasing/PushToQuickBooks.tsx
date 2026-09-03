@@ -103,6 +103,11 @@ export function PushToQuickBooks({
   /** What QuickBooks already has under this number. Null while unasked. */
   const [proposal, setProposal] = useState<BillLinkProposal | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
+  /** Mid the click-time duplicate lookup (see `push()`) — distinct from
+   *  `busy`, which covers the SEND itself, so the button can say "Checking…"
+   *  during the lookup and "Sending…" only once it actually knows there's
+   *  nothing to link to. */
+  const [checkingDuplicate, setCheckingDuplicate] = useState(false);
   /** What QuickBooks says is still owed. HELD IN STATE AND NEVER STORED — see
    *  `refresh_status`. It disappears on reload, which is honest: a balance kept
    *  in our row would be stale the moment it landed and shown as if current. */
@@ -253,36 +258,6 @@ export function PushToQuickBooks({
     };
   }, [readContext]);
 
-  // ASKED AUTOMATICALLY, and only where it can matter: connected, approved,
-  // not already linked, and carrying a number. During the Bill.com parallel run
-  // the bill is ALREADY over there 51 times out of 52, so the default question
-  // on this screen is "which one is it", not "shall we create one" — and the
-  // cost of not asking is a duplicate in the real books.
-  useEffect(() => {
-    if (!ctx?.connected) return;
-    if (ctx.invoiceRef?.qbo?.id) return;
-    if (status !== "approved" || !invoiceNumber) return;
-    let cancelled = false;
-    void (async () => {
-      const { data, message } = await invokeQbo(supabase, {
-        mode: "find_bills",
-        invoice_ids: [invoiceId],
-      });
-      if (cancelled) return;
-      if (message) return; // silent: this is a convenience, not the screen's job
-      const found = proposeBillLink(
-        { invoice_number: invoiceNumber, total, is_credit: isCredit, external_ref: ctx.invoiceRef },
-        (data?.candidates as QboCandidate[]) ?? [],
-        qboVendorId(ctx.atShop?.external_ref ?? null),
-        normalizeInvoiceNumber
-      );
-      setProposal(found);
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [ctx, status, invoiceNumber, invoiceId, total, isCredit, supabase]);
-
   /**
    * THE ACTUAL SEND, with no confirm of its own — `push()` and the
    * re-approval offer below both confirm first, in their own words, and then
@@ -402,9 +377,11 @@ export function PushToQuickBooks({
   // (Mark, 2026-09-03: "place a dummy button and prose in place just as a
   // placeholder while the app is deciding what to actually show"). It is
   // deliberately BLANK rather than a guess at the real label — at this point
-  // we don't yet know whether this becomes Send, Update, Link to it, or
-  // nothing at all (the org may not be connected), and a placeholder that
-  // claims a specific action would be worse than one that claims nothing.
+  // we don't yet know whether this becomes Send, Update, or nothing at all
+  // (the org may not be connected), and a placeholder that claims a specific
+  // action would be worse than one that claims nothing. (Link to QuickBooks
+  // is never a first-paint state anyway — see `push()` — it only appears
+  // after Send is clicked and finds a duplicate.)
   // `aria-hidden` because there is no content here for a screen reader to
   // announce, only a shape.
   if (!ctx) {
@@ -496,20 +473,50 @@ export function PushToQuickBooks({
   }
 
   async function push() {
+    // THE DUPLICATE CHECK MOVED HERE, FROM PAGE LOAD (Mark, 2026-09-03: "just
+    // check when the user clicks send… not when the page loads"). It only
+    // applies to a first SEND — an already-linked bill has nothing to
+    // duplicate, so `already` skips straight to the ordinary confirm below.
+    //
+    // FOUND MEANS STOP, NOT WARN. The old flow let you send anyway, past a
+    // "makes a SECOND one" caveat in the confirm; this one doesn't reach the
+    // confirm at all. `setProposal` is what swaps the button from Send to
+    // Link (see the render below) — there is no path from here back to
+    // sending once QuickBooks says it already has this bill, matching Mark's
+    // "if the user doesn't want to link, we don't do anything."
+    if (!already) {
+      setCheckingDuplicate(true);
+      const { data, message } = await invokeQbo(supabase, {
+        mode: "find_bills",
+        invoice_ids: [invoiceId],
+      });
+      setCheckingDuplicate(false);
+      if (!message) {
+        const found = proposeBillLink(
+          {
+            invoice_number: invoiceNumber,
+            total,
+            is_credit: isCredit,
+            external_ref: ctx!.invoiceRef,
+          },
+          (data?.candidates as QboCandidate[]) ?? [],
+          vendorRef,
+          normalizeInvoiceNumber
+        );
+        if (found.ok) {
+          setProposal(found);
+          return;
+        }
+      }
+      // No duplicate — or the lookup itself failed, which is a convenience
+      // and not the screen's job to enforce — either way, fall through to
+      // the ordinary send below exactly as if nothing had been checked.
+    }
+
     const where = splitAccountName(account!.name).leaf || account!.ref;
-    // IF WE KNOW IT IS ALREADY THERE, SAY SO IN THE CONFIRM. Not a block —
-    // `closeReadiness`'s posture, name it and let you through — but this one
-    // costs a duplicate bill in the real books, so it leads and it is blunt.
-    const dup =
-      !already && proposal?.ok
-        ? `QuickBooks ALREADY HAS this as ${proposal.candidate.entity} ` +
-          `${proposal.candidate.doc_number ?? proposal.candidate.id}. Sending it makes a ` +
-          `SECOND one. Link to the existing bill instead unless you mean to duplicate it.\n\n`
-        : "";
     const ok = await confirmDialog({
       ...splitConfirmMessage(
-        dup +
-          `${already ? "Update" : "Send"} this ${isCredit ? "credit" : "bill"} in QuickBooks?\n\n` +
+        `${already ? "Update" : "Send"} this ${isCredit ? "credit" : "bill"} in QuickBooks?\n\n` +
           `${ctx!.vendorName} · ${invoiceNumber ?? "no number"} · $${Number(total).toFixed(2)}\n` +
           `Posts to ${where}${account!.source === "org" ? " (the org default)" : ""}` +
           `${tracking.location ? `\nLocation: ${tracking.location.name ?? tracking.location.ref}` : ""}` +
@@ -639,8 +646,12 @@ export function PushToQuickBooks({
           Delete · Withdraw approval beside it for no reason other than the
           two components never having compared notes. */}
       <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
-        {/* IT IS ALREADY OVER THERE. The button stands with Send/Update; its
-            sentence is in the status row below. */}
+        {/* IT IS ALREADY OVER THERE — found at the moment Send was
+            clicked, not on load. SEND ITSELF IS HIDDEN once this is known
+            (Mark, 2026-09-03: "hide the 'Send to Quickbooks' button so the
+            user can only link"), because sending now would only ever create
+            a second document — there is no reading of the button that still
+            means "send" once QuickBooks says it already has this bill. */}
         {proposal?.ok && !already && canPush && (
           <button
             type="button"
@@ -648,21 +659,23 @@ export function PushToQuickBooks({
             disabled={busy}
             onClick={() => void link(proposal.candidate)}
           >
-            {busy ? "Linking…" : "Link to it"}
+            {busy ? "Linking…" : "Link to QuickBooks"}
           </button>
         )}
-        {canPush && (
+        {canPush && !(proposal?.ok && !already) && (
           <button
             type="button"
             className={BUTTON_CLASS}
-            disabled={busy || refusals.length > 0}
+            disabled={busy || checkingDuplicate || refusals.length > 0}
             onClick={() => void push()}
           >
-            {busy
-              ? "Sending…"
-              : already
-                ? "Update in QuickBooks"
-                : `Send to QuickBooks`}
+            {checkingDuplicate
+              ? "Checking…"
+              : busy
+                ? "Sending…"
+                : already
+                  ? "Update in QuickBooks"
+                  : `Send to QuickBooks`}
           </button>
         )}
         {/* SAME DRESS AS "Update in QuickBooks" (Mark, 2026-09-03) — it had
