@@ -2496,6 +2496,43 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    confirm on BOTH screens read "Still unresolved: · 1 line's price differs
    from the catalog" over a ticked **"Also file invoice 120274 as a bill"**,
    with the bill caveat correctly absent. Cancelled; nothing written.
+   **Shipped 2026-09-02 — A LINE'S CHARGE IS MAINTAINED, NOT DERIVED** (Mark:
+   "I find it annoying to have to enter all the values into the invoice anytime
+   I want to change something. Extended should be calculated, full stop. The
+   total should be calculated as well. If it's off, we should be warned when
+   'approving' and allowed to cancel and edit"). It shipped as
+   `extended = qty x unit_price` and **the first real invoice it was verified on
+   disproved it.**
+   **A BROKEN CASE IS NOT qty x unit_price, and the pack column says so.** Chefs
+   Warehouse 73358289 bills packs `24/1 LB BC` / `12/750 ML BC` — **BC**, broken
+   case — printing the CASE price as the unit price and charging for EACHES:
+   seven pounds out of a $62.68 case is **$18.28**, not $438.76. Measured over
+   the whole invoice, deriving the charges turned **$472.13 into $1,952.90** on
+   a bill already approved, and the screen showed a header total of $472.13 over
+   an Amounts block reading $1,952.90 — a screen may disagree with the page, it
+   may never disagree with itself.
+   So `extended` STAYS THE STORED CHARGE and stays typeable, and what is
+   calculated is the MOVEMENT: **`rescaledExtended` scales by the rate the line
+   was really billed at** (`extended / qty`), never by the printed unit price.
+   Seven units at $18.28 become fourteen at $36.56; the struck topping on
+   BakeMark 452660 at 2 x $88.90 becomes 0 x anything = $0.00; a price edit
+   moves the charge in PROPORTION, so a broken case stays one. It is the
+   derivation receiving already uses, and for the stated reason — it "survived
+   catch-weight lines". Multiplication is the fallback only where there is no
+   prior charge to scale, which is a line somebody is typing from nothing.
+   **The totals are summed from the CHARGES**, so a rent bill with no lines
+   keeps its typed figure (null, never 0 — that would be a claim nothing is
+   owed) and nobody types a subtotal again. `totalDisagreesWithDocument` names
+   the gap against what the PAGE said at approval and lets you through, which is
+   `closeReadiness`'s posture and the half of Mark's ask that survived intact.
+   **A quantity of nothing carrying a charge is MARKED** — yellow, on the cell —
+   because that is not a pricing subtlety, it is a struck line with a figure
+   left behind, which is precisely what 452660 was.
+   The regression fixture is the Chefs Warehouse invoice itself and it exists to
+   go RED if anybody makes this a computation again; checked by breaking it, 2
+   go red and reproduce the $1,952.90.
+   **1572 fixtures pass.**
+
    **1485 fixtures pass**, 14 new, and each rule was checked by BREAKING it —
    dropping the number grouping turns 4 red, a naive concat 2, a set instead of
    a multiset 2 (in BOTH callers, which is what proves they share one

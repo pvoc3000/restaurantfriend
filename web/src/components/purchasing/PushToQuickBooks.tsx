@@ -476,6 +476,20 @@ export function PushToQuickBooks({
       {/* IT IS ALREADY OVER THERE. Yellow, because this is not an error — it is
           the normal state during the Bill.com parallel run, and the thing worth
           your eye is that pressing Send would make a second copy. */}
+      {/* THE BUTTON STANDS WITH THE OTHER COMMANDS and its sentence goes below
+          with the other prose (Mark, 2026-09-02) — it was a button inside a
+          band, which made it a different KIND of control from Void, Delete and
+          Approve when it is the same kind: a thing you press on this record. */}
+      {proposal?.ok && !already && canPush && (
+        <button
+          type="button"
+          className={BUTTON_CLASS}
+          disabled={busy}
+          onClick={() => void link(proposal.candidate)}
+        >
+          {busy ? "Linking…" : "Link to it"}
+        </button>
+      )}
       {proposal?.ok && !already && (
         <div className="order-last basis-full space-y-1 bg-mark-fill px-2 py-1 text-[13px] text-ink">
           <p>
@@ -485,16 +499,6 @@ export function PushToQuickBooks({
             {proposal.candidate.txn_date ?? "no date"} · ${proposal.candidate.total.toFixed(2)}.
           </p>
           {proposal.caveat && <p>{proposal.caveat}</p>}
-          {canPush && (
-            <button
-              type="button"
-              className={BUTTON_CLASS}
-              disabled={busy}
-              onClick={() => void link(proposal.candidate)}
-            >
-              {busy ? "Linking…" : "Link to it"}
-            </button>
-          )}
         </div>
       )}
         {canPush && (
@@ -537,6 +541,20 @@ export function PushToQuickBooks({
           it can neither update, nor create, nor be linked while it points at a
           dead id. Red rather than the mark colour: this is not "worth your eye",
           the record here disagrees with QuickBooks and one of them is wrong. */}
+      {/* Same split as the proposal above: the command joins the row, its
+          sentence goes below with the rest. This one keeps the ACCENT border on
+          the prose — the record here disagrees with QuickBooks and one of them
+          is wrong, which is not the yellow "worth your eye". */}
+      {gone && canPush && (
+        <button
+          type="button"
+          className={BUTTON_CLASS}
+          disabled={busy}
+          onClick={() => void unlink()}
+        >
+          {busy ? "Forgetting…" : "Forget the link"}
+        </button>
+      )}
       {gone && (
         <div className="order-last basis-full space-y-1 border border-accent px-2 py-1 text-[13px] text-ink">
           <p>
@@ -544,16 +562,6 @@ export function PushToQuickBooks({
             It was deleted there, so this bill points at nothing and can be neither
             updated nor sent until the link is forgotten.
           </p>
-          {canPush && (
-            <button
-              type="button"
-              className={BUTTON_CLASS}
-              disabled={busy}
-              onClick={() => void unlink()}
-            >
-              {busy ? "Forgetting…" : "Forget the link"}
-            </button>
-          )}
         </div>
       )}
 

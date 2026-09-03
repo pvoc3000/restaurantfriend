@@ -1231,15 +1231,16 @@ export function billPaymentNote(
 /**
  * A line's own money: what was billed times what it cost.
  *
- * COMPUTED SINCE 2026-09-02 (Mark: "Extended should be calculated, full stop").
- * It was transcribed, on the reasoning that the record should be what the page
- * says so a vendor's own arithmetic error stayed visible — which is true, and
- * was paid for by hand every time a quantity changed. The page's own figures
- * are not lost: they stay in the READING, untouched, and the disagreement is
- * raised where it costs something, at approval.
+ * ONLY WHERE THE PAGE'S OWN ARITHMETIC IS THIS ARITHMETIC, which on a food
+ * distributor's invoice is not always. Chefs Warehouse 73358289 bills BROKEN
+ * CASES — pack `24/1 LB BC` — printing the CASE price as the unit price and
+ * charging for eaches: 7 units of a $62.68 case is $18.28, not $438.76.
+ * Computing that invoice from qty × unit_price turns $472.13 into $1,952.90,
+ * measured, on a bill already approved.
  *
- * Null when either half is missing — a struck line with no price has no
- * extended, and 0 would be a claim rather than an absence.
+ * So this is the SIMPLE case only, and `rescaledExtended` is what a quantity
+ * edit actually goes through. Null when either half is missing — a struck line
+ * with no price has no extended, and 0 would be a claim rather than an absence.
  */
 export function lineExtended(
   qty: number | null | undefined,
@@ -1248,6 +1249,50 @@ export function lineExtended(
   if (qty === null || qty === undefined) return null;
   if (unitPrice === null || unitPrice === undefined) return null;
   return Math.round(Number(qty) * Number(unitPrice) * 100) / 100;
+}
+
+/**
+ * What a line's charge becomes when its quantity or price moves.
+ *
+ * IT SCALES BY THE LINE'S OWN RATE, not by the printed unit price — which is
+ * what makes it right on a broken case as well as an ordinary line. The rate a
+ * line was really billed at is `extended ÷ qty`, whatever the page printed
+ * beside it, so seven units at $18.28 rescale to fourteen at $36.56 and a
+ * struck line at 2 × $88.90 rescales to 0 × anything = $0.00.
+ *
+ * The same reasoning receiving already uses: its price derivation is
+ * `extended ÷ qty` precisely because it "survived catch-weight lines".
+ *
+ * Falls back to qty × unit_price only when there is no prior charge to scale —
+ * a line somebody is typing from nothing — and returns null when there is
+ * neither, because 0 would be a claim that the line was free.
+ */
+export function rescaledExtended(
+  line: Pick<VendorInvoiceLine, "qty" | "unit_price" | "extended">,
+  next: { qty?: number | null; unit_price?: number | null }
+): number | null {
+  const qty = next.qty !== undefined ? next.qty : line.qty;
+  const price = next.unit_price !== undefined ? next.unit_price : line.unit_price;
+
+  const hadQty = line.qty !== null && line.qty !== undefined && Number(line.qty) !== 0;
+  const hadExtended = line.extended !== null && line.extended !== undefined;
+
+  if (hadQty && hadExtended && qty !== null && qty !== undefined) {
+    const rate = Number(line.extended) / Number(line.qty);
+    // A price edit moves the charge in proportion, which keeps a broken case a
+    // broken case: the ratio the vendor billed at is preserved.
+    const priceRatio =
+      next.unit_price !== undefined &&
+      line.unit_price !== null &&
+      line.unit_price !== undefined &&
+      Number(line.unit_price) !== 0 &&
+      price !== null &&
+      price !== undefined
+        ? Number(price) / Number(line.unit_price)
+        : 1;
+    return Math.round(Number(qty) * rate * priceRatio * 100) / 100;
+  }
+  return lineExtended(qty, price);
 }
 
 export type ComputedAmounts = {
@@ -1278,13 +1323,10 @@ export function computedAmounts(
 
   const subtotal =
     Math.round(
-      // NO FALLBACK TO THE STORED FIGURE, and a fixture caught the version that
-      // had one: the struck cocoa line on BakeMark 452660 has a quantity of 0
-      // and no price, so it computes NOTHING — and falling back to what the
-      // page printed put its old $177.80 back into a total the driver had
-      // struck it out of. "Calculated, full stop" (Mark) means the stored
-      // column stops being consulted, or it is not calculated at all.
-      items.reduce((sum, l) => sum + (lineExtended(l.qty, l.unit_price) ?? 0), 0) * 100
+      // THE LINE'S OWN CHARGE, which is what it was billed — not qty × price,
+      // which is wrong on every broken case (see `lineExtended`). A line
+      // carrying no charge at all contributes nothing rather than a guess.
+      items.reduce((sum, l) => sum + Number(l.extended ?? 0), 0) * 100
     ) / 100;
 
   // Charge LINES are money billed too, and they are not in the subtotal — a
@@ -1292,7 +1334,7 @@ export function computedAmounts(
   // whichever the reader found is counted once here.
   const chargeLines = lines
     .filter((l) => l.kind !== "item")
-    .reduce((sum, l) => sum + (lineExtended(l.qty, l.unit_price) ?? 0), 0);
+    .reduce((sum, l) => sum + Number(l.extended ?? 0), 0);
 
   const total =
     Math.round(

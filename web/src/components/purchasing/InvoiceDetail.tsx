@@ -23,6 +23,7 @@ import {
   printedVendorDisagreement,
   signedTotal,
   lineExtended,
+  rescaledExtended,
   computedAmounts,
   totalDisagreesWithDocument,
   toInvoiceLine,
@@ -278,17 +279,22 @@ export function InvoiceDetail({
   /**
    * Write a line's quantity or price, and the arithmetic that follows from it.
    *
-   * ONE STATEMENT FOR THE LINE — `extended` rides along, so a row can never be
+   * ONE STATEMENT FOR THE LINE — the charge rides along, so a row can never be
    * caught with a quantity and a stale total beside it — and then a SECOND for
    * the invoice, because the totals live on another table and `alsoUpdate`
    * cannot reach it.
+   *
+   * The charge is RESCALED, not recomputed: `rescaledExtended` moves it by the
+   * rate the line was really billed at, which is the only thing that is right
+   * on a broken case. Recomputing it as qty × unit_price turned Chefs Warehouse
+   * 73358289 from $472.13 into $1,952.90.
    *
    * The invoice write is skipped when there is nothing to compute, which is the
    * hand-typed bill: its total is the only figure it has.
    */
   async function writeLineAmount(
     lineId: string,
-    column: "qty" | "unit_price",
+    column: "qty" | "unit_price" | "extended",
     next: unknown
   ): Promise<{ error: string | null }> {
     const value = next === null || next === "" ? null : Number(next);
@@ -298,7 +304,16 @@ export function InvoiceDetail({
 
     const { error } = await supabase
       .from("vendor_invoice_lines")
-      .update({ [column]: value, extended: lineExtended(qty, price) })
+      .update(
+        column === "extended"
+          ? { extended: value }
+          : {
+              [column]: value,
+              extended: line
+                ? rescaledExtended(line, { [column]: value })
+                : lineExtended(qty, price),
+            }
+      )
       .eq("id", lineId)
       .select("id");
     // Reported back to the cell, which reopens itself on a refusal — below
@@ -307,7 +322,19 @@ export function InvoiceDetail({
     if (error) return { error: error.message };
 
     const after = lines.map((l) =>
-      l.id === lineId ? { ...l, qty, unit_price: price } : l
+      l.id === lineId
+        ? {
+            ...l,
+            qty,
+            unit_price: price,
+            extended:
+              column === "extended"
+                ? value
+                : line
+                  ? rescaledExtended(line, { [column]: value })
+                  : lineExtended(qty, price),
+          }
+        : l
     );
     const sums = computedAmounts(after, invoice);
     if (sums.total !== null) {
@@ -586,19 +613,45 @@ export function InvoiceDetail({
       label: "Extended",
       width: 130,
       align: "right",
-      sortValue: (l) => lineExtended(l.qty, l.unit_price),
-      // CALCULATED, NEVER TYPED (Mark, 2026-09-02: "Extended should be
-      // calculated, full stop"). It was transcribed so a vendor's own
-      // arithmetic error stayed visible, which was true and was paid for by
-      // hand every time a quantity moved. The page's figures are not lost —
-      // they stay in the READING, and the disagreement is raised where it costs
-      // something, at approval.
+      sortValue: (l) => l.extended,
+      // MAINTAINED, NOT COMPUTED (Mark, 2026-09-02: "Extended should be
+      // calculated, full stop" — and it is, on every edit, by
+      // `rescaledExtended`). It stays TYPEABLE because the arithmetic behind a
+      // distributor's line is not always ours: a broken case bills a fraction
+      // of the printed case price, so a figure derived from qty × unit_price
+      // would be confidently wrong on rows nobody had touched.
+      //
+      // A quantity of nothing carrying a charge is marked — that is not a
+      // pricing subtlety, it is a line that was struck and a figure left
+      // behind, which is exactly what BakeMark 452660 was.
       render: (l) => {
-        const own = lineExtended(l.qty, l.unit_price);
-        return (
+        const stranded =
+          Number(l.qty ?? 0) === 0 && Number(l.extended ?? 0) !== 0;
+        const cell = canEdit ? (
+          <InlineValue
+            table="vendor_invoice_lines"
+            id={l.id}
+            column="extended"
+            value={l.extended}
+            kind="number"
+            align="right"
+            onWrite={(next) => writeLineAmount(l.id, "extended", next)}
+            format={(v) => money(Number(v))}
+          />
+        ) : (
           <span className={`${READ_ONLY_VALUE} tabular-nums`}>
-            {own === null ? "—" : money(own)}
+            {l.extended === null ? "—" : money(l.extended)}
           </span>
+        );
+        return stranded ? (
+          <span
+            className="bg-mark-fill"
+            title="Billed for nothing and still carrying a charge — take the amended total, or clear this figure."
+          >
+            {cell}
+          </span>
+        ) : (
+          cell
         );
       },
     },
@@ -774,8 +827,20 @@ export function InvoiceDetail({
             <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
               Total
             </div>
+            {/* THE COMPUTED FIGURE, the same one AMOUNTS shows. It read the
+                stored column until 2026-09-02 and, once the totals became
+                calculated, that put TWO different totals on one screen —
+                caught on Chefs Warehouse 73358289, whose header said $472.13
+                over an Amounts block saying $1,952.90. A screen may disagree
+                with the page; it may not disagree with itself. */}
             <div className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
-              {money(signedTotal(invoice))}
+              {money(
+                computed.total === null
+                  ? signedTotal(invoice)
+                  : invoice.is_credit
+                    ? -computed.total
+                    : computed.total
+              )}
             </div>
           </div>
         </div>
