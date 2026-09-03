@@ -6960,8 +6960,23 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    cited `salesNote` for the "INFORMATION, never a caveat" rule; the rule
    survives, the citations now state it rather than pointing at a dead function.
    The two prose lines under the boxes were each explaining the box above them,
-   which the box's own heading (red "Before this can be sent" over red items,
-   plain "Still outstanding" over yellow ones) already does.
+   which the box's own heading already does.
+   **AND THEN THE TWO BOXES BECAME ONE, ALL RED** (Mark, same day: "we have two
+   distinct boxes when I think one would do", then "make all the text the same
+   — red"). The gate-versus-list distinction cost a heading, a border and 32px
+   of air to state something the SEND BUTTON already enforces — it is disabled,
+   and its tooltip names the blockers — so what is left on the page is one list
+   of things somebody should deal with. Blockers lead, because you cannot leave
+   without them; the heading follows the box's JOB rather than its contents
+   ("Before this can be sent" while one is present, "Still outstanding"
+   otherwise); and the only thing still telling the two kinds apart is the
+   BORDER, red and 2px when blocked. **The box is FILLED yellow** (Mark's third
+   pass), which is the mark colour doing what this file says it is for — a
+   fill, never an ink — over the whole thing rather than per line. Red on
+   yellow-200 measures **4.62:1**, which passes AA; worth re-measuring if
+   either token moves. The arrays stay separate in the props and in
+   `submitReadiness`/`submitBlockers` — this is a rendering decision, and the
+   email still reports only `outstanding`.
    **THE REPORT IS THE LAST PAGE BEFORE SUBMIT, ON EVERY SHIFT** (Mark, same
    day). It was already true of opening, mid and off-site and false of CLOSING,
    where Tomorrow's production sat between the two — so the one shift with

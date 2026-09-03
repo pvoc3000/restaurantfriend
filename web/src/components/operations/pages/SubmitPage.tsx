@@ -53,41 +53,43 @@ export function SubmitPage({
    */
   blockers: string[];
 }) {
-  const caveats = outstanding;
+  const blocked = blockers.length > 0;
+
+  if (blockers.length + outstanding.length === 0) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <p className="text-sm">Everything is done. Send it.</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="mx-auto max-w-2xl space-y-8">
-      {blockers.length > 0 ? (
-        <div className="space-y-2 border-2 border-accent p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
-            Before this can be sent
-          </p>
-          <ul className="space-y-1 text-sm">
-            {blockers.map((b) => (
-              <li key={b} className="text-accent">
-                {b}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
+    <div className="mx-auto max-w-2xl">
+      {/* ONE BOX, ONE COLOUR (Mark, 2026-09-03: "we have two distinct boxes
+          when I think one would do", then "make all the text the same - red").
+          Two frames spent a heading, a border and 32px of air on a
+          gate-versus-list distinction that the SEND BUTTON already enforces —
+          it is disabled, and its tooltip names the blockers. So what is left
+          here is one list of things somebody should deal with, and the only
+          thing still telling the two kinds apart is the BORDER.
 
-      {caveats.length > 0 ? (
-        <div className="space-y-2 border border-hairline p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.08em]">
-            Still outstanding
-          </p>
-          <ul className="space-y-1 text-sm">
-            {caveats.map((c) => (
-              <li key={c}>
-                <span className="bg-mark-fill px-1">{c}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      ) : blockers.length === 0 ? (
-        <p className="text-sm">Everything is done. Send it.</p>
-      ) : null}
+          The heading follows the box's job: with a blocker present the box is
+          the gate and says so; with none it is a list. Blockers lead — you
+          cannot leave without them. */}
+      <div
+        className={`space-y-2 bg-mark-fill p-4 ${
+          blocked ? "border-2 border-accent" : "border border-hairline"
+        }`}
+      >
+        <p className="text-xs font-semibold uppercase tracking-[0.08em] text-accent">
+          {blocked ? "Before this can be sent" : "Still outstanding"}
+        </p>
+        <ul className="space-y-1 text-sm text-accent">
+          {[...blockers, ...outstanding].map((line) => (
+            <li key={line}>{line}</li>
+          ))}
+        </ul>
+      </div>
     </div>
   );
 }
