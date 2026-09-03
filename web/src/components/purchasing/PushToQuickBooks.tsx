@@ -100,6 +100,10 @@ export function PushToQuickBooks({
    *  `refresh_status`. It disappears on reload, which is honest: a balance kept
    *  in our row would be stale the moment it landed and shown as if current. */
   const [balance, setBalance] = useState<{ text: string; at: string } | null>(null);
+  /** QuickBooks answered, and the document it names is not there. Kept apart
+   *  from `balance` because it is the one answer that needs an ACTION rather
+   *  than a figure — see `unlink`. */
+  const [gone, setGone] = useState(false);
 
   const readContext = useCallback(async (): Promise<Ctx> => {
     const [conn, vendor, invoice, atShop, docs] = await Promise.all([
@@ -234,8 +238,10 @@ export function PushToQuickBooks({
     // must not read as paid in full.
     if (st.missing) {
       setBalance({ text: "no longer in QuickBooks", at });
+      setGone(true);
       return;
     }
+    setGone(false);
     const owed = Number(st.balance);
     setBalance({
       text: st.settled
@@ -391,6 +397,66 @@ export function PushToQuickBooks({
     onDone();
   }
 
+  /**
+   * Forget the QuickBooks document this bill claims to be.
+   *
+   * WITHOUT THIS THE BILL IS STUCK, which is how it was found (Mark,
+   * 2026-09-02, having pushed one and then deleted it in QuickBooks): it cannot
+   * update — the document is gone — it cannot create, because `pushMode` reads
+   * the stored id and answers "update", and it cannot LINK, because the
+   * proposal is only offered on an unlinked bill. Three doors, all shut by the
+   * same dead id.
+   *
+   * IT IS A HUMAN ACT, NOT AN AUTO-CLEAR ON `missing`. Absence has more causes
+   * than deletion, and a silent unlink followed by a push is how you get the
+   * duplicate this whole module is arranged to avoid. So QuickBooks' answer is
+   * reported and the person decides — the receiving screen's posture.
+   *
+   * A DIRECT UPDATE, not `record_accounting_push`, and the asymmetry is the
+   * argument: that definer exists so a purchaser cannot INVENT a QuickBooks id,
+   * and removing a claim is strictly safe where making one is not. It also
+   * stamps `synced_at = now()`, which on an unlink would assert a sync that did
+   * not happen.
+   */
+  async function unlink() {
+    const ok = await confirmDialog({
+      ...splitConfirmMessage(
+        gone
+          ? `Forget the QuickBooks link?\n\nQuickBooks no longer has the document this ` +
+            `bill points at, so the link means nothing. Nothing is deleted anywhere. ` +
+            `Afterwards this bill can be linked to the right one, or sent afresh.`
+          : `Forget the QuickBooks link?\n\nThe document STAYS in QuickBooks — this only ` +
+            `stops this bill pointing at it. Sending afterwards would create a SECOND one, ` +
+            `so link it to the right document rather than sending, unless you mean to.`
+      ),
+      confirmLabel: "Forget it",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setBusy(true);
+    setError(null);
+    // Its own row count: 025's update policy is purchaser+, so below that this
+    // changes nothing and returns NO error — the cheerful-success trap.
+    const { data: cleared, error: clearErr } = await supabase
+      .from("vendor_invoices")
+      .update({ external_ref: {}, synced_at: null })
+      .eq("id", invoiceId)
+      .select("id");
+    setBusy(false);
+    if (clearErr || !cleared || cleared.length === 0) {
+      setError(clearErr?.message ?? "That could not be changed here, so nothing was unlinked.");
+      return;
+    }
+    setBalance(null);
+    setGone(false);
+    setSent(null);
+    // Re-reading is what makes this one step rather than two: the proposal
+    // effect is gated on there being no link, so it runs again and offers the
+    // right document by itself.
+    setCtx(await readContext());
+    onDone();
+  }
+
   return (
     <div className="space-y-1">
       {/* IT IS ALREADY OVER THERE. Yellow, because this is not an error — it is
@@ -443,7 +509,41 @@ export function PushToQuickBooks({
             {busy ? "Checking…" : "Check QuickBooks"}
           </button>
         )}
+        {already && canPush && !gone && (
+          <button
+            type="button"
+            className="text-[13px] text-muted underline decoration-neutral-400 underline-offset-[3px] hover:text-ink hover:decoration-neutral-900 disabled:opacity-35"
+            disabled={busy}
+            onClick={() => void unlink()}
+          >
+            Forget the link
+          </button>
+        )}
       </div>
+
+      {/* THE DOCUMENT IS GONE AND THE BILL IS STUCK UNTIL THIS IS PRESSED —
+          it can neither update, nor create, nor be linked while it points at a
+          dead id. Red rather than the mark colour: this is not "worth your eye",
+          the record here disagrees with QuickBooks and one of them is wrong. */}
+      {gone && (
+        <div className="max-w-2xl space-y-1 border border-accent px-2 py-1 text-[13px] text-ink">
+          <p>
+            QuickBooks no longer has {already?.replace("In QuickBooks as ", "") ?? "that document"}.
+            It was deleted there, so this bill points at nothing and can be neither
+            updated nor sent until the link is forgotten.
+          </p>
+          {canPush && (
+            <button
+              type="button"
+              className={BUTTON_CLASS}
+              disabled={busy}
+              onClick={() => void unlink()}
+            >
+              {busy ? "Forgetting…" : "Forget the link"}
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Why the button is off, in words. A disabled control explains itself
           only on hover, and the iPad has none. */}

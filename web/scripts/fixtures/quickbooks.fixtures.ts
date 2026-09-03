@@ -441,6 +441,8 @@ import {
   withAttachments,
   attachmentsToSend,
   INVOICE_SHEET_KEY,
+  proposeBillLink,
+  linkedRef,
   type InvoiceOrder,
   type InvoicePushInputs,
 } from "../../src/lib/quickbooks";
@@ -744,4 +746,97 @@ test("a ref with no sync token is a CREATE, which is why one is never rebuilt", 
   const after = withAttachments(fromServer, { sheet: "1000000032" });
   eq(qboRef(after)?.syncToken, "7", "the token survives");
   eq(pushMode({ external_ref: after }), "update", "so it is still an update");
+});
+
+// ---------------------------------------------------------------------------
+// Adopting a bill QuickBooks already has — the Bill.com parallel run
+// ---------------------------------------------------------------------------
+
+// The real normaliser, copied in shape from `lib/invoices` so these cases pin
+// the behaviour the app actually uses.
+const norm = (raw: string | null): string | null => {
+  if (!raw) return null;
+  const cleaned = raw.trim().toUpperCase().replace(/[\s-]+/g, "");
+  if (!cleaned) return null;
+  return cleaned.replace(/^0+/, "") || cleaned;
+};
+
+const cand = (over: Partial<Parameters<typeof proposeBillLink>[1][number]> = {}) => ({
+  id: "550202", sync_token: "0", doc_number: "448139", entity: "Bill" as const,
+  total: 1510.26, vendor_ref: "3054", vendor_name: "Bakemark DF02",
+  txn_date: "2026-08-20", balance: 1510.26, ...over,
+});
+const inv = (over = {}) => ({
+  invoice_number: "448139", total: 1510.26, is_credit: false, external_ref: null, ...over,
+});
+
+test("a bill already in QuickBooks is proposed, not written", () => {
+  // The real pair, from the live company: 51 of 52 looked exactly like this.
+  const p = proposeBillLink(inv(), [cand()], "3054", norm);
+  ok(p.ok, "proposed");
+  eq(p.ok ? p.candidate.id : null, "550202", "names the bill");
+  eq(p.ok ? p.exact : null, true, "number and amount agree");
+  eq(p.ok ? p.caveat : "x", null, "so nothing to caveat");
+
+  // Punctuation and leading zeros are not a difference — the same rule the
+  // printed-PO check uses, so the two cannot disagree about "the same number".
+  ok(proposeBillLink(inv({ invoice_number: "00448-139" }), [cand()], "3054", norm).ok,
+     "spacing and leading zeros normalise away");
+});
+
+test("the vendor REFUSES and the amount only CAVEATS", () => {
+  // Two suppliers can print the same number in one month, and no amount would
+  // tell you which is which — so this is a refusal, never a warning.
+  const wrongVendor = proposeBillLink(inv(), [cand({ vendor_ref: "9999", vendor_name: "Dawn Food Products" })], "3054", norm);
+  eq(wrongVendor.ok, false, "a different vendor is a different document");
+  ok(!wrongVendor.ok && wrongVendor.reason.includes("Dawn Food Products"), "and says whose it is");
+
+  // Same number, same vendor, different money: the case a human most needs to
+  // see — a credit, a short delivery, a correction made on one side only.
+  const off = proposeBillLink(inv({ total: 1400 }), [cand()], "3054", norm);
+  ok(off.ok, "still proposed");
+  eq(off.ok ? off.exact : null, false, "but not exact");
+  ok(off.ok && off.caveat?.includes("1510.26") && off.caveat?.includes("1400.00"), "naming both figures");
+});
+
+test("it refuses rather than guessing", () => {
+  eq(proposeBillLink(inv(), [], "3054", norm).ok, false, "nothing there");
+  eq(proposeBillLink(inv({ invoice_number: null }), [cand()], "3054", norm).ok, false, "no number of ours");
+  eq(proposeBillLink(inv({ invoice_number: "   " }), [cand()], "3054", norm).ok, false, "blank is no number");
+  // Measured 0 of 52 on the real data, which is why it can afford to refuse.
+  const two = proposeBillLink(inv(), [cand(), cand({ id: "550203" })], "3054", norm);
+  eq(two.ok, false, "two matches is a hand-pick");
+  ok(!two.ok && two.reason.includes("2 documents"), "and says how many");
+  // A credit is a different entity and must never adopt a Bill.
+  eq(proposeBillLink(inv({ is_credit: true }), [cand()], "3054", norm).ok, false, "a credit is not a bill");
+  ok(proposeBillLink(inv({ is_credit: true }), [cand({ entity: "VendorCredit" })], "3054", norm).ok, "but a VendorCredit is");
+  // Already linked: proposing again would offer to overwrite a real link.
+  eq(proposeBillLink(inv({ external_ref: { qbo: { id: "1", sync_token: "0" } } }), [cand()], "3054", norm).ok,
+     false, "already linked");
+});
+
+test("an adopted bill is indistinguishable from one we pushed", () => {
+  // Which is the whole point: attachments, the balance and the "In QuickBooks
+  // as…" line all read this ref and must not care how it got there.
+  const ref = linkedRef(cand());
+  eq(qboRef(ref)?.id, "550202", "id");
+  eq(qboRef(ref)?.syncToken, "0", "and a token, so the next write is an UPDATE");
+  eq(pushMode({ external_ref: ref }), "update", "never a create");
+  eq(pushedLabel(ref), "In QuickBooks as Bill 448139", "and it reads as a bill");
+});
+
+test("forgetting a link puts the bill back to where it can be sent or adopted", () => {
+  // The dead end this exists for (Mark, 2026-09-02): a bill pushed and then
+  // DELETED in QuickBooks could not update (gone), could not create (`pushMode`
+  // read the stored id), and could not be linked (the proposal is only offered
+  // on an unlinked bill). Three doors, all shut by the same dead id.
+  const stuck = { qbo: { id: "550425", sync_token: "1", doc_number: "73707384.2", entity: "Bill" as const } };
+  eq(pushMode({ external_ref: stuck }), "update", "stuck: it will only ever try to update");
+  eq(proposeBillLink(inv({ external_ref: stuck }), [cand()], "3054", norm).ok, false, "and refuses to be linked");
+
+  // What the unlink writes.
+  const cleared = {};
+  eq(pushMode({ external_ref: cleared }), "create", "cleared: it can be sent afresh");
+  eq(pushedLabel(cleared), null, "and claims nothing");
+  ok(proposeBillLink(inv({ external_ref: cleared }), [cand()], "3054", norm).ok, "and can be adopted");
 });
