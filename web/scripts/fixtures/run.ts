@@ -56,6 +56,7 @@ import "./productionScale.fixtures";
 import "./productionSchedule.fixtures";
 import "./purchaseRequests.fixtures";
 import "./quickbooks.fixtures";
+import "./billStage.fixtures";
 import "./recipeCosts.fixtures";
 import "./receiving.fixtures";
 import "./roles.fixtures";

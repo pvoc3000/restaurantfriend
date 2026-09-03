@@ -29,6 +29,13 @@ export type InvoiceListRow = {
    *  column, so it cannot claim an order none of its lines touch. */
   purchase_orders: { id: string; po_number: string }[];
   document_count: number;
+  /** Whether a QuickBooks document is linked. Only the presence matters here —
+   *  086's reasoning, applied one level down: a list has no use for the id. */
+  qbo_linked: boolean;
+  /** 088's cache: what QuickBooks last said was owed, and when. Never one
+   *  without the other. */
+  qbo_balance: number | null;
+  qbo_checked_at: string | null;
 };
 
 export default async function InvoicesPage({
@@ -57,20 +64,51 @@ export default async function InvoicesPage({
   const timeZone = session.orgSettings.timezone ?? serverTimeZone();
   const today = todayInTimeZone(timeZone);
 
+  const start = rangeStart(filters.range, timeZone);
+  const locationId = session.activeLocation.id;
+
+  // THE SELECT LIST IS WRITTEN OUT AT EACH CALL SITE, not passed in. A helper
+  // taking `columns: string` reads better and breaks the types: supabase-js
+  // parses the list at the TYPE level, so a `string` parameter collapses every
+  // row to `GenericStringError` — which is what happened when this was written
+  // that way (2026-09-02), and is the same trap `CONNECTION_COLUMNS` fell into.
   let query = supabase
     .from("vendor_invoices")
     .select(
       `id, invoice_number, invoice_date, due_date, total, tax, freight,
-       is_credit, status, vendors ( id, name )`
+       is_credit, status, external_ref, qbo_balance, qbo_checked_at,
+       vendors ( id, name )`
     )
-    .eq("location_id", session.activeLocation.id)
+    .eq("location_id", locationId)
     .order("invoice_date", { ascending: false })
     .limit(500);
-
-  const start = rangeStart(filters.range, timeZone);
   if (start) query = query.gte("invoice_date", start);
 
-  const { data: invoices, error } = await query;
+  let { data: invoices, error } = await query;
+
+  // 088's two columns arrive after this code. Selecting a column that does not
+  // exist yet 400s the WHOLE query, which would take the invoice list down
+  // rather than costing it one chip — so on that ONE failure it asks again
+  // without them. Bills then read Submitted where they would read Paid, which
+  // is the honest answer when nothing has been cached.
+  //
+  // Narrow on purpose: only a missing column is retried, and every other
+  // failure is still reported rather than swallowed.
+  if (error && /qbo_balance|qbo_checked_at/.test(error.message)) {
+    let retry = supabase
+      .from("vendor_invoices")
+      .select(
+        `id, invoice_number, invoice_date, due_date, total, tax, freight,
+         is_credit, status, external_ref, vendors ( id, name )`
+      )
+      .eq("location_id", locationId)
+      .order("invoice_date", { ascending: false })
+      .limit(500);
+    if (start) retry = retry.gte("invoice_date", start);
+    const fallback = await retry;
+    invoices = fallback.data as unknown as typeof invoices;
+    error = fallback.error;
+  }
 
   if (error) {
     return (
@@ -139,8 +177,13 @@ export default async function InvoicesPage({
   const rows: InvoiceListRow[] = (invoices ?? []).map((i) => ({
     ...(i as unknown as Omit<
       InvoiceListRow,
-      "line_count" | "purchase_orders" | "document_count"
+      "line_count" | "purchase_orders" | "document_count" | "qbo_linked"
     >),
+    // The PRESENCE of a link, never the id — a list has no use for it, and
+    // sending an id to the browser is what 086 exists to stop.
+    qbo_linked: Boolean(
+      (i as unknown as { external_ref?: { qbo?: { id?: string } } }).external_ref?.qbo?.id
+    ),
     line_count: counts.get(i.id) ?? 0,
     purchase_orders: [...(poIdsByInvoice.get(i.id) ?? [])]
       .map((id) => ({ id, po_number: poNumbers.get(id) ?? "" }))

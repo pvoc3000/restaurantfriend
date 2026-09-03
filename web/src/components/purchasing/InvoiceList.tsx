@@ -12,11 +12,13 @@ import {
   sumSignedTotals,
   AGING_LABEL,
   AGING_ORDER,
-  INVOICE_STATUS_CLASS,
-  INVOICE_STATUS_LABEL,
   INVOICE_STATUS_ORDER,
+  BILL_STAGE_CLASS,
+  BILL_STAGE_LABEL,
+  BILL_STAGE_ORDER,
+  billPaymentNote,
+  billStage,
   type AgingBucket,
-  type InvoiceStatus,
 } from "@/lib/invoices";
 import {
   invoiceDetailHref,
@@ -56,6 +58,18 @@ type QboStatus = {
 };
 
 const INVOICE_WIDTHS_KEY = "rf.invoices.columnWidths.v1";
+
+/** Where a bill has got to, from what is on the row. Derived here rather than
+ *  stored — see `billStage`. One call, so the chip, the sort and the search
+ *  cannot disagree about which rung a bill is on. */
+function stageOf(i: InvoiceListRow) {
+  return billStage({
+    status: i.status,
+    linked: i.qbo_linked,
+    qbo_balance: i.qbo_balance,
+    qbo_checked_at: i.qbo_checked_at,
+  });
+}
 
 function sortValue(
   invoice: InvoiceListRow,
@@ -103,7 +117,7 @@ function sortValue(
 const GROUP_LABEL: Partial<
   Record<InvoiceSortKey, (i: InvoiceListRow, today: string) => string>
 > = {
-  status: (i) => INVOICE_STATUS_LABEL[i.status],
+  status: (i) => BILL_STAGE_LABEL[stageOf(i)],
   vendor: (i) => i.vendors?.name ?? "No vendor",
   due_date: (i, today) => AGING_LABEL[agingBucket(i.due_date, today)],
 };
@@ -172,7 +186,10 @@ export function InvoiceList({
 
   const statusCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const i of invoices) counts[i.status] = (counts[i.status] ?? 0) + 1;
+    for (const i of invoices) {
+      const stage = stageOf(i);
+      counts[stage] = (counts[stage] ?? 0) + 1;
+    }
     return counts;
   }, [invoices]);
 
@@ -188,7 +205,7 @@ export function InvoiceList({
   const visible = useMemo(() => {
     const words = filters.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return invoices.filter((i) => {
-      if (filters.status !== "all" && i.status !== filters.status) return false;
+      if (filters.status !== "all" && stageOf(i) !== filters.status) return false;
       if (filters.aging !== "all" && agingBucket(i.due_date, today) !== filters.aging) {
         return false;
       }
@@ -351,15 +368,25 @@ export function InvoiceList({
                   can't click. */}
               {i.invoice_number ?? <span className="text-faint">No number</span>}
             </Link>
-            {st && (
-              <span className="text-[11px] text-faint">
-                {st.missing
-                  ? "not in QuickBooks"
+            {/* WHAT WAS LAST HEARD, not only what was just asked. It used to
+                render `qboStatus` alone, so the line was blank until somebody
+                pressed the button and gone again on reload — which is no use in
+                a column. 088 stores it; a fresh check overrides it in place. */}
+            {(() => {
+              const live = st
+                ? st.missing
+                  ? "no longer in QuickBooks"
                   : st.settled
-                    ? "paid in QuickBooks"
-                    : `${money(Number(st.balance))} owed`}
-              </span>
-            )}
+                    ? "paid"
+                    : `${money(Number(st.balance))} owed`
+                : null;
+              const stored = billPaymentNote(
+                { status: i.status, linked: i.qbo_linked, qbo_balance: i.qbo_balance, qbo_checked_at: i.qbo_checked_at },
+                money
+              );
+              const text = live ?? stored;
+              return text ? <span className="text-[11px] text-faint">{text}</span> : null;
+            })()}
           </div>
         );
       },
@@ -418,14 +445,17 @@ export function InvoiceList({
       key: "status",
       label: "Status",
       width: 120,
-      sortValue: (i) => INVOICE_STATUS_ORDER.indexOf(i.status),
-      render: (i) => (
-        <span
-          className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${INVOICE_STATUS_CLASS[i.status]}`}
-        >
-          {INVOICE_STATUS_LABEL[i.status]}
-        </span>
-      ),
+      sortValue: (i) => BILL_STAGE_ORDER.indexOf(stageOf(i)),
+      render: (i) => {
+        const stage = stageOf(i);
+        return (
+          <span
+            className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${BILL_STAGE_CLASS[stage]}`}
+          >
+            {BILL_STAGE_LABEL[stage]}
+          </span>
+        );
+      },
     },
     {
       key: "po",
@@ -531,9 +561,7 @@ export function InvoiceList({
   const statusTabs: InvoiceStatusFilter[] = [
     "all",
     "open",
-    ...INVOICE_STATUS_ORDER.filter(
-      (s) => s !== "open" && (statusCounts[s] ?? 0) > 0
-    ),
+    ...BILL_STAGE_ORDER.filter((s) => s !== "open" && (statusCounts[s] ?? 0) > 0),
   ];
 
   const agingTabs: AgingFilter[] = [
@@ -604,7 +632,7 @@ export function InvoiceList({
             onChange={(status) => update({ status })}
             options={statusTabs.map((s) => ({
               key: s,
-              label: s === "all" ? "All" : INVOICE_STATUS_LABEL[s as InvoiceStatus],
+              label: s === "all" ? "All" : BILL_STAGE_LABEL[s],
               count: s === "all" ? invoices.length : statusCounts[s] ?? 0,
             }))}
           />

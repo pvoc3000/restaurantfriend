@@ -6,7 +6,8 @@ import type { RawSearchParams } from "./itemFilters";
 import type { SortDir } from "./tableSort";
 import { withFrom } from "./breadcrumbs";
 import { RANGES, rangeStart, type RangeKey } from "./poFilters";
-import { AGING_ORDER, INVOICE_STATUS_ORDER, type AgingBucket, type InvoiceStatus } from "./invoices";
+import { AGING_ORDER, BILL_STAGE_ORDER,
+  type BillStage, type AgingBucket } from "./invoices";
 
 /**
  * The status chips: the three real statuses plus `all`.
@@ -15,10 +16,19 @@ import { AGING_ORDER, INVOICE_STATUS_ORDER, type AgingBucket, type InvoiceStatus
  * of the three, and a roll-up over "not void" would be a fourth chip that
  * almost always equals `all`.
  */
-export type InvoiceStatusFilter = InvoiceStatus | "all";
+/**
+ * IT FILTERS ON THE LADDER, NOT ON `invoices.status` (2026-09-02). The chip in
+ * the row says Open · Approved · Submitted · Paid · Void, and a filter offering
+ * only the three stored values would be a second vocabulary for one column —
+ * "Approved" would then include every bill already on the books and paid.
+ *
+ * Submitted and Paid are derived (`billStage`), so this filter is applied in
+ * the browser over rows the server already sent, which it was anyway.
+ */
+export type InvoiceStatusFilter = BillStage | "all";
 
 function isStatusFilter(value: string): value is InvoiceStatusFilter {
-  return value === "all" || (INVOICE_STATUS_ORDER as string[]).includes(value);
+  return value === "all" || (BILL_STAGE_ORDER as string[]).includes(value);
 }
 
 /** The aging tiers, plus `all`. */

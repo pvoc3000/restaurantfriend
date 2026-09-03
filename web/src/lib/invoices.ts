@@ -1096,3 +1096,114 @@ function money(value: number | null | undefined): string {
     maximumFractionDigits: 2,
   })}`;
 }
+
+// ---------------------------------------------------------------------------
+// Where a bill has got to — our acts, then QuickBooks'
+// ---------------------------------------------------------------------------
+
+/**
+ * Open → Approved → Submitted → Paid, with `void` off to the side (Mark,
+ * 2026-09-02: "the status should be 'Submitted' as in Submitted for payment.
+ * When it's paid, the status should be 'Paid'").
+ *
+ * SUBMITTED AND PAID ARE DERIVED, NEVER STORED. `external_ref.qbo.id` already
+ * says a bill is on the books and `qbo_balance` says what is left on it; a
+ * status column repeating either would be two answers to one question, which
+ * is the thing this schema keeps refusing (051's biconditional, 016's
+ * `nextDeliveryDate`). `invoices.status` stays open/approved/void.
+ *
+ * THE FIRST TWO ARE OURS AND THE LAST TWO ARE NOT, and that is the distinction
+ * the colours cannot carry. Open and Approved are acts we performed and are
+ * always current. Submitted is true the moment a link exists. **Paid is a fact
+ * we last HEARD**, so it may never be shown without `qbo_checked_at` beside it
+ * — see `billPaymentNote`, and 088's header for why that pairing is what makes
+ * storing the balance honest at all.
+ *
+ * "SUBMITTED" MEANS ON THE BOOKS, NOT SENT FOR PAYMENT. Nothing here can tell
+ * QuickBooks to pay anybody: Bill Pay is a QBO interface feature and the
+ * Accounting API records a payment rather than initiating one. During the
+ * Bill.com parallel run it is usually Bill.com that put it there, which the
+ * word still covers.
+ *
+ * PART-PAID IS NOT A FIFTH RUNG. A bill with something still on it reads
+ * Submitted, and the note says what is owed — a number is more use than another
+ * word. `void` is an exit rather than a rung, like `cancelled` on a special
+ * order.
+ */
+export type BillStage = "open" | "approved" | "submitted" | "paid" | "void";
+
+export const BILL_STAGE_ORDER: BillStage[] = [
+  "open",
+  "approved",
+  "submitted",
+  "paid",
+  "void",
+];
+
+export const BILL_STAGE_LABEL: Record<BillStage, string> = {
+  open: "Open",
+  approved: "Approved",
+  submitted: "Submitted",
+  paid: "Paid",
+  void: "Void",
+};
+
+/**
+ * Yellow and green keep the meanings this list already gave them; the two new
+ * rungs continue the purchase order ladder rather than inventing a vocabulary.
+ * Submitted takes `closed`'s white-on-ink — definite, and nothing outstanding
+ * from us — and Paid takes the same green as Approved a shade stronger, which
+ * says "further along the same axis" and not "a different kind of thing".
+ */
+export const BILL_STAGE_CLASS: Record<BillStage, string> = {
+  open: "border border-ink bg-[var(--rf-yellow-200)] text-ink",
+  approved: "border border-ink bg-[var(--rf-green-200)] text-ink",
+  submitted: "border border-ink bg-white text-ink",
+  paid: "border border-ink bg-[var(--rf-green-300)] text-ink",
+  void: "border border-neutral-300 bg-white text-faint",
+};
+
+/** Everything the stage is read from. Plain fields rather than the QuickBooks
+ *  types, so `lib/invoices` stays free of that module and the fixtures can
+ *  build a case in one line. */
+export type BillStageInput = {
+  status: InvoiceStatus;
+  /** Whether a QuickBooks document is linked — `external_ref.qbo.id`. */
+  linked: boolean;
+  /** 088's cache. Null means either nobody asked or QuickBooks no longer has
+   *  it; `checkedAt` is what tells those apart. */
+  qbo_balance: number | null;
+  qbo_checked_at: string | null;
+};
+
+export function billStage(invoice: BillStageInput): BillStage {
+  // Void first: it is an exit from the ladder, not a position on it, and a
+  // voided bill that happens to carry a link must not read as Submitted.
+  if (invoice.status === "void") return "void";
+  if (!invoice.linked) return invoice.status === "approved" ? "approved" : "open";
+  // Zero is the only balance that means paid, and it must be a NUMBER — null
+  // here is "not asked" or "no longer there", neither of which is paid.
+  if (invoice.qbo_balance !== null && invoice.qbo_balance <= 0.005) return "paid";
+  return "submitted";
+}
+
+/**
+ * What QuickBooks last said, and when — the sentence that must accompany any
+ * claim about payment.
+ *
+ * Null when there is nothing to report, so a bill nobody has asked about says
+ * nothing rather than implying it was checked and found unpaid.
+ */
+export function billPaymentNote(
+  invoice: BillStageInput,
+  money: (n: number) => string
+): string | null {
+  if (!invoice.linked || !invoice.qbo_checked_at) return null;
+  const when = invoice.qbo_checked_at.slice(0, 10);
+  // Checked, and the document is not there. The one answer that needs an act
+  // rather than a figure — the bill can neither be updated nor sent until the
+  // link is forgotten.
+  if (invoice.qbo_balance === null) return `no longer in QuickBooks · as of ${when}`;
+  if (invoice.qbo_balance <= 0.005) return `paid · as of ${when}`;
+  return `${money(invoice.qbo_balance)} owed · as of ${when}`;
+}

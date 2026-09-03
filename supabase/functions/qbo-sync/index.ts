@@ -768,13 +768,18 @@ Deno.serve(async (req) => {
       // so this can never report on another org's books.
       let q = supabase
         .from("vendor_invoices")
-        .select("id, invoice_number, external_ref")
+        .select("id, invoice_number, external_ref, qbo_balance")
         .not("external_ref->qbo->>id", "is", null);
       if (Array.isArray(wanted) && wanted.length > 0) q = q.in("id", wanted);
       const { data: rows, error: rowsError } = await q;
       if (rowsError) return json(500, { error: rowsError.message });
 
-      type Pushed = { id: string; invoice_number: string | null; external_ref: { qbo?: { id?: string; entity?: string } } };
+      type Pushed = {
+        id: string;
+        invoice_number: string | null;
+        external_ref: { qbo?: { id?: string; entity?: string } };
+        qbo_balance: number | null;
+      };
       const pushed = (rows ?? []) as Pushed[];
       if (pushed.length === 0) {
         return json(200, { checked_at: new Date().toISOString(), statuses: [] });
@@ -839,12 +844,53 @@ Deno.serve(async (req) => {
         };
       });
 
+      // CACHED, SO A LIST COLUMN CAN SAY IT WITHOUT ASKING FIRST (088). The
+      // balance is stored WITH the moment it was true and never rendered
+      // without it — which is what makes storing somebody else's fact honest,
+      // and is the whole of the rule this bends.
+      //
+      // NULL BALANCE IS A REAL ANSWER HERE: "we asked, and QuickBooks does not
+      // have it any more". It reads differently from "nobody asked", which is a
+      // null `qbo_checked_at`, and only the pair can tell them apart.
+      //
+      // Only what CHANGED is written — a re-check of forty settled bills should
+      // cost nothing — and each write checks its own row count, because 025's
+      // update policy is purchaser+ and below that this changes nothing and
+      // returns NO error.
+      const checkedAt = new Date().toISOString();
+      let stored = 0;
+      let refused = 0;
+      for (const st of statuses) {
+        const row = pushed.find((r) => r.id === st.invoice_id);
+        const next = st.missing ? null : Number(st.balance);
+        const before = row?.qbo_balance === undefined || row?.qbo_balance === null
+          ? null
+          : Number(row.qbo_balance);
+        if (before === next) continue;
+        const { data: done, error: upErr } = await supabase
+          .from("vendor_invoices")
+          .update({ qbo_balance: next, qbo_checked_at: checkedAt })
+          .eq("id", st.invoice_id)
+          .select("id");
+        if (upErr || !done || done.length === 0) refused++;
+        else stored++;
+      }
+
       await admin
         .from("accounting_connections")
         .update({ last_used_at: new Date().toISOString() })
         .eq("id", conn.id);
 
-      return json(200, { checked_at: new Date().toISOString(), statuses });
+      return json(200, {
+        checked_at: checkedAt,
+        statuses,
+        stored,
+        // Said out loud rather than swallowed: below purchaser+ the figures are
+        // still correct on screen and simply will not survive a reload, and a
+        // silent difference between those two is how somebody concludes the
+        // feature is broken.
+        ...(refused ? { not_stored: refused } : {}),
+      });
     }
 
     if (mode === "vendors") {
