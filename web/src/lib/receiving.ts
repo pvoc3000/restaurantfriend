@@ -162,6 +162,17 @@ export function receivedClass(ordered: number, received: number | null): string 
  * doesn't bill are deliberately not filled from the ordered quantity — that
  * would quietly assert that something arrived which nobody billed us for. Those
  * keep their own per-row "Ordered" chip.
+ *
+ * AND NEVER A LINE THE PAGE STRIKES OUT. A driver who takes goods back crosses
+ * the line through and the printed quantity beside it is what was loaded, not
+ * what was left — filling from it records a delivery that was undone in front
+ * of the person signing.
+ *
+ * That is not hypothetical: on BakeMark 452660 this filled six of seven lines
+ * from the invoice, including two cases of whipped topping the driver had just
+ * taken back and struck out, and receiving then agreed with the invoice because
+ * the invoice had become its own witness (Mark, 2026-09-02). A struck line is
+ * left for a person, who is the only one who knows whether anything arrived.
  */
 export function fillable(
   lines: PoLine[],
@@ -172,7 +183,9 @@ export function fillable(
   for (const line of lines) {
     if (line.qty_received !== null) continue;
     if (hasExtraction) {
-      const qty = matchByLine.get(line.id)?.invoice?.qty;
+      const billed = matchByLine.get(line.id)?.invoice;
+      if (billed?.struck_through === true) continue;
+      const qty = billed?.qty;
       if (qty !== null && qty !== undefined) out.push({ line, qty: Number(qty) });
     } else {
       out.push({ line, qty: Number(line.qty_ordered) });

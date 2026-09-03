@@ -37,6 +37,15 @@ export type InvoiceLine = {
   extended: number | null;
   pack: string | null;
   /**
+   * Struck out, crossed through, or marked OUT/SHORT/CREDIT by hand.
+   *
+   * OPTIONAL, and for `alt_product_id`'s reason: every reading stored before
+   * 2026-09-02 predates the field and stays valid — those lines simply carry no
+   * amendment, which is what they said. The printed `qty` and `extended` are
+   * unchanged beside it; this only says not to believe them.
+   */
+  struck_through?: boolean | null;
+  /**
    * OUR purchase order number as printed on THIS line, when the page prints one
    * per line rather than once at the top.
    *
@@ -111,6 +120,17 @@ export type InvoiceExtraction = {
    */
   is_credit?: boolean | null;
   invoice_total: number | null;
+  /**
+   * A total written by hand at the foot that supersedes the printed one.
+   *
+   * THE PRINTED FIGURE STILL GOES IN `invoice_total`. The record is what the
+   * page says; this is the correction laid over it, and keeping them apart is
+   * what lets a screen show both — "printed $1,001.26, corrected $823.46" —
+   * rather than silently preferring one.
+   *
+   * Optional, like `struck_through` and for the same reason.
+   */
+  corrected_total?: number | null;
   lines: InvoiceLine[];
   /**
    * The reader's own caveats, in its own words — anything illegible, but also
@@ -298,4 +318,76 @@ export function priceDiffers(a: number | null, b: number | null): boolean {
 export function qtyDiffers(a: number | null, b: number | null): boolean {
   if (a === null || b === null) return false;
   return Math.abs(a - b) > 0.001;
+}
+
+// ---------------------------------------------------------------------------
+// A page amended by hand
+// ---------------------------------------------------------------------------
+
+export type HandAmendment = {
+  /** Lines the page itself takes off the bill. */
+  struck: InvoiceLine[];
+  /** What was printed at the foot. */
+  printedTotal: number | null;
+  /** What somebody wrote there instead, when they did. */
+  correctedTotal: number | null;
+  /** What the un-struck lines come to — the arithmetic the page implies. */
+  remaining: number;
+};
+
+/**
+ * What a driver changed on the page, or null when nothing was.
+ *
+ * WHY THIS IS A FUNCTION AND NOT A BOOLEAN COLUMN: it is derived from the
+ * reading, so a re-read updates it and nothing has to be kept in step. It is
+ * also the shape both screens want — the struck lines to mark, and two totals
+ * to show side by side.
+ *
+ * BakeMark 452660 (Mark, 2026-09-02) is the case it was written for: a driver
+ * took two cases of whipped topping back, struck the line and wrote $823.46
+ * under a printed $1,001.26. The reader saw every bit of that and had nowhere
+ * to put it but prose, so both screens went on showing the printed total —
+ * which is money nobody owed.
+ *
+ * IT NEVER REWRITES THE READING. The printed figures stay printed; this is the
+ * pen laid over them, and applying it is a person's act.
+ */
+export function handAmendment(
+  extraction: Pick<InvoiceExtraction, "lines" | "invoice_total" | "corrected_total">
+): HandAmendment | null {
+  const lines = extraction.lines ?? [];
+  const struck = lines.filter((l) => l.struck_through === true);
+  const corrected =
+    extraction.corrected_total === undefined || extraction.corrected_total === null
+      ? null
+      : Number(extraction.corrected_total);
+  // Neither a struck line nor a handwritten total: the page is as printed.
+  if (struck.length === 0 && corrected === null) return null;
+
+  const remaining = lines
+    .filter((l) => l.struck_through !== true)
+    .reduce((sum, l) => sum + Number(l.extended ?? 0), 0);
+
+  return {
+    struck,
+    printedTotal:
+      extraction.invoice_total === null || extraction.invoice_total === undefined
+        ? null
+        : Number(extraction.invoice_total),
+    correctedTotal: corrected,
+    remaining: Math.round(remaining * 100) / 100,
+  };
+}
+
+/**
+ * What the invoice really comes to — the handwritten total when there is one,
+ * else what the lines left standing add up to.
+ *
+ * THE HANDWRITTEN FIGURE WINS over our own arithmetic, deliberately: it is what
+ * the driver and the person who signed agreed on at the door, and if the two
+ * disagree the page is the record. `handAmendment` exposes both so a screen can
+ * say when they differ rather than picking quietly.
+ */
+export function amendedTotal(amendment: HandAmendment): number {
+  return amendment.correctedTotal ?? amendment.remaining;
 }

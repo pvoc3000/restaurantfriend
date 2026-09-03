@@ -105,6 +105,7 @@ const INVOICE_SCHEMA = {
     "other_charges",
     "is_credit",
     "invoice_total",
+    "corrected_total",
     "lines",
     "notes",
   ],
@@ -140,6 +141,17 @@ const INVOICE_SCHEMA = {
     // (see `invoiceHeaderFromExtraction`), the reading never does.
     is_credit: nullable("boolean"),
     invoice_total: nullable("number"),
+    // THE PAGE AMENDED BY HAND, which is the one thing on a delivery invoice
+    // that the printed figures cannot tell you. A driver taking two cases back
+    // strikes the line and writes a corrected total at the foot — and the
+    // printed total, correctly transcribed, then states money nobody owes.
+    //
+    // BakeMark 452660 (2026-09-02) is the case this exists for: the reader saw
+    // all of it and could only say so in `notes`, where it sat behind a
+    // collapsed caret while both screens showed $1,001.26 against a real
+    // $823.46. The printed figures still go in `invoice_total` — the record is
+    // what was printed — and this is the correction laid over them.
+    corrected_total: nullable("number"),
     lines: {
       type: "array",
       items: {
@@ -153,6 +165,7 @@ const INVOICE_SCHEMA = {
           "unit_price",
           "extended",
           "pack",
+          "struck_through",
           "purchase_order_number",
         ],
         properties: {
@@ -173,6 +186,11 @@ const INVOICE_SCHEMA = {
           unit_price: nullable("number"),
           extended: nullable("number"),
           pack: optionalText,
+          // Struck out, crossed through, or marked OUT/SHORT by hand — the
+          // line was billed and then taken off the bill on the page itself.
+          // The printed qty and extended stay exactly as printed beside it;
+          // this says not to believe them.
+          struck_through: nullable("boolean"),
           // OUR purchase order number for THIS line, when the page prints one
           // per line rather than once at the top. That disagreement between
           // lines is exactly where a consolidated invoice splits.
@@ -238,6 +256,20 @@ or "none" into a text field; an empty string is how that is said.
   number or a line number here; only an identifier for the ITEM.
 - qty is the quantity billed and extended is that line's total charge. Both are
   printed on the page — never compute them.
+
+HANDWRITING IS PART OF THE DOCUMENT. A delivery driver who takes goods back
+strikes the line out and writes a corrected total at the foot, and that pen is
+as binding as the print. Transcribe the PRINTED figures unchanged, exactly as
+above, and report the amendment separately:
+- struck_through is true for a line crossed out, struck through, or marked by
+  hand as OUT, SHORT, CREDIT or REFUSED. Its printed qty, unit_price and
+  extended still go in as printed — this only says not to believe them.
+- corrected_total is a total written by hand at the foot that supersedes the
+  printed one. Report the printed figure in invoice_total as always, and the
+  handwritten one here. Use null when the foot carries no handwritten total,
+  even if lines are struck — do not compute it yourself.
+Say what you saw in notes as well; these fields are for acting on, the note is
+for the person reading.
 - unit_price is the rate printed for ONE of whatever qty counts. Many lines show
   two rates (a per-pound or per-each figure for catch-weight goods alongside a
   case price): pick the one where qty × unit_price equals extended. If neither

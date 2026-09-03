@@ -365,6 +365,32 @@ test("bulk fill takes the INVOICE quantity when something has been read", () => 
   eq(fillable([line], byLine, true)[0].qty, 3);
 });
 
+test("bulk fill skips a line the driver struck out", () => {
+  // BakeMark 452660 (Mark, 2026-09-02): this filled six of seven lines from the
+  // invoice, including two cases of whipped topping the driver had just taken
+  // back and crossed through — so receiving then agreed with the invoice
+  // because the invoice had become its own witness.
+  const kept = poLine({ product_id: "A", qty_ordered: 5 });
+  const returned = poLine({ product_id: "11200", qty_ordered: 2 });
+  const result = matchInvoiceToOrder(
+    [kept, returned],
+    [
+      invoiceLine({ product_id: "A", qty: 5 }),
+      invoiceLine({ product_id: "11200", qty: 2, struck_through: true }),
+    ]
+  );
+  const byLine = new Map(result.matches.map((m) => [m.line.id, m]));
+  const out = fillable([kept, returned], byLine, true);
+  eq(out.length, 1, "only the line that stayed on the truck");
+  eq(out[0].line.id, kept.id);
+  // The printed quantity is untouched — the record is what the page says.
+  eq(
+    result.matches.find((m) => m.line.id === returned.id)?.invoice?.qty,
+    2,
+    "the struck line still reports what was printed"
+  );
+});
+
 test("bulk fill skips lines the invoice doesn't bill", () => {
   // Deliberately NOT filled from the ordered quantity — that would assert that
   // something arrived which nobody billed us for.

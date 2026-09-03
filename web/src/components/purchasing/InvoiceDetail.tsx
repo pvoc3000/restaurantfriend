@@ -41,6 +41,7 @@ import { useAttachmentActions } from "./useAttachmentActions";
 import { InvoiceFooter } from "./InvoiceFooter";
 import { PushToQuickBooks } from "./PushToQuickBooks";
 import { attachmentRejection, type AttachmentKind } from "@/lib/attachments";
+import { handAmendment, amendedTotal } from "@/lib/invoiceExtraction";
 
 type InvoiceRecord = VendorInvoice & {
   vendors: { id: string; name: string; order_type: string } | null;
@@ -198,6 +199,28 @@ export function InvoiceDetail({
     : null;
 
   /**
+   * The page as a driver left it — struck lines and a total written by hand.
+   *
+   * DERIVED FROM THE READING, never stored: a re-read updates it and nothing
+   * has to be kept in step. It is shown at the TOP because it changes what the
+   * whole document means — BakeMark 452660 sat here reading $1,001.26 while the
+   * page in the folder said $823.46, and the reader had seen all of it and
+   * could only say so in a note behind a caret (Mark, 2026-09-02).
+   */
+  const amendment = shown?.extraction ? handAmendment(shown.extraction) : null;
+  /** Which of OUR lines the page strikes out, by the vendor's own SKU — the
+   *  same key the lines were seeded under. */
+  const struckSkus = useMemo(
+    () =>
+      new Set(
+        (amendment?.struck ?? [])
+          .map((l) => (l.product_id ?? "").trim())
+          .filter(Boolean)
+      ),
+    [amendment]
+  );
+
+  /**
    * The purchase order this invoice PRINTS, when exactly one candidate answers
    * to it — a proposal, never an automatic link. A printed number is one OCR
    * digit from someone else's order, so the same uniqueness discipline the SKU
@@ -293,17 +316,31 @@ export function InvoiceDetail({
       pinned: true,
       wrap: true,
       sortValue: (l) => l.description,
-      render: (l) =>
-        canEdit ? (
-          <InlineValue
-            table="vendor_invoice_lines"
-            id={l.id}
-            column="description"
-            value={l.description}
-          />
-        ) : (
-          <span className={READ_ONLY_VALUE}>{l.description ?? "—"}</span>
-        ),
+      render: (l) => {
+        // MARKED WHERE YOU READ THE LINE, not in a legend. A struck line still
+        // shows its printed figures — that is the record — so the only thing
+        // saying "do not believe these" has to sit beside them.
+        const struck = struckSkus.has((l.product_id ?? "").trim());
+        return (
+          <span className="flex flex-wrap items-baseline gap-x-2">
+            {canEdit ? (
+              <InlineValue
+                table="vendor_invoice_lines"
+                id={l.id}
+                column="description"
+                value={l.description}
+              />
+            ) : (
+              <span className={READ_ONLY_VALUE}>{l.description ?? "—"}</span>
+            )}
+            {struck && (
+              <span className="bg-mark-fill px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink">
+                struck out by hand
+              </span>
+            )}
+          </span>
+        );
+      },
     },
     {
       key: "pack",
@@ -325,7 +362,11 @@ export function InvoiceDetail({
     },
     {
       key: "qty",
-      label: "Qty",
+      // WHOSE NUMBER IT IS. Mark read this as a received quantity and expected
+      // it to reflect the receiving he had already done (2026-09-02) — it is
+      // the vendor's claim, and has to be, or a line billed for goods that
+      // never came would have nowhere to show up.
+      label: "Billed",
       width: 100,
       align: "right",
       sortValue: (l) => l.qty,
@@ -742,6 +783,64 @@ export function InvoiceDetail({
             {/* Yellow, never red — "worth your eye", the ≈/? rule. A total that
                 doesn't match its parts is usually a reading to correct, not a
                 vendor who can't add up. */}
+            {/* THE PAGE WAS AMENDED BY HAND, and that outranks every other
+                caveat here — it changes what the document says is owed, where
+                the rest are about how well we read it. Yellow: a driver taking
+                goods back is normal, not an error. */}
+            {amendment && (
+              <div className="space-y-1 border border-ink bg-mark-fill px-4 py-2 text-sm">
+                <p>
+                  <strong>Amended by hand on the page.</strong>{" "}
+                  {amendment.printedTotal !== null && (
+                    <>
+                      Printed{" "}
+                      <span className="tabular-nums">{money(amendment.printedTotal)}</span>,{" "}
+                    </>
+                  )}
+                  {amendment.correctedTotal !== null ? (
+                    <>
+                      handwritten{" "}
+                      <strong className="tabular-nums">
+                        {money(amendment.correctedTotal)}
+                      </strong>
+                      .
+                    </>
+                  ) : (
+                    <>
+                      and the lines left standing come to{" "}
+                      <strong className="tabular-nums">{money(amendment.remaining)}</strong>.
+                    </>
+                  )}
+                </p>
+                {amendment.struck.length > 0 && (
+                  <p className="text-[13px]">
+                    Struck out:{" "}
+                    {amendment.struck
+                      .map((l) => `${l.product_id || "no number"} ${l.description}`.trim())
+                      .join(" · ")}
+                    .
+                  </p>
+                )}
+                {/* SAID, NOT SETTLED. Our own sum against the pen — when they
+                    disagree the page is the record, and which one is on screen
+                    should never be a silent choice. */}
+                {amendment.correctedTotal !== null &&
+                  Math.abs(amendment.correctedTotal - amendment.remaining) > 0.005 && (
+                    <p className="text-[13px]">
+                      The lines left standing come to{" "}
+                      <span className="tabular-nums">{money(amendment.remaining)}</span>, which is
+                      not what was written.
+                    </p>
+                  )}
+                {Math.abs(Number(invoice.total ?? 0) - amendedTotal(amendment)) > 0.005 && (
+                  <p className="text-[13px]">
+                    This record still says{" "}
+                    <span className="tabular-nums">{money(invoice.total)}</span> — correct the
+                    total and the struck lines below.
+                  </p>
+                )}
+              </div>
+            )}
             {amounts.differs && (
               <p className="border border-ink bg-mark-fill px-4 py-2 text-sm">
                 The parts add up to{" "}

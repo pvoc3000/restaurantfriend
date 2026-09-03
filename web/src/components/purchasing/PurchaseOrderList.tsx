@@ -374,6 +374,38 @@ export function PurchaseOrderList({
   async function deleteOrders(selected: PoListRow[]): Promise<boolean> {
     if (selected.length === 0) return false;
     const nonDraft = selected.filter((po) => po.status !== "draft");
+
+    /**
+     * WHICH BILLS POINT AT THESE ORDERS.
+     *
+     * Both links are `on delete set null` (025), so deleting an order does not
+     * take its invoices with it — the money is still owed and the bill stays
+     * payable, which is right. What goes is the ATTRIBUTION: those invoices
+     * silently stop knowing what was ordered, and nothing said so (Mark asked
+     * what happens, 2026-09-02).
+     *
+     * Asked here rather than carried on every row: the list is 500 orders and
+     * this matters at the moment of deleting one.
+     */
+    let attributed: string[] = [];
+    const { data: linked } = await supabase
+      .from("vendor_invoice_lines")
+      .select("invoice_id, vendor_invoices ( invoice_number )")
+      .in("purchase_order_id", selected.map((po) => po.id));
+    if (linked && linked.length > 0) {
+      attributed = [
+        ...new Set(
+          linked
+            .map(
+              (l) =>
+                (l.vendor_invoices as unknown as { invoice_number: string | null } | null)
+                  ?.invoice_number ?? "no number"
+            )
+            .filter(Boolean)
+        ),
+      ];
+    }
+
     const message =
       (selected.length === 1
         ? `Delete purchase order ${selected[0].po_number} and its lines?`
@@ -385,7 +417,19 @@ export function PurchaseOrderList({
                 nonDraft.length === 1 ? "is" : "are"
               } not a draft (${[...new Set(nonDraft.map((po) => po.status))].join(", ")}).`) +
           " Deleting sent or received orders erases order history permanently."
-        : "\n\nThis cannot be undone.");
+        : "") +
+      (attributed.length > 0
+        ? `\n\n${attributed.length} invoice${attributed.length === 1 ? "" : "s"} ` +
+          `(${attributed.slice(0, 4).join(", ")}${attributed.length > 4 ? ", …" : ""}) ` +
+          `${attributed.length === 1 ? "is" : "are"} attributed to ` +
+          `${selected.length === 1 ? "this order" : "these orders"}. ` +
+          `The bill${attributed.length === 1 ? "" : "s"} stay${attributed.length === 1 ? "s" : ""} ` +
+          `and remain${attributed.length === 1 ? "s" : ""} payable — but ` +
+          `${attributed.length === 1 ? "it" : "they"} will no longer know what was ordered.`
+        : "") +
+      (nonDraft.length === 0 && attributed.length === 0
+        ? "\n\nThis cannot be undone."
+        : "");
     if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Delete", tone: "danger" })))
       return false;
 
