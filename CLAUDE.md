@@ -2862,6 +2862,48 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    border now; verified live (`getComputedStyle` reads `0px solid` on the
    surviving band on 15476478). **1575 fixtures pass** (unchanged — a pure
    styling edit).
+
+   **Shipped 2026-09-03 — A LINE CAN BE ADDED OR DELETED.** Mark: "we need to
+   be able to delete and add lines to the invoice." Every other write on this
+   table had a home — Unlink and Mark as freight already lived in each line's
+   `⋯` menu, qty/price/extended were already `InlineValue` cells — but adding
+   or removing a whole LINE had no door at all.
+   **NO PICKER, unlike a purchase order's Add item.** A PO line is chosen off
+   the catalog; an invoice line is transcribed off a page, and every cell on
+   this table was already typeable. So **New Invoice Item** (`BUTTON_CLASS`,
+   in the lines table's `leading` slot, right-aligned beside the "Lines"
+   heading — which puts it directly beside the eye's own cell without either
+   one knowing the other exists) inserts one blank row (`kind: "item"`,
+   everything else null) and leaves it to be typed into, the same way every
+   other line already gets corrected.
+   **DELETE JOINS THE `⋯` MENU**, last, `danger: true` — the receiving/PO
+   line table's own confirm-gated pattern (`confirmDialog`, `tone: "danger"`,
+   naming what's lost: `Delete <description> — <extended>?` / "This cannot be
+   undone."). It recomputes the invoice's cached subtotal/total from what's
+   LEFT (`computedAmounts` over the filtered array), the same discipline
+   `writeLineAmount` already follows for an edit — the total lives on
+   another table, so removing a line has to write it too or the record
+   disagrees with its own lines the moment the row is gone.
+   **BOTH ARE GATED ON `canEditFinancials`, not plain `canEdit`** — Delete
+   disabled with the same "Withdraw approval to change this" hint as Unlink
+   and Mark as freight beside it, New Invoice Item hidden outright. 089's
+   trigger only locks UPDATE and would not itself refuse an insert or a
+   delete, but adding or removing a line moves the total exactly as an
+   edited qty does, so the UI follows 089's rule rather than leaving a hole
+   in it — a purchaser could otherwise change what an approved invoice adds
+   up to without ever touching a locked column.
+   Verified live end to end, twice, on a real open invoice (15492980) and
+   left exactly as found both times: New Invoice Item took Lines 6 → 7 with
+   a blank row (`line_no` null, sorting last) and the invoice's stored
+   totals untouched; deleting that row took it back to 6 with totals
+   unmoved. Then a scripted $50 test line was added directly and deleted
+   through the same UI path — subtotal $476.75 → $526.75 → $476.75, the
+   `lineSums.differs` band correctly appearing and disappearing with it. On
+   the approved invoice (15501523) New Invoice Item does not render at all
+   and all three `⋯` items — Unlink, Mark as freight, **Delete** — render
+   disabled with the withdraw-approval hint. **1575 fixtures pass**
+   (unchanged — `computedAmounts` was already exercised by every other
+   money write on this screen).
 4e. ✅ **EMPLOYEE EVENTS — migration 035, APPLIED and LOADED 2026-08-06.**
    FMP's two HR child tables merged into ONE (Mark: "In retrospect, these should
    really be all in one table: Events. What were 'ratings' are really just shift

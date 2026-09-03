@@ -8,6 +8,8 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { withFrom } from "@/lib/breadcrumbs";
 import { useFillToBottom } from "@/lib/fillHeight";
 import { useViewportAtLeast } from "@/lib/tableHead";
@@ -135,6 +137,14 @@ export function InvoiceDetail({
    *  line id, not a plain boolean — several rows can carry the flag at once
    *  and only the one pressed should read "Taking…". */
   const [takingReceivedFor, setTakingReceivedFor] = useState<string | null>(null);
+  const [addingLine, setAddingLine] = useState(false);
+  /** Which line is mid-delete — a line id, so only the row pressed reads as
+   *  busy while the rest of the table stays interactive. */
+  const [deletingLineId, setDeletingLineId] = useState<string | null>(null);
+  /** Add/delete failures. Its own state rather than reusing `attachError` —
+   *  those are read from props and a line action's own refusal must not be
+   *  wiped out the next time this component re-renders with the same props. */
+  const [lineActionError, setLineActionError] = useState<string | null>(null);
   const [shownId, setShownId] = useState<string | null>(null);
   const [kind, setKind] = useState<AttachmentKind>("invoice");
 
@@ -481,6 +491,85 @@ export function InvoiceDetail({
     const { error } = await writeLineAmount(lineId, "qty", received);
     setTakingReceivedFor(null);
     if (error) return;
+    router.refresh();
+  }
+
+  /**
+   * A new line, added blank (Mark, 2026-09-03: "we need to be able to delete
+   * and add lines to the invoice").
+   *
+   * NO PICKER, unlike a purchase order's Add item — an invoice line is
+   * transcribed off a page, not chosen from the catalog, and every cell on
+   * this table is already `InlineValue`-editable. The fastest way a blank
+   * line gets onto the page is the way every other line already gets edited:
+   * type straight into it. `kind: "item"` matches the column's own default.
+   *
+   * GATED ON `canEditFinancials`, same as adding or removing a line's own
+   * qty/price does — a new row changes the invoice's total exactly as an
+   * edited one would, so it follows 089's rule even though the trigger only
+   * locks UPDATE and would not itself refuse this insert.
+   */
+  async function addLine() {
+    setAddingLine(true);
+    setLineActionError(null);
+    const { error } = await supabase
+      .from("vendor_invoice_lines")
+      .insert({ org_id: orgId, invoice_id: invoice.id, kind: "item" });
+    setAddingLine(false);
+    if (error) {
+      setLineActionError(error.message);
+      return;
+    }
+    router.refresh();
+  }
+
+  /**
+   * Delete a line — CONFIRMED, naming what it takes with it, the PO line
+   * table's own pattern (Mark, 2026-09-03, the same request as `addLine`).
+   *
+   * The invoice's cached subtotal/total are recomputed from what's LEFT,
+   * same discipline as `writeLineAmount`: the total lives on another table,
+   * so removing a line has to write it too or the record disagrees with its
+   * own lines the moment the row is gone.
+   */
+  async function deleteLine(l: VendorInvoiceLine) {
+    const named = l.description?.trim() || l.product_id?.trim() || "this line";
+    const message =
+      `Delete ${named}${l.extended !== null ? ` — ${money(l.extended)}` : ""}?` +
+      `\n\nThis cannot be undone.`;
+    if (
+      !(await confirmDialog({
+        ...splitConfirmMessage(message),
+        confirmLabel: "Delete",
+        tone: "danger",
+      }))
+    )
+      return;
+
+    setDeletingLineId(l.id);
+    setLineActionError(null);
+    const { data, error } = await supabase
+      .from("vendor_invoice_lines")
+      .delete()
+      .eq("id", l.id)
+      .select("id");
+    if (error || !data || data.length === 0) {
+      setDeletingLineId(null);
+      setLineActionError(
+        error?.message ?? "Nothing was deleted — you may not have permission to do that."
+      );
+      return;
+    }
+
+    const remaining = lines.filter((line) => line.id !== l.id);
+    const sums = computedAmounts(remaining, invoice);
+    if (sums.total !== null) {
+      await supabase
+        .from("vendor_invoices")
+        .update({ subtotal: sums.subtotal, total: sums.total })
+        .eq("id", invoice.id);
+    }
+    setDeletingLineId(null);
     router.refresh();
   }
 
@@ -891,6 +980,17 @@ export function InvoiceDetail({
               onSelect: () =>
                 void setLineKind(l.id, l.kind === "freight" ? "item" : "freight"),
             },
+            {
+              label: deletingLineId === l.id ? "Deleting…" : "Delete",
+              // Same lock as the two above — removing a line moves the
+              // total exactly as editing its qty or price would.
+              hint: financialsLocked
+                ? "Withdraw approval to change this"
+                : "Remove this line from the invoice",
+              disabled: financialsLocked || deletingLineId !== null,
+              danger: true,
+              onSelect: () => void deleteLine(l),
+            },
           ]}
         />
       ),
@@ -1093,9 +1193,9 @@ export function InvoiceDetail({
         </div>
       </div>
 
-      {(attachError || documentError || linkError) && (
+      {(attachError || documentError || linkError || lineActionError) && (
         <p className="border border-accent px-4 py-3 text-sm text-accent">
-          {attachError ?? documentError ?? linkError}
+          {attachError ?? documentError ?? linkError ?? lineActionError}
         </p>
       )}
       {phase.kind !== "idle" && (
@@ -1531,7 +1631,26 @@ export function InvoiceDetail({
             // brings either back, and an explicit choice beats this default in
             // both directions.
             compactBelow={1536}
-            leading={<SectionHeading count={lines.length}>Lines</SectionHeading>}
+            leading={
+              // The heading and the one command on one line, `justify-between`
+              // — the "Purchase orders" heading's own pattern above. It sits
+              // at the RIGHT edge of `leading`'s own `min-w-0 flex-1` box,
+              // which puts it directly beside the eye's cell without either
+              // one knowing about the other.
+              <div className="flex flex-wrap items-baseline justify-between gap-x-4">
+                <SectionHeading count={lines.length}>Lines</SectionHeading>
+                {canEditFinancials && (
+                  <button
+                    type="button"
+                    disabled={addingLine}
+                    onClick={() => void addLine()}
+                    className={`${BUTTON_CLASS} shrink-0`}
+                  >
+                    {addingLine ? "Adding…" : "New Invoice Item"}
+                  </button>
+                )}
+              </div>
+            }
             empty={
               <p className="text-sm text-muted">
                 No lines — a one-line bill doesn&rsquo;t need any.
