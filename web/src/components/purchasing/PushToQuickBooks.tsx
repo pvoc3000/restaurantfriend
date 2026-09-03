@@ -481,8 +481,12 @@ export function PushToQuickBooks({
   // grid was already doing badly.
   return (
     <div className="flex flex-col items-end gap-1.5">
-      {/* ROW 1 — every button that DOES something, packed together. */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
+      {/* ROW 1 — every button that DOES something, packed together.
+          SAME GAP AS THE ACTIONS ROW (`gap-x-3 gap-y-2`, Mark, 2026-09-03) —
+          it had been `gap-2` throughout, which read as tighter than Void ·
+          Delete · Withdraw approval beside it for no reason other than the
+          two components never having compared notes. */}
+      <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
         {/* IT IS ALREADY OVER THERE. The button stands with Send/Update; its
             sentence is in the status row below. */}
         {proposal?.ok && !already && canPush && (
@@ -528,7 +532,7 @@ export function PushToQuickBooks({
       {/* ROW 2 — what column 1 produced, packed against the one act that
           undoes it. */}
       {(already || (gone && canPush)) && (
-        <div className="flex flex-wrap items-center justify-end gap-2 text-[13px]">
+        <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2 text-[13px]">
           {already && <span className="text-muted">{already}</span>}
           {already && canPush && !gone && (
             <button

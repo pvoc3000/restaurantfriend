@@ -924,23 +924,40 @@ export function InvoiceDetail({
         {/* RIGHT — QuickBooks | actions, matching the Bill/Amounts column's
             width. Each renders its OWN box now (buttons, then its own prose)
             — see `PushToQuickBooks` and `InvoiceFooter` — so this grid only
-            has to place the two boxes side by side. */}
+            has to place the two boxes side by side.
+
+            THE QUICKBOOKS SLOT IS WRAPPED IN ITS OWN `div` (Mark, 2026-09-03:
+            "Void, Delete and Withdraw appear where the quickbook buttons
+            should be, then move into place"). `PushToQuickBooks` returns
+            `null` for its first render or two — it reads its connection
+            status over the network before it knows whether to show anything
+            — and a grid with `grid-cols-2` whose FIRST child vanishes does
+            not leave an empty slot: CSS auto-placement drops the one
+            remaining child (`InvoiceFooter`) into the FIRST track, because a
+            `null` render leaves no DOM node behind to hold that track open.
+            So Actions renders on the LEFT for a beat, then jumps right the
+            instant QuickBooks has something to say. The wrapping `div` is
+            always in the DOM regardless of what's inside it, which is what
+            keeps the track — and Actions beside it — where they belong from
+            the first frame. */}
         <div className="grid grid-cols-2 items-start gap-x-4">
-          <PushToQuickBooks
-            invoiceId={invoice.id}
-            vendorId={invoice.vendor_id}
-            locationId={invoice.location_id}
-            orgId={orgId}
-            status={invoice.status}
-            total={invoice.total}
-            isCredit={invoice.is_credit}
-            invoiceNumber={invoice.invoice_number}
-            invoiceDate={invoice.invoice_date}
-            dueDate={invoice.due_date}
-            canPush={canEdit}
-            supabase={supabase}
-            onDone={() => router.refresh()}
-          />
+          <div>
+            <PushToQuickBooks
+              invoiceId={invoice.id}
+              vendorId={invoice.vendor_id}
+              locationId={invoice.location_id}
+              orgId={orgId}
+              status={invoice.status}
+              total={invoice.total}
+              isCredit={invoice.is_credit}
+              invoiceNumber={invoice.invoice_number}
+              invoiceDate={invoice.invoice_date}
+              dueDate={invoice.due_date}
+              canPush={canEdit}
+              supabase={supabase}
+              onDone={() => router.refresh()}
+            />
+          </div>
           <InvoiceFooter
             invoiceId={invoice.id}
             status={invoice.status}
