@@ -132,6 +132,10 @@ export function InvoiceDetail({
   const router = useRouter();
   const supabase = createClient();
   const [settingTotal, setSettingTotal] = useState(false);
+  /** Which line's Billed flag is mid-write, taking the PO's received qty. A
+   *  line id, not a plain boolean — several rows can carry the flag at once
+   *  and only the one pressed should read "Taking…". */
+  const [takingReceivedFor, setTakingReceivedFor] = useState<string | null>(null);
   const [shownId, setShownId] = useState<string | null>(null);
   const [kind, setKind] = useState<AttachmentKind>("invoice");
 
@@ -425,6 +429,30 @@ export function InvoiceDetail({
     return { error: null };
   }
 
+  /**
+   * Take the PO's received quantity as the billed one (Mark, 2026-09-03:
+   * turn the "differs" flag into a button that does exactly this).
+   *
+   * GOES THROUGH `writeLineAmount`, not a separate write — one implementation
+   * of "set this line's qty", so the rescale that already keeps `extended`
+   * honest on a broken case applies here too, and the invoice's cached totals
+   * move with it in the same statement, exactly as a manual edit would.
+   *
+   * SILENT ON A REFUSAL, matching `takeAmendedTotal` beside it: the primary
+   * defence is the button not rendering at all once the invoice is locked
+   * (`canEditFinancials`), so reaching the trigger's refusal here means the
+   * invoice was approved in the moment between render and click — rare
+   * enough that this follows the same precedent rather than inventing a
+   * second way to report a write failure in a table this dense.
+   */
+  async function takeReceivedQty(lineId: string, received: number) {
+    setTakingReceivedFor(lineId);
+    const { error } = await writeLineAmount(lineId, "qty", received);
+    setTakingReceivedFor(null);
+    if (error) return;
+    router.refresh();
+  }
+
   /** Which of OUR lines the page strikes out, by the vendor's own SKU — the
    *  same key the lines were seeded under. */
   const struckSkus = useMemo(
@@ -638,7 +666,25 @@ export function InvoiceDetail({
         // flag simply grows the cell leftward when it has something to say.
         return (
           <span className="flex items-center justify-end gap-1">
-            {differs && (
+            {/* A BUTTON WHEN IT CAN WRITE, THE OLD FLAG WHEN IT CAN'T (Mark,
+                2026-09-03: turn the flag into a button that takes the PO's
+                received quantity). `canEditFinancials` is the same gate the
+                qty cell itself uses a few lines down — a button offering to
+                write a locked field would just trip the trigger's refusal, so
+                it falls back to the plain statement instead, exactly as the
+                InlineValue cell beside it already does. */}
+            {differs && canEditFinancials && (
+              <button
+                type="button"
+                disabled={takingReceivedFor === l.id}
+                onClick={() => void takeReceivedQty(l.id, received!)}
+                title={`Take the received quantity — ${received} — replacing ${l.qty ?? 0} billed`}
+                className="shrink-0 bg-mark-fill px-1 text-[11px] font-semibold tabular-nums transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+              >
+                {takingReceivedFor === l.id ? "Taking…" : `→ ${received}`}
+              </button>
+            )}
+            {differs && !canEditFinancials && (
               <span
                 className="shrink-0 bg-mark-fill px-1 text-[11px] font-semibold tabular-nums"
                 title={`${received} received against ${l.qty ?? 0} billed`}
@@ -1394,7 +1440,12 @@ export function InvoiceDetail({
                       This record still says{" "}
                       <span className="tabular-nums">{money(invoice.total)}</span>.
                     </span>
-                    {canEdit && (
+                    {/* `canEditFinancials`, not plain `canEdit` — `total` is
+                        one of the columns 089 locks, so this button was
+                        rendering enabled on an approved invoice and quietly
+                        doing nothing when pressed (found while wiring the
+                        Billed flag's own button to the same gate). */}
+                    {canEditFinancials && (
                       <button
                         type="button"
                         className="border border-ink bg-white px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"

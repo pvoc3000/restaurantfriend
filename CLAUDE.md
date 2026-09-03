@@ -2711,6 +2711,35 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    for void, that means no sentence at all, which is what it always was.
    **1574 fixtures pass.**
 
+   **Shipped 2026-09-03 — THE BILLED/RECEIVED FLAG IS A BUTTON.** Mark: "can
+   the flag that pops up when a billed qty and po received qty differ be
+   turned into a button that, when pressed, updates the billed qty with the
+   po received qty number?" The chip was informational ("2.5 rec", a `<span>`
+   with a title); it's the SAME chip now, just a `<button>` reading "→ 2.5"
+   that writes it.
+   **GOES THROUGH `writeLineAmount`, THE SAME PATH A HAND EDIT TAKES** — one
+   implementation of "set this line's qty", so the rescale that keeps
+   `extended` honest on a broken case (`rescaledExtended`) applies here too,
+   and the invoice's cached subtotal/total move with it in the same
+   statement. Verified live on a real open invoice with two mismatched lines
+   (BakeMark 450364): pressing → 5 moved qty 7→5, rescaled extended $350→$250
+   at the line's own $50 rate, and dropped the header total by exactly $100 —
+   then restored to its original state.
+   **GATED ON `canEditFinancials`, NOT JUST `canEdit`** — qty is one of 089's
+   locked columns, so the button only renders once the invoice is open;
+   locked, it falls back to the original plain flag, exactly like the
+   InlineValue qty cell beside it. Verified on a real approved invoice
+   (15501523): the "2.5 rec" chip renders as a `<span>`, not a button.
+   **FOUND THE SAME BUG NEXT TO IT WHILE WIRING THIS UP, AND FIXED IT**: the
+   handwritten-amendment band's "take the corrected total" button
+   (`takeAmendedTotal`) was gated on plain `canEdit`, but `total` is also one
+   of 089's locked columns — so it rendered enabled on an approved invoice and
+   silently did nothing when pressed (matching `takeAmendedTotal`'s own
+   existing on-error behavior, which is why nothing ever surfaced it). Moved
+   to `canEditFinancials`. A second `canEdit`-gated control on this same page
+   ("Link to PO…") was flagged rather than audited in the same pass — it
+   wasn't touched, and whether it also needs the same fix is unconfirmed.
+
    **1485 fixtures pass**, 14 new, and each rule was checked by BREAKING it —
    dropping the number grouping turns 4 red, a naive concat 2, a set instead of
    a multiset 2 (in BOTH callers, which is what proves they share one
