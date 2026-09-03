@@ -7816,6 +7816,14 @@ weekday column, and 003 then silently made it per-vendor-item.
   never a reassurance. Where a line does earn its place, write it as short as it
   can be and stop.
   The reasoning belongs in a code comment, where it is free.
+  **IT SITS UNDER THE TITLE, IN THE TITLE'S OWN `space-y-1` BLOCK** — 4px, not
+  the page's `space-y-6` (Mark, 2026-09-03: the production ones "appear lower
+  than they do for the facilities module"). `/plans` and `/schedules` had theirs
+  as a SIBLING of the title ROW, so it inherited 24px and read as a line about
+  the list rather than about the heading. With a create command still beside the
+  title the row becomes `items-start` over a `space-y-1` block holding both.
+  Audited across the app afterwards: those two were the only real cases — the
+  other candidates are role-refusal blocks, which are already tight.
   **A ONE-LINE STATEMENT OF WHAT A SCREEN IS *DOES* EARN ITS PLACE** (Mark,
   2026-09-03, putting them back the same day: "a leaner version"). Every
   Facilities list carries one under its title again — *"The physical layout of

@@ -142,10 +142,22 @@ export default async function SchedulesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Schedules
-        </h1>
+      {/* Under the title, `/plans`' shape and for its reason. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Schedules
+          </h1>
+          {/* The scope, stated rather than merely applied — the plans list's
+              rule. A shorter list with no explanation reads as nights having
+              gone missing. */}
+          <p className="text-sm text-muted">
+            Nights made at{" "}
+            <span className="font-semibold text-ink">{kitchen?.code ?? "this shop"}</span>
+            {" "}— including what this kitchen bakes for another shop. Switch
+            shops to see another kitchen&rsquo;s.
+          </p>
+        </div>
         {editable && kitchen ? (
           <GenerateSchedules
             locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
@@ -158,16 +170,6 @@ export default async function SchedulesPage() {
           />
         ) : null}
       </div>
-
-      {/* The scope, stated rather than merely applied — the plans list's rule.
-          A shorter list with no explanation reads as nights having gone
-          missing. */}
-      <p className="text-sm text-muted">
-        Nights made at{" "}
-        <span className="font-semibold text-ink">{kitchen?.code ?? "this shop"}</span>
-        {" "}— including what this kitchen bakes for another shop. Switch shops
-        to see another kitchen&rsquo;s.
-      </p>
 
       {lineErr ? (
         // Not folded into the page's own error: a line-count failure must not

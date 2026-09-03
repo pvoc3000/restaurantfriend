@@ -102,10 +102,33 @@ export default async function PlansPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Plans
-        </h1>
+      {/* The description sits UNDER THE TITLE in a `space-y-1` block, which is
+          Facilities' shape and the one Mark prefers (2026-09-03) — as a sibling
+          of the title ROW it inherited the page's `space-y-6` and sat 24px
+          adrift of the heading it belongs to. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="space-y-1">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            Plans
+          </h1>
+          {/* The scope is STATED, never merely applied. A shorter list with no
+              explanation reads as plans having gone missing, and the count is
+              what tells you the one you are hunting for is at another
+              kitchen. */}
+          <p className="text-sm text-muted">
+            Plans made at{" "}
+            <span className="font-semibold text-ink">
+              {session.activeLocation?.code ?? "this shop"}
+            </span>
+            {hiddenElsewhere > 0
+              ? ` — ${hiddenElsewhere} more ${
+                  hiddenElsewhere === 1 ? "plan is" : "plans are"
+                } made at another kitchen. Switch shops to see ${
+                  hiddenElsewhere === 1 ? "it" : "them"
+                }.`
+              : "."}
+          </p>
+        </div>
         {editable ? (
           <NewPlan
             orgId={session.membership.org_id}
@@ -114,23 +137,6 @@ export default async function PlansPage({
           />
         ) : null}
       </div>
-
-      {/* The scope is STATED, never merely applied. A shorter list with no
-          explanation reads as plans having gone missing, and the count is what
-          tells you the one you are hunting for is at another kitchen. */}
-      <p className="text-sm text-muted">
-        Plans made at{" "}
-        <span className="font-semibold text-ink">
-          {session.activeLocation?.code ?? "this shop"}
-        </span>
-        {hiddenElsewhere > 0
-          ? ` — ${hiddenElsewhere} more ${
-              hiddenElsewhere === 1 ? "plan is" : "plans are"
-            } made at another kitchen. Switch shops to see ${
-              hiddenElsewhere === 1 ? "it" : "them"
-            }.`
-          : "."}
-      </p>
 
       {rows.length === 0 ? (
         <p className="max-w-[80ch] text-sm text-muted">
