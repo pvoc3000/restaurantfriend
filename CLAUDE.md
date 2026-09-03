@@ -2606,7 +2606,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **1572 fixtures pass.**
 
    **Shipped 2026-09-03 — AN APPROVED INVOICE'S FIGURES ARE LOCKED (migration
-   089, NEEDS APPLYING).** Mark: "I think a lot of the invoice should not be
+   089, APPLIED 2026-09-03).** Mark: "I think a lot of the invoice should not be
    editable once it has been approved for payment. The billed qty, unit price,
    tax, freight, and other fields at the very least, and any others you
    recommend. If the user wants to edit these things, they need to withdraw
@@ -2687,7 +2687,29 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    app itself confirms the wiring is live — a request against the (not yet
    migrated) hosted DB fails with "column vendor_invoices.financials_touched_at
    does not exist" rather than a silent mismatch, matching 018's own
-   say-so-out-loud precedent for a pending migration. **1574 fixtures pass.**
+   say-so-out-loud precedent for a pending migration, and Mark confirmed 089
+   applied the same day.
+   **TERMS JOINED THE LOCK — migration 090, APPLIED 2026-09-03** (Mark, having
+   used the screen: "now that I'm seeing it - we should lock the terms too").
+   089 had left it open on the reasoning that "Net 30" is informational and
+   doesn't change what's owed; seeing the rest of the invoice locked changed
+   his mind — payment terms are part of what an approver signs off on, same
+   as the due date beside it, which already locked. **One function, widened,
+   not a new trigger**: `create or replace` is safe here because the trigger
+   function's SIGNATURE is unchanged, only its `v_changed` boolean gains one
+   more clause — unlike `freeze_pay_period`'s drop-first rule, which is for a
+   CHANGED ARGUMENT LIST. 089 stays exactly as it was run; 090 is its own file
+   (055's rule). Verified on the harness as a real authenticated purchaser+:
+   `terms` now raises the same "withdraw approval before editing its figures"
+   while approved, `notes` still doesn't.
+   **THE LOCK EXPLAINS ITSELF, AND SAYING SO WAS THE THING TO CUT** (Mark, the
+   same day, seeing it live: "the text 'Its figures are locked — withdraw
+   approval to edit them.' is unnecessary"). The fields are already sitting
+   there read-only, which is the whole message; restating it in prose was a
+   confirm nobody needed to read twice. Both sentences (`InvoiceFooter`'s
+   approved and void lines) went back to exactly what they said before 089 —
+   for void, that means no sentence at all, which is what it always was.
+   **1574 fixtures pass.**
 
    **1485 fixtures pass**, 14 new, and each rule was checked by BREAKING it —
    dropping the number grouping turns 4 red, a naive concat 2, a set instead of

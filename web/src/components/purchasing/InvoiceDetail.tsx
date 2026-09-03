@@ -164,12 +164,14 @@ export function InvoiceDetail({
    * this buys is the field rendering read-only BEFORE anyone tries, instead
    * of erroring after.
    *
-   * NOT the same as `canEdit`: notes and terms stay editable at any status —
-   * pure annotation, no effect on money or on what QuickBooks receives — so
-   * they keep reading plain `canEdit`. This is only for the fields the
-   * trigger actually locks: invoice_number, invoice_date, due_date, vendor,
+   * NOT the same as `canEdit`: NOTES stays editable at any status — pure
+   * annotation, no effect on money or on what QuickBooks receives — so it
+   * keeps reading plain `canEdit`. This is only for the fields the trigger
+   * actually locks: invoice_number, invoice_date, due_date, terms, vendor,
    * location, tax, freight, other, subtotal/total, and on a line — qty,
-   * unit_price, extended, the freight/item toggle, and the PO link.
+   * unit_price, extended, the freight/item toggle, and the PO link. (Terms
+   * joined the locked set in 090, Mark, 2026-09-03, having seen the screen
+   * with the rest of it locked: "we should lock the terms too.")
    */
   const financialsLocked = invoice.status !== "open";
   const canEditFinancials = canEdit && !financialsLocked;
@@ -1214,7 +1216,7 @@ export function InvoiceDetail({
                   ours, and an allowNew-less list would make an unlisted value
                   unenterable — the GAL/QT lesson. */}
               <Field label="Terms">
-                <Cell canEdit={canEdit} value={invoice.terms}>
+                <Cell canEdit={canEditFinancials} value={invoice.terms}>
                   <InlineValue
                     boxed={BOXED_FIELDS}
                     table="vendor_invoices"

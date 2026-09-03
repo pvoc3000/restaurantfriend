@@ -259,18 +259,16 @@ export function InvoiceFooter({
 
       <div className="w-full space-y-1 text-right">
         {error && <p className="text-sm text-accent">{error}</p>}
+        {/* THE LOCK EXPLAINS ITSELF (Mark, 2026-09-03, on seeing it live:
+            "the text 'Its figures are locked — withdraw approval to edit
+            them.' is unnecessary") — the fields are already sitting there
+            read-only, which is the whole message; restating it in prose was
+            the confirm nobody needs to read twice. Back to exactly what this
+            said before 089. */}
         {status === "approved" && (
           <span className="block text-sm text-muted">
             Approved for payment
-            {approvedAt ? ` on ${approvedAt.slice(0, 10)}` : ""}. Its figures
-            are locked — withdraw approval to edit them.
-          </span>
-        )}
-        {/* 089: void locks the same as approved, and its own unlock path is
-            Reopen — the trigger's own wording, matched here. */}
-        {status === "void" && (
-          <span className="block text-sm text-muted">
-            Void. Its figures are locked — reopen it to edit them.
+            {approvedAt ? ` on ${approvedAt.slice(0, 10)}` : ""}.
           </span>
         )}
       </div>
