@@ -281,11 +281,16 @@ export function submitBlockers(input: ReadinessInput): string[] {
  * The sales line on the submit page. INFORMATION, never a caveat: Square types
  * the figure now, so there is no act for a supervisor to complete — which is
  * why FMP's `Task_SalesData_isComplete_b` has no counterpart in this schema.
+ *
+ * NULL WHEN THERE IS NO FIGURE, and the page then says nothing about sales
+ * (Mark, 2026-09-03). It used to explain the absence — "Square has not reported
+ * this day yet, the figures will arrive on tomorrow's sync" — which is the
+ * normal case, so page 8 opened by describing a wait nobody is waiting on and
+ * that no act of theirs can end. The only sales fact worth a line here is the
+ * one that IS actionable in the sense of being good news: they arrived.
  */
-export function salesNote(netSalesCents: number | null): string {
-  return netSalesCents === null
-    ? "Square has not reported this day yet — the figures will arrive on tomorrow's sync."
-    : "Sales are in.";
+export function salesNote(netSalesCents: number | null): string | null {
+  return netSalesCents === null ? null : "Sales are in.";
 }
 
 // ---------------------------------------------------------------------------

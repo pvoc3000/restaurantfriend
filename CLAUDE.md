@@ -6946,6 +6946,21 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    ABOVE the table when there are — never both, because when rows exist the
    empty slot does not. Verified both ways at 1440, the second by temporarily
    flagging every report (tab 7, note above, two rows beneath).
+   **PAGE 8 SAYS NOTHING IT CANNOT ACT ON** (Mark, 2026-09-03, three sentences
+   over two passes). Gone: the blockers box's "These can only be answered
+   tonight"; `salesNote`'s "Square has not reported this day yet — the figures
+   will arrive on tomorrow's sync"; and the outstanding box's "You can send it
+   anyway — this is a list, not a gate."
+   The sales one is the interesting removal, because it was the NORMAL case:
+   Square types the figure on the next day's sync, so page 8 opened by
+   describing a wait nobody is waiting on and that no act of a supervisor's can
+   end. `salesNote` returns **null** now and the page renders no line at all —
+   the only sales fact worth stating here is the one that is good news, "Sales
+   are in." The two prose lines under the boxes were each explaining the box
+   above them, which the box's own heading (red "Before this can be sent" over
+   red items, plain "Still outstanding" over yellow ones) already does; the
+   colour and the border carry the gate-versus-list distinction without a
+   sentence restating it.
    **IT MOVED UNDER THE TAB PICKER 2026-09-03** (Mark), which retires the
    two-places arrangement above: the nights are half of the Needs-attention
    COUNT, so the sentence explaining that count belongs beneath the tab carrying

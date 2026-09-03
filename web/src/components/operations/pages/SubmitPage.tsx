@@ -50,10 +50,11 @@ export function SubmitPage({
   netSalesCents: number | null;
 }) {
   const caveats = outstanding;
+  const sales = salesNote(netSalesCents);
 
   return (
     <div className="mx-auto max-w-2xl space-y-8">
-      <p className="text-sm text-muted">{salesNote(netSalesCents)}</p>
+      {sales ? <p className="text-sm text-muted">{sales}</p> : null}
 
       {blockers.length > 0 ? (
         <div className="space-y-2 border-2 border-accent p-4">
@@ -82,9 +83,6 @@ export function SubmitPage({
               </li>
             ))}
           </ul>
-          <p className="text-sm text-muted">
-            You can send it anyway — this is a list, not a gate.
-          </p>
         </div>
       ) : blockers.length === 0 ? (
         <p className="text-sm">Everything is done. Send it.</p>
