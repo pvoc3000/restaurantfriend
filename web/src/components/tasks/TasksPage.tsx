@@ -156,7 +156,7 @@ export async function TasksPage({
     photos: photosByTask.get(t.id as string) ?? [],
   }));
 
-  const heading = kind === "maintenance" ? "Maintenance" : "Tasks";
+  const heading = kind === "maintenance" ? "Maintenance Requests" : "Tasks";
 
   // ONE projection for both consumers. The create dialog needs the equipment's
   // own section, so that picking a fryer can fill in where the fryer stands.
@@ -175,25 +175,11 @@ export async function TasksPage({
       {/* The create command sits BESIDE THE TITLE, which is what `/checklists`
           and `/inspection-logs` already did — this screen and `/equipment` were
           the two that kept it in a `justify-end` row above the filters, where
-          it reads as one more filter. `items-start` so it lines up with the top
-          of the heading rather than centring against a block whose height
-          changes with the description. */}
+          it reads as one more filter. */}
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 space-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            {heading}
-          </h1>
-          {/* Maintenance keeps its line because it draws the boundary between
-              two nav entries — which of the two a job belongs on is not
-              something the screen shows you. Tasks had a description of itself
-              and lost it (Mark, 2026-09-03). */}
-          {kind === "maintenance" && (
-            <p className="max-w-[72ch] text-sm text-muted">
-              What needs a vendor at {active.code} — the plumber, the fridge
-              engineer. Anything the crew can fix belongs on Tasks.
-            </p>
-          )}
-        </div>
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          {heading}
+        </h1>
         {canResolveTasks(session.membership.role) && (
           <NewTask
             kind={kind}

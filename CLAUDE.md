@@ -6750,8 +6750,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    organised by THE WORK and every one of these is about the BUILDING — the
    same argument that put purchase requests under Purchasing. The Operations
    stubs "Check Lists" and "Master Check Lists" are gone; the Location section
-   is All · Shop Sections · Checklists · Tasks · Maintenance · Inspection Logs ·
-   Equipment, and all of it sits INSIDE `InactiveLocationGate` (unlike
+   is Locations · Shop Sections · Checklists · Tasks · Maintenance · Inspection
+   Logs · Equipment, and all of it sits INSIDE `InactiveLocationGate` (unlike
    `/employees` and `/sales`, these really are location-scoped: you do not walk
    a closing list at a shop that is shut).
    **THE WALKS AND THE MASTER LISTS SHARE ONE SCREEN** (Mark, 2026-08-30:
@@ -7784,6 +7784,12 @@ weekday column, and 003 then silently made it per-vendor-item.
 
 ## Conventions
 
+- **A NAV LABEL AND A PAGE TITLE NEED NOT MATCH** (Mark, 2026-09-03, asking
+  outright). Nothing couples them — `lib/nav.ts` holds one, the screen holds the
+  other — and the two have different jobs: a nav tier is a narrow strip where a
+  short label earns its place, a title is where the full name reads. Hence
+  **Maintenance** in the band over **Maintenance Requests** on the page. The
+  SLUG is a third thing again and must not move: `rf.nav` stores it.
 - **THE SCREEN EXPLAINS ITSELF. STOP WRITING HINTS** (Mark, 2026-09-03: "stop
   adding extra comments and hints, or make them super terse at the very least.
   Most of them have been unnecessary"). Said after a run of removals that were

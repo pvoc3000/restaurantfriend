@@ -443,16 +443,18 @@ export function TasksScreen({
 
       {failed && <p className="text-sm text-accent">{failed}</p>}
 
+      {/* The search box does NOT grow (Mark, 2026-09-03). It was `flex-1`, which
+          took every spare pixel and pushed the tabs to the far right edge,
+          reading as a different section from the control beside it. */}
       <div className="flex flex-wrap items-end gap-4">
-        <div className="min-w-[16rem] flex-1">
-          <TextInput
-            value={search}
-            onValueChange={setSearch}
-            placeholder="Search…"
-            aria-label="Search"
-            clearLabel="Clear the search"
-          />
-        </div>
+        <TextInput
+          value={search}
+          onValueChange={setSearch}
+          placeholder="Search…"
+          aria-label="Search"
+          clearLabel="Clear the search"
+          className="w-72"
+        />
         <TabPicker
           ariaLabel="Which"
           value={tier}
@@ -483,10 +485,10 @@ export function TasksScreen({
         openRowKey={openRowKey}
         defaultSort={{ key: "age" }}
         empty={
-          <p className="max-w-[72ch] text-sm text-muted">
+          <p className="text-sm text-muted">
             {kind === "maintenance"
               ? `Nothing needs a vendor at ${locationCode}.`
-              : `Nothing outstanding at ${locationCode}. Flag something on a checklist and it lands here.`}
+              : `Nothing outstanding at ${locationCode}.`}
           </p>
         }
       />

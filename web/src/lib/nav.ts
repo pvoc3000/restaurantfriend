@@ -136,8 +136,10 @@ export const SECTIONS: NavSection[] = [
         roles: ["owner", "admin", "purchaser", "supervisor"],
       },
       {
-        // "Maintenance", not "Maintenance Requests" — same trim. The SLUG keeps
-        // FileMaker's word because the `rf.nav` cookie stores it.
+        // "Maintenance" in the band, "Maintenance Requests" on the page (Mark,
+        // 2026-09-03). Nothing couples the two: a nav tier is a narrow strip
+        // where a short label earns its place, and the title is where the full
+        // name reads.
         slug: "maintenance-requests",
         label: "Maintenance",
         href: "/maintenance-requests",
