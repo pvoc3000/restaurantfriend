@@ -12,7 +12,6 @@ import {
   sumSignedTotals,
   AGING_LABEL,
   AGING_ORDER,
-  INVOICE_STATUS_ORDER,
   BILL_STAGE_CLASS,
   BILL_STAGE_LABEL,
   BILL_STAGE_ORDER,
@@ -59,6 +58,17 @@ type QboStatus = {
 
 const INVOICE_WIDTHS_KEY = "rf.invoices.columnWidths.v1";
 
+/** When the ordering behind this invoice began — the earliest of its purchase
+ *  orders' dates, or null when it has none. Sorting, grouping and the cell all
+ *  read this one function, so they cannot disagree about which date it is. */
+function poDate(i: InvoiceListRow): string | null {
+  const dates = i.purchase_orders.map((p) => p.order_date).filter(Boolean) as string[];
+  if (dates.length === 0) return null;
+  // ISO strings, so a plain comparison is a date comparison — `new Date` here
+  // would be UTC midnight and could move the day west of Greenwich.
+  return dates.reduce((a, b) => (a < b ? a : b));
+}
+
 /** Where a bill has got to, from what is on the row. Derived here rather than
  *  stored — see `billStage`. One call, so the chip, the sort and the search
  *  cannot disagree about which rung a bill is on. */
@@ -71,11 +81,7 @@ function stageOf(i: InvoiceListRow) {
   });
 }
 
-function sortValue(
-  invoice: InvoiceListRow,
-  key: InvoiceSortKey,
-  today: string
-): SortValue {
+function sortValue(invoice: InvoiceListRow, key: InvoiceSortKey): SortValue {
   switch (key) {
     case "invoice_number":
       return invoice.invoice_number;
@@ -86,7 +92,12 @@ function sortValue(
     case "vendor":
       return invoice.vendors?.name ?? null;
     case "status":
-      return INVOICE_STATUS_ORDER.indexOf(invoice.status);
+      // THE LADDER, because that is what the chip says. It read
+      // `INVOICE_STATUS_ORDER.indexOf(invoice.status)` until 2026-09-02, so
+      // after the chip became Open/Approved/Submitted/Paid the column sorted by
+      // a vocabulary it no longer displayed — Paid and Submitted tied, since
+      // both are `approved` underneath.
+      return BILL_STAGE_ORDER.indexOf(stageOf(invoice));
     case "po":
       // A set, so it sorts by how MANY orders it touches — there is no single
       // number to order by, and "which one comes first alphabetically" would
@@ -94,11 +105,18 @@ function sortValue(
       return invoice.purchase_orders.length;
     case "total":
       return signedTotal(invoice);
+    case "po_date":
+      return poDate(invoice);
     case "lines":
       return invoice.line_count;
   }
-  // Unreachable; keeps the switch exhaustive for the linter's benefit.
-  return agingBucket(invoice.due_date, today);
+  // EXHAUSTIVE, AND THE COMPILER CHECKS IT. This used to fall through to the
+  // aging bucket "for the linter's benefit", which meant a sort key added later
+  // sorted silently by the wrong thing — `po_date` did exactly that for the
+  // ten minutes between adding the column and finding this. A `never` makes the
+  // next one a build error instead.
+  const unreachable: never = key;
+  return unreachable;
 }
 
 /**
@@ -120,6 +138,10 @@ const GROUP_LABEL: Partial<
   status: (i) => BILL_STAGE_LABEL[stageOf(i)],
   vendor: (i) => i.vendors?.name ?? "No vendor",
   due_date: (i, today) => AGING_LABEL[agingBucket(i.due_date, today)],
+  // BY THE DATE ITSELF, not a bucket. Ordering here is WEEKLY, so each PO date
+  // is one shop's order for that week and the band is the batch — which is the
+  // reason to group by it at all.
+  po_date: (i) => poDate(i) ?? "No purchase order",
 };
 
 /**
@@ -226,7 +248,7 @@ export function InvoiceList({
     () =>
       [...visible].sort(
         makeComparator<InvoiceListRow>({
-          value: (i) => sortValue(i, filters.sort, today),
+          value: (i) => sortValue(i, filters.sort),
           dir: filters.dir,
           // Vendor as the secondary sort whatever the primary is, matching the
           // PO list: a due-date band and a status band are both read vendor by
@@ -238,7 +260,7 @@ export function InvoiceList({
           ],
         })
       ),
-    [visible, filters.sort, filters.dir, today]
+    [visible, filters.sort, filters.dir]
   );
 
   usePublishRecordSet(
@@ -506,32 +528,23 @@ export function InvoiceList({
       },
     },
     {
-      key: "tax",
-      label: "Tax",
-      width: 95,
-      align: "right",
-      hideWhenCompact: true,
-      sortValue: (i) => i.tax,
-      render: (i) =>
-        i.tax === null ? (
-          <span className="text-faint">—</span>
-        ) : (
-          <span className="text-muted">{money(i.tax)}</span>
-        ),
-    },
-    {
-      key: "freight",
-      label: "Freight",
-      width: 100,
-      align: "right",
-      hideWhenCompact: true,
-      sortValue: (i) => i.freight,
-      render: (i) =>
-        i.freight === null ? (
-          <span className="text-faint">—</span>
-        ) : (
-          <span className="text-muted">{money(i.freight)}</span>
-        ),
+      key: "po_date",
+      label: "PO Date",
+      width: 120,
+      // THE EARLIEST, when an invoice covers more than one order — the question
+      // this column answers is "when was this ordered", and that is when the
+      // ordering began. Measured on the real data: 47 of 50 linked invoices
+      // carry ONE purchase order, the other 3 carry two a week apart, and in
+      // all three the lowest PO NUMBER is also the earliest date, so this
+      // agrees with the PO column beside it rather than naming a different
+      // document. The `+N` there already says there are more.
+      sortValue: (i) => poDate(i),
+      render: (i) => {
+        const date = poDate(i);
+        return (
+          <span className="tabular-nums text-muted">{date ?? <span className="text-faint">—</span>}</span>
+        );
+      },
     },
     {
       key: "total",

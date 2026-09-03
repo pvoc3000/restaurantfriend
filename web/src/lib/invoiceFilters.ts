@@ -45,6 +45,7 @@ export const INVOICE_SORT_KEYS = [
   "vendor",
   "status",
   "po",
+  "po_date",
   "total",
   "lines",
 ] as const;

@@ -27,7 +27,7 @@ export type InvoiceListRow = {
   line_count: number;
   /** The purchase orders this invoice's lines point at — derived, never a
    *  column, so it cannot claim an order none of its lines touch. */
-  purchase_orders: { id: string; po_number: string }[];
+  purchase_orders: { id: string; po_number: string; order_date: string | null }[];
   document_count: number;
   /** Whether a QuickBooks document is linked. Only the presence matters here —
    *  086's reasoning, applied one level down: a list has no use for the id. */
@@ -151,14 +151,14 @@ export default async function InvoicesPage({
   }
 
   // One more pass so the PO column prints numbers rather than uuids.
-  const poNumbers = new Map<string, string>();
+  const poNumbers = new Map<string, { po_number: string; order_date: string | null }>();
   const allPoIds = [...new Set([...poIdsByInvoice.values()].flatMap((s) => [...s]))];
   if (allPoIds.length > 0) {
     const { data: orders } = await supabase
       .from("purchase_orders")
-      .select("id, po_number")
+      .select("id, po_number, order_date")
       .in("id", allPoIds);
-    for (const o of orders ?? []) poNumbers.set(o.id, o.po_number);
+    for (const o of orders ?? []) poNumbers.set(o.id, o);
   }
 
   // And the documents, exactly as the PO list counts its Files column.
@@ -186,7 +186,11 @@ export default async function InvoicesPage({
     ),
     line_count: counts.get(i.id) ?? 0,
     purchase_orders: [...(poIdsByInvoice.get(i.id) ?? [])]
-      .map((id) => ({ id, po_number: poNumbers.get(id) ?? "" }))
+      .map((id) => ({
+        id,
+        po_number: poNumbers.get(id)?.po_number ?? "",
+        order_date: poNumbers.get(id)?.order_date ?? null,
+      }))
       .filter((p) => p.po_number)
       .sort((a, b) => a.po_number.localeCompare(b.po_number)),
     document_count: documentCounts.get(i.id) ?? 0,
