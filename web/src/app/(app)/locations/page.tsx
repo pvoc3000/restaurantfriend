@@ -54,10 +54,8 @@ export default async function LocationsPage() {
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           Locations
         </h1>
-        <p className="max-w-[72ch] text-sm text-muted">
-          Every screen in the app is scoped to the location you&rsquo;re working
-          at — the one marked here, and the code the masthead&rsquo;s picker
-          shows. Open a row to read or edit that record.
+        <p className="text-sm text-muted">
+          Settings for each location. Your working location is bold.
         </p>
       </div>
 

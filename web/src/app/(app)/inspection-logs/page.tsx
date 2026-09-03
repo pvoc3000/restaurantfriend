@@ -111,9 +111,12 @@ export default async function InspectionLogsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-        Inspection logs
-      </h1>
+      <div className="space-y-1">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          Inspection logs
+        </h1>
+        <p className="text-sm text-muted">Health and physical inspection reports.</p>
+      </div>
 
       <ChecklistsList
         key={active.id}

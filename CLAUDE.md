@@ -7816,6 +7816,17 @@ weekday column, and 003 then silently made it per-vendor-item.
   never a reassurance. Where a line does earn its place, write it as short as it
   can be and stop.
   The reasoning belongs in a code comment, where it is free.
+  **A ONE-LINE STATEMENT OF WHAT A SCREEN IS *DOES* EARN ITS PLACE** (Mark,
+  2026-09-03, putting them back the same day: "a leaner version"). Every
+  Facilities list carries one under its title again — *"The physical layout of
+  your shop."*, *"Items to be completed by the team."*, *"Health and physical
+  inspection reports."* — and that is not the rule bending. What went was the
+  PARAGRAPH explaining how a screen works, where findings go, which of two
+  screens a thing belongs on, what a blank field means; what came back is a
+  sentence naming the subject, which a title alone cannot always do
+  ("Equipment" of what? "Tasks" for whom?). **The words are Mark's own, verbatim
+  bar one lowercase**, and they are the length to copy: one sentence, no
+  clauses, no second sentence about mechanics.
 - **IT IS A PAY PERIOD, NEVER A "FORTNIGHT"** (Mark, 2026-08-23: "stop
   referring to pay periods as 'fortnights'. It's a pay period. say 'pay period'
   please"). This was already the rule for VISIBLE STRINGS when `/timesheets`

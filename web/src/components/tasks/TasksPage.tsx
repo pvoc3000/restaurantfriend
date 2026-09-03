@@ -172,9 +172,16 @@ export async function TasksPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-        {heading}
-      </h1>
+      <div className="space-y-1">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          {heading}
+        </h1>
+        <p className="text-sm text-muted">
+          {kind === "maintenance"
+            ? "Equipment maintenance and repair requests."
+            : "Items to be completed by the team."}
+        </p>
+      </div>
 
       <TasksScreen
         key={`${active.id}:${kind}`}

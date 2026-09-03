@@ -36,10 +36,9 @@ import { NewChecklistTemplate } from "./NewChecklistTemplate";
  * one tab, New template on the other — so it is handed to whichever list is
  * rendered rather than living up here.
  *
- * There is NO explanatory paragraph under the heading (Mark, same day). Both
- * tabs are named, the counts are on them, and the lists say what they hold when
- * they are empty — so the sentence was telling you something the screen was
- * already showing you.
+ * There IS a one-line description under the heading again (Mark, 2026-09-03) —
+ * what the screen is for, in a sentence, rather than the paragraph explaining
+ * how it works that was removed on 2026-08-30.
  */
 export function ChecklistsScreen({
   view,
@@ -68,9 +67,14 @@ export function ChecklistsScreen({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-        Checklists
-      </h1>
+      <div className="space-y-1">
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          Checklists
+        </h1>
+        <p className="text-sm text-muted">
+          Lists for supervisors to complete each shift.
+        </p>
+      </div>
 
       <TabPicker
         ariaLabel="Which view"

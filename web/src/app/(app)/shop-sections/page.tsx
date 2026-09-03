@@ -78,11 +78,7 @@ export default async function ShopSectionsPage() {
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           Shop sections
         </h1>
-        <p className="max-w-[72ch] text-sm text-muted">
-          The order guide walks {active.code} in this order — sort first, then
-          name. The display name is what the guide groups by and what the
-          in-person shopping list prints, so renaming one renames it everywhere.
-        </p>
+        <p className="text-sm text-muted">The physical layout of your shop.</p>
       </div>
 
       {/* Keyed for the same reason /location is: switching location is a
