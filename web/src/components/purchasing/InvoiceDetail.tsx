@@ -26,6 +26,7 @@ import {
   lineExtended,
   rescaledExtended,
   computedAmounts,
+  dueDateFromTerms,
   totalDisagreesWithDocument,
   toInvoiceLine,
   AGING_LABEL,
@@ -1393,6 +1394,21 @@ export function InvoiceDetail({
                     column="invoice_date"
                     value={invoice.invoice_date}
                     kind="date"
+                    // Only while NOTHING has been said about when this is due
+                    // — a due date once set, by hand or by this same
+                    // computation, is never silently moved by a later edit to
+                    // the date beside it.
+                    alsoUpdate={
+                      invoice.due_date === null
+                        ? (next) => {
+                            const due = dueDateFromTerms(
+                              next === null || next === "" ? null : String(next),
+                              invoice.terms
+                            );
+                            return due === null ? null : { due_date: due };
+                          }
+                        : undefined
+                    }
                   />
                 </Cell>
               </Field>
@@ -1419,6 +1435,22 @@ export function InvoiceDetail({
                     id={invoice.id}
                     column="terms"
                     value={invoice.terms}
+                    // Same guard as Invoice date's, from the other side — a
+                    // manual bill (NewInvoice asks for no terms at all) most
+                    // often gets its terms typed in HERE, after the record
+                    // already exists, which is "no due date is set" just as
+                    // much as the moment of creation is.
+                    alsoUpdate={
+                      invoice.due_date === null
+                        ? (next) => {
+                            const due = dueDateFromTerms(
+                              invoice.invoice_date,
+                              next === null || next === "" ? null : String(next)
+                            );
+                            return due === null ? null : { due_date: due };
+                          }
+                        : undefined
+                    }
                   />
                 </Cell>
               </Field>
@@ -1479,15 +1511,21 @@ export function InvoiceDetail({
                   ["Tax", "tax", invoice.tax],
                   ["Freight", "freight", invoice.freight],
                   ["Other", "other_charges", invoice.other_charges],
+                  // POSITIVE, AND SUBTRACTED — the opposite sign convention
+                  // from Other, which is signed as printed (091). Typing what
+                  // the page shows as a plain positive number is the natural
+                  // entry; `computedAmounts` does the subtracting.
+                  ["Discounts", "discount", invoice.discount],
                   ["Total", "total", invoice.total],
                 ] as const
               ).map(([label, column, value]) => (
                 <Field key={column} label={label}>
                   {/* SUBTOTAL AND TOTAL ARE READ once the invoice has lines to
                       add up — the same decision as `extended`, one level up.
-                      Tax, freight and other stay typed: they are on the page
-                      and follow from nothing. A bill with NO lines keeps every
-                      field, which is the rent bill and the plumber. */}
+                      Tax, freight, other and discounts stay typed: they are on
+                      the page and follow from nothing. A bill with NO lines
+                      keeps every field, which is the rent bill and the
+                      plumber. */}
                   {(column === "subtotal" || column === "total") &&
                   computed.total !== null ? (
                     <span className={`${READ_ONLY_VALUE} tabular-nums`}>
@@ -1505,7 +1543,10 @@ export function InvoiceDetail({
                       format={(v) => money(Number(v))}
                       // A charge moves the total with it, in one statement.
                       alsoUpdate={
-                        column === "tax" || column === "freight" || column === "other_charges"
+                        column === "tax" ||
+                        column === "freight" ||
+                        column === "other_charges" ||
+                        column === "discount"
                           ? (next) => {
                               const sums = computedAmounts(lines, {
                                 ...invoice,

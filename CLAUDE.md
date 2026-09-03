@@ -3051,6 +3051,115 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    disabled with the withdraw-approval hint. **1575 fixtures pass**
    (unchanged — `computedAmounts` was already exercised by every other
    money write on this screen).
+
+   **Shipped 2026-09-03 — THREE MORE FROM MARK, ALL SMALL, ALL SAME DAY:**
+   a computed due date, a Discounts field (migration 091, **APPLIED**), and a
+   four-colour status ladder.
+
+   **(a) A DUE DATE FILLS ITSELF IN FROM THE INVOICE DATE AND TERMS, AND ONLY
+   WHILE NOTHING HAS BEEN SAID ABOUT IT.** Mark: "when creating a new invoice,
+   if no due date is set, can we calculate one based on invoice date and
+   terms?" `termsDays`/`dueDateFromTerms` in `lib/invoices` read the ordinary
+   spellings — `NET 30`, `N30`, `Net due in 15 days`, a bare number of days,
+   `COD`/`C.O.D.` as zero, `2 weeks` as 14 — and add them to the invoice date
+   with `Date.UTC` throughout, so a build running west of Greenwich can't roll
+   a month boundary back a day (pinned: `2026-08-25` + Net 30 → `2026-09-24`,
+   not the 23rd a local-timezone `new Date` would give).
+   **IT WRITES IN TWO PLACES, because "creating a new invoice" is two
+   different moments here.** `invoiceHeaderFromExtraction` calls it as a
+   fallback (`invoiceDueDate(extraction) ?? dueDateFromTerms(invoiceDate,
+   terms)`) — the OCR reading is where terms is usually already known, the
+   moment a filed reading becomes a draft record. But `NewInvoice`'s manual
+   dialog (the landlord, the plumber) asks for no terms at all — there is
+   nothing to compute FROM at that moment — so the same calculation rides as
+   an `alsoUpdate` on the detail screen's **Invoice date** and **Terms**
+   cells instead, each firing the other way (Terms's `alsoUpdate` reads
+   `invoice.invoice_date`, Invoice date's reads `invoice.terms`), which is
+   what makes typing Terms into a manual bill AFTER filing it — the normal
+   order for a rent bill — the moment the due date actually appears.
+   **BOTH SITES ARE GATED ON `invoice.due_date === null`**, never on whether
+   the FIELD being edited changed — editing Terms on an invoice that already
+   carries a real due date (typed by hand, or computed once already) must
+   never silently move it. Verified live end to end on a real throwaway open
+   invoice (Amazon, `TEST-DISCOUNT-091`, deleted after): typing `Net 30` into
+   Terms with Invoice date `09/03/2026` wrote `due_date = 2026-10-03` and the
+   header line picked it up as "DUE IN 30 DAYS" in the same paint.
+   **6 new fixtures**, each terms spelling plus the two-sided header-fallback
+   case (a stated due date wins over what terms would imply; with neither, the
+   field stays null).
+
+   **(b) DISCOUNTS IS ITS OWN FIELD, POSITIVE, AND SUBTRACTED — the opposite
+   sign convention from `Other`.** Mark: "can we add one more amount field to
+   the detail page: discounts. Currently only Amoretti has a discount but
+   there may be others in the future." The real case (Amoretti 15-700541 /
+   15-700341, from the 2026-09-03 on-page-total-check fix above) had that
+   $15.31 credit typed into `Other` as a NEGATIVE number, because `Other` was
+   the only free slot at the foot of the invoice that could hold it — which
+   works arithmetically and reads badly: an "Other" line carrying a negative
+   figure says nothing about WHAT it is. **Migration 091** adds
+   `vendor_invoices.discount numeric(12,2)`, nullable, meaning none was
+   printed (true of nearly every bill); `computedAmounts` and
+   `amountReconciliation` both widen to `... - Number(charges.discount ?? 0)`
+   — SUBTRACTED, where `other_charges` stays signed-as-printed because it's a
+   catch-all with no fixed direction and Discounts earns a dedicated sign by
+   having a dedicated column name. **NOT BACKFILLED, deliberately** — Amoretti's
+   existing $-15.31 stays exactly where it was typed, in `Other`; moving it is
+   a data edit Mark can make himself from the screen now that the field
+   exists, not a migration's business to decide for him.
+   **IT LOCKS WITH THE REST** — migration 091 widens 090's own
+   `enforce_vendor_invoice_financials_lock()` trigger function (`create or
+   replace`, safe per 090's own reasoning: the signature doesn't change, only
+   the body) to add `new.discount is distinct from old.discount` to
+   `v_changed`, joining tax/freight/other/subtotal/total/terms. A discount
+   moves what's owed, so it's part of what an approval signs off on — and
+   without this, withdrawing approval to fix a mis-typed Other charge and
+   re-typing it as a Discount instead would be a hole in 089's lock the size
+   of one column.
+   On the detail screen it's a fifth `Cell`/`InlineValue` between Other and
+   Total in the Amounts block, and `alsoUpdate` on the tax/freight/other
+   trio widened to include `discount` — one closure, one extra branch,
+   `computedAmounts(lines, {...invoice, discount: next})` recomputing
+   subtotal/total in the same statement as the write.
+   **Verified live and against migration 091 directly.** Mark applied 091
+   himself (per the standing rule — he runs migrations in the SQL editor);
+   confirmed after: `discount` selects on `vendor_invoices` (0 rows non-null,
+   matching "not backfilled"), and a direct `service_role` update of
+   `discount` on a real APPROVED invoice was refused by the trigger — *"This
+   invoice is approved — withdraw approval before editing its figures"* —
+   the same sentence `terms` gets, proving the widened function is live and
+   not just the column. The manual test invoice showed the Discounts cell
+   accepting `$15.31` and writing it; Subtotal/Total stayed independently
+   typed on that LINELESS bill, which is `computedAmounts`'s existing
+   `lines.length === 0` rule (it returns `{subtotal: null, total: null}` on
+   purpose there) — not a gap this change opened, the same thing already
+   true of editing Tax on a rent bill with no lines.
+   **2 new fixtures** for the sign convention and the null case, plus
+   `discount: null` added to the fixture builder's default row (forced by
+   `VendorInvoice` widening, caught by `tsc`).
+
+   **(c) THE STATUS LADDER GAINED A FOURTH COLOUR.** Mark: "the status colors
+   should change: open = yellow, approved = green, submitted = orange, paid =
+   white." `BILL_STAGE_CLASS` had shipped Submitted as `closed`'s inherited
+   white-on-ink and Paid as green-300 — "further along the same axis" as
+   Approved's green-200. Mark's reading is the opposite: **Paid is the
+   QUIETEST colour, because it's the one rung with nothing left outstanding**,
+   where Open/Approved/Submitted all still owe an eye in one way or another
+   and keep the warmer marks. `submitted` swaps to a new
+   **`--rf-orange-200: #fed7aa`** (the app's yellow, green and red palette had
+   no orange at all — one shade added, nothing else in the app reaches for it
+   yet) and `paid` swaps to plain `bg-white`, both still `border border-ink`.
+   Verified live via `getComputedStyle` on the real invoice list (not a
+   screenshot): Submitted chips read `rgb(254, 215, 170)`, Paid chips read
+   `rgb(255, 255, 255)` — Open (unchanged) still `rgb(255, 233, 138)`,
+   yellow-200, on a freshly created test invoice. No fixture change — the
+   class strings aren't exercised by the suite, and the four hex values are
+   the whole of the change.
+
+   **1584 fixtures pass**, 8 new (2 discount, 5 `dueDateFromTerms`, 1 header
+   fallback), every new rule checked against the real database rather than
+   only the fixture harness — the test invoice was filed through the app's
+   own `NewInvoice` dialog and deleted through its own Delete confirm,
+   leaving 26 invoices at DF02 exactly as found.
 4e. ✅ **EMPLOYEE EVENTS — migration 035, APPLIED and LOADED 2026-08-06.**
    FMP's two HR child tables merged into ONE (Mark: "In retrospect, these should
    really be all in one table: Events. What were 'ratings' are really just shift

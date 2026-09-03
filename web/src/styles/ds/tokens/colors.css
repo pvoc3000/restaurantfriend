@@ -54,6 +54,13 @@
   --rf-yellow-700: #a88a00;
   --rf-yellow-800: #6b5800;
 
+  /* Orange — the invoice status ladder's "Submitted" rung (Mark, 2026-09-03):
+     pushed to QuickBooks, waiting on payment. It sits between Approved's
+     green and Paid's white on the same ladder, so it needs its own hue —
+     yellow and green are already spoken for by other rungs on the same chip.
+     One shade only; nothing else in the app reaches for orange yet. */
+  --rf-orange-200: #fed7aa;
+
   /* ---- Semantic aliases ---- */
   --rf-text-primary: var(--rf-neutral-900);
   --rf-text-body: var(--rf-neutral-700);

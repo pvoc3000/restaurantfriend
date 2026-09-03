@@ -14,7 +14,7 @@ import { PO_LINE_SELECT } from "./purchaseOrderQueries";
 import type { PoLine } from "./purchaseOrders";
 
 export const INVOICE_SELECT = `id, org_id, location_id, vendor_id, invoice_number,
-   invoice_date, due_date, terms, subtotal, tax, freight, other_charges, total,
+   invoice_date, due_date, terms, subtotal, tax, freight, other_charges, discount, total,
    is_credit, status, approved_at, approved_by, source, notes,
    synced_at, financials_touched_at, external_ref, qbo_balance, qbo_checked_at,
    vendors ( id, name, order_type )`;

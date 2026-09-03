@@ -13,6 +13,7 @@ import {
   agingBucket,
   amountReconciliation,
   approvalReadiness,
+  dueDateFromTerms,
   findPossibleDuplicates,
   invoiceHeaderFromExtraction,
   invoiceLinesFromExtraction,
@@ -66,6 +67,7 @@ function invoice(over: Partial<VendorInvoice> = {}): VendorInvoice {
     tax: null,
     freight: null,
     other_charges: null,
+    discount: null,
     total: null,
     is_credit: false,
     status: "open",
@@ -310,6 +312,29 @@ test("amounts: no subtotal is UNVERIFIABLE, not a disagreement", () => {
     invoice({ subtotal: 900, tax: 0, freight: null, other_charges: null, total: 1001.26 })
   );
   ok(wrong.differs, "a real subtotal that does not add up still reports");
+});
+
+test("amounts: a discount SUBTRACTS from the total, the opposite sign from other_charges", () => {
+  const check = amountReconciliation(
+    invoice({
+      subtotal: 100,
+      tax: 8.25,
+      freight: 0,
+      other_charges: 0,
+      discount: 15.31,
+      total: 92.94,
+    })
+  );
+  no(check.differs);
+  eq(check.computed, 92.94);
+});
+
+test("amounts: a null discount is the same as none printed", () => {
+  const check = amountReconciliation(
+    invoice({ subtotal: 100, tax: 0, freight: 0, other_charges: 0, discount: null, total: 100 })
+  );
+  no(check.differs);
+  eq(check.computed, 100);
 });
 
 test("amounts: a null part counts as zero but is NAMED", () => {
@@ -614,6 +639,56 @@ test("header: a due date that doesn't exist is refused, not rolled over", () => 
   eq(invoiceDueDate(extraction({ due_date: "09/13/2026" })), null);
   eq(invoiceDueDate(extraction({ due_date: "2026-08-04" })), "2026-08-04");
   eq(invoiceHeaderFromExtraction(extraction({ due_date: "2026-02-31" })).due_date, null);
+});
+
+test("dueDateFromTerms: NET/N and a bare number of days", () => {
+  eq(dueDateFromTerms("2026-08-03", "Net 30"), "2026-09-02");
+  eq(dueDateFromTerms("2026-08-03", "NET30"), "2026-09-02");
+  eq(dueDateFromTerms("2026-08-03", "N30"), "2026-09-02");
+  eq(dueDateFromTerms("2026-08-03", "Net due in 15 days"), "2026-08-18");
+  eq(dueDateFromTerms("2026-08-03", "15"), "2026-08-18", "a bare number of days");
+});
+
+test("dueDateFromTerms: COD is due the same day", () => {
+  eq(dueDateFromTerms("2026-08-03", "COD"), "2026-08-03");
+  eq(dueDateFromTerms("2026-08-03", "C.O.D."), "2026-08-03");
+});
+
+test("dueDateFromTerms: weeks convert to days", () => {
+  eq(dueDateFromTerms("2026-08-03", "2 weeks"), "2026-08-17");
+});
+
+test("dueDateFromTerms: a month boundary carries over in UTC, not local time", () => {
+  // Anchored on Date.UTC throughout — a local-timezone build west of
+  // Greenwich must not roll this back a day.
+  eq(dueDateFromTerms("2026-08-25", "Net 30"), "2026-09-24");
+});
+
+test("dueDateFromTerms: no date, no terms, or unreadable terms all return null", () => {
+  eq(dueDateFromTerms(null, "Net 30"), null);
+  eq(dueDateFromTerms("2026-08-03", null), null);
+  eq(dueDateFromTerms("2026-08-03", "Due on receipt"), null);
+});
+
+test("header: a missing due date is filled from terms, a stated one is not", () => {
+  const filled = invoiceHeaderFromExtraction(
+    extraction({ invoice_date: "2026-08-03", due_date: null, terms: "Net 30" })
+  );
+  eq(filled.due_date, "2026-09-02", "computed from the invoice date and terms");
+
+  const stated = invoiceHeaderFromExtraction(
+    extraction({
+      invoice_date: "2026-08-03",
+      due_date: "2026-08-10",
+      terms: "Net 30",
+    })
+  );
+  eq(stated.due_date, "2026-08-10", "what was printed wins over what terms imply");
+
+  const neither = invoiceHeaderFromExtraction(
+    extraction({ invoice_date: "2026-08-03", due_date: null, terms: null })
+  );
+  eq(neither.due_date, null, "nothing to compute from");
 });
 
 test("credit: the flag with positive amounts stores positive", () => {

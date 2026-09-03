@@ -72,6 +72,10 @@ export type VendorInvoice = {
   tax: number | null;
   freight: number | null;
   other_charges: number | null;
+  /** A discount printed on the invoice — positive, and SUBTRACTED from the
+   *  total (091), the opposite sign convention from `other_charges`, which is
+   *  signed as printed. Null on nearly every bill. */
+  discount: number | null;
   total: number | null;
   is_credit: boolean;
   status: InvoiceStatus;
@@ -165,7 +169,7 @@ export type AmountCheck = {
 export function amountReconciliation(
   invoice: Pick<
     VendorInvoice,
-    "subtotal" | "tax" | "freight" | "other_charges" | "total"
+    "subtotal" | "tax" | "freight" | "other_charges" | "discount" | "total"
   >
 ): AmountCheck {
   const parts = [
@@ -185,7 +189,14 @@ export function amountReconciliation(
     return { computed: null, stated, differs: false, missing: [...missing] };
   }
 
-  const computed = parts.reduce((sum, [, v]) => sum + Number(v ?? 0), 0);
+  // DISCOUNT IS NOT ONE OF `parts` AND NEVER `missing` (091) — nearly every
+  // invoice has none, and reporting an absent discount as missing data would
+  // be noise on the overwhelming majority of bills this checks. Read as zero
+  // when absent, same as the others, but SUBTRACTED — it's the one part of
+  // the foot that reduces what's owed rather than adding to it.
+  const computed =
+    parts.reduce((sum, [, v]) => sum + Number(v ?? 0), 0) -
+    Number(invoice.discount ?? 0);
   const differs =
     stated !== null && Math.abs(computed - stated) > MONEY_EPSILON;
   return { computed, stated, differs, missing: [...missing] };
@@ -693,7 +704,7 @@ export type LinkedOrder = {
 export function approvalReadiness(
   invoice: Pick<
     VendorInvoice,
-    "subtotal" | "tax" | "freight" | "other_charges" | "total"
+    "subtotal" | "tax" | "freight" | "other_charges" | "discount" | "total"
   >,
   lines: Pick<VendorInvoiceLine, "extended" | "kind" | "purchase_order_id">[],
   linked: LinkedOrder[],
@@ -819,6 +830,63 @@ export type InvoiceHeaderDraft = {
 };
 
 /**
+ * A number of days, read out of the vendor's own wording — free text, not a
+ * vocabulary, same as `terms` itself. Measured against every distinct value
+ * on file: "NET 14 DAYS", "Net 7", "Net 15 Days", "Net Due in 14 Days", "N10",
+ * "2 Weeks".
+ *
+ * A NET-prefixed number wins over anything earlier in the string, which is
+ * what keeps a discount-for-early-payment term honest: "2% 10 Net 30" is a
+ * 30-day bill, not a 10-day one, and a bare first-number reading would take
+ * the "2" or the "10" instead of the term that actually governs when it's
+ * due. "N10" is the same pattern with "ET" dropped, and "Net Due in 14 Days"
+ * is the same pattern with words between "Net" and the number.
+ *
+ * COD is zero days — due the day it's billed — and "n Week(s)" multiplies by
+ * seven, since none of the NET forms would otherwise catch it. A bare number
+ * with neither is the last resort, for a wording this hasn't seen yet.
+ */
+function termsDays(terms: string): number | null {
+  if (/\bC\.?O\.?D\.?\b/i.test(terms)) return 0;
+  const net = terms.match(/\bN(?:ET)?\.?\s*(?:due\s*(?:in\s*)?)?(\d+)/i);
+  if (net) return Number(net[1]);
+  const weeks = terms.match(/(\d+)\s*week/i);
+  if (weeks) return Number(weeks[1]) * 7;
+  const bare = terms.match(/\d+/);
+  return bare ? Number(bare[0]) : null;
+}
+
+/**
+ * The due date implied by the invoice date and the vendor's printed terms —
+ * for the moment a reading has one but not the other, which happens: the
+ * model transcribes what it can find, and a due date is sometimes simply not
+ * printed on the page while the terms are.
+ *
+ * UTC THROUGHOUT, never local getters — `invoiceDate` is a bare "YYYY-MM-DD"
+ * with no time of its own, so parsing and formatting through the LOCAL
+ * timezone could move the answer a day west of Greenwich (the `usDate`
+ * lesson). `Date.UTC`/`setUTCDate`/`toISOString` never read the local clock,
+ * so the result is the same date everywhere this runs.
+ *
+ * Never overrides a real due date — callers only reach for this when one is
+ * missing — and returns null rather than guessing when the terms don't name
+ * a number of days at all ("Due on receipt", "Prepaid").
+ */
+export function dueDateFromTerms(
+  invoiceDate: string | null,
+  terms: string | null
+): string | null {
+  if (!invoiceDate || !terms) return null;
+  const days = termsDays(terms);
+  if (days === null) return null;
+  const [y, m, d] = invoiceDate.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  const due = new Date(Date.UTC(y, m - 1, d));
+  due.setUTCDate(due.getUTCDate() + days);
+  return due.toISOString().slice(0, 10);
+}
+
+/**
  * The record a reading proposes.
  *
  * This is the ONE place a credit's sign is decided, and the normalization runs
@@ -831,6 +899,16 @@ export type InvoiceHeaderDraft = {
  * Dates go through `isoDate`'s round trip. The json_schema holds the model to a
  * STRING and says nothing about its shape, while these land in `date` columns —
  * an unchecked "2026-02-31" rolls over to March 2nd rather than failing.
+ *
+ * DUE DATE FALLS BACK TO THE TERMS (Mark, 2026-09-03: "when creating a new
+ * invoice, if no due date is set, can we calculate one based on invoice date
+ * and terms?"). Scoped to this reading path deliberately — it's where a
+ * bill's terms are already being transcribed, so a due date the model missed
+ * (or the vendor simply didn't print) is filled from a fact already on the
+ * same page, rather than left for someone to notice is blank. The manual
+ * "New invoice" dialog has no Terms field to compute from — see its own
+ * comment — so this stays a creation-time fallback, never a live recompute
+ * on the detail screen where `due_date` is typed directly.
  */
 export function invoiceHeaderFromExtraction(
   extraction: InvoiceExtraction
@@ -838,12 +916,14 @@ export function invoiceHeaderFromExtraction(
   const charges = invoiceCharges(extraction);
   const isCredit = isCreditReading(extraction);
   const magnitude = (v: number | null) => (v === null ? null : Math.abs(Number(v)));
+  const invoiceDate = isoDate(extraction.invoice_date);
+  const terms = extraction.terms?.trim() || null;
 
   return {
     invoice_number: extraction.invoice_number?.trim() || null,
-    invoice_date: isoDate(extraction.invoice_date),
-    due_date: invoiceDueDate(extraction),
-    terms: extraction.terms?.trim() || null,
+    invoice_date: invoiceDate,
+    due_date: invoiceDueDate(extraction) ?? dueDateFromTerms(invoiceDate, terms),
+    terms,
     subtotal: magnitude(charges.subtotal),
     tax: magnitude(charges.tax),
     freight: magnitude(charges.freight),
@@ -1164,17 +1244,18 @@ export const BILL_STAGE_LABEL: Record<BillStage, string> = {
 };
 
 /**
- * Yellow and green keep the meanings this list already gave them; the two new
- * rungs continue the purchase order ladder rather than inventing a vocabulary.
- * Submitted takes `closed`'s white-on-ink — definite, and nothing outstanding
- * from us — and Paid takes the same green as Approved a shade stronger, which
- * says "further along the same axis" and not "a different kind of thing".
+ * Mark's own ladder (2026-09-03): "open = yellow, approved = green,
+ * submitted = orange, paid = white." Four rungs, four hues — a bill's stage
+ * is read off the chip alone rather than off yellow-vs-a-shade-of-yellow, and
+ * "paid" reading as the QUIETEST colour is deliberate: it's the state that
+ * needs no further eye on it, where open/approved/submitted are all still
+ * outstanding in one way or another and get the warmer marks.
  */
 export const BILL_STAGE_CLASS: Record<BillStage, string> = {
   open: "border border-ink bg-[var(--rf-yellow-200)] text-ink",
   approved: "border border-ink bg-[var(--rf-green-200)] text-ink",
-  submitted: "border border-ink bg-white text-ink",
-  paid: "border border-ink bg-[var(--rf-green-300)] text-ink",
+  submitted: "border border-ink bg-[var(--rf-orange-200)] text-ink",
+  paid: "border border-ink bg-white text-ink",
   void: "border border-neutral-300 bg-white text-faint",
 };
 
@@ -1335,7 +1416,7 @@ export type ComputedAmounts = {
  */
 export function computedAmounts(
   lines: Pick<VendorInvoiceLine, "qty" | "unit_price" | "extended" | "kind">[],
-  charges: Pick<VendorInvoice, "tax" | "freight" | "other_charges">
+  charges: Pick<VendorInvoice, "tax" | "freight" | "other_charges" | "discount">
 ): ComputedAmounts {
   const items = lines.filter((l) => l.kind === "item");
   if (lines.length === 0) return { subtotal: null, total: null };
@@ -1361,7 +1442,10 @@ export function computedAmounts(
         chargeLines +
         Number(charges.tax ?? 0) +
         Number(charges.freight ?? 0) +
-        Number(charges.other_charges ?? 0)) *
+        Number(charges.other_charges ?? 0) -
+        // SUBTRACTED, not added — the one part of the foot that reduces what's
+        // owed rather than adding to it. See 091.
+        Number(charges.discount ?? 0)) *
         100
     ) / 100;
   return { subtotal, total };
