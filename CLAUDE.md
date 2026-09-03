@@ -2851,6 +2851,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    printed subtotal but the total still doesn't — a real tax/freight/other
    gap — `totalDisagreement` still fires on its own with something new to
    say. Verified live: 15476478 now shows exactly one band.
+   **AND NEITHER BAND KEEPS THE BORDER** (Mark, same thread — first the RCVD
+   button "should have a solid black border… to denote that it's a button",
+   then the total-check band "should not have a solid black border", and
+   finally, once the dedup left `lineSums.differs` as the one band left
+   standing, "remove the solid black border around the remaining warning").
+   A caveat band is a SENTENCE, not a control — the border belongs to the
+   RCVD button because pressing it writes, and a bare `<p>` earns nothing by
+   looking like one. Both bands are `bg-mark-fill px-4 py-2 text-sm` with no
+   border now; verified live (`getComputedStyle` reads `0px solid` on the
+   surviving band on 15476478). **1575 fixtures pass** (unchanged — a pure
+   styling edit).
 4e. ✅ **EMPLOYEE EVENTS — migration 035, APPLIED and LOADED 2026-08-06.**
    FMP's two HR child tables merged into ONE (Mark: "In retrospect, these should
    really be all in one table: Events. What were 'ratings' are really just shift

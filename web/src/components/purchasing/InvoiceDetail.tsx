@@ -1498,7 +1498,7 @@ export function InvoiceDetail({
               </p>
             )}
             {lineSums.differs && (
-              <p className="border border-ink bg-mark-fill px-4 py-2 text-sm">
+              <p className="bg-mark-fill px-4 py-2 text-sm">
                 The item lines come to{" "}
                 <strong className="tabular-nums">{money(lineSums.computed)}</strong>{" "}
                 against a printed subtotal of{" "}
