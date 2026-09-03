@@ -60,7 +60,7 @@ export function NewShiftReport({
    * `my_employee_id`, or null when their login has no HR record.
    */
   myEmployeeId: string | null;
-  existing: { date: string; shift: ShiftSlot }[];
+  existing: { date: string; shift: ShiftSlot; status: "draft" | "sent" }[];
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -76,7 +76,10 @@ export function NewShiftReport({
   // A handover legitimately produces two closing reports for one night, so this
   // WARNS and never blocks — `findPossibleRehires`' treatment, and the reason
   // there is no unique constraint behind it.
-  const duplicate = date !== null && existing.some((e) => e.date === date && e.shift === shift);
+  // The STATUS rides along so the sentence can say which it is: "completed" of
+  // a draft would be a claim the list two inches away contradicts.
+  const duplicate =
+    date === null ? null : existing.find((e) => e.date === date && e.shift === shift) ?? null;
 
   function create() {
     startTransition(async () => {
@@ -204,10 +207,8 @@ export function NewShiftReport({
               {duplicate ? (
                 <p className="text-sm">
                   <span className="bg-mark-fill px-1">
-                    There is already a {SHIFT_SLOT_LABEL[shift].toLowerCase()} report for that day
-                  </span>{" "}
-                  <span className="text-muted">
-                    — which is right for a handover, and worth a look otherwise.
+                    There is already a {duplicate.status === "sent" ? "completed" : "draft"}{" "}
+                    {SHIFT_SLOT_LABEL[shift].toLowerCase()} shift report on {date}!
                   </span>
                 </p>
               ) : null}

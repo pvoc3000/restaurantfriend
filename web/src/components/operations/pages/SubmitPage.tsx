@@ -67,15 +67,6 @@ export function SubmitPage({
               </li>
             ))}
           </ul>
-          {/* WHY, not just what. These are the answers that stop existing at
-              the end of the shift — nobody can count last night's leftovers in
-              the morning or say what the walk-in read at close — which is the
-              whole reason they are a gate rather than a note. It was worded as
-              being about breaks alone, which was true for about a day. */}
-          <p className="text-sm text-muted">
-            These can only be answered tonight &mdash; by tomorrow the donuts
-            are gone and nobody can remember the numbers.
-          </p>
         </div>
       ) : null}
 

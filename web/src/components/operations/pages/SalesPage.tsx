@@ -79,8 +79,12 @@ function Change({ current, basis }: { current: number | null; basis: number | nu
   // Red and green here are a real exception to "colour means record state", and
   // FMP's own page made it: on a comparison the sign IS the information, and
   // the figure is meaningless without knowing which way it points.
+  //
+  // `text-go-ink`, never `text-go` — that token is green-200, the order box's
+  // FILL, and as 13px text on white it is 1.35:1 (Mark, 2026-09-03: "too light
+  // to read"). Same measurement, same cure as the yellow rule.
   return (
-    <span className={pct < 0 ? "text-accent" : "text-go"}>
+    <span className={pct < 0 ? "text-accent" : "text-go-ink"}>
       {pct > 0 ? "+" : ""}
       {pct}%
     </span>

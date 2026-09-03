@@ -15,6 +15,12 @@
   --color-hairline: var(--rf-neutral-200);
   --color-go: var(--rf-green-200);
   --color-go-wash: var(--rf-green-50);
+  /* GREEN AS INK, and it has to be its own token: `go` is green-200, a FILL,
+     and as text on white it measures ~1.35:1 — the same unreadability
+     `text-mark` has (1.43:1). green-600 is 5.34:1, which passes AA and is the
+     counterpart of `accent` (red-500, 5.61:1) on the other side of a
+     comparison. */
+  --color-go-ink: var(--rf-green-600);
   --color-stop: var(--rf-red-200);
   --color-accent: var(--rf-red-500);
   --color-mark: var(--rf-yellow-500);

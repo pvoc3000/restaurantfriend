@@ -6946,6 +6946,18 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    ABOVE the table when there are — never both, because when rows exist the
    empty slot does not. Verified both ways at 1440, the second by temporarily
    flagging every report (tab 7, note above, two rows beneath).
+   **IT MOVED UNDER THE TAB PICKER 2026-09-03** (Mark), which retires the
+   two-places arrangement above: the nights are half of the Needs-attention
+   COUNT, so the sentence explaining that count belongs beneath the tab carrying
+   it — over the tabs it read as a banner about the whole screen. One place now,
+   in `leading` below the picker, so it sits directly over the table whether or
+   not the table has rows, and the empty slot no longer stands in for it. The
+   contradiction that started all this is still closed, by wording rather than
+   by placement: with gaps present the empty slot says **"No reports need
+   attention"**, which is about REPORTS and does not argue with a line naming
+   nights that produced none. **The other three tabs carry counts too** — they
+   had none, so the one tier with a count read as the only one that was
+   measured.
    **THREE BUGS ONLY RENDERING COULD CATCH**, none of which typechecks, lints or
    fixture-fails — see `docs/checklists-brief.md` for each:
    an HTML ENTITY IN JSX TEXT EATING THE SPACE after an interpolated value (a
@@ -7960,6 +7972,15 @@ weekday column, and 003 then silently made it per-vendor-item.
   `specialOrders/CustomerPicker`. Each needs the same judgement — redundant with
   a fill elsewhere, a short signal, or a sentence — so fix them as you touch
   those screens rather than in one mechanical pass.
+  **GREEN HAS THE SAME PROBLEM AND NOW HAS ITS OWN INK TOKEN** (Mark,
+  2026-09-03, on the shift report's Sales page: the Change column's green is
+  "too light to read"). `--color-go` is `--rf-green-200` — the fill sampled off
+  FileMaker's order box — and as text on white it measures **1.35:1**, which is
+  the yellow measurement again. So `--color-go-ink` (`--rf-green-600`,
+  **5.34:1**) is the counterpart of `accent` (red-500, 5.61:1) on the other side
+  of a comparison, and the pair now mirrors the red one: `stop`/`go` are FILLS,
+  `accent`/`go-ink` are INKS. `text-go` had exactly ONE caller in the app and it
+  was this bug; if a second appears, it is almost certainly the same mistake.
 
 - **EVERY BUTTON IS WHITE; only a SET FILTER is black** (Mark, 2026-08-02, after
   a sweep). The outlined cell — `border border-ink bg-white`, filling black on

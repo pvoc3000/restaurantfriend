@@ -108,6 +108,8 @@ export function ShiftReportsList({
   );
 
   const attentionCount = withReason.filter((r) => r.reason !== null).length + gaps.length;
+  const draftCount = rows.filter((r) => r.status === "draft").length;
+  const sentCount = rows.filter((r) => r.status === "sent").length;
 
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
@@ -246,9 +248,9 @@ export function ShiftReportsList({
     },
   ];
 
-  // The nights this shop was open and nobody reported. Held as a value rather
-  // than written inline because it renders in TWO places and never both — see
-  // where it is used.
+  // The nights this shop was open and nobody reported. It has no ROW of its
+  // own — there is no report to show — so it is a sentence under the tab whose
+  // count it is half of.
   const gapsNote =
     gaps.length > 0 ? (
       <p className="text-sm">
@@ -276,20 +278,11 @@ export function ShiftReportsList({
           locationCode={locationCode}
           today={today}
           myEmployeeId={myEmployeeId}
-          existing={rows.map((r) => ({ date: r.reportDate, shift: r.shift }))}
+          existing={rows.map((r) => ({ date: r.reportDate, shift: r.shift, status: r.status }))}
         />
       </div>
 
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
-
-      {/* ONE STATEMENT, IN WHICHEVER PLACE CAN BE SEEN. The missing nights are
-          counted on the tab and have no row to show, so with no flagged report
-          under it the table's own empty slot is where they belong — a band
-          saying "5 nights" over a table saying "nothing needs attention" is the
-          screen contradicting itself, and a band plus a sentence pointing AT
-          the band is the same fact twice, an inch apart. Above the table only
-          when there are rows, because then the empty slot does not exist. */}
-      {tier === "attention" && visible.length > 0 ? gapsNote : null}
 
       <DataTable
         rows={visible}
@@ -301,12 +294,15 @@ export function ShiftReportsList({
         columnChooser
         empty={
           tier === "attention" ? (
-            (gapsNote ?? <p className="text-sm text-muted">Nothing needs attention.</p>)
+            <p className="text-sm text-muted">
+              {gaps.length > 0 ? "No reports need attention." : "Nothing needs attention."}
+            </p>
           ) : (
             <p className="text-sm text-muted">No shift reports here yet.</p>
           )
         }
         leading={
+          <div className="space-y-3">
           <div className="flex flex-wrap items-end gap-3">
             <TabPicker
               ariaLabel="Which shift reports"
@@ -314,9 +310,9 @@ export function ShiftReportsList({
               onChange={setTier}
               options={[
                 { key: "attention", label: "Needs attention", count: attentionCount },
-                { key: "draft", label: "Drafts" },
-                { key: "sent", label: "Sent" },
-                { key: "all", label: "All" },
+                { key: "draft", label: "Drafts", count: draftCount },
+                { key: "sent", label: "Sent", count: sentCount },
+                { key: "all", label: "All", count: rows.length },
               ]}
             />
             <TextInput
@@ -326,6 +322,15 @@ export function ShiftReportsList({
               clearLabel="Clear the search"
               className="w-72"
             />
+          </div>
+          {/* UNDER THE TABS, NOT OVER THEM (Mark, 2026-09-03). The missing
+              nights are counted ON the Needs attention tab, so the sentence
+              that explains that count belongs beneath the tab carrying it —
+              above, it read as a banner about the screen rather than as the
+              detail of one tier. One place now rather than two: it sits
+              directly over the table whether or not the table has rows, so the
+              empty slot no longer has to stand in for it. */}
+          {tier === "attention" ? gapsNote : null}
           </div>
         }
       />
