@@ -123,6 +123,7 @@ export function InvoiceDetail({
 }) {
   const router = useRouter();
   const supabase = createClient();
+  const [settingTotal, setSettingTotal] = useState(false);
   const [shownId, setShownId] = useState<string | null>(null);
   const [kind, setKind] = useState<AttachmentKind>("invoice");
 
@@ -235,6 +236,28 @@ export function InvoiceDetail({
       }
     }
     return { qty: null, linked: false };
+  }
+
+  /**
+   * Take the total the page was corrected to.
+   *
+   * ONE FIELD, and deliberately not the lines as well: zeroing a struck line's
+   * `extended` is a second judgement — the printed figure is still what was
+   * printed — and a button that quietly rewrote seven rows would be doing more
+   * than it says. The band names the struck lines; they are one click each.
+   */
+  async function takeAmendedTotal(next: number) {
+    setSettingTotal(true);
+    const { data, error } = await supabase
+      .from("vendor_invoices")
+      .update({ total: next })
+      .eq("id", invoice.id)
+      .select("id");
+    setSettingTotal(false);
+    // Its own row count: below purchaser+ this changes nothing and returns NO
+    // error, and a total that silently did not move is money reading wrong.
+    if (error || !data || data.length === 0) return;
+    router.refresh();
   }
 
   /** Which of OUR lines the page strikes out, by the vendor's own SKU — the
@@ -892,11 +915,32 @@ export function InvoiceDetail({
                       not what was written.
                     </p>
                   )}
+                {/* THE OFFER, NOT THE WRITE — the receiving screen's `→` idiom.
+                    The total is TRANSCRIBED, never computed: it is what the
+                    vendor's document claims, and deriving it would let our
+                    arithmetic quietly replace theirs so a misread line stopped
+                    being visible. But the corrected figure is on the page, we
+                    have read it, and making somebody retype it is the friction
+                    Mark hit (2026-09-02). A number the page supplies, offered
+                    beside the one it replaces. */}
                 {Math.abs(Number(invoice.total ?? 0) - amendedTotal(amendment)) > 0.005 && (
-                  <p className="text-[13px]">
-                    This record still says{" "}
-                    <span className="tabular-nums">{money(invoice.total)}</span> — correct the
-                    total and the struck lines below.
+                  <p className="flex flex-wrap items-center gap-2 text-[13px]">
+                    <span>
+                      This record still says{" "}
+                      <span className="tabular-nums">{money(invoice.total)}</span>.
+                    </span>
+                    {canEdit && (
+                      <button
+                        type="button"
+                        className="border border-ink bg-white px-2 py-0.5 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+                        disabled={settingTotal}
+                        onClick={() => void takeAmendedTotal(amendedTotal(amendment))}
+                      >
+                        {settingTotal
+                          ? "Setting…"
+                          : `→ ${money(amendedTotal(amendment))}`}
+                      </button>
+                    )}
                   </p>
                 )}
               </div>
