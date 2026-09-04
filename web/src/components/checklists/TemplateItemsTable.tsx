@@ -305,43 +305,58 @@ export function TemplateItemsTable({
             </span>
           );
         }
-        // THE THREE BOXES SHARE THE CELL rather than each claiming a fixed
-        // width (Mark, 2026-09-03: "I am unable to set the second value, just
-        // the two numeric ones"). Widths here are WEIGHTS, so this column is
-        // ~131px at a 1280 window while `w-14 + w-14 + w-12` and their gaps
-        // want 180 — the unit box was simply outside the cell. Flexible, it is
-        // always reachable however narrow the column is dragged.
+        // THE THREE BOXES SHARE THE CELL, AND EACH IS PENNED IN BY ITS OWN
+        // WRAPPER (Mark, 2026-09-03, twice: "I am unable to set the second
+        // value", then "when editing the numeric field, it expands and covers
+        // the unit field").
+        //
+        // Two separate faults, and the second is the one to remember.
+        // Widths here are WEIGHTS, so this column is ~131px at a 1280 window
+        // while three fixed boxes and their gaps wanted 180 — the unit was
+        // outside the cell. And `InlineValue` applies a caller's `className` to
+        // its RESTING button only: its editing wrapper is a bare `flex w-full`
+        // whose Sizer is `whitespace-pre`, so in a flex row it grows to the
+        // text's own width and lies over whatever is beside it. A class on the
+        // component cannot fix that; the pen has to be a parent it cannot
+        // escape. `min-w-0` kills the min-content floor, `flex-1` fixes the
+        // share, `overflow-hidden` clips the invisible Sizer.
         return (
           <div className="flex items-center gap-1">
-            <InlineValue
-              table="checklist_template_items"
-              id={r.id}
-              column="min_value"
-              value={r.min_value}
-              kind="number"
-              align="right"
-              className="w-full min-w-0 flex-1"
-              ariaLabel={`Lowest acceptable value for ${r.prompt}`}
-            />
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <InlineValue
+                table="checklist_template_items"
+                id={r.id}
+                column="min_value"
+                value={r.min_value}
+                kind="number"
+                align="right"
+                className="w-full"
+                ariaLabel={`Lowest acceptable value for ${r.prompt}`}
+              />
+            </div>
             <span className="shrink-0 text-faint">–</span>
-            <InlineValue
-              table="checklist_template_items"
-              id={r.id}
-              column="max_value"
-              value={r.max_value}
-              kind="number"
-              align="right"
-              className="w-full min-w-0 flex-1"
-              ariaLabel={`Highest acceptable value for ${r.prompt}`}
-            />
-            <InlineValue
-              table="checklist_template_items"
-              id={r.id}
-              column="unit"
-              value={r.unit}
-              className="w-full min-w-0 flex-1"
-              ariaLabel={`Unit for ${r.prompt}`}
-            />
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <InlineValue
+                table="checklist_template_items"
+                id={r.id}
+                column="max_value"
+                value={r.max_value}
+                kind="number"
+                align="right"
+                className="w-full"
+                ariaLabel={`Highest acceptable value for ${r.prompt}`}
+              />
+            </div>
+            <div className="min-w-0 flex-1 overflow-hidden">
+              <InlineValue
+                table="checklist_template_items"
+                id={r.id}
+                column="unit"
+                value={r.unit}
+                className="w-full"
+                ariaLabel={`Unit for ${r.prompt}`}
+              />
+            </div>
           </div>
         );
       },

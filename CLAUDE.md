@@ -7865,6 +7865,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   cell: not narrow, ABSENT, with no scrollbar and no ellipsis to say so.
   Anything laid out inside a cell must be FLEXIBLE (`min-w-0 flex-1`), or it is
   sized against a width the column may never have.
+- **`InlineValue`'s `className` REACHES ITS RESTING BUTTON ONLY, so a width
+  passed to it does not survive the click** (Mark, 2026-09-03, on the same
+  cell after the first fix: "when editing the numeric field, it expands and
+  covers the unit field"). Its editing branch returns a bare `flex w-full`
+  wrapper around a `whitespace-pre` Sizer, so in a FLEX ROW it grows to the
+  text's own width and lies over whatever is beside it — while in a `dl` track
+  or a `table-fixed` cell, which is every other caller, `w-full` resolves and
+  nothing moves. **Several `InlineValue`s side by side therefore need a PEN
+  EACH** — `min-w-0 flex-1 overflow-hidden` on a wrapper the component cannot
+  escape, with `w-full` passed down — rather than a width class on the
+  component. Verified by measuring: editing the low box leaves the input at
+  47px and the two beside it exactly where they were.
 - **EVERY LIST SCREEN'S HEADER IS `ui/PageHeading`. THIS IS THE DEFAULT — a new
   page uses it without being asked** (Mark, 2026-09-03: "I like this the best
   and think we should copy it to the other sections of the app", then "make a
