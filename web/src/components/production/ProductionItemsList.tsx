@@ -463,7 +463,6 @@ export function ProductionItemsList({
         visible={visible.length}
         total={rows.length}
         noun="items"
-        action={action}
       />
     <DataTable
       rows={sorted}
@@ -490,6 +489,7 @@ export function ProductionItemsList({
             dimensions={dimensions}
             values={filters}
             onChange={changeFilters}
+            rowAction={action}
             leading={
               <div className="space-y-1.5">
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">

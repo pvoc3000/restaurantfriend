@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { canWriteCatalog } from "@/lib/roles";
 import { staleBucket, type StaleBucket } from "@/lib/lastOrdered";
 import { type CatalogItem } from "@/lib/catalog";
 import { parseItemFilters, type RawSearchParams } from "@/lib/itemFilters";
@@ -92,6 +93,8 @@ export default async function ItemsPage({
       categories={categories}
       activeLocationCode={session.activeLocation?.code ?? null}
       initialFilters={initialFilters}
+      orgId={session.membership.org_id}
+      editable={canWriteCatalog(session.membership.role)}
     />
   );
 }

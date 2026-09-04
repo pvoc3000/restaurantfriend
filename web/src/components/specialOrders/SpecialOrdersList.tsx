@@ -6,6 +6,7 @@ import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { NewSpecialOrder } from "@/components/specialOrders/NewSpecialOrder";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { StickyFooter } from "@/components/ui/StickyFooter";
 import {
   PROGRESS_LABELS,
@@ -643,6 +644,17 @@ export function SpecialOrdersList({
 
   return (
     <>
+      {/* The app's page header — this screen had no title at all (Mark,
+          2026-09-03). Org-wide, so no shop code: decision 8 makes a special
+          order the ORG's, which is why this screen is exempt from
+          `InactiveLocationGate`. */}
+      <PageHeading
+        title="Special Orders"
+        visible={visible.length}
+        total={rows.length}
+        noun="orders"
+      />
+
     <DataTable
       rows={sorted}
       // `sort ?? NATURAL_SORT` so the header arrow agrees with the rows. The
@@ -707,7 +719,7 @@ export function SpecialOrdersList({
                 />
               </div>
             }
-            trailing={
+            rowAction={
               canWrite ? (
                 <NewSpecialOrder
                   orgId={orgId}

@@ -53,6 +53,8 @@ export function FilterMenus<T>({
   noun = "rows",
   leading,
   trailing,
+  rowAction,
+  showCount = true,
 }: {
   /**
    * The rows BEFORE these menus, but after anything else that narrows the list
@@ -95,6 +97,23 @@ export function FilterMenus<T>({
    * at the render. It is no longer part of the filter row.
    */
   trailing?: ReactNode;
+  /**
+   * The create command AS THE LAST CELL OF THE MENU ROW, right-aligned (Mark,
+   * 2026-09-03: the action buttons should be "in line with the search field and
+   * filter tabpickers"). The alternative is `trailing`, which puts it on its own
+   * line above — see the note there for why that exists and when it is the
+   * better answer. A caller passes one or the other, never both.
+   */
+  rowAction?: ReactNode;
+  /**
+   * Whether the bar states its own "N of M noun" (default true).
+   *
+   * FALSE where `ui/PageHeading` already says it three inches above — which
+   * since 2026-09-03 is most lists, so this is the flag that stops one number
+   * being stated twice. The Clear affordance survives either way; it is the
+   * half of this line that is not a duplicate.
+   */
+  showCount?: boolean;
 }) {
   const counts = filterCounts(rows, dimensions, values);
   const active = activeFilterCount(dimensions, values);
@@ -172,28 +191,33 @@ export function FilterMenus<T>({
             </div>
           );
         })}
+        {rowAction ? <div className="ml-auto">{rowAction}</div> : null}
       </div>
 
       {/* Always stated, never only when filtered: "470 of 470" is a fact worth
           having, and a line that appears and disappears moves the table under
           it every time you touch a menu. */}
-      <p className="text-[13px] text-muted">
-        {shown === population
-          ? `${population.toLocaleString()} ${noun}`
-          : `${shown.toLocaleString()} of ${population.toLocaleString()} ${noun}`}
-        {active > 0 ? (
-          <>
-            {" · "}
-            <button
-              type="button"
-              onClick={() => onChange(clearedFilters(dimensions))}
-              className="underline underline-offset-2 hover:text-ink"
-            >
-              Clear {active === 1 ? "filter" : `${active} filters`}
-            </button>
-          </>
-        ) : null}
-      </p>
+      {showCount || active > 0 ? (
+        <p className="text-[13px] text-muted">
+          {showCount
+            ? shown === population
+              ? `${population.toLocaleString()} ${noun}`
+              : `${shown.toLocaleString()} of ${population.toLocaleString()} ${noun}`
+            : null}
+          {active > 0 ? (
+            <>
+              {showCount ? " · " : null}
+              <button
+                type="button"
+                onClick={() => onChange(clearedFilters(dimensions))}
+                className="underline underline-offset-2 hover:text-ink"
+              >
+                Clear {active === 1 ? "filter" : `${active} filters`}
+              </button>
+            </>
+          ) : null}
+        </p>
+      ) : null}
     </div>
   );
 }

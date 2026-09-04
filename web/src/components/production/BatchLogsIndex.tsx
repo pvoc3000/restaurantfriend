@@ -262,8 +262,62 @@ export function BatchLogsIndex({
         visible={visible.length}
         total={rows.length}
         noun="logs"
-        action={action}
       />
+
+      {/* Its own filter row, above the table — `PlansList`'s change and reason. */}
+      <div className="flex flex-wrap items-end gap-4">
+        <TextInput
+          value={term}
+          onValueChange={setTerm}
+          placeholder="Search date, kitchen, note…"
+          aria-label="Search batch logs"
+          className="w-64"
+        />
+        {/* HREF CELLS, not an onChange — this one is a navigation, because the
+            rows it wants do not exist on the client yet. The order guide's day
+            strip is the same control for the same reason. */}
+        <div className="space-y-1.5">
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+            Show
+          </span>
+          <TabPicker
+            ariaLabel="How far back to look"
+            value={range}
+            options={BATCH_LOG_RANGES.map((r) => ({
+              key: r.key,
+              label: r.label,
+              href: batchLogRangeHref(r.key, params),
+            }))}
+          />
+        </div>
+        <TabPicker
+          ariaLabel="Which logs"
+          value={tier}
+          onChange={setTier}
+          options={[
+            { key: "open" as Tier, label: "Open", count: counts.open },
+            { key: "today" as Tier, label: "Today", count: counts.today },
+            { key: "complete" as Tier, label: "Complete", count: counts.complete },
+            { key: "all" as Tier, label: "All", count: counts.all },
+          ]}
+        />
+        <div className="space-y-1.5">
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+            Group by
+          </span>
+          <TabPicker
+            ariaLabel="Group the logs"
+            value={grouping}
+            onChange={setGrouping}
+            options={[
+              { key: "none" as Grouping, label: "None" },
+              { key: "date" as Grouping, label: "Date" },
+              { key: "location" as Grouping, label: "Location" },
+            ]}
+          />
+        </div>
+        {action ? <div className="ml-auto">{action}</div> : null}
+      </div>
       {note}
     <DataTable
       rows={visible}
@@ -276,66 +330,6 @@ export function BatchLogsIndex({
       sort={sort}
       onSortChange={setSort}
       empty={<p className="text-sm text-muted">No logs match.</p>}
-      leading={
-        // SEARCH FIRST (Mark, 2026-08-09: "the search bar ... should be all the
-        // way to the left, not in between two filter pickers"). It had been
-        // dropped in beside the range picker when that was added, which left
-        // one text field wedged between two chip bars — every other list in
-        // this app opens with its search box, and the eye goes to the left edge
-        // of the row for the thing you type into.
-        <div className="flex flex-wrap items-end gap-4">
-          <TextInput
-            value={term}
-            onValueChange={setTerm}
-            placeholder="Search date, kitchen, note…"
-            aria-label="Search batch logs"
-            className="w-64"
-          />
-          {/* HREF CELLS, not an onChange — this one is a navigation, because the
-              rows it wants do not exist on the client yet. The order guide's day
-              strip is the same control for the same reason. */}
-          <div className="space-y-1.5">
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-              Show
-            </span>
-            <TabPicker
-              ariaLabel="How far back to look"
-              value={range}
-              options={BATCH_LOG_RANGES.map((r) => ({
-                key: r.key,
-                label: r.label,
-                href: batchLogRangeHref(r.key, params),
-              }))}
-            />
-          </div>
-          <TabPicker
-            ariaLabel="Which logs"
-            value={tier}
-            onChange={setTier}
-            options={[
-              { key: "open" as Tier, label: "Open", count: counts.open },
-              { key: "today" as Tier, label: "Today", count: counts.today },
-              { key: "complete" as Tier, label: "Complete", count: counts.complete },
-              { key: "all" as Tier, label: "All", count: counts.all },
-            ]}
-          />
-          <div className="space-y-1.5">
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-              Group by
-            </span>
-            <TabPicker
-              ariaLabel="Group the logs"
-              value={grouping}
-              onChange={setGrouping}
-              options={[
-                { key: "none" as Grouping, label: "None" },
-                { key: "date" as Grouping, label: "Date" },
-                { key: "location" as Grouping, label: "Location" },
-              ]}
-            />
-          </div>
-        </div>
-      }
     />
     </div>
   );

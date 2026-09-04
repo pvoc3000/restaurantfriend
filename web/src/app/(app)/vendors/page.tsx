@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { canWriteCatalog } from "@/lib/roles";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { parseVendorFilters } from "@/lib/vendorFilters";
 import { VendorsList } from "@/components/catalog/VendorsList";
@@ -66,6 +67,8 @@ export default async function VendorsPage({
       types={types}
       activeLocationCode={session.activeLocation?.code ?? null}
       initialFilters={initialFilters}
+      orgId={session.membership.org_id}
+      editable={canWriteCatalog(session.membership.role)}
     />
   );
 }

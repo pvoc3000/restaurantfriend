@@ -363,8 +363,49 @@ export function SchedulesList({
         visible={visible.length}
         total={rows.length}
         noun="schedules"
-        action={action}
       />
+
+      {/* Its own filter row, above the table — `PlansList`'s change and for its
+          reason: in `DataTable`'s `leading` it shared a strip with the columns
+          eye and read as part of the table. */}
+      <div className="flex flex-wrap items-end gap-4">
+        <TextInput
+          value={term}
+          onValueChange={setTerm}
+          placeholder="Search shop, kitchen, note…"
+          aria-label="Search schedules"
+          className="w-64"
+        />
+        <TabPicker
+          ariaLabel="Which schedules"
+          value={tier}
+          onChange={setTier}
+          options={[
+            { key: "upcoming" as Tier, label: "Upcoming", count: counts.upcoming },
+            { key: "today" as Tier, label: "Today", count: counts.today },
+            { key: "unprinted" as Tier, label: "Unprinted", count: counts.unprinted },
+            { key: "all" as Tier, label: "All", count: counts.all },
+          ]}
+        />
+        <div className="space-y-1.5">
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+            Group by
+          </span>
+          <TabPicker
+            ariaLabel="Group the schedules"
+            value={grouping}
+            onChange={setGrouping}
+            options={[
+              { key: "date" as Grouping, label: "Date" },
+              { key: "kitchen" as Grouping, label: "Kitchen" },
+              { key: "sells" as Grouping, label: "Shop" },
+              { key: "none" as Grouping, label: "None" },
+            ]}
+          />
+        </div>
+        {action ? <div className="ml-auto">{action}</div> : null}
+      </div>
+
       <DataTable
         rows={visible}
         columns={columns}
@@ -376,44 +417,6 @@ export function SchedulesList({
         empty={<p className="text-sm text-muted">No schedules match these filters.</p>}
         sort={sort}
         onSortChange={setSort}
-        leading={
-          <div className="flex flex-wrap items-end gap-4">
-            <TextInput
-              value={term}
-              onValueChange={setTerm}
-              placeholder="Search shop, kitchen, note…"
-              aria-label="Search schedules"
-              className="w-64"
-            />
-            <TabPicker
-              ariaLabel="Which schedules"
-              value={tier}
-              onChange={setTier}
-              options={[
-                { key: "upcoming" as Tier, label: "Upcoming", count: counts.upcoming },
-                { key: "today" as Tier, label: "Today", count: counts.today },
-                { key: "unprinted" as Tier, label: "Unprinted", count: counts.unprinted },
-                { key: "all" as Tier, label: "All", count: counts.all },
-              ]}
-            />
-            <div className="space-y-1.5">
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                Group by
-              </span>
-              <TabPicker
-                ariaLabel="Group the schedules"
-                value={grouping}
-                onChange={setGrouping}
-                options={[
-                  { key: "date" as Grouping, label: "Date" },
-                  { key: "kitchen" as Grouping, label: "Kitchen" },
-                  { key: "sells" as Grouping, label: "Shop" },
-                  { key: "none" as Grouping, label: "None" },
-                ]}
-              />
-            </div>
-          </div>
-        }
       />
 
       {checked.size > 0 ? (

@@ -309,8 +309,30 @@ export function RecipesList({
         visible={visible.length}
         total={rows.length}
         noun="recipes"
-        action={action}
       />
+
+      {/* Its own filter row, above the table — `PlansList`'s change and reason. */}
+      <div className="flex flex-wrap items-end gap-3">
+        <TextInput
+          value={search}
+          onValueChange={changeSearch}
+          placeholder="Search recipes"
+          className="w-64"
+          aria-label="Search recipes"
+          clearLabel="Clear the search"
+        />
+        <TabPicker
+          ariaLabel="Which recipes"
+          value={filters.tier ?? "active"}
+          onChange={changeTier}
+          options={dimensions[0].options.map((o) => ({
+            key: o.value,
+            label: o.label,
+            count: counts[o.value],
+          }))}
+        />
+        {action ? <div className="ml-auto">{action}</div> : null}
+      </div>
     <DataTable
       rows={sorted}
       sort={sort}
@@ -322,28 +344,6 @@ export function RecipesList({
       columnChooser
       group={group}
       empty={<p className="text-sm text-muted">No recipes match these filters.</p>}
-      leading={
-        <div className="flex flex-wrap items-end gap-3">
-          <TextInput
-            value={search}
-            onValueChange={changeSearch}
-            placeholder="Search recipes"
-            className="w-64"
-            aria-label="Search recipes"
-            clearLabel="Clear the search"
-          />
-          <TabPicker
-            ariaLabel="Which recipes"
-            value={filters.tier ?? "active"}
-            onChange={changeTier}
-            options={dimensions[0].options.map((o) => ({
-              key: o.value,
-              label: o.label,
-              count: counts[o.value],
-            }))}
-          />
-        </div>
-      }
     />
     </div>
   );

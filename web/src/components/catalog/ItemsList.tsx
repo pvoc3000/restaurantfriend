@@ -22,6 +22,7 @@ import { DataTable, type DataColumn } from "./DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { NewInventoryItem } from "./NewInventoryItem";
 import { PickList } from "@/components/ui/PickList";
 import type { ItemRow } from "@/app/(app)/items/page";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
@@ -87,11 +88,16 @@ export function ItemsList({
   categories,
   activeLocationCode,
   initialFilters,
+  orgId,
+  editable,
 }: {
   items: ItemRow[];
   categories: string[];
   activeLocationCode: string | null;
   initialFilters: ItemFilters;
+  orgId: string;
+  /** purchaser+ — 001's generic write policy. */
+  editable: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -357,7 +363,7 @@ export function ItemsList({
       </div>
 
       {/* Search + category */}
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-end gap-2">
         <TextInput
           value={filters.q}
           onValueChange={(q) => update({ q })}
@@ -386,6 +392,15 @@ export function ItemsList({
           onChange={(active) => update({ active })}
           options={ACTIVE_TABS}
         />
+        {editable ? (
+          <div className="ml-auto">
+            <NewInventoryItem
+              orgId={orgId}
+              categories={categories}
+              existingNames={items.map((i) => i.name)}
+            />
+          </div>
+        ) : null}
       </div>
 
       {/* Last-ordered filter — same buckets as the cleanup queue. The label

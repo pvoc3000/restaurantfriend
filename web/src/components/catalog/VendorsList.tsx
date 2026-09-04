@@ -18,6 +18,7 @@ import { DataTable, type DataColumn } from "./DataTable";
 import { VendorActiveToggle } from "@/components/VendorActiveToggle";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { NewVendor } from "./NewVendor";
 import { PickList } from "@/components/ui/PickList";
 import type { VendorRow } from "@/app/(app)/vendors/page";
 
@@ -101,11 +102,16 @@ export function VendorsList({
   types,
   activeLocationCode,
   initialFilters,
+  orgId,
+  editable,
 }: {
   vendors: VendorRow[];
   types: string[];
   activeLocationCode: string | null;
   initialFilters: VendorFilters;
+  orgId: string;
+  /** purchaser+ — 001's generic write policy. */
+  editable: boolean;
 }) {
   // Seeded from the ADDRESS BAR where it can be read, and only from the props
   // otherwise — see `urlFilterParams`. A back or forward restore hands this
@@ -260,7 +266,7 @@ export function VendorsList({
         </p>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-end gap-2">
         <TextInput
           value={filters.q}
           onValueChange={(q) => update({ q })}
@@ -290,6 +296,11 @@ export function VendorsList({
           onChange={(active) => update({ active })}
           options={ACTIVE_TABS}
         />
+        {editable ? (
+          <div className="ml-auto">
+            <NewVendor orgId={orgId} types={types} existingNames={vendors.map((v) => v.name)} />
+          </div>
+        ) : null}
       </div>
 
       <DataTable

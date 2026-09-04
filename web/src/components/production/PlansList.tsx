@@ -497,10 +497,38 @@ export function PlansList({
         visible={visible.length}
         total={rows.length}
         noun="plans"
-        action={action}
       />
 
       {failed ? <p className="mb-3 text-[13px] text-accent">{failed}</p> : null}
+
+      {/* A FILTER ROW OF ITS OWN, above the table (Mark, 2026-09-03: Plans
+          "looks different, almost like the filter row and datatable are
+          merged"). It was — it sat in `DataTable`'s `leading`, which shares a
+          strip with the columns eye and butts against the head. Out here it
+          reads like every other list, and `ml-auto` reaches the page's right
+          edge rather than stopping 48px short of it. */}
+      <div className="mb-4 flex flex-wrap items-end gap-3">
+        <TextInput
+          value={search}
+          onValueChange={changeSearch}
+          placeholder="Search plans"
+          aria-label="Search plans"
+          clearLabel="Clear the search"
+          className="w-64"
+        />
+        <TabPicker
+          ariaLabel="Which plans"
+          value={filters.tier ?? "active"}
+          onChange={changeTier}
+          options={dimensions[0].options.map((o) => ({
+            key: o.value,
+            label: o.label,
+            count: counts[o.value],
+          }))}
+        />
+        {action ? <div className="ml-auto">{action}</div> : null}
+      </div>
+
     <DataTable
       rows={sorted}
       sort={sort}
@@ -511,28 +539,6 @@ export function PlansList({
       compactBelow={1100}
       columnChooser
       empty={<p className="text-sm text-muted">No plans match these filters.</p>}
-      leading={
-        <div className="flex flex-wrap items-end gap-3">
-          <TextInput
-            value={search}
-            onValueChange={changeSearch}
-            placeholder="Search plans"
-            aria-label="Search plans"
-            clearLabel="Clear the search"
-            className="w-64"
-          />
-          <TabPicker
-            ariaLabel="Which plans"
-            value={filters.tier ?? "active"}
-            onChange={changeTier}
-            options={dimensions[0].options.map((o) => ({
-              key: o.value,
-              label: o.label,
-              count: counts[o.value],
-            }))}
-          />
-        </div>
-      }
     />
     </>
   );

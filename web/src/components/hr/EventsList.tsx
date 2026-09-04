@@ -522,6 +522,9 @@ export function EventsList({
             // would also throw you from Shift ratings to Notes & warnings while
             // counting itself as two.
             onChange={(next) => changeFilters({ tier, ...next })}
+            // `PageHeading` states the count now, and this bar said it again a
+            // few pixels below (Mark, 2026-09-03).
+            showCount={false}
             leading={
               <div className="space-y-1.5">
                 <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
@@ -538,16 +541,6 @@ export function EventsList({
               </div>
             }
           />
-          {/* A WINDOW statement, not a row count: this list is bounded by a date
-              rather than by `.range()`, so the honest sentence names the date.
-              It sits on every tier now that the picker does — under Notes &
-              warnings it is the sentence that explains why the tab beside says
-              520 and this one says 2,635, which is the question the two counts
-              raise. */}
-          <p className="text-[13px] text-subtle">
-            Shift ratings {RATING_WINDOW_SINCE[windowKey]} ({shiftsShown.toLocaleString()}). Every
-            note and warning is here, back to 2014.
-          </p>
           {nameError ? (
             <p className="text-[12px] text-accent">Names could not be loaded: {nameError}</p>
           ) : null}

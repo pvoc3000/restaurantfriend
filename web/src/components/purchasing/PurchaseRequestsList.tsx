@@ -404,14 +404,6 @@ export function PurchaseRequestsList({
       }
       leading={
         <div className="space-y-3">
-          <div className="flex justify-end">
-            <NewPurchaseRequest
-              orgId={orgId}
-              locationId={locationId}
-              userId={userId}
-              locationCode={locationCode}
-            />
-          </div>
           <div className="flex flex-wrap items-end gap-3">
             <TextInput
               value={search}
@@ -436,6 +428,14 @@ export function PurchaseRequestsList({
                 Showing the most recent 500.
               </span>
             ) : null}
+            <div className="ml-auto">
+              <NewPurchaseRequest
+                orgId={orgId}
+                locationId={locationId}
+                userId={userId}
+                locationCode={locationCode}
+              />
+            </div>
           </div>
         </div>
       }

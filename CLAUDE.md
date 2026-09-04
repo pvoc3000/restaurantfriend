@@ -7855,9 +7855,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   that row — outside `DataTable`'s `leading`, which would leave it 48px short of
   the edge. And the SEARCH BOX COMES FIRST in that row, before the tiers, which
   is the order every list uses (`/shift-reports` had it after and was corrected).
-  `PageHeading` still takes an `action`, and the screens outside Facilities, HR
-  and Operations still use it; **converting Production, Purchasing and Special
-  Orders is outstanding.**
+  On a `ui/FilterMenus` bar the slot is **`rowAction`** — the last cell of the
+  MENU row — where `trailing` puts it on its own line above; a caller passes one
+  or the other. On a bar wide enough to wrap, `ml-auto` lands it at the end of
+  whatever line it falls on, which is still right-aligned and still in the
+  filter block (`/special-orders`, `/production-items`, `/elements` and
+  `/batch-logs` all do).
+  **AND `FilterMenus` STOPS STATING THE COUNT WHERE THE HEADER DOES** —
+  `showCount={false}`, because that bar's "N of M noun" is now the same fact
+  three inches under `PageHeading`'s. Only `/events` passes it so far; the
+  duplication is still on the other FilterMenus lists.
+  `PageHeading` still takes an `action` and a few screens still use it;
+  everything Mark has named is converted.
   A list that owns the heading has to RENDER EVEN WHEN EMPTY either way, or an
   empty shop gets no title and no way to make its first record (`/plans` and
   `/schedules` both had that hole).
