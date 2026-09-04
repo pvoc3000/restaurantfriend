@@ -6,12 +6,10 @@ import { createClient } from "@/lib/supabase/client";
 import { Switch } from "@/components/ui/Switch";
 
 /**
- * Table-agnostic active/inactive switch (inventory_items,
- * inventory_item_locations, vendor_items). Optimistic, reverts on failure,
- * then refreshes so dependent UI re-resolves.
- *
- * Deliberately a sibling of VendorActiveToggle rather than a rewrite of it —
- * the vendors screen is shipped and this keeps it untouched.
+ * Table-agnostic active/inactive switch — every catalog table, vendors
+ * included since 2026-09-04, when `VendorActiveToggle` (a hand-rolled copy
+ * that predated this part and never learned `readOnly`) was deleted.
+ * Optimistic, reverts on failure, then refreshes so dependent UI re-resolves.
  */
 export function ActiveToggle({
   table,
