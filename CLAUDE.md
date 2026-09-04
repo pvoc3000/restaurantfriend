@@ -1280,7 +1280,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    it** — the app's first CREATE and first DELETE of a top-level record. Until
    this, every `.insert()` in `web/src` was a child row and nothing inserted a
    vendor, an item or a location either, so **this is the template those will
-   follow**: a command right-aligned ABOVE the list's filter row (it sat IN
+   follow** — and on **2026-09-03 all three finally did**: `NewVendor`,
+   `NewInventoryItem` and `NewLocation`, plus `NewProductionItem` and
+   `NewRecipe`. Every one of those tables already had a purchaser+ write policy
+   from 001 or 037; **what was missing was a door, never a migration.** The
+   shape: a command right-aligned ABOVE the list's filter row (it sat IN
    that row until 2026-08-21 — see `ui/FilterMenus`) → `ui/Dialog` →
    insert → land on the new record. `components/hr/NewEmployee.tsx` asks for the
    ROSTER fields only (the columns the list groups and filters by — a record
@@ -7824,6 +7828,43 @@ weekday column, and 003 then silently made it per-vendor-item.
 
 ## Conventions
 
+- **A CREATE DIALOG ASKS FOR THE FIELDS THE REST OF THE APP READS, AND STOPS**
+  — `NewEmployee`'s template, now followed by `NewVendor`, `NewInventoryItem`,
+  `NewLocation`, `NewProductionItem` and `NewRecipe` (all 2026-09-03). Command
+  in the filter row → `ui/Dialog` → one insert carrying `org_id` EXPLICITLY
+  (design rule 1) → land on the new record. Everything else is an `InlineValue`
+  on that record, because a create form that also set it would be a second
+  editor to keep in step.
+  **Which fields make the cut is not taste — it is what BREAKS without them.**
+  A vendor is asked for **Order via** because it decides what the PO screen
+  offers, so one defaulted to `email_po` produces a Process card that cannot
+  work. An inventory item is asked for its **base unit** because design rule 5
+  rests on it: created in the wrong one, its suggested order quantity is wrong
+  by the conversion factor. A location is asked for its **code** because the
+  masthead, every count line and `unique (org_id, code)` all read it.
+  **A DUPLICATE WARNS UNLESS THE DATABASE WOULD REFUSE IT**, which is the line
+  between `findPossibleRehires` and `NewLocation`. Vendors, items and production
+  items have no unique index and two entries for one supplier is a real thing a
+  shop does, so those say so and let you through; a location code has one, so
+  the commit is DISABLED and says why — a button that can only fail is worse
+  than a warning.
+  **A CODE UPPERCASES AS YOU TYPE**, visibly rather than on the way to the
+  database: every existing code is upper case, that unique index is
+  case-SENSITIVE, and "df01" beside "DF01" is two shops that read as one.
+  **AND THE DIALOG CLOSES ON COMMIT.** `AddShopSection`'s stay-open ending is
+  the exception, not the rule — the row landing on the list behind you is the
+  better confirmation, and `AddTemplateItem` was corrected to match (Mark,
+  2026-09-03). Anything counting how many you added goes with it: with the panel
+  closing it can never read anything but zero.
+- **A FIXED px WIDTH INSIDE A `DataTable` CELL WILL BE CLIPPED, AND SILENTLY**
+  (found 2026-09-03 on the checklist template's Expected column, reported by
+  Mark as "I am unable to set the second value, just the two numeric ones").
+  Column widths are WEIGHTS resolved against the table's visible total, so a
+  column declared 200 out of 1880 is ~131px at a 1280 window — while the three
+  `w-14`/`w-14`/`w-12` boxes in it wanted 180. The third was simply outside the
+  cell: not narrow, ABSENT, with no scrollbar and no ellipsis to say so.
+  Anything laid out inside a cell must be FLEXIBLE (`min-w-0 flex-1`), or it is
+  sized against a width the column may never have.
 - **EVERY LIST SCREEN'S HEADER IS `ui/PageHeading`. THIS IS THE DEFAULT — a new
   page uses it without being asked** (Mark, 2026-09-03: "I like this the best
   and think we should copy it to the other sections of the app", then "make a
@@ -7955,6 +7996,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/RowMenu` | a `⋯` you wire yourself | a table row's own commands — `ui/MenuButton` wearing `⋯`, so it escapes scroll panes and flips near the window's foot exactly like `PickList` |
   | `catalog/InlineValue` | a hand-wired edit-in-place, or a bare `<input type="date">` / `<input type="time">` | any editable cell — `kind` text / number / date / **time** / **pick** (`time` delegates to `ui/TimeField` and, like `date`, does NOT click-to-edit — the native control is already a box you can type into and a picker on an iPad); `multiline` for prose (textarea, ⌘↵ saves); `jsonColumn` + `jsonPath` + `jsonDocument` to edit a key INSIDE a jsonb column; `arrayColumn` + `arrayIndex` + `arrayStrip` + `arrayWidth` to edit ONE SLOT of a Postgres array (the `par_by_weekday` idiom, which had no editor until the recipe sheet). An array column CONSTRAINED against a sibling array must write both in one statement — that is what `alsoUpdate` is for. `emptyClassName` styles the cell when it holds NOTHING (faint by default; the plan matrix wants a yellow "—", and a caller CAN'T do this through `className`, because Tailwind resolves competing utilities by stylesheet order); `ariaLabel` names the cell where no `<dt>` does — a grid of identical cells otherwise all announce as "—, click to edit". **`onWrite` replaces the UPDATE and nothing else** — for a column whose rule is COLUMN-scoped and so lives behind a definer function (044's `made`/`leftover`); without it the cell issues a plain update that matches zero rows, returns NO error, and silently loses what was typed |
   | `useCalcField()` spread on the input (`ui/CalcPad` is already mounted) | `inputMode="decimal"` plus your own operator affordance | letting a numeric field take a `lib/calc` expression ON A TOUCH DEVICE. iOS renders `inputMode="decimal"` as the number pad, which has no operators, and on iPadOS `*`/`+`/`×`/`÷` are two keyboard layers deep — so on touch the field asks for NO system keyboard (`inputMode="none"`) and CalcPad supplies one that has them, with a live readout of what the expression comes to. The spread is the whole wiring; it writes through the native value setter, so a controlled React input needs no code. **Half a keyboard bolted to Apple's was tried first and Mark's verdict on hardware was "clumsy and awkward"** — don't reach back for it. Spread it ONLY on fields `evaluateNumeric` reads: several others carry `inputMode="decimal"` and parse with a plain `Number()`, where an inserted `×` is a value that can't save |
+  | `ui/PageHeading` | a hand-styled `<h1>`, or a title plus a description | EVERY list screen's header — the title over one small-caps line reading shop first, `DF02 · 29 of 80 vendors`. The count is the FILTERED one, so it usually lives in the LIST component; `visible` is omitted where a screen cannot reach it. `code` is dropped on an org-wide screen. It takes no create command any more — that goes in the filter row |
   | `ui/SectionHeading` | a hand-styled `<h2>` | the heading over a block on a detail screen (16px bold black, optional `count`) |
   | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style. Selected cell is ALWAYS black; `count` and `href` are the only options |
   | **`ui/FilterMenus`** + `lib/filterMenus` | several `TabPicker`s stacked, or a row of hand-wired `PickList`s | a list filtering on THREE OR MORE dimensions AT ONCE — a row of labelled popup menus that AND together ("FilterMenus" is the name to call it by; NOT `catalog/ListFilters`, which is the older fixed search+category+active row). A dimension declares `matches`, never a pre-filtered list, which is what makes the option counts CONDITIONED ON THE OTHER MENUS (and never on their own, or every option but the chosen one reads 0). "All" is supplied, not declared; the bar owns the result count and a Clear, because four collapsed menus can hide a list while the screen looks unfiltered. Values live in the URL via `parseFilterValues`/`filterHref` + `history.replaceState`, and a value no option offers is DROPPED rather than obeyed. ONE dimension stays a `TabPicker` — this is not a replacement for it | The **`trailing`** slot holds a list's create command and renders RIGHT-ALIGNED ON ITS OWN LINE ABOVE the menus — it rode at the END of the filter row until 2026-08-21, which reads well only while the row fits, and `/special-orders`' search box plus six menus want ~1439px against the 1376 a 1440 window gives, so on an ordinary laptop the one control you came to press had already wrapped BELOW the filters. Its own line always, rather than a breakpoint: the wrap depends on how many menus a caller declares, so any threshold is tuned to one list and wrong for the next |
@@ -9589,6 +9631,28 @@ weekday column, and 003 then silently made it per-vendor-item.
 - Vendors include non-food suppliers (landlord, plumber) — `order_type: none`.
 
 ## Open threads (pinned by Mark — don't act without asking)
+
+- **`InlineValue`'s OPEN EDITOR CARRIES NO `aria-label`, where its resting
+  button does** (found 2026-09-03 while testing the checklist template's unit
+  cell). A screen reader names the field until you click it and then loses the
+  name at the moment you are typing into it — every inline cell in the app, not
+  one screen. One prop threaded through the editing branch; not done, because it
+  is a pass of its own and nobody asked for it.
+
+- **FOUR SCREENS STILL HAVE NO CREATE COMMAND, and only one is a gap.** Scanned
+  2026-09-03 after Mark asked. `/events` is created from the employee record —
+  an event is about a PERSON, and a dialog here would have to ask which one
+  first. `/prices` is a matrix whose cells are `set`, not rows to create.
+  `/order-guide`, `/purchase-orders`, `/cleanup` and `/production-day` are all
+  DERIVED and a create button would be wrong on each. `/benefits` has one and it
+  IS in the filter row — that list has no search and no tabs, so its command's
+  own strip above the table is that row.
+  **`/sales` IS THE ONE SCREEN LEFT PUTTING A COMMAND IN THE HEADER**, and
+  `Sync from Square` is not a create — it is an import, so whether the filter-row
+  rule applies to it is a question rather than an oversight. It and
+  `PayrollBenefitsList` are the last two `action` props; once `/sales` is
+  settled, `PageHeading.action` has no callers and should be deleted rather than
+  left as a second sanctioned place to put a button.
 
 - **Does an overnight baker belong in the tip pool, and what happens to a
   straddling shop-day?** Raised 2026-08-22 by 061 and NOT answered. All eleven
