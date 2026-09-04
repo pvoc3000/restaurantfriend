@@ -7509,6 +7509,15 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `grep -rln '<RowMenu\|key: "select"\|checked.size > 0'`; every other list
    already wrapped its commands in `editable`. **A selection column exists for
    its bar; if the bar has nothing a role may press, drop the column too.**
+   **THE SHEET WAS REVISED THE SAME AFTERNOON** (Mark, on a purchaser account:
+   "purchasers should have almost manager access, minus HR"): a purchaser now
+   WRITES Plans, Items, Elements, Recipes, Invoices and Customers, and
+   Locations is OWNER ONLY — the manager cell went blank, so `/` lands a
+   manager on Checklists. Seven cells, no migration: every one of those tables
+   already admitted a purchaser. That is the table doing what it was built for.
+   **There is no permissions SCREEN** — the table is the file, read on GitHub
+   or in the editor; a read-only grid on /settings is the obvious next step if
+   Mark wants to see it in the app.
    **Nobody has ever held purchaser or supervisor**, so the first invites are
    the first real exercise of any of this. Expect small holes; each is a cell.
    **1601 fixtures pass**, 17 new.

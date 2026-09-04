@@ -2,9 +2,9 @@
 //
 // This is Mark's "Page Permissions" spreadsheet (docs/Page Permissions.xlsx,
 // 2026-09-04, revised the same afternoon: "purchasers should have almost
-// manager access, minus HR") as code, one row per screen, one column per role, so that
-// changing who sees what is an edit to THIS FILE and a deploy — never a
-// migration. Read it the way the sheet reads:
+// manager access, minus HR") as code, one row per screen, one column per
+// role, so that changing who sees what is an edit to THIS FILE and a deploy —
+// never a migration. Read it the way the sheet reads:
 //
 //   staff · supervisor · purchaser · manager · owner
 //
@@ -20,16 +20,18 @@
 //
 // TWO LAYERS, AND THIS FILE IS ONLY ONE OF THEM. Row-level security in
 // Postgres is the gate; this table is what the SCREENS do. It can take access
-// away from a role the database would still serve (a purchaser on /plans is
-// "R" here while 039's write policy still admits them — the door is closed at
-// the screen and not at the table, which Mark accepted for everything outside
+// away from a role the database would still serve (a supervisor on /plans is
+// "R" here while 039's write policy would refuse them anyway, but a manager on
+// /locations is "-" while 001's policy admits them — the door is closed at the
+// screen and not at the table, which Mark accepted for everything outside
 // HR), and it can NEVER grant access the database refuses: an "R" or "W" cell
 // on a table whose policy says no renders an empty list or a write that
 // matches zero rows. Every loosening the FIRST sheet asked for was therefore
-// ALSO a policy change — migration 092 — where the afternoon revision
-// (purchaser Write on production, invoices and customers; Locations owner
-// only) needed none, every one of those tables already admitting a purchaser. and the fixture that pins this table says
-// which cells those are, so the next one is recognised as a migration too.
+// ALSO a policy change — migration 092 — and the fixture that pins this table
+// says which cells those are, so the next one is recognised as a migration
+// too. The afternoon revision (purchaser Write on production, invoices and
+// customers; Locations owner only) needed none: every one of those tables
+// already admitted a purchaser.
 //
 // A page-level cell is a CEILING, not the whole story. Some single acts on a
 // "W" screen are stricter than the screen — approving an invoice, syncing
