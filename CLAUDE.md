@@ -7841,11 +7841,19 @@ weekday column, and 003 then silently made it per-vendor-item.
   genuinely cannot reach it (`/checklists`, whose filters sit below the view
   tabs; `/benefits`, `/prices`, `/timesheets`, `/sales`, which do not filter at
   that level), `visible` is omitted and the line states the total alone.
-  **THE ROW IS `items-end`**, so a create command beside the title bottom-aligns
-  with the count rather than with the first line of a two-line block. Commands
-  are handed in as `action`; a list that owns the heading therefore has to
-  RENDER EVEN WHEN EMPTY, or an empty shop gets no title and no way to make its
-  first record (`/plans` and `/schedules` both had that hole).
+  **THE HEADER CARRIES NO COMMAND. THE CREATE BUTTON GOES IN THE FILTER ROW,
+  RIGHT-ALIGNED** (Mark, 2026-09-03: they "are all over the place. Sometimes in
+  the header area, sometimes lined up with the filter tabpicker objects,
+  sometimes next to the eye button above a datatable… I think they should be in
+  line with the search field and filter tabpickers"). `ml-auto` on the last cell
+  of the row that holds the search box and the tab pickers, which lands it on
+  the page's right edge — the same pixel as the columns eye (measured, 1232 at
+  1280) — and bottom-aligns it with the controls beside it.
+  `PageHeading` still takes an `action`, and the screens outside Facilities
+  still use it; **converting the rest of the app is outstanding.**
+  A list that owns the heading has to RENDER EVEN WHEN EMPTY either way, or an
+  empty shop gets no title and no way to make its first record (`/plans` and
+  `/schedules` both had that hole).
   The org-wide screens pass no `code` — Employees, Events, Timesheets,
   Benefits, Locations, Sales and the production catalog are not scoped to a
   shop, and naming one would be a claim the screen does not make.

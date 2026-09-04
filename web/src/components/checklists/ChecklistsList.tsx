@@ -187,7 +187,6 @@ export function ChecklistsList({
           visible={shown.length}
           total={rows.length}
           noun={heading.noun}
-          action={action}
         />
       ) : null}
 
@@ -205,7 +204,7 @@ export function ChecklistsList({
           ]}
           onChange={(v) => setTier(v as typeof tier)}
         />
-        {action && !heading ? <div className="ml-auto">{action}</div> : null}
+        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
       <DataTable

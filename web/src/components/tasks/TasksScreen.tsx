@@ -460,7 +460,6 @@ export function TasksScreen({
         visible={shown.length}
         total={rows.length}
         noun={kind === "maintenance" ? "requests" : "tasks"}
-        action={action}
       />
 
       <div className="flex flex-wrap items-end gap-4">
@@ -490,6 +489,7 @@ export function TasksScreen({
           ]}
           onChange={(v) => setTier(v as typeof tier)}
         />
+        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
       <DataTable

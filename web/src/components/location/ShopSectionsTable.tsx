@@ -213,14 +213,13 @@ export function ShopSectionsTable({
         visible={shown.length}
         total={rows.length}
         noun="shop sections"
-        action={
-          editable ? (
-            <AddShopSection orgId={orgId} locationId={locationId} areas={areas} />
-          ) : null
-        }
       />
 
-      <div className="flex flex-wrap items-center gap-4">
+      {/* THE COMMAND SITS IN THE FILTER ROW, right-aligned (Mark, 2026-09-03:
+          the action buttons "are all over the place… I think they should be in
+          line with the search field and filter tabpickers"). One place across
+          the app, so nothing has to be hunted for. */}
+      <div className="flex flex-wrap items-end gap-4">
         <TextInput
           value={search}
           onValueChange={setSearch}
@@ -229,6 +228,11 @@ export function ShopSectionsTable({
           clearLabel="Clear the search"
           className="w-72"
         />
+        {editable ? (
+          <div className="ml-auto">
+            <AddShopSection orgId={orgId} locationId={locationId} areas={areas} />
+          </div>
+        ) : null}
       </div>
 
       {failed && <p className="text-sm text-accent">Could not delete: {failed}</p>}

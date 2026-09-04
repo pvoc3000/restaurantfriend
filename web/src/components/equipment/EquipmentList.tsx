@@ -207,7 +207,6 @@ export function EquipmentList({
         visible={shown.length}
         total={rows.length}
         noun="equipment"
-        action={action}
       />
 
       <div className="flex flex-wrap items-end gap-4">
@@ -219,6 +218,7 @@ export function EquipmentList({
           clearLabel="Clear the search"
           className="w-72"
         />
+        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
       <DataTable
