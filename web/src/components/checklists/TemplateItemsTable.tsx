@@ -464,11 +464,15 @@ export function TemplateItemsTable({
       sortValue: (r) => weekdaySetLabel(r.weekdays),
       // A LABEL here rather than a `WeekdayPicker`, which needs 300px and would
       // be clipped in a column this table cannot afford to give it. Almost every
-      // item is "every run", so the rare edit goes in the row menu where it has
-      // room — a control that is clipped is worse than one that is a click away.
+      // item runs on all of them, so the rare edit goes in the row menu where it
+      // has room — a control that is clipped is worse than one a click away.
+      //
+      // "All", not "Every run" (Mark, 2026-09-03) — the column is Days, so the
+      // honest answer to it is which days, and "all of them" is a shorter way of
+      // saying the same thing than naming the RUN it is a fact about.
       render: (r) => (
         <span className={r.weekdays ? "" : "text-muted"}>
-          {r.weekdays ? weekdaySetLabel(r.weekdays) : "Every run"}
+          {r.weekdays ? weekdaySetLabel(r.weekdays) : "All"}
         </span>
       ),
     },
