@@ -297,7 +297,7 @@ export function TemplateItemsTable({
         if (!editable) {
           const lo = r.min_value ?? "";
           const hi = r.max_value ?? "";
-          const range = lo === "" && hi === "" ? "any" : `${lo}–${hi}`;
+          const range = lo === "" && hi === "" ? "any" : `${lo} to ${hi}`;
           return (
             <span className={READ_ONLY_VALUE}>
               {range}
@@ -334,7 +334,17 @@ export function TemplateItemsTable({
                 ariaLabel={`Lowest acceptable value for ${r.prompt}`}
               />
             </div>
-            <span className="shrink-0 text-faint">–</span>
+            {/* "to", NOT A DASH (Mark, 2026-09-03: "what looks like an empty
+                unit field is just a text divider. I think this is
+                misleading"). It was: an empty `InlineValue` renders an em
+                dash in `text-faint`, so a row with nothing set read
+                "— – — —" — four marks, three of them fields and one of them
+                punctuation, all the same shape and weight. A WORD cannot be
+                mistaken for an empty box, and `text-muted` puts it a step
+                above the faint the empty fields wear. Removing the divider
+                was the other option and is worse: two adjacent number boxes
+                with only a gap between them read as two unrelated fields. */}
+            <span className="shrink-0 text-muted">to</span>
             <div className="min-w-0 flex-1 overflow-hidden">
               <InlineValue
                 table="checklist_template_items"
