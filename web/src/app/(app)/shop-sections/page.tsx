@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import {
   ShopSectionsTable,
   type ShopSectionRow,
 } from "@/components/location/ShopSectionsTable";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * The shop's shelves, in walk order.
@@ -22,7 +22,7 @@ export default async function ShopSectionsPage() {
     return <p className="text-sm text-muted">No location is set up for this org yet.</p>;
   }
 
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/shop-sections");
 
   const { data: sections, error } = await supabase
     .from("shop_sections")

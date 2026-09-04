@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
@@ -15,6 +14,7 @@ import {
   REVIEW_DEFAULTS_PARAM,
   type PlanSummary,
 } from "@/lib/productionPlans";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * One plan: what it is, and the tray × weekday matrix that IS the plan.
@@ -32,7 +32,7 @@ export async function PlanDetail({
 }) {
   const session = await getAppSession();
   const supabase = await createClient();
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/plans");
 
   const [{ data: plan, error }, { data: allPlans }, { data: trays }, { data: items }] =
     await Promise.all([

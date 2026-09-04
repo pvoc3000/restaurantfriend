@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canEnterCounts } from "@/lib/roles";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import { parseFilterSearch } from "@/lib/filterMenus";
 import { orderTotals } from "@/lib/specialOrders";
 import { CustomersList, type CustomerRow } from "@/components/specialOrders/CustomersList";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * The customer book — org-wide, supervisor+, and exempt from
@@ -28,15 +28,6 @@ export default async function CustomersPage({
 }) {
   const params = await searchParams;
   const session = await getAppSession();
-
-  if (!canEnterCounts(session.membership.role)) {
-    return (
-      <p className="text-sm text-muted">
-        The customer book is open to supervisors and up — it carries names,
-        addresses, phone numbers and email addresses.
-      </p>
-    );
-  }
 
   const supabase = await createClient();
   const orgId = session.membership.org_id;
@@ -161,7 +152,7 @@ export default async function CustomersPage({
       rows={rows}
       initialFilters={params}
       initialSearch={parseFilterSearch(params)}
-      canWrite={canEnterCounts(session.membership.role)}
+      canWrite={canEditPage(session.membership.role, "/customers")}
       orgId={orgId}
     />
   );

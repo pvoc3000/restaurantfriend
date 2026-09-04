@@ -7421,6 +7421,70 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    fees — and that belongs with Square, not Intuit.
 
 
+4m. ✅ **PAGE PERMISSIONS — the spreadsheet is code (2026-09-04; migration 092
+   NEEDS APPLYING, `sync-square-sales` NEEDS REDEPLOYING).** Mark, inviting the
+   first employees: "I put together a spreadsheet with each page listed and how
+   I imagine each security level should be able to access them … I LOVE the
+   idea of having the spreadsheet be code that I can adjust." The sheet is
+   `docs/Page Permissions.xlsx`; the code is **`web/src/lib/pageAccess.ts`**,
+   one `row("-","R","W","W","W")` per screen in the sheet's own column order
+   (staff · supervisor · purchaser · manager · owner), fixture-pinned cell by
+   cell.
+   **THREE READERS, ONE TABLE.** `sectionsForRole` (the menu) hides what the
+   table hides; `components/PageAccessGate` in the (app) layout says so in a
+   sentence for a typed URL ("This screen is open to managers and the owner.
+   You're signed in as Staff."); and each page takes its `editable` /
+   `canWrite` from `canEditPage(role, "/plans")`. `NavSub.roles` is GONE — it
+   was a second copy of the same fact, and a second copy is how the menu and
+   the screen came to disagree. `/` lands on `homeHref(role)`: the Locations
+   list where the sheet allows it, else the first screen the menu offers.
+   **HIDDEN VERSUS UNREACHABLE, and which is which is Mark's call**: "other
+   than sensitive info for employees, everything else can be just hidden … I'd
+   rather avoid the migration step as much as possible." So outside HR the
+   table is the whole gate — a purchaser on /plans is "R" at the screen while
+   039's policy still admits them at the table — and tightening is an edit here
+   and a deploy. The one thing an edit here can NEVER do is loosen: a screen
+   offering a write the policy refuses changes zero rows and reports success.
+   **`LOOSENED_BY_092`** lists the six cells that asked for more than the
+   policies gave, and the fixture pins them, so the next such cell goes red and
+   is recognised as a migration.
+   **092** widens: `preq_resolve` → supervisor+; `production_schedules` /
+   `_items` / `_par_overrides` writes and `generate_production_schedules` →
+   supervisor+ (this is also the bug where a supervisor's closing shift report
+   could not generate tomorrow's paper); the 051 select policies on special
+   orders and customers → every member (quote tokens stay supervisor+);
+   `production_batches` / `_batch_logs` insert+update, the batch-photos bucket,
+   `next_batch_number` and `production_operators` → every member (delete stays
+   purchaser+, `generate_production_batches` stays supervisor+); and the three
+   sales definers → purchaser+. One tightening: `payroll_benefits` select →
+   owner/admin, the sheet's Unreachable. Each function is reproduced whole with
+   its argument list unchanged (033's overload trap); RERUNNABLE, proved by
+   applying it twice on the harness; every widening and every surviving refusal
+   verified there as real authenticated roles (staff read an order and update 0;
+   staff log a batch and delete 0; a supervisor resolves a request and the
+   author cannot mark their own ordered; a supervisor generates and staff are
+   refused by name; a purchaser corrects a day and a supervisor is refused;
+   anon sees nothing; each reproduced function exists exactly once).
+   Predicates that moved in `lib/roles`: `canResolveRequests` (supervisor+),
+   `canSyncSales` (purchaser+), `canLogBatch` (every member), plus the new
+   `canScheduleProduction` (supervisor+ — `schedule_special_order` is INVOKER
+   and now answers to the widened policy, which is what 068's header asked
+   for). The Square function's WRITE check is purchaser+ to match.
+   Two cross-screen consequences, both deliberate: a purchaser is Read Only on
+   Invoices, so "File as bill", the ticked box on Close and "File as invoice"
+   all take a `canFileBills` from the INVOICES cell rather than from the PO's
+   own gate; and staff are Read Only on Requests, so the New request command is
+   withheld from them even though `preq_insert` would take the row.
+   **Rows the sheet did not carry keep their old rule and say so in the file**:
+   Inspection Logs (supervisor+), Equipment (staff hidden to match the rest of
+   Facilities — the one assumption, one letter to reverse), Timesheets
+   (unreachable below manager), Cleanup (purchaser+). Reviews, Documents,
+   Policies and Tags are stubs and their /soon/ routes carry rows too.
+   **Nobody has ever held purchaser or supervisor**, so the first invites are
+   the first real exercise of any of this. Expect small holes; each is a cell.
+   **1601 fixtures pass**, 17 new.
+
+
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -9558,7 +9622,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   FMP's 1–5 user levels — staff · supervisor · purchaser · manager · owner —
   with purchasing slotted between supervisor and manager.
   Staff can create purchase requests + guide entries; catalog/PO writes need
-  purchaser+; HR and member management need admin+.
+  purchaser+; HR and member management need admin+. **WHICH SCREENS A ROLE MAY
+  OPEN, AND WHETHER A SCREEN OFFERS WRITES, IS `web/src/lib/pageAccess.ts`** —
+  the Page Permissions sheet as code, read by the menu, the layout gate and
+  every page's editable flag (build step 4m). Edit the cell, not the screen.
   **`admin` displays as "Manager"** and is NOT renamed in the DB — it's the
   value every policy names. Labels and the gate predicates live in
   `web/src/lib/roles.ts` (`ROLE_LABEL`, `canWriteCatalog`, `canManageMembers`,

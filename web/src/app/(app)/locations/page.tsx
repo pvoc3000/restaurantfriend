@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { LocationsList, type LocationRow } from "@/components/location/LocationsList";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * Every location in the org, and where you choose the one you're working at
@@ -21,7 +21,7 @@ export default async function LocationsPage() {
   // below that the Active column isn't offered at all. Choosing where YOU work
   // is a different write — set_my_member_profile, granted to every member — so
   // the Working column stays.
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/locations");
 
   const { data, error } = await supabase
     .from("locations")

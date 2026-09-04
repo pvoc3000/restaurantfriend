@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { PlansList, type PlanRow } from "@/components/production/PlansList";
 import { planKitchen } from "@/lib/productionPlans";
 import { NewPlan } from "@/components/production/NewPlan";
 import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * The plans — production brief decision 9.
@@ -24,7 +24,7 @@ export default async function PlansPage({
   const params = await searchParams;
   const session = await getAppSession();
   const supabase = await createClient();
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/plans");
 
   const [{ data: plans, error }, { data: trays }, { data: slots }] = await Promise.all([
     supabase

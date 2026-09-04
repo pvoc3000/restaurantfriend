@@ -1,12 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph } from "@/lib/productionQueries";
 import { elementCost, costContext } from "@/lib/productionCost";
 import { ElementsList, type ElementRow } from "@/components/production/ElementsList";
 import { NewElement } from "@/components/production/NewElement";
 import { elementTypeVocabulary, type ElementKind } from "@/lib/production";
 import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * The element catalog — production brief decision 2's merged component
@@ -28,7 +28,7 @@ export default async function ElementsPage({
   const params = await searchParams;
   const session = await getAppSession();
   const supabase = await createClient();
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/elements");
   // The WORKING shop, and its labour rate: both are costing inputs (Mark,
   // 2026-08-12, "each location has its own vendor item and labor costs") — a
   // price override beats the catalog price, and a recipe's prep time is hours

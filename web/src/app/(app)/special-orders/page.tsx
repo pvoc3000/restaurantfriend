@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canEnterCounts } from "@/lib/roles";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import { parseFilterSearch } from "@/lib/filterMenus";
@@ -9,6 +8,7 @@ import {
   SpecialOrdersList,
   type SpecialOrderRow,
 } from "@/components/specialOrders/SpecialOrdersList";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * The special orders work queue.
@@ -169,7 +169,7 @@ export default async function SpecialOrdersPage({
       rows={rows}
       today={today}
       thresholds={settings.attention}
-      canWrite={canEnterCounts(session.membership.role)}
+      canWrite={canEditPage(session.membership.role, "/special-orders")}
       orgId={session.membership.org_id}
       kitchens={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
       defaultLocationId={session.activeLocation?.id ?? null}

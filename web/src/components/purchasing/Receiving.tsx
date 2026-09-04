@@ -84,6 +84,7 @@ export function Receiving({
   locationCode,
   orgId,
   canReceive,
+  canFileBills,
   attachments,
   attachmentError,
   linkedInvoices,
@@ -95,6 +96,9 @@ export function Receiving({
   orgId: string;
   /** purchaser+. Below that the screen is readable and nothing writes. */
   canReceive: boolean;
+  /** The Invoices cell of the Page Permissions sheet — see PurchaseOrderDetail
+   *  for why a purchaser who can receive is still not offered a bill. */
+  canFileBills: boolean;
   attachments: SignedAttachment[];
   attachmentError: string | null;
   /** Invoices FILED against this order (migration 025). Empty on every order
@@ -425,7 +429,7 @@ export function Receiving({
     // Read FIRST, because the confirm is composed out of it twice: it decides
     // whether the tick box appears, and it tells `closeReadiness` not to name
     // a gap that box is about to settle.
-    const unfiled = unfiledReadings(attachments);
+    const unfiled = canFileBills ? unfiledReadings(attachments) : [];
     const caveats = closeReadiness(
       lines,
       attachments.length,

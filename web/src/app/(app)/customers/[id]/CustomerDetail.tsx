@@ -2,7 +2,6 @@ import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canEnterCounts } from "@/lib/roles";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import {
@@ -21,6 +20,7 @@ import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { CustomerActions } from "@/components/specialOrders/CustomerActions";
 import { CustomerAccounting } from "@/components/specialOrders/CustomerAccounting";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
+import { canEditPage } from "@/lib/pageAccess";
 
 const CUSTOMERS_CRUMB = { href: "/customers", label: "Customers" };
 
@@ -45,17 +45,10 @@ export async function CustomerDetail({
 }) {
   const session = await getAppSession();
 
-  if (!canEnterCounts(session.membership.role)) {
-    return (
-      <p className="text-sm text-muted">
-        Customer records are open to supervisors and up — they carry names,
-        addresses and phone numbers.
-      </p>
-    );
-  }
-
   const supabase = await createClient();
-  const canWrite = canEnterCounts(session.membership.role);
+  // The Page Permissions sheet: staff, supervisors and purchasers READ the
+  // customer book; a manager and the owner change it.
+  const canWrite = canEditPage(session.membership.role, "/customers");
 
   const [{ data: customer, error }, { data: orderRows, error: orderError }] = await Promise.all([
     supabase

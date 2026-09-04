@@ -3,7 +3,6 @@ import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph, loadElementOptions } from "@/lib/productionQueries";
 import { versionBatchCost, laborCells, costContext } from "@/lib/productionCost";
 import { scaleColumns } from "@/lib/production";
@@ -23,6 +22,7 @@ import {
   recipeHref,
 } from "@/lib/recipes";
 import type { SheetLine, SheetVersion } from "@/components/production/RecipeVersionSheet";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * One recipe family, and whichever version you are reading.
@@ -40,7 +40,7 @@ export async function RecipeDetail({
 }) {
   const session = await getAppSession();
   const supabase = await createClient();
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/recipes");
   // The WORKING shop, and its labour rate: both are costing inputs (Mark,
   // 2026-08-12, "each location has its own vendor item and labor costs") — a
   // price override beats the catalog price, and a recipe's prep time is hours

@@ -1,8 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { DerivedDay, type DayRow, type OverrideItem } from "@/components/production/DerivedDay";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * The day BEFORE it is committed — production brief decision 6.
@@ -28,7 +28,7 @@ export default async function ProductionDayPage({
 }) {
   const session = await getAppSession();
   const supabase = await createClient();
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/schedules");
   const params = await searchParams;
 
   if (!session.activeLocation) {

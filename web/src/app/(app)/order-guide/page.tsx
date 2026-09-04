@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
+import { canResolveRequests, canWriteCatalog } from "@/lib/roles";
 import type { GuideRequest } from "@/components/purchasing/GuideRequests";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import {
@@ -291,6 +291,7 @@ export default async function OrderGuidePage({
       userId={session.userId}
       orgId={session.membership.org_id}
       canGeneratePos={canWriteCatalog(session.membership.role)}
+      canResolveRequests={canResolveRequests(session.membership.role)}
     />
   );
 }

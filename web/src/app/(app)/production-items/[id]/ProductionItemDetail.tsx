@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph, loadItemGraph, loadElementOptions } from "@/lib/productionQueries";
 import { itemCost, lineCost, costContext } from "@/lib/productionCost";
 import { resolveItemPrice } from "@/lib/productionPrice";
@@ -15,6 +14,7 @@ import { ProductionItemLocations } from "@/components/production/ProductionItemL
 import { ProductionItemHistory } from "@/components/production/ProductionItemHistory";
 import { historyWindow, type HistoryLine } from "@/lib/productionHistory";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * One item: what it is, what it is made of, what that costs, and what each shop
@@ -34,7 +34,7 @@ export async function ProductionItemDetail({
 }) {
   const session = await getAppSession();
   const supabase = await createClient();
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/production-items");
   const locationId = session.activeLocation?.id ?? null;
   // The WORKING shop, and its labour rate: both are costing inputs (Mark,
   // 2026-08-12, "each location has its own vendor item and labor costs") — a

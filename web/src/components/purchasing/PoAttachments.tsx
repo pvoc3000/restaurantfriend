@@ -64,6 +64,7 @@ export function PoAttachments({
   orgId,
   attachments,
   canEdit,
+  canFile,
   order,
 }: {
   poId: string;
@@ -72,6 +73,9 @@ export function PoAttachments({
   /** Signed by the server at render — see PurchaseOrderDetailView. */
   attachments: SignedAttachment[];
   canEdit: boolean;
+  /** May a reading be FILED as an invoice record — the Invoices cell of the
+   *  Page Permissions sheet, which a purchaser is Read Only on. */
+  canFile: boolean;
   /** The order these belong to, so a read invoice can be filed as a record
    *  against the right vendor and matched to the right lines. */
   order: InvoiceCreationOrder;
@@ -230,7 +234,7 @@ export function PoAttachments({
                     >
                       {a.extraction ? "Read again" : "Read invoice"}
                     </button>
-                    {a.extraction && !a.invoice_id && (
+                    {canFile && a.extraction && !a.invoice_id && (
                       <button
                         type="button"
                         disabled={busy}

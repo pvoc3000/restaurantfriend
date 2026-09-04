@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { LOCATIONS_CRUMB } from "@/lib/locations";
 import type { RawSearchParams } from "@/lib/itemFilters";
@@ -15,6 +14,7 @@ import { OperatingHours } from "@/components/location/OperatingHours";
 import { ProductionMapping } from "@/components/location/ProductionMapping";
 import { WorkingHere } from "@/components/location/WorkingHere";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { canEditPage } from "@/lib/pageAccess";
 
 /** The columns migration 017 added, plus what 001 always had. */
 type LocationRecord = {
@@ -67,7 +67,7 @@ export async function LocationDetail({
   // Writes on `locations` need purchaser+ (the generic policy from 001). Below
   // that every field renders as plain text rather than offering an edit the
   // database will refuse.
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/locations");
 
   const [
     { data: row, error },

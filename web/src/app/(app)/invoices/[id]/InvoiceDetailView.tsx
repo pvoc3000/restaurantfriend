@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canApprovePayment, canWriteCatalog } from "@/lib/roles";
+import { canApprovePayment } from "@/lib/roles";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { crumbPath, currentQuery, parseTrail } from "@/lib/breadcrumbs";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
@@ -15,6 +15,7 @@ import {
 } from "@/lib/invoiceQueries";
 import { daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { InvoiceDetail } from "@/components/purchasing/InvoiceDetail";
+import { canEditPage } from "@/lib/pageAccess";
 
 /** The invoice detail's whole body — every query lives here. */
 export async function InvoiceDetailView({
@@ -126,7 +127,7 @@ export async function InvoiceDetailView({
             code: l.code,
             name: l.name,
           }))}
-          canEdit={canWriteCatalog(session.membership.role)}
+          canEdit={canEditPage(session.membership.role, "/invoices")}
           canApprove={canApprovePayment(session.membership.role)}
           // Built here because only the server has rawParams — without
           // currentQuery a stamped crumb is a bare href and the trail that led

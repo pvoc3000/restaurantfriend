@@ -33,6 +33,7 @@ import "./fileReadings.fixtures";
 import "./printedVendor.fixtures";
 import "./filterMenus.fixtures";
 import "./nav.fixtures";
+import "./pageAccess.fixtures";
 import "./vendors.fixtures";
 import "./workday.fixtures";
 import "./orderWorkflow.fixtures";

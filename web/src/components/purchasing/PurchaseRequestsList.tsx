@@ -86,6 +86,7 @@ export function PurchaseRequestsList({
   locationCode,
   userId,
   canResolve,
+  canFile,
   timeZone,
   capped,
   initialFilters,
@@ -97,6 +98,10 @@ export function PurchaseRequestsList({
   locationCode: string;
   userId: string;
   canResolve: boolean;
+  /** May this role FILE a request from here? The Page Permissions sheet has
+   *  staff at Read Only on this screen, so the command is withheld from them
+   *  even though `preq_insert` would still take the row. */
+  canFile: boolean;
   /** The org's zone — a request filed at 5pm Pacific is not tomorrow's. */
   timeZone: string;
   /** True if the query hit its own ceiling and older rows are not shown. */
@@ -411,14 +416,16 @@ export function PurchaseRequestsList({
               Showing the most recent 500.
             </span>
           ) : null}
-          <div className="ml-auto">
-            <NewPurchaseRequest
-              orgId={orgId}
-              locationId={locationId}
-              userId={userId}
-              locationCode={locationCode}
-            />
-          </div>
+          {canFile && (
+            <div className="ml-auto">
+              <NewPurchaseRequest
+                orgId={orgId}
+                locationId={locationId}
+                userId={userId}
+                locationCode={locationCode}
+              />
+            </div>
+          )}
         </div>
       </div>
 

@@ -3,7 +3,6 @@ import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canEnterCounts, canWriteCatalog } from "@/lib/roles";
 import { crumbPath, parseTrail, withFrom } from "@/lib/breadcrumbs";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { RawSearchParams } from "@/lib/filterMenus";
@@ -56,6 +55,8 @@ import {
   type SignedSoAttachment,
   type SoAttachment,
 } from "@/lib/specialOrderAttachments";
+import { canEditPage } from "@/lib/pageAccess";
+import { canScheduleProduction } from "@/lib/roles";
 
 const SPECIAL_ORDERS_CRUMB = { href: "/special-orders", label: "Special Orders" };
 
@@ -104,18 +105,6 @@ export async function SpecialOrderDetail({
   rawParams: RawSearchParams;
 }) {
   const session = await getAppSession();
-
-  // Decision 7: supervisor+ for the whole module, READ included. RLS is the
-  // real gate; this is the sentence that explains the empty screen rather than
-  // leaving someone staring at one.
-  if (!canEnterCounts(session.membership.role)) {
-    return (
-      <p className="text-sm text-muted">
-        Special orders are open to supervisors and up — they carry customer
-        names, addresses and phone numbers.
-      </p>
-    );
-  }
 
   const supabase = await createClient();
   const timeZone = session.orgSettings.timezone ?? serverTimeZone();
@@ -309,7 +298,9 @@ export async function SpecialOrderDetail({
     };
   });
 
-  const canWrite = canEnterCounts(session.membership.role);
+  // The Page Permissions sheet: staff READ an order, supervisor+ change it —
+  // 092 widened decision 7's select policies for the read half.
+  const canWrite = canEditPage(session.membership.role, "/special-orders");
 
   /* ------------------------------------------------------------------------
    * DECISION 9's LOCK (Mark, 2026-08-27)
@@ -508,7 +499,7 @@ export async function SpecialOrderDetail({
             <OrderActions
               scheduled={scheduled}
               schedule={
-                kind === "order" && status !== "cancelled" && canWriteCatalog(session.membership.role) ? (
+                kind === "order" && status !== "cancelled" && canScheduleProduction(session.membership.role) ? (
                   <ScheduleProduction
                     orderId={id}
                     number={row.number as string}

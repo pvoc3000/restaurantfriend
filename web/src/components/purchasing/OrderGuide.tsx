@@ -88,6 +88,7 @@ export function OrderGuide({
   locationCode,
   orgId,
   canGeneratePos,
+  canResolveRequests,
   requests,
   userId,
 }: {
@@ -113,6 +114,8 @@ export function OrderGuide({
   orgId: string;
   /** Purchaser+ only — staff walk the guide but can't create POs (RLS). */
   canGeneratePos: boolean;
+  /** Supervisor+ since 092 — `canResolveRequests`, no longer the PO gate. */
+  canResolveRequests: boolean;
   /** Open purchase requests at this location, for the header's right column. */
   requests: GuideRequest[];
   /** Who is walking — the request menu needs it to know its own author. */
@@ -657,9 +660,7 @@ export function OrderGuide({
         <GuideRequests
           requests={requests}
           userId={userId}
-          // 001's `preq_resolve` is the same role array as `canWriteCatalog`,
-          // which is what `canGeneratePos` already carries.
-          canResolve={canGeneratePos}
+          canResolve={canResolveRequests}
           showEmpty={reminders.length > 0}
           onJumpToItem={jumpToItem}
           jumpMiss={jumpMiss}

@@ -11,11 +11,20 @@
  * roles as ordered — there is no rank function and "purchaser+" is a phrase in
  * comments, not a construct — so the ladder is a way of talking about them,
  * and each predicate below names its own set.
+ *
+ * WHICH SCREENS A ROLE MAY OPEN, AND WHETHER A SCREEN OFFERS WRITES AT ALL, is
+ * NOT here — that is `lib/pageAccess`, the Page Permissions sheet as code.
+ * What is here is the set of ACTS stricter than their screen: approving a
+ * payment, syncing sales, reopening a run. A page-level cell is a ceiling; a
+ * predicate is one button.
  */
 
 import type { PickOption } from "@/components/ui/PickList";
 
 export type Role = "owner" | "admin" | "purchaser" | "supervisor" | "staff";
+
+/** Every role, ladder order. */
+export const ROLES: Role[] = ["owner", "admin", "purchaser", "supervisor", "staff"];
 
 /**
  * `admin` displays as "Manager" — FMP's level 3, and the word Donut Friend
@@ -83,17 +92,33 @@ export function canEnterCounts(role: Role): boolean {
 }
 
 /**
- * Log a batch — migration 044's `production_batches` write policies and
- * `generate_production_batches`.
+ * Log a batch — migration 092's `production_batches` write policies and
+ * `next_batch_number`, which check this same set.
  *
- * The same set as `canEnterCounts` today, and named separately for the reason
- * `canReadHr` gives: "may record what the case sold" and "may record what came
- * out of the mixer" are different questions with the same answer today, and one
- * of them will move first. DELETING a batch is purchaser+ — `canWriteCatalog`
- * — because correcting a batch is editing it and erasing the record that one
- * happened is a different act.
+ * EVERY MEMBER since 2026-09-04 (the Page Permissions sheet: Batch Logs is
+ * "Y" all the way across, staff included). 044 had it at supervisor+.
+ * Recording what came out of the mixer is done by whoever was at the mixer,
+ * and the overnight baker is staff. DELETING a batch is still purchaser+ —
+ * `canWriteCatalog` — because correcting a batch is editing it and erasing
+ * the record that one happened is a different act. GENERATING the week's
+ * batch list stays supervisor+ in 047, an act-level exception the way editing
+ * a master checklist is on the Checklists screen.
  */
-export const canLogBatch = canEnterCounts;
+export function canLogBatch(role: Role): boolean {
+  return ROLES.includes(role);
+}
+
+/**
+ * Put a special order's donuts on a real production schedule —
+ * `schedule_special_order` and `unschedule_special_order` (068/069), which
+ * are SECURITY INVOKER and so answer to `production_schedules`' own insert
+ * and delete policies. 092 widened those to supervisor+ (the sheet has
+ * Schedules AND Special Orders at "Y" for a supervisor), so this is that set.
+ * 068's header argued the opposite — that a definer would "silently widen"
+ * scheduling to supervisors — and the widening is now explicit and the
+ * policy's, which is what that header asked for.
+ */
+export const canScheduleProduction = canEnterCounts;
 
 /** Invite people, change roles, remove access. 001's members_write. */
 export function canManageMembers(role: Role): boolean {
@@ -110,19 +135,21 @@ export function canManageMembers(role: Role): boolean {
 export const canReadHr = canManageMembers;
 
 /**
- * Pull daily sales and tips from Square — migration 063's `record_daily_sales`,
- * which checks this same set inside the function.
+ * Pull daily sales and tips from Square, and correct a day's figures by hand
+ * — migration 092's `record_daily_sales`, `set_daily_sales_figure` and
+ * `revert_daily_sales_to_square`, which check this same set inside the
+ * function.
  *
- * READING `/sales` is open to every member: what the shop took is a shop-floor
- * fact, and 063's select policy is membership-wide. This is only the SYNC,
- * which is an IMPORT — it rewrites the org's sales history and feeds the tip
- * figure payroll divides — and 030 already gates imports here.
+ * PURCHASER+ since 2026-09-04 (the Page Permissions sheet: Sales is "Y" for a
+ * purchaser). It was owner/admin from 063 on the reasoning that a sync is an
+ * IMPORT — it rewrites the org's sales history and feeds the tip figure
+ * payroll divides — and that reasoning still holds for STAFF and supervisors,
+ * who read the screen and go no further.
  *
- * Named separately from `canManageMembers` for that file's own reason: "may
- * invite a colleague" and "may restate a year of takings" are different
- * questions with the same answer today.
+ * READING `/sales` is open to every member at the database (063's select
+ * policy); which roles OPEN the screen is `lib/pageAccess`' business.
  */
-export const canSyncSales = canManageMembers;
+export const canSyncSales = canWriteCatalog;
 
 /**
  * Approve a vendor invoice for payment — migration 025's
@@ -160,20 +187,21 @@ export const canRunPayroll = canManageMembers;
 
 /**
  * Resolve a purchase request — mark it ordered, dismiss it, reopen it.
- * Migration 001's `preq_resolve`, whose role array is this set verbatim.
+ * Migration 092's `preq_resolve`, whose role array is this set verbatim.
+ *
+ * SUPERVISOR+ since 2026-09-04 (the Page Permissions sheet: Requests is "Y"
+ * for a supervisor). 001 had it at purchaser+, and this file's own note on
+ * that version named "a supervisor resolving requests" as the obvious
+ * candidate to move first. It has.
  *
  * Note what it does NOT gate: FILING a request is membership-only
- * (`preq_insert`), so the New request command is never behind this, and 059's
- * `preq_author_update` lets the person who filed one correct or withdraw it
- * while it is still open. A queue that staff can read and not add to would be
- * the feature inverted.
- *
- * The same set as `canWriteCatalog` today, and named separately for the reason
- * `canReadHr` gives: "may edit the catalog" and "may say we bought this" are
- * different questions with the same answer today, and one of them will move
- * first — a supervisor resolving requests is the obvious candidate.
+ * (`preq_insert`), and 059's `preq_author_update` lets the person who filed
+ * one correct or withdraw it while it is still open. Whether the New request
+ * command is OFFERED is `lib/pageAccess`' call — the sheet has staff at
+ * "Read Only" on that screen, so they read the queue and do not add to it
+ * from there.
  */
-export const canResolveRequests = canWriteCatalog;
+export const canResolveRequests = canEnterCounts;
 
 /**
  * Walk a checklist, work a task — migrations 075 and 076, whose policies name

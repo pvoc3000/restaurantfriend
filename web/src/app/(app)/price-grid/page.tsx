@@ -1,8 +1,8 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { PriceGrid } from "@/components/production/PriceGrid";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * The price grid — decision 10's org-level (class × tier) prices and the sparse
@@ -15,7 +15,7 @@ import { PriceGrid } from "@/components/production/PriceGrid";
 export default async function PriceGridPage() {
   const session = await getAppSession();
   const supabase = await createClient();
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/price-grid");
 
   const [{ data: grid, error }, { data: overrides, error: overrideError }] = await Promise.all([
     supabase

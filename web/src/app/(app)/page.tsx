@@ -1,5 +1,8 @@
 import { redirect } from "next/navigation";
 
+import { homeHref } from "@/lib/nav";
+import { getAppSession } from "@/lib/session";
+
 /**
  * THE APP LANDS ON THE LOCATIONS LIST (Mark, 2026-08-20: "can you make the
  * landing page for the app the locations page").
@@ -21,7 +24,13 @@ import { redirect } from "next/navigation";
  * NO `loading.tsx` BESIDE IT, deliberately: a redirect thrown during render
  * never paints, so a loading file here would announce a screen that does not
  * exist. `/locations` has its own.
+ *
+ * PER ROLE since 2026-09-04: the Page Permissions sheet hides the Locations
+ * list from staff, supervisors and purchasers, so for them `/` lands on the
+ * first screen their menu offers instead of on a refusal. `homeHref` is the
+ * rule, beside the menu it reads.
  */
-export default function HomePage() {
-  redirect("/locations");
+export default async function HomePage() {
+  const session = await getAppSession();
+  redirect(homeHref(session.membership.role));
 }

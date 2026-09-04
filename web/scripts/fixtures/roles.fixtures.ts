@@ -23,6 +23,8 @@ import {
   canApprovePayment,
   canRunPayroll,
   canResolveRequests,
+  canScheduleProduction,
+  canSyncSales,
   type Role,
 } from "../../src/lib/roles";
 
@@ -50,11 +52,28 @@ test("canEnterCounts refuses staff", () => {
   no(canEnterCounts("staff"));
 });
 
-test("canLogBatch is the same set, and is not the delete gate", () => {
-  eq(admits(canLogBatch), admits(canEnterCounts));
-  // Deleting a batch is purchaser+ in 044's policy — correcting a batch is
+test("canLogBatch admits EVERY role since 092, and is not the delete gate", () => {
+  // The Page Permissions sheet (2026-09-04) has Batch Logs at "Y" all the way
+  // across; 092 widened production_batches' insert/update and
+  // next_batch_number to match. Staff is the member that moved.
+  eq(admits(canLogBatch), ["owner", "admin", "purchaser", "supervisor", "staff"]);
+  ok(canLogBatch("staff"), "the overnight baker logs the batch");
+  // Deleting a batch is still purchaser+ (044) — correcting a batch is
   // editing it; erasing the record that one happened is a different act.
   no(canWriteCatalog("supervisor"), "delete must stay out of a supervisor's reach");
+});
+
+test("canScheduleProduction is the supervisor+ set", () => {
+  // 092 widened production_schedules' insert/delete to supervisor+, and the
+  // invoker functions schedule_special_order / unschedule_special_order answer
+  // to those policies — so this is exactly that set.
+  eq(admits(canScheduleProduction), ["owner", "admin", "purchaser", "supervisor"]);
+  no(canScheduleProduction("staff"), "staff read an order and never commit a kitchen's night");
+});
+
+test("canSyncSales is purchaser+ since 092", () => {
+  eq(admits(canSyncSales), ["owner", "admin", "purchaser"]);
+  no(canSyncSales("supervisor"), "a supervisor reads sales and syncs nothing");
 });
 
 test("canWriteCatalog is unchanged by phase 5", () => {
@@ -83,13 +102,13 @@ test("ROLE_OPTIONS offers every role except owner", () => {
   );
 });
 
-test("canResolveRequests is exactly 001's preq_resolve role array", () => {
-  // `preq_resolve` names owner/admin/purchaser — the same set as
-  // canWriteCatalog, which is why it is an alias. Filing a request is NOT
-  // gated at all (`preq_insert` is membership-only), so the assertion that
-  // matters most here is the staff one: they may add to the queue and never
-  // decide it.
-  eq(admits(canResolveRequests), ["owner", "admin", "purchaser"]);
-  no(canResolveRequests("supervisor"), "a supervisor does not resolve requests yet");
-  no(canResolveRequests("staff"), "staff file requests, purchasers resolve them");
+test("canResolveRequests is exactly 092's preq_resolve role array", () => {
+  // 001 had it at purchaser+ and named the supervisor as the obvious next
+  // member; the Page Permissions sheet moved them (Requests "Y"). Filing is
+  // still NOT gated at the database (`preq_insert` is membership-only), so
+  // the assertion that matters most here is the staff one: they may add to
+  // the queue and never decide it.
+  eq(admits(canResolveRequests), ["owner", "admin", "purchaser", "supervisor"]);
+  ok(canResolveRequests("supervisor"), "a supervisor resolves requests since 092");
+  no(canResolveRequests("staff"), "staff file requests and never decide them");
 });

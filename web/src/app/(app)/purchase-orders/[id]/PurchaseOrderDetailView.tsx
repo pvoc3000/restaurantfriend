@@ -12,6 +12,7 @@ import {
   fetchSignedAttachments,
 } from "@/lib/purchaseOrderQueries";
 import { PurchaseOrderDetail } from "@/components/purchasing/PurchaseOrderDetail";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * The PO detail's whole body. Its own full-screen page (Mark, 2026-07-30);
@@ -83,6 +84,7 @@ export async function PurchaseOrderDetailView({
         <p className="text-sm text-accent">Could not load order lines: {lineError}</p>
       ) : (
         <PurchaseOrderDetail
+          canFileBills={canEditPage(session.membership.role, "/invoices")}
           order={order}
           lines={lines}
           locationCode={locationCode}

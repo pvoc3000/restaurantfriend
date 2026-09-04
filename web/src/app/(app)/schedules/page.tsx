@@ -1,10 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog, canEnterCounts } from "@/lib/roles";
+import { canEnterCounts } from "@/lib/roles";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SchedulesList, type ScheduleRow } from "@/components/production/SchedulesList";
 import type { SchedulePlan } from "@/lib/productionSchedule";
 import { GenerateSchedules } from "@/components/production/GenerateSchedules";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * The committed days — production brief phase 4.
@@ -32,7 +33,7 @@ export default async function SchedulesPage() {
   // Generating a day is purchaser+; stamping a packet as printed is supervisor
   // and up (migration 044), because printing is part of the closing routine
   // rather than a catalog write.
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/schedules");
   const countable = canEnterCounts(session.membership.role);
   const today = guideToday(session.orgSettings.timezone ?? serverTimeZone()).date;
 

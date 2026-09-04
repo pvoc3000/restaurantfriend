@@ -10,6 +10,7 @@
 // module drops into a slot that already has a name. To ship one: set `built`
 // and give it a real `href`.
 
+import { canReachPage } from "./pageAccess";
 import type { Role } from "./roles";
 
 export type NavSub = {
@@ -23,16 +24,13 @@ export type NavSub = {
   /** Extra pathname prefixes that keep this sub lit — detail routes that don't
    *  sit under the sub's own href. */
   also?: string[];
-  /**
-   * Who sees this in the menu. Absent means everyone.
-   *
-   * This is a TIDINESS rule, never a security one: RLS decides what a screen
-   * can actually load, and each gated screen says so in a sentence rather than
-   * rendering an empty table. Hiding the tab only keeps the menu honest about
-   * what's worth tapping.
-   */
-  roles?: Role[];
 };
+
+// WHO SEES AN ENTRY IS NOT DECLARED HERE. Each sub used to carry its own
+// `roles` list; since 2026-09-04 the menu reads `lib/pageAccess` — the Page
+// Permissions sheet as code — through `sectionsForRole`, so the menu, the
+// layout's refusal and each page's editable flag answer from ONE table. A
+// second copy on the entry is how the menu and the screen came to disagree.
 
 export type NavSection = {
   slug: string;
@@ -106,11 +104,7 @@ export const SECTIONS: NavSection[] = [
       // the list, work what came out of it, then the register of things the
       // whole module points at.
       //
-      // supervisor+ on the three that write; Templates and Equipment are
-      // unrestricted because their READ is membership (076/075's own RLS), and
-      // everyone should be able to see what they will be asked and to resolve
-      // the name of the thing they are asked about. Tidiness only — RLS is the
-      // gate and each screen says so in a sentence.
+      // Who sees each of these is `lib/pageAccess`' row for it.
       {
         // ONE ENTRY, TWO VIEWS (Mark, 2026-08-30): "instead of having a
         // checklist and master checklist menu options, what about just having a
@@ -126,14 +120,12 @@ export const SECTIONS: NavSection[] = [
         href: "/checklists",
         built: true,
         also: ["/checklist-templates"],
-        roles: ["owner", "admin", "purchaser", "supervisor"],
       },
       {
         slug: "tasks",
         label: "Tasks",
         href: "/tasks",
         built: true,
-        roles: ["owner", "admin", "purchaser", "supervisor"],
       },
       {
         // "Maintenance" in the band, "Maintenance Requests" on the page (Mark,
@@ -144,14 +136,12 @@ export const SECTIONS: NavSection[] = [
         label: "Maintenance",
         href: "/maintenance-requests",
         built: true,
-        roles: ["owner", "admin", "purchaser", "supervisor"],
       },
       {
         slug: "inspection-logs",
         label: "Inspection Logs",
         href: "/inspection-logs",
         built: true,
-        roles: ["owner", "admin", "purchaser", "supervisor"],
       },
       { slug: "equipment", label: "Equipment", href: "/equipment", built: true },
     ],
@@ -165,10 +155,8 @@ export const SECTIONS: NavSection[] = [
         label: "Employees",
         href: "/employees",
         built: true,
-        // Migration 020 gates the employee record at owner/admin. The screen
-        // says so itself for anyone who reaches it by URL — this only keeps
-        // the tab out of the menu for people it would never open for.
-        roles: ["owner", "admin"],
+        // Migration 020 gates the employee record at owner/admin; the
+        // pageAccess row matches, and the screen says so itself by URL.
       },
       {
         // The whole team's events on one screen (migration 035). The slug keeps
@@ -180,14 +168,12 @@ export const SECTIONS: NavSection[] = [
         // on this screen pretending to be a screen of its own, and whichever of
         // the two you pressed you would have got the same list.
         //
-        // 035's RLS is owner/admin on all four verbs, and the screen says so
-        // itself for anyone who reaches it by URL; this only keeps the tab out
-        // of the menu for people it would never open for.
+        // 035's RLS is owner/admin on all four verbs; the pageAccess row
+        // matches, and the screen says so itself by URL.
         slug: "team-events",
         label: "Events",
         href: "/events",
         built: true,
-        roles: ["owner", "admin"],
       },
       stub("hr", "team-reviews", "Team Reviews"),
       // Pay Periods used to sit here, and it went on 2026-08-06 (Mark: "since
@@ -210,10 +196,7 @@ export const SECTIONS: NavSection[] = [
         also: ["/pay-periods"],
         // Migration 028 gates timesheets at owner/admin on every verb, select
         // included — what a named person was paid for is the same class of fact
-        // as their home address. The screen says so itself for anyone who
-        // reaches it by URL; this only keeps the tab out of the menu for people
-        // it would never open for.
-        roles: ["owner", "admin"],
+        // as their home address. The pageAccess row matches.
       },
       {
         slug: "payroll-benefits",
@@ -226,10 +209,7 @@ export const SECTIONS: NavSection[] = [
         label: "Benefits",
         href: "/payroll-benefits",
         built: true,
-        // 033 makes payroll_benefits readable by any member — it names no
-        // person. The tab is still gated, because the screen is only useful to
-        // whoever also maintains the entitlements, which IS owner/admin.
-        roles: ["owner", "admin"],
+        // Owner only on the sheet — the manager cell is blank. See pageAccess.
       },
     ],
   },
@@ -253,13 +233,11 @@ export const SECTIONS: NavSection[] = [
       // tables it happens to write. The slug is untouched, so the `rf.nav`
       // cookie keeps working.
       //
-      // supervisor+ is 070's own RLS, restated for tidiness only.
       {
         slug: "shift-reports",
         label: "Shift Reports",
         href: "/shift-reports",
         built: true,
-        roles: ["owner", "admin", "purchaser", "supervisor"],
       },
       { slug: "sales", label: "Sales", href: "/sales", built: true },
       stub("operations", "documents", "Documents"),
@@ -327,9 +305,7 @@ export const SECTIONS: NavSection[] = [
       // under Location as a stub until 2026-08-21, inherited from the FileMaker
       // FILE the table lives in (DF-Locations) rather than from the work — and
       // even FMP surfaced it in Purchasing, as the guide's "N REQUESTS" badge.
-      // Deliberately NOT role-gated: `preq_insert` is membership-only, because
-      // the person who notices the shelf is empty is rarely the person who
-      // orders. `resolveRoute` matches on `href` or `href + "/"`, so this and
+      // `resolveRoute` matches on `href` or `href + "/"`, so this and
       // /purchase-orders cannot light each other.
       { slug: "requests", label: "Requests", href: "/purchase-requests", built: true },
       { slug: "order-guide", label: "Order Guide", href: "/order-guide", built: true },
@@ -357,24 +333,20 @@ export const SECTIONS: NavSection[] = [
     // /customers/[id] and the receive-style child routes light these without an
     // `also`.
     //
-    // Both are supervisor+ (decision 7) — a TIDINESS rule, never a security
-    // one: RLS is the gate and each screen says so in a sentence. Staff have no
-    // screen that needs a customer's phone number, so a menu item leading to a
-    // refusal is worse than no menu item.
+    // Decision 7 had both at supervisor+; the sheet (2026-09-04) opens both
+    // to staff READ ONLY, which migration 092 widened the select policies for.
     subs: [
       {
         slug: "special-orders",
         label: "Special Orders",
         href: "/special-orders",
         built: true,
-        roles: ["owner", "admin", "purchaser", "supervisor"],
       },
       {
         slug: "customers",
         label: "Customers",
         href: "/customers",
         built: true,
-        roles: ["owner", "admin", "purchaser", "supervisor"],
       },
     ],
   },
@@ -385,18 +357,36 @@ export function findSection(slug: string): NavSection | undefined {
 }
 
 /**
- * The menu as this role should see it — subs whose `roles` exclude them are
- * dropped, and a section left with nothing goes too.
+ * The menu as this role should see it — subs the Page Permissions table hides
+ * from them are dropped, and a section left with nothing goes too.
  *
  * Computed on the SERVER (AppHeader holds the session) and handed to AppNav as
- * a prop, so the role never has to cross into the client bundle and the
- * decision lives in one place.
+ * a prop, so the decision lives in one place. A stub's /soon/ href is in the
+ * table too, so an unbuilt screen is hidden from exactly the roles the sheet
+ * hides it from.
  */
 export function sectionsForRole(role: Role): NavSection[] {
   return SECTIONS.map((section) => ({
     ...section,
-    subs: section.subs.filter((sub) => !sub.roles || sub.roles.includes(role)),
+    subs: section.subs.filter((sub) => canReachPage(role, sub.href)),
   })).filter((section) => section.subs.length > 0);
+}
+
+/**
+ * Where `/` lands for this role: the Locations list where the sheet lets them
+ * open it (Mark, 2026-08-20 — the first question of the day is which shop),
+ * otherwise the first built screen the menu offers them, in menu order. A
+ * staffer is hidden from Facilities, HR and Operations entirely, so a fixed
+ * `/locations` would greet them with a refusal.
+ */
+export function homeHref(role: Role): string {
+  if (canReachPage(role, "/locations")) return "/locations";
+  for (const section of sectionsForRole(role)) {
+    const first = section.subs.find((sub) => sub.built);
+    if (first) return first.href;
+  }
+  // No menu at all — a role the sheet shows nothing. Settings is ungoverned.
+  return "/settings";
 }
 
 export function findSub(section: NavSection, slug: string): NavSub | undefined {

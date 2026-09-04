@@ -8,6 +8,7 @@ import {
   type PayrollBenefitRow,
 } from "@/components/payroll/PayrollBenefitsList";
 import type { BenefitUnit } from "@/lib/payrollBenefits";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * The benefit catalog — what a flat allowance IS, before anybody earns one.
@@ -90,7 +91,7 @@ export default async function PayrollBenefitsPage() {
 
       <PayrollBenefitsList
         rows={rows}
-        editable={canReadHr(session.membership.role)}
+        editable={canEditPage(session.membership.role, "/payroll-benefits")}
         action={<AddPayrollBenefit orgId={session.membership.org_id} />}
       />
     </div>

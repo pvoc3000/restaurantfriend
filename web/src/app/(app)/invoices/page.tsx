@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canApprovePayment, canWriteCatalog } from "@/lib/roles";
+import { canApprovePayment } from "@/lib/roles";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import {
   parseInvoiceFilters,
@@ -12,6 +12,7 @@ import {
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { InvoiceStatus } from "@/lib/invoices";
 import { InvoiceList } from "@/components/purchasing/InvoiceList";
+import { canEditPage } from "@/lib/pageAccess";
 
 export type InvoiceListRow = {
   id: string;
@@ -221,7 +222,7 @@ export default async function InvoicesPage({
         name: v.name as string,
         inactive: v.is_active === false,
       }))}
-      canEdit={canWriteCatalog(session.membership.role)}
+      canEdit={canEditPage(session.membership.role, "/invoices")}
       canApprove={canApprovePayment(session.membership.role)}
     />
   );

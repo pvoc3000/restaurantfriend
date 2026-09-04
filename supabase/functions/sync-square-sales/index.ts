@@ -297,7 +297,7 @@ Deno.serve(async (req) => {
       .limit(1)
       .maybeSingle();
 
-    // PREVIEW IS SUPERVISOR+, WRITING IS OWNER/ADMIN.
+    // PREVIEW IS SUPERVISOR+, WRITING IS PURCHASER+.
     //
     // The shift report reads today's figure live at the end of a shift, and
     // today's figure is one the supervisor can already read off the register
@@ -305,16 +305,21 @@ Deno.serve(async (req) => {
     // writing `daily_sales`, which is the settled reporting day and which
     // `tip_pools` is computed from. The split is between LOOKING and
     // RECORDING, and only the second one touches anybody's pay.
+    //
+    // Writing was owner/admin until 2026-09-04; the Page Permissions sheet has
+    // Sales at "Y" for a purchaser, and migration 092 widened
+    // `record_daily_sales` to match. This check mirrors that function's own —
+    // the readable error, not the gate.
     const previewing = payload?.preview === true;
     const allowed = previewing
       ? ["owner", "admin", "purchaser", "supervisor"]
-      : ["owner", "admin"];
+      : ["owner", "admin", "purchaser"];
 
     if (!member || !allowed.includes(member.role as string)) {
       return json(403, {
         error: previewing
           ? "a supervisor or above is required to read sales from Square"
-          : "a manager or the owner is required to sync sales from Square",
+          : "a purchaser or above is required to sync sales from Square",
       });
     }
 

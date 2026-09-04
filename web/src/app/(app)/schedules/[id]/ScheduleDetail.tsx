@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog, canEnterCounts } from "@/lib/roles";
+import { canEnterCounts } from "@/lib/roles";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
@@ -15,6 +15,7 @@ import { ScheduleLines, type ScheduleLineRow } from "@/components/production/Sch
 import { ScheduleActions } from "@/components/production/ScheduleActions";
 import { AddScheduleItems, type AddableItem } from "@/components/production/AddScheduleItems";
 import { PrintPacket } from "@/components/production/PrintPacket";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * One committed night.
@@ -41,7 +42,7 @@ export async function ScheduleDetail({
 }) {
   const session = await getAppSession();
   const supabase = await createClient();
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/schedules");
   // Two gates, not one. Everything on this screen is purchaser+ EXCEPT the two
   // counting cells, which migration 044 opens to a supervisor through a
   // column-scoped definer function — see `ActualCell`.

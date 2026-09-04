@@ -1,11 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph, loadElementOptions } from "@/lib/productionQueries";
 import { elementCost, costContext } from "@/lib/productionCost";
 import { RecipesList, type RecipeRow } from "@/components/production/RecipesList";
 import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
 import { NewRecipe } from "@/components/production/NewRecipe";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * The recipe families — the kitchen binder, costed.
@@ -23,7 +23,7 @@ export default async function RecipesPage({
   const params = await searchParams;
   const session = await getAppSession();
   const supabase = await createClient();
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/recipes");
   // The WORKING shop, and its labour rate: both are costing inputs (Mark,
   // 2026-08-12, "each location has its own vendor item and labor costs") — a
   // price override beats the catalog price, and a recipe's prep time is hours

@@ -8,6 +8,7 @@ import {
   type PurchaseRequestRow,
 } from "@/components/purchasing/PurchaseRequestsList";
 import type { RequestPriority, RequestStatus } from "@/lib/purchaseRequests";
+import { canEditPage } from "@/lib/pageAccess";
 
 /** The most recent requests we'll load. See `capped` below. */
 const LIMIT = 500;
@@ -126,6 +127,7 @@ export default async function PurchaseRequestsPage({
         locationCode={active.code}
         userId={session.userId}
         canResolve={canResolveRequests(session.membership.role)}
+        canFile={canEditPage(session.membership.role, "/purchase-requests")}
         timeZone={session.orgSettings.timezone ?? serverTimeZone()}
         capped={rows.length === LIMIT}
         initialFilters={params}

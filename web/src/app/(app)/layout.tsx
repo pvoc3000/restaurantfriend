@@ -2,6 +2,7 @@ import { AppHeader } from "@/components/AppHeader";
 import { CalcPad } from "@/components/ui/CalcPad";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { InactiveLocationGate } from "@/components/InactiveLocationGate";
+import { PageAccessGate } from "@/components/PageAccessGate";
 import { ScrollMemory } from "@/components/ScrollMemory";
 import { getAppSession } from "@/lib/session";
 
@@ -32,16 +33,22 @@ export default async function AppLayout({
           its collapsed strip and the ActionBar carry the SAME pair, so the four
           black-and-white bands stay aligned at every width. */}
       <main className="flex-1 px-4 py-8 xl:px-12">
-        {/* You can deactivate the shop you're standing in, right from the
-            Locations list — so every screen but /locations has to answer for a
-            closed one. See InactiveLocationGate. */}
-        <InactiveLocationGate
-          code={session.activeLocation?.code ?? null}
-          isActive={session.activeLocation?.is_active ?? true}
-          locationId={session.activeLocation?.id ?? null}
-        >
-          {children}
-        </InactiveLocationGate>
+        {/* The Page Permissions sheet, applied to a typed URL: the menu hides
+            a screen from a role, and this says so in a sentence for anyone who
+            reaches it anyway. OUTSIDE the location gate, because "you may not
+            open this" is the more fundamental of the two answers. */}
+        <PageAccessGate role={session.membership.role}>
+          {/* You can deactivate the shop you're standing in, right from the
+              Locations list — so every screen but /locations has to answer for
+              a closed one. See InactiveLocationGate. */}
+          <InactiveLocationGate
+            code={session.activeLocation?.code ?? null}
+            isActive={session.activeLocation?.is_active ?? true}
+            locationId={session.activeLocation?.id ?? null}
+          >
+            {children}
+          </InactiveLocationGate>
+        </PageAccessGate>
       </main>
       {/* Renders nothing; remembers where you were on every screen. AFTER the
           page, so a screen publishing its own scroll key has already done so by

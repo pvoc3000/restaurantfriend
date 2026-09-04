@@ -74,6 +74,7 @@ export function PurchaseOrderDetail({
   attachments,
   attachmentError,
   receiveHref,
+  canFileBills,
 }: {
   order: PurchaseOrder;
   lines: PoLine[];
@@ -90,6 +91,14 @@ export function PurchaseOrderDetail({
   /** Link to the receiving screen, stamped with this page's own trail. Built on
    *  the server, which is the only side that has the search params. */
   receiveHref: string;
+  /**
+   * May this role turn paperwork into a BILL — a row on /invoices? The Page
+   * Permissions sheet has a purchaser at Read Only there, so a purchaser who
+   * can process and close this order is still not offered "File as bill" or
+   * the ticked box on Close: a record they could create and then not open is
+   * worse than no offer. Without this the two offers followed `canEditLines`.
+   */
+  canFileBills: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -163,8 +172,9 @@ export function PurchaseOrderDetail({
    */
   async function close() {
     // Read first: the confirm is composed out of it twice — see the receiving
-    // screen's `close`, which this mirrors deliberately.
-    const unfiled = unfiledReadings(attachments);
+    // screen's `close`, which this mirrors deliberately. Empty for a role the
+    // sheet keeps off /invoices, so the box is never offered to them.
+    const unfiled = canFileBills ? unfiledReadings(attachments) : [];
     // The fourth argument is how many invoices are FILED against this order.
     // PO detail does not query them, so it passes the count it can see: an
     // attachment tagged with an invoice_id IS a filed invoice. The fifth is
@@ -716,7 +726,7 @@ export function PurchaseOrderDetail({
           It shows only while there is something to file, which is the whole of
           its state: a bill already recorded offers nothing, and an order with
           no document has nothing to record. */}
-      {canEditLines && unfiledReadings(attachments).length > 0 && (
+      {canEditLines && canFileBills && unfiledReadings(attachments).length > 0 && (
         <button
           disabled={busy}
           onClick={() => void fileUnfiled(unfiledReadings(attachments))}
@@ -1031,6 +1041,7 @@ export function PurchaseOrderDetail({
             orgId={orgId}
             attachments={attachments}
             canEdit={canEditLines}
+            canFile={canFileBills}
             // What an auto-filed invoice needs: whose vendor, whose location,
             // and the lines to match its own against.
             order={{

@@ -1,6 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { loadProductionGraph, loadItemGraph } from "@/lib/productionQueries";
 import { itemCost, costContext } from "@/lib/productionCost";
 import { resolveItemPrice, margin } from "@/lib/productionPrice";
@@ -10,6 +9,7 @@ import {
 } from "@/components/production/ProductionItemsList";
 import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
 import { NewProductionItem } from "@/components/production/NewProductionItem";
+import { canEditPage } from "@/lib/pageAccess";
 
 /**
  * The menu — production brief decision 4's operational taxonomy, and the
@@ -29,7 +29,7 @@ export default async function ProductionItemsPage({
   const params = await searchParams;
   const session = await getAppSession();
   const supabase = await createClient();
-  const editable = canWriteCatalog(session.membership.role);
+  const editable = canEditPage(session.membership.role, "/production-items");
   const locationId = session.activeLocation?.id ?? null;
   // The WORKING shop, and its labour rate: both are costing inputs (Mark,
   // 2026-08-12, "each location has its own vendor item and labor costs") — a

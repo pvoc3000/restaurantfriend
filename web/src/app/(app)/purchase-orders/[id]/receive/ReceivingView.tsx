@@ -11,6 +11,7 @@ import {
 } from "@/lib/purchaseOrderQueries";
 import { fetchInvoicesForOrder } from "@/lib/invoiceQueries";
 import { Receiving } from "@/components/purchasing/Receiving";
+import { canEditPage } from "@/lib/pageAccess";
 
 /** The receiving screen's whole body — every query lives here. */
 export async function ReceivingView({
@@ -87,6 +88,7 @@ export async function ReceivingView({
           locationCode={locationCode}
           orgId={session.membership.org_id}
           canReceive={canReceive}
+          canFileBills={canEditPage(session.membership.role, "/invoices")}
           attachments={attachments}
           // Said out loud rather than swallowed: if this query fails on its own
           // columns, an empty document pane would read as "no invoice yet"
