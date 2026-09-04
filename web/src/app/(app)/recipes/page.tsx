@@ -100,32 +100,26 @@ export default async function RecipesPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Recipes
-          </h1>
-          <p className="text-sm text-muted">How to make our item components.</p>
-        </div>
-        {editable ? (
-          <NewRecipe
-            orgId={session.membership.org_id}
-            elements={elementOptions}
-            types={[
-              ...new Set(
-                (recipes ?? [])
-                  .map((r) => (r.recipe_type as string | null) ?? "")
-                  .filter((t) => t.trim() !== "")
-              ),
-            ].sort()}
-          />
-        ) : null}
-      </div>
       <RecipesList
         rows={rows}
         editable={editable}
         initialFilters={params}
         initialSearch={parseFilterSearch(params)}
+        action={
+          editable ? (
+            <NewRecipe
+              orgId={session.membership.org_id}
+              elements={elementOptions}
+              types={[
+                ...new Set(
+                  (recipes ?? [])
+                    .map((r) => (r.recipe_type as string | null) ?? "")
+                    .filter((t) => t.trim() !== "")
+                ),
+              ].sort()}
+            />
+          ) : null
+        }
       />
     </div>
   );

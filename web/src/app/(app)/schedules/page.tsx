@@ -142,34 +142,6 @@ export default async function SchedulesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Under the title, `/plans`' shape and for its reason. */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Schedules
-          </h1>
-          {/* The scope, stated rather than merely applied — the plans list's
-              rule. A shorter list with no explanation reads as nights having
-              gone missing. */}
-          <p className="text-sm text-muted">
-            Nights made at{" "}
-            <span className="font-semibold text-ink">{kitchen?.code ?? "this shop"}</span>
-            {" "}— including what this kitchen bakes for another shop. Switch
-            shops to see another kitchen&rsquo;s.
-          </p>
-        </div>
-        {editable && kitchen ? (
-          <GenerateSchedules
-            locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
-            today={today}
-            kitchenId={kitchen.id}
-            kitchenCode={kitchen.code}
-            // Every plan, not the active ones: `sellingShopsForKitchen` decides
-            // that itself, and the dialog re-asks as the date range moves.
-            plans={plans}
-          />
-        ) : null}
-      </div>
 
       {lineErr ? (
         // Not folded into the page's own error: a line-count failure must not
@@ -182,16 +154,31 @@ export default async function SchedulesPage() {
         </p>
       ) : null}
 
-      {rows.length === 0 ? (
-        <p className="max-w-[80ch] text-sm text-muted">
-          Nothing for the {kitchen?.code ?? "this"} kitchen in the four weeks
-          either side of {today}. A schedule is generated from the active plans
-          for a date — one per shop per kitchen — and generating ahead is fine:
-          par overrides written later are picked up whenever generation runs.
-        </p>
-      ) : (
-        <SchedulesList rows={rows} plans={plans} stampable={countable} today={today} />
-      )}
+      <SchedulesList
+          rows={rows}
+          plans={plans}
+          stampable={countable}
+          today={today}
+          locationCode={kitchen?.code ?? null}
+          action={
+            editable && kitchen ? (
+              <GenerateSchedules
+                locations={session.activeLocations.map((l) => ({
+                  id: l.id,
+                  code: l.code,
+                  name: l.name,
+                }))}
+                today={today}
+                kitchenId={kitchen.id}
+                kitchenCode={kitchen.code}
+                // Every plan, not the active ones: `sellingShopsForKitchen`
+                // decides that itself, and the dialog re-asks as the date range
+                // moves.
+                plans={plans}
+              />
+            ) : null
+          }
+        />
     </div>
   );
 }

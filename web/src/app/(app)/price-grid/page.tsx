@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canWriteCatalog } from "@/lib/roles";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { PriceGrid } from "@/components/production/PriceGrid";
 
 /**
@@ -39,9 +40,9 @@ export default async function PriceGridPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-        Prices
-      </h1>
+      {/* A MATRIX, not a list — one record with two axes — so the count is the
+          grid's own cells and there is nothing to filter it down to. */}
+      <PageHeading title="Prices" total={(grid ?? []).length} noun="prices" />
       <PriceGrid
         grid={(grid ?? []).map((g) => ({
           id: g.id as string,

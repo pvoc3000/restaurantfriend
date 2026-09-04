@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
@@ -66,12 +67,15 @@ export function RecipesList({
   editable,
   initialFilters,
   initialSearch = "",
+  action,
 }: {
   rows: RecipeRow[];
   editable: boolean;
   /** The URL's query, raw. */
   initialFilters?: RawSearchParams;
   initialSearch?: string;
+  /** The screen's create command, beside the title. */
+  action?: ReactNode;
 }) {
   /**
    * ONE DIMENSION, so it stays a `TabPicker` — the app's rule for a single
@@ -299,6 +303,14 @@ export function RecipesList({
   };
 
   return (
+    <div className="space-y-4">
+      <PageHeading
+        title="Recipes"
+        visible={visible.length}
+        total={rows.length}
+        noun="recipes"
+        action={action}
+      />
     <DataTable
       rows={sorted}
       sort={sort}
@@ -333,5 +345,6 @@ export function RecipesList({
         </div>
       }
     />
+    </div>
   );
 }

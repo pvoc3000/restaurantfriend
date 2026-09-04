@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import type { SortDir } from "@/lib/tableSort";
@@ -60,6 +61,9 @@ export function BatchLogsIndex({
   rows,
   range,
   params,
+  locationCode,
+  action,
+  note,
 }: {
   rows: BatchLogRow[];
   /**
@@ -70,6 +74,12 @@ export function BatchLogsIndex({
   range: BatchLogRange;
   /** Whatever else is in the URL, so a range chip keeps it. */
   params: Record<string, string | string[] | undefined>;
+  /** The working shop, for the heading's count line. */
+  locationCode?: string | null;
+  /** The screen's create command, beside the title. */
+  action?: ReactNode;
+  /** A line under the heading — what the count alone cannot say. */
+  note?: ReactNode;
 }) {
   // ALL, not Open (Mark, 2026-08-09). Open was the right default while this
   // screen held one row: a log is a thing you work, so the one being worked is
@@ -245,6 +255,16 @@ export function BatchLogsIndex({
     grouping === "none" ? undefined : { label: GROUP_LABEL[grouping] };
 
   return (
+    <div className="space-y-4">
+      <PageHeading
+        title="Batch Logs"
+        code={locationCode}
+        visible={visible.length}
+        total={rows.length}
+        noun="logs"
+        action={action}
+      />
+      {note}
     <DataTable
       rows={visible}
       columns={columns}
@@ -317,5 +337,6 @@ export function BatchLogsIndex({
         </div>
       }
     />
+    </div>
   );
 }

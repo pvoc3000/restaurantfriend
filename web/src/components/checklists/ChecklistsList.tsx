@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { TabPicker } from "@/components/ui/TabPicker";
@@ -44,6 +45,7 @@ export function ChecklistsList({
   startable,
   locationCode,
   action,
+  heading,
 }: {
   rows: RunRow[];
   startable: StartableTemplate[];
@@ -55,6 +57,12 @@ export function ChecklistsList({
    * pass it.
    */
   action?: ReactNode;
+  /**
+   * The page heading, when this list IS the page — `/inspection-logs`. On
+   * `/checklists` the heading sits above the view tabs, so the screen owns it
+   * and this is left off.
+   */
+  heading?: { title: string; code: string; noun: string };
 }) {
   const [tier, setTier] = useState<"open" | "all">("open");
 
@@ -172,6 +180,17 @@ export function ChecklistsList({
         </section>
       )}
 
+      {heading ? (
+        <PageHeading
+          title={heading.title}
+          code={heading.code}
+          visible={shown.length}
+          total={rows.length}
+          noun={heading.noun}
+          action={action}
+        />
+      ) : null}
+
       <div className="flex flex-wrap items-end gap-4">
         <TabPicker
           ariaLabel="Which ones"
@@ -186,7 +205,7 @@ export function ChecklistsList({
           ]}
           onChange={(v) => setTier(v as typeof tier)}
         />
-        {action ? <div className="ml-auto">{action}</div> : null}
+        {action && !heading ? <div className="ml-auto">{action}</div> : null}
       </div>
 
       <DataTable

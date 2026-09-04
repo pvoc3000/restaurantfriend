@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
@@ -113,12 +114,15 @@ export function ElementsList({
   editable,
   initialFilters,
   initialSearch = "",
+  action,
 }: {
   rows: ElementRow[];
   editable: boolean;
   /** The URL's query, raw — validated below against the real vocabulary. */
   initialFilters?: RawSearchParams;
   initialSearch?: string;
+  /** The screen's create command, beside the title. */
+  action?: ReactNode;
 }) {
   // DECLARED BEFORE THE STATE THAT IS VALIDATED AGAINST IT. `parseFilterValues`
   // needs the options to know which of the URL's values are real, and a hook's
@@ -427,6 +431,14 @@ export function ElementsList({
   };
 
   return (
+    <div className="space-y-4">
+      <PageHeading
+        title="Elements"
+        visible={visible.length}
+        total={rows.length}
+        noun="elements"
+        action={action}
+      />
     <DataTable
       rows={sorted}
       sort={sort}
@@ -476,5 +488,6 @@ export function ElementsList({
         </div>
       }
     />
+    </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
@@ -204,6 +205,21 @@ export function ShopSectionsTable({
 
   return (
     <div className="space-y-4">
+      {/* The count moved into the heading, which is where every list states it
+          now — it used to sit beside the search box. */}
+      <PageHeading
+        title="Shop sections"
+        code={locationCode}
+        visible={shown.length}
+        total={rows.length}
+        noun="shop sections"
+        action={
+          editable ? (
+            <AddShopSection orgId={orgId} locationId={locationId} areas={areas} />
+          ) : null
+        }
+      />
+
       <div className="flex flex-wrap items-center gap-4">
         <TextInput
           value={search}
@@ -213,18 +229,6 @@ export function ShopSectionsTable({
           clearLabel="Clear the search"
           className="w-72"
         />
-        <span className="text-sm text-muted">
-          {shown.length === rows.length
-            ? `${rows.length} at ${locationCode}`
-            : `${shown.length} of ${rows.length}`}
-        </span>
-
-        {/* Right-aligned with the filters, like the roster's New employee —
-            a command at the TOP of the screen (Mark, 2026-08-02), where it
-            used to be a form strip stranded under 168 rows. */}
-        {editable && (
-          <AddShopSection orgId={orgId} locationId={locationId} areas={areas} />
-        )}
       </div>
 
       {failed && <p className="text-sm text-accent">Could not delete: {failed}</p>}

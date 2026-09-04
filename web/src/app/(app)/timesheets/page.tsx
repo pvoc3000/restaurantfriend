@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { canRunPayroll } from "@/lib/roles";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import {
@@ -564,9 +565,10 @@ export default async function TimesheetsPage({
 
   return (
     <div className="space-y-6">
-      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-        Timesheets
-      </h1>
+      {/* Org-wide and PAY-PERIOD scoped rather than shop scoped, so the code
+          would name the wrong thing. The filtered count lives in the list
+          below, with the period's own total here. */}
+      <PageHeading title="Timesheets" total={rows.length} noun="shifts" />
 
       {/* Which fortnight and what state it's in, then the two commands that act
           on the PERIOD. The filters below act on the shifts. */}

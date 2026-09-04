@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canReadHr } from "@/lib/roles";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { AddPayrollBenefit } from "@/components/payroll/AddPayrollBenefit";
 import {
@@ -84,9 +85,9 @@ export default async function PayrollBenefitsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-        Benefits
-      </h1>
+      {/* Org-wide, and the list does not filter, so there is nothing to count
+          "of" — the total alone is the honest line. */}
+      <PageHeading title="Benefits" total={rows.length} noun="benefits" />
 
       <PayrollBenefitsList rows={rows} editable={canReadHr(session.membership.role)} />
 

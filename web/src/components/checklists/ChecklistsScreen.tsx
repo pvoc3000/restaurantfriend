@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { PageHeading } from "@/components/ui/PageHeading";
 import {
   CHECKLIST_VIEWS,
   CHECKLIST_VIEW_LABEL,
@@ -67,14 +68,15 @@ export function ChecklistsScreen({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Checklists
-        </h1>
-        <p className="text-sm text-muted">
-          Lists for supervisors to complete each shift.
-        </p>
-      </div>
+      {/* The TOTAL for the view on screen, with no "of": the filtered count
+          lives inside each list, below the tabs, and a heading above them
+          cannot reach it. The tabs carry their own counts. */}
+      <PageHeading
+        title="Checklists"
+        code={locationCode}
+        total={view === "walks" ? runs.length : templates.length}
+        noun={view === "walks" ? "checklists" : "templates"}
+      />
 
       <TabPicker
         ariaLabel="Which view"

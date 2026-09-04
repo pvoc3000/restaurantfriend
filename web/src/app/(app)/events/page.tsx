@@ -193,13 +193,6 @@ export default async function EventsPage({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">Events</h1>
-        <p className="max-w-[72ch] text-sm text-muted">
-          Notes, warnings, incidents and call-outs across the whole team, and the shift
-          ratings supervisors write at the end of a night.
-        </p>
-      </div>
       <EventsList
         rows={rows}
         windowKey={windowKey}

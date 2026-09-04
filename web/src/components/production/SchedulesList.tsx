@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import type { SortDir } from "@/lib/tableSort";
@@ -76,6 +77,8 @@ export function SchedulesList({
   plans,
   stampable,
   today,
+  locationCode,
+  action,
 }: {
   rows: ScheduleRow[];
   /** Every plan, active or not — `plansInForce` decides which are in force. */
@@ -83,6 +86,10 @@ export function SchedulesList({
   /** Supervisor and up — the only thing this list writes is the print stamp. */
   stampable: boolean;
   today: string;
+  /** The working shop, for the heading's count line. */
+  locationCode?: string | null;
+  /** The screen's create command, beside the title. */
+  action?: ReactNode;
 }) {
   const [tier, setTier] = useState<Tier>("upcoming");
   const [grouping, setGrouping] = useState<Grouping>("date");
@@ -350,6 +357,14 @@ export function SchedulesList({
 
   return (
     <div className="space-y-4">
+      <PageHeading
+        title="Schedules"
+        code={locationCode}
+        visible={visible.length}
+        total={rows.length}
+        noun="schedules"
+        action={action}
+      />
       <DataTable
         rows={visible}
         columns={columns}

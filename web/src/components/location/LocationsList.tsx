@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
@@ -185,6 +186,9 @@ export function LocationsList({
 
   return (
     <div className="space-y-4">
+      {/* No shop code: these rows ARE the locations, so the screen is org-wide. */}
+      <PageHeading title="Locations" visible={shown.length} total={rows.length} noun="locations" />
+
       <div className="flex flex-wrap items-center gap-4">
         <TextInput
           value={search}

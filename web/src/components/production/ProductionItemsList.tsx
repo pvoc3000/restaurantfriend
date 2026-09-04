@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
@@ -123,12 +124,15 @@ export function ProductionItemsList({
   editable,
   initialFilters,
   initialSearch = "",
+  action,
 }: {
   rows: ProductionItemRow[];
   editable: boolean;
   /** The URL's query, raw — validated below against the real vocabulary. */
   initialFilters?: RawSearchParams;
   initialSearch?: string;
+  /** The screen's create command, beside the title. */
+  action?: ReactNode;
 }) {
   // Before the state that is validated against it — `parseFilterValues` needs
   // the options to know which of the URL's values are real.
@@ -453,6 +457,14 @@ export function ProductionItemsList({
   ];
 
   return (
+    <div className="space-y-4">
+      <PageHeading
+        title="Items"
+        visible={visible.length}
+        total={rows.length}
+        noun="items"
+        action={action}
+      />
     <DataTable
       rows={sorted}
       sort={sort}
@@ -505,5 +517,6 @@ export function ProductionItemsList({
         </div>
       }
     />
+    </div>
   );
 }

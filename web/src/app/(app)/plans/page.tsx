@@ -102,57 +102,39 @@ export default async function PlansPage({
 
   return (
     <div className="space-y-6">
-      {/* The description sits UNDER THE TITLE in a `space-y-1` block, which is
-          Facilities' shape and the one Mark prefers (2026-09-03) — as a sibling
-          of the title ROW it inherited the page's `space-y-6` and sat 24px
-          adrift of the heading it belongs to. */}
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Plans
-          </h1>
-          {/* The scope is STATED, never merely applied. A shorter list with no
-              explanation reads as plans having gone missing, and the count is
-              what tells you the one you are hunting for is at another
-              kitchen. */}
-          <p className="text-sm text-muted">
-            Plans made at{" "}
-            <span className="font-semibold text-ink">
-              {session.activeLocation?.code ?? "this shop"}
-            </span>
-            {hiddenElsewhere > 0
-              ? ` — ${hiddenElsewhere} more ${
-                  hiddenElsewhere === 1 ? "plan is" : "plans are"
-                } made at another kitchen. Switch shops to see ${
-                  hiddenElsewhere === 1 ? "it" : "them"
-                }.`
-              : "."}
-          </p>
-        </div>
-        {editable ? (
-          <NewPlan
-            orgId={session.membership.org_id}
-            locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
-            today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
-          />
-        ) : null}
-      </div>
-
-      {rows.length === 0 ? (
-        <p className="max-w-[80ch] text-sm text-muted">
-          No plans made here yet. A plan is a shop&rsquo;s display case over a
-          stretch of time — which trays hold what, on which days. Several can be
-          active at once, and their union is that shop&rsquo;s menu.
-        </p>
-      ) : (
-        <PlansList
-          rows={rows}
-          orgId={session.membership.org_id}
-          editable={editable}
-          initialFilters={params}
-          initialSearch={parseFilterSearch(params)}
-        />
-      )}
+      {/* THE LIST RENDERS EVEN WHEN EMPTY: it owns the heading and the create
+          command now, so skipping it on an empty shop would leave no title and
+          no way to make the first plan. */}
+      <PlansList
+        rows={rows}
+        orgId={session.membership.org_id}
+        editable={editable}
+        initialFilters={params}
+        initialSearch={parseFilterSearch(params)}
+        locationCode={session.activeLocation?.code ?? null}
+        action={
+          editable ? (
+            <NewPlan
+              orgId={session.membership.org_id}
+              locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
+              today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
+            />
+          ) : null
+        }
+        // THE OTHER-KITCHEN NOTE SURVIVES THE HEADER CHANGE, because it is not
+        // a description of the screen — it is the one fact the count cannot
+        // carry: a shorter list with no explanation reads as plans having gone
+        // missing.
+        note={
+          hiddenElsewhere > 0 ? (
+            <p className="text-sm text-muted">
+              {hiddenElsewhere} more {hiddenElsewhere === 1 ? "plan is" : "plans are"} made
+              at another kitchen. Switch shops to see{" "}
+              {hiddenElsewhere === 1 ? "it" : "them"}.
+            </p>
+          ) : null
+        }
+      />
     </div>
   );
 }

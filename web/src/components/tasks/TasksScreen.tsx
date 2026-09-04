@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
@@ -453,6 +454,15 @@ export function TasksScreen({
       {/* The search box does NOT grow (Mark, 2026-09-03). It was `flex-1`, which
           took every spare pixel and pushed the tabs to the far right edge,
           reading as a different section from the control beside it. */}
+      <PageHeading
+        title={kind === "maintenance" ? "Maintenance Requests" : "Tasks"}
+        code={locationCode}
+        visible={shown.length}
+        total={rows.length}
+        noun={kind === "maintenance" ? "requests" : "tasks"}
+        action={action}
+      />
+
       <div className="flex flex-wrap items-end gap-4">
         <TextInput
           value={search}
@@ -480,7 +490,6 @@ export function TasksScreen({
           ]}
           onChange={(v) => setTier(v as typeof tier)}
         />
-        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
       <DataTable

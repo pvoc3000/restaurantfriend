@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
@@ -264,23 +265,23 @@ export function ShiftReportsList({
 
   return (
     <div className="space-y-4">
-      {/* Beside the title, like `/checklists` and `/equipment`: in a
-          `justify-end` row above the filters a create command reads as one
-          more filter. `items-start`, so it lines up with the TOP of the
-          heading and stays put if the title ever wraps. */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Shift Reports
-        </h1>
-        <NewShiftReport
-          orgId={orgId}
-          locationId={locationId}
-          locationCode={locationCode}
-          today={today}
-          myEmployeeId={myEmployeeId}
-          existing={rows.map((r) => ({ date: r.reportDate, shift: r.shift, status: r.status }))}
-        />
-      </div>
+      <PageHeading
+        title="Shift Reports"
+        code={locationCode}
+        visible={visible.length}
+        total={rows.length}
+        noun="shift reports"
+        action={
+          <NewShiftReport
+            orgId={orgId}
+            locationId={locationId}
+            locationCode={locationCode}
+            today={today}
+            myEmployeeId={myEmployeeId}
+            existing={rows.map((r) => ({ date: r.reportDate, shift: r.shift, status: r.status }))}
+          />
+        }
+      />
 
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
 

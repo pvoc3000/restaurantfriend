@@ -141,50 +141,39 @@ export default async function BatchLogsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Batch Logs
-          </h1>
-          <p className="text-sm text-muted">Records of when we make something.</p>
-          {/* What the screen IS, then what it is currently showing — the
-              description belongs to the title, the scope line to the list. */}
-          <p className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-            {active.code} · {rows.length} {rows.length === 1 ? "log" : "logs"}
-          </p>
-        </div>
-        {editable ? (
-          <GenerateBatches
-            locationId={active.id}
-            locationCode={active.code}
-            today={today}
-          />
-        ) : null}
-      </div>
-
-      {rows.length === 0 ? (
+      <BatchLogsIndex
+        rows={rows}
+        range={range}
+        params={rawParams}
+        locationCode={active.code}
+        action={
+          editable ? (
+            <GenerateBatches
+              locationId={active.id}
+              locationCode={active.code}
+              today={today}
+            />
+          ) : null
+        }
         // TWO DIFFERENT SENTENCES, because they are two different facts. With a
         // window in force an empty list usually means "not in these 90 days",
         // and telling somebody their kitchen has never made anything — over six
         // years of history sitting one chip away — would be plainly false.
-        <div className="max-w-[80ch] space-y-3">
-          {range === "all" ? (
-            <p className="text-sm text-muted">
-              No batch logs at {active.code}{" "}yet. Generating one turns that
+        note={
+          rows.length > 0 ? null : range === "all" ? (
+            <p className="max-w-[80ch] text-sm text-muted">
+              No batch logs at {active.code} yet. Generating one turns that
               kitchen&rsquo;s weekly round into a batch to do per element — what
               needs making, in no particular order — and anything off the round
               is logged by hand on the log itself.
             </p>
           ) : (
-            <p className="text-sm text-muted">
+            <p className="max-w-[80ch] text-sm text-muted">
               No batch logs at {active.code} in this window.
             </p>
-          )}
-          <BatchLogsIndex rows={rows} range={range} params={rawParams} />
-        </div>
-      ) : (
-        <BatchLogsIndex rows={rows} range={range} params={rawParams} />
-      )}
+          )
+        }
+      />
     </div>
   );
 }

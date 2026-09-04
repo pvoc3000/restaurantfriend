@@ -74,13 +74,6 @@ export default async function ShopSectionsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Shop sections
-        </h1>
-        <p className="text-sm text-muted">The physical layout of your shop.</p>
-      </div>
-
       {/* Keyed for the same reason /location is: switching location is a
           navigation to this same route, so without it the search box keeps the
           term you typed against the other shop's shelves. A new location is a

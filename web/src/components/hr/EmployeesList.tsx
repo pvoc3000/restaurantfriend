@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
@@ -350,6 +351,26 @@ export function EmployeesList({
 
   return (
     <div className="space-y-4">
+      {/* Org-wide, so no shop code: a person belongs to the ORG, which is why
+          this screen is exempt from `InactiveLocationGate` in the first place. */}
+      <PageHeading
+        title="Employees"
+        visible={shown.length}
+        total={rows.length}
+        noun="people"
+        action={
+          <NewEmployee
+            orgId={orgId}
+            // The FULL set, not `shown` — the rehire check has to see the 417
+            // former employees a filter is hiding.
+            roster={rows}
+            locationOptions={locationOptions}
+            positions={positions}
+            today={today}
+          />
+        }
+      />
+
       <div className="space-y-3">
         <div className="flex flex-wrap items-center gap-4">
           <TextInput
@@ -383,24 +404,6 @@ export function EmployeesList({
               ...positions.map((p) => ({ value: p, label: p })),
             ]}
             className="w-56"
-          />
-          <span className="text-sm text-muted">
-            {shown.length === rows.length
-              ? `${rows.length} ${rows.length === 1 ? "person" : "people"}`
-              : `${shown.length} of ${rows.length}`}
-          </span>
-
-          {/* Right-aligned against the filters (Mark's placement), and
-              `shrink-0` so it never squeezes: when the row wraps it goes with
-              the last line rather than being crushed between two pickers.
-              `roster` is the FULL set, not `shown` — the rehire check has to see
-              the 417 former employees a filter is hiding. */}
-          <NewEmployee
-            orgId={orgId}
-            roster={rows}
-            locationOptions={locationOptions}
-            positions={positions}
-            today={today}
           />
         </div>
 

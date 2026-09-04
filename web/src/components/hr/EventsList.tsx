@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
@@ -433,6 +434,10 @@ export function EventsList({
   const shiftsShown = tierCounts.shifts ?? 0;
 
   return (
+    <div className="space-y-4">
+      {/* Org-wide — the whole team, across every shop. */}
+      <PageHeading title="Events" visible={visible.length} total={rows.length} noun="events" />
+
     <DataTable
       rows={sorted}
       sort={sort ?? NATURAL_SORT}
@@ -549,5 +554,6 @@ export function EventsList({
         </div>
       }
     />
+    </div>
   );
 }

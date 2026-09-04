@@ -50,15 +50,6 @@ export default async function LocationsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Locations
-        </h1>
-        <p className="text-sm text-muted">
-          Settings for each location. Your working location is bold.
-        </p>
-      </div>
-
       {/* Deliberately NOT keyed by the working location, unlike every other
           location-scoped screen: these rows ARE the locations, so none of them
           goes stale when the working one changes, and remounting would throw

@@ -101,16 +101,6 @@ export default async function EquipmentPage() {
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Equipment
-        </h1>
-        <p className="text-sm text-muted">
-          Items in the shop that require periodic maintenance or special
-          attention.
-        </p>
-      </div>
-
       <EquipmentList
         key={active.id}
         rows={rows}

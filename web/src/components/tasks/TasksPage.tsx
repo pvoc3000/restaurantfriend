@@ -156,7 +156,6 @@ export async function TasksPage({
     photos: photosByTask.get(t.id as string) ?? [],
   }));
 
-  const heading = kind === "maintenance" ? "Maintenance Requests" : "Tasks";
 
   // ONE projection for both consumers. The create dialog needs the equipment's
   // own section, so that picking a fryer can fill in where the fryer stands.
@@ -172,17 +171,6 @@ export async function TasksPage({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          {heading}
-        </h1>
-        <p className="text-sm text-muted">
-          {kind === "maintenance"
-            ? "Equipment maintenance and repair requests."
-            : "Items to be completed by the team."}
-        </p>
-      </div>
-
       <TasksScreen
         key={`${active.id}:${kind}`}
         rows={rows}

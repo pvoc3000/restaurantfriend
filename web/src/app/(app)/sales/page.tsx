@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { canSyncSales } from "@/lib/roles";
 import { todayInTimeZone, serverTimeZone } from "@/lib/today";
 import type { RawSearchParams } from "@/lib/filterMenus";
@@ -191,15 +192,14 @@ export default async function SalesPage({
           about the VIEW. `items-start` so the button lines up with the top of
           the heading rather than centring against a block whose height changes
           with the description. */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[28px] font-bold uppercase tracking-[0.08em]">Sales</h1>
-          <p className="mt-1 text-sm text-muted">
-            Net sales and tips per shop per day, from Square.
-          </p>
-        </div>
-        {canSyncSales(session.membership.role) ? <SyncFromSquare today={today} /> : null}
-      </div>
+      {/* Every shop, not the working one — the shop is a COLUMN here, which is
+          why this screen is exempt from `InactiveLocationGate`. */}
+      <PageHeading
+        title="Sales"
+        total={days.length}
+        noun="shop-days"
+        action={canSyncSales(session.membership.role) ? <SyncFromSquare today={today} /> : null}
+      />
 
       <SalesScreen
         canEdit={canSyncSales(session.membership.role)}

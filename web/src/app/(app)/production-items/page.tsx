@@ -77,14 +77,13 @@ export default async function ProductionItemsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="space-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Items
-          </h1>
-          <p className="text-sm text-muted">The items we make and sell.</p>
-        </div>
-        {editable ? (
+      <ProductionItemsList
+        rows={rows}
+        editable={editable}
+        initialFilters={params}
+        initialSearch={parseFilterSearch(params)}
+        action={
+          editable ? (
           <NewProductionItem
             orgId={session.membership.org_id}
             types={vocab((r) => r.item_type)}
@@ -99,13 +98,8 @@ export default async function ProductionItemsPage({
                 .join("|")
             )}
           />
-        ) : null}
-      </div>
-      <ProductionItemsList
-        rows={rows}
-        editable={editable}
-        initialFilters={params}
-        initialSearch={parseFilterSearch(params)}
+          ) : null
+        }
       />
     </div>
   );

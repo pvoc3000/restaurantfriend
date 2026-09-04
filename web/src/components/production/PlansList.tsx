@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useState, useTransition, type ReactNode } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
@@ -77,6 +78,9 @@ export function PlansList({
   editable,
   initialFilters,
   initialSearch = "",
+  locationCode,
+  action,
+  note,
 }: {
   rows: PlanRow[];
   orgId: string;
@@ -84,6 +88,12 @@ export function PlansList({
   /** The URL's query, raw. */
   initialFilters?: RawSearchParams;
   initialSearch?: string;
+  /** The working shop, for the heading's count line. */
+  locationCode?: string | null;
+  /** The screen's create command, beside the title. */
+  action?: ReactNode;
+  /** A line under the heading — the one fact the count cannot carry. */
+  note?: ReactNode;
 }) {
   const router = useRouter();
 
@@ -484,6 +494,16 @@ export function PlansList({
 
   return (
     <>
+      <PageHeading
+        title="Plans"
+        code={locationCode}
+        visible={visible.length}
+        total={rows.length}
+        noun="plans"
+        action={action}
+      />
+      {note}
+
       {failed ? <p className="mb-3 text-[13px] text-accent">{failed}</p> : null}
     <DataTable
       rows={sorted}

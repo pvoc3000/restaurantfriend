@@ -7824,18 +7824,33 @@ weekday column, and 003 then silently made it per-vendor-item.
 
 ## Conventions
 
-- **PURCHASING HAS ONE HEADER, AND IT IS `PurchaseOrderList`'S** (Mark,
-  2026-09-03: "the model is Purchase orders and invoices. Those shouldn't
-  change"). Title, then a small-caps 12px `text-subtle` line under it reading
-  **shop first** — `DF02 · 29 of 80 vendors`. Vendors and Inventory had the same
-  facts beside the title and shop LAST; the order guide had the count beside the
-  title and no shop at all; Requests had a prose paragraph. All four now match.
-  Two consequences worth knowing. **The count is the FILTERED one**, so the
-  header has to live wherever the filters do — which is why `/purchase-requests`
-  moved its title out of the page and into `PurchaseRequestsList`, as the two
-  model screens already had. And the ORDER GUIDE's title row is `items-end`, so
-  the day picker and the commands bottom-align with the count rather than with
-  the first line of a two-line block.
+- **EVERY LIST SCREEN'S HEADER IS `ui/PageHeading`. THIS IS THE DEFAULT — a new
+  page uses it without being asked** (Mark, 2026-09-03: "I like this the best
+  and think we should copy it to the other sections of the app", then "make a
+  note in CLAUDE.md that this is the default way to code a header so future
+  pages follow it"). The title, then ONE small-caps 12px `text-subtle` line
+  under it reading **shop first**: `DF02 · 29 of 80 vendors`. It began as
+  `PurchaseOrderList`'s header, which he named as the model.
+  **THE LINE REPLACES ANY DESCRIPTION** — his words, and it is the part most
+  likely to be undone by accident. Every prose sentence that stood under a
+  title is gone, including the seven he had written himself hours earlier; a
+  header is a title and a count, and nothing else.
+  **THE COUNT IS THE FILTERED ONE** — what is on screen now, out of everything
+  the screen could show — which is why the header usually lives in the LIST
+  COMPONENT rather than the page: that is where the filters are. Where a screen
+  genuinely cannot reach it (`/checklists`, whose filters sit below the view
+  tabs; `/benefits`, `/prices`, `/timesheets`, `/sales`, which do not filter at
+  that level), `visible` is omitted and the line states the total alone.
+  **THE ROW IS `items-end`**, so a create command beside the title bottom-aligns
+  with the count rather than with the first line of a two-line block. Commands
+  are handed in as `action`; a list that owns the heading therefore has to
+  RENDER EVEN WHEN EMPTY, or an empty shop gets no title and no way to make its
+  first record (`/plans` and `/schedules` both had that hole).
+  The org-wide screens pass no `code` — Employees, Events, Timesheets,
+  Benefits, Locations, Sales and the production catalog are not scoped to a
+  shop, and naming one would be a claim the screen does not make.
+  Applied 2026-09-03 to all 24 list screens. `/purchase-orders` and `/invoices`
+  keep their own header markup because they carry a Window total beside it.
 - **A NAV LABEL AND A PAGE TITLE NEED NOT MATCH** (Mark, 2026-09-03, asking
   outright). Nothing couples them — `lib/nav.ts` holds one, the screen holds the
   other — and the two have different jobs: a nav tier is a narrow strip where a
