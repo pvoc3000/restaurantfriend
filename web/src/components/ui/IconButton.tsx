@@ -23,6 +23,27 @@ export function HomeIcon() {
   );
 }
 
+/**
+ * A storefront — awning, front, door — for the ORG'S settings (Mark,
+ * 2026-09-04: the house read as Home, and he wanted "something more org
+ * reading" once that slot became the organisation's own settings). Same
+ * idiom as the other two: 16px, 1.5px square-capped strokes, no fill.
+ */
+export function OrgIcon() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden focusable="false">
+      <path
+        d="M1.5 6.5 3 2.5h10l1.5 4H1.5Z M2.5 6.5V14h11V6.5 M6.25 14V9.5h3.5V14 M5.5 6.5V2.5 M8 6.5V2.5 M10.5 6.5V2.5"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinecap="square"
+        strokeLinejoin="miter"
+      />
+    </svg>
+  );
+}
+
 export function GearIcon() {
   return (
     <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden focusable="false">

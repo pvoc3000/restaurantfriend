@@ -42,9 +42,9 @@
 //
 // Routes are matched by PREFIX, longest wins, so a record route inherits its
 // list's row without being listed (/plans/[id] is /plans). A route with no row
-// at all is UNGOVERNED — /settings, /, the login pages — and passes; the
-// fixture asserts every built menu entry has a row, so nothing reaches the
-// menu ungoverned by accident.
+// at all is UNGOVERNED — /account (a member's own settings), /, the login
+// pages — and passes; the fixture asserts every built menu entry has a row,
+// so nothing reaches the menu ungoverned by accident.
 
 import { ROLE_LABEL, type Role } from "./roles";
 
@@ -144,6 +144,12 @@ export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   // Not on the sheet. A catalog-cleanup tool, so it follows the catalog's
   // own write rule.
   "/cleanup":              row("-", "-", "W", "W", "W"),
+
+  // ── The masthead's org icon ───────────────────────────────────────────────
+  // Not on the sheet. Org settings were open to everyone until 2026-09-04
+  // (Mark: "available to everyone" — as a screen, read-only below manager);
+  // manager+ matches 001's `org_update`, which is the only write on it.
+  "/settings":             row("-", "-", "-", "W", "W"),
 
   // ── Special Orders ────────────────────────────────────────────────────────
   "/special-orders":       row("R", "W", "W", "W", "W"),

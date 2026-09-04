@@ -3,7 +3,8 @@ import { cookies } from "next/headers";
 import { signOut } from "@/app/actions";
 import { AppNav } from "@/components/AppNav";
 import { HeaderShell } from "@/components/HeaderShell";
-import { GearIcon, HomeIcon, IconButton } from "@/components/ui/IconButton";
+import { GearIcon, IconButton, OrgIcon } from "@/components/ui/IconButton";
+import { canReachPage } from "@/lib/pageAccess";
 import { WorkingLocation } from "@/components/WorkingLocation";
 import { NAV_COOKIE, parseNavMemory } from "@/lib/navMemory";
 import { sectionsForRole } from "@/lib/nav";
@@ -36,11 +37,19 @@ export async function AppHeader({ session }: { session: AppSession }) {
         // components/HeaderShell.
         controls={
           <>
-            <IconButton href="/" label="Home">
-              <HomeIcon />
-            </IconButton>
+            {/* TWO SETTINGS, TWO ICONS (Mark, 2026-09-04): the storefront is
+                the ORG's — what the business says and is connected to, manager
+                and owner only, so the icon is withheld from anyone the table
+                refuses — and the gear is YOUR OWN: name, password, the shops
+                you may work at. The house that stood first went with it; the
+                section tabs are the way home, and `/` still lands per role. */}
+            {canReachPage(session.membership.role, "/settings") && (
+              <IconButton href="/settings" label="Org settings">
+                <OrgIcon />
+              </IconButton>
+            )}
 
-            <IconButton href="/settings" label="Settings">
+            <IconButton href="/account" label="Your settings">
               <GearIcon />
             </IconButton>
 

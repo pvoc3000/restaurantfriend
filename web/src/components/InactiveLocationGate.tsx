@@ -38,6 +38,9 @@ const UNSCOPED_ROUTES = [
   // rather than a scope around the screen — /sales' argument exactly. There is
   // nothing here for a closed working location to empty.
   "/events",
+  // Neither settings screen is about a shop: one is the org's, one is yours.
+  "/settings",
+  "/account",
 ];
 
 function isUnscopedRoute(pathname: string): boolean {

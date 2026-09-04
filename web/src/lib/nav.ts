@@ -385,8 +385,9 @@ export function homeHref(role: Role): string {
     const first = section.subs.find((sub) => sub.built);
     if (first) return first.href;
   }
-  // No menu at all — a role the sheet shows nothing. Settings is ungoverned.
-  return "/settings";
+  // No menu at all — a role the sheet shows nothing. A member's own account
+  // screen is ungoverned, so it is always somewhere to land.
+  return "/account";
 }
 
 export function findSub(section: NavSection, slug: string): NavSub | undefined {
@@ -403,8 +404,9 @@ function under(pathname: string, href: string): boolean {
 
 /**
  * Which tabs light up for a pathname, or null for routes that belong to no
- * section — Home and Settings are utilities, not sections, and deliberately
- * light nothing (the second tier hides entirely there).
+ * section — the org settings and a member's own account are utilities, not
+ * sections, and deliberately light nothing (the second tier hides entirely
+ * there).
  *
  * Detail routes keep their section AND sub lit: /vendors/9 is still Vendors.
  * The longest match wins, so a sub whose href is a prefix of another's can't

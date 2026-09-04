@@ -7518,6 +7518,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **There is no permissions SCREEN** — the table is the file, read on GitHub
    or in the editor; a read-only grid on /settings is the obvious next step if
    Mark wants to see it in the app.
+   **TWO SETTINGS, TWO ICONS** (Mark, 2026-09-04: the gear was "available to
+   everyone" and showed ORG settings; "the gear icon should be user
+   settings"). The masthead's house became a STOREFRONT (`OrgIcon`) opening
+   `/settings` — the org's, now `row("-","-","-","W","W")` in the table and
+   withheld from the masthead below manager — and the gear opens the new
+   **`/account`**: the member's own name (via `setDisplayName` →
+   `set_my_member_profile`), email, role, the shops 073 lets them work at,
+   and a password change through `supabase.auth.updateUser`, the same call
+   /welcome makes. `/account` is UNGOVERNED — there is no role for whom your
+   own name is off limits — and both settings screens are exempt from
+   `InactiveLocationGate`. The house is gone; the section tabs are the way
+   home and `/` still lands per role (`homeHref`'s no-menu fallback is now
+   `/account`).
    **Nobody has ever held purchaser or supervisor**, so the first invites are
    the first real exercise of any of this. Expect small holes; each is a cell.
    **1601 fixtures pass**, 17 new.

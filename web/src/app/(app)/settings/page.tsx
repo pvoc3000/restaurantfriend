@@ -17,6 +17,10 @@ import { AccountingSettings, type AccountingStatus } from "@/components/settings
  * billing, timezone) are still SQL-only and named at the bottom, so nobody has
  * to guess whether this screen is the whole of it.
  *
+ * Behind the masthead's STOREFRONT icon since 2026-09-04; the gear beside it
+ * is a member's own /account. The layout gate refuses this screen below
+ * manager (`lib/pageAccess`), which is why the icon is withheld there too.
+ *
  * OWNER AND MANAGER ONLY, because 001's `org_update` policy is
  * `user_has_role(id, array['owner','admin'])`. Below that RLS would accept the
  * write, change zero rows and return NO error — the silent-failure shape this
@@ -44,7 +48,7 @@ export default async function SettingsPage() {
     <div className="space-y-16">
       <div className="space-y-2">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Settings
+          Org settings
         </h1>
         <p className="max-w-2xl text-sm text-muted">
           {editable

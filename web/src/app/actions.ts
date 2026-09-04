@@ -40,3 +40,19 @@ export async function setActiveLocation(locationId: string) {
 
   revalidatePath("/", "layout");
 }
+
+/**
+ * The member's own display name — the other column `set_my_member_profile`
+ * names, and the one thing on /account that reaches `org_members`. The
+ * masthead reads it, so the layout revalidates. An empty string CLEARS it
+ * (the function's own contract), after which the masthead falls back to the
+ * email.
+ */
+export async function setDisplayName(name: string) {
+  const supabase = await createClient();
+  const { error } = await supabase.rpc("set_my_member_profile", {
+    p_display_name: name.trim(),
+  });
+  if (error) throw error;
+  revalidatePath("/", "layout");
+}

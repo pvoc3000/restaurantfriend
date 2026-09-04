@@ -105,9 +105,19 @@ test("a record route inherits its list's row — by prefix, longest wins", () =>
 });
 
 test("an ungoverned route opens for everyone and offers writes to nobody", () => {
-  eq(pageAccess("staff", "/settings"), null);
-  ok(canReachPage("staff", "/settings"), "settings opens");
-  no(canEditPage("staff", "/settings"), "but the table claims no writes for it");
+  eq(pageAccess("staff", "/account"), null);
+  ok(canReachPage("staff", "/account"), "a member's own account opens");
+  no(canEditPage("staff", "/account"), "but the table claims no writes for it");
+});
+
+test("org settings are manager+, and the account screen is everyone's", () => {
+  // Mark, 2026-09-04: the gear was "available to everyone" and showed the
+  // ORG's settings. The org's are behind the storefront now, gated; the gear
+  // is the member's own.
+  eq(pageAccess("purchaser", "/settings"), "none");
+  eq(pageAccess("admin", "/settings"), "write");
+  eq(whoMayReachSentence("/settings"), "managers and the owner");
+  ok(canReachPage("staff", "/account"));
 });
 
 test("canReachPage and canEditPage read the same cell", () => {
