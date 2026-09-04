@@ -7493,6 +7493,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    into every block. One switch on the control rather than a conditional at
    thirty call sites. **A field block that renders `InlineValue` must take
    `editable`**; grep for the ones that don't before trusting a Read Only cell.
+   **Second hole, same hour: the vendors LIST still toggled Active.** It used
+   `VendorActiveToggle`, a hand-rolled copy that predated `catalog/ActiveToggle`
+   and so never learned `readOnly` — deleted, the list uses the shared part.
+   `VendorItemsTable` and `PayrollBenefitsList` rendered the shared toggle
+   without the flag; both pass it now. **Every `<ActiveToggle` either sits
+   inside an `editable ?` or carries `readOnly={!editable}`** — the sweep that
+   found these is `grep -rn -A4 "<ActiveToggle"`.
    **Nobody has ever held purchaser or supervisor**, so the first invites are
    the first real exercise of any of this. Expect small holes; each is a cell.
    **1601 fixtures pass**, 17 new.

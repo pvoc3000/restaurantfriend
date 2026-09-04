@@ -55,7 +55,7 @@ export function PayrollBenefitsList({
       // The house rule: the Active toggle leads every catalog table, and it is
       // why 033 names the column `is_active` rather than `active`.
       render: (b) => (
-        <ActiveToggle table="payroll_benefits" id={b.id} active={b.is_active} />
+        <ActiveToggle table="payroll_benefits" id={b.id} active={b.is_active} readOnly={!editable} />
       ),
     },
     {

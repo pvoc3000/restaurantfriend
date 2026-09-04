@@ -148,6 +148,7 @@ export function VendorItemsTable({
           table="vendor_items"
           id={vi.id}
           active={vi.is_active}
+          readOnly={!canEdit}
           label="Vendor item active"
         />
       ),

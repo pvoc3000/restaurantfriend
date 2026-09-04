@@ -15,7 +15,7 @@ import {
   type VendorSortKey,
 } from "@/lib/vendorFilters";
 import { DataTable, type DataColumn } from "./DataTable";
-import { VendorActiveToggle } from "@/components/VendorActiveToggle";
+import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { NewVendor } from "./NewVendor";
@@ -156,7 +156,19 @@ export function VendorsList({
         label: "Active",
         width: 95,
         sortValue: (v) => sortValue(v, "active"),
-        render: (v) => <VendorActiveToggle vendorId={v.id} active={v.is_active} />,
+        // The shared `ActiveToggle`, not the hand-rolled `VendorActiveToggle`
+        // this used until 2026-09-04 — a copy that predated the part and never
+        // learned `readOnly`, which is how a staff account could deactivate a
+        // vendor from a list the sheet has at Read Only.
+        render: (v) => (
+          <ActiveToggle
+            table="vendors"
+            id={v.id}
+            active={v.is_active}
+            readOnly={!editable}
+            label={`${v.name} active`}
+          />
+        ),
       },
       {
         key: "name",
