@@ -96,7 +96,8 @@ export function ItemsList({
   activeLocationCode: string | null;
   initialFilters: ItemFilters;
   orgId: string;
-  /** purchaser+ — 001's generic write policy. */
+  /** The Page Permissions sheet's cell for /items — false hides New item,
+   *  the selection column and the bulk Deactivate bar. */
   editable: boolean;
 }) {
   const router = useRouter();
@@ -245,7 +246,10 @@ export function ItemsList({
   }
 
   const columns: DataColumn<ItemRow>[] = [
-    {
+    // The selection column exists for the bulk Deactivate bar, so it goes with
+    // it: a Read Only role (a supervisor, per the Page Permissions sheet) gets
+    // no boxes to tick and no bar to act from.
+    ...(editable ? [{
       key: "select",
       label: "",
       width: 40,
@@ -267,7 +271,7 @@ export function ItemsList({
           size={18}
         />
       ),
-    },
+    } satisfies DataColumn<ItemRow>] : []),
     {
       key: "name",
       label: "Item",
@@ -423,7 +427,7 @@ export function ItemsList({
         />
       </div>
 
-      {checked.size > 0 && (
+      {editable && checked.size > 0 && (
         <div className="flex flex-wrap items-center gap-3 border border-ink px-4 py-3 text-sm">
           <span>{checked.size} selected</span>
           <button

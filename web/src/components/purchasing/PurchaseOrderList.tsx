@@ -93,11 +93,20 @@ export function PurchaseOrderList({
   initialFilters,
   activeLocationCode,
   capped,
+  editable,
 }: {
   orders: PoListRow[];
   initialFilters: PoFilters;
   activeLocationCode: string;
   capped: boolean;
+  /**
+   * The Page Permissions sheet's cell for /purchase-orders (2026-09-04). A
+   * supervisor is Read Only there, and this list had never taken a role at
+   * all — "RLS is the gate" — so they were offered the selection column, the
+   * batch bar and a row's Delete, each of which then changed zero rows and
+   * said so. False hides the three; Preview and Download stay, being reads.
+   */
+  editable: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -584,7 +593,7 @@ export function PurchaseOrderList({
   }
 
   const columns: DataColumn<PoListRow>[] = [
-    {
+    ...(editable ? [{
       key: "select",
       label: "",
       width: 48,
@@ -609,7 +618,7 @@ export function PurchaseOrderList({
           size={18}
         />
       ),
-    },
+    } satisfies DataColumn<PoListRow>] : []),
     {
       key: "po_number",
       label: "PO number",
@@ -764,9 +773,10 @@ export function PurchaseOrderList({
     // spare — "RECEIVED" fills its chip exactly — or from the two DATE
     // columns, which had 2px and are the thing you read this list for.
     //
-    // NOT role-gated, matching the selection bar directly above it: this list
-    // takes no role prop, RLS is the gate, and `deleteOrders` now checks its
-    // own row count so a refusal is a sentence rather than a silent success.
+    // Delete is offered only to a Write role (`editable`); Preview and
+    // Download are reads and stay for everyone who can open the list.
+    // `deleteOrders` still checks its own row count, so a stale session's
+    // refusal is a sentence rather than a silent success.
     {
       key: "menu",
       label: "",
@@ -791,15 +801,19 @@ export function PurchaseOrderList({
               disabled: batchBusy !== null,
               onSelect: () => void renderPoPdf("po", "download", [po.id]),
             },
-            {
-              label: "Delete purchase order",
-              hint:
-                po.status === "draft"
-                  ? "and its lines"
-                  : `it is ${po.status} — this erases order history`,
-              danger: true,
-              onSelect: () => void deleteOne(po),
-            },
+            ...(editable
+              ? [
+                  {
+                    label: "Delete purchase order",
+                    hint:
+                      po.status === "draft"
+                        ? "and its lines"
+                        : `it is ${po.status} — this erases order history`,
+                    danger: true,
+                    onSelect: () => void deleteOne(po),
+                  },
+                ]
+              : []),
           ]}
         />
       ),
@@ -896,7 +910,7 @@ export function PurchaseOrderList({
         </p>
       )}
 
-      {checked.size > 0 && (
+      {editable && checked.size > 0 && (
         <div className="space-y-1 border border-ink px-4 py-3 text-sm">
           <div className="flex flex-wrap items-center gap-4">
             <span>{checked.size} selected</span>

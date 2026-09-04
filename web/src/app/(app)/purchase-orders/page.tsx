@@ -11,6 +11,7 @@ import {
 import { serverTimeZone } from "@/lib/today";
 import type { PoStatus } from "@/lib/purchaseOrders";
 import { PurchaseOrderList } from "@/components/purchasing/PurchaseOrderList";
+import { canEditPage } from "@/lib/pageAccess";
 
 export type PoListRow = {
   id: string;
@@ -141,6 +142,7 @@ export default async function PurchaseOrdersPage({
       initialFilters={filters}
       activeLocationCode={session.activeLocation.code}
       capped={rows.length === 500}
+      editable={canEditPage(session.membership.role, "/purchase-orders")}
     />
   );
 }
