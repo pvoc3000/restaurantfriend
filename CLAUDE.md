@@ -7859,12 +7859,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   MENU row — where `trailing` puts it on its own line above; a caller passes one
   or the other. On a bar wide enough to wrap, `ml-auto` lands it at the end of
   whatever line it falls on, which is still right-aligned and still in the
-  filter block (`/special-orders`, `/production-items`, `/elements` and
-  `/batch-logs` all do).
+  filter block (`/elements` and `/batch-logs` both do).
+  **THE FILTER ROW LIVES OUTSIDE `DataTable`, NOT IN ITS `leading` SLOT**, and
+  this is the one that looks like nothing and is not (Mark, 2026-09-03, twice:
+  Plans "looks different, almost like the filter row and datatable are merged",
+  and then on Items "the new item button isn't aligned all the way to the
+  right"). `leading` is a `min-w-0 flex-1` cell with the columns eye beside it,
+  so a row in there is 48px narrower than the page and `ml-auto` cannot reach
+  the edge — measured, 1169 against 1217. Out here it is the full content width
+  and the eye keeps its own strip. Eight lists were lifted.
   **AND `FilterMenus` STOPS STATING THE COUNT WHERE THE HEADER DOES** —
   `showCount={false}`, because that bar's "N of M noun" is now the same fact
-  three inches under `PageHeading`'s. Only `/events` passes it so far; the
-  duplication is still on the other FilterMenus lists.
+  three inches under `PageHeading`'s. All five callers pass it.
   `PageHeading` still takes an `action` and a few screens still use it;
   everything Mark has named is converted.
   A list that owns the heading has to RENDER EVEN WHEN EMPTY either way, or an

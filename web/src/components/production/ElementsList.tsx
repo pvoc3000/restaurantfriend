@@ -438,6 +438,45 @@ export function ElementsList({
         total={rows.length}
         noun="elements"
       />
+      <div className="space-y-3">
+        <FilterMenus
+          rows={searched}
+          total={rows.length}
+          noun="elements"
+          dimensions={dimensions}
+          values={filters}
+          onChange={changeFilters}
+          // `PageHeading` states the count now — see `showCount`.
+          showCount={false}
+          rowAction={action}
+          leading={
+            <div className="space-y-1.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Search
+              </span>
+              <TextInput
+                value={search}
+                onValueChange={changeSearch}
+                placeholder="Name, type, schedule…"
+                // w-56 rather than w-64 for the same measurement as the
+                // menus beside it: the bar has to hold on one line.
+                className="w-56"
+                aria-label="Search elements"
+                clearLabel="Clear the search"
+              />
+            </div>
+          }
+        />
+        {filters.cost === "uncosted" ? (
+          <p className="max-w-[80ch] text-[13px] text-muted">
+            These resolve to no cost at all — a purchased element with no
+            inventory item, a made one with no recipe, or a manual one with no
+            amount. Every recipe containing one prints its cost as a lower
+            bound until they are settled.
+          </p>
+        ) : null}
+      </div>
+
     <DataTable
       rows={sorted}
       sort={sort}
@@ -449,44 +488,6 @@ export function ElementsList({
       columnChooser
       group={group}
       empty={<p className="text-sm text-muted">No elements match these filters.</p>}
-      leading={
-        <div className="space-y-3">
-          <FilterMenus
-            rows={searched}
-            total={rows.length}
-            noun="elements"
-            dimensions={dimensions}
-            values={filters}
-            onChange={changeFilters}
-            rowAction={action}
-            leading={
-              <div className="space-y-1.5">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                  Search
-                </span>
-                <TextInput
-                  value={search}
-                  onValueChange={changeSearch}
-                  placeholder="Name, type, schedule…"
-                  // w-56 rather than w-64 for the same measurement as the
-                  // menus beside it: the bar has to hold on one line.
-                  className="w-56"
-                  aria-label="Search elements"
-                  clearLabel="Clear the search"
-                />
-              </div>
-            }
-          />
-          {filters.cost === "uncosted" ? (
-            <p className="max-w-[80ch] text-[13px] text-muted">
-              These resolve to no cost at all — a purchased element with no
-              inventory item, a made one with no recipe, or a manual one with no
-              amount. Every recipe containing one prints its cost as a lower
-              bound until they are settled.
-            </p>
-          ) : null}
-        </div>
-      }
     />
     </div>
   );

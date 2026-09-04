@@ -386,6 +386,42 @@ export function PurchaseRequestsList({
         </p>
       </div>
 
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <TextInput
+            value={search}
+            onValueChange={changeSearch}
+            placeholder="Search requests"
+            className="w-64"
+            aria-label="Search purchase requests"
+            clearLabel="Clear the search"
+          />
+          <TabPicker
+            ariaLabel="Which requests"
+            value={filters.status ?? "open"}
+            onChange={changeStatus}
+            options={dimensions[0].options.map((o) => ({
+              key: o.value,
+              label: o.label,
+              count: counts[o.value],
+            }))}
+          />
+          {capped ? (
+            <span className="text-[12px] text-subtle">
+              Showing the most recent 500.
+            </span>
+          ) : null}
+          <div className="ml-auto">
+            <NewPurchaseRequest
+              orgId={orgId}
+              locationId={locationId}
+              userId={userId}
+              locationCode={locationCode}
+            />
+          </div>
+        </div>
+      </div>
+
       <DataTable
       rows={sorted}
       sort={sort ?? REQUESTS_NATURAL_SORT}
@@ -401,43 +437,6 @@ export function PurchaseRequestsList({
             ? `Nothing has been asked for at ${locationCode} yet.`
             : "No requests match these filters."}
         </p>
-      }
-      leading={
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-end gap-3">
-            <TextInput
-              value={search}
-              onValueChange={changeSearch}
-              placeholder="Search requests"
-              className="w-64"
-              aria-label="Search purchase requests"
-              clearLabel="Clear the search"
-            />
-            <TabPicker
-              ariaLabel="Which requests"
-              value={filters.status ?? "open"}
-              onChange={changeStatus}
-              options={dimensions[0].options.map((o) => ({
-                key: o.value,
-                label: o.label,
-                count: counts[o.value],
-              }))}
-            />
-            {capped ? (
-              <span className="text-[12px] text-subtle">
-                Showing the most recent 500.
-              </span>
-            ) : null}
-            <div className="ml-auto">
-              <NewPurchaseRequest
-                orgId={orgId}
-                locationId={locationId}
-                userId={userId}
-                locationCode={locationCode}
-              />
-            </div>
-          </div>
-        </div>
       }
     />
     </div>

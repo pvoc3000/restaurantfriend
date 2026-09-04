@@ -655,6 +655,50 @@ export function SpecialOrdersList({
         noun="orders"
       />
 
+      <div className="space-y-3">
+        <FilterMenus
+          rows={searched}
+          total={rows.length}
+          noun="orders"
+          dimensions={dimensions}
+          values={filters}
+          onChange={changeFilters}
+          leading={
+            <div className="space-y-1.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Search
+              </span>
+              <TextInput
+                value={search}
+                onValueChange={changeSearch}
+                placeholder="Number, customer, event…"
+                className="w-56"
+                aria-label="Search special orders"
+                clearLabel="Clear the search"
+              />
+            </div>
+          }
+          // `PageHeading` states the count now — see `showCount`.
+          showCount={false}
+          rowAction={
+            canWrite ? (
+              <NewSpecialOrder
+                orgId={orgId}
+                kitchens={kitchens}
+                defaultLocationId={defaultLocationId}
+                today={today}
+                takenBy={takenBy}
+              />
+            ) : undefined
+          }
+        />
+        {capped ? (
+          <p className="text-[13px] text-mark">
+            Showing the most recent 500. Narrow the view to see further back.
+          </p>
+        ) : null}
+      </div>
+
     <DataTable
       rows={sorted}
       // `sort ?? NATURAL_SORT` so the header arrow agrees with the rows. The
@@ -695,49 +739,6 @@ export function SpecialOrdersList({
           : undefined
       }
       empty={<p className="text-sm text-muted">No orders match these filters.</p>}
-      leading={
-        <div className="space-y-3">
-          <FilterMenus
-            rows={searched}
-            total={rows.length}
-            noun="orders"
-            dimensions={dimensions}
-            values={filters}
-            onChange={changeFilters}
-            leading={
-              <div className="space-y-1.5">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                  Search
-                </span>
-                <TextInput
-                  value={search}
-                  onValueChange={changeSearch}
-                  placeholder="Number, customer, event…"
-                  className="w-56"
-                  aria-label="Search special orders"
-                  clearLabel="Clear the search"
-                />
-              </div>
-            }
-            rowAction={
-              canWrite ? (
-                <NewSpecialOrder
-                  orgId={orgId}
-                  kitchens={kitchens}
-                  defaultLocationId={defaultLocationId}
-                  today={today}
-                  takenBy={takenBy}
-                />
-              ) : undefined
-            }
-          />
-          {capped ? (
-            <p className="text-[13px] text-mark">
-              Showing the most recent 500. Narrow the view to see further back.
-            </p>
-          ) : null}
-        </div>
-      }
     />
 
     {/* THE KEY IS PINNED TO THE FOOT OF THE WINDOW (Mark, 2026-08-20). The

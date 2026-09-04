@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { FilterMenus } from "@/components/ui/FilterMenus";
@@ -216,6 +217,43 @@ export function CustomersList({
   usePublishRecordSet(PATH, sorted.map((r) => ({ id: r.id, href: detailHref(r.id) })));
 
   return (
+    <div className="space-y-4">
+      {/* This screen had no title at all, the same gap `/special-orders` had
+          (Mark, 2026-09-03). Org-wide: decision 8 makes a customer the ORG's. */}
+      <PageHeading
+        title="Customers"
+        visible={visible.length}
+        total={rows.length}
+        noun="customers"
+      />
+
+      <FilterMenus
+        rows={searched}
+        total={rows.length}
+        noun="customers"
+        dimensions={dimensions}
+        values={filters}
+        onChange={changeFilters}
+        // `PageHeading` states the count now — see `showCount`.
+        showCount={false}
+        leading={
+          <div className="space-y-1.5">
+            <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+              Search
+            </span>
+            <TextInput
+              value={search}
+              onValueChange={changeSearch}
+              placeholder="Name, company, email…"
+              className="w-64"
+              aria-label="Search customers"
+              clearLabel="Clear the search"
+            />
+          </div>
+        }
+        rowAction={canWrite ? <NewCustomer orgId={orgId} roster={rows} /> : undefined}
+      />
+
     <DataTable
       rows={sorted}
       sort={sort}
@@ -227,32 +265,7 @@ export function CustomersList({
       compactBelow={1280}
       columnChooser
       empty={<p className="text-sm text-muted">No customers match these filters.</p>}
-      leading={
-        <FilterMenus
-          rows={searched}
-          total={rows.length}
-          noun="customers"
-          dimensions={dimensions}
-          values={filters}
-          onChange={changeFilters}
-          leading={
-            <div className="space-y-1.5">
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                Search
-              </span>
-              <TextInput
-                value={search}
-                onValueChange={changeSearch}
-                placeholder="Name, company, email…"
-                className="w-64"
-                aria-label="Search customers"
-                clearLabel="Clear the search"
-              />
-            </div>
-          }
-          trailing={canWrite ? <NewCustomer orgId={orgId} roster={rows} /> : undefined}
-        />
-      }
     />
+    </div>
   );
 }

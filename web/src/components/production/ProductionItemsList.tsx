@@ -464,6 +464,43 @@ export function ProductionItemsList({
         total={rows.length}
         noun="items"
       />
+      <div className="space-y-3">
+        <FilterMenus
+          rows={searched}
+          total={rows.length}
+          noun="items"
+          dimensions={dimensions}
+          values={filters}
+          onChange={changeFilters}
+          // `PageHeading` states the count now — see `showCount`.
+          showCount={false}
+          rowAction={action}
+          leading={
+            <div className="space-y-1.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Search
+              </span>
+              <TextInput
+                value={search}
+                onValueChange={changeSearch}
+                placeholder="Name, dough, finish…"
+                // w-56 rather than w-64 for the same measurement as the
+                // menus beside it: the bar has to hold on one line.
+                className="w-56"
+                aria-label="Search items"
+                clearLabel="Clear the search"
+              />
+            </div>
+          }
+        />
+        {filters.price === "unpriced" ? (
+          <p className="max-w-[80ch] text-[13px] text-muted">
+            These carry no price class or tier, so the grid has no cell for
+            them. Setting both gives them a price without touching a number.
+          </p>
+        ) : null}
+      </div>
+
     <DataTable
       rows={sorted}
       sort={sort}
@@ -480,42 +517,6 @@ export function ProductionItemsList({
       columnChooser
       group={groups}
       empty={<p className="text-sm text-muted">No items match these filters.</p>}
-      leading={
-        <div className="space-y-3">
-          <FilterMenus
-            rows={searched}
-            total={rows.length}
-            noun="items"
-            dimensions={dimensions}
-            values={filters}
-            onChange={changeFilters}
-            rowAction={action}
-            leading={
-              <div className="space-y-1.5">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                  Search
-                </span>
-                <TextInput
-                  value={search}
-                  onValueChange={changeSearch}
-                  placeholder="Name, dough, finish…"
-                  // w-56 rather than w-64 for the same measurement as the
-                  // menus beside it: the bar has to hold on one line.
-                  className="w-56"
-                  aria-label="Search items"
-                  clearLabel="Clear the search"
-                />
-              </div>
-            }
-          />
-          {filters.price === "unpriced" ? (
-            <p className="max-w-[80ch] text-[13px] text-muted">
-              These carry no price class or tier, so the grid has no cell for
-              them. Setting both gives them a price without touching a number.
-            </p>
-          ) : null}
-        </div>
-      }
     />
     </div>
   );
