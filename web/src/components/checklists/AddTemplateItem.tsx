@@ -46,7 +46,6 @@ export function AddTemplateItem({
   const [prompt, setPrompt] = useState("");
   const [sectionId, setSectionId] = useState("");
   const [asks, setAsks] = useState<ResponseType>("check");
-  const [added, setAdded] = useState(0);
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
 
@@ -65,7 +64,7 @@ export function AddTemplateItem({
           // Sorts step by ten so a later insert between two rows needs no
           // renumber — `sort` is numeric(8,2), the same reason FMP's own shop
           // sections carry 09.5 and 13.1.
-          sort: nextSort + added * 10,
+          sort: nextSort,
           prompt: prompt.trim(),
           response_type: asks,
         })
@@ -75,7 +74,10 @@ export function AddTemplateItem({
         setFailed(error?.message ?? "That item was not added.");
         return;
       }
-      setAdded((n) => n + 1);
+      // IT CLOSES (Mark, 2026-09-03). It stayed open on `AddShopSection`'s
+      // reasoning — you seed a whole walk order in a sitting — and the row
+      // landing on the table behind it is the better confirmation.
+      setOpen(false);
       setPrompt("");
       router.refresh();
     });
@@ -90,7 +92,6 @@ export function AddTemplateItem({
         className={`${BUTTON_CLASS} shrink-0`}
         onClick={() => {
           setOpen(true);
-          setAdded(0);
           setFailed(null);
         }}
       >
@@ -105,28 +106,23 @@ export function AddTemplateItem({
           busy={busy}
           onSubmit={canCommit ? add : undefined}
           footer={
-            <div className="flex items-center justify-between gap-3">
-              <span className="text-[12px] text-muted">
-                {added > 0 && `${added} added`}
-              </span>
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  className={DIALOG_CANCEL_CLASS}
-                  onClick={() => setOpen(false)}
-                >
-                  {added > 0 ? "Done" : "Cancel"}
-                </button>
-                <button
-                  type="button"
-                  className={DIALOG_COMMIT_CLASS}
-                  onClick={add}
-                  disabled={!canCommit}
-                >
-                  Add
-                </button>
-              </div>
-            </div>
+            <>
+              <button
+                type="button"
+                className={DIALOG_CANCEL_CLASS}
+                onClick={() => setOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={DIALOG_COMMIT_CLASS}
+                onClick={add}
+                disabled={!canCommit}
+              >
+                Add
+              </button>
+            </>
           }
         >
           <div className="space-y-5">

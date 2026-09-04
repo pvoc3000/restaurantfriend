@@ -112,10 +112,10 @@ export function TemplateItemsTable({
     { value: "", label: "No section" },
     ...sections.map((s) => ({ value: s.id, label: s.display_name })),
   ];
-  const equipmentOptions = [
-    { value: "", label: "Nothing in particular" },
-    ...equipment.map((e) => ({ value: e.id, label: e.name })),
-  ];
+  // NO "nothing in particular" ROW (Mark, 2026-09-03: "just let the field be
+  // empty or blank"). `clearable` is how you take an item off a machine, and it
+  // leaves the cell blank rather than making a phrase out of an empty value.
+  const equipmentOptions = equipment.map((e) => ({ value: e.id, label: e.name }));
 
   async function remove(row: TemplateItemRow) {
     const ok = await confirmDialog({
@@ -271,7 +271,7 @@ export function TemplateItemsTable({
     {
       key: "expected",
       label: "Expected",
-      width: 200,
+      width: 240,
       hideWhenCompact: true,
       // The range is only meaningful for a number, and the whole point of it is
       // that an out-of-range reading raises the issue by itself. On any other
@@ -305,6 +305,12 @@ export function TemplateItemsTable({
             </span>
           );
         }
+        // THE THREE BOXES SHARE THE CELL rather than each claiming a fixed
+        // width (Mark, 2026-09-03: "I am unable to set the second value, just
+        // the two numeric ones"). Widths here are WEIGHTS, so this column is
+        // ~131px at a 1280 window while `w-14 + w-14 + w-12` and their gaps
+        // want 180 — the unit box was simply outside the cell. Flexible, it is
+        // always reachable however narrow the column is dragged.
         return (
           <div className="flex items-center gap-1">
             <InlineValue
@@ -314,10 +320,10 @@ export function TemplateItemsTable({
               value={r.min_value}
               kind="number"
               align="right"
-              className="w-14"
+              className="w-full min-w-0 flex-1"
               ariaLabel={`Lowest acceptable value for ${r.prompt}`}
             />
-            <span className="text-faint">–</span>
+            <span className="shrink-0 text-faint">–</span>
             <InlineValue
               table="checklist_template_items"
               id={r.id}
@@ -325,7 +331,7 @@ export function TemplateItemsTable({
               value={r.max_value}
               kind="number"
               align="right"
-              className="w-14"
+              className="w-full min-w-0 flex-1"
               ariaLabel={`Highest acceptable value for ${r.prompt}`}
             />
             <InlineValue
@@ -333,7 +339,7 @@ export function TemplateItemsTable({
               id={r.id}
               column="unit"
               value={r.unit}
-              className="w-12"
+              className="w-full min-w-0 flex-1"
               ariaLabel={`Unit for ${r.prompt}`}
             />
           </div>
@@ -385,7 +391,7 @@ export function TemplateItemsTable({
     },
     {
       key: "equipment_id",
-      label: "About",
+      label: "Equipment",
       width: 180,
       hideWhenCompact: true,
       sortValue: (r) => equipment.find((e) => e.id === r.equipment_id)?.name ?? "",
@@ -398,6 +404,7 @@ export function TemplateItemsTable({
             value={r.equipment_id ?? ""}
             kind="pick"
             options={equipmentOptions}
+            clearable
             ariaLabel={`Equipment for ${r.prompt}`}
           />
         ) : (
