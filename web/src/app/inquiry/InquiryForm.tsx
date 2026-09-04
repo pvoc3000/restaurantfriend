@@ -151,7 +151,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
           <button
             type="button"
             onClick={() => setDone(null)}
-            className="h-12 w-full border border-ink text-[14px] font-semibold uppercase tracking-[0.06em]"
+            className="h-12 w-full border border-ink text-[14px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
           >
             Go back to the form
           </button>
@@ -235,7 +235,9 @@ export function InquiryForm({ orgId }: { orgId: string }) {
                 className={
                   "h-12 flex-1 text-[14px] font-semibold uppercase tracking-[0.06em] " +
                   (i === 1 ? "border-l border-ink " : "") +
-                  (draft.fulfillment === mode ? "bg-ink text-white" : "bg-white")
+                  (draft.fulfillment === mode
+                    ? "bg-ink text-white"
+                    : "bg-white hover:bg-neutral-100")
                 }
               >
                 {mode === "pickup" ? "Pickup" : "Delivery"}
@@ -375,7 +377,7 @@ export function InquiryForm({ orgId }: { orgId: string }) {
         <button
           type="submit"
           disabled={busy || !ready}
-          className="h-12 w-full border-2 border-ink bg-ink text-[14px] font-semibold uppercase tracking-[0.06em] text-white transition-colors disabled:opacity-35"
+          className="h-12 w-full border-2 border-ink bg-ink text-[14px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:opacity-35"
         >
           {busy ? "Sending…" : ready ? "Send my inquiry" : "Loading…"}
         </button>

@@ -852,7 +852,9 @@ export function DataTable<T>({
                                 aria-expanded={isOpen}
                                 aria-label={isOpen ? "Collapse row" : "Expand row"}
                                 className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center border-[1.5px] border-ink text-[9px] leading-none transition-colors ${
-                                  isOpen ? "bg-ink text-white" : "bg-white text-ink"
+                                  isOpen
+                                    ? "bg-ink text-white"
+                                    : "bg-white text-ink hover:bg-neutral-100"
                                 }`}
                               >
                                 {isOpen ? "▼" : "▶"}

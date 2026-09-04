@@ -98,7 +98,7 @@ export function RevealPanel({
       // glyph, so it reads as a control and gives a real touch target, filled
       // black when it is holding the panel open.
       className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center border-[1.5px] border-ink text-[9px] leading-none transition-colors ${
-        pinned ? "bg-ink text-white" : "bg-white text-ink"
+        pinned ? "bg-ink text-white" : "bg-white text-ink hover:bg-neutral-100"
       }`}
     >
       {open ? (direction === "up" ? "▼" : "▲") : direction === "up" ? "▲" : "▼"}

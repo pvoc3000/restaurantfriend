@@ -110,7 +110,13 @@ export function WeekdayPicker({
             disabled={pending}
             onClick={() => toggle(day.weekday)}
             className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums transition-colors first:border-l disabled:opacity-35 ${
-              on ? "bg-ink text-white" : "bg-white text-faint hover:text-ink"
+              on
+                ? "bg-ink text-white"
+                : // The grey wash, same as `TabPicker`'s off cells — this is the
+                  // app's other segmented control and it darkened the TEXT
+                  // alone, which on a 32px cell is a much fainter answer to the
+                  // pointer than the cell beside it gives.
+                  "bg-white text-faint hover:bg-neutral-100 hover:text-ink"
             }`}
           >
             {day.label}

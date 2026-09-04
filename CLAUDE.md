@@ -8248,6 +8248,34 @@ weekday column, and 003 then silently made it per-vendor-item.
   `accent`/`go-ink` are INKS. `text-go` had exactly ONE caller in the app and it
   was this bug; if a second appears, it is almost certainly the same mistake.
 
+- **A CONTROL YOU PRESS FILLS GREY ON HOVER — `hover:bg-neutral-100`** (Mark,
+  2026-09-04, on the checklist template record: Kind "fills grey and the border
+  becomes black", where Shifts "become[s] black with no grey fill… I think
+  filling grey is the preferred behavior"). The wash is the app's one "you can
+  press this" cue, and it is the answer to the pointer, where a BORDER that
+  darkens is a resting cue about the field's own kind (`BOXED_FIELD_BORDER`
+  says "editable"). A control that only darkens its border is answering half the
+  question.
+  **WHAT TAKES IT**: every `PickList` trigger (`field` and `inline`), `PickSet`,
+  `InlineValue`'s resting button, `DateField` and `TimeField` in their cell
+  dress, a `TabPicker`'s unselected cell, a `WeekdayPicker`'s unselected day,
+  `DataTable`'s row expander and `RevealPanel`'s toggle (which is that expander
+  to the pixel), `RowMenu`'s ⋯ and the columns eye.
+  **WHAT DOES NOT, and each for its own reason**: a BUTTON, which fills BLACK
+  (`BUTTON_CLASS`) — or `neutral-800` when it is already black
+  (`DIALOG_COMMIT_CLASS`), so a black commit still answers; a SWITCH, a CHECKBOX
+  and a RADIO, whose affordance is the thing that moves or fills; and a TEXT
+  INPUT (`TextInput`, and the order guide's quantity boxes), because you type
+  into it rather than press it — and on the guide a wash would fight the
+  three-state colour those boxes carry, which is a state and outranks a hover.
+  **A SELECTED cell never washes** — it is already filled, and a wash on top
+  would say the pointer had changed something.
+  `PickSet` also gained `w-full` when `boxed`, the other half of the same report
+  ("It is also not as wide as the other fields"): a boxed field fills its track,
+  which is what `BOXED_FIELD` says. That made `LocationAccess`'s `fullWidth`
+  prop dead, so it is gone rather than left saying something it no longer
+  decides.
+
 - **EVERY BUTTON IS WHITE; only a SET FILTER is black** (Mark, 2026-08-02, after
   a sweep). The outlined cell — `border border-ink bg-white`, filling black on
   hover — is the only button weight the app has. There is no "primary": a filled

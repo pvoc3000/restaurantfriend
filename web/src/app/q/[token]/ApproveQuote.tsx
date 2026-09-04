@@ -239,7 +239,7 @@ export function ApproveQuote({ token }: { token: string }) {
           type="button"
           disabled={busy || !agreed || !name.trim()}
           onClick={() => void approve()}
-          className="h-12 w-full border-2 border-ink bg-ink text-[14px] font-semibold uppercase tracking-[0.06em] text-white transition-colors disabled:opacity-35"
+          className="h-12 w-full border-2 border-ink bg-ink text-[14px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-neutral-800 disabled:opacity-35"
         >
           {busy ? "Recording…" : "Approve this quote"}
         </button>

@@ -34,7 +34,6 @@ export function LocationAccess({
   locations,
   allowed,
   editable,
-  fullWidth = false,
 }: {
   orgId: string;
   /** The member's auth user id — `employees.user_id`. */
@@ -44,8 +43,6 @@ export function LocationAccess({
   /** The location ids already on the grid. Empty = unrestricted. */
   allowed: string[];
   editable: boolean;
-  /** Fill the field track, so this and the Role picker share one edge. */
-  fullWidth?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -128,7 +125,6 @@ export function LocationAccess({
         label="Which shops this member may work at"
         noun="shop"
         boxed
-        className={fullWidth ? "w-full" : ""}
       />
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
     </div>

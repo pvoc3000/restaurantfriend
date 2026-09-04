@@ -117,8 +117,20 @@ export function PickSet({
         // wants the black rule its neighbours have, a detail FIELD wants the
         // hairline that blackens on hover. Mark, 2026-08-29 — Works at and
         // Role were a black border beside a grey one.
-        className={`flex h-9 items-center gap-2 bg-white px-3 text-[13px] disabled:opacity-40 ${
-          boxed ? BOXED_FIELD_BORDER : "border border-ink"
+        //
+        // THE GREY WASH ON HOVER IS THE APP'S ONE "you can press this" CUE, and
+        // this control shipped without it (Mark, 2026-09-04: Kind "fills grey
+        // and the border becomes black", Shifts only got the border). A border
+        // that darkens is the BOXED dress's own resting cue and says nothing
+        // about pressing — every button and every `PickList` trigger fills.
+        //
+        // `w-full` when boxed, for the other half of the same report ("not as
+        // wide as the other fields"): a boxed field fills its track, which is
+        // what `BOXED_FIELD` says and what every `InlineValue` beside this one
+        // does. Unboxed it stays content-sized, because a filter row packs its
+        // controls rather than stretching them.
+        className={`flex h-9 items-center gap-2 bg-white px-3 text-[13px] hover:bg-neutral-100 disabled:opacity-40 ${
+          boxed ? `${BOXED_FIELD_BORDER} w-full` : "border border-ink"
         } ${className}`}
       >
         <span className="truncate">{summary}</span>

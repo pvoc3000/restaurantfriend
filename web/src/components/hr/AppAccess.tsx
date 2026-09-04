@@ -224,7 +224,6 @@ export function AppAccess({
                 locations={locations}
                 allowed={allowedLocationIds}
                 editable={!isOwner}
-                fullWidth
               />
             </dd>
             <dt className="text-subtle">Role</dt>
