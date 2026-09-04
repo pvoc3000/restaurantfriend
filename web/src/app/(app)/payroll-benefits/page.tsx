@@ -2,7 +2,6 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canReadHr } from "@/lib/roles";
 import { PageHeading } from "@/components/ui/PageHeading";
-import { SectionHeading } from "@/components/ui/SectionHeading";
 import { AddPayrollBenefit } from "@/components/payroll/AddPayrollBenefit";
 import {
   PayrollBenefitsList,
@@ -89,12 +88,11 @@ export default async function PayrollBenefitsPage() {
           "of" — the total alone is the honest line. */}
       <PageHeading title="Benefits" total={rows.length} noun="benefits" />
 
-      <PayrollBenefitsList rows={rows} editable={canReadHr(session.membership.role)} />
-
-      <section className="space-y-2">
-        <SectionHeading>Adding one</SectionHeading>
-        <AddPayrollBenefit orgId={session.membership.org_id} />
-      </section>
+      <PayrollBenefitsList
+        rows={rows}
+        editable={canReadHr(session.membership.role)}
+        action={<AddPayrollBenefit orgId={session.membership.org_id} />}
+      />
     </div>
   );
 }

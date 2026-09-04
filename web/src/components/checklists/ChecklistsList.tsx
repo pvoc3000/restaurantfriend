@@ -45,6 +45,7 @@ export function ChecklistsList({
   startable,
   locationCode,
   action,
+  viewTabs,
   heading,
 }: {
   rows: RunRow[];
@@ -57,6 +58,13 @@ export function ChecklistsList({
    * pass it.
    */
   action?: ReactNode;
+  /**
+   * The screen's view tabs (Checklists | Templates), rendered as the FIRST cell
+   * of this row (Mark, 2026-09-03) — they used to sit on a line of their own
+   * between the heading and the filters, which made three stacked bands of
+   * controls out of two.
+   */
+  viewTabs?: ReactNode;
   /**
    * The page heading, when this list IS the page — `/inspection-logs`. On
    * `/checklists` the heading sits above the view tabs, so the screen owns it
@@ -191,6 +199,7 @@ export function ChecklistsList({
       ) : null}
 
       <div className="flex flex-wrap items-end gap-4">
+        {viewTabs}
         <TabPicker
           ariaLabel="Which ones"
           value={tier}

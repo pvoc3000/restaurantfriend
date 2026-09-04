@@ -271,16 +271,6 @@ export function ShiftReportsList({
         visible={visible.length}
         total={rows.length}
         noun="shift reports"
-        action={
-          <NewShiftReport
-            orgId={orgId}
-            locationId={locationId}
-            locationCode={locationCode}
-            today={today}
-            myEmployeeId={myEmployeeId}
-            existing={rows.map((r) => ({ date: r.reportDate, shift: r.shift, status: r.status }))}
-          />
-        }
       />
 
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
@@ -304,7 +294,16 @@ export function ShiftReportsList({
         }
         leading={
           <div className="space-y-3">
+          {/* SEARCH FIRST, then the tiers, then the command — the order every
+              other list uses (Mark, 2026-09-03). */}
           <div className="flex flex-wrap items-end gap-3">
+            <TextInput
+              value={search}
+              onValueChange={setSearch}
+              placeholder="Search the reports…"
+              clearLabel="Clear the search"
+              className="w-72"
+            />
             <TabPicker
               ariaLabel="Which shift reports"
               value={tier}
@@ -316,13 +315,20 @@ export function ShiftReportsList({
                 { key: "all", label: "All", count: rows.length },
               ]}
             />
-            <TextInput
-              value={search}
-              onValueChange={setSearch}
-              placeholder="Search the reports…"
-              clearLabel="Clear the search"
-              className="w-72"
-            />
+            <div className="ml-auto">
+              <NewShiftReport
+                orgId={orgId}
+                locationId={locationId}
+                locationCode={locationCode}
+                today={today}
+                myEmployeeId={myEmployeeId}
+                existing={rows.map((r) => ({
+                  date: r.reportDate,
+                  shift: r.shift,
+                  status: r.status,
+                }))}
+              />
+            </div>
           </div>
           {/* UNDER THE TABS, NOT OVER THEM (Mark, 2026-09-03). The missing
               nights are counted ON the Needs attention tab, so the sentence

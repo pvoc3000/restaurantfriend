@@ -45,6 +45,7 @@ export function ChecklistTemplatesList({
   locationCode,
   editable,
   action,
+  viewTabs,
 }: {
   rows: TemplateRow[];
   locationCode: string;
@@ -55,6 +56,13 @@ export function ChecklistTemplatesList({
    * flag: only the page knows which command this list is for.
    */
   action?: ReactNode;
+  /**
+   * The screen's view tabs (Checklists | Templates), rendered as the FIRST cell
+   * of this row (Mark, 2026-09-03) — they used to sit on a line of their own
+   * between the heading and the filters, which made three stacked bands of
+   * controls out of two.
+   */
+  viewTabs?: ReactNode;
 }) {
   const [search, setSearch] = useState("");
   const [kind, setKind] = useState<ChecklistKind | "all">("all");
@@ -146,13 +154,17 @@ export function ChecklistTemplatesList({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end gap-4">
+        {viewTabs}
         <TextInput
           value={search}
           onValueChange={setSearch}
           placeholder="Search templates…"
           aria-label="Search templates"
           clearLabel="Clear the search"
-          className="w-72"
+          // w-56, not the usual w-72: with the view tabs now in this row the
+          // bar wants 1221px of a 1184px line at 1280 and the command wraps.
+          // `ElementsList` narrows its own for the same measurement.
+          className="w-56"
         />
         <TabPicker
           ariaLabel="Kind"

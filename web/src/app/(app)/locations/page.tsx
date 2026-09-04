@@ -59,6 +59,7 @@ export default async function LocationsPage() {
         workableIds={session.workableLocations.map((l) => l.id)}
         workingLocationId={session.activeLocation?.id ?? null}
         editable={editable}
+        orgId={session.membership.org_id}
       />
     </div>
   );

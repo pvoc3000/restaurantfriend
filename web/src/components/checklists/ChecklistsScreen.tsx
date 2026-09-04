@@ -66,6 +66,22 @@ export function ChecklistsScreen({
 }) {
   const router = useRouter();
 
+  // Handed to whichever list is rendered, so it sits IN the filter row rather
+  // than on a band above it (Mark, 2026-09-03).
+  const viewTabs = (
+    <TabPicker
+      ariaLabel="Which view"
+      value={view}
+      options={CHECKLIST_VIEWS.map((v) => ({
+        key: v,
+        label: CHECKLIST_VIEW_LABEL[v],
+        count: v === "walks" ? runs.length : templates.length,
+        href: checklistViewHref(v),
+      }))}
+      onChange={(v) => router.push(checklistViewHref(v as ChecklistView))}
+    />
+  );
+
   return (
     <div className="space-y-6">
       {/* The TOTAL for the view on screen, with no "of": the filtered count
@@ -78,23 +94,12 @@ export function ChecklistsScreen({
         noun={view === "walks" ? "checklists" : "templates"}
       />
 
-      <TabPicker
-        ariaLabel="Which view"
-        value={view}
-        options={CHECKLIST_VIEWS.map((v) => ({
-          key: v,
-          label: CHECKLIST_VIEW_LABEL[v],
-          count: v === "walks" ? runs.length : templates.length,
-          href: checklistViewHref(v),
-        }))}
-        onChange={(v) => router.push(checklistViewHref(v as ChecklistView))}
-      />
-
       {view === "walks" ? (
         <ChecklistsList
           rows={runs}
           startable={startable}
           locationCode={locationCode}
+          viewTabs={viewTabs}
           action={
             canWalk && (
               <StartWalk
@@ -111,6 +116,7 @@ export function ChecklistsScreen({
           rows={templates}
           locationCode={locationCode}
           editable={canEdit}
+          viewTabs={viewTabs}
           action={
             canEdit && (
               <NewChecklistTemplate

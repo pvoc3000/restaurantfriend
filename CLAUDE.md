@@ -7849,8 +7849,15 @@ weekday column, and 003 then silently made it per-vendor-item.
   of the row that holds the search box and the tab pickers, which lands it on
   the page's right edge — the same pixel as the columns eye (measured, 1232 at
   1280) — and bottom-aligns it with the controls beside it.
-  `PageHeading` still takes an `action`, and the screens outside Facilities
-  still use it; **converting the rest of the app is outstanding.**
+  **THE ROW IS THE ONE WITH THE SEARCH BOX IN IT, not a tab picker on a line
+  below** (Mark, 2026-09-03, on `/employees`). Where a list has no search and no
+  tabs at all (`/payroll-benefits`) the command's own strip above the table IS
+  that row — outside `DataTable`'s `leading`, which would leave it 48px short of
+  the edge. And the SEARCH BOX COMES FIRST in that row, before the tiers, which
+  is the order every list uses (`/shift-reports` had it after and was corrected).
+  `PageHeading` still takes an `action`, and the screens outside Facilities, HR
+  and Operations still use it; **converting Production, Purchasing and Special
+  Orders is outstanding.**
   A list that owns the heading has to RENDER EVEN WHEN EMPTY either way, or an
   empty shop gets no title and no way to make its first record (`/plans` and
   `/schedules` both had that hole).

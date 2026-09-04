@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { PageHeading } from "@/components/ui/PageHeading";
+import { NewLocation } from "./NewLocation";
 import Link from "next/link";
 
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
@@ -40,12 +41,14 @@ export function LocationsList({
   workingLocationId,
   workableIds,
   editable,
+  orgId,
 }: {
   rows: LocationRow[];
   workingLocationId: string | null;
   /** 073: the shops this member may work at — `session.workableLocations`. */
   workableIds: string[];
   editable: boolean;
+  orgId: string;
 }) {
   const workable = new Set(workableIds);
   const [search, setSearch] = useState("");
@@ -189,7 +192,8 @@ export function LocationsList({
       {/* No shop code: these rows ARE the locations, so the screen is org-wide. */}
       <PageHeading title="Locations" visible={shown.length} total={rows.length} noun="locations" />
 
-      <div className="flex flex-wrap items-center gap-4">
+      {/* The command sits in the filter row, right-aligned — Facilities' rule. */}
+      <div className="flex flex-wrap items-end gap-4">
         <TextInput
           value={search}
           onValueChange={setSearch}
@@ -201,11 +205,11 @@ export function LocationsList({
           // than the same field on Vendors, Inventory and the PO list.
           className="w-72"
         />
-        <span className="text-sm text-muted">
-          {shown.length === rows.length
-            ? `${rows.length} location${rows.length === 1 ? "" : "s"}`
-            : `${shown.length} of ${rows.length}`}
-        </span>
+        {editable ? (
+          <div className="ml-auto">
+            <NewLocation orgId={orgId} existingCodes={rows.map((r) => r.code)} />
+          </div>
+        ) : null}
       </div>
 
       <DataTable

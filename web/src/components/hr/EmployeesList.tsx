@@ -358,21 +358,13 @@ export function EmployeesList({
         visible={shown.length}
         total={rows.length}
         noun="people"
-        action={
-          <NewEmployee
-            orgId={orgId}
-            // The FULL set, not `shown` — the rehire check has to see the 417
-            // former employees a filter is hiding.
-            roster={rows}
-            locationOptions={locationOptions}
-            positions={positions}
-            today={today}
-          />
-        }
       />
 
       <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-4">
+        {/* THE SEARCH ROW, not the tab picker under it (Mark, 2026-09-03):
+            `items-end` and `ml-auto` put the command level with the search box
+            and the two filter menus, on the page's right edge. */}
+        <div className="flex flex-wrap items-end gap-4">
           <TextInput
             value={search}
             onValueChange={setSearch}
@@ -405,6 +397,17 @@ export function EmployeesList({
             ]}
             className="w-56"
           />
+          <div className="ml-auto">
+            <NewEmployee
+              orgId={orgId}
+              // The FULL set, not `shown` — the rehire check has to see the 417
+              // former employees a filter is hiding.
+              roster={rows}
+              locationOptions={locationOptions}
+              positions={positions}
+              today={today}
+            />
+          </div>
         </div>
 
         <TabPicker
