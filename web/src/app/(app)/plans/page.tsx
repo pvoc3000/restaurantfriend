@@ -81,7 +81,6 @@ export default async function PlansPage({
           }) === workingId
       )
     : (plans ?? []);
-  const hiddenElsewhere = (plans ?? []).length - mine.length;
 
   const rows: PlanRow[] = mine.map((p) => ({
     id: p.id as string,
@@ -119,19 +118,6 @@ export default async function PlansPage({
               locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
               today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
             />
-          ) : null
-        }
-        // THE OTHER-KITCHEN NOTE SURVIVES THE HEADER CHANGE, because it is not
-        // a description of the screen — it is the one fact the count cannot
-        // carry: a shorter list with no explanation reads as plans having gone
-        // missing.
-        note={
-          hiddenElsewhere > 0 ? (
-            <p className="text-sm text-muted">
-              {hiddenElsewhere} more {hiddenElsewhere === 1 ? "plan is" : "plans are"} made
-              at another kitchen. Switch shops to see{" "}
-              {hiddenElsewhere === 1 ? "it" : "them"}.
-            </p>
           ) : null
         }
       />

@@ -7849,6 +7849,9 @@ weekday column, and 003 then silently made it per-vendor-item.
   The org-wide screens pass no `code` — Employees, Events, Timesheets,
   Benefits, Locations, Sales and the production catalog are not scoped to a
   shop, and naming one would be a claim the screen does not make.
+  The one surviving `note` is `/batch-logs`' two empty-window sentences; the
+  plans list's "1 more plan is made at another kitchen" was kept for one commit
+  and then deleted (Mark), and its prop went with it.
   Applied 2026-09-03 to all 24 list screens. `/purchase-orders` and `/invoices`
   keep their own header markup because they carry a Window total beside it.
 - **A NAV LABEL AND A PAGE TITLE NEED NOT MATCH** (Mark, 2026-09-03, asking

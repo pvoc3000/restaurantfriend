@@ -80,7 +80,6 @@ export function PlansList({
   initialSearch = "",
   locationCode,
   action,
-  note,
 }: {
   rows: PlanRow[];
   orgId: string;
@@ -92,8 +91,6 @@ export function PlansList({
   locationCode?: string | null;
   /** The screen's create command, beside the title. */
   action?: ReactNode;
-  /** A line under the heading — the one fact the count cannot carry. */
-  note?: ReactNode;
 }) {
   const router = useRouter();
 
@@ -502,7 +499,6 @@ export function PlansList({
         noun="plans"
         action={action}
       />
-      {note}
 
       {failed ? <p className="mb-3 text-[13px] text-accent">{failed}</p> : null}
     <DataTable
