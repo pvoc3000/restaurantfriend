@@ -345,12 +345,15 @@ export function ItemsList({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-baseline gap-3">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">Inventory</h1>
-        <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-          {visible.length} of {items.length}
-          {activeLocationCode ? ` · ${activeLocationCode}` : ""}
-        </span>
+      {/* The module's model header — see `VendorsList`. */}
+      <div>
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          Inventory
+        </h1>
+        <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+          {activeLocationCode ? `${activeLocationCode} · ` : ""}
+          {visible.length} of {items.length} inventory items
+        </p>
       </div>
 
       {/* Search + category */}

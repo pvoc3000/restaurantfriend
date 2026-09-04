@@ -374,7 +374,19 @@ export function PurchaseRequestsList({
   const sorted = sortRows(visible, columns, sort ?? REQUESTS_NATURAL_SORT);
 
   return (
-    <DataTable
+    <div className="space-y-4">
+      {/* The module's model header (`PurchaseOrderList`): title, then a
+          small-caps line leading with the shop. */}
+      <div>
+        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+          Purchase Requests
+        </h1>
+        <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+          {locationCode} · {visible.length} of {rows.length} requests
+        </p>
+      </div>
+
+      <DataTable
       rows={sorted}
       sort={sort ?? REQUESTS_NATURAL_SORT}
       onSortChange={changeSort}
@@ -428,5 +440,6 @@ export function PurchaseRequestsList({
         </div>
       }
     />
+    </div>
   );
 }

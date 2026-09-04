@@ -115,17 +115,6 @@ export default async function PurchaseRequestsPage({
 
   return (
     <div className="space-y-6">
-      <div className="space-y-1">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Requests
-        </h1>
-        <p className="max-w-[72ch] text-sm text-muted">
-          What {active.code} has asked for. Anyone can file one; whoever does the
-          ordering marks it ordered or says why not. Nothing here is deleted —
-          the two answers are the record.
-        </p>
-      </div>
-
       {/* Keyed for the reason /shop-sections is: switching location is a
           navigation to this same route, so without it the search box and the
           status tab keep the state you set against the other shop's queue. */}

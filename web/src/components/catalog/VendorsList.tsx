@@ -250,12 +250,14 @@ export function VendorsList({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-baseline gap-3">
+      {/* `PurchaseOrderList`'s header, which is the module's model (Mark,
+          2026-09-03): the count sits UNDER the title and leads with the shop. */}
+      <div>
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">Vendors</h1>
-        <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-          {visible.length} of {vendors.length}
-          {activeLocationCode ? ` · ${activeLocationCode}` : ""}
-        </span>
+        <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+          {activeLocationCode ? `${activeLocationCode} · ` : ""}
+          {visible.length} of {vendors.length} vendors
+        </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">

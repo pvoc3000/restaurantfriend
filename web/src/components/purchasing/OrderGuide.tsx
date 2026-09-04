@@ -597,6 +597,11 @@ export function OrderGuide({
     setEntries(new Map());
   }
 
+  // Is there a band above the guide at all? Both columns decide it together —
+  // `showEmpty` is what holds one open beside the other — and the title row
+  // needs the same answer, to know whether it is carrying "Add reminder".
+  const bands = reminders.length > 0 || requests.length > 0;
+
   return (
     // The two FIXED children — the command bar and the back-to-top disc — sit
     // OUTSIDE the spacing container, and that placement is load-bearing.
@@ -636,6 +641,7 @@ export function OrderGuide({
           leaving a hole where a column should be. With both empty neither
           renders at all — the guide's first row should be the guide — and
           Reminders falls back to its own quiet "Add reminder" line. */}
+      {bands && (
       <div className="grid gap-4 md:grid-cols-2 md:items-start">
         <Reminders
           reminders={reminders}
@@ -659,23 +665,30 @@ export function OrderGuide({
           jumpMiss={jumpMiss}
         />
       </div>
+      )}
 
       {/* The shelf — everything above the list: the title, the day picker,
           the vendor totals and the filters. It used to hide with the
           masthead's collapse toggle, on the argument that these are all
           things you set BEFORE you start walking; that toggle is gone
           (Mark, 2026-08-02) and so is the hiding. */}
-      {/* Title block. The context line that used to sit under the title is
-          gone (Mark, 2026-07-29) — the location is in the masthead and the
-          day is the lit chip in the picker, so all it added was the walked
-          date. What's left of it is the count, moved up BESIDE the title
-          where it reads as a subtitle, with the day picker taking the line
-          underneath. */}
+      {/* Title block. The count sits UNDER the title and leads with the shop
+          (Mark, 2026-09-03) — `PurchaseOrderList`'s header, which is this
+          module's model. It rode BESIDE the title from 2026-07-29 until then. */}
       <div className="space-y-3">
-        <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1">
-          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            Order Guide
-          </h1>
+        <div className="flex flex-wrap items-end gap-x-6 gap-y-1">
+          {/* The module's model header (`PurchaseOrderList`): the count sits
+              UNDER the title and leads with the shop. `items-end`, so the day
+              picker and the commands bottom-align with it rather than with the
+              first line of a two-line block. */}
+          <div>
+            <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+              Order Guide
+            </h1>
+            <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+              {locationCode} · {visibleRows.length} of {rows.length} vendor items
+            </p>
+          </div>
 
           {/* THE DAY — the screen's ONE piece of day state, and it sits in the
               identity block after the title because that is what it is: which
@@ -712,15 +725,31 @@ export function OrderGuide({
             )}
           </span>
 
-          <p className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-            {visibleRows.length} of {rows.length} items
-          </p>
-          <button
-            onClick={() => router.refresh()}
-            className="ml-auto text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-          >
-            Refresh
-          </button>
+          {/* WITH NO BANDS ABOVE, "Add reminder" LIVES HERE (Mark, 2026-09-03:
+              it "should be bottom aligned. Hopefully that will get rid of the
+              extra space in the header"). It did: the fallback line was a
+              right-aligned paragraph occupying a cell of the two-column band
+              grid, so on a quiet day the guide opened with a row of white
+              space above its own title. With a band on screen the trigger is
+              in that band's header, where it belongs. */}
+          <div className="ml-auto flex flex-wrap items-baseline gap-x-6 gap-y-1">
+            {bands ? null : (
+              <Reminders
+                reminders={reminders}
+                guideDate={guideDate}
+                locationId={locationId}
+                orgId={orgId}
+                canWrite={canGeneratePos}
+                showEmpty={false}
+              />
+            )}
+            <button
+              onClick={() => router.refresh()}
+              className="text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+            >
+              Refresh
+            </button>
+          </div>
         </div>
 
         {/* The guide is the screen the shop is walked on, so a view it can't

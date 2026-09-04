@@ -7824,6 +7824,18 @@ weekday column, and 003 then silently made it per-vendor-item.
 
 ## Conventions
 
+- **PURCHASING HAS ONE HEADER, AND IT IS `PurchaseOrderList`'S** (Mark,
+  2026-09-03: "the model is Purchase orders and invoices. Those shouldn't
+  change"). Title, then a small-caps 12px `text-subtle` line under it reading
+  **shop first** — `DF02 · 29 of 80 vendors`. Vendors and Inventory had the same
+  facts beside the title and shop LAST; the order guide had the count beside the
+  title and no shop at all; Requests had a prose paragraph. All four now match.
+  Two consequences worth knowing. **The count is the FILTERED one**, so the
+  header has to live wherever the filters do — which is why `/purchase-requests`
+  moved its title out of the page and into `PurchaseRequestsList`, as the two
+  model screens already had. And the ORDER GUIDE's title row is `items-end`, so
+  the day picker and the commands bottom-align with the count rather than with
+  the first line of a two-line block.
 - **A NAV LABEL AND A PAGE TITLE NEED NOT MATCH** (Mark, 2026-09-03, asking
   outright). Nothing couples them — `lib/nav.ts` holds one, the screen holds the
   other — and the two have different jobs: a nav tier is a narrow strip where a
