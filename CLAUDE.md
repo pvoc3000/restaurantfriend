@@ -7500,6 +7500,15 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    without the flag; both pass it now. **Every `<ActiveToggle` either sits
    inside an `editable ?` or carries `readOnly={!editable}`** — the sweep that
    found these is `grep -rn -A4 "<ActiveToggle"`.
+   **Third hole, on a supervisor: the LISTS' bulk bars and row menus.**
+   `ItemsList` and `PurchaseOrderList` offered the selection column, the
+   batch bar and a row's Delete to everyone ("RLS is the gate"), so a
+   supervisor — Read Only on both — could tick, press, and be told zero rows
+   moved. Both take the cell now; `SchedulesList` gates its print selection
+   on `stampable` and `InvoiceList` on `canEdit || canApprove`. Swept with
+   `grep -rln '<RowMenu\|key: "select"\|checked.size > 0'`; every other list
+   already wrapped its commands in `editable`. **A selection column exists for
+   its bar; if the bar has nothing a role may press, drop the column too.**
    **Nobody has ever held purchaser or supervisor**, so the first invites are
    the first real exercise of any of this. Expect small holes; each is a cell.
    **1601 fixtures pass**, 17 new.
