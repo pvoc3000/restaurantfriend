@@ -373,7 +373,7 @@ export function TemplateItemsTable({
     },
     {
       key: "position",
-      label: "Who",
+      label: "Assigned to",
       width: 150,
       sortValue: (r) => r.position ?? "",
       // The ROSTER vocabulary — Baker, Fryer, Supervisor — not org_members.role.
