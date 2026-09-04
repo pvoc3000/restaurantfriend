@@ -1,7 +1,8 @@
 // WHO MAY OPEN WHICH SCREEN, AND WHETHER THEY MAY CHANGE ANYTHING ON IT.
 //
 // This is Mark's "Page Permissions" spreadsheet (docs/Page Permissions.xlsx,
-// 2026-09-04) as code, one row per screen, one column per role, so that
+// 2026-09-04, revised the same afternoon: "purchasers should have almost
+// manager access, minus HR") as code, one row per screen, one column per role, so that
 // changing who sees what is an edit to THIS FILE and a deploy — never a
 // migration. Read it the way the sheet reads:
 //
@@ -24,8 +25,10 @@
 // the screen and not at the table, which Mark accepted for everything outside
 // HR), and it can NEVER grant access the database refuses: an "R" or "W" cell
 // on a table whose policy says no renders an empty list or a write that
-// matches zero rows. Every loosening the sheet asked for was therefore ALSO a
-// policy change — migration 092 — and the fixture that pins this table says
+// matches zero rows. Every loosening the FIRST sheet asked for was therefore
+// ALSO a policy change — migration 092 — where the afternoon revision
+// (purchaser Write on production, invoices and customers; Locations owner
+// only) needed none, every one of those tables already admitting a purchaser. and the fixture that pins this table says
 // which cells those are, so the next one is recognised as a migration too.
 //
 // A page-level cell is a CEILING, not the whole story. Some single acts on a
@@ -78,7 +81,7 @@ function row(staff: Cell, supervisor: Cell, purchaser: Cell, admin: Cell, owner:
  */
 export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   // ── Facilities ────────────────────────────────── staff  sup  purch  mgr  own
-  "/locations":            row("-", "-", "-", "W", "W"),
+  "/locations":            row("-", "-", "-", "-", "W"),
   "/shop-sections":        row("-", "-", "-", "-", "W"),
   "/checklists":           row("-", "W", "W", "W", "W"),
   // The template RECORD and the retired list shim — nav's `also` for Checklists.
@@ -117,13 +120,13 @@ export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   "/price-grid":           row("-", "R", "W", "W", "W"),
 
   // ── Production ────────────────────────────────────────────────────────────
-  "/plans":                row("-", "R", "R", "W", "W"),
+  "/plans":                row("-", "R", "W", "W", "W"),
   "/schedules":            row("R", "W", "W", "W", "W"),
   // The derived day is a sibling of the schedules screen (nav's `also`).
   "/production-day":       row("R", "W", "W", "W", "W"),
-  "/production-items":     row("-", "R", "R", "W", "W"),
-  "/elements":             row("-", "R", "R", "W", "W"),
-  "/recipes":              row("R", "R", "R", "W", "W"),
+  "/production-items":     row("-", "R", "W", "W", "W"),
+  "/elements":             row("-", "R", "W", "W", "W"),
+  "/recipes":              row("R", "R", "W", "W", "W"),
   "/batch-logs":           row("W", "W", "W", "W", "W"),
 
   // ── Purchasing ────────────────────────────────────────────────────────────
@@ -135,14 +138,14 @@ export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   "/purchase-requests":    row("R", "W", "W", "W", "W"),
   "/order-guide":          row("-", "W", "W", "W", "W"),
   "/purchase-orders":      row("-", "R", "W", "W", "W"),
-  "/invoices":             row("-", "-", "R", "W", "W"),
+  "/invoices":             row("-", "-", "W", "W", "W"),
   // Not on the sheet. A catalog-cleanup tool, so it follows the catalog's
   // own write rule.
   "/cleanup":              row("-", "-", "W", "W", "W"),
 
   // ── Special Orders ────────────────────────────────────────────────────────
   "/special-orders":       row("R", "W", "W", "W", "W"),
-  "/customers":            row("R", "R", "R", "W", "W"),
+  "/customers":            row("R", "R", "W", "W", "W"),
 };
 
 /**

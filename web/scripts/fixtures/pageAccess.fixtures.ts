@@ -44,9 +44,12 @@ test("HR is unreachable below manager, and the manager cell on Benefits is blank
   eq(pageAccess("owner", "/payroll-benefits"), "write");
 });
 
-test("production is read-only for a purchaser and open to a manager", () => {
+test("production is read-only for a supervisor and open to a purchaser", () => {
+  // The afternoon revision: "purchasers should have almost manager access,
+  // minus HR". A supervisor still reads.
   for (const route of ["/plans", "/production-items", "/elements", "/recipes"]) {
-    eq(pageAccess("purchaser", route), "read", route);
+    eq(pageAccess("supervisor", route), "read", route);
+    eq(pageAccess("purchaser", route), "write", route);
     eq(pageAccess("admin", route), "write", route);
   }
   // Schedules is the one production screen a supervisor WRITES on.
@@ -54,9 +57,9 @@ test("production is read-only for a purchaser and open to a manager", () => {
   eq(pageAccess("staff", "/schedules"), "read");
 });
 
-test("invoices are hidden below purchaser and read-only for one", () => {
+test("invoices are hidden below purchaser and open from one up", () => {
   eq(pageAccess("supervisor", "/invoices"), "none");
-  eq(pageAccess("purchaser", "/invoices"), "read");
+  eq(pageAccess("purchaser", "/invoices"), "write");
   eq(pageAccess("admin", "/invoices"), "write");
 });
 
@@ -65,11 +68,13 @@ test("staff read special orders and customers, supervisors write orders and read
   eq(pageAccess("staff", "/customers"), "read");
   eq(pageAccess("supervisor", "/special-orders"), "write");
   eq(pageAccess("supervisor", "/customers"), "read");
+  eq(pageAccess("purchaser", "/customers"), "write");
 });
 
-test("the Facilities list is manager+, and shop sections are owner only", () => {
+test("the Facilities list and shop sections are owner only", () => {
   eq(pageAccess("purchaser", "/locations"), "none");
-  eq(pageAccess("admin", "/locations"), "write");
+  eq(pageAccess("admin", "/locations"), "none");
+  eq(pageAccess("owner", "/locations"), "write");
   eq(pageAccess("admin", "/shop-sections"), "none");
   eq(pageAccess("owner", "/shop-sections"), "write");
 });
@@ -89,7 +94,7 @@ test("every built menu entry, and every `also` route, has a row", () => {
 });
 
 test("a record route inherits its list's row — by prefix, longest wins", () => {
-  eq(pageAccess("purchaser", "/plans/abc-123"), "read");
+  eq(pageAccess("supervisor", "/plans/abc-123"), "read");
   eq(pageAccess("staff", "/special-orders/abc?from=x"), "read");
   // /production-day is not /production-items, and neither is a prefix of the
   // other's records.
@@ -106,9 +111,9 @@ test("an ungoverned route opens for everyone and offers writes to nobody", () =>
 });
 
 test("canReachPage and canEditPage read the same cell", () => {
-  ok(canReachPage("purchaser", "/plans"));
-  no(canEditPage("purchaser", "/plans"));
-  ok(canEditPage("admin", "/plans"));
+  ok(canReachPage("supervisor", "/plans"));
+  no(canEditPage("supervisor", "/plans"));
+  ok(canEditPage("purchaser", "/plans"));
   no(canReachPage("staff", "/order-guide"));
   no(canReachPage("staff", "/employees"), "unreachable is not reachable either");
 });
@@ -131,9 +136,9 @@ test("the menu hides exactly what the table hides", () => {
 
 test("home is the Locations list where the sheet allows it, else the first offered screen", () => {
   eq(homeHref("owner"), "/locations");
-  eq(homeHref("admin"), "/locations");
-  // A purchaser is hidden from Locations; the first built screen their menu
-  // offers, in menu order, is the checklists.
+  // Everyone else is hidden from Locations since the afternoon revision; the
+  // first built screen their menu offers, in menu order, is the checklists.
+  eq(homeHref("admin"), "/checklists");
   eq(homeHref("purchaser"), "/checklists");
   eq(homeHref("supervisor"), "/checklists");
   // Staff are hidden from all of Facilities, HR and Operations.
@@ -146,6 +151,7 @@ test("the refusal names who may open the screen, in the app's own words", () => 
   eq(rolesWhoMayReach("/employees"), ["admin", "owner"]);
   eq(whoMayReachSentence("/employees"), "managers and the owner");
   eq(whoMayReachSentence("/shop-sections"), "the owner");
+  eq(whoMayReachSentence("/locations"), "the owner");
   eq(whoMayReachSentence("/order-guide"), "supervisors, purchasers, managers and the owner");
   // Never the raw role name: `admin` is Manager on every screen.
   no(whoMayReachSentence("/employees").includes("admin"));
