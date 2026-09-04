@@ -373,9 +373,15 @@ export function TemplateItemsTable({
     },
     {
       key: "position",
-      label: "Assigned to",
+      label: "Role",
       width: 150,
       sortValue: (r) => r.position ?? "",
+      // "Role", not "Assigned to" (Mark, 2026-09-03): this column is
+      // `position`, so it names a JOB — and `/tasks` already has an Assigned
+      // column that points at an actual app user (079) and decides whose
+      // checklist a job appears on. Two columns a word apart meaning different
+      // things is worth avoiding.
+      //
       // The ROSTER vocabulary — Baker, Fryer, Supervisor — not org_members.role.
       // `allowNew` because the next position must not need a migration, and a
       // list offers the spelling before somebody types a second one.
