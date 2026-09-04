@@ -22,14 +22,19 @@ export type VendorRecord = {
  * has had an inline-editable field block since it shipped — vendor detail was
  * the one record you couldn't touch without leaving the page.
  *
- * No role gate, matching `ItemFields`/`VendorItemFields`: InlineValue tries the
+ * `editable` is the Page Permissions sheet's cell (2026-09-04). Before that,
+ * no role gate, matching `ItemFields`/`VendorItemFields`: InlineValue tried the
  * write and RLS answers for a role below purchaser+, with the error shown
  * beside the field rather than the control disappearing.
  */
 export function VendorFields({
   vendor,
   vendorTypes,
+  editable,
 }: {
+  /** The Page Permissions sheet's cell for /vendors — staff and supervisors
+   *  READ this block. */
+  editable: boolean;
   vendor: VendorRecord;
   /** Every `vendor_type` already in use across the org — the vocabulary
    *  `allowNew` grows, same as the item category picker. */
@@ -40,6 +45,7 @@ export function VendorFields({
       <dt className="text-subtle">Type</dt>
       <dd>
         <InlineValue
+          readOnly={!editable}
           boxed={BOXED_FIELDS}
           table="vendors"
           id={vendor.id}
@@ -55,6 +61,7 @@ export function VendorFields({
       <dd>
         {/* A closed set — the DB's own check constraint — so no allowNew. */}
         <InlineValue
+          readOnly={!editable}
           boxed={BOXED_FIELDS}
           table="vendors"
           id={vendor.id}
@@ -87,6 +94,7 @@ export function VendorFields({
       </dt>
       <dd>
         <InlineValue
+          readOnly={!editable}
           boxed={BOXED_FIELDS}
           table="vendors"
           id={vendor.id}
@@ -98,6 +106,7 @@ export function VendorFields({
       <dt className="text-subtle">Description</dt>
       <dd>
         <InlineValue
+          readOnly={!editable}
           boxed={BOXED_FIELDS}
           table="vendors"
           id={vendor.id}
@@ -111,6 +120,7 @@ export function VendorFields({
         {/* Operational constraints — "1pm cutoff" (the column's own comment
             in migration 001). */}
         <InlineValue
+          readOnly={!editable}
           boxed={BOXED_FIELDS}
           table="vendors"
           id={vendor.id}

@@ -7480,6 +7480,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Facilities — the one assumption, one letter to reverse), Timesheets
    (unreachable below manager), Cleanup (purchaser+). Reviews, Documents,
    Policies and Tags are stubs and their /soon/ routes carry rows too.
+   **THE FIRST HOLE, found by Mark on a staff account within the hour: the
+   vendor record's fields were editable.** `VendorFields`, `ItemFields`,
+   `VendorItemFields`, `VendorLocationsTable`, `ItemLocationRows` and
+   `VendorItemLocations` had never taken an editable flag — they left writes
+   to RLS, which for staff means a cell that opens, accepts typing and matches
+   zero rows. A "Read Only" cell in the table reached nothing on those screens.
+   Fixed by giving **`InlineValue`, `ActiveToggle` and `WeekdayPicker` a
+   `readOnly` prop** (a value with `READ_ONLY_VALUE`'s padding and no box; a
+   word instead of a switch; the seven boxes as a statement) and threading
+   `editable` from the three records — `/vendors`, `/items`, `/vendor-items` —
+   into every block. One switch on the control rather than a conditional at
+   thirty call sites. **A field block that renders `InlineValue` must take
+   `editable`**; grep for the ones that don't before trusting a Read Only cell.
    **Nobody has ever held purchaser or supervisor**, so the first invites are
    the first real exercise of any of this. Expect small holes; each is a cell.
    **1601 fixtures pass**, 17 new.

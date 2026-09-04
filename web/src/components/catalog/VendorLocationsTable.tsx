@@ -118,7 +118,10 @@ export function VendorLocationsTable({
   codeById,
   activeLocationId,
   leading,
+  editable,
 }: {
+  /** The Page Permissions sheet's cell for /vendors. */
+  editable: boolean;
   rows: VendorLocationRow[];
   codeById: Record<string, string>;
   activeLocationId: string | null;
@@ -199,6 +202,7 @@ export function VendorLocationsTable({
       sortValue: (r) => (r.is_active ? 0 : 1),
       render: (r) => (
         <ActiveToggle
+          readOnly={!editable}
           table="vendor_locations"
           id={r.id}
           active={r.is_active}
@@ -232,6 +236,7 @@ export function VendorLocationsTable({
       sortValue: (r) => r.account_number,
       render: (r) => (
         <InlineValue
+          readOnly={!editable}
           table="vendor_locations"
           id={r.id}
           column="account_number"
@@ -247,6 +252,7 @@ export function VendorLocationsTable({
       sortValue: (r) => (r.minimum_order === null ? null : Number(r.minimum_order)),
       render: (r) => (
         <InlineValue
+          readOnly={!editable}
           table="vendor_locations"
           id={r.id}
           column="minimum_order"
@@ -264,6 +270,7 @@ export function VendorLocationsTable({
       sortValue: (r) => daysKey(r.order_days),
       render: (r) => (
         <WeekdayPicker
+          readOnly={!editable}
           table="vendor_locations"
           id={r.id}
           column="order_days"
@@ -279,6 +286,7 @@ export function VendorLocationsTable({
       sortValue: (r) => daysKey(r.delivery_days),
       render: (r) => (
         <WeekdayPicker
+          readOnly={!editable}
           table="vendor_locations"
           id={r.id}
           column="delivery_days"
@@ -305,6 +313,7 @@ export function VendorLocationsTable({
             <dt className="py-0.5 text-subtle">Sales rep</dt>
             <dd>
               <InlineValue
+                readOnly={!editable}
                 table="vendor_locations"
                 id={r.id}
                 column="sales_rep"
@@ -315,6 +324,7 @@ export function VendorLocationsTable({
             <dt className="py-0.5 text-subtle">Phone</dt>
             <dd>
               <InlineValue
+                readOnly={!editable}
                 table="vendor_locations"
                 id={r.id}
                 column="rep_phone"
@@ -325,6 +335,7 @@ export function VendorLocationsTable({
             <dt className="py-0.5 text-subtle">Email</dt>
             <dd>
               <InlineValue
+                readOnly={!editable}
                 table="vendor_locations"
                 id={r.id}
                 column="rep_email"
@@ -365,6 +376,7 @@ export function VendorLocationsTable({
                 <dt className="py-0.5 text-subtle">Account</dt>
                 <dd>
                   <InlineValue
+                    readOnly={!editable}
                     table="vendor_locations"
                     id={r.id}
                     column="expense_account_ref"
@@ -391,6 +403,7 @@ export function VendorLocationsTable({
                 <dt className="py-0.5 text-subtle">Location</dt>
                 <dd>
                   <InlineValue
+                    readOnly={!editable}
                     table="vendor_locations"
                     id={r.id}
                     column="qbo_location_ref"
@@ -418,6 +431,7 @@ export function VendorLocationsTable({
                 <dt className="py-0.5 text-subtle">Class</dt>
                 <dd>
                   <InlineValue
+                    readOnly={!editable}
                     table="vendor_locations"
                     id={r.id}
                     column="qbo_class_ref"

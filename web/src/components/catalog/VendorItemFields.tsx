@@ -104,9 +104,12 @@ function RecalcContent({
 export function VendorItemFields({
   vi,
   here,
+  editable,
 }: {
   vi: VendorItemRecord;
   here: Crumb;
+  /** The Page Permissions sheet's cell for /vendor-items. */
+  editable: boolean;
 }) {
   const unit = vi.inventory_items?.base_unit ?? "unit";
   const title = vendorItemTitle(vi, vi.inventory_items?.name, unit);
@@ -158,6 +161,7 @@ export function VendorItemFields({
         </h1>
         <span className="flex items-center gap-2 text-sm text-muted">
           <ActiveToggle
+            readOnly={!editable}
             table="vendor_items"
             id={vi.id}
             active={vi.is_active}
@@ -213,6 +217,7 @@ export function VendorItemFields({
         <dt className="text-subtle">Description</dt>
         <dd>
           <InlineValue
+            readOnly={!editable}
             boxed={BOXED_FIELDS}
             table="vendor_items"
             id={vi.id}
@@ -224,6 +229,7 @@ export function VendorItemFields({
         <dt className="text-subtle">Brand</dt>
         <dd>
           <InlineValue
+            readOnly={!editable}
             boxed={BOXED_FIELDS}
             table="vendor_items"
             id={vi.id}
@@ -235,6 +241,7 @@ export function VendorItemFields({
         <dt className="text-subtle">Product ID</dt>
         <dd>
           <InlineValue
+            readOnly={!editable}
             boxed={BOXED_FIELDS}
             table="vendor_items"
             id={vi.id}
@@ -250,6 +257,7 @@ export function VendorItemFields({
         <dt className="text-subtle">Sold as</dt>
         <dd>
           <InlineValue
+            readOnly={!editable}
             boxed={BOXED_FIELDS}
             table="vendor_items"
             id={vi.id}
@@ -289,6 +297,7 @@ export function VendorItemFields({
         <dd className="flex items-center gap-0.5">
           <span className="w-10 shrink-0">
             <InlineValue
+              readOnly={!editable}
               boxed={BOXED_FIELDS}
               table="vendor_items"
               id={vi.id}
@@ -302,6 +311,7 @@ export function VendorItemFields({
           <span className="shrink-0 text-faint">×</span>
           <span className="w-14 shrink-0">
             <InlineValue
+              readOnly={!editable}
               boxed={BOXED_FIELDS}
               table="vendor_items"
               id={vi.id}
@@ -314,6 +324,7 @@ export function VendorItemFields({
           </span>
           <span className="w-14 shrink-0">
             <InlineValue
+              readOnly={!editable}
               boxed={BOXED_FIELDS}
               table="vendor_items"
               id={vi.id}
@@ -329,6 +340,7 @@ export function VendorItemFields({
             <span>(</span>
             <span className="w-16">
               <InlineValue
+                readOnly={!editable}
                 boxed={BOXED_FIELDS}
                 table="vendor_items"
                 id={vi.id}
@@ -350,6 +362,7 @@ export function VendorItemFields({
         <dt className="text-subtle">Price</dt>
         <dd>
           <InlineValue
+            readOnly={!editable}
             boxed={BOXED_FIELDS}
             table="vendor_items"
             id={vi.id}
@@ -362,6 +375,7 @@ export function VendorItemFields({
         <dt className="text-subtle">Notes</dt>
         <dd>
           <InlineValue
+            readOnly={!editable}
             boxed={BOXED_FIELDS}
             table="vendor_items"
             id={vi.id}

@@ -47,12 +47,16 @@ export function WeekdayPicker({
   column,
   value,
   label,
+  readOnly = false,
 }: {
   table: string;
   id: string;
   column: string;
   value: number[] | null;
   label: string;
+  /** The seven boxes as a STATEMENT — no toggling, no All/None — for a role
+   *  the Page Permissions sheet has at Read Only. */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -93,6 +97,23 @@ export function WeekdayPicker({
   const allOn = days.length === DAYS.length;
   function toggleAll() {
     write(allOn ? [] : DAYS.map((d) => d.weekday));
+  }
+
+  if (readOnly) {
+    return (
+      <span className="inline-flex items-center" aria-label={label}>
+        {DAYS.map((day) => (
+          <span
+            key={day.weekday}
+            className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums first:border-l ${
+              days.includes(day.weekday) ? "bg-ink text-white" : "bg-white text-faint"
+            }`}
+          >
+            {day.label}
+          </span>
+        ))}
+      </span>
+    );
   }
 
   return (

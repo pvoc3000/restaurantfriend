@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { VENDOR_ITEM_SELECT } from "@/lib/catalog";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { crumbPath, currentQuery, parseTrail } from "@/lib/breadcrumbs";
@@ -19,6 +18,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { VendorFields } from "@/components/catalog/VendorFields";
 import { VENDOR_TABS, VENDOR_TAB_LABEL, parseVendorTab, vendorTabHref } from "@/lib/vendors";
+import { canEditPage } from "@/lib/pageAccess";
 
 type VendorLocationRow = {
   id: string;
@@ -202,6 +202,8 @@ export async function VendorDetail({
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
   // Links out of this page come back here, with the trail so far intact.
   const here = { href: `/vendors/${id}${queryString}`, label: v.name };
+  // The Page Permissions sheet: staff and supervisors READ a vendor.
+  const editable = canEditPage(session.membership.role, "/vendors");
 
   // Built once and rendered twice — see the two navs below.
   const tabOptions = VENDOR_TABS.map((t) => ({
@@ -238,7 +240,7 @@ export async function VendorDetail({
             walking. Above the split with the name, because it is about the
             vendor rather than about either section. */}
         {session.activeLocation &&
-          canWriteCatalog(session.membership.role) && (
+          editable && (
             <span className="ml-auto">
               <AddVendorReminder
                 vendorId={v.id}
@@ -286,7 +288,7 @@ export async function VendorDetail({
         <div className="min-w-0 flex-1 space-y-16">
           {tab === "info" && (
             <>
-              <VendorFields vendor={v} vendorTypes={vendorTypes} />
+              <VendorFields vendor={v} vendorTypes={vendorTypes} editable={editable} />
 
 
               {/* The heading rides in the table's own strip, opposite the columns
@@ -307,6 +309,7 @@ export async function VendorDetail({
                     qbo_class_name: (qboByRow[row.id]?.qbo_class_name as string | null) ?? null,
                   }))}
                   qboConnected={qboDefault !== null}
+                  editable={editable}
                   codeById={Object.fromEntries(codeById)}
                   activeLocationId={session.activeLocation?.id ?? null}
                   leading={<SectionHeading>Per-location config</SectionHeading>}
@@ -330,7 +333,7 @@ export async function VendorDetail({
                   from={here}
                   filters
                   showLastOrdered={session.activeLocation !== null}
-                  canEdit={canWriteCatalog(session.membership.role)}
+                  canEdit={editable}
                 />
               )}
             </section>

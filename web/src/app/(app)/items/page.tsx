@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { staleBucket, type StaleBucket } from "@/lib/lastOrdered";
 import { type CatalogItem } from "@/lib/catalog";
 import { parseItemFilters, type RawSearchParams } from "@/lib/itemFilters";
 import { ItemsList } from "@/components/catalog/ItemsList";
+import { canEditPage } from "@/lib/pageAccess";
 
 // The list is item-master rows with the CURRENT location's config embedded, so
 // one row = one item, and the per-location columns (section, par) reflect where
@@ -94,7 +94,7 @@ export default async function ItemsPage({
       activeLocationCode={session.activeLocation?.code ?? null}
       initialFilters={initialFilters}
       orgId={session.membership.org_id}
-      editable={canWriteCatalog(session.membership.role)}
+      editable={canEditPage(session.membership.role, "/items")}
     />
   );
 }

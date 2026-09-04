@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import { money } from "@/lib/catalog";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { crumbPath, currentQuery, parseTrail } from "@/lib/breadcrumbs";
@@ -17,6 +16,7 @@ import {
 } from "@/components/catalog/VendorItemLocations";
 import { VendorItemActions } from "@/components/catalog/VendorItemActions";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { canEditPage } from "@/lib/pageAccess";
 
 const SELECT = `
   id, brand, description, product_id, package_desc, package_content, price,
@@ -170,6 +170,10 @@ export async function VendorItemDetail({
   const here = { href: `/vendor-items/${id}${queryString}`, label };
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
 
+  // The Page Permissions sheet: a vendor item follows Vendors — staff and
+  // supervisors READ it.
+  const editable = canEditPage(session.membership.role, "/vendor-items");
+
   return (
     <div className="space-y-6">
       {/* The record's own commands sit with its breadcrumb rather than in the
@@ -181,7 +185,7 @@ export async function VendorItemDetail({
           current={label}
           trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
         />
-        {canWriteCatalog(session.membership.role) && (
+        {editable && (
           <VendorItemActions
             vendorItemId={id}
             label={label}
@@ -196,7 +200,7 @@ export async function VendorItemDetail({
         )}
       </div>
 
-      <VendorItemFields vi={vi} here={here} />
+      <VendorItemFields vi={vi} here={here} editable={editable} />
 
       <section className="space-y-2">
         <SectionHeading>Per-location</SectionHeading>
@@ -206,6 +210,7 @@ export async function VendorItemDetail({
           orgId={session.membership.org_id}
           globalPrice={vi.price}
           activeLocationId={session.activeLocation?.id ?? null}
+          editable={editable}
         />
         <p className="text-xs text-subtle">
           A favorite day marks this as the preferred source for that day&apos;s

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import type { CatalogItem } from "@/lib/catalog";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
-import { InlineValue } from "./InlineValue";
+import { InlineValue, READ_ONLY_VALUE } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
 import { BaseUnitEditor } from "./BaseUnitEditor";
 
@@ -16,8 +16,12 @@ import { BaseUnitEditor } from "./BaseUnitEditor";
 export function ItemFields({
   item,
   categories,
+  editable,
 }: {
   item: CatalogItem;
+  /** The Page Permissions sheet's cell for /items — false renders every
+   *  field as a value and offers no switch, no base-unit change. */
+  editable: boolean;
   /** Every category already in the catalog — the list you pick from. */
   categories: string[];
 }) {
@@ -33,6 +37,7 @@ export function ItemFields({
           so the quietest possible "editable" is enough and a frame round a
           page heading is not what the boxes are for. */}
           <InlineValue
+            readOnly={!editable}
             table="inventory_items"
             id={item.id}
             column="name"
@@ -42,12 +47,14 @@ export function ItemFields({
           />
         </h1>
         <span className="flex items-center gap-2 text-sm text-muted">
-          <ActiveToggle
-            table="inventory_items"
-            id={item.id}
-            active={item.is_active}
-            label="Item active in the catalog"
-          />
+          {editable && (
+            <ActiveToggle
+              table="inventory_items"
+              id={item.id}
+              active={item.is_active}
+              label="Item active in the catalog"
+            />
+          )}
           {item.is_active ? "Active" : "Inactive"}
         </span>
       </div>
@@ -61,6 +68,7 @@ export function ItemFields({
               matches it rather than making a near-duplicate, which is how
               "COMMISSARY" and "Commissary" would otherwise both end up real. */}
           <InlineValue
+            readOnly={!editable}
             table="inventory_items"
             id={item.id}
             column="category"
@@ -81,17 +89,22 @@ export function ItemFields({
             drawer uses, so the two can't drift. */}
         <dt className="text-subtle">Base unit</dt>
         <dd>
-          <BaseUnitEditor
-            key={`${item.id}:${item.base_unit}`}
-            inventoryItemId={item.id}
-            baseUnit={item.base_unit}
-            onChanged={() => router.refresh()}
-          />
+          {editable ? (
+            <BaseUnitEditor
+              key={`${item.id}:${item.base_unit}`}
+              inventoryItemId={item.id}
+              baseUnit={item.base_unit}
+              onChanged={() => router.refresh()}
+            />
+          ) : (
+            <span className={READ_ONLY_VALUE}>{item.base_unit}</span>
+          )}
         </dd>
 
         <dt className="text-subtle">Note</dt>
         <dd>
           <InlineValue
+            readOnly={!editable}
             table="inventory_items"
             id={item.id}
             column="note"
@@ -101,12 +114,14 @@ export function ItemFields({
         </dd>
       </dl>
 
+      {editable && (
       <p className="text-xs text-subtle">
         Pars and on-hand counts are in the base unit; order quantities are in
         packages of the chosen vendor item. Changing the base unit recomputes
         each package content whose pack can answer for it and reports the ones
         that can&apos;t. Pars are never rescaled — check them afterwards.
       </p>
+      )}
     </div>
   );
 }

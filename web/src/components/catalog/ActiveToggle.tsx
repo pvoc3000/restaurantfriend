@@ -18,11 +18,15 @@ export function ActiveToggle({
   id,
   active,
   label,
+  readOnly = false,
 }: {
   table: string;
   id: string;
   active: boolean;
   label?: string;
+  /** Say the state in a word and offer no switch — a Read Only cell of the
+   *  Page Permissions sheet. A disabled switch would read as broken. */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -46,6 +50,10 @@ export function ActiveToggle({
       }
       router.refresh();
     });
+  }
+
+  if (readOnly) {
+    return <span className="text-sm text-muted">{active ? "Active" : "Inactive"}</span>;
   }
 
   return (

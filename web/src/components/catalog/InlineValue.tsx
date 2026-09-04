@@ -277,6 +277,7 @@ export function InlineValue({
   scale,
   multiline = false,
   boxed = false,
+  readOnly = false,
 }: {
   table: string;
   /** The row's uuid — the identity of every table in the catalog. Omit it only
@@ -435,6 +436,17 @@ export function InlineValue({
    *  `INLINE_REST_BOXED`. For a stack of multiline notes, where the quiet cue
    *  leaves the fields indistinguishable from each other. */
   boxed?: boolean;
+  /**
+   * Render the VALUE and offer no edit at all — the Page Permissions sheet's
+   * "Read Only" cell reaching a field block (2026-09-04, found by Mark on a
+   * staff account editing a vendor). One switch here rather than a
+   * conditional at every call site, because a field block with twelve cells
+   * would otherwise carry twelve copies of the same `editable ? … :` and drift
+   * the way the hand-rolled dialogs did. Wears `READ_ONLY_VALUE`'s padding so
+   * a column does not shift 4px between a role that may edit and one that may
+   * not, and NO box: the box means "you can change this".
+   */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -562,6 +574,28 @@ export function InlineValue({
   // A chosen value writes on the spot: there's no draft to abandon and nothing
   // to confirm, which is the same call BaseUnitEditor made ("picking a unit IS
   // the edit") and the reason the control can live in a table cell at all.
+  if (readOnly) {
+    const label =
+      kind === "pick"
+        ? (options?.find((o) => o.value === String(value))?.label ??
+          (value === null ? null : String(value)))
+        : shown === null || shown === ""
+          ? null
+          : format
+            ? format(shown)
+            : String(shown);
+    return (
+      <span
+        aria-label={ariaLabel ?? column}
+        className={`${READ_ONLY_VALUE} ${align === "right" ? "text-right tabular-nums" : ""} ${
+          multiline ? "whitespace-pre-wrap" : ""
+        } ${label === null ? emptyClassName : ""} ${className}`}
+      >
+        {label ?? (fieldPlaceholder(placeholder, boxed) || "\u00A0")}
+      </span>
+    );
+  }
+
   if (kind === "pick") {
     return (
       <span className="inline-flex w-full flex-col">

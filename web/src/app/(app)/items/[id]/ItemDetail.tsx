@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canWriteCatalog } from "@/lib/roles";
 import {
   VENDOR_ITEM_SELECT_ACTIVE_VENDOR,
   type CatalogItem,
@@ -15,6 +14,7 @@ import { ItemFields } from "@/components/catalog/ItemFields";
 import { ItemLocationRows } from "@/components/catalog/ItemLocationRows";
 import { VendorItemsTable } from "@/components/catalog/VendorItemsTable";
 import { SectionHeading } from "@/components/ui/SectionHeading";
+import { canEditPage } from "@/lib/pageAccess";
 
 // Item detail is per-ITEM, not per-location: every location's row is listed so
 // the differences between shops are visible in one place (spec §4.8 — the
@@ -114,6 +114,9 @@ export async function ItemDetail({
     });
   }
 
+  // The Page Permissions sheet: a supervisor READS an item; staff are hidden.
+  const editable = canEditPage(session.membership.role, "/items");
+
   const locationRows = [...row.inventory_item_locations].sort((a, b) => {
     const codeA = session.locations.find((l) => l.id === a.location_id)?.code ?? "";
     const codeB = session.locations.find((l) => l.id === b.location_id)?.code ?? "";
@@ -132,7 +135,7 @@ export async function ItemDetail({
         trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
       />
 
-      <ItemFields item={row} categories={categories} />
+      <ItemFields item={row} categories={categories} editable={editable} />
 
       {/* Both headings ride in their table's own strip rather than sitting in a
           <section> above it (Mark, 2026-08-02: too much air under each heading,
@@ -153,6 +156,7 @@ export async function ItemDetail({
         orgId={session.membership.org_id}
         activeLocationId={session.activeLocation?.id ?? null}
         sectionsByLocation={sectionsByLocation}
+        editable={editable}
       />
 
       {viError ? (
@@ -174,7 +178,7 @@ export async function ItemDetail({
           baseUnit={row.base_unit}
           showVendor
           from={{ href: `/items/${id}${queryString}`, label: row.name }}
-          canEdit={canWriteCatalog(session.membership.role)}
+          canEdit={editable}
         />
       )}
     </div>

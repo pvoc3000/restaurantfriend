@@ -32,7 +32,11 @@ export function ItemLocationRows({
   activeLocationId,
   sectionsByLocation,
   leading,
+  editable,
 }: {
+  /** The Page Permissions sheet's cell for /items — false renders values,
+   *  no switch and no "Stock here". */
+  editable: boolean;
   rows: CatalogItemLocation[];
   locations: Location[];
   inventoryItemId: string;
@@ -87,11 +91,14 @@ export function ItemLocationRows({
       render: (r) =>
         r.il ? (
           <ActiveToggle
+            readOnly={!editable}
             table="inventory_item_locations"
             id={r.il.id}
             active={r.il.is_active}
             label={`Item active at ${r.location.code}`}
           />
+        ) : !editable ? (
+          <span className="text-faint">—</span>
         ) : (
           <button
             disabled={busy}
@@ -137,6 +144,7 @@ export function ItemLocationRows({
         }
         return (
           <InlineValue
+            readOnly={!editable}
             table="inventory_item_locations"
             id={r.il.id}
             column="shop_section_id"
@@ -162,6 +170,7 @@ export function ItemLocationRows({
       render: (r) =>
         r.il ? (
           <WeekdayPicker
+            readOnly={!editable}
             table="inventory_item_locations"
             id={r.il.id}
             column="order_days"
@@ -184,6 +193,7 @@ export function ItemLocationRows({
       render: (r) =>
         r.il ? (
           <InlineValue
+            readOnly={!editable}
             table="inventory_item_locations"
             id={r.il.id}
             column="default_par"
@@ -208,6 +218,7 @@ export function ItemLocationRows({
       render: (r) =>
         r.il ? (
           <InlineValue
+            readOnly={!editable}
             table="inventory_item_locations"
             id={r.il.id}
             column="note"

@@ -51,11 +51,14 @@ function FavoriteDays({
   vendorItemId,
   orgId,
   days,
+  readOnly = false,
 }: {
   itemLocationId: string;
   vendorItemId: string;
   orgId: string;
   days: number[];
+  /** The seven boxes as a statement — a Read Only cell of the sheet. */
+  readOnly?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -127,6 +130,23 @@ function FavoriteDays({
     router.refresh();
   }
 
+  if (readOnly) {
+    return (
+      <span className="inline-flex items-center" aria-label="Favorite days">
+        {DAYS.map((d) => (
+          <span
+            key={d.weekday}
+            className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums first:border-l ${
+              on.includes(d.weekday) ? "bg-ink text-white" : "bg-white text-faint"
+            }`}
+          >
+            {d.label}
+          </span>
+        ))}
+      </span>
+    );
+  }
+
   return (
     <span className="inline-flex items-center">
       {DAYS.map((d) => {
@@ -175,7 +195,10 @@ export function VendorItemLocations({
   orgId,
   globalPrice,
   activeLocationId,
+  editable,
 }: {
+  /** The Page Permissions sheet's cell for /vendor-items. */
+  editable: boolean;
   rows: VendorItemLocationRow[];
   vendorItemId: string;
   orgId: string;
@@ -216,6 +239,7 @@ export function VendorItemLocations({
             vendorItemId={vendorItemId}
             orgId={orgId}
             days={r.favoriteDays}
+            readOnly={!editable}
           />
         ) : (
           <span className="text-xs text-faint">not stocked here</span>
