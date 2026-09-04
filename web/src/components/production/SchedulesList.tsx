@@ -191,7 +191,11 @@ export function SchedulesList({
   const allChecked = visible.length > 0 && visible.every((r) => checked.has(r.id));
 
   const columns: DataColumn<ScheduleRow>[] = [
-    {
+    // The selection exists for the print bar, and printing STAMPS the night
+    // (044's `mark_schedule_printed`, supervisor+) — so a role that cannot
+    // stamp gets no boxes: staff are Read Only here per the Page Permissions
+    // sheet, and a bar whose only command raises for them is noise.
+    ...(stampable ? [{
       key: "select",
       label: "",
       width: 56,
@@ -214,7 +218,7 @@ export function SchedulesList({
           size={18}
         />
       ),
-    },
+    } satisfies DataColumn<ScheduleRow>] : []),
     {
       key: "date",
       label: "Date",
@@ -419,7 +423,7 @@ export function SchedulesList({
         onSortChange={setSort}
       />
 
-      {checked.size > 0 ? (
+      {stampable && checked.size > 0 ? (
         <div className="flex flex-wrap items-center gap-4 border border-ink bg-white px-4 py-3 text-sm">
           <span className="font-medium">
             {checked.size} {checked.size === 1 ? "night" : "nights"} selected

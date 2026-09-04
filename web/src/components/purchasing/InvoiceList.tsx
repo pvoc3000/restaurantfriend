@@ -357,7 +357,11 @@ export function InvoiceList({
   }
 
   const columns: DataColumn<InvoiceListRow>[] = [
-    {
+    // The selection exists for the batch bar, whose two commands are approve
+    // (manager+) and delete (`canEdit`). A role with neither — a purchaser,
+    // Read Only here per the Page Permissions sheet — got boxes to tick and a
+    // bar reading "3 selected" with nothing to press.
+    ...(canEdit || canApprove ? [{
       key: "select",
       label: "",
       width: 48,
@@ -377,7 +381,7 @@ export function InvoiceList({
           size={18}
         />
       ),
-    },
+    } satisfies DataColumn<InvoiceListRow>] : []),
     {
       key: "invoice_number",
       label: "Invoice",
@@ -742,7 +746,7 @@ export function InvoiceList({
         </p>
       )}
 
-      {checked.size > 0 && (
+      {(canEdit || canApprove) && checked.size > 0 && (
         <div className="flex flex-wrap items-center gap-4 border border-ink px-4 py-3 text-sm">
           <span>{checked.size} selected</span>
           <span className="tabular-nums text-muted">{money(selectedTotal)}</span>
