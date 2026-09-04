@@ -128,7 +128,7 @@ export function AddTemplateItem({
           <div className="space-y-5">
             <label className="block space-y-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                What it asks
+                Task
               </span>
               <TextInput
                 value={prompt}
@@ -136,7 +136,7 @@ export function AddTemplateItem({
                 fullWidth
                 autoFocus
                 placeholder="Walk-in temperature"
-                aria-label="What it asks"
+                aria-label="Task"
               />
             </label>
 

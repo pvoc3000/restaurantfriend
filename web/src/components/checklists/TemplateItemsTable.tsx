@@ -207,7 +207,7 @@ export function TemplateItemsTable({
     },
     {
       key: "prompt",
-      label: "What it asks",
+      label: "Task",
       width: 320,
       pinned: true,
       sortValue: (r) => r.prompt,
@@ -219,7 +219,7 @@ export function TemplateItemsTable({
             column="prompt"
             value={r.prompt}
             nullable={false}
-            ariaLabel="What it asks"
+            ariaLabel="Task"
           />
         ) : (
           <span className={READ_ONLY_VALUE}>{r.prompt}</span>
@@ -227,7 +227,7 @@ export function TemplateItemsTable({
     },
     {
       key: "section",
-      label: "Section",
+      label: "Location",
       width: 200,
       sortValue: (r) => r.section_name,
       render: (r) =>
@@ -239,7 +239,7 @@ export function TemplateItemsTable({
             value={r.shop_section_id ?? ""}
             kind="pick"
             options={sectionOptions}
-            ariaLabel={`Section for ${r.prompt}`}
+            ariaLabel={`Location for ${r.prompt}`}
           />
         ) : (
           <span className={READ_ONLY_VALUE}>{r.section_name}</span>
@@ -247,7 +247,7 @@ export function TemplateItemsTable({
     },
     {
       key: "response_type",
-      label: "Answer",
+      label: "Type",
       width: 110,
       sortValue: (r) => r.response_type,
       render: (r) =>
@@ -397,7 +397,7 @@ export function TemplateItemsTable({
     },
     {
       key: "guidance",
-      label: "How you know",
+      label: "Note",
       width: 280,
       sortValue: (r) => r.guidance ?? "",
       render: (r) =>
