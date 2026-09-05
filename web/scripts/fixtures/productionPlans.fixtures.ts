@@ -8,7 +8,7 @@ import {
   rangesOverlap,
   overlappingPlans,
   planRange,
-  buildMatrix, traySortUpdates,
+  buildMatrix, traySortUpdates, renumberTrays,
   defaultParFor,
   slotParLabel,
   stepPar,
@@ -161,6 +161,23 @@ test("trays order by their NUMBER, numerically, whatever `sort` says", () => {
     new Map()
   );
   eq(m.map((r) => r.tray.tray_number), ["7", "17", "18", "20"]);
+});
+
+test("renumberTrays reads top to bottom, pads to two digits, names only what changes", () => {
+  eq(
+    renumberTrays([
+      { id: "a", tray_number: "01", sort: 1 },
+      { id: "b", tray_number: "07", sort: 2 },
+      { id: "c", tray_number: "7A", sort: 3 },
+      { id: "d", tray_number: "18", sort: 4 },
+    ]),
+    [
+      { id: "b", from: "07", to: "02" },
+      { id: "c", from: "7A", to: "03" },
+      { id: "d", from: "18", to: "04" },
+    ]
+  );
+  eq(renumberTrays([{ id: "a", tray_number: "01", sort: 1 }, { id: "b", tray_number: "02", sort: 2 }]), []);
 });
 
 test("traySortUpdates renumbers by tray number and names only what moves", () => {

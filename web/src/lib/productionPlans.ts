@@ -436,6 +436,23 @@ export function traySortUpdates(
     .map(({ id, sort }) => ({ id, sort }));
 }
 
+/**
+ * "Renumber trays": the plan's trays in READING order become 01, 02, 03 … —
+ * padded to two digits (more only past 99), which is what FileMaker's numbers
+ * look like and what `compareTrayNumbers` sorts as a number anyway. Returns
+ * ONLY the trays whose number changes, in reading order.
+ */
+export function renumberTrays(
+  trays: readonly { id: string; tray_number: string; sort: number | null }[]
+): { id: string; from: string; to: string }[] {
+  const width = Math.max(2, String(trays.length).length);
+  return trays
+    .slice()
+    .sort((a, b) => compareTrayNumbers(a.tray_number, b.tray_number) || (a.sort ?? 0) - (b.sort ?? 0))
+    .map((t, i) => ({ id: t.id, from: t.tray_number, to: String(i + 1).padStart(width, "0") }))
+    .filter((t) => t.from !== t.to);
+}
+
 export function duplicateTitle(existing: readonly string[], from: string): string {
   const taken = new Set(existing.map((t) => t.trim()));
   for (let i = 1; i <= 200; i++) {

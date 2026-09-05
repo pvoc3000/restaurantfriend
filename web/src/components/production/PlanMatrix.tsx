@@ -17,6 +17,7 @@ import {
   buildMatrix,
   defaultParFor,
   traySortUpdates,
+  renumberTrays,
   slotParLabel,
   stepPar,
   nextTrayNumber,
@@ -272,6 +273,55 @@ export function PlanMatrix({
       if (e || !w?.length) return e?.message ?? "The trays could not be reordered.";
     }
     return null;
+  }
+
+  /**
+   * "Renumber trays" (Mark, 2026-09-04): top to bottom becomes 01, 02, 03 …
+   * however many there are. A confirm names how many move and the range.
+   *
+   * TWO PASSES, because the number is unique per plan and a one-pass rename
+   * collides with itself the moment a tray takes a number another tray still
+   * holds. Every moving tray is first parked on a placeholder no real tray can
+   * carry, then given its final number; `sort` follows in the same statement.
+   * Each write is checked. If it stops halfway the parked trays are visible on
+   * the screen as "~n" and one more press finishes the job — a partial rename
+   * you can see beats a silent one.
+   */
+  async function renumber() {
+    const moves = renumberTrays(trays);
+    if (moves.length === 0) {
+      setFailed(`The ${trays.length} trays are already numbered in order.`);
+      return;
+    }
+    const last = String(trays.length).padStart(Math.max(2, String(trays.length).length), "0");
+    if (
+      !(await confirmDialog({
+        title: `Renumber ${trays.length} trays 01 – ${last}?`,
+        body: `${moves.length} ${moves.length === 1 ? "tray changes" : "trays change"} number, in the order they are listed. The printed packet follows the new numbers.`,
+        confirmLabel: "Renumber",
+      }))
+    ) {
+      return;
+    }
+    run(async (supabase) => {
+      const write = async (id: string, patch: { tray_number: string; sort?: number }) => {
+        const { data, error } = await supabase
+          .from("production_plan_trays")
+          .update(patch)
+          .eq("id", id)
+          .select("id");
+        return error || !data?.length ? error?.message ?? "nothing was written" : null;
+      };
+      for (const [i, m] of moves.entries()) {
+        const e = await write(m.id, { tray_number: `~${i + 1}` });
+        if (e) return `Tray ${m.from} could not be renumbered: ${e}`;
+      }
+      for (const m of moves) {
+        const e = await write(m.id, { tray_number: m.to, sort: Number(m.to) });
+        if (e) return `Tray ${m.from} could not become ${m.to}: ${e}`;
+      }
+      return resortTrays(supabase);
+    });
   }
 
   function addItem(trayId: string, weekday: number, itemId: string) {
@@ -1190,6 +1240,14 @@ export function PlanMatrix({
               className="inline-flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
             >
               Add tray
+            </button>
+            <button
+              type="button"
+              onClick={() => void renumber()}
+              disabled={pending || trays.length === 0}
+              className="inline-flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+            >
+              Renumber trays
             </button>
             {/* The grand total, beside the command that changes it. It repeats
                 the heading's own count deliberately: once the footer is pinned
