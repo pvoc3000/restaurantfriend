@@ -146,7 +146,7 @@ export function ProductionItemLocations({
         columnChooser
         leading={
           <div className="space-y-1">
-            <SectionHeading count={pars.length}>Per location</SectionHeading>
+            <SectionHeading count={pars.length}>Default pars</SectionHeading>
             <p className="max-w-[80ch] text-[13px] text-muted">
               The default par is what a plan slot starts with when this item is
               added to a plan at that shop. Changing it does not change plans
