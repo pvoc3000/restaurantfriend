@@ -46,6 +46,15 @@ test("switching tabs carries the breadcrumb trail through", () => {
   );
 });
 
+test("the two record tabs write their own key and parse back", () => {
+  // The slug has a hyphen, which is fine in a query string and is what the
+  // label reads as; `purchaseorders` or `pos` would be a second spelling.
+  eq(vendorTabHref("v-1", "purchase-orders"), "/vendors/v-1?tab=purchase-orders");
+  eq(vendorTabHref("v-1", "invoices"), "/vendors/v-1?tab=invoices");
+  eq(parseVendorTab("purchase-orders"), "purchase-orders");
+  eq(parseVendorTab("invoices"), "invoices");
+});
+
 test("the old tab is replaced, never appended twice", () => {
   eq(vendorTabHref("v-1", "items", { tab: "items" }), "/vendors/v-1?tab=items");
   eq(vendorTabHref("v-1", "info", { tab: "items" }), "/vendors/v-1", "back to the default drops it");

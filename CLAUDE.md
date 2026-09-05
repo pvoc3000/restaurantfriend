@@ -9353,6 +9353,25 @@ weekday column, and 003 then silently made it per-vendor-item.
   (measured: table 1314px in a 1314px pane, scrollWidth 1320). The unpaned path
   is unaffected — `useOverflowOnlyWhenNeeded` compares the TABLE's width, not
   scrollWidth, so the grip never fooled it.
+- **THE VENDOR RECORD HAS FOUR TABS — Info · Items · Purchase Orders · Invoices**
+  (Mark, 2026-09-05: "add a 'Purchase Orders' and 'Invoices' tabs to the
+  Vendor detail page", clarified: "I don't want to see the scanned invoices…
+  a simplified version of the purchase order screen… a simplified version of
+  the invoices screen"). `catalog/VendorPurchaseOrders` and
+  `catalog/VendorInvoices` are `DataTable`s with the WORKING taken off the two
+  lists they are read from — no date window, no filters, no selection bar, no
+  row menu, no commands — each row a link into the record, with the list's own
+  status chips (`PO_STATUS_CLASS`, the `billStage` ladder) so a bill reads Paid
+  here exactly as it does there, and a closing `totals` row.
+  **ORG-WIDE WITH A SHOP COLUMN, not scoped to the working location**, which is
+  the one way they differ from `/purchase-orders` and `/invoices`: the Info tab
+  already lists every shop's account side by side, and "what have we bought
+  from these people" is the same kind of question. Newest first, capped at the
+  lists' own 500 with a sentence when the cap bites. Fetched only on their own
+  tab (the `SKIP` idiom), and the PO link on an invoice is DERIVED from its
+  lines as `/invoices` derives it. Verified live on Chefs Warehouse — 19
+  orders, 10 bills, both counts confirmed against the database — with the
+  crumb from a row returning to the tab it left.
 - **Vendor detail has an editable field block** (`catalog/VendorFields.tsx`,
   Mark, 2026-08-01: type, description, order type, url and notes "are not
   reachable/visible… and should be"). `description` and `notes` weren't even

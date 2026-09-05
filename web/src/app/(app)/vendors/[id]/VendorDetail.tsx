@@ -19,6 +19,17 @@ import { SectionNav } from "@/components/ui/SectionNav";
 import { VendorFields } from "@/components/catalog/VendorFields";
 import { VENDOR_TABS, VENDOR_TAB_LABEL, parseVendorTab, vendorTabHref } from "@/lib/vendors";
 import { canEditPage } from "@/lib/pageAccess";
+import { todayInTimeZone } from "@/lib/today";
+import {
+  VendorPurchaseOrders,
+  VENDOR_PO_CAP,
+  type VendorPoRow,
+} from "@/components/catalog/VendorPurchaseOrders";
+import {
+  VendorInvoices,
+  VENDOR_INVOICE_CAP,
+  type VendorInvoiceRow,
+} from "@/components/catalog/VendorInvoices";
 
 type VendorLocationRow = {
   id: string;
@@ -73,6 +84,8 @@ export async function VendorDetail({
   const tab = parseVendorTab(rawParams.tab);
   const SKIP = { data: null, error: null, count: null };
   const wantsItems = tab === "items";
+  const wantsOrders = tab === "purchase-orders";
+  const wantsInvoices = tab === "invoices";
 
   // Every location's config is listed (not just the active one) — the vendor's
   // account number and minimum differ per shop, and seeing them together is the
@@ -83,6 +96,8 @@ export async function VendorDetail({
     { data: typeRows },
     { data: qboRows },
     { data: locationQbo },
+    { data: poRows, error: poError },
+    { data: invoiceRows, error: invoiceError },
   ] =
     await Promise.all([
       supabase
@@ -119,6 +134,30 @@ export async function VendorDetail({
           "id, external_ref, expense_account_ref, expense_account_name, qbo_location_ref, qbo_location_name, qbo_class_ref, qbo_class_name"
         )
         .eq("vendor_id", id),
+      // THE VENDOR'S ORDERS, every shop (see lib/vendors for why not the
+      // working one). Newest first and capped like `/purchase-orders`;
+      // Chefs Warehouse alone has years of them.
+      wantsOrders
+        ? supabase
+            .from("purchase_orders")
+            .select("id, po_number, status, order_date, delivery_date, location_id")
+            .eq("vendor_id", id)
+            .order("order_date", { ascending: false })
+            .limit(VENDOR_PO_CAP)
+        : SKIP,
+      // THE VENDOR'S BILLS. `external_ref` is read for its PRESENCE only and
+      // never reaches the browser (086).
+      wantsInvoices
+        ? supabase
+            .from("vendor_invoices")
+            .select(
+              `id, invoice_number, invoice_date, due_date, total, is_credit, status,
+               location_id, external_ref, qbo_balance, qbo_checked_at`
+            )
+            .eq("vendor_id", id)
+            .order("invoice_date", { ascending: false })
+            .limit(VENDOR_INVOICE_CAP)
+        : SKIP,
     ]);
 
   if (error) {
@@ -200,6 +239,98 @@ export async function VendorDetail({
     return { ...vi, last_order_date: last, stale: staleBucket(last, today) };
   });
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
+
+  // ---- the Purchase Orders tab's rows ------------------------------------
+  // Totals in one paginated pass over the lines, the list's own idiom: 500
+  // orders is a few thousand lines and PostgREST caps a page at 1000.
+  let orders: VendorPoRow[] = [];
+  if (wantsOrders && poRows) {
+    const ids = poRows.map((o) => o.id);
+    const totals = new Map<string, { lines: number; ordered: number; received: number }>();
+    for (let from = 0; ids.length > 0; from += 1000) {
+      const { data: lines } = await supabase
+        .from("purchase_order_items")
+        .select("po_id, qty_ordered, qty_received, unit_price")
+        .in("po_id", ids)
+        .order("id")
+        .range(from, from + 999);
+      for (const line of lines ?? []) {
+        const t = totals.get(line.po_id) ?? { lines: 0, ordered: 0, received: 0 };
+        t.lines += 1;
+        t.ordered += Number(line.qty_ordered ?? 0) * Number(line.unit_price ?? 0);
+        t.received += Number(line.qty_received ?? 0) * Number(line.unit_price ?? 0);
+        totals.set(line.po_id, t);
+      }
+      if (!lines || lines.length < 1000) break;
+    }
+    orders = poRows.map((o) => {
+      const t = totals.get(o.id);
+      return {
+        id: o.id,
+        po_number: o.po_number,
+        status: o.status,
+        order_date: o.order_date,
+        delivery_date: o.delivery_date,
+        location_code: codeById.get(o.location_id) ?? "—",
+        line_count: t?.lines ?? 0,
+        ordered_total: t?.ordered ?? 0,
+        received_total: t?.received ?? 0,
+      };
+    });
+  }
+
+  // ---- the Invoices tab's rows -------------------------------------------
+  // The PO link is DERIVED from the lines, as `/invoices` derives it — an
+  // invoice claims an order only where one of its lines points at it.
+  let invoices: VendorInvoiceRow[] = [];
+  if (wantsInvoices && invoiceRows) {
+    const ids = invoiceRows.map((i) => i.id);
+    const poIdsByInvoice = new Map<string, Set<string>>();
+    for (let from = 0; ids.length > 0; from += 1000) {
+      const { data: lines } = await supabase
+        .from("vendor_invoice_lines")
+        .select("id, invoice_id, purchase_order_id")
+        .in("invoice_id", ids)
+        .order("id")
+        .range(from, from + 999);
+      for (const line of lines ?? []) {
+        if (!line.purchase_order_id) continue;
+        const set = poIdsByInvoice.get(line.invoice_id) ?? new Set<string>();
+        set.add(line.purchase_order_id);
+        poIdsByInvoice.set(line.invoice_id, set);
+      }
+      if (!lines || lines.length < 1000) break;
+    }
+    const poNumbers = new Map<string, string>();
+    const allPoIds = [...new Set([...poIdsByInvoice.values()].flatMap((s) => [...s]))];
+    if (allPoIds.length > 0) {
+      const { data: linked } = await supabase
+        .from("purchase_orders")
+        .select("id, po_number")
+        .in("id", allPoIds);
+      for (const o of linked ?? []) poNumbers.set(o.id, o.po_number);
+    }
+    invoices = invoiceRows.map((i) => ({
+      id: i.id,
+      invoice_number: i.invoice_number,
+      invoice_date: i.invoice_date,
+      due_date: i.due_date,
+      total: i.total,
+      is_credit: i.is_credit,
+      status: i.status,
+      location_code: codeById.get(i.location_id) ?? "—",
+      purchase_orders: [...(poIdsByInvoice.get(i.id) ?? [])]
+        .map((pid) => ({ id: pid, po_number: poNumbers.get(pid) ?? "" }))
+        .filter((p) => p.po_number)
+        .sort((a, b) => a.po_number.localeCompare(b.po_number)),
+      qbo_linked: Boolean(
+        (i as { external_ref?: { qbo?: { id?: string } } | null }).external_ref?.qbo?.id
+      ),
+      qbo_balance: i.qbo_balance,
+      qbo_checked_at: i.qbo_checked_at,
+    }));
+  }
+  const timeZone = session.orgSettings.timezone ?? serverTimeZone();
   // Links out of this page come back here, with the trail so far intact.
   const here = { href: `/vendors/${id}${queryString}`, label: v.name };
   // The Page Permissions sheet: staff and supervisors READ a vendor.
@@ -338,6 +469,33 @@ export async function VendorDetail({
               )}
             </section>
           )}
+
+          {tab === "purchase-orders" &&
+            (poError ? (
+              <p className="text-sm text-accent">
+                Could not load purchase orders: {poError.message}
+              </p>
+            ) : (
+              <VendorPurchaseOrders
+                orders={orders}
+                from={here}
+                capped={orders.length === VENDOR_PO_CAP}
+              />
+            ))}
+
+          {tab === "invoices" &&
+            (invoiceError ? (
+              <p className="text-sm text-accent">
+                Could not load invoices: {invoiceError.message}
+              </p>
+            ) : (
+              <VendorInvoices
+                invoices={invoices}
+                from={here}
+                today={todayInTimeZone(timeZone)}
+                capped={invoices.length === VENDOR_INVOICE_CAP}
+              />
+            ))}
         </div>
       </div>
     </div>

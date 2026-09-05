@@ -18,13 +18,29 @@
  * of the last-ordered round trips' reason for existing along with the type list
  * the Type picker offers.
  */
-export type VendorTab = "info" | "items";
+/**
+ * FOUR SECTIONS SINCE 2026-09-05 (Mark: "add a 'Purchase Orders' and
+ * 'Invoices' tabs to the Vendor detail page"). The two new ones are the
+ * vendor's RECORDS — every order placed with them and every bill they sent,
+ * across every shop — as a simplified reading of `/purchase-orders` and
+ * `/invoices`: no filters, no selection bar, no commands, just the rows and
+ * a link into each. Not the scanned documents; those live on the order.
+ *
+ * ORG-WIDE, NOT SCOPED TO THE WORKING SHOP, which is the one way these differ
+ * from the lists they are simplified from. A vendor is an org-level record
+ * whose Info tab already lists every shop's account number side by side, so
+ * "what have we bought from these people" is answered the same way — with a
+ * Shop column — rather than answered for DF01 and silently not for DF02.
+ */
+export type VendorTab = "info" | "items" | "purchase-orders" | "invoices";
 
-export const VENDOR_TABS: VendorTab[] = ["info", "items"];
+export const VENDOR_TABS: VendorTab[] = ["info", "items", "purchase-orders", "invoices"];
 
 export const VENDOR_TAB_LABEL: Record<VendorTab, string> = {
   info: "Info",
   items: "Items",
+  "purchase-orders": "Purchase Orders",
+  invoices: "Invoices",
 };
 
 /**
