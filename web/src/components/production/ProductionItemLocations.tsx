@@ -38,7 +38,7 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
  * `min-w-0 flex-1` pen so an open editor cannot lie over its neighbour.
  *
  * Most (item, location) pairs have NO row, so a shop with none offers
- * **Set pars**, which inserts the row — /price-grid's "set" and the inventory
+ * **Set Default Pars**, which inserts the row — /price-grid's "set" and the inventory
  * item's "Stock here": a cell with no row to write to cannot be an
  * `InlineValue`.
  *
@@ -119,7 +119,7 @@ export function ProductionItemLocations({
               onClick={() => void createRow(l.location.id)}
               className="border border-ink px-2 py-0.5 text-xs text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
             >
-              {busy === l.location.id ? "Setting…" : "Set pars"}
+              {busy === l.location.id ? "Setting…" : "Set Default Pars"}
             </button>
           ) : (
             <span className={`${READ_ONLY_VALUE} text-subtle`}>—</span>

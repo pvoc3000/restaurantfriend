@@ -3541,7 +3541,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **Per-location pars are EDITABLE AGAIN since 2026-09-04 (Mark: "we should
    be able to edit the default pars"), and the block is titled "Default pars"**
    — seven `InlineValue`s per shop through `arrayColumn`, each in its own
-   `min-w-0 flex-1` pen, with a **Set pars** button that INSERTS the row for a
+   `min-w-0 flex-1` pen, with a **Set Default Pars** button that INSERTS the row for a
    shop that has none (/price-grid's "set"). What the 043-era paragraph below
    missed is the NEW item: it has no plan slot yet, so the default is the only
    number anyone can write before it reaches a tray. Kept for the reasoning:
