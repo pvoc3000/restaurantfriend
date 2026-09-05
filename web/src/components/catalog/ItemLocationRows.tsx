@@ -9,7 +9,7 @@ import { DataTable, type DataColumn } from "./DataTable";
 import { InlineValue } from "./InlineValue";
 import { ActiveToggle } from "./ActiveToggle";
 import { WeekdayPicker, WEEKDAY_PICKER_WIDTH } from "./WeekdayPicker";
-import { FavoritesEditor } from "@/components/cleanup/FavoritesEditor";
+import { FavoritesEditor } from "./FavoritesEditor";
 
 // One row per location, whether or not the item is stocked there — an item
 // missing from a shop is a fact worth seeing, and it's where "Stock here" goes.

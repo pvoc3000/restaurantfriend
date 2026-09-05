@@ -186,8 +186,7 @@ export default async function OrderGuidePage({
       //
       // Deliberate departure from spec §4.7a, which asked for blocked lines
       // shown greyed with the reason. That belongs on the catalog screens,
-      // where you can act on it; during a walk it's noise. `/cleanup` remains
-      // where dead pairings get found and fixed.
+      // where you can act on it; during a walk it's noise.
       .eq("is_orderable", true)
       // shop_section_sort is the AREA number and is shared by every shelf in
       // that area, so it needs the section name after it to be a total order —

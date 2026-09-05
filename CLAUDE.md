@@ -9958,7 +9958,11 @@ not as questions:
 ## What NOT to build (deliberately killed or deferred)
 
 Killed: location transfers/packing lists, PO_Type taxonomy, most legacy
-reports, standalone inventory-count UI. Deferred to v2+: order suggestions,
+reports, standalone inventory-count UI. **`/cleanup` was REMOVED 2026-09-05**
+(Mark: "you can remove the Cleanup page") — the route, `CleanupQueue`,
+`FixDrawer` and `lib/cleanup.ts` are gone; `FavoritesEditor` moved to
+`components/catalog/` because the item record's per-location rows use it. The
+catalog notes above that mention the cleanup queue are history. Deferred to v2+: order suggestions,
 minimum helper, spend dashboard, collaborative ordering, offline.
 ~~Invoice OCR~~ **built 2026-07-31** — it moved out of v2 because attachments
 made it a small feature rather than a project: the invoice was already in the

@@ -300,7 +300,7 @@ export function VendorItemsTable({
       // Read-only (Mark, 2026-07-29). It's the base-unit total the ordering
       // math divides by, derivable from the pack structure beside it, and a
       // second hand-typed copy of a derived number is only ever a way for the
-      // two to disagree. /cleanup's package editor is the one writer.
+      // two to disagree. The vendor item's own record derives and writes it.
       render: (vi) => qty(vi.package_content),
     },
     {
@@ -449,7 +449,7 @@ export function VendorItemsTable({
       empty={
         <p className="text-sm text-muted">
           {vendorItems.length === 0
-            ? "No vendor items yet. The cleanup drawer's vendor-item picker can link an existing one to this item."
+            ? "No vendor items yet. Link one from the vendor item's own record."
             : "No vendor items match these filters."}
         </p>
       }

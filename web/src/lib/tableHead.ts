@@ -6,7 +6,7 @@
 //
 // Shared from here rather than living in DataTable, because the two biggest
 // lists in the app — /vendors and /items — hand-roll their own <table> and do
-// not use DataTable at all, and /cleanup deliberately predates it. A constant
+// not use DataTable at all (and /cleanup, since removed, predated it). A constant
 // and a hook are what those three can actually reuse.
 //
 // THE TRAP, measured on the vendor list at scrollTop 600 (2026-07-31):

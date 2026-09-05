@@ -1,6 +1,6 @@
 // Shared shapes + formatting for the catalog admin screens (brief §D): the
 // items list, item detail, and vendor detail. These are the general-purpose
-// catalog surfaces — /cleanup stays a separate, problem-driven queue.
+// catalog surfaces. (/cleanup, the problem-driven queue, was removed 2026-09-05.)
 
 import { packageContent, unitFamily } from "./units";
 

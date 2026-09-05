@@ -321,7 +321,6 @@ export const SECTIONS: NavSection[] = [
       { slug: "invoices", label: "Invoices", href: "/invoices", built: true },
       // Last on purpose: a migration-era tool, easy to drop when the catalog
       // is clean.
-      { slug: "cleanup", label: "Cleanup", href: "/cleanup", built: true },
     ],
   },
   {

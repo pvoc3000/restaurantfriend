@@ -144,7 +144,7 @@ export function BaseUnitEditor({
     const ok = (await confirmDialog({ ...splitConfirmMessage(`Count this item in ${chosen} instead of ${baseUnit}?\n\n` +
         `This applies at EVERY location, not just this one.\n\n` +
         `Package contents that can be worked out from their pack are recomputed; ` +
-        `the rest are left for you and will show up in the cleanup queue.\n\n` +
+        `the rest are left for you to fill in on each vendor item.\n\n` +
         parLine), confirmLabel: "Change unit" }));
     // Snap back on cancel, so the control never shows a value that isn't saved.
     if (!ok) {

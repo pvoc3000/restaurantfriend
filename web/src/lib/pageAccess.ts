@@ -141,9 +141,6 @@ export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   "/order-guide":          row("-", "W", "W", "W", "W"),
   "/purchase-orders":      row("-", "R", "W", "W", "W"),
   "/invoices":             row("-", "-", "W", "W", "W"),
-  // Not on the sheet. A catalog-cleanup tool, so it follows the catalog's
-  // own write rule.
-  "/cleanup":              row("-", "-", "W", "W", "W"),
 
   // ── The masthead's org icon ───────────────────────────────────────────────
   // Not on the sheet. Org settings were open to everyone until 2026-09-04
