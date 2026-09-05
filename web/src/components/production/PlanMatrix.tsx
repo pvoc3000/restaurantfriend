@@ -534,22 +534,75 @@ export function PlanMatrix({
   });
 
   /**
-   * Change a tray's CATEGORY — "Edit category" on the ⋯ menu.
+   * Change a tray's NUMBER, CATEGORY and DONUT — "Edit tray" on the ⋯ menu
+   * (Mark, 2026-09-04, widening what had been "Edit category").
    *
    * The column is still `band`, which is what 039 called it and what every
-   * reader downstream selects; only the word on screen changed (Mark,
-   * 2026-08-08: "Category… would be more intuitive"). Same split as `admin`
-   * displaying as "Manager" — rename the label, leave the schema alone.
+   * reader downstream selects; only the word on screen is "Category" (Mark,
+   * 2026-08-08). Same split as `admin` displaying as "Manager".
+   *
+   * THE DONUT IS THE ONE HALF WITH RULES. The dialog offers it only when the
+   * tray holds AT MOST ONE distinct item — the common shape, one kind of donut
+   * all week — because "the tray's donut" is not a fact about a tray carrying
+   * three. Changing it RE-POINTS the existing slots at the new item, keeping
+   * every par (the par is the number you typed, and swapping the donut is not
+   * consent to lose a week of numbers — the drag-move rule), and fills any day
+   * the old item was missing from, seeded from the new item's default. Picking
+   * a donut for an EMPTY tray fills all seven days, exactly as Add tray does.
    */
-  function setCategory(trayId: string, category: string) {
+  function editTray(
+    tray: MatrixTray,
+    next: { trayNumber: string; category: string; itemId: string },
+    currentItemId: string | null
+  ) {
     run(async (supabase) => {
       const { data, error } = await supabase
         .from("production_plan_trays")
-        .update({ band: category.trim() || null })
-        .eq("id", trayId)
+        .update({ tray_number: next.trayNumber.trim(), band: next.category.trim() || null })
+        .eq("id", tray.id)
         .select("id");
       if (error || !data?.length) {
-        return error?.message ?? "That category could not be changed.";
+        return /duplicate key|unique/.test(error?.message ?? "")
+          ? `This plan already has a tray ${next.trayNumber.trim()}.`
+          : error?.message ?? "That tray could not be changed.";
+      }
+
+      if (next.itemId && next.itemId !== currentItemId) {
+        const held = slots.filter((sl) => sl.tray_id === tray.id && sl.item_id === currentItemId);
+        if (held.length > 0) {
+          const { data: moved, error: moveError } = await supabase
+            .from("production_plan_tray_items")
+            .update({ item_id: next.itemId })
+            .in("id", held.map((sl) => sl.id))
+            .select("id");
+          if (moveError || (moved?.length ?? 0) !== held.length) {
+            return `The tray was changed, but its donut could not be: ${
+              moveError?.message ?? "nothing was written"
+            }`;
+          }
+        }
+        const missing = [1, 2, 3, 4, 5, 6, 7].filter(
+          (weekday) => !held.some((sl) => sl.weekday === weekday)
+        );
+        if (missing.length > 0) {
+          const { data: added, error: addError } = await supabase
+            .from("production_plan_tray_items")
+            .insert(
+              missing.map((weekday) => ({
+                org_id: orgId,
+                tray_id: tray.id,
+                weekday,
+                item_id: next.itemId,
+                par: defaultParFor(defaultPars, next.itemId, weekday),
+              }))
+            )
+            .select("id");
+          if (addError || (added?.length ?? 0) !== missing.length) {
+            return `The tray was changed, but its donut could not be added to every day: ${
+              addError?.message ?? "nothing was written"
+            }`;
+          }
+        }
       }
       setEditing(null);
       return null;
@@ -1050,10 +1103,8 @@ export function PlanMatrix({
                         label={`Actions for tray ${row.tray.tray_number}`}
                         items={[
                           {
-                            label: "Edit category",
-                            hint: row.tray.band
-                              ? `Currently ${row.tray.band}`
-                              : "This tray has none",
+                            label: "Edit tray",
+                            hint: "Number, category and donut",
                             onSelect: () => setEditing(tray),
                           },
                           {
@@ -1204,12 +1255,14 @@ export function PlanMatrix({
       ) : null}
 
       {editing ? (
-        <EditCategoryDialog
+        <EditTrayDialog
           tray={editing}
+          heldItemIds={[...new Set(slots.filter((sl) => sl.tray_id === editing.id).map((sl) => sl.item_id))]}
           bands={bands}
+          items={items}
           pending={pending}
           onClose={() => setEditing(null)}
-          onSave={(category) => setCategory(editing.id, category)}
+          onSave={(next, currentItemId) => editTray(editing, next, currentItemId)}
         />
       ) : null}
     </div>
@@ -1363,35 +1416,52 @@ function NewTrayDialog({
 }
 
 /**
- * Change one tray's category — the ⋯ menu's "Edit category".
+ * Change one tray's number, category and donut — the ⋯ menu's "Edit tray",
+ * the Add tray dialog's three fields over an existing tray.
  *
- * A dialog rather than an inline cell because the tray column is 40px wide and
- * this is a vocabulary you pick from, not a number you nudge; and `allowNew`,
- * because the list of categories is the org's own and legitimately grows.
+ * The number is unique per plan and the write says so if it collides. The
+ * donut field is offered only when the tray holds at most ONE distinct item;
+ * a tray carrying several says so in its place, since there is no one donut to
+ * show and re-pointing three items at one would silently collapse a tray
+ * somebody built by hand.
  */
-function EditCategoryDialog({
+function EditTrayDialog({
   tray,
+  heldItemIds,
   bands,
+  items,
   pending,
   onClose,
   onSave,
 }: {
   tray: MatrixTray;
+  /** The distinct items on this tray, any day. */
+  heldItemIds: string[];
   bands: string[];
+  items: MatrixItem[];
   pending: boolean;
   onClose: () => void;
-  onSave: (category: string) => void;
+  onSave: (
+    next: { trayNumber: string; category: string; itemId: string },
+    currentItemId: string | null
+  ) => void;
 }) {
+  const single = heldItemIds.length <= 1;
+  const currentItemId = heldItemIds.length === 1 ? heldItemIds[0] : null;
+  const [trayNumber, setTrayNumber] = useState(tray.tray_number);
   const [category, setCategory] = useState(tray.band ?? "");
+  const [itemId, setItemId] = useState(currentItemId ?? "");
+  const ready = trayNumber.trim() !== "";
+  const save = () => onSave({ trayNumber, category, itemId }, currentItemId);
 
   return (
     <Dialog
-      title={`Tray ${tray.tray_number} category`}
+      title={`Edit tray ${tray.tray_number}`}
       onClose={onClose}
       busy={pending}
       width="max-w-md"
       onSubmit={() => {
-        if (!pending) onSave(category);
+        if (!pending && ready) save();
       }}
       footer={
         <>
@@ -1400,8 +1470,8 @@ function EditCategoryDialog({
           </button>
           <button
             type="button"
-            onClick={() => onSave(category)}
-            disabled={pending}
+            onClick={save}
+            disabled={pending || !ready}
             className={DIALOG_COMMIT_CLASS}
           >
             {pending ? "Saving…" : "Save"}
@@ -1409,29 +1479,69 @@ function EditCategoryDialog({
         </>
       }
     >
-      <div className="space-y-1.5">
-        <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-          Category
-        </span>
-        <PickList
-          variant="field"
-          ariaLabel="Category"
-          value={category}
-          onPick={setCategory}
-          options={bands.map((b) => ({ value: b, label: b }))}
-          allowNew
-          placeholder="RAISED, CLASSIC, SIGNATURE…"
-        />
-        {/* Clearing it is a real answer — a tray with no category groups under
-            "No category" rather than disappearing. */}
-        <button
-          type="button"
-          onClick={() => setCategory("")}
-          disabled={pending || category === ""}
-          className="text-[11px] uppercase tracking-[0.08em] text-subtle hover:text-ink disabled:opacity-35"
-        >
-          Clear
-        </button>
+      <div className="space-y-5">
+        <div className="space-y-1.5">
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Tray number
+          </span>
+          <TextInput
+            value={trayNumber}
+            onValueChange={setTrayNumber}
+            placeholder="01"
+            aria-label="Tray number"
+            autoFocus
+          />
+        </div>
+        <div className="space-y-1.5">
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Category
+          </span>
+          <PickList
+            variant="field"
+            ariaLabel="Category"
+            value={category}
+            onPick={setCategory}
+            options={bands.map((b) => ({ value: b, label: b }))}
+            allowNew
+            placeholder="RAISED, CLASSIC, SIGNATURE…"
+          />
+          {/* Clearing it is a real answer — a tray with no category groups under
+              "No category" rather than disappearing. */}
+          <button
+            type="button"
+            onClick={() => setCategory("")}
+            disabled={pending || category === ""}
+            className="text-[11px] uppercase tracking-[0.08em] text-subtle hover:text-ink disabled:opacity-35"
+          >
+            Clear
+          </button>
+        </div>
+        <div className="space-y-1.5">
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Donut
+          </span>
+          {single ? (
+            <PickList
+              variant="field"
+              ariaLabel="Donut"
+              value={itemId}
+              onPick={setItemId}
+              options={items.map((it) => ({
+                value: it.id,
+                label: it.name,
+                hint: it.taxonomy,
+                inactive: it.inactive,
+              }))}
+              placeholder="Every day of the week, or leave empty"
+              activateTable="production_items"
+            />
+          ) : (
+            <p className="text-[13px] text-muted">
+              This tray holds {heldItemIds.length} different items — change them
+              on the tray itself.
+            </p>
+          )}
+        </div>
       </div>
     </Dialog>
   );
