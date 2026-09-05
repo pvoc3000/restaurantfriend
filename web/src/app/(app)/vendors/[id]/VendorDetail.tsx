@@ -348,7 +348,7 @@ export async function VendorDetail({
       <Breadcrumbs
         trail={trail}
         current={v.name}
-        trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
+        trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} carry={["tab"]} />}
       />
 
       {/* ---- who this vendor is, ABOVE the split ----------------------- */}

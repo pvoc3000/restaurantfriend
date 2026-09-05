@@ -63,6 +63,7 @@ import "./handAmendment.fixtures";
 import "./computedAmounts.fixtures";
 import "./recipeCosts.fixtures";
 import "./receiving.fixtures";
+import "./recordSet.fixtures";
 import "./roles.fixtures";
 import "./specialOrders.fixtures";
 import "./specialOrderDocs.fixtures";

@@ -102,3 +102,37 @@ export function recordPosition(records: RecordRef[], id: string): RecordPosition
   };
 }
 
+
+/**
+ * A record's href with the CURRENT screen's view carried onto it — the tab you
+ * are on, above all (Mark, 2026-09-05: "is it possible to stay on the current
+ * tab when using the navigation buttons… currently the page resets to the
+ * first tab").
+ *
+ * The list published each href as ITS rows link to it, which is right for the
+ * breadcrumb (the trail is the list's) and wrong for the tab (the tab is the
+ * reader's, chosen after arriving). So the book overlays the named keys from
+ * the URL it is standing on, and nothing else: `from`/`fromLabel` stay the
+ * list's, so walking the set never rewrites where Back goes.
+ *
+ * A key ABSENT from the current URL is REMOVED from the target — the default
+ * tab writes no parameter, so being on Info must land on Info, not on whatever
+ * `?tab=` the published href happened to carry (today none do, but the rule is
+ * cheaper than the assumption).
+ */
+export function carryQuery(
+  href: string,
+  current: URLSearchParams,
+  keys: readonly string[]
+): string {
+  if (keys.length === 0) return href;
+  const [path, query = ""] = href.split("?", 2);
+  const params = new URLSearchParams(query);
+  for (const key of keys) {
+    const value = current.get(key);
+    if (value === null || value === "") params.delete(key);
+    else params.set(key, value);
+  }
+  const out = params.toString();
+  return out ? `${path}?${out}` : path;
+}

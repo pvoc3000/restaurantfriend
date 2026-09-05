@@ -9656,10 +9656,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   One more thing the move earned: a block that was hiding from crowding can stop
   (`RevealPanel alwaysOpen` — paperwork got its own tab, so the reveal had
   nothing left to avoid).
-  Known gaps, neither fixed: `RecordNav` doesn't carry the tab, so walking to the
-  next record lands on the first one; and `ScrollMemory` keys on pathname without
-  the query, so all five tabs share one scroll position — `useScrollMemoryKey` is
-  how the order guide solves exactly that.
+  **THE BOOK KEEPS THE TAB** (Mark, 2026-09-05: "is it possible to stay on the
+  current tab when using the navigation buttons… currently the page resets to
+  the first tab"). `RecordNav carry={["tab"]}` on every tabbed record — vendors,
+  employees, recipes, special orders. `carryQuery` in `lib/recordSet` overlays
+  the named keys from the URL you are standing on onto the four published hrefs
+  and NOTHING else: `from`/`fromLabel` stay the list's, so paging never rewrites
+  where Back goes; and a key absent from the current URL is REMOVED, since the
+  default tab writes none. Fixture-pinned. Verified live: Amoretti → Invoices →
+  Next landed on BakeMark's Invoices at "4 of 29", crumb still Vendors.
+  Known gap, not fixed: `ScrollMemory` keys on pathname without the query, so
+  all five tabs share one scroll position — `useScrollMemoryKey` is how the
+  order guide solves exactly that.
 - **Safari:** a table cell under `border-collapse` is NOT a containing block in
   WebKit — anchor absolutely-positioned children to an inner `<div>`. And see
   web/README.md on Safari caching a stale dev stylesheet.

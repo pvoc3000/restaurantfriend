@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRecordPosition } from "@/lib/recordSet";
+import { useSearchParams } from "next/navigation";
+import { carryQuery, useRecordPosition } from "@/lib/recordSet";
 
 /**
  * FileMaker's book, on a detail screen: |‹ ‹ 4 of 61 › ›|
@@ -15,23 +16,38 @@ import { useRecordPosition } from "@/lib/recordSet";
  * It renders NOTHING when there's no found set — a pasted URL, a reload, or a
  * record reached from somewhere that isn't a list. That's deliberate: a book
  * that walks a set you can't see is worse than no book.
+ *
+ * `carry` names query keys the book copies from the CURRENT URL onto each
+ * step — a tabbed record passes `["tab"]`, so paging through vendors while on
+ * Invoices lands on the next vendor's Invoices (Mark, 2026-09-05). See
+ * `carryQuery` for what is and isn't carried.
  */
-export function RecordNav({ listKey, id }: { listKey: string | null; id: string }) {
+export function RecordNav({
+  listKey,
+  id,
+  carry = [],
+}: {
+  listKey: string | null;
+  id: string;
+  carry?: readonly string[];
+}) {
   const position = useRecordPosition(listKey, id);
+  const current = useSearchParams();
   if (!position) return null;
+  const step = (href: string | null) => (href ? carryQuery(href, current, carry) : null);
 
   return (
     <nav
       aria-label="Record navigation"
       className="flex shrink-0 items-center gap-1 tabular-nums"
     >
-      <Step href={position.first} label="First record" glyph={FIRST_PAGE} />
-      <Step href={position.previous} label="Previous record" glyph={CHEVRON_LEFT} />
+      <Step href={step(position.first)} label="First record" glyph={FIRST_PAGE} />
+      <Step href={step(position.previous)} label="Previous record" glyph={CHEVRON_LEFT} />
       <span className="px-1 text-[11px] uppercase tracking-[0.12em] text-subtle">
         {position.index} of {position.total}
       </span>
-      <Step href={position.next} label="Next record" glyph={CHEVRON_RIGHT} />
-      <Step href={position.last} label="Last record" glyph={LAST_PAGE} />
+      <Step href={step(position.next)} label="Next record" glyph={CHEVRON_RIGHT} />
+      <Step href={step(position.last)} label="Last record" glyph={LAST_PAGE} />
     </nav>
   );
 }
