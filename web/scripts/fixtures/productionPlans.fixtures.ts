@@ -139,12 +139,14 @@ test("a slot may hold SEVERAL items — half a tray of two things", () => {
   const m = buildMatrix(
     [{ id: "t1", tray_number: "01", band: null, sort: 1 }],
     [
-      { id: "s1", tray_id: "t1", weekday: 1, item_id: "a", par: 12 },
       { id: "s2", tray_id: "t1", weekday: 1, item_id: "b", par: 12 },
+      { id: "s1", tray_id: "t1", weekday: 1, item_id: "a", par: 12 },
     ],
     names
   );
-  eq(m[0].days[0].map((s) => s.name).sort(), ["Angry Samoa", "Bacon 182"]);
+  // In NAME order whatever order the slots arrived in — the fixture feeds
+  // Bacon 182 first.
+  eq(m[0].days[0].map((s) => s.name), ["Angry Samoa", "Bacon 182"]);
 });
 
 test("trays order by their NUMBER, numerically, whatever `sort` says", () => {

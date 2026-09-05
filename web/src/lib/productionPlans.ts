@@ -287,6 +287,12 @@ export function buildMatrix(
             // while the database still holds it.
             par: s.par,
           }))
+          // BY NAME within a day (Mark, 2026-09-04: a tray holding three
+          // mochis listed them in a different order on every day). Slots
+          // arrive in whatever order they were written, and a cell whose
+          // order depends on which donut was added first is a cell you have
+          // to re-read on every column.
+          .sort((a, b) => compareValues(a.name, b.name) || a.itemId.localeCompare(b.itemId))
       ),
       groupLabel: startsRun ? group.label : null,
       // How many trays this run holds — counted here, so the band can say it
