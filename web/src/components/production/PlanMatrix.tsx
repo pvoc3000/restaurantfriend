@@ -431,6 +431,51 @@ export function PlanMatrix({
    */
   function dropSlot(source: SlotDragSource, target: SlotDropTarget, copy: boolean) {
     run(async (supabase) => {
+      // THE SAME DONUT LANDING ON A DAY THAT ALREADY HAS IT MERGES (Mark,
+      // 2026-09-04: "it should add the item anyway"). 039 keys a slot on
+      // (tray, weekday, item), so a second row is refused by the database;
+      // what the reader wanted was the donuts, and the day's par is the sum
+      // of its lines either way. So the copied par is ADDED to the line
+      // already there, and a MOVE does the same and then removes the source.
+      // Nothing is refused, and no par typed into either line is lost.
+      async function mergeInto(): Promise<string | null> {
+        const { data: existing, error: readError } = await supabase
+          .from("production_plan_tray_items")
+          .select("id, par")
+          .eq("tray_id", target.trayId)
+          .eq("weekday", target.weekday)
+          .eq("item_id", source.itemId)
+          .maybeSingle();
+        if (readError || !existing) {
+          return readError?.message ?? `${source.name} could not be ${copy ? "copied" : "moved"}.`;
+        }
+        const par =
+          source.par === null && existing.par === null
+            ? null
+            : (Number(source.par ?? 0) + Number(existing.par ?? 0));
+        const { data: merged, error: mergeError } = await supabase
+          .from("production_plan_tray_items")
+          .update({ par })
+          .eq("id", existing.id)
+          .select("id");
+        if (mergeError || !merged?.length) {
+          return mergeError?.message ?? `${source.name} could not be ${copy ? "copied" : "moved"}.`;
+        }
+        if (!copy) {
+          const { data: gone, error: goneError } = await supabase
+            .from("production_plan_tray_items")
+            .delete()
+            .eq("id", source.rowId)
+            .select("id");
+          if (goneError || !gone?.length) {
+            return `${source.name} was added to that day, but could not be taken off its old one: ${
+              goneError?.message ?? "nothing was removed"
+            }`;
+          }
+        }
+        return null;
+      }
+
       const { data, error } = copy
         ? await supabase
             .from("production_plan_tray_items")
@@ -448,9 +493,8 @@ export function PlanMatrix({
             .eq("id", source.rowId)
             .select("id");
       if (error || !data?.length) {
-        return /duplicate key|unique/.test(error?.message ?? "")
-          ? `${source.name} is already on that tray that day.`
-          : error?.message ?? `${source.name} could not be ${copy ? "copied" : "moved"}.`;
+        if (/duplicate key|unique/.test(error?.message ?? "")) return mergeInto();
+        return error?.message ?? `${source.name} could not be ${copy ? "copied" : "moved"}.`;
       }
       // The row that now sits at the destination: a copy's new id, or the moved
       // row's own. Added to the offers already on screen rather than replacing
