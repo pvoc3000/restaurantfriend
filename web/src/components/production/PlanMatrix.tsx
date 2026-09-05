@@ -51,14 +51,10 @@ export type MatrixItem = {
 };
 
 /**
- * The tray column's fixed width — just the number and its band now that the
- * row's controls have moved to the other end.
- */
-const TRAY_COLUMN = 40;
-/**
- * The controls column at the far right: the row's stepper pair (16px) beside
- * `RowMenu`'s 36px trigger. It took the 20px the tray column gave up, so the
- * seven days are exactly as wide as before.
+ * The controls column at the far right: the row's steppers (16px) beside
+ * `RowMenu`'s 36px trigger. There is no tray column any more (Mark,
+ * 2026-09-05) — the number and category sit on a line ABOVE the tray's chips,
+ * `<number> · <category>`, so the seven days share everything but this.
  */
 const MENU_COLUMN = 60;
 
@@ -877,19 +873,11 @@ export function PlanMatrix({
         <table ref={tableRef} className="w-full table-fixed border-collapse text-[13px]">
           <thead>
             <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
-              <th className="px-1 py-2 text-left" style={{ width: TRAY_COLUMN }}>
-                {/* "#" on screen (Mark, 2026-08-08) — the column holds "01",
-                    "7A", and the word was wider than the column it labelled.
-                    Still announced as "Tray", because a screen reader saying
-                    "number sign" names nothing. */}
-                <span aria-hidden="true">#</span>
-                <span className="sr-only">Tray</span>
-              </th>
               {WEEKDAYS.map((d) => (
                 <th
                   key={d.iso}
                   className="px-2 py-2 text-left"
-                  style={{ width: `calc((100% - ${TRAY_COLUMN + MENU_COLUMN}px) / 7)` }}
+                  style={{ width: `calc((100% - ${MENU_COLUMN}px) / 7)` }}
                 >
                   {d.short}
                 </th>
@@ -910,7 +898,7 @@ export function PlanMatrix({
                 {row.groupLabel ? (
                   <tr>
                     <td
-                      colSpan={WEEKDAYS.length + 2}
+                      colSpan={WEEKDAYS.length + 1}
                       className="bg-ink px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-white"
                     >
                       {row.groupLabel}
@@ -932,7 +920,7 @@ export function PlanMatrix({
                 {row.subGroupLabel ? (
                   <tr>
                     <td
-                      colSpan={WEEKDAYS.length + 2}
+                      colSpan={WEEKDAYS.length + 1}
                       className="px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink"
                     >
                       {row.subGroupLabel}
@@ -956,17 +944,27 @@ export function PlanMatrix({
                     `border-b-2 border-ink` wins the collapse against the first
                     row's hairline, so the table still opens on one heavy rule
                     rather than two stacked. */}
-                <tr className="group/tray border-t border-hairline align-top">
-                  <td className={`px-1 py-8 ${row.endsSubGroup ? "pb-12" : ""}`}>
-                    <div className="min-w-0">
-                      <span className="block truncate font-medium">{row.tray.tray_number}</span>
-                      {row.tray.band ? (
-                        <span className="block truncate text-[10px] uppercase tracking-[0.08em] text-subtle">
+                {/* THE TRAY'S NAME IS A LINE ABOVE ITS CHIPS, not a column
+                    beside them (Mark, 2026-09-05): `<number> · <category>`.
+                    The rule and the top padding live on THIS row; the day row
+                    beneath carries only the bottom padding, so the pair reads
+                    as one block with 64px of air around it. */}
+                <tr className="border-t border-hairline">
+                  <td colSpan={WEEKDAYS.length + 1} className="px-2 pb-1 pt-8">
+                    <span className="font-medium">{row.tray.tray_number}</span>
+                    {row.tray.band ? (
+                      <>
+                        <span className="mx-2 text-subtle" aria-hidden="true">
+                          ·
+                        </span>
+                        <span className="text-[11px] uppercase tracking-[0.08em] text-subtle">
                           {row.tray.band}
                         </span>
-                      ) : null}
-                    </div>
+                      </>
+                    ) : null}
                   </td>
+                </tr>
+                <tr className="group/tray align-top">
                   {row.days.map((day, i) => {
                     const weekday = WEEKDAYS[i].iso;
                     const isAdding =
@@ -976,7 +974,7 @@ export function PlanMatrix({
                         key={weekday}
                         data-tray-id={row.tray.id}
                         data-weekday={weekday}
-                        className={`px-2 py-8 align-top ${row.endsSubGroup ? "pb-12" : ""}`}
+                        className={`px-2 pt-1 align-top ${row.endsSubGroup ? "pb-12" : "pb-8"}`}
                       >
                         <div className="flex flex-col gap-1">
                           {day.map((slot, slotIndex) => (
@@ -1186,7 +1184,7 @@ export function PlanMatrix({
                       whole week, then the ⋯. `px-0` because the two of them are
                       exactly this column's width and RowMenu's 36px trigger
                       carries its own whitespace. */}
-                  <td className={`px-0 py-8 align-top ${row.endsSubGroup ? "pb-12" : ""}`}>
+                  <td className={`px-0 pt-1 align-top ${row.endsSubGroup ? "pb-12" : "pb-8"}`}>
                     <div className="flex items-start justify-end gap-1">
                     {editable ? (
                       <RowSteppers
