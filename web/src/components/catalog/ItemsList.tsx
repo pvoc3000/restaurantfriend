@@ -23,6 +23,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { NewInventoryItem } from "./NewInventoryItem";
+import { InventoryItemActions } from "./InventoryItemActions";
 import { PickList } from "@/components/ui/PickList";
 import type { ItemRow } from "@/app/(app)/items/page";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
@@ -245,6 +246,8 @@ export function ItemsList({
     router.refresh();
   }
 
+  const itemNames = useMemo(() => items.map((i) => i.name), [items]);
+
   const columns: DataColumn<ItemRow>[] = [
     // The selection column exists for the bulk Deactivate bar, so it goes with
     // it: a Read Only role (a supervisor, per the Page Permissions sheet) gets
@@ -351,6 +354,30 @@ export function ItemsList({
           <span className="tabular-nums text-accent">never</span>
         ),
     },
+    // The row's own commands — Duplicate and Delete (Mark, 2026-09-04). The
+    // selection bar stays for the batch deactivate; acting on ONE item should
+    // not mean ticking it and reading a bar written for many. Unlabelled, so
+    // it stays out of the Columns menu, and 68 = the 36px button plus the
+    // cell's padding (VendorItemsTable's arithmetic).
+    ...(editable
+      ? [
+          {
+            key: "actions",
+            label: "",
+            width: 68,
+            render: (item: ItemRow) => (
+              <span className="flex justify-end">
+                <InventoryItemActions
+                  itemId={item.id}
+                  name={item.name}
+                  isActive={item.is_active}
+                  existingNames={itemNames}
+                />
+              </span>
+            ),
+          } satisfies DataColumn<ItemRow>,
+        ]
+      : []),
   ];
 
   return (
@@ -401,7 +428,7 @@ export function ItemsList({
             <NewInventoryItem
               orgId={orgId}
               categories={categories}
-              existingNames={items.map((i) => i.name)}
+              existingNames={itemNames}
             />
           </div>
         ) : null}
