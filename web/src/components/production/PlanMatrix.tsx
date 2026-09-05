@@ -16,6 +16,7 @@ import {
   WEEKDAYS,
   buildMatrix,
   defaultParFor,
+  traySortUpdates,
   slotParLabel,
   stepPar,
   nextTrayNumber,
@@ -246,6 +247,31 @@ export function PlanMatrix({
       }
       router.refresh();
     });
+  }
+
+  /**
+   * Keep `production_plan_trays.sort` in step with the tray NUMBERS, which is
+   * the order the matrix reads them in (`compareTrayNumbers`). `sort` is what
+   * `production_day` and the printed packet order by, and until now nothing
+   * wrote it except "append" — so a tray 17 created after 18 and 20 printed
+   * after them. Called after anything that adds or renumbers a tray; writes
+   * only the rows whose value differs, one statement each, checked.
+   */
+  async function resortTrays(supabase: ReturnType<typeof createClient>): Promise<string | null> {
+    const { data, error } = await supabase
+      .from("production_plan_trays")
+      .select("id, tray_number, sort")
+      .eq("plan_id", planId);
+    if (error || !data) return error?.message ?? "The trays could not be reordered.";
+    for (const u of traySortUpdates(data)) {
+      const { data: w, error: e } = await supabase
+        .from("production_plan_trays")
+        .update({ sort: u.sort })
+        .eq("id", u.id)
+        .select("id");
+      if (e || !w?.length) return e?.message ?? "The trays could not be reordered.";
+    }
+    return null;
   }
 
   function addItem(trayId: string, weekday: number, itemId: string) {
@@ -604,6 +630,8 @@ export function PlanMatrix({
           }
         }
       }
+      const resort = await resortTrays(supabase);
+      if (resort) return resort;
       setEditing(null);
       return null;
     });
@@ -659,6 +687,8 @@ export function PlanMatrix({
           }`;
         }
       }
+      const resort = await resortTrays(supabase);
+      if (resort) return resort;
       setNewTray(false);
       return null;
     });
@@ -729,17 +759,18 @@ export function PlanMatrix({
           par: slot.par,
         }))
       );
-      if (!rows.length) return null;
-      const { data: copied, error: slotError } = await supabase
-        .from("production_plan_tray_items")
-        .insert(rows)
-        .select("id");
-      if (slotError || copied?.length !== rows.length) {
-        return `Tray ${number} was created, but its items could not be copied: ${
-          slotError?.message ?? "nothing was written"
-        }`;
+      if (rows.length) {
+        const { data: copied, error: slotError } = await supabase
+          .from("production_plan_tray_items")
+          .insert(rows)
+          .select("id");
+        if (slotError || copied?.length !== rows.length) {
+          return `Tray ${number} was created, but its items could not be copied: ${
+            slotError?.message ?? "nothing was written"
+          }`;
+        }
       }
-      return null;
+      return resortTrays(supabase);
     });
   }
 

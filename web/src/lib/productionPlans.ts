@@ -266,10 +266,7 @@ export function buildMatrix(
       const d = compareValues(a.group.sortBy[i] ?? "", b.group.sortBy[i] ?? "");
       if (d !== 0) return d;
     }
-    return (
-      (a.tray.sort ?? 0) - (b.tray.sort ?? 0) ||
-      a.tray.tray_number.localeCompare(b.tray.tray_number, undefined, { numeric: true })
-    );
+    return compareTrayNumbers(a.tray.tray_number, b.tray.tray_number) || (a.tray.sort ?? 0) - (b.tray.sort ?? 0);
   });
 
   return ordered.map(({ tray, group }, i) => {
@@ -408,6 +405,37 @@ export const REVIEW_DEFAULTS_PARAM = "defaults";
  * READER rather than the database: two rows called "SUMMER 2026" in a list you
  * pick a plan from is the problem being solved.
  */
+/**
+ * The order trays are READ in: by their NUMBER, numerically, so "07" sits
+ * between "05" and "10" and "7A" after "7" (Mark, 2026-09-04: grouping by
+ * tray "doesn't look like the trays are being sorted by tray number").
+ *
+ * `production_plan_trays.sort` used to lead, and nothing ever wrote it except
+ * "append": a tray added or duplicated after its neighbours sat wherever it
+ * was created. `sort` is what `production_day` and the printed packet order
+ * by, so it is kept IN STEP with this comparator rather than replaced — see
+ * `traySortUpdates`.
+ */
+export function compareTrayNumbers(a: string, b: string): number {
+  return a.trim().localeCompare(b.trim(), undefined, { numeric: true, sensitivity: "base" });
+}
+
+/**
+ * The `sort` each tray should carry so the database orders them the way this
+ * screen reads them — 1-based, by number — returning ONLY the trays whose
+ * stored value differs, so a plan already in order writes nothing.
+ */
+export function traySortUpdates(
+  trays: readonly { id: string; tray_number: string; sort: number | null }[]
+): { id: string; sort: number }[] {
+  return trays
+    .slice()
+    .sort((a, b) => compareTrayNumbers(a.tray_number, b.tray_number))
+    .map((t, i) => ({ id: t.id, sort: i + 1, was: t.sort }))
+    .filter((t) => t.was !== t.sort)
+    .map(({ id, sort }) => ({ id, sort }));
+}
+
 export function duplicateTitle(existing: readonly string[], from: string): string {
   const taken = new Set(existing.map((t) => t.trim()));
   for (let i = 1; i <= 200; i++) {

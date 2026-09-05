@@ -8,7 +8,7 @@ import {
   rangesOverlap,
   overlappingPlans,
   planRange,
-  buildMatrix,
+  buildMatrix, traySortUpdates,
   defaultParFor,
   slotParLabel,
   stepPar,
@@ -147,17 +147,37 @@ test("a slot may hold SEVERAL items — half a tray of two things", () => {
   eq(m[0].days[0].map((s) => s.name).sort(), ["Angry Samoa", "Bacon 182"]);
 });
 
-test("trays order by sort, then by their number", () => {
+test("trays order by their NUMBER, numerically, whatever `sort` says", () => {
+  // Tray 17 was created after 18 and 20, so its `sort` is highest — the case
+  // Mark hit. The number is what a person reads; sort only breaks ties.
   const m = buildMatrix(
     [
-      { id: "c", tray_number: "07", band: null, sort: 3 },
-      { id: "a", tray_number: "01", band: null, sort: 1 },
-      { id: "b", tray_number: "05", band: null, sort: 2 },
+      { id: "c", tray_number: "18", band: null, sort: 1 },
+      { id: "a", tray_number: "20", band: null, sort: 2 },
+      { id: "b", tray_number: "17", band: null, sort: 3 },
+      { id: "d", tray_number: "7", band: null, sort: 4 },
     ],
     [],
     new Map()
   );
-  eq(m.map((r) => r.tray.tray_number), ["01", "05", "07"]);
+  eq(m.map((r) => r.tray.tray_number), ["7", "17", "18", "20"]);
+});
+
+test("traySortUpdates renumbers by tray number and names only what moves", () => {
+  eq(
+    traySortUpdates([
+      { id: "c", tray_number: "18", sort: 1 },
+      { id: "a", tray_number: "20", sort: 2 },
+      { id: "b", tray_number: "17", sort: 3 },
+    ]),
+    [
+      { id: "b", sort: 1 },
+      { id: "c", sort: 2 },
+      { id: "a", sort: 3 },
+    ]
+  );
+  // Already in order: nothing to write.
+  eq(traySortUpdates([{ id: "a", tray_number: "01", sort: 1 }, { id: "b", tray_number: "02", sort: 2 }]), []);
 });
 
 test("a tray with nothing on it still renders seven empty days", () => {
