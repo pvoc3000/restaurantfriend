@@ -948,11 +948,14 @@ export function PlanMatrix({
                     unit is a grid cell and the rule is what says where a tray
                     ends.
 
-                    On the `<tr>`, which `border-collapse` honours — and where
-                    the head's own `border-b-2 border-ink` wins the collapse
-                    against the first row's hairline, so the table still opens
-                    on one heavy rule rather than two stacked. */}
-                <tr className="group/tray border-t border-hairline align-top">
+                    BLACK, not a hairline (Mark, 2026-09-05), the day after
+                    the padding between trays doubled: with 32px of air a grey
+                    rule reads as a smudge, and the app's mark for a band that
+                    DELIMITS is ink. On the `<tr>`, which `border-collapse`
+                    honours — and where the head's own `border-b-2` still wins
+                    the collapse against the first row's 1px, so the table
+                    opens on one heavy rule rather than two stacked. */}
+                <tr className="group/tray border-t border-ink align-top">
                   <td className={`px-1 py-4 ${row.endsSubGroup ? "pb-8" : ""}`}>
                     <div className="min-w-0">
                       <span className="block truncate font-medium">{row.tray.tray_number}</span>
