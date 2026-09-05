@@ -28,7 +28,7 @@ import {
 } from "@/lib/productionPlans";
 import { useSlotDrag, type SlotDragSource, type SlotDropTarget } from "@/lib/planSlotDrag";
 import { withSlot } from "@/lib/production";
-import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { alertDialog, confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 export type MatrixTray = { id: string; tray_number: string; band: string | null; sort: number | null };
 export type MatrixSlot = {
@@ -123,7 +123,6 @@ export function PlanMatrix({
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
-  const [failed, setFailed] = useState<string | null>(null);
   const [adding, setAdding] = useState<{ trayId: string; weekday: number } | null>(null);
   const [newTray, setNewTray] = useState(false);
   const [editing, setEditing] = useState<MatrixTray | null>(null);
@@ -238,12 +237,17 @@ export function PlanMatrix({
   const matrix = buildMatrix(trays, slots, itemNames, grouping, taxonomy);
 
   /** One write, one refresh, one place to report the failure. */
+  /**
+   * Every write on this screen goes through here, and a failure is a POPUP
+   * (Mark, 2026-09-04: the message "is at the top of the page and I'm working
+   * at the bottom so didn't see it"). A plan runs to two dozen trays, so a
+   * line under the heading is off screen for most of the work.
+   */
   function run(work: (supabase: ReturnType<typeof createClient>) => Promise<string | null>) {
-    setFailed(null);
     start(async () => {
       const message = await work(createClient());
       if (message) {
-        setFailed(message);
+        await alertDialog({ title: "That didn't work", body: message });
         return;
       }
       router.refresh();
@@ -290,7 +294,10 @@ export function PlanMatrix({
   async function renumber() {
     const moves = renumberTrays(trays);
     if (moves.length === 0) {
-      setFailed(`The ${trays.length} trays are already numbered in order.`);
+      await alertDialog({
+        title: "Nothing to renumber",
+        body: `The ${trays.length} trays are already numbered in order.`,
+      });
       return;
     }
     const last = String(trays.length).padStart(Math.max(2, String(trays.length).length), "0");
@@ -826,7 +833,6 @@ export function PlanMatrix({
 
   return (
     <div className="space-y-3">
-      {failed ? <p className="text-[13px] text-accent">{failed}</p> : null}
 
       {/* A control that changes what the list SHOWS goes with the list, never
           in a command bar — and every one-of-N choice in this app is a

@@ -44,6 +44,12 @@ export type ConfirmRequest = {
    * asked at the moment you press a button is a worse form than a screen.
    */
   option?: ConfirmOption;
+  /**
+   * A NOTICE rather than a question — one button, no Cancel. For an error the
+   * reader must see (a write that failed on a screen where the failure line is
+   * a scroll away), never for anything that writes. See `alertDialog`.
+   */
+  notice?: boolean;
 };
 
 export type ConfirmOption = {
@@ -140,4 +146,20 @@ export function splitConfirmMessage(message: string): { title: string; body?: st
   const [title, ...rest] = message.split(/\n\s*\n/);
   const body = rest.join("\n\n").trim();
   return body ? { title: title.trim(), body } : { title: title.trim() };
+}
+
+/**
+ * Tell the reader something and wait until they have seen it — the confirm
+ * dialog with one button (Mark, 2026-09-04, on the plan matrix: a failure
+ * reported at the top of the page went unread while he worked at the bottom).
+ * Use it for a failed write, never for a question and never for something the
+ * screen already says beside the control.
+ */
+export async function alertDialog(request: { title: string; body?: string; label?: string }): Promise<void> {
+  await confirmDialog({
+    title: request.title,
+    body: request.body,
+    confirmLabel: request.label ?? "OK",
+    notice: true,
+  });
 }

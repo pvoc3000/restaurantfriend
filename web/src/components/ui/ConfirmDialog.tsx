@@ -114,14 +114,18 @@ function ConfirmPanel({
       onSubmit={danger ? undefined : () => onSettle({ ok: true, option })}
       footer={
         <>
-          <button
-            ref={cancel}
-            type="button"
-            className={DIALOG_CANCEL_CLASS}
-            onClick={() => onSettle({ ok: false, option: false })}
-          >
-            {request.cancelLabel ?? "Cancel"}
-          </button>
+          {/* A notice has nothing to refuse, so no Cancel — one button, which
+              is also what makes Enter and Escape both mean "seen". */}
+          {request.notice ? null : (
+            <button
+              ref={cancel}
+              type="button"
+              className={DIALOG_CANCEL_CLASS}
+              onClick={() => onSettle({ ok: false, option: false })}
+            >
+              {request.cancelLabel ?? "Cancel"}
+            </button>
+          )}
           <button
             ref={commit}
             type="button"
