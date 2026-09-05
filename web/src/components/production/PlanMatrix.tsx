@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useRef, useState, useTransition } from "react";
+import { Fragment, useLayoutEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
@@ -395,9 +395,20 @@ export function PlanMatrix({
    * seven days usually land on two or three distinct answers, so this is two or
    * three updates rather than a dozen.
    */
-  function stepTray(days: TraySlot[][], direction: 1 | -1) {
+  /**
+   * Step ONE ROW of a tray across the week — the slot at `index` in every day
+   * (Mark, 2026-09-04: "each stepper should only increase the items in its
+   * row"). It stepped the whole tray until then, which on a tray of three
+   * donuts moved all three when you meant one. Rows are POSITIONS: a day's
+   * slots list by name, so position n is the same donut down the week wherever
+   * the tray carries one kind of donut per row, and where it doesn't it is
+   * still exactly the row on screen the stepper sits beside.
+   */
+  function stepTray(days: TraySlot[][], direction: 1 | -1, index: number) {
     const groups = new Map<number, string[]>();
-    for (const slot of days.flat()) {
+    for (const day of days) {
+      const slot = day[index];
+      if (!slot) continue;
       const next = stepPar(slot.par, stepFor(slot.itemId), direction);
       if (next === slot.par) continue;
       groups.set(next, [...(groups.get(next) ?? []), slot.rowId]);
@@ -964,9 +975,10 @@ export function PlanMatrix({
                         className={`px-2 py-2 align-top ${row.endsSubGroup ? "pb-6" : ""}`}
                       >
                         <div className="flex flex-col gap-1">
-                          {day.map((slot) => (
+                          {day.map((slot, slotIndex) => (
                             <span
                               key={slot.rowId}
+                              data-slot-index={slotIndex}
                               // ONE line, TWO groups (Mark, 2026-08-08):
                               // `[item ✕] [par ▲▼]`. The ✕ belongs with the
                               // thing it removes and the steppers with the
@@ -1173,21 +1185,12 @@ export function PlanMatrix({
                   <td className={`px-0 py-2 align-top ${row.endsSubGroup ? "pb-6" : ""}`}>
                     <div className="flex items-start justify-end gap-1">
                     {editable ? (
-                      // Dropped 5px to sit on the same line as every per-day
-                      // stepper in its row — which is exactly the chip's 1px
-                      // border plus its 4px top padding, the two things that
-                      // stand between a cell's top and the stepper inside it.
-                      // Measured, not guessed; if the chip's padding changes,
-                      // this changes with it.
-                      <span className="mt-[5px]">
-                        <Steppers
-                          disabled={pending}
-                          onUp={() => stepTray(row.days, 1)}
-                          onDown={() => stepTray(row.days, -1)}
-                          labelUp={`Raise every par on tray ${row.tray.tray_number} by one box`}
-                          labelDown={`Lower every par on tray ${row.tray.tray_number} by one box`}
-                        />
-                      </span>
+                      <RowSteppers
+                        rows={Math.max(0, ...row.days.map((d) => d.length))}
+                        disabled={pending}
+                        trayNumber={row.tray.tray_number}
+                        onStep={(index, direction) => stepTray(row.days, direction, index)}
+                      />
                     ) : null}
                     {editable && tray ? (
                       <RowMenu
@@ -1408,6 +1411,84 @@ function Steppers({
         ▼
       </button>
     </span>
+  );
+}
+
+/**
+ * One stepper per ROW of a tray, each level with the chips it moves.
+ *
+ * The seven day cells lay their chips out independently and a long name wraps,
+ * so row n's chips do not share a y by construction — the third row can start
+ * at 88px in Monday's cell and 92px in Tuesday's. The band each stepper sits
+ * against is therefore MEASURED off the chips themselves (`data-slot-index`),
+ * top of the highest to bottom of the lowest across the week, and re-measured
+ * whenever the row resizes: a name wrapping, an offer line appearing, a chip
+ * added. Written straight to the node, no state, the receiving screen's rule.
+ *
+ * The stepper sits 5px into its band — the chip's 1px border plus 4px top
+ * padding — so its arrows line up with the per-day pair inside every chip on
+ * that row. If the chip's padding moves, this moves with it.
+ */
+function RowSteppers({
+  rows,
+  disabled,
+  trayNumber,
+  onStep,
+}: {
+  rows: number;
+  disabled: boolean;
+  trayNumber: string;
+  onStep: (index: number, direction: 1 | -1) => void;
+}) {
+  const box = useRef<HTMLDivElement | null>(null);
+
+  useLayoutEffect(() => {
+    const el = box.current;
+    const tr = el?.closest("tr");
+    if (!el || !tr) return;
+    const place = () => {
+      const origin = el.getBoundingClientRect().top;
+      const bands = new Map<number, { top: number; bottom: number }>();
+      tr.querySelectorAll<HTMLElement>("[data-slot-index]").forEach((chip) => {
+        const i = Number(chip.dataset.slotIndex);
+        const r = chip.getBoundingClientRect();
+        const b = bands.get(i);
+        bands.set(i, {
+          top: Math.min(b?.top ?? Infinity, r.top - origin),
+          bottom: Math.max(b?.bottom ?? -Infinity, r.bottom - origin),
+        });
+      });
+      let height = 0;
+      el.querySelectorAll<HTMLElement>("[data-row-stepper]").forEach((node) => {
+        const b = bands.get(Number(node.dataset.rowStepper));
+        if (!b) return;
+        node.style.top = `${b.top}px`;
+        height = Math.max(height, b.bottom);
+      });
+      // The column is a positioning frame; give it the chips' height so the
+      // row's own height and the ⋯ beside it are unaffected.
+      el.style.height = `${height}px`;
+    };
+    place();
+    const ro = new ResizeObserver(place);
+    ro.observe(tr);
+    return () => ro.disconnect();
+  }, [rows]);
+
+  return (
+    <div ref={box} className="relative w-4 shrink-0">
+      {Array.from({ length: rows }, (_, i) => (
+        <span key={i} data-row-stepper={i} className="absolute left-0 mt-[5px]">
+          <Steppers
+            disabled={disabled}
+            onUp={() => onStep(i, 1)}
+            onDown={() => onStep(i, -1)}
+            labelUp={`Raise row ${i + 1} of tray ${trayNumber} by one box, every day`}
+            labelDown={`Lower row ${i + 1} of tray ${trayNumber} by one box, every day`}
+          />
+        </span>
+      ))}
+    </div>
   );
 }
 
