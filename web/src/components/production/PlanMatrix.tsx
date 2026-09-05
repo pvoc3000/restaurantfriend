@@ -556,7 +556,20 @@ export function PlanMatrix({
     });
   }
 
-  function addTray(trayNumber: string, band: string) {
+  /**
+   * A tray, and optionally the donut it carries ALL WEEK (Mark, 2026-09-04:
+   * "whatever donut is selected will be added to every day of the week on
+   * that tray"). A tray usually holds one kind of donut every day, so seven
+   * "+ add"s for the common case was the transcription the dialog exists to
+   * skip. Each day's par is seeded from the item's default at this shop for
+   * THAT weekday, exactly as a single "+ add" would.
+   *
+   * The tray is written BEFORE its slots — a tray with nothing on it is
+   * visible and one gesture from fixed, where slots with no tray cannot exist.
+   * If the slots then fail, the dialog stays up saying so over a tray that
+   * already exists, so the failure is not mistaken for the tray's.
+   */
+  function addTray(trayNumber: string, band: string, itemId: string) {
     run(async (supabase) => {
       const { data, error } = await supabase
         .from("production_plan_trays")
@@ -572,6 +585,26 @@ export function PlanMatrix({
         return /duplicate key|unique/.test(error?.message ?? "")
           ? `This plan already has a tray ${trayNumber.trim()}.`
           : error?.message ?? "That tray could not be added.";
+      }
+      if (itemId) {
+        const trayId = data[0].id as string;
+        const { data: slots, error: slotError } = await supabase
+          .from("production_plan_tray_items")
+          .insert(
+            [1, 2, 3, 4, 5, 6, 7].map((weekday) => ({
+              org_id: orgId,
+              tray_id: trayId,
+              weekday,
+              item_id: itemId,
+              par: defaultParFor(defaultPars, itemId, weekday),
+            }))
+          )
+          .select("id");
+        if (slotError || (slots?.length ?? 0) !== 7) {
+          return `Tray ${trayNumber.trim()} was added, but its donut could not be: ${
+            slotError?.message ?? "nothing was written"
+          }`;
+        }
       }
       setNewTray(false);
       return null;
@@ -1163,6 +1196,7 @@ export function PlanMatrix({
       {newTray ? (
         <NewTrayDialog
           bands={bands}
+          items={items}
           pending={pending}
           onClose={() => setNewTray(false)}
           onAdd={addTray}
@@ -1227,17 +1261,21 @@ function Steppers({
 
 function NewTrayDialog({
   bands,
+  items,
   pending,
   onClose,
   onAdd,
 }: {
   bands: string[];
+  items: MatrixItem[];
   pending: boolean;
   onClose: () => void;
-  onAdd: (trayNumber: string, band: string) => void;
+  /** `itemId` empty = a bare tray, to be filled a day at a time. */
+  onAdd: (trayNumber: string, band: string, itemId: string) => void;
 }) {
   const [trayNumber, setTrayNumber] = useState("");
   const [band, setBand] = useState("");
+  const [itemId, setItemId] = useState("");
 
   return (
     <Dialog
@@ -1249,7 +1287,7 @@ function NewTrayDialog({
       // asks — an Enter that fires a refused write is worse than one that does
       // nothing.
       onSubmit={() => {
-        if (!pending && trayNumber.trim() !== "") onAdd(trayNumber, band);
+        if (!pending && trayNumber.trim() !== "") onAdd(trayNumber, band, itemId);
       }}
       footer={
         <>
@@ -1258,7 +1296,7 @@ function NewTrayDialog({
           </button>
           <button
             type="button"
-            onClick={() => onAdd(trayNumber, band)}
+            onClick={() => onAdd(trayNumber, band, itemId)}
             disabled={pending || trayNumber.trim() === ""}
             className={DIALOG_COMMIT_CLASS}
           >
@@ -1294,6 +1332,29 @@ function NewTrayDialog({
             options={bands.map((b) => ({ value: b, label: b }))}
             allowNew
             placeholder="RAISED, CLASSIC, SIGNATURE…"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+            Donut
+          </span>
+          {/* Optional. Chosen here it goes on all seven days of the tray, each
+              day seeded with the item's default par at this shop; left empty
+              the tray arrives bare and is filled a day at a time. */}
+          <PickList
+            variant="field"
+            ariaLabel="Donut"
+            value={itemId}
+            onPick={setItemId}
+            clearable
+            options={items.map((it) => ({
+              value: it.id,
+              label: it.name,
+              hint: it.taxonomy,
+              inactive: it.inactive,
+            }))}
+            placeholder="Every day of the week, or leave empty"
+            activateTable="production_items"
           />
         </div>
       </div>
