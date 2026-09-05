@@ -34,6 +34,12 @@
  */
 export type VendorTab = "info" | "items" | "purchase-orders" | "invoices";
 
+/** Caps on the two record tabs' fetches — the lists' own 500. Here and not
+ *  in the components, because a server component reads them: see
+ *  `ITEM_PURCHASE_CAP` in `lib/inventoryItems` for the trap. */
+export const VENDOR_PO_CAP = 500;
+export const VENDOR_INVOICE_CAP = 500;
+
 export const VENDOR_TABS: VendorTab[] = ["info", "items", "purchase-orders", "invoices"];
 
 export const VENDOR_TAB_LABEL: Record<VendorTab, string> = {

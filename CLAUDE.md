@@ -9353,6 +9353,38 @@ weekday column, and 003 then silently made it per-vendor-item.
   (measured: table 1314px in a 1314px pane, scrollWidth 1320). The unpaned path
   is unaffected — `useOverflowOnlyWhenNeeded` compares the TABLE's width, not
   scrollWidth, so the grip never fooled it.
+- **THE INVENTORY ITEM RECORD HAS THREE TABS — Info · Vendor Items · Purchase
+  History** (Mark, 2026-09-05). `lib/inventoryItems` mirrors `lib/vendors`;
+  `ItemTitle` (the editable name, alone) sits above the split and **the Active
+  switch is the FIRST ROW of Info's `dl`** (Mark, same day: "move the active
+  button … out of the identity block … onto the info tab"). Purchase History is
+  `catalog/ItemPurchaseHistory`: every `purchase_order_items` row of the item
+  with `qty_received > 0` on a non-void order, reached through
+  `vendor_item_id → vendor_items.inventory_item_id` (every source, retired
+  vendors included — history is history), **SCOPED TO THE WORKING SHOP** (Mark,
+  same day — the OPPOSITE call from the vendor tabs, and right: a vendor is one
+  account across shops, what DF01 paid for its flour is DF01's fact), the shop
+  named in the heading. `purchase_orders!inner` makes the location test a
+  filter rather than a null embed. Fetched whole on `.order("id")` pages, then
+  sorted newest-first and capped at 500 in memory, because PostgREST cannot
+  order a top-level select by an embedded column. Quantities are in PACKAGES of
+  whatever vendor item each line was, so only the MONEY is totalled.
+  `compactBelow={1440}`, not 1280 — beside the 192px sidebar the table has
+  ~190px less than a list, measured at 977px, and PO number resolved to 115px
+  for a 13-character value. Verified live on Flour, All Purpose: 103 received
+  lines org-wide → 45 at DF02, 0 with a zero received qty, 6 columns at 1280
+  and 9 unclipped at 1440.
+  **A CONSTANT A SERVER COMPONENT COMPUTES WITH MUST NOT BE EXPORTED FROM A
+  `"use client"` FILE.** Next turns EVERY export of a client module into a
+  client reference on the server, so `ITEM_PURCHASE_CAP` imported from the
+  table component was an OBJECT there: `.slice(0, cap)` returned `[]` and the
+  tab read "0" over 103 real rows with no error anywhere. The vendor tabs had
+  the same bug latent — `.limit(cap)` was silently no limit and `capped` could
+  never be true. All three caps live in `lib/` now. **Passing such a constant
+  THROUGH JSX is fine** — eight server components hand `READ_ONLY_VALUE` down
+  as a `className`, and React resolves the reference on the client to the real
+  string — so the rule is about the server DOING ARITHMETIC OR LOGIC with it,
+  which is exactly the case that fails without a symptom.
 - **THE VENDOR RECORD HAS FOUR TABS — Info · Items · Purchase Orders · Invoices**
   (Mark, 2026-09-05: "add a 'Purchase Orders' and 'Invoices' tabs to the
   Vendor detail page", clarified: "I don't want to see the scanned invoices…

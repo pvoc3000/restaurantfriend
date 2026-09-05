@@ -52,6 +52,7 @@ import "./recipeIngredients.fixtures";
 import "./productionHistory.fixtures";
 import "./inquiry.fixtures";
 import "./inventorySearch.fixtures";
+import "./inventoryItems.fixtures";
 import "./productionItems.fixtures";
 import "./productionPlans.fixtures";
 import "./productionScale.fixtures";

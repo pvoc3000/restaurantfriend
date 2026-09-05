@@ -14,6 +14,7 @@ import {
   type InvoiceStatus,
 } from "@/lib/invoices";
 import { money } from "@/lib/purchaseOrders";
+import { VENDOR_INVOICE_CAP } from "@/lib/vendors";
 
 /** One bill from this vendor. What the vendor record's Invoices tab shows —
  *  the RECORD, never the scanned document (Mark, 2026-09-05). */
@@ -34,9 +35,6 @@ export type VendorInvoiceRow = {
   qbo_balance: number | null;
   qbo_checked_at: string | null;
 };
-
-/** Cap on the fetch — the same 500 `/invoices` stops at. */
-export const VENDOR_INVOICE_CAP = 500;
 
 const LINK =
   "text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900";

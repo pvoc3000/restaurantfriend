@@ -8,26 +8,15 @@ import { ActiveToggle } from "./ActiveToggle";
 import { BaseUnitEditor } from "./BaseUnitEditor";
 
 /**
- * The item master header: name, category, base unit, note, active. base_unit is
- * chosen from a list (lbs / oz / each / gal / case) and pars are expressed in it,
- * so changing it does NOT rescale existing pars — the hint says so out loud.
- * It DOES rescale package contents, which are derivable; see BaseUnitEditor.
+ * The record's IDENTITY — the editable name — rendered ABOVE the tab split so
+ * it stays put while the sections change under it (2026-09-05, when the item
+ * record became three tabs). Split out of `ItemFields`, whose `dl` is Info's
+ * alone. The Active switch is NOT here (Mark, same day: "move the active button
+ * … out of the identity block … onto the info tab") — it is a field like the
+ * others, and it sits with them.
  */
-export function ItemFields({
-  item,
-  categories,
-  editable,
-}: {
-  item: CatalogItem;
-  /** The Page Permissions sheet's cell for /items — false renders every
-   *  field as a value and offers no switch, no base-unit change. */
-  editable: boolean;
-  /** Every category already in the catalog — the list you pick from. */
-  categories: string[];
-}) {
-  const router = useRouter();
+export function ItemTitle({ item, editable }: { item: CatalogItem; editable: boolean }) {
   return (
-    <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           {/* THE TITLE KEEPS THE UNDERLINE, and it is the one place on a record
@@ -46,7 +35,37 @@ export function ItemFields({
             className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]"
           />
         </h1>
-        <span className="flex items-center gap-2 text-sm text-muted">
+      </div>
+  );
+}
+
+/**
+ * The item master's fields: category, base unit, note. base_unit is chosen
+ * from a list (lbs / oz / each / gal / case) and pars are expressed in it, so
+ * changing it does NOT rescale existing pars — the hint says so out loud. It
+ * DOES rescale package contents, which are derivable; see BaseUnitEditor.
+ */
+export function ItemFields({
+  item,
+  categories,
+  editable,
+}: {
+  item: CatalogItem;
+  /** The Page Permissions sheet's cell for /items — false renders every
+   *  field as a value and offers no base-unit change. */
+  editable: boolean;
+  /** Every category already in the catalog — the list you pick from. */
+  categories: string[];
+}) {
+  const router = useRouter();
+  return (
+    <div className="space-y-3">
+      <dl className="grid max-w-[min(42rem,max(24rem,50%))] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+        {/* First, where every catalog table puts Active. The switch says the
+            state by its position; the word beside it says it in text, which
+            is also what a reader below purchaser+ gets instead of a switch. */}
+        <dt className="text-subtle">Active</dt>
+        <dd className="flex items-center gap-2 text-muted">
           {editable && (
             <ActiveToggle
               table="inventory_items"
@@ -56,10 +75,8 @@ export function ItemFields({
             />
           )}
           {item.is_active ? "Active" : "Inactive"}
-        </span>
-      </div>
+        </dd>
 
-      <dl className="grid max-w-[min(42rem,max(24rem,50%))] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
         <dt className="text-subtle">Category</dt>
         <dd>
           {/* Pick from what the catalog already uses, but ADD is allowed: this

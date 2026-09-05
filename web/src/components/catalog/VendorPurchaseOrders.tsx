@@ -11,6 +11,7 @@ import {
   money,
   type PoStatus,
 } from "@/lib/purchaseOrders";
+import { VENDOR_PO_CAP } from "@/lib/vendors";
 
 /** One order placed with this vendor. What the vendor record's Purchase Orders
  *  tab shows — the row, not the document. */
@@ -25,9 +26,6 @@ export type VendorPoRow = {
   ordered_total: number;
   received_total: number;
 };
-
-/** Cap on the fetch — the same 500 `/purchase-orders` stops at. */
-export const VENDOR_PO_CAP = 500;
 
 const LINK =
   "text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900";

@@ -17,17 +17,22 @@ import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { VendorFields } from "@/components/catalog/VendorFields";
-import { VENDOR_TABS, VENDOR_TAB_LABEL, parseVendorTab, vendorTabHref } from "@/lib/vendors";
+import {
+  VENDOR_INVOICE_CAP,
+  VENDOR_PO_CAP,
+  VENDOR_TABS,
+  VENDOR_TAB_LABEL,
+  parseVendorTab,
+  vendorTabHref,
+} from "@/lib/vendors";
 import { canEditPage } from "@/lib/pageAccess";
 import { todayInTimeZone } from "@/lib/today";
 import {
   VendorPurchaseOrders,
-  VENDOR_PO_CAP,
   type VendorPoRow,
 } from "@/components/catalog/VendorPurchaseOrders";
 import {
   VendorInvoices,
-  VENDOR_INVOICE_CAP,
   type VendorInvoiceRow,
 } from "@/components/catalog/VendorInvoices";
 
