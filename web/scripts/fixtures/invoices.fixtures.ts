@@ -26,6 +26,7 @@ import {
   sumSignedTotals,
   type VendorInvoice,
   type VendorInvoiceLine,
+  balanceOwed,
 } from "../../src/lib/invoices";
 import {
   invoiceDueDate,
@@ -1042,4 +1043,21 @@ test("matchesFromLinks: with no links at all it behaves exactly like the plain j
     [{ ...invoiceLine({ product_id: "A1", description: "Flour" }), purchase_order_item_id: null }]
   );
   eq(result.matches[0].invoice?.product_id, "A1");
+});
+
+// ---------------------------------------------------------------------------
+// balanceOwed — the vendor record's Balance column
+// ---------------------------------------------------------------------------
+
+test("balanceOwed reads QuickBooks where it can and the whole bill where it can't", () => {
+  const base = { status: "approved" as const, total: 100, is_credit: false };
+  eq(balanceOwed({ ...base, linked: false, qbo_balance: null }), 100, "unpushed: owed in full");
+  eq(balanceOwed({ ...base, linked: true, qbo_balance: null }), 100, "pushed, never checked: still the bill");
+  eq(balanceOwed({ ...base, linked: true, qbo_balance: 40 }), 40, "part paid");
+  eq(balanceOwed({ ...base, linked: true, qbo_balance: 0 }), 0, "paid");
+  eq(balanceOwed({ ...base, status: "void", linked: false, qbo_balance: null }), 0, "void owes nothing");
+  // A credit is negative both ways, so a column of balances nets out —
+  // QuickBooks reports a VendorCredit's remaining Balance as a positive figure.
+  eq(balanceOwed({ ...base, is_credit: true, linked: false, qbo_balance: null }), -100);
+  eq(balanceOwed({ ...base, is_credit: true, linked: true, qbo_balance: 25 }), -25);
 });

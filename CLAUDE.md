@@ -9372,6 +9372,12 @@ weekday column, and 003 then silently made it per-vendor-item.
   lines as `/invoices` derives it. Verified live on Chefs Warehouse — 19
   orders, 10 bills, both counts confirmed against the database — with the
   crumb from a row returning to the tab it left.
+  **Invoices carries a BALANCE column with its own total** (Mark, same day).
+  `balanceOwed` in `lib/invoices`: void → 0; linked and QuickBooks answered →
+  what it said; anything else → the whole bill, because this app records no
+  vendor payment (4l), so "owed in full" is exactly what the row says. A
+  credit is NEGATIVE both ways so the column nets out; QuickBooks reports a
+  VendorCredit's remaining Balance positive, and the sign is put back here.
 - **Vendor detail has an editable field block** (`catalog/VendorFields.tsx`,
   Mark, 2026-08-01: type, description, order type, url and notes "are not
   reachable/visible… and should be"). `description` and `notes` weren't even

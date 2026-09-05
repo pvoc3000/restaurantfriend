@@ -1305,6 +1305,41 @@ export function billPaymentNote(
 }
 
 /**
+ * What is still OWED on a bill, from what is on the row (Mark, 2026-09-05, for
+ * the vendor record's Invoices tab: "a 'Balance' owed column with the total
+ * below it").
+ *
+ * This app deliberately stores no vendor payment — QuickBooks is the only
+ * place that fact exists (build step 4l) — so the balance is READ OFF 088's
+ * cache where there is one and is otherwise the whole bill:
+ *
+ *   void                       → 0     (nothing is owed on a bill that isn't one)
+ *   linked, QuickBooks answered → what it said, signed like the total
+ *   anything else              → the signed total
+ *
+ * That last line is the honest default rather than a guess: a bill nobody has
+ * pushed, or pushed and never checked, has had NOTHING recorded against it, so
+ * "still owed in full" is exactly what the record says. A credit comes out
+ * NEGATIVE, as it does in the Total column, so a column of balances sums to
+ * what the vendor is actually owed net of their credits.
+ *
+ * QuickBooks reports a VendorCredit's `Balance` as the credit still unapplied,
+ * a positive number, which is why the sign is put back here.
+ */
+export function balanceOwed(invoice: {
+  status: InvoiceStatus;
+  total: number | null;
+  is_credit: boolean;
+  linked: boolean;
+  qbo_balance: number | null;
+}): number {
+  if (invoice.status === "void") return 0;
+  const sign = invoice.is_credit ? -1 : 1;
+  if (invoice.linked && invoice.qbo_balance !== null) return sign * invoice.qbo_balance;
+  return sign * Number(invoice.total ?? 0);
+}
+
+/**
  * Has this bill's money changed since it was last sent to QuickBooks?
  *
  * 089's whole point: `financials_touched_at` is bumped ONLY by the LOCKED

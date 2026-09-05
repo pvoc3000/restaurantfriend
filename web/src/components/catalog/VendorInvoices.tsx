@@ -9,6 +9,7 @@ import {
   BILL_STAGE_LABEL,
   BILL_STAGE_ORDER,
   agingBucket,
+  balanceOwed,
   billStage,
   type InvoiceStatus,
 } from "@/lib/invoices";
@@ -43,6 +44,16 @@ const LINK =
 function signedTotal(i: VendorInvoiceRow): number {
   const t = Number(i.total ?? 0);
   return i.is_credit ? -t : t;
+}
+
+function owed(i: VendorInvoiceRow): number {
+  return balanceOwed({
+    status: i.status,
+    total: i.total,
+    is_credit: i.is_credit,
+    linked: i.qbo_linked,
+    qbo_balance: i.qbo_balance,
+  });
 }
 
 function stageOf(i: VendorInvoiceRow) {
@@ -174,6 +185,24 @@ export function VendorInvoices({
         </span>
       ),
     },
+    // What is still owed, beside the bill's total (Mark, 2026-09-05). Quiet
+    // when settled — a column of $0.00s says nothing — and in full ink when
+    // money is outstanding, so the eye lands on the rows that matter.
+    {
+      key: "balance",
+      label: "Balance",
+      width: 135,
+      align: "right",
+      sortValue: (i) => owed(i),
+      render: (i) => {
+        const b = owed(i);
+        return Math.abs(b) < 0.005 ? (
+          <span className="text-faint">{money(0)}</span>
+        ) : (
+          <span className={b < 0 ? "font-semibold text-accent" : "text-body"}>{money(b)}</span>
+        );
+      },
+    },
   ];
 
   return (
@@ -181,7 +210,8 @@ export function VendorInvoices({
       rows={invoices}
       columns={columns}
       rowKey={(i) => i.id}
-      storageKey="rf.vendorInvoices.v1"
+      // v2: Balance joined the columns (2026-09-05).
+      storageKey="rf.vendorInvoices.v2"
       defaultSort={{ key: "invoice_date", dir: "desc" }}
       compactBelow={1100}
       leading={
@@ -198,6 +228,11 @@ export function VendorInvoices({
         total: (
           <span className="font-semibold text-ink">
             {money(rows.reduce((s, r) => s + signedTotal(r), 0))}
+          </span>
+        ),
+        balance: (
+          <span className="font-semibold text-ink">
+            {money(rows.reduce((s, r) => s + owed(r), 0))}
           </span>
         ),
       })}
