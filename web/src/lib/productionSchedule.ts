@@ -297,15 +297,17 @@ function leafRows(lines: ScheduleLine[], grain: Grain): RollRow[] {
     // One row per LINE, not per item name: "Angry Samoa" is four different
     // donuts (038), and two of them can legitimately share a night.
     //
-    // FINISH THEN NAME. The roll-up already groups TYPE → SIZE → CUT, so
-    // ordering the leaves by finish completes the sequence Mark named
-    // (2026-08-13: "sorted and grouped by Type, Size, Cut, then Finish.
-    // THAT'S ALL YOU NEED"). It is a fourth SORT rather than a fourth band:
-    // this packet is verified line for line against FileMaker's own, and a new
-    // heading every few rows would change a page somebody reads at 4am.
+    // BY NAME (Mark, 2026-09-04: "sort the tray guides in the packet the same
+    // way" as the plan matrix, which lists a day's donuts by item name). This
+    // supersedes finish-then-name from 2026-08-13 ("Type, Size, Cut, then
+    // Finish"): under one cut, three mochis whose finishes differ came out in
+    // an order the reader could not see the reason for, where the name is on
+    // the page. Finish stays the tiebreak for two lines of one name (038's
+    // four "Angry Samoa"s), and the roll-up above still bands TYPE → SIZE →
+    // CUT exactly as before.
     return lines
       .slice()
-      .sort((a, b) => byName(name(a.finish), name(b.finish)) || byName(a.item_name, b.item_name))
+      .sort((a, b) => byName(a.item_name, b.item_name) || byName(name(a.finish), name(b.finish)))
       .map((l) => ({
         key: l.id,
         label: l.item_name,

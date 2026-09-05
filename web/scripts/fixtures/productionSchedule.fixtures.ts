@@ -171,6 +171,21 @@ test("the three grains are three different cuts of one night", () => {
   }
 });
 
+test("decorator rows read by NAME under a cut, whatever the finish says", () => {
+  // Mark, 2026-09-04: the plan lists a day's donuts by name, and the guides
+  // follow. By finish these would read Mango (Glaze) · Strawberry (Sugar) ·
+  // Mixed Berry (Vanilla); by name Mango · Mixed Berry · Strawberry.
+  const lines = [
+    line({ subtype: "Mochi", finish: "Sugar", item_name: "Mochi - Strawberry", par: 24 }),
+    line({ subtype: "Mochi", finish: "Vanilla", item_name: "Mochi - Mixed Berry", par: 12 }),
+    line({ subtype: "Mochi", finish: "Glaze", item_name: "Mochi - Mango", par: 6 }),
+  ];
+  eq(
+    rollUp(lines, "item")[0].sizes[0].subtypes[0].rows.map((r) => r.label),
+    ["Mochi - Mango", "Mochi - Mixed Berry", "Mochi - Strawberry"]
+  );
+});
+
 test("two items sharing a name are two rows, not one", () => {
   // 038: "Angry Samoa" is four different donuts. Merging them at item grain
   // would under-report the decorator's night.
