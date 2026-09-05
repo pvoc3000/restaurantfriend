@@ -948,15 +948,16 @@ export function PlanMatrix({
                     unit is a grid cell and the rule is what says where a tray
                     ends.
 
-                    BLACK, not a hairline (Mark, 2026-09-05), the day after
-                    the padding between trays doubled: with 32px of air a grey
-                    rule reads as a smudge, and the app's mark for a band that
-                    DELIMITS is ink. On the `<tr>`, which `border-collapse`
-                    honours — and where the head's own `border-b-2` still wins
-                    the collapse against the first row's 1px, so the table
-                    opens on one heavy rule rather than two stacked. */}
-                <tr className="group/tray border-t border-ink align-top">
-                  <td className={`px-1 py-4 ${row.endsSubGroup ? "pb-8" : ""}`}>
+                    A HAIRLINE with a lot of air around it (Mark, 2026-09-05,
+                    in two steps — black was tried for an hour and reverted;
+                    the padding went 16 → 32 → 64px instead, so the AIR does the
+                    separating and the rule only marks where). On the `<tr>`,
+                    which `border-collapse` honours — and where the head's own
+                    `border-b-2 border-ink` wins the collapse against the first
+                    row's hairline, so the table still opens on one heavy rule
+                    rather than two stacked. */}
+                <tr className="group/tray border-t border-hairline align-top">
+                  <td className={`px-1 py-8 ${row.endsSubGroup ? "pb-12" : ""}`}>
                     <div className="min-w-0">
                       <span className="block truncate font-medium">{row.tray.tray_number}</span>
                       {row.tray.band ? (
@@ -975,7 +976,7 @@ export function PlanMatrix({
                         key={weekday}
                         data-tray-id={row.tray.id}
                         data-weekday={weekday}
-                        className={`px-2 py-4 align-top ${row.endsSubGroup ? "pb-8" : ""}`}
+                        className={`px-2 py-8 align-top ${row.endsSubGroup ? "pb-12" : ""}`}
                       >
                         <div className="flex flex-col gap-1">
                           {day.map((slot, slotIndex) => (
@@ -1185,7 +1186,7 @@ export function PlanMatrix({
                       whole week, then the ⋯. `px-0` because the two of them are
                       exactly this column's width and RowMenu's 36px trigger
                       carries its own whitespace. */}
-                  <td className={`px-0 py-4 align-top ${row.endsSubGroup ? "pb-8" : ""}`}>
+                  <td className={`px-0 py-8 align-top ${row.endsSubGroup ? "pb-12" : ""}`}>
                     <div className="flex items-start justify-end gap-1">
                     {editable ? (
                       <RowSteppers
