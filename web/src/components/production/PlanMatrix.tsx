@@ -953,7 +953,7 @@ export function PlanMatrix({
                     against the first row's hairline, so the table still opens
                     on one heavy rule rather than two stacked. */}
                 <tr className="group/tray border-t border-hairline align-top">
-                  <td className={`px-1 py-2 ${row.endsSubGroup ? "pb-6" : ""}`}>
+                  <td className={`px-1 py-4 ${row.endsSubGroup ? "pb-8" : ""}`}>
                     <div className="min-w-0">
                       <span className="block truncate font-medium">{row.tray.tray_number}</span>
                       {row.tray.band ? (
@@ -972,7 +972,7 @@ export function PlanMatrix({
                         key={weekday}
                         data-tray-id={row.tray.id}
                         data-weekday={weekday}
-                        className={`px-2 py-2 align-top ${row.endsSubGroup ? "pb-6" : ""}`}
+                        className={`px-2 py-4 align-top ${row.endsSubGroup ? "pb-8" : ""}`}
                       >
                         <div className="flex flex-col gap-1">
                           {day.map((slot, slotIndex) => (
@@ -1182,7 +1182,7 @@ export function PlanMatrix({
                       whole week, then the ⋯. `px-0` because the two of them are
                       exactly this column's width and RowMenu's 36px trigger
                       carries its own whitespace. */}
-                  <td className={`px-0 py-2 align-top ${row.endsSubGroup ? "pb-6" : ""}`}>
+                  <td className={`px-0 py-4 align-top ${row.endsSubGroup ? "pb-8" : ""}`}>
                     <div className="flex items-start justify-end gap-1">
                     {editable ? (
                       <RowSteppers
