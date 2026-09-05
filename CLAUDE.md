@@ -3538,14 +3538,21 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    a row, the dough included, rendered as **"1/340 of a batch"** because that is
    how a baker says it, and anything unpriced says so on its own line rather
    than being dropped from the total.
-   **Per-location pars are READ-ONLY, and since 043 they are a DEFAULT rather
-   than the par** — the number a new plan slot is seeded with, nothing more.
+   **Per-location pars are EDITABLE AGAIN since 2026-09-04 (Mark: "we should
+   be able to edit the default pars"), and the block is titled "Default pars"**
+   — seven `InlineValue`s per shop through `arrayColumn`, each in its own
+   `min-w-0 flex-1` pen, with a **Set pars** button that INSERTS the row for a
+   shop that has none (/price-grid's "set"). What the 043-era paragraph below
+   missed is the NEW item: it has no plan slot yet, so the default is the only
+   number anyone can write before it reaches a tray. Kept for the reasoning:
+   Per-location pars WERE read-only, and since 043 they are a DEFAULT rather
+   than the par — the number a new plan slot is seeded with, nothing more.
    This line used to say the reason was that `InlineValue` writes a whole COLUMN
    while a par cell must write one SLOT of an array, and that **"is the obvious
    next thing to build"**. Both halves are wrong now: 041 shipped
    `arrayColumn`/`arrayIndex`/`arrayStrip`/`arrayWidth` for the recipe sheet, and
-   043 made the editor beside the point. **Do NOT build it.** After 043 an edit
-   there changes nothing that exists — no plan, no schedule, no day, only what
+   043 made the editor beside the point. (It IS built now — see above.) The
+   argument against it was that after 043 an edit there changes nothing that exists — no plan, no schedule, no day, only what
    some future slot starts at — and a live-looking editor whose effect is
    invisible until an unrelated act on an unrelated screen lies about its own
    reach. The par is edited on the PLAN.

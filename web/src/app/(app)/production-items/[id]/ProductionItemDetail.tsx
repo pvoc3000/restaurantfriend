@@ -199,6 +199,7 @@ export async function ProductionItemDetail({
 
       <ProductionItemLocations
         itemId={id}
+        orgId={session.membership.org_id}
         pars={await loadPars(supabase, id)}
         locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
         gridPrice={price.cell?.price ?? null}

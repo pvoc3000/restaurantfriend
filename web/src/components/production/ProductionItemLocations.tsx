@@ -1,5 +1,8 @@
 "use client";
 
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -14,7 +17,7 @@ export type ItemLocationRow = {
 const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 /**
- * Per-shop par and price for one item.
+ * Per-shop DEFAULT par and price for one item.
  *
  * The par is 009's seven-slot array, slot n = weekday n, and it really does
  * vary by day: item 32 is 18 all week at DF02 and 18/18/18/18/24/36/36 at
@@ -22,38 +25,62 @@ const WEEKDAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
  *
  * SINCE MIGRATION 043 IT IS A DEFAULT, NOT THE PAR. The par lives on the plan
  * slot; this is the number a NEW slot is seeded with when the item is added to
- * a plan at that shop, and nothing reads it at generation.
+ * a plan at that shop, and nothing reads it at generation. The heading and the
+ * sentence under it say so.
  *
- * IT IS READ-ONLY HERE, and the reason is no longer the one that used to be
- * written down. That reason — "`InlineValue` writes a whole column and a par
- * cell has to write one slot of a Postgres array" — has been false since 041
- * shipped `arrayColumn`/`arrayIndex`/`arrayStrip`/`arrayWidth` for the recipe
- * sheet. The real reason now is stronger: after 043 an edit here changes
- * NOTHING THAT EXISTS. It reaches no plan, no schedule and no day; it only
- * changes what some future slot on some future plan will start at. A
- * live-looking editor whose effect is invisible until an unrelated act, on an
- * unrelated screen, at an unspecified later time is worse than a read-only
- * figure — it lies about its own reach. Building it properly would also mean
- * /price-grid's "set" INSERT button, since most (item, location) pairs have no
- * row at all to write to, which is real work for a column scheduled to be
- * dropped once real plans carry the numbers. The plan is where a par is
- * changed in anger, and it is one tap away.
+ * EDITABLE SINCE 2026-09-04 (Mark: "we should be able to edit the default
+ * pars"), reversing the read-only call made when 043 shipped. That call argued
+ * an edit here "changes nothing that exists"; what it missed is that a NEW item
+ * has no plan slot yet, so the default is the only number anyone can write
+ * before it reaches a tray — and typing seven pars into a plan for every new
+ * item is the transcription the default exists to avoid. One `InlineValue` per
+ * weekday through `arrayColumn`, the recipe sheet's idiom, each in its own
+ * `min-w-0 flex-1` pen so an open editor cannot lie over its neighbour.
+ *
+ * Most (item, location) pairs have NO row, so a shop with none offers
+ * **Set pars**, which inserts the row — /price-grid's "set" and the inventory
+ * item's "Stock here": a cell with no row to write to cannot be an
+ * `InlineValue`.
  *
  * Enumerating over ACTIVE locations, never all of them — design rule 3.
  */
 export function ProductionItemLocations({
+  itemId,
+  orgId,
   pars,
   locations,
   gridPrice,
   editable,
 }: {
   itemId: string;
+  orgId: string;
   pars: ItemLocationRow[];
   locations: { id: string; code: string; name: string }[];
   /** What the grid says, so an override can be read against it. */
   gridPrice: number | null;
   editable: boolean;
 }) {
+  const router = useRouter();
+  const supabase = createClient();
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  // A shop with no row yet gets one, empty — org_id EXPLICITLY (design rule 1).
+  async function createRow(locationId: string) {
+    setBusy(locationId);
+    setError(null);
+    const { data, error } = await supabase
+      .from("production_item_locations")
+      .insert({ org_id: orgId, item_id: itemId, location_id: locationId })
+      .select("id");
+    setBusy(null);
+    if (error || !data?.length) {
+      setError(error?.message ?? "Nothing was written — you may not have permission.");
+      return;
+    }
+    router.refresh();
+  }
+
   const byLocation = new Map(pars.map((p) => [p.location_id, p]));
 
   type Line = {
@@ -82,19 +109,57 @@ export function ProductionItemLocations({
     {
       key: "par",
       label: "Default par",
-      width: 340,
-      render: (l) => (
-        <span className="flex flex-wrap gap-x-3 gap-y-1 tabular-nums">
-          {WEEKDAYS.map((day, i) => (
-            <span key={day} className="inline-flex flex-col items-center">
-              <span className="text-[10px] uppercase tracking-[0.08em] text-subtle">{day}</span>
-              <span className={l.row?.par_by_weekday?.[i] == null ? "text-subtle" : ""}>
-                {l.row?.par_by_weekday?.[i] ?? "–"}
+      width: 440,
+      render: (l) => {
+        if (!l.row) {
+          return editable ? (
+            <button
+              type="button"
+              disabled={busy !== null}
+              onClick={() => void createRow(l.location.id)}
+              className="border border-ink px-2 py-0.5 text-xs text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+            >
+              {busy === l.location.id ? "Setting…" : "Set pars"}
+            </button>
+          ) : (
+            <span className={`${READ_ONLY_VALUE} text-subtle`}>—</span>
+          );
+        }
+        const row = l.row;
+        return (
+          <span className="flex gap-x-1 tabular-nums">
+            {WEEKDAYS.map((day, i) => (
+              // Each slot in its own pen: an open editor is a bare flex wrapper
+              // that grows to its text, and without `min-w-0 flex-1
+              // overflow-hidden` it lies over the next day's box.
+              <span key={day} className="flex min-w-0 flex-1 flex-col items-center overflow-hidden">
+                <span className="text-[10px] uppercase tracking-[0.08em] text-subtle">{day}</span>
+                {editable ? (
+                  <InlineValue
+                    table="production_item_locations"
+                    id={row.id}
+                    column="par"
+                    ariaLabel={`${day} default par at ${l.location.code}`}
+                    kind="number"
+                    align="right"
+                    value={row.par_by_weekday?.[i] ?? null}
+                    placeholder="–"
+                    className="w-full"
+                    arrayColumn="par_by_weekday"
+                    arrayIndex={i}
+                    arrayStrip={row.par_by_weekday}
+                    arrayWidth={7}
+                  />
+                ) : (
+                  <span className={row.par_by_weekday?.[i] == null ? "text-subtle" : ""}>
+                    {row.par_by_weekday?.[i] ?? "–"}
+                  </span>
+                )}
               </span>
-            </span>
-          ))}
-        </span>
-      ),
+            ))}
+          </span>
+        );
+      },
     },
     {
       key: "price",
@@ -137,7 +202,8 @@ export function ProductionItemLocations({
   ];
 
   return (
-    <section>
+    <section className="space-y-2">
+      {error && <p className="text-sm text-accent">{error}</p>}
       <DataTable
         rows={lines}
         columns={columns}
