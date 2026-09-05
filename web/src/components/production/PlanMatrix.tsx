@@ -1383,6 +1383,7 @@ function NewTrayDialog({
           <PickList
             variant="field"
             ariaLabel="Category"
+            className="w-full"
             value={band}
             onPick={setBand}
             options={bands.map((b) => ({ value: b, label: b }))}
@@ -1400,6 +1401,7 @@ function NewTrayDialog({
           <PickList
             variant="field"
             ariaLabel="Donut"
+            className="w-full"
             value={itemId}
             onPick={setItemId}
             clearable
@@ -1505,6 +1507,7 @@ function EditTrayDialog({
           <PickList
             variant="field"
             ariaLabel="Category"
+            className="w-full"
             value={category}
             onPick={setCategory}
             options={bands.map((b) => ({ value: b, label: b }))}
@@ -1530,6 +1533,7 @@ function EditTrayDialog({
             <PickList
               variant="field"
               ariaLabel="Donut"
+              className="w-full"
               value={itemId}
               onPick={setItemId}
               options={items.map((it) => ({
