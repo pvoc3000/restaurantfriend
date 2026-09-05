@@ -371,7 +371,7 @@ export async function EmployeeDetail({
           "the row's right-hand end" was three inches from the left margin. */}
       <div className="flex items-start justify-between gap-4">
         <Breadcrumbs trail={trail} current={employeeName(person)} />
-        <RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} carry={["tab"]} />
+        <RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />
       </div>
 
       {/* ---- who this is, ABOVE the split ------------------------------ */}

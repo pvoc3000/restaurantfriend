@@ -290,7 +290,7 @@ export async function RecipeDetail({
       <Breadcrumbs
         trail={trail}
         current={recipe.name as string}
-        trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} carry={["tab"]} />}
+        trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
       />
 
       {/* The identity block sits ABOVE the split and is INDENTED to the content

@@ -8159,7 +8159,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/buttons` `DANGER_BUTTON_CLASS` | re-typing the red class string | any destructive command out on a screen — Delete, Void, "Deactivate everywhere". Red EVEN THOUGH most only open a confirm: a reader can't tell "opens a confirm" from "destroys" by looking. Bordered, never filled. NOT the same as `DIALOG_DANGER_CLASS` (`px-5`, a dialog footer's commit) — don't merge them. Positional classes stay at the call site |
   | `ui/FileDropZone` | `onDrop` on a div | dropping files onto a region. Its OVERLAY takes the drop (a PDF `<object>` is a plugin and swallows drag events — confirmed working over a live PDF, Mark 2026-08-04), it arms off WINDOW drag events so it's up before the pointer arrives, it vets types itself (`accept` governs only the picker), and it stops a stray drop navigating the page away |
   | `ui/SectionNav` | a second sidebar, underline tabs, or a `TabPicker` turned sideways | **the sections of one detail record** — the employee screen's Info · Employment · Events · Documents · Admin. Plain text links, no box: active bold black, inactive `text-muted`. `orientation="horizontal"` is the narrow-screen form. See "A detail screen that outgrows one page" below — REUSE THIS, don't re-derive it |
-  | `ui/RecordNav` + `lib/recordSet` | going back to the list for the next record | FMP's book on a detail screen: the LIST publishes its found set, the detail walks it |
+  | `ui/RecordNav` + `lib/recordSet` | going back to the list for the next record | FMP's book on a detail screen: the LIST publishes its found set, the detail walks it. **It carries `?tab=` by default**, so paging a tabbed record stays on the tab you are on — name a record's tab parameter `tab` and nothing else is needed |
   | `DataTable columnChooser` | a bespoke checklist, or placing `ColumnsMenu` yourself | show/hide columns on a list — the table puts it above its own last column header; pair it with `DataColumn.pinned` on the column that IS the row |
   | `ui/BackToTop` | — | long lists; already on the guide |
   | `components/Breadcrumbs` | a back link | every detail screen, unconditionally |
@@ -9656,12 +9656,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   One more thing the move earned: a block that was hiding from crowding can stop
   (`RevealPanel alwaysOpen` — paperwork got its own tab, so the reveal had
   nothing left to avoid).
-  **THE BOOK KEEPS THE TAB** (Mark, 2026-09-05: "is it possible to stay on the
-  current tab when using the navigation buttons… currently the page resets to
-  the first tab"). `RecordNav carry={["tab"]}` on every tabbed record — vendors,
-  employees, recipes, special orders. `carryQuery` in `lib/recordSet` overlays
-  the named keys from the URL you are standing on onto the four published hrefs
-  and NOTHING else: `from`/`fromLabel` stay the list's, so paging never rewrites
+  **THE BOOK KEEPS THE TAB, AND IT IS THE DEFAULT** (Mark, 2026-09-05: "is it
+  possible to stay on the current tab when using the navigation buttons…
+  currently the page resets to the first tab", then "make this standard
+  behavior for any page with tabs on current and future pages"). `RecordNav`
+  carries `?tab=` unless told otherwise (`RECORD_NAV_CARRY`), so a tabbed record
+  gets this BY EXISTING and no caller passes anything — which is what makes it a
+  standard rather than a checklist item. **The contract it rests on: every
+  tabbed record names its tab `tab`** (`parseVendorTab`, `parseEmployeeTab`,
+  `parseRecipeTab`, `parseOrderTab` all read that key). Keep doing that; a
+  record whose view also lives under another key passes `carry` with both.
+  `carryQuery` in `lib/recordSet` overlays the named keys from the URL you are
+  standing on onto the four published hrefs and NOTHING else: `from`/`fromLabel` stay the list's, so paging never rewrites
   where Back goes; and a key absent from the current URL is REMOVED, since the
   default tab writes none. Fixture-pinned. Verified live: Amoretti → Invoices →
   Next landed on BakeMark's Invoices at "4 of 29", crumb still Vendors.

@@ -17,15 +17,25 @@ import { carryQuery, useRecordPosition } from "@/lib/recordSet";
  * record reached from somewhere that isn't a list. That's deliberate: a book
  * that walks a set you can't see is worse than no book.
  *
- * `carry` names query keys the book copies from the CURRENT URL onto each
- * step — a tabbed record passes `["tab"]`, so paging through vendors while on
- * Invoices lands on the next vendor's Invoices (Mark, 2026-09-05). See
- * `carryQuery` for what is and isn't carried.
+ * IT KEEPS THE TAB YOU ARE ON, BY DEFAULT (Mark, 2026-09-05: "make this
+ * standard behavior for any page with tabs on current and future pages"). The
+ * book copies `?tab=` from the CURRENT URL onto each step, so paging through
+ * vendors while on Invoices lands on the next vendor's Invoices — and a record
+ * that grows tabs next year gets this without anybody remembering, because
+ * every tabbed record in this app names its tab `tab` (`parseVendorTab`,
+ * `parseEmployeeTab`, `parseRecipeTab`, `parseOrderTab` all read that key).
+ * A record with no tabs has no `?tab=` and nothing is carried.
+ *
+ * `carry` overrides the list for a record whose view lives under other keys
+ * as well. See `carryQuery` for what is and isn't carried — the breadcrumb's
+ * `from`/`fromLabel` never are.
  */
+export const RECORD_NAV_CARRY: readonly string[] = ["tab"];
+
 export function RecordNav({
   listKey,
   id,
-  carry = [],
+  carry = RECORD_NAV_CARRY,
 }: {
   listKey: string | null;
   id: string;

@@ -366,7 +366,7 @@ export async function SpecialOrderDetail({
     <div className="space-y-8">
       <div className="flex items-start justify-between gap-4">
         <Breadcrumbs trail={trail} current={`#${row.number as string}`} />
-        <RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} carry={["tab"]} />
+        <RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />
       </div>
 
       {/* ---- who and what, ABOVE the split ----------------------------- */}
