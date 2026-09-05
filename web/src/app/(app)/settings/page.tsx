@@ -4,6 +4,13 @@ import { canManageMembers } from "@/lib/roles";
 import { ShiftReportSettings } from "@/components/settings/ShiftReportSettings";
 import { SpecialOrderSettings } from "@/components/settings/SpecialOrderSettings";
 import { AccountingSettings, type AccountingStatus } from "@/components/settings/AccountingSettings";
+import { SectionNav } from "@/components/ui/SectionNav";
+import {
+  SETTINGS_TABS,
+  SETTINGS_TAB_LABEL,
+  parseSettingsTab,
+  settingsTabHref,
+} from "@/lib/orgSettings";
 
 /**
  * Where the masthead's gear points, and what it had been promising since the
@@ -28,9 +35,14 @@ import { AccountingSettings, type AccountingStatus } from "@/components/settings
  * than offering an edit the database will swallow. Every value is still SHOWN:
  * knowing what the shop's quote says is not manager-only, changing it is.
  */
-export default async function SettingsPage() {
+export default async function SettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string | string[] }>;
+}) {
   const session = await getAppSession();
   if (!session) return null;
+  const tab = parseSettingsTab((await searchParams).tab);
 
   const editable = canManageMembers(session.membership.role);
 
@@ -38,15 +50,30 @@ export default async function SettingsPage() {
   // itself is unreadable — 081 gave it zero policies — so this definer function
   // is the only way to learn anything about the connection, and it returns the
   // realm and the dates and never a credential.
-  const supabase = await createClient();
-  const { data: qbo } = await supabase.rpc("accounting_connection_status", {
-    p_org: session.membership.org_id,
-  });
-  const accounting = Array.isArray(qbo) ? ((qbo[0] as AccountingStatus | undefined) ?? null) : null;
+  // Only the Accounting tab reads it — each tab fetches only itself, the
+  // employee record's rule.
+  let accounting: AccountingStatus | null = null;
+  if (tab === "accounting") {
+    const supabase = await createClient();
+    const { data: qbo } = await supabase.rpc("accounting_connection_status", {
+      p_org: session.membership.org_id,
+    });
+    accounting = Array.isArray(qbo) ? ((qbo[0] as AccountingStatus | undefined) ?? null) : null;
+  }
+
+  const tabOptions = SETTINGS_TABS.map((t) => ({
+    key: t,
+    label: SETTINGS_TAB_LABEL[t],
+    href: settingsTabHref(t),
+  }));
+  const orgId = session.membership.org_id;
+  const settings = session.orgSettings as Record<string, unknown>;
 
   return (
-    <div className="space-y-16">
-      <div className="space-y-2">
+    <div className="space-y-8">
+      {/* Indented to the content column — `lg:ml-48` is the sidebar's `lg:w-40`
+          plus the row's `lg:gap-8`, the employee record's coupled trio. */}
+      <div className="space-y-2 lg:ml-48">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           Org settings
         </h1>
@@ -57,41 +84,49 @@ export default async function SettingsPage() {
         </p>
       </div>
 
-      {/* FIRST, deliberately. Everything below is copy that gets tuned; this is
-          the one block with a command and a status, and it is what somebody
-          opens this screen to do once. Appended at the bottom it sat six
-          viewports down behind six message templates. */}
-      <AccountingSettings
-        orgId={session.membership.org_id}
-        editable={editable}
-        initialStatus={accounting}
-      />
+      {/* THREE SECTIONS (Mark, 2026-09-05), `ui/SectionNav` vertical beside the
+          content and horizontal above it below `lg` — the employee and vendor
+          records' shape, copied rather than re-derived. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:gap-8">
+        <div
+          className="hidden lg:sticky lg:block lg:w-40 lg:shrink-0"
+          style={{ top: "calc(var(--rf-header-h) + 1.5rem)" }}
+        >
+          <SectionNav ariaLabel="Which settings" value={tab} items={tabOptions} />
+        </div>
+        <div className="lg:hidden">
+          <SectionNav orientation="horizontal" ariaLabel="Which settings" value={tab} items={tabOptions} />
+        </div>
 
-      <div className="border-t border-hairline pt-8">
-        <SpecialOrderSettings
-          orgId={session.membership.org_id}
-          settings={session.orgSettings as Record<string, unknown>}
-          editable={editable}
-        />
+        <div className="min-w-0 flex-1 space-y-16">
+          {tab === "general" && (
+            <>
+              <SpecialOrderSettings orgId={orgId} settings={settings} editable={editable} section="general" />
+              {/* Say what this screen does NOT cover, so its absence is a
+                  statement rather than something to hunt for. */}
+              <section className="space-y-2 border-t border-hairline pt-6">
+                <p className="max-w-2xl text-[13px] leading-relaxed text-subtle">
+                  Purchase-order email, the PO number format, payroll and the billing
+                  entity also live in this org’s settings and do not have a screen
+                  yet — they are edited in the database. The shop names customers see are
+                  on each location’s own record.
+                </p>
+              </section>
+            </>
+          )}
+          {tab === "messages" && (
+            <>
+              <SpecialOrderSettings orgId={orgId} settings={settings} editable={editable} section="messages" />
+              <div className="border-t border-hairline pt-8">
+                <ShiftReportSettings settings={settings} editable={editable} />
+              </div>
+            </>
+          )}
+          {tab === "accounting" && (
+            <AccountingSettings orgId={orgId} editable={editable} initialStatus={accounting} />
+          )}
+        </div>
       </div>
-
-      <div className="border-t border-hairline pt-8">
-        <ShiftReportSettings
-          settings={session.orgSettings as Record<string, unknown>}
-          editable={editable}
-        />
-      </div>
-
-      {/* Say what this screen does NOT cover, so its absence is a statement
-          rather than something to hunt for. */}
-      <section className="space-y-2 border-t border-hairline pt-6">
-        <p className="max-w-2xl text-[13px] leading-relaxed text-subtle">
-          Purchase-order email, the PO number format, payroll and the billing
-          entity also live in this org&rsquo;s settings and do not have a screen
-          yet — they are edited in the database. The shop names customers see are
-          on each location&rsquo;s own record.
-        </p>
-      </section>
     </div>
   );
 }

@@ -94,10 +94,19 @@ export function SpecialOrderSettings({
   orgId,
   settings,
   editable,
+  section,
 }: {
   orgId: string;
   settings: Settings;
   editable: boolean;
+  /**
+   * Which of the org settings screen's tabs this is rendering for (Mark,
+   * 2026-09-05): `messages` is the six templates and the mailbox they leave
+   * from; `general` is the inquiry form's copy, the documents' copy and the
+   * timing numbers. One component, because every cell writes the same jsonb
+   * document through the same `cell` helper.
+   */
+  section: "general" | "messages";
 }) {
   const so = (settings.special_orders ?? {}) as Record<string, unknown>;
   const provider = (so.email_provider ?? {}) as Record<string, unknown>;
@@ -126,6 +135,8 @@ export function SpecialOrderSettings({
 
   return (
     <div className="space-y-16">
+      {section === "messages" ? (
+        <>
       {/* ---- the messages ------------------------------------------- */}
       <section className="space-y-6">
         <SectionHeading count={TEMPLATES.length}>Messages we send</SectionHeading>
@@ -212,7 +223,33 @@ export function SpecialOrderSettings({
           </p>
         </div>
       </section>
-
+      {/* ---- the mailbox, stated not offered ------------------------ */}
+      <section className="space-y-4">
+        <SectionHeading>Where these are sent from</SectionHeading>
+        <dl className="grid max-w-2xl grid-cols-[10rem_1fr] gap-x-6 gap-y-1 text-sm">
+          <dt className="py-0.5 text-subtle">From</dt>
+          <dd className="py-0.5">{String(provider.from ?? "the app's own sender")}</dd>
+          <dt className="py-0.5 text-subtle">Replies go to</dt>
+          <dd className="py-0.5">{String(provider.reply_to ?? provider.from ?? "—")}</dd>
+          <dt className="py-0.5 text-subtle">Through</dt>
+          <dd className="py-0.5">
+            {provider.kind ? String(provider.kind) : "the app's default"}
+            {provider.secret_ref ? ` · ${String(provider.secret_ref)}` : ""}
+          </dd>
+        </dl>
+        <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
+          Not editable here, on purpose. The credential behind this lives in the
+          server&rsquo;s own secrets and never in the database, and the address has to
+          be one that credential is allowed to send as —{" "}
+          <strong>Gmail does not refuse an address it is not authorised for, it
+          silently replaces it</strong>, so a typo would not fail, it would
+          quietly start signing your quotes as somebody else. Changing it is a
+          setup job: see <code>docs/po-email-setup.md</code>.
+        </p>
+      </section>
+        </>
+      ) : (
+        <>
       {/* ---- the public form ---------------------------------------- */}
       <section className="space-y-4">
         <SectionHeading>What the inquiry form says</SectionHeading>
@@ -247,7 +284,6 @@ export function SpecialOrderSettings({
           </div>
         </dl>
       </section>
-
       {/* ---- the documents ------------------------------------------ */}
       <section className="space-y-4">
         <SectionHeading>What the documents say</SectionHeading>
@@ -300,7 +336,6 @@ export function SpecialOrderSettings({
           </div>
         </dl>
       </section>
-
       {/* ---- the numbers -------------------------------------------- */}
       <section className="space-y-4">
         <SectionHeading>Timing and limits</SectionHeading>
@@ -316,31 +351,8 @@ export function SpecialOrderSettings({
           <Num label="Inquiries accepted per hour, in total" path={["special_orders", "inquiry_max_per_hour"]} v={num(so.inquiry_max_per_hour)} {...{ cell, editable }} />
         </dl>
       </section>
-
-      {/* ---- the mailbox, stated not offered ------------------------ */}
-      <section className="space-y-4">
-        <SectionHeading>Where these are sent from</SectionHeading>
-        <dl className="grid max-w-2xl grid-cols-[10rem_1fr] gap-x-6 gap-y-1 text-sm">
-          <dt className="py-0.5 text-subtle">From</dt>
-          <dd className="py-0.5">{String(provider.from ?? "the app's own sender")}</dd>
-          <dt className="py-0.5 text-subtle">Replies go to</dt>
-          <dd className="py-0.5">{String(provider.reply_to ?? provider.from ?? "—")}</dd>
-          <dt className="py-0.5 text-subtle">Through</dt>
-          <dd className="py-0.5">
-            {provider.kind ? String(provider.kind) : "the app's default"}
-            {provider.secret_ref ? ` · ${String(provider.secret_ref)}` : ""}
-          </dd>
-        </dl>
-        <p className="max-w-2xl text-[13px] leading-relaxed text-muted">
-          Not editable here, on purpose. The credential behind this lives in the
-          server&rsquo;s own secrets and never in the database, and the address has to
-          be one that credential is allowed to send as —{" "}
-          <strong>Gmail does not refuse an address it is not authorised for, it
-          silently replaces it</strong>, so a typo would not fail, it would
-          quietly start signing your quotes as somebody else. Changing it is a
-          setup job: see <code>docs/po-email-setup.md</code>.
-        </p>
-      </section>
+        </>
+      )}
     </div>
   );
 }
