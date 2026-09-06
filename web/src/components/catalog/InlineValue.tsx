@@ -184,7 +184,10 @@ function restLook(
   rows = 4
 ): string {
   if (!boxed) return INLINE_REST_LOOK;
-  if (multiline) return `${INLINE_REST_BOXED} ${tallFor(rows)}`;
+  // `flex items-start`: a <button> centres its content vertically, so a
+  // one-line note in a 128px box sat mid-air (Mark, 2026-09-06: "top align the
+  // text"). The Sizer wears the same, or the field jumps on click.
+  if (multiline) return `${INLINE_REST_BOXED} ${tallFor(rows)} flex items-start text-left`;
   return `${INLINE_REST_BOXED} ${BOXED_FIELD} flex items-center ${
     align === "right" ? "justify-end" : "justify-start"
   }`;
