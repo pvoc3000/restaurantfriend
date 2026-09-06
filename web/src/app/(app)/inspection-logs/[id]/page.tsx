@@ -12,9 +12,9 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { PHOTO_BUCKET, PHOTO_URL_TTL_SECONDS } from "@/lib/facilityPhotos";
-import { INSPECTION_SELECT, type Inspection } from "@/lib/inspections";
+import { INSPECTION_DOCUMENTS, INSPECTION_SELECT, type Inspection } from "@/lib/inspections";
 import { TASK_STATUS_LABEL, isTaskOpen, type TaskStatus } from "@/lib/facilityTasks";
-import { InspectionDocuments, type InspectionDocument } from "@/components/inspections/InspectionDocuments";
+import { FiledDocuments, type FiledDocument } from "@/components/documents/FiledDocuments";
 import { InspectionActions } from "@/components/inspections/InspectionActions";
 import { ScoreChip } from "@/components/inspections/InspectionsList";
 import { NewTask } from "@/components/tasks/NewTask";
@@ -101,7 +101,7 @@ export default async function InspectionPage({
     const { data: urls } = await supabase.storage.from(PHOTO_BUCKET).createSignedUrls(paths, PHOTO_URL_TTL_SECONDS);
     for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
   }
-  const documents: InspectionDocument[] = (docs ?? []).map((d) => ({
+  const documents: FiledDocument[] = (docs ?? []).map((d) => ({
     id: d.id as string,
     url: signed.get(d.storage_path as string) ?? null,
     storage_path: d.storage_path as string,
@@ -294,7 +294,13 @@ export default async function InspectionPage({
       </section>
         </div>
       <section>
-        <InspectionDocuments inspectionId={id} orgId={orgId} documents={documents} editable={editable} />
+        <FiledDocuments
+          target={INSPECTION_DOCUMENTS}
+          ownerId={id}
+          orgId={orgId}
+          documents={documents}
+          editable={editable}
+        />
       </section>
       </div>
     </div>

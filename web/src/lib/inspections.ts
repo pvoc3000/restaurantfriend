@@ -7,7 +7,8 @@
  * `InspectionLog` shape, with the report in 077's bucket and the follow-up in
  * 075's tasks.
  */
-import { PHOTO_ACCEPT } from "./facilityPhotos";
+import { PHOTO_ACCEPT, PHOTO_BUCKET } from "./facilityPhotos";
+import type { FiledDocumentsTarget } from "@/components/documents/FiledDocuments";
 
 export type Inspection = {
   id: string;
@@ -81,3 +82,14 @@ export function excerpt(text: string | null | undefined, max = 80): string {
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length > max ? `${flat.slice(0, max - 1).trimEnd()}…` : flat;
 }
+
+/** Where an inspection's report is filed — `FiledDocuments`' configuration. */
+export const INSPECTION_DOCUMENTS: FiledDocumentsTarget = {
+  table: "facility_photos",
+  ownerColumn: "inspection_id",
+  bucket: PHOTO_BUCKET,
+  accept: INSPECTION_DOC_ACCEPT,
+  rejection: inspectionDocRejection,
+  heading: "Report",
+  noun: "the report",
+};

@@ -28,6 +28,8 @@ const LOCATIONS_ROUTE = "/locations";
 const UNSCOPED_ROUTES = [
   LOCATIONS_ROUTE,
   "/employees",
+  // The org's documents are the org's — a form is not a fact about a shop.
+  "/documents",
   "/special-orders",
   "/customers",
   // Both shops side by side IS the screen, so location is a filter dimension

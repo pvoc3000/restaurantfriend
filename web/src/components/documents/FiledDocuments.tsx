@@ -11,14 +11,9 @@ import { Pane } from "@/components/ui/Pane";
 import { DocumentViewer } from "@/components/ui/DocumentViewer";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog } from "@/lib/confirm";
-import { PHOTO_BUCKET, photoPath } from "@/lib/facilityPhotos";
-import {
-  INSPECTION_DOC_ACCEPT,
-  INSPECTION_DOC_ACCEPT_ATTR,
-  inspectionDocRejection,
-} from "@/lib/inspections";
+import { photoPath } from "@/lib/facilityPhotos";
 
-export type InspectionDocument = {
+export type FiledDocument = {
   id: string;
   url: string | null;
   storage_path: string;
@@ -27,35 +22,56 @@ export type InspectionDocument = {
 };
 
 /**
- * The inspector's report, on the record (093 — `facility_photos`' third
- * owner). Usually one PDF; sometimes a photograph of the paper. `TaskPhotos`'
- * two write orders apply verbatim: STORAGE then ROW on the way up, ROW then
- * OBJECT on the way out, and every write `.select()`s its own result.
+ * A record's files, previewed and kept: the inspector's report on an
+ * inspection, the PDF on an org document. ONE component (2026-09-05, when the
+ * Documents screen wanted exactly what the inspection record had) — the table,
+ * the owner column and the bucket are props, so the two screens cannot drift
+ * the way two hand-rolled frames did.
+ *
+ * `TaskPhotos`' two write orders apply verbatim: **upload is STORAGE then
+ * ROW**, because a row pointing at nothing renders broken, and **delete is ROW
+ * then OBJECT**, because an orphaned object is invisible and harmless. Every
+ * write `.select()`s its own result.
+ *
+ * THE RIGHT SIDE OF THE SCREEN (Mark: "let the report viewer take up the right
+ * side of the screen"). Beside the record at `xl` the column is sticky under
+ * the masthead and THE VIEWER BOX ITSELF is measured to the foot of the window
+ * (`useFillToBottom`, 480 floor — 560 overran a 900px window). Measuring the
+ * box and not the column is deliberate: a height handed down through
+ * `FileDropZone`'s wrapper and two flex columns arrived as 150px, the PDF
+ * plugin's own minimum. Below `xl` it stacks at `h-[70vh]`.
  */
-export function InspectionDocuments({
-  inspectionId,
+export type FiledDocumentsTarget = {
+  /** The files table and the column naming the owning record. */
+  table: string;
+  ownerColumn: string;
+  bucket: string;
+  /** Types the picker offers AND the drop re-checks — `accept` governs the
+   *  picker only. */
+  accept: readonly string[];
+  /** The refusal, worded for this screen (HEIC gets its own sentence). */
+  rejection: (file: { name: string; type: string }) => string | null;
+  /** What the card is called and what one file is ("Report" / "the report"). */
+  heading: string;
+  noun: string;
+};
+
+export function FiledDocuments({
+  target,
+  ownerId,
   orgId,
   documents,
   editable,
 }: {
-  inspectionId: string;
+  target: FiledDocumentsTarget;
+  ownerId: string;
   orgId: string;
-  documents: InspectionDocument[];
+  documents: FiledDocument[];
   editable: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
   const fileInput = useRef<HTMLInputElement>(null);
-  // THE RIGHT SIDE OF THE SCREEN (Mark, 2026-09-05: "let the report viewer take
-  // up the right side of the screen"). Beside the record at `xl` the column is
-  // sticky under the masthead and THE VIEWER BOX ITSELF is measured to the foot
-  // of the window — the invoice record's `useFillToBottom` with a 480 floor — 560 overran a 900px window by 47px,
-  // which subtracts whatever follows it (the file list, the page padding) — so
-  // the report is as tall as the screen allows while the details scroll past
-  // on the left. Measuring the box and not the column is deliberate: a height
-  // handed down through `FileDropZone`'s wrapper and two flex columns arrived
-  // as 150px (the plugin's own minimum), the same lesson as `Pane`'s `h-full`.
-  // Below `xl` it stacks and the box takes `h-[70vh]` instead.
   const viewerRef = useRef<HTMLDivElement>(null);
   const beside = useViewportAtLeast(1280);
   useFillToBottom(viewerRef, beside, 480);
@@ -71,19 +87,19 @@ export function InspectionDocuments({
   const shown = documents.find((d) => d.id === picked) ?? documents[0] ?? null;
 
   async function add(file: File) {
-    const refusal = inspectionDocRejection(file);
+    const refusal = target.rejection(file);
     if (refusal) return setFailed(refusal);
     setFailed(null);
     setBusy(true);
     try {
-      const path = photoPath(orgId, inspectionId, file.name);
-      const up = await supabase.storage.from(PHOTO_BUCKET).upload(path, file);
+      const path = photoPath(orgId, ownerId, file.name);
+      const up = await supabase.storage.from(target.bucket).upload(path, file);
       if (up.error) return setFailed(up.error.message);
       const { data, error } = await supabase
-        .from("facility_photos")
+        .from(target.table)
         .insert({
           org_id: orgId,
-          inspection_id: inspectionId,
+          [target.ownerColumn]: ownerId,
           storage_path: path,
           file_name: file.name,
           content_type: file.type,
@@ -100,10 +116,10 @@ export function InspectionDocuments({
     }
   }
 
-  async function remove(doc: InspectionDocument) {
+  async function remove(doc: FiledDocument) {
     const ok = await confirmDialog({
-      title: "Remove this report?",
-      body: `${doc.file_name ?? "The file"} comes off this inspection. There is no way back.`,
+      title: `Remove ${target.noun}?`,
+      body: `${doc.file_name ?? "The file"} comes off this record. There is no way back.`,
       tone: "danger",
       confirmLabel: "Remove it",
     });
@@ -111,13 +127,13 @@ export function InspectionDocuments({
     setFailed(null);
     startTransition(async () => {
       const { data, error } = await supabase
-        .from("facility_photos")
+        .from(target.table)
         .delete()
         .eq("id", doc.id)
         .select("id");
       if (error) return setFailed(error.message);
       if (!data || data.length === 0) return setFailed("Nothing was removed — you may not have permission.");
-      await supabase.storage.from(PHOTO_BUCKET).remove([doc.storage_path]);
+      await supabase.storage.from(target.bucket).remove([doc.storage_path]);
       router.refresh();
     });
   }
@@ -125,13 +141,13 @@ export function InspectionDocuments({
   const body = (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
-        <SectionHeading count={documents.length}>Report</SectionHeading>
+        <SectionHeading count={documents.length}>{target.heading}</SectionHeading>
         {editable && (
           <>
             <input
               ref={fileInput}
               type="file"
-              accept={INSPECTION_DOC_ACCEPT_ATTR}
+              accept={target.accept.join(",")}
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0];
@@ -153,7 +169,7 @@ export function InspectionDocuments({
 
       {documents.length === 0 ? (
         <p className="text-sm text-muted">
-          {editable ? "Nothing attached — drop the report here." : "Nothing attached."}
+          {editable ? `Nothing attached — drop ${target.noun} here.` : "Nothing attached."}
         </p>
       ) : (
         <>
@@ -194,20 +210,33 @@ export function InspectionDocuments({
                     aria-pressed={shown?.id === d.id}
                     className={`min-w-0 flex-1 truncate text-left text-sm ${shown?.id === d.id ? "font-semibold text-ink" : "text-body underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"}`}
                   >
-                    {d.file_name ?? "report"}
+                    {d.file_name ?? target.noun}
                   </button>
                 ) : (
-                  <span className="min-w-0 flex-1 truncate text-sm text-body">{d.file_name ?? "report"}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm text-body">{d.file_name ?? target.noun}</span>
                 )}
                 {d.url ? (
-                  <a
-                    href={d.url}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="shrink-0 text-sm text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-                  >
-                    Open
-                  </a>
+                  <>
+                    {/* Open is also how you PRINT — the browser's own viewer
+                        carries the print button, and a cross-origin PDF cannot
+                        be printed from here. Download appends Supabase's own
+                        `download` parameter to the signed URL, which sets the
+                        Content-Disposition. */}
+                    <a
+                      href={d.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0 text-sm text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+                    >
+                      Open
+                    </a>
+                    <a
+                      href={`${d.url}&download=${encodeURIComponent(d.file_name ?? "file")}`}
+                      className="shrink-0 text-sm text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+                    >
+                      Download
+                    </a>
+                  </>
                 ) : (
                   <span className="shrink-0 text-sm text-faint">unreadable</span>
                 )}
@@ -232,8 +261,8 @@ export function InspectionDocuments({
 
   const column = editable ? (
     <FileDropZone
-      accept={INSPECTION_DOC_ACCEPT}
-      label="Drop the report here"
+      accept={target.accept}
+      label={`Drop ${target.noun} here`}
       disabled={busy}
       onFiles={(files) => {
         const first = files[0];
@@ -241,7 +270,7 @@ export function InspectionDocuments({
       }}
       onReject={(rejected) => {
         const first = rejected[0];
-        setFailed(first ? inspectionDocRejection(first) : "That file cannot be attached.");
+        setFailed(first ? target.rejection(first) : "That file cannot be attached.");
       }}
     >
       {body}

@@ -7176,6 +7176,45 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    its sort (`sortRows`) and publishes the found set under `/inspection-logs`,
    the record renders `RecordNav` in the crumb row — "2 of 4" → Next → "3 of 4"
    verified. A new record screen gets the book by doing those two things.
+   **DOCUMENTS — migration 094, NEEDS APPLYING; loader `migration/load-documents.mjs`
+   NEEDS RUNNING after it.** Mark, 2026-09-05: "Super simple. It's just a place
+   to store, retrieve, and print the documents the organization uses … Like the
+   inspection report, I want to see the document previewed on the right side."
+   FMP's `Documents` table, 73 records: title · version (TEXT — "01", "2021",
+   "2023-01") · category (free text, nine values, `allowNew`) · shop or ALL ·
+   description · notes · submitted by · added · the file in a container. 64 of
+   the 73 have a file in the export; nine do not.
+   **094**: `org_documents` + `org_document_files` (a record with NO file is a
+   real state, and the 4-up beside the single is a second file) and a bucket of
+   their own, **`org-documents`** — NOT `facility-photos`, whose reads are
+   supervisor+ and whose objects are evidence about a building, where a cheat
+   sheet is for every member to read and print. Membership READ (table, files
+   and objects), supervisor+ WRITE, owner/admin DELETE (023). `location_id` null
+   = ALL. Verified on the Docker harness as real roles (staff read the record
+   and the file, update 0, insert refused; supervisor delete 0; anon 0; owner's
+   delete cascades the file row; a staffer's object insert refused, a
+   supervisor's landed, and the staffer READS it). NOT rerunnable.
+   Screens: `/documents` (org-wide, exempt from `InactiveLocationGate`; a
+   `DataTable` grouped by CATEGORY with a search box and nothing else; **File**
+   column marks a record with none) and `/documents/[id]` (the record on the
+   left, the file previewed on the right, the record book). The nav stub became
+   the real entry; the sheet's row for the stub is kept as written — **staff
+   Read was tried and reverted within the hour**, because Documents sits before
+   Production in the menu and would have become every staffer's landing screen
+   (`homeHref`); the table policy is membership-wide regardless.
+   **`components/documents/FiledDocuments` IS THE INSPECTION RECORD'S REPORT
+   CARD, GENERALISED** — the table, owner column, bucket, accept list and
+   wording are a `FiledDocumentsTarget` (`INSPECTION_DOCUMENTS` in
+   `lib/inspections`, `ORG_DOCUMENT_FILES` in `lib/orgDocuments`), so the two
+   screens share one preview column, one drop zone and one pair of write
+   orders. It gained **Download** (Supabase's `download=` parameter on the
+   signed URL) beside Open; **printing is Open** — the browser's own viewer
+   carries the print button, and a cross-origin PDF cannot be printed from
+   here. `lib/orgDocuments.exportPrefix`/`fileMatchesRecord` is how the loader
+   pairs files with records: FMP named each export
+   `{shop}_{category}_{title}_{version}_{original}`, so the prefix IS the
+   record; one collision (the two Ice Cream Display Signs v02) is told apart by
+   the description's "4up". Dry run: 73 to load, 64 with a file, 0 unclaimed.
    **A TASK CAN BE SOMEBODY'S — migration 079, APPLIED 2026-08-31.** *Probe,
    don't read this line; it has been wrong in both directions for four different
    migrations.* Mark, 2026-08-31: "Tasks should be assignable to someone. Not

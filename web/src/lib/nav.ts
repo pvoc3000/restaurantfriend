@@ -240,7 +240,7 @@ export const SECTIONS: NavSection[] = [
         built: true,
       },
       { slug: "sales", label: "Sales", href: "/sales", built: true },
-      stub("operations", "documents", "Documents"),
+      { slug: "documents", label: "Documents", href: "/documents", built: true },
       stub("operations", "policies", "Policies"),
       // "Check Lists" and "Master Check Lists" USED TO SIT HERE and moved to
       // the Locations section on 2026-08-29 when they were built — see the note
