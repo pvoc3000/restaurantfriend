@@ -7096,8 +7096,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    was invisible because it was only ever checked at desktop width.
 
    **AN INSPECTION LOG IS THE RECORD OF A VISIT, NOT A WALK — migration 093,
-   NEEDS APPLYING; loader `migration/load-inspections.mjs` NEEDS RUNNING after
-   it.** Mark, 2026-09-05: "conceptually I think of the inspection log as a
+   APPLIED 2026-09-05 and LOADED the same day** (`migration/load-inspections.mjs`:
+   13 inspections, 12 reports filed, a second `--apply` filed 0). *Probe, don't
+   read this line*: `select count(*) from inspections` (13); `select count(*)
+   from facility_photos where inspection_id is not null` (12). Walked live at
+   DF01 and left as found: the four DF01 rows, the 2024-09-11 record with FMP's
+   line breaks intact and its PDF served through the signed link (200,
+   application/pdf); a task raised from it with a due date landed in Follow-up,
+   on `/tasks`, and as "1" in the list's Open tasks (then cancelled with a
+   reason — there is no task delete); a throwaway inspection filed through New
+   inspection landed dated the ORG's day (2026-09-05 where UTC read the 6th)
+   and Delete named it and returned to the list. Mark, 2026-09-05: "conceptually I think of the inspection log as a
    record of a visit by the health inspector (or some other city or county
    inspector). It's the result of their inspection and nothing more. Not a walk.
    No need for a template as far as I can tell. … I would just build a way to
