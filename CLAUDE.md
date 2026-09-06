@@ -9353,6 +9353,35 @@ weekday column, and 003 then silently made it per-vendor-item.
   (measured: table 1314px in a 1314px pane, scrollWidth 1320). The unpaned path
   is unaffected — `useOverflowOnlyWhenNeeded` compares the TABLE's width, not
   scrollWidth, so the grip never fooled it.
+- **THE WEEKDAY PAR HAS AN EDITOR AT LAST** (Mark, 2026-09-05: "one thing we
+  lost from FMP that we should maybe bring back — different pars for each day
+  of the week"). IT WAS NEVER LOST FROM THE DATA: 009 restored FMP's seven-slot
+  `Par__array` as `inventory_item_locations.par_by_weekday` and the guide's
+  view has read `coalesce(par_by_weekday[weekday], default_par)` ever since —
+  34 rows carried a weekday override, 6 varying across the week (the weekend
+  ramp: 500 → 600 Fri/Sat), and nothing on any screen could set one. The
+  item record's per-location rows now carry a **Weekday par** strip beside
+  **Default par** — seven `InlineValue`s through `arrayColumn`, the production
+  item record's idiom, each in its own `min-w-0 flex-1` pen. **A blank slot is
+  the default**, which the label says ("– = default") because it is the one
+  fact the strip cannot show about itself. `par_fixed_by_weekday` still has no
+  editor; nothing in the UI reads `par_mode` beyond the view.
+  **THAT TABLE'S WEIGHTS WERE REBALANCED, and the sidebar is why.** When the
+  item record grew tabs the content column beside the 192px `SectionNav` came
+  out at 977px at 1280, and at the old weights Order days resolved to 197px
+  against the 300 its All/None command needs — the `WEEKDAY_PICKER_WIDTH`
+  warning, met on a screen that had shipped clean. Two weekday strips cannot
+  give, so Section and Note are the compact set (`compactBelow={1440}`),
+  Location is labelled **Shop** (the longer word clipped to "LOCA…"), and the
+  strip is 370 because a four-digit par is 37px of ink plus the cell's 8px in
+  a 45px pen. Measured: 1280 → five columns, Order days 347, strip 347, zero
+  pen overflow; 1440 → seven columns, 309 and 347, zero overflow. **Any table
+  placed beside a record's tab sidebar loses ~190px and must be re-measured.**
+  Verified end to end on Flour, All Purpose at DF02 and left as found: a 7
+  typed into Friday landed as `[null,null,null,null,7,null,null]` with
+  `default_par` untouched, the guide view resolved Friday to 7 on all 13 of
+  the item's lines and 100 every other day, and clearing the cell put the
+  slot back to null.
 - **THE INVENTORY ITEM RECORD HAS THREE TABS — Info · Vendor Items · Purchase
   History** (Mark, 2026-09-05). `lib/inventoryItems` mirrors `lib/vendors`;
   `ItemTitle` (the editable name, alone) sits above the split and **the Active

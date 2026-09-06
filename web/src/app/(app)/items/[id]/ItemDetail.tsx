@@ -35,7 +35,7 @@ import type { PoStatus } from "@/lib/purchaseOrders";
 const SELECT = `
   id, name, category, base_unit, note, is_active,
   inventory_item_locations (
-    id, location_id, default_par, order_days, note, is_active,
+    id, location_id, default_par, par_by_weekday, order_days, note, is_active,
     shop_section_id,
     shop_sections ( display_name, sort_order )
   )

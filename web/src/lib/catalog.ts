@@ -26,6 +26,11 @@ export type CatalogItemLocation = {
   id: string;
   location_id: string;
   default_par: number | null;
+  /** FMP's `Par__array`, back since migration 009: slot n = ISO weekday n, a
+   *  null slot falls back to `default_par`. The guide's view reads it as
+   *  `coalesce(par_by_weekday[weekday], default_par)`; the item record's
+   *  per-location rows are its only editor (2026-09-05). */
+  par_by_weekday: (number | null)[] | null;
   /** ISO weekdays we order this item at this location (schema 008). One of
    *  the four should-order conditions; empty = out of focus, still on guide. */
   order_days: number[];
