@@ -7095,6 +7095,54 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    sibling has a 0 basis. That last had been true since the runner shipped and
    was invisible because it was only ever checked at desktop width.
 
+   **AN INSPECTION LOG IS THE RECORD OF A VISIT, NOT A WALK — migration 093,
+   NEEDS APPLYING; loader `migration/load-inspections.mjs` NEEDS RUNNING after
+   it.** Mark, 2026-09-05: "conceptually I think of the inspection log as a
+   record of a visit by the health inspector (or some other city or county
+   inspector). It's the result of their inspection and nothing more. Not a walk.
+   No need for a template as far as I can tell. … I would just build a way to
+   record an inspection, upload the report, and track what things we need to
+   work on." This REVERSES 076's modelling of an inspection as a
+   `checklist_runs` row of kind 'inspection' (never used — no template of that
+   kind was ever created). FMP's `InspectionLog` had exactly the new shape:
+   type · date · score · a container with the hardcopy · Violations ·
+   Violations_Corrected, 13 records, all Health, scores 92–99.
+   **093**: `inspections` (its own table, not nullable-template runs — every
+   reader of `checklist_runs` assumes items exist); `facility_photos.inspection_id`
+   as a THIRD owner, the one-owner CHECK widened; `location_tasks.source_inspection_id`
+   (`set null` — deleting the record of the visit does not make the drain less
+   loose). RLS is 075's tasks: supervisor+ select/insert/update, **owner/admin
+   DELETE** (023's rule). `score` is TEXT (the next inspector writes "A");
+   `inspection_type` is free text with `allowNew` (all 13 say Health). Verified
+   on the Docker harness as real roles: a supervisor files and edits, cannot
+   claim another's `created_by`, deletes 0 with no error; staff and anon see 0;
+   a report with no owner or two owners is refused by the CHECK; the owner's
+   delete cascades the report and leaves the task with a null source. 093 is
+   NOT rerunnable ("relation already exists" is the signal).
+   Screens: `/inspection-logs` (a `DataTable`: Date · Type · Score chip · Inspector
+   · Violations excerpt · Report count · Open tasks; **New inspection** in the
+   command strip) and `/inspection-logs/[id]` (Details `dl`, Violations and
+   Corrected as boxed paragraphs, a **Report** card taking PDFs — `INSPECTION_DOC_ACCEPT`,
+   since `PHOTO_ACCEPT` alone would refuse the thing the card is FOR — with
+   drop, Open and Remove, and a **Follow-up** list with **New task from this
+   inspection**). `ScoreChip` tone follows LA County's grades: quiet ≥90,
+   mark-fill 80–89, red below; a letter score gets no tone.
+   **`NewTask` gained a Due date and `sourceInspectionId`** — `due_on` had had
+   no writer since 075 — so a task raised from an inspection is an ordinary
+   `location_tasks` row and lands on every closing checklist until done, which
+   is what "show up on the checklist until resolved like issues do" means with
+   NO new machinery. Deeper integration (the inspection appearing ON a
+   checklist, for instance) is deliberately NOT built: Mark asked to talk first.
+   The template kind picker stopped offering 'inspection'; the kind stays in the
+   type and the check. `checklist_runs` keeps its `kind` check unchanged.
+   **The loader matches the 12 exported PDFs to the 13 records BY DATE** from a
+   table typed in the file — a `.mer` carries a container's filename, never
+   its bytes — and is idempotent on `(org_id, legacy_id)`, filing a report only
+   where the record has none. Dry run measured: 13 to load, 12 with a report;
+   the 2026-07-06 DF02 visit (score 92) has no document on disk. One quirk kept
+   as FMP had it: the 2022-11-16 record says DF02 while its file is named
+   `DF03 221116.pdf`.
+   Permit expiry was offered and NOT built — Mark did not ask for it.
    **A TASK CAN BE SOMEBODY'S — migration 079, APPLIED 2026-08-31.** *Probe,
    don't read this line; it has been wrong in both directions for four different
    migrations.* Mark, 2026-08-31: "Tasks should be assignable to someone. Not

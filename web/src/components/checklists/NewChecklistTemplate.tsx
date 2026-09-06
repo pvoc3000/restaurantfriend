@@ -17,7 +17,10 @@ import {
   type ChecklistKind,
 } from "@/lib/checklists";
 
-const KINDS: ChecklistKind[] = ["checklist", "walkthrough", "inspection"];
+// Not "inspection" any more: since 093 an inspection is a RECORD of a visit
+// (`/inspection-logs`), not a template anybody walks. The kind survives in the
+// type and the check so nothing stored breaks.
+const KINDS: ChecklistKind[] = ["checklist", "walkthrough"];
 
 /**
  * Start a template.
@@ -196,7 +199,7 @@ export function NewChecklistTemplate({
               />
               <p className="text-[12px] text-muted">
                 Leave it empty for a list nobody is prompted for — a
-                walkthrough or an inspection, started by hand.
+                walkthrough, started by hand.
               </p>
             </div>
 

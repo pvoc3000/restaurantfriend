@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { TextInput } from "@/components/ui/TextInput";
+import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { BOXED_FIELD, BOXED_FIELDS, FORM_TEXTAREA } from "@/components/ui/fieldMetrics";
@@ -24,6 +25,8 @@ export function NewTask({
   equipment,
   sections,
   assignees,
+  sourceInspectionId,
+  buttonLabel,
 }: {
   kind: TaskKind;
   orgId: string;
@@ -31,6 +34,10 @@ export function NewTask({
   equipment: { id: string; name: string; shop_section_id: string | null }[];
   sections: { id: string; display_name: string }[];
   assignees: Assignee[];
+  /** 093: the inspection this task is raised FROM, so the record can list its
+   *  own follow-up and a task can say where it came from. */
+  sourceInspectionId?: string;
+  buttonLabel?: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -52,6 +59,10 @@ export function NewTask({
   // tasks are — so this is never required and never defaults to whoever is
   // filing it: "I noticed this" and "I will do this" are different claims.
   const [assignedTo, setAssignedTo] = useState("");
+  // `location_tasks.due_on` existed since 075 with no writer — an inspector's
+  // "correct by" date is the first thing that needed one. Optional; empty
+  // means no deadline, which is most tasks.
+  const [dueOn, setDueOn] = useState("");
   const [failed, setFailed] = useState<string | null>(null);
   const [busy, startTransition] = useTransition();
 
@@ -76,6 +87,8 @@ export function NewTask({
           shop_section_id: sectionId || null,
           carry_forward: carry,
           assigned_to: assignedTo || null,
+          due_on: dueOn || null,
+          source_inspection_id: sourceInspectionId ?? null,
           created_by: uid,
         })
         .select("id");
@@ -87,6 +100,7 @@ export function NewTask({
       setTitle("");
       setDetails("");
       setAssignedTo("");
+      setDueOn("");
       router.refresh();
     });
   }
@@ -97,7 +111,7 @@ export function NewTask({
   return (
     <>
       <button type="button" className={BUTTON_CLASS} onClick={() => setOpen(true)}>
-        New {noun}
+        {buttonLabel ?? `New ${noun}`}
       </button>
 
       {open && (
@@ -270,6 +284,13 @@ export function NewTask({
                   }}
                 />
               </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                Due
+              </span>
+              <DateField value={dueOn} onChange={(v) => setDueOn(v ?? "")} ariaLabel="Due date" />
             </div>
 
             <Checkbox checked={carry} onChange={setCarry} label="Carry it forward">

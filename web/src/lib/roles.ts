@@ -267,3 +267,12 @@ export const canEditChecklists = canWriteCatalog;
  * people standing in front of it.
  */
 export const canResolveTasks = canWalkChecklists;
+
+/**
+ * Delete an inspection log. 093's `inspections_delete` — owner/admin, 023's
+ * rule that deletion is for the typo: a record saying the county scored the
+ * shop 92 is not something a supervisor should be able to make disappear.
+ */
+export function canDeleteInspection(role: Role): boolean {
+  return role === "owner" || role === "admin";
+}
