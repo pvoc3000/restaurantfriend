@@ -201,7 +201,7 @@ export function OrderLines({
     onDrop: dropRow,
   });
 
-  const { widths, startResize, setWidth, reset, customized } = useResizableColumns(
+  const { widths, startResize, resetColumn, reset, customized } = useResizableColumns(
     // v2: the `remove` column became `actions`, so a stored v1 map holds a
     // width for a key that no longer exists and none for the one that does —
     // which changes the visible total every other column is a share of.
@@ -384,8 +384,8 @@ export function OrderLines({
                   align={align}
                   // No sort: the ORDER IS THE DOCUMENT (see LINE_WIDTHS).
                   sorted={false}
-                  onResizeStart={(e) => startResize(e, key)}
-                  onResizeReset={() => setWidth(key, LINE_WIDTHS[key])}
+                  onResizeStart={(e) => startResize(e, key, columnKeys)}
+                  onResizeReset={() => resetColumn(key, columnKeys, LINE_WIDTHS[key])}
                 />
               ))}
               {canWrite ? <th className="p-0" /> : null}

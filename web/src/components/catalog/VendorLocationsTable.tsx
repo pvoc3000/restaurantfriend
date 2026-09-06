@@ -267,6 +267,7 @@ export function VendorLocationsTable({
       key: "order_days",
       label: "Order days",
       width: WEEKDAY_PICKER_WIDTH,
+      minWidth: WEEKDAY_PICKER_WIDTH,
       sortValue: (r) => daysKey(r.order_days),
       render: (r) => (
         <WeekdayPicker
@@ -283,6 +284,7 @@ export function VendorLocationsTable({
       key: "delivery_days",
       label: "Delivery days",
       width: WEEKDAY_PICKER_WIDTH,
+      minWidth: WEEKDAY_PICKER_WIDTH,
       sortValue: (r) => daysKey(r.delivery_days),
       render: (r) => (
         <WeekdayPicker

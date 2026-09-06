@@ -230,6 +230,7 @@ export function VendorItemLocations({
       key: "favorite_days",
       label: "Favorite days",
       width: WEEKDAY_PICKER_WIDTH,
+      minWidth: WEEKDAY_PICKER_WIDTH,
       // Sorts on how many days it's the preferred source here.
       sortValue: (r) => (r.itemLocationId ? r.favoriteDays.length : null),
       render: (r) =>

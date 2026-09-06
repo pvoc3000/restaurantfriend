@@ -17,7 +17,7 @@ import {
   type SortDir,
   type SortValue,
 } from "@/lib/tableSort";
-import { useResizableColumns, type ColumnWidths } from "@/lib/columnWidths";
+import { useResizableColumns, type ColumnWidths, MIN_COLUMN_WIDTH } from "@/lib/columnWidths";
 import { isColumnVisible, useColumnVisibility } from "@/lib/columnVisibility";
 import {
   applyColumnOrder,
@@ -46,6 +46,14 @@ export type DataColumn<T> = {
   key: string;
   label: string;
   width: number;
+  /**
+   * The least this column may be squeezed to by a resize — its own drag, or
+   * another column's drag paying with it (`resizeWeights`). Default 48. A
+   * column holding a control with a real minimum (a `WeekdayPicker` needs
+   * `WEEKDAY_PICKER_WIDTH`) declares it here, or a drag two columns away can
+   * quietly clip its All/None off the edge.
+   */
+  minWidth?: number;
   align?: "right";
   /** Omit to make the column unsortable (e.g. a control column). */
   sortValue?: (row: T) => SortValue;
@@ -392,7 +400,7 @@ export function DataTable<T>({
     [columns]
   );
 
-  const { widths, startResize, setWidth, reset, customized } =
+  const { widths, startResize, resetColumn, reset, customized } =
     useResizableColumns(storageKey, defaultWidths);
 
   // A table in `scroll` mode is the one list the page's own scroll memory can't
@@ -686,6 +694,12 @@ export function DataTable<T>({
     }
   }
 
+  // The rule in `resizeWeights` needs the visible columns left to right, and
+  // each one's floor.
+  const visibleKeys = visibleColumns.map((c) => c.key);
+  const minByKey = new Map(visibleColumns.map((c) => [c.key, c.minWidth ?? MIN_COLUMN_WIDTH]));
+  const minFor = (key: string) => minByKey.get(key) ?? MIN_COLUMN_WIDTH;
+
   const colWidth = (col: DataColumn<T>) => {
     const w = widths[col.key] ?? col.width;
     if (naturalTotal <= 0) return `${w}px`;
@@ -721,8 +735,8 @@ export function DataTable<T>({
                   align={col.align}
                   sorted={sort?.key === col.key ? sort.dir : false}
                   onSort={col.sortValue ? () => toggleSort(col.key) : undefined}
-                  onResizeStart={(e) => startResize(e, col.key)}
-                  onResizeReset={() => setWidth(col.key, col.width)}
+                  onResizeStart={(e) => startResize(e, col.key, visibleKeys, minFor)}
+                  onResizeReset={() => resetColumn(col.key, visibleKeys, col.width, minFor)}
                   onDragStart={
                     movableVisible > 1 && isMovableColumn(col)
                       ? (e) =>

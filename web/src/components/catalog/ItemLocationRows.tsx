@@ -190,6 +190,7 @@ export function ItemLocationRows({
       // Above WEEKDAY_PICKER_WIDTH on purpose: widths are weights, and this
       // is what keeps the RESOLVED width at or over 300 beside the par strip.
       width: Math.max(WEEKDAY_PICKER_WIDTH, 330),
+      minWidth: WEEKDAY_PICKER_WIDTH,
       // Sorts on how MANY days it's ordered — "which items do we buy most
       // often here" is the question worth asking of this column.
       sortValue: (r) => (r.il ? r.il.order_days.length : null),

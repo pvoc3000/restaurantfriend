@@ -8677,6 +8677,33 @@ weekday column, and 003 then silently made it per-vendor-item.
   A stretched pane also needs **`md:grid-rows-1`** on a grid body: an implicit
   row is content-sized, so `h-full` on the pane means nothing and it falls back
   to its own min-height however tall the panel gets.
+- **RESIZING A COLUMN MOVES THAT COLUMN AND ONE OTHER, NEVER THE ROW** (Mark,
+  2026-09-05: "when I resize a column, every other column resizes as well,
+  making it difficult to get right … I don't like it"). Widths are still
+  WEIGHTS and the table is still exactly as wide as its pane — that is what
+  keeps the labels sticking and tablets free of sideways scroll — but the drag
+  rule changed: `resizeWeights` in `lib/columnWidths` keeps the SUM constant,
+  so the column you drag moves by the pixels you moved (the hook measures the
+  `<table>` to convert pixels to weights at the rendered rate) and the
+  RIGHTMOST visible column pays, walking leftwards when it hits its floor
+  (`NSTableView`'s default; Finder's list view). Dragging the last column
+  borrows from its left neighbour. A shrink hands all the slack to the last
+  column; a grow is capped at what the payers can give. Double-click reset
+  goes through the same rule, so it too moves two columns, and a value back at
+  its default is DROPPED from the store so the reset footer does not appear on
+  a table exactly as declared. Every `DataTable` and `OrderLines` (the one
+  hand-rolled table still resizing) go through it; nothing else calls
+  `startResize`. Chosen over fixed pixels with horizontal scroll, and over a
+  pixels-that-fit-until-they-don't hybrid, because it fixes the feel without
+  giving up a layout guarantee; if the fixed total still feels confining the
+  hybrid is the next step and this is on the way to it.
+  **`DataColumn.minWidth` IS THE FLOOR A PAYER CANNOT BE PUSHED UNDER.** The
+  first live test paid a Name drag out of a weekday picker column, which needs
+  300 for its All/None — so every `WEEKDAY_PICKER_WIDTH` column declares
+  `minWidth: WEEKDAY_PICKER_WIDTH`, and any column holding a control with a
+  real minimum should do the same. Default 48. Verified live: a 600px drag on
+  the item record cascaded through three payers and held Order days at 302px
+  with All/None visible. 9 fixtures pin every clause.
 - **A DataTable column holding a day picker must be `WEEKDAY_PICKER_WIDTH`**
   (300px, exported from `WeekdayPicker.tsx`). The table is `table-fixed` with
   `truncate` cells, so a narrow column silently CLIPS the right-hand end rather
