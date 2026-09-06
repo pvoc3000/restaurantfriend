@@ -7189,7 +7189,18 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    whole record down with "Functions cannot be passed directly to Client
    Components" (`BatchLogDetail`'s lesson, met again the first time the
    component had a second caller). The targets are a registry INSIDE the
-   client module and the page passes `kind="inspection" | "document"`. Mark, 2026-09-05: "Super simple. It's just a place
+   client module and the page passes `kind="inspection" | "document"`.
+   **PRINT IS A ROW ACTION** (Mark, 2026-09-06: "Is it possible to add a
+   'print' option … along with open, download, and remove?"). It is, by one
+   route, `lib/printDocument`: a cross-origin PDF cannot be printed by the page
+   (`window.open(url).print()` is refused), but the signed URL already lets the
+   app's origin FETCH it, and a blob: URL is same-origin — so fetch the bytes,
+   load them in a hidden iframe, and ask that frame to print (print-js's
+   technique). Verified by stubbing the frame's `print`: called once, no
+   error. Known limit, not fixable from here: **iOS Safari prints only the
+   first page of a PDF in a frame**, so Open (the viewer's own print button)
+   stays beside it. The document record's Description and Notes are
+   `rows={8}`, the inspection's two paragraphs' size. Mark, 2026-09-05: "Super simple. It's just a place
    to store, retrieve, and print the documents the organization uses … Like the
    inspection report, I want to see the document previewed on the right side."
    FMP's `Documents` table, 73 records: title · version (TEXT — "01", "2021",

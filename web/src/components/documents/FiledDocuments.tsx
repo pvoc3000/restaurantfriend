@@ -12,6 +12,7 @@ import { DocumentViewer } from "@/components/ui/DocumentViewer";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog } from "@/lib/confirm";
 import { PHOTO_BUCKET, photoPath } from "@/lib/facilityPhotos";
+import { printDocument } from "@/lib/printDocument";
 import { INSPECTION_DOC_ACCEPT, inspectionDocRejection } from "@/lib/inspections";
 import { DOCUMENT_ACCEPT, DOCUMENT_BUCKET, documentRejection } from "@/lib/orgDocuments";
 
@@ -118,6 +119,20 @@ export function FiledDocuments({
   // refresh after an attach or a remove keeps the same document up — or falls
   // back to the first when that one is gone.
   const [picked, setPicked] = useState<string | null>(null);
+  const [printing, setPrinting] = useState<string | null>(null);
+
+  async function print(doc: FiledDocument) {
+    if (!doc.url) return;
+    setFailed(null);
+    setPrinting(doc.id);
+    try {
+      await printDocument(doc.url, doc.content_type);
+    } catch (e) {
+      setFailed(e instanceof Error ? e.message : "Could not print.");
+    } finally {
+      setPrinting(null);
+    }
+  }
   const shown = documents.find((d) => d.id === picked) ?? documents[0] ?? null;
 
   async function add(file: File) {
@@ -251,11 +266,12 @@ export function FiledDocuments({
                 )}
                 {d.url ? (
                   <>
-                    {/* Open is also how you PRINT — the browser's own viewer
-                        carries the print button, and a cross-origin PDF cannot
-                        be printed from here. Download appends Supabase's own
-                        `download` parameter to the signed URL, which sets the
-                        Content-Disposition. */}
+                    {/* Open shows the file in the browser's own viewer, whose
+                        print button is the whole-document route on an iPad.
+                        Print fetches the bytes and prints them from a hidden
+                        same-origin frame (`lib/printDocument`). Download
+                        appends Supabase's own `download` parameter to the
+                        signed URL, which sets the Content-Disposition. */}
                     <a
                       href={d.url}
                       target="_blank"
@@ -264,6 +280,14 @@ export function FiledDocuments({
                     >
                       Open
                     </a>
+                    <button
+                      type="button"
+                      onClick={() => void print(d)}
+                      disabled={printing !== null}
+                      className="shrink-0 text-sm text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900 disabled:opacity-35"
+                    >
+                      {printing === d.id ? "Printing…" : "Print"}
+                    </button>
                     <a
                       href={`${d.url}&download=${encodeURIComponent(d.file_name ?? "file")}`}
                       className="shrink-0 text-sm text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"

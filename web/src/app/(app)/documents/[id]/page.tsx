@@ -138,11 +138,11 @@ export default async function DocumentPage({
           </section>
           <section className="space-y-3">
             <SectionHeading>Description</SectionHeading>
-            {cell("description", row.description, "Description", { multiline: true })}
+            {cell("description", row.description, "Description", { multiline: true, rows: 8 })}
           </section>
           <section className="space-y-3">
             <SectionHeading>Notes</SectionHeading>
-            {cell("notes", row.notes, "Notes", { multiline: true })}
+            {cell("notes", row.notes, "Notes", { multiline: true, rows: 8 })}
           </section>
         </div>
         <FiledDocuments kind="document" ownerId={id} orgId={orgId} documents={documents} editable={editable} />
