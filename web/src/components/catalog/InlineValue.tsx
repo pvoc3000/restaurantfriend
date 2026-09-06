@@ -10,6 +10,7 @@ import {
   BOXED_FIELD,
   BOXED_FIELD_BORDER,
   BOXED_FIELD_TALL,
+  BOXED_FIELD_TALLER,
   fieldPlaceholder,
 } from "@/components/ui/fieldMetrics";
 import { PickList, type PickOption } from "@/components/ui/PickList";
@@ -161,6 +162,12 @@ const INLINE_REST_BOXED = BOXED_FIELD_BORDER;
  */
 const INLINE_REST_TALL = BOXED_FIELD_TALL;
 
+/** The resting floor for a note, sized to the editor's `rows` so the field
+ *  does not jump on click: 4 rows is a paragraph's worth, 8 is twice that. */
+function tallFor(rows: number): string {
+  return rows >= 8 ? BOXED_FIELD_TALLER : INLINE_REST_TALL;
+}
+
 /**
  * The resting dress: a box or the dotted underline.
  *
@@ -170,9 +177,14 @@ const INLINE_REST_TALL = BOXED_FIELD_TALL;
  * longer gets from its own content; `justify-*` carries the alignment that
  * `text-right` used to, since a flex container ignores it.
  */
-function restLook(boxed: boolean, multiline = false, align?: "left" | "right"): string {
+function restLook(
+  boxed: boolean,
+  multiline = false,
+  align?: "left" | "right",
+  rows = 4
+): string {
   if (!boxed) return INLINE_REST_LOOK;
-  if (multiline) return `${INLINE_REST_BOXED} ${INLINE_REST_TALL}`;
+  if (multiline) return `${INLINE_REST_BOXED} ${tallFor(rows)}`;
   return `${INLINE_REST_BOXED} ${BOXED_FIELD} flex items-center ${
     align === "right" ? "justify-end" : "justify-start"
   }`;
@@ -220,6 +232,7 @@ function Sizer({
   align,
   boxed = false,
   multiline = false,
+  rows = 4,
 }: {
   text: string;
   align?: "left" | "right";
@@ -229,13 +242,14 @@ function Sizer({
   boxed?: boolean;
   /** …and so does a note's `min-h`, for exactly the same reason. */
   multiline?: boolean;
+  rows?: number;
 }) {
   return (
     <span
       aria-hidden
       className={`invisible whitespace-pre ${INLINE_BOX} ${
         boxed && !multiline ? "" : "block"
-      } ${restLook(boxed, multiline, align)} ${
+      } ${restLook(boxed, multiline, align, rows)} ${
         align === "right" ? "text-right tabular-nums" : "text-left"
       }`}
     >
@@ -276,6 +290,7 @@ export function InlineValue({
   activateTable,
   scale,
   multiline = false,
+  rows = 4,
   boxed = false,
   readOnly = false,
 }: {
@@ -432,6 +447,9 @@ export function InlineValue({
    * with Enter spoken for there has to be a keyboard way out.
    */
   multiline?: boolean;
+  /** How tall a multiline editor opens — and, boxed, how tall it rests, so the
+   *  two never differ. 4 is a paragraph; 8 is a page of violations. */
+  rows?: number;
   /** Wear a bounding box at rest instead of the dotted underline — see
    *  `INLINE_REST_BOXED`. For a stack of multiline notes, where the quiet cue
    *  leaves the fields indistinguishable from each other. */
@@ -708,10 +726,10 @@ export function InlineValue({
             it falls back to the sizer's content width, which is the resting
             button's width. One rule, both cases. */}
         <span className="relative block w-full">
-          <Sizer text={draft} align={align} boxed={boxed} multiline />
+          <Sizer text={draft} align={align} boxed={boxed} multiline rows={rows} />
         <textarea
           autoFocus
-          rows={4}
+          rows={rows}
           value={draft}
           disabled={saving}
           autoComplete="off"
@@ -798,7 +816,7 @@ export function InlineValue({
       title="Click to edit"
       aria-label={ariaLabel ?? column}
       // Dotted underline at rest — the quietest possible "this is editable".
-      className={`w-full ${INLINE_BOX} ${restLook(boxed, multiline, align)} hover:bg-neutral-100 ${
+      className={`w-full ${INLINE_BOX} ${restLook(boxed, multiline, align, rows)} hover:bg-neutral-100 ${
         align === "right" ? "text-right tabular-nums" : "text-left"
       } ${multiline ? "whitespace-pre-wrap" : ""} ${
         shown === null || shown === "" ? emptyClassName : ""

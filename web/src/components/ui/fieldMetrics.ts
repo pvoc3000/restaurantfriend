@@ -95,6 +95,11 @@ export const BOXED_FIELD_BORDER = "border border-hairline hover:border-ink";
 /** A boxed MULTILINE field grows instead, from a paragraph's worth of floor. */
 export const BOXED_FIELD_TALL = "min-h-16 w-full";
 
+/** Twice that, for a field whose paragraph is the record's substance — an
+ *  inspector's violations (Mark, 2026-09-05: "make the violations and
+ *  corrections fields twice as tall"). `InlineValue rows={8}`. */
+export const BOXED_FIELD_TALLER = "min-h-32 w-full";
+
 /**
  * WHAT AN EMPTY FIELD USED TO SAY, and no longer needs to (Mark, 2026-08-28:
  * "with the boxes, there's no longer a need for the em dashes in other empty

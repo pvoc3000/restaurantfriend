@@ -1,7 +1,10 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
+import { usePublishRecordSet } from "@/lib/recordSet";
+import { sortRows, type SortDir } from "@/lib/tableSort";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { withFrom } from "@/lib/breadcrumbs";
 import { excerpt, scoreTone } from "@/lib/inspections";
@@ -54,6 +57,13 @@ export function InspectionsList({
   action?: React.ReactNode;
 }) {
   const from = { href: "/inspection-logs", label: "Inspection logs" };
+  // The list OWNS its sort (CLAUDE.md: a list that publishes a found set must),
+  // so the record book walks the rows in the order they are on screen.
+  const [sort, setSort] = useState<{ key: string; dir: SortDir }>({
+    key: "inspected_on",
+    dir: "desc",
+  });
+  const href = (id: string) => withFrom(`/inspection-logs/${id}`, from);
   const columns: DataColumn<InspectionRow>[] = [
     {
       key: "inspected_on",
@@ -62,7 +72,7 @@ export function InspectionsList({
       width: 130,
       sortValue: (r) => r.inspected_on,
       render: (r) => (
-        <Link href={withFrom(`/inspection-logs/${r.id}`, from)} className={`${LINK} tabular-nums`}>
+        <Link href={href(r.id)} className={`${LINK} tabular-nums`}>
           {r.inspected_on}
         </Link>
       ),
@@ -129,6 +139,14 @@ export function InspectionsList({
     },
   ];
 
+  const sorted = useMemo(() => sortRows(rows, columns, sort), [rows, sort]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // The found set, for the record book on the inspection record (lib/recordSet).
+  usePublishRecordSet(
+    "/inspection-logs",
+    useMemo(() => sorted.map((r) => ({ id: r.id, href: href(r.id) })), [sorted]) // eslint-disable-line react-hooks/exhaustive-deps
+  );
+
   return (
     <div className="space-y-6">
       <PageHeading
@@ -142,11 +160,12 @@ export function InspectionsList({
           is the filter row (/payroll-benefits' shape). */}
       {action && <div className="flex items-center">{action}</div>}
       <DataTable
-        rows={rows}
+        rows={sorted}
         columns={columns}
         rowKey={(r) => r.id}
         storageKey="rf.inspections.v1"
-        defaultSort={{ key: "inspected_on", dir: "desc" }}
+        sort={sort}
+        onSortChange={setSort}
         compactBelow={1280}
         empty={<p className="text-sm text-muted">No inspections recorded at {locationCode} yet.</p>}
       />

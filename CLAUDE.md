@@ -7168,6 +7168,14 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    iOS needs; images with zoom and rotate; URL held from first render and keyed
    by document id so a refresh never re-fetches the PDF) — one viewer, or the
    two drift. With several files the list's names are the picker.
+   **Violations and Corrected are TWICE a note's height** (Mark, same day) —
+   `InlineValue rows={8}`, a new prop that drives the textarea AND the resting
+   box's floor together (`BOXED_FIELD_TALLER`, `min-h-32`): both 128px,
+   measured, so the field does not jump on click. Default 4 rows / `min-h-16`,
+   every other note unchanged. **And the record has the book**: the list owns
+   its sort (`sortRows`) and publishes the found set under `/inspection-logs`,
+   the record renders `RecordNav` in the crumb row — "2 of 4" → Next → "3 of 4"
+   verified. A new record screen gets the book by doing those two things.
    **A TASK CAN BE SOMEBODY'S — migration 079, APPLIED 2026-08-31.** *Probe,
    don't read this line; it has been wrong in both directions for four different
    migrations.* Mark, 2026-08-31: "Tasks should be assignable to someone. Not

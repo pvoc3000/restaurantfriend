@@ -4,7 +4,8 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canEditPage } from "@/lib/pageAccess";
 import { canDeleteInspection } from "@/lib/roles";
-import { parseTrail } from "@/lib/breadcrumbs";
+import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
+import { RecordNav } from "@/components/ui/RecordNav";
 import type { RawSearchParams } from "@/lib/itemFilters";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
@@ -120,7 +121,12 @@ export default async function InspectionPage({
 
   return (
     <div className="space-y-12">
-      <Breadcrumbs trail={trail} current={title} />
+      {/* The book walks the list's found set — see ui/RecordNav. */}
+      <Breadcrumbs
+        trail={trail}
+        current={title}
+        trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
+      />
 
       <div className="flex flex-wrap items-start gap-4">
         <div className="space-y-1">
@@ -218,6 +224,7 @@ export default async function InspectionPage({
             column="violations"
             value={row.violations}
             multiline
+            rows={8}
             boxed={BOXED_FIELDS}
             ariaLabel="Violations"
           />
@@ -231,6 +238,7 @@ export default async function InspectionPage({
             column="violations_corrected"
             value={row.violations_corrected}
             multiline
+            rows={8}
             boxed={BOXED_FIELDS}
             ariaLabel="What was corrected"
           />
