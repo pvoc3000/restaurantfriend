@@ -143,6 +143,12 @@ export default async function InspectionPage({
         )}
       </div>
 
+      {/* THE RECORD ON THE LEFT, THE REPORT ON THE RIGHT (Mark, 2026-09-05) —
+          the invoice record mirrored: here the document is what you check the
+          typed record against, so it stands beside it rather than above. The
+          right column measures its own height; see `InspectionDocuments`. */}
+      <div className="grid gap-12 xl:grid-cols-2 xl:items-start">
+        <div className="min-w-0 space-y-12">
       <section className="space-y-4">
         <SectionHeading>Details</SectionHeading>
         <dl className="grid max-w-[min(42rem,max(24rem,50%))] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
@@ -203,8 +209,7 @@ export default async function InspectionPage({
         </dl>
       </section>
 
-      <div className="grid gap-12 xl:grid-cols-2">
-        <section className="space-y-3">
+      <section className="space-y-3">
           <SectionHeading>Violations</SectionHeading>
           <InlineValue
             readOnly={!editable}
@@ -217,7 +222,7 @@ export default async function InspectionPage({
             ariaLabel="Violations"
           />
         </section>
-        <section className="space-y-3">
+      <section className="space-y-3">
           <SectionHeading>Corrected</SectionHeading>
           <InlineValue
             readOnly={!editable}
@@ -230,11 +235,7 @@ export default async function InspectionPage({
             ariaLabel="What was corrected"
           />
         </section>
-      </div>
 
-      <section>
-        <InspectionDocuments inspectionId={id} orgId={orgId} documents={documents} editable={editable} />
-      </section>
 
       <section className="space-y-4">
         <div className="flex items-center gap-3">
@@ -283,6 +284,11 @@ export default async function InspectionPage({
           </ul>
         )}
       </section>
+        </div>
+      <section>
+        <InspectionDocuments inspectionId={id} orgId={orgId} documents={documents} editable={editable} />
+      </section>
+      </div>
     </div>
   );
 }

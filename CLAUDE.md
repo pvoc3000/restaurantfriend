@@ -7152,6 +7152,22 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    as FMP had it: the 2022-11-16 record says DF02 while its file is named
    `DF03 221116.pdf`.
    Permit expiry was offered and NOT built — Mark did not ask for it.
+   **THE REPORT IS PREVIEWED, ON THE RIGHT** (Mark, 2026-09-05, two asks:
+   "I'd like to see the inspection document previewed on the detail page",
+   then "let the report viewer take up the right side of the screen"). The
+   record is a two-column grid at `xl`: details, the two paragraphs and
+   Follow-up down the left, the Report column on the right — STICKY under the
+   masthead, with the VIEWER BOX measured to the foot of the window by
+   `useFillToBottom` (480 floor; 560 overran a 900px window) and the file list
+   beneath it. Stacked below `xl` the box is `h-[70vh]`. **Measure the box, not
+   the column**: a height handed down through `FileDropZone`'s wrapper and a
+   flex chain arrived as 150px, the PDF plugin's own minimum — and a second
+   height utility on `Pane` (`h-full`) loses by stylesheet order, so a WRAPPER
+   carries the height. The viewer is **`ui/DocumentViewer`**, extracted from the
+   receiving screen's `DocumentPane` (PDF via `<object>` with the Open fallback
+   iOS needs; images with zoom and rotate; URL held from first render and keyed
+   by document id so a refresh never re-fetches the PDF) — one viewer, or the
+   two drift. With several files the list's names are the picker.
    **A TASK CAN BE SOMEBODY'S — migration 079, APPLIED 2026-08-31.** *Probe,
    don't read this line; it has been wrong in both directions for four different
    migrations.* Mark, 2026-08-31: "Tasks should be assignable to someone. Not

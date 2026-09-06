@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { PickList } from "@/components/ui/PickList";
 import { Pane, PaneHeader } from "@/components/ui/Pane";
+import { DocumentViewer } from "@/components/ui/DocumentViewer";
 import {
   fileSize,
   isImage,
@@ -202,7 +202,13 @@ export function DocumentPane({
         {attachment === null ? (
           <Empty canEdit={canEdit} />
         ) : (
-          <Viewer key={attachment.id} attachment={attachment} />
+          // Keyed by the document's id — `ui/DocumentViewer` says why.
+          <DocumentViewer
+            key={attachment.id}
+            url={attachment.url}
+            fileName={attachment.file_name}
+            image={isImage(attachment)}
+          />
         )}
       </FileDropZone>
     </Pane>
@@ -221,110 +227,5 @@ function Empty({ canEdit }: { canEdit: boolean }) {
         </span>
       </p>
     </div>
-  );
-}
-
-/**
- * The document itself. Split out purely so the `key` above remounts it —
- * everything below depends on `url` never changing under a working page.
- *
- * Nothing here carries a `min-height`. It used to (`min-h-64`, 256px), and on a
- * short pane — a tall invoice band above it, or a small window — that was 2px
- * MORE than the space the flex row had to give, so the PDF plugin painted over
- * the pane's own bottom border and the left column's frame stopped matching the
- * right's (Mark, 2026-07-31). The container always has a height to fill now:
- * governed by the measured split row when side by side, `h-[70vh]` when
- * stacked. `overflow-hidden` on `Pane` is the belt to this braces.
- */
-function Viewer({ attachment }: { attachment: SignedAttachment }) {
-  const [url] = useState(() => attachment.url);
-  const [zoom, setZoom] = useState(1);
-  const [turns, setTurns] = useState(0);
-
-  if (!url) {
-    return (
-      <div className="grid h-full place-items-center px-6 text-center">
-        <p className="text-sm text-muted">
-          This file couldn&rsquo;t be signed for viewing. Reload the page to try again.
-        </p>
-      </div>
-    );
-  }
-
-  if (isImage(attachment)) {
-    return (
-      <div className="relative h-full overflow-auto bg-neutral-100">
-        <div className="absolute right-2 top-2 z-10 flex items-center gap-1 border border-ink bg-white">
-          <ToolButton label="Zoom out" onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))}>
-            −
-          </ToolButton>
-          <ToolButton label="Zoom in" onClick={() => setZoom((z) => Math.min(6, z + 0.25))}>
-            +
-          </ToolButton>
-          <ToolButton label="Rotate left" onClick={() => setTurns((t) => t - 1)}>
-            ⟲
-          </ToolButton>
-          <ToolButton label="Rotate right" onClick={() => setTurns((t) => t + 1)}>
-            ⟳
-          </ToolButton>
-        </div>
-        {/* A plain <img>, not next/image: a signed, short-lived URL into a
-            PRIVATE bucket. next/image would need the Supabase host whitelisted
-            as a remote pattern and would then cache a URL built to expire. */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={url}
-          alt={attachment.file_name ?? "Invoice"}
-          style={{
-            transform: `rotate(${turns * 90}deg) scale(${zoom})`,
-            transformOrigin: "center top",
-          }}
-          className="mx-auto block w-full max-w-none"
-        />
-      </div>
-    );
-  }
-
-  return (
-    <object data={url} type="application/pdf" className="h-full w-full">
-      {/* Shown by any client without an inline PDF viewer — the Claude browser
-          pane is one, and so is iOS Safari past page 1. */}
-      <div className="grid h-full place-items-center px-6 text-center">
-        <p className="text-sm text-muted">
-          This browser won&rsquo;t show the PDF inline.{" "}
-          <a href={url} target="_blank" rel="noreferrer" className="text-ink">
-            Open {attachment.file_name ?? "the document"}
-          </a>{" "}
-          in a new tab.
-          <br />
-          <span className="text-xs">
-            The link is signed and expires after an hour — reload the page for a fresh
-            one.
-          </span>
-        </p>
-      </div>
-    </object>
-  );
-}
-
-function ToolButton({
-  label,
-  onClick,
-  children,
-}: {
-  label: string;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      onClick={onClick}
-      className="grid h-8 w-8 place-items-center text-ink hover:bg-neutral-100"
-    >
-      {children}
-    </button>
   );
 }
