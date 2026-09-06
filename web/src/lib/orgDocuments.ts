@@ -5,7 +5,6 @@
  * (Mark, 2026-09-05): forms, checklists, signs, cheat sheets, job
  * descriptions, manuals. A record and its file(s); nothing else.
  */
-import type { FiledDocumentsTarget } from "@/components/documents/FiledDocuments";
 import { PHOTO_ACCEPT } from "./facilityPhotos";
 
 export type OrgDocument = {
@@ -34,15 +33,6 @@ export function documentRejection(file: { name: string; type: string }): string 
   return `${file.name} isn't a file the app can file here. PDF, JPEG, PNG or WebP.`;
 }
 
-export const ORG_DOCUMENT_FILES: FiledDocumentsTarget = {
-  table: "org_document_files",
-  ownerColumn: "document_id",
-  bucket: DOCUMENT_BUCKET,
-  accept: DOCUMENT_ACCEPT,
-  rejection: documentRejection,
-  heading: "File",
-  noun: "the file",
-};
 
 /**
  * FileMaker's export named each file `{shop}_{category}_{title}_{version}_{original}`

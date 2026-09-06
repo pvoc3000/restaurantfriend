@@ -12,7 +12,7 @@ import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { PHOTO_BUCKET, PHOTO_URL_TTL_SECONDS } from "@/lib/facilityPhotos";
-import { INSPECTION_DOCUMENTS, INSPECTION_SELECT, type Inspection } from "@/lib/inspections";
+import { INSPECTION_SELECT, type Inspection } from "@/lib/inspections";
 import { TASK_STATUS_LABEL, isTaskOpen, type TaskStatus } from "@/lib/facilityTasks";
 import { FiledDocuments, type FiledDocument } from "@/components/documents/FiledDocuments";
 import { InspectionActions } from "@/components/inspections/InspectionActions";
@@ -295,7 +295,7 @@ export default async function InspectionPage({
         </div>
       <section>
         <FiledDocuments
-          target={INSPECTION_DOCUMENTS}
+          kind="inspection"
           ownerId={id}
           orgId={orgId}
           documents={documents}

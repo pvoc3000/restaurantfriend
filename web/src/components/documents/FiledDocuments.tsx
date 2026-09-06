@@ -11,7 +11,9 @@ import { Pane } from "@/components/ui/Pane";
 import { DocumentViewer } from "@/components/ui/DocumentViewer";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog } from "@/lib/confirm";
-import { photoPath } from "@/lib/facilityPhotos";
+import { PHOTO_BUCKET, photoPath } from "@/lib/facilityPhotos";
+import { INSPECTION_DOC_ACCEPT, inspectionDocRejection } from "@/lib/inspections";
+import { DOCUMENT_ACCEPT, DOCUMENT_BUCKET, documentRejection } from "@/lib/orgDocuments";
 
 export type FiledDocument = {
   id: string;
@@ -41,7 +43,17 @@ export type FiledDocument = {
  * `FileDropZone`'s wrapper and two flex columns arrived as 150px, the PDF
  * plugin's own minimum. Below `xl` it stacks at `h-[70vh]`.
  */
-export type FiledDocumentsTarget = {
+/**
+ * WHICH RECORD'S FILES. A KEY, not the target object, crosses the server →
+ * client boundary: a target carries a FUNCTION (`rejection`), and "Functions
+ * cannot be passed directly to Client Components" took the whole record down
+ * with a runtime error — `BatchLogDetail`'s lesson (CLAUDE.md), met again
+ * the first time this component was used from a second page. The registry
+ * lives here, on the client side of the line.
+ */
+export type FiledDocumentsKind = "inspection" | "document";
+
+type FiledDocumentsTarget = {
   /** The files table and the column naming the owning record. */
   table: string;
   ownerColumn: string;
@@ -56,19 +68,41 @@ export type FiledDocumentsTarget = {
   noun: string;
 };
 
+const TARGETS: Record<FiledDocumentsKind, FiledDocumentsTarget> = {
+  inspection: {
+    table: "facility_photos",
+    ownerColumn: "inspection_id",
+    bucket: PHOTO_BUCKET,
+    accept: INSPECTION_DOC_ACCEPT,
+    rejection: inspectionDocRejection,
+    heading: "Report",
+    noun: "the report",
+  },
+  document: {
+    table: "org_document_files",
+    ownerColumn: "document_id",
+    bucket: DOCUMENT_BUCKET,
+    accept: DOCUMENT_ACCEPT,
+    rejection: documentRejection,
+    heading: "File",
+    noun: "the file",
+  },
+};
+
 export function FiledDocuments({
-  target,
+  kind,
   ownerId,
   orgId,
   documents,
   editable,
 }: {
-  target: FiledDocumentsTarget;
+  kind: FiledDocumentsKind;
   ownerId: string;
   orgId: string;
   documents: FiledDocument[];
   editable: boolean;
 }) {
+  const target = TARGETS[kind];
   const router = useRouter();
   const supabase = createClient();
   const fileInput = useRef<HTMLInputElement>(null);

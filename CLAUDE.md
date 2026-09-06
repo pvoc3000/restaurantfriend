@@ -7176,8 +7176,20 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    its sort (`sortRows`) and publishes the found set under `/inspection-logs`,
    the record renders `RecordNav` in the crumb row — "2 of 4" → Next → "3 of 4"
    verified. A new record screen gets the book by doing those two things.
-   **DOCUMENTS — migration 094, NEEDS APPLYING; loader `migration/load-documents.mjs`
-   NEEDS RUNNING after it.** Mark, 2026-09-05: "Super simple. It's just a place
+   **DOCUMENTS — migration 094, APPLIED 2026-09-05 and LOADED the same day**
+   (`migration/load-documents.mjs`: 73 documents, 64 files, a second `--apply`
+   filed 0; *probe*: `select count(*) from org_documents` 73, `… from
+   org_document_files` 64). Walked live and left as found: 73 rows in ten
+   category bands with the nine file-less records marked; Espresso Log's record
+   with the PDF previewed at the right, Open serving it (200, application/pdf)
+   and Download carrying the filename; a throwaway document filed through New
+   document and removed through Delete, back to 73.
+   **A `FiledDocumentsTarget` MUST NOT CROSS THE SERVER → CLIENT LINE** — it
+   carries a function (`rejection`), and passing it from the page took the
+   whole record down with "Functions cannot be passed directly to Client
+   Components" (`BatchLogDetail`'s lesson, met again the first time the
+   component had a second caller). The targets are a registry INSIDE the
+   client module and the page passes `kind="inspection" | "document"`. Mark, 2026-09-05: "Super simple. It's just a place
    to store, retrieve, and print the documents the organization uses … Like the
    inspection report, I want to see the document previewed on the right side."
    FMP's `Documents` table, 73 records: title · version (TEXT — "01", "2021",

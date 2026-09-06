@@ -11,7 +11,7 @@ import { InlineValue } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { PHOTO_URL_TTL_SECONDS } from "@/lib/facilityPhotos";
-import { DOCUMENT_BUCKET, DOCUMENT_SELECT, ORG_DOCUMENT_FILES, type OrgDocument } from "@/lib/orgDocuments";
+import { DOCUMENT_BUCKET, DOCUMENT_SELECT, type OrgDocument } from "@/lib/orgDocuments";
 import { FiledDocuments, type FiledDocument } from "@/components/documents/FiledDocuments";
 import { DocumentActions } from "@/components/documents/DocumentActions";
 
@@ -145,7 +145,7 @@ export default async function DocumentPage({
             {cell("notes", row.notes, "Notes", { multiline: true })}
           </section>
         </div>
-        <FiledDocuments target={ORG_DOCUMENT_FILES} ownerId={id} orgId={orgId} documents={documents} editable={editable} />
+        <FiledDocuments kind="document" ownerId={id} orgId={orgId} documents={documents} editable={editable} />
       </div>
     </div>
   );
