@@ -7738,7 +7738,27 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `planDateParam` refuses a rolled-over date). It first read the whole
    week; measured on DF01 the weekday matters — Monday 23, every other day
    24. `DateField boxed` in a `w-44` wrapper is the filter row's h-9 dress;
-   `variant="field"` is the public form's 48px box and ran the row over. a selection column
+   `variant="field"` is the public form's 48px box and ran the row over. The
+   row reads **All tags 84 · On plan 23 · FOR 09/06/2026** (three passes the
+   same day): the count sits between the cell and the box, so the box needed a
+   word of its own or two numbers ran together. **Search and tier ride in the
+   URL** (`?q=`, `?tier=all`, `replaceState`, seeded from the address bar —
+   `urlFilterParams`' rule) so the breadcrumb restores the view; a bare
+   `useState("")` had lost a search on the way back from a record. Default
+   sort is **Item**. No tagline under the heading; the selection bar sits
+   under the FILTER ROW, not the table.
+   **Delete and Duplicate have three doors and ONE implementation each**
+   (`components/tags/tagWrites.ts`): the selection bar's Delete (names the
+   tag when one, the count when several, and how many backgrounds go), a ⋯
+   row menu (Duplicate · Delete, unlabelled so the Columns menu never offers
+   it, purchaser+ only), and the record's own two buttons. Duplicate makes
+   "… copy" (`duplicateTitle`) with the same item, description and state and
+   every background COPIED in the bucket under the new tag's folder — 095's
+   policies authorise off the folder, so a copy cannot share objects — and
+   lands on it; a size that failed to copy is named on arrival (`?warning=`).
+   **2x8 prints LANDSCAPE as well as 2x10** (Mark: a portrait sheet's
+   quarter-inch side margin lost the cut marks inside some printers'
+   unprintable edge); every sheet margin ≥ ½", fixture-pinned. a selection column
    for every role (printing is a read act) and a bar with Print 2x3.5 / 2x8 /
    2x10, each counting the selected tags that have THAT background AND a
    price. `/tags/[id]`: title, item, active, description, then the three
