@@ -75,6 +75,30 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    table under a full-height pane ever wants marking, that is a frame and a
    separate decision.
 
+   **THE VENDOR ITEM RECORD HAD ONE INBOUND LINK IN THE WHOLE APP** (Mark,
+   2026-09-07: "where is the best place to edit a vendor item? I'm missing a lot
+   on the item tab of the vendor detail page"). He was right, and the cause was
+   worse than missing columns: NEITHER grid linked to `/vendor-items/[id]`. The
+   pinned column names the OTHER parent — the inventory item on a vendor's
+   screen, the vendor on an item's — so the only screen carrying the PACK
+   (count × size unit, with the content beside it and Recalc), the PER-LOCATION
+   block (favorite days, price override, item par, last ordered) and the PRICE
+   HISTORY was reachable only from the order guide. `VendorItemActions` already
+   said so in as many words, in the note explaining why "unlinked" had to become
+   a control.
+   **THE THREE SURFACES, and which is for what.** The RECORD is where a vendor
+   item is edited — it has every field. The two GRIDS are for scanning and
+   correcting one cell across many rows, and each leaves out exactly what a
+   fixed-width row cannot hold. Neither is a subset of the other by accident;
+   they are a list and a record.
+   **"Open vendor item" is the first entry of the ⋯ menu**, and the ⋯ column now
+   renders FOR EVERYONE — the Page Permissions sheet gives `/vendor-items` an R
+   to staff and supervisors, so gating their only way in on a write permission
+   would hide a screen they may read. Below purchaser+ the menu holds that one
+   entry and nothing else. It is a `router.push` rather than an `<a>`, because
+   `MenuCommand` has only `onSelect`; the cost is cmd-click, which is worth one
+   menu entry and not worth an href on every menu in the app.
+
    **THE VENDOR ITEM'S CONTENT IS EDITABLE FROM THE GRID** (Mark, 2026-09-07:
    "I need to be able to edit the content field from the vendor item tab on the
    inventory item detail screen"). `package_content` had been read-only in

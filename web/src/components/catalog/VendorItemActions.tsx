@@ -97,6 +97,8 @@ export function VendorItemActions({
   isActive,
   inventoryItem,
   afterDelete = "refresh",
+  openHref,
+  canEdit = true,
 }: {
   vendorItemId: string;
   /** What to call this item in the dialog — the catalog name where there is one. */
@@ -121,6 +123,31 @@ export function VendorItemActions({
    * can't cross that boundary.
    */
   afterDelete?: "refresh" | { href: string };
+  /**
+   * THE ROUTE TO THE ROW'S OWN RECORD, and the reason this prop exists (Mark,
+   * 2026-09-07: "where is the best place to edit a vendor item? I'm missing a
+   * lot on the item tab of the vendor detail page").
+   *
+   * He was right, and it was worse than missing fields: NOTHING on either grid
+   * linked to `/vendor-items/[id]` at all. The pinned column names the OTHER
+   * parent — the inventory item on a vendor's screen, the vendor on an item's —
+   * so the one screen carrying the pack structure, the per-location prices and
+   * favorite days, and the price history had a single inbound link in the whole
+   * app, from the order guide. This file already said so in as many words, in
+   * the note explaining why "unlinked" had to become a control.
+   *
+   * A `router.push` rather than an `<a>`, because `MenuCommand` has only
+   * `onSelect`. The cost is cmd-click, which is worth one menu entry and not
+   * worth an href on every menu in the app.
+   */
+  openHref?: string;
+  /**
+   * Purchaser+, per the Page Permissions cell for `/vendor-items`. Below it the
+   * menu keeps ONLY the route to the record — staff and supervisors may READ
+   * that screen, so gating their sole way in on a write permission would hide a
+   * page they are allowed to see.
+   */
+  canEdit?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -200,6 +227,20 @@ export function VendorItemActions({
       <RowMenu
         label={`Actions for ${label}`}
         items={[
+          // FIRST, because it is the answer to "where do I edit this?" — the
+          // record holds every field the grid leaves out.
+          ...(openHref
+            ? [
+                {
+                  label: "Open vendor item",
+                  hint: "Pack, per-location prices and favorites, price history",
+                  onSelect: () => router.push(openHref),
+                },
+              ]
+            : []),
+          ...(!canEdit
+            ? []
+            : [
           {
             label: busy === "duplicate" ? "Duplicating…" : "Duplicate",
             hint: "A new item, same vendor, no favorites",
@@ -227,6 +268,7 @@ export function VendorItemActions({
             disabled: busy !== null,
             onSelect: () => void openConfirm(),
           },
+            ]),
         ]}
       />
 

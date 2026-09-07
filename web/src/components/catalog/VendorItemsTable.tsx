@@ -426,44 +426,51 @@ export function VendorItemsTable({
       : []),
     // The row's own commands, last — a ⋯ menu rather than a right-click, since
     // iPad Safari is the ordering surface and has no right-click to give.
-    ...(canEdit
-      ? [
-          {
-            key: "actions",
-            label: "",
-            // 36px button + the cell's own px-4. A narrower column CLIPS the
-            // target rather than shrinking it — the table is `table-fixed` with
-            // `truncate` cells — which is the same arithmetic the day-picker
-            // column needs (WEEKDAY_PICKER_WIDTH).
-            width: 68,
-            render: (vi: VendorItemWithItem) => (
-              <span className="flex justify-end">
-                <VendorItemActions
-                  vendorItemId={vi.id}
-                  label={
-                    vi.inventory_items?.name ||
-                    [vi.brand, vi.description].filter(Boolean).join(" · ") ||
-                    "this vendor item"
+    //
+    // RENDERED FOR EVERYONE since 2026-09-07, because it now carries the route
+    // to the row's own record and `/vendor-items` is readable below purchaser+.
+    // Gating the only way in on a write permission would hide a screen the
+    // Page Permissions sheet says staff may read.
+    {
+      key: "actions",
+      label: "",
+      // 36px button + the cell's own px-4. A narrower column CLIPS the target
+      // rather than shrinking it — the table is `table-fixed` with `truncate`
+      // cells — which is the same arithmetic the day-picker column needs
+      // (WEEKDAY_PICKER_WIDTH).
+      width: 68,
+      render: (vi: VendorItemWithItem) => (
+        <span className="flex justify-end">
+          <VendorItemActions
+            vendorItemId={vi.id}
+            label={
+              vi.inventory_items?.name ||
+              [vi.brand, vi.description].filter(Boolean).join(" · ") ||
+              "this vendor item"
+            }
+            isActive={vi.is_active}
+            canEdit={canEdit}
+            // The grid leaves out the pack, the per-location prices and
+            // favorites, and the price history; this is how you reach them.
+            // `link` carries the crumb, so the record comes back here rather
+            // than to a bare list.
+            openHref={link(`/vendor-items/${vi.id}`)}
+            // Only where the column that shows the link is on screen. On the
+            // ITEM's own screen every row is that item by definition, so
+            // re-pointing one from here would be a way to make a row vanish
+            // off the table you are looking at.
+            inventoryItem={
+              showItem
+                ? {
+                    id: vi.inventory_items?.id ?? null,
+                    name: vi.inventory_items?.name ?? null,
                   }
-                  isActive={vi.is_active}
-                  // Only where the column that shows the link is on screen. On
-                  // the ITEM's own screen every row is that item by definition,
-                  // so re-pointing one from here would be a way to make a row
-                  // vanish off the table you are looking at.
-                  inventoryItem={
-                    showItem
-                      ? {
-                          id: vi.inventory_items?.id ?? null,
-                          name: vi.inventory_items?.name ?? null,
-                        }
-                      : undefined
-                  }
-                />
-              </span>
-            ),
-          } as DataColumn<VendorItemWithItem>,
-        ]
-      : []),
+                : undefined
+            }
+          />
+        </span>
+      ),
+    },
   ];
 
   const table = (
