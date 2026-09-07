@@ -13,7 +13,21 @@ type ItemRow = {
   is_active: boolean;
 };
 
-export type ChosenItem = { id: string; name: string };
+export type ChosenItem = {
+  id: string;
+  name: string;
+  /**
+   * OPTIONAL, and it is what a caller creating a vendor item needs: pars,
+   * on-hand counts and `package_content` are all in this unit (design rule 5),
+   * so a pack of "50 lbs" can only become a content once you know what the ITEM
+   * is counted in.
+   *
+   * Optional because two callers construct a `ChosenItem` from a row they
+   * already hold rather than from this search, and neither of them has the unit
+   * or needs it. Every choice made THROUGH this component carries it.
+   */
+  base_unit?: string;
+};
 
 /**
  * FIND AN INVENTORY ITEM AND HAND IT BACK. IT WRITES NOTHING.
@@ -84,7 +98,7 @@ export function InventoryItemChooser({
   }, [supabase, canSearch, term]);
 
   function choose(item: ItemRow) {
-    onPick({ id: item.id, name: item.name });
+    onPick({ id: item.id, name: item.name, base_unit: item.base_unit });
     setTerm("");
     setResults([]);
   }

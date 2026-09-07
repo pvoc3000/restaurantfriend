@@ -12,6 +12,7 @@ import {
   VendorItemsTable,
   type VendorItemWithItem,
 } from "@/components/catalog/VendorItemsTable";
+import { NewVendorItem } from "@/components/catalog/NewVendorItem";
 import { AddVendorReminder } from "@/components/purchasing/Reminders";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SectionHeading } from "@/components/ui/SectionHeading";
@@ -456,7 +457,25 @@ export async function VendorDetail({
 
           {tab === "items" && (
             <section className="space-y-2">
-              <SectionHeading count={vendorItems?.length ?? 0}>Vendor items</SectionHeading>
+              {/* The create command shares the heading's line, right-aligned —
+                  `/production-items`' arrangement, since this table's own
+                  filter row lives inside `DataTable`'s strip. `items-end` so a
+                  36px button sits on the heading's baseline rather than above
+                  it. */}
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <SectionHeading count={vendorItems?.length ?? 0}>Vendor items</SectionHeading>
+                {editable ? (
+                  <NewVendorItem
+                    orgId={session.membership.org_id}
+                    vendorId={v.id}
+                    vendorName={v.name}
+                    existingProductIds={(vendorItems ?? [])
+                      .map((vi) => (vi.product_id ?? "") as string)
+                      .filter(Boolean)}
+                    from={here}
+                  />
+                ) : null}
+              </div>
               {viError ? (
                 <p className="text-sm text-accent">
                   Could not load vendor items: {viError.message}

@@ -75,6 +75,41 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    table under a full-height pane ever wants marking, that is a frame and a
    separate decision.
 
+   **THERE WAS NO WAY TO ADD A VENDOR ITEM** (Mark, 2026-09-07: "we seem to
+   have lost a way to add a vendor item. Should at least be a button on the
+   vendor detail screen"). The only `insert` into `vendor_items` anywhere in
+   `web/src` was the ⋯ menu's DUPLICATE — so a vendor's FIRST item could not be
+   created at all, there being nothing to copy. Every one of the 2,888 rows came
+   out of the FileMaker load, which is why months passed without anyone hitting
+   it: design rule 1's lesson in a second costume ("a create that a loader also
+   performs is a create nobody has tested"), except here the loader was the only
+   creator there had ever been.
+   **`NewVendorItem` ASKS FOR ONE LINE OF A VENDOR'S PRICE LIST**, which is what
+   you are holding: SKU, brand, their wording, the pack, the price. The create
+   convention says ask for the fields the rest of the app reads and stop, and
+   here that reduces to the same thing.
+   **THE INVENTORY ITEM IS THE ONLY REQUIRED FIELD.** An unlinked vendor item is
+   a real state — 71 came out of FileMaker that way — but it is on NO order
+   guide until it is linked, so deliberately creating one is creating a row that
+   does nothing. Everything else is editable in the grid behind you and on the
+   record you land on.
+   **IT ASKS FOR THE PACK, NOT THE CONTENT**, and derives `package_content`
+   exactly as the record does: "4 × 2.5 lbs" on an item counted in lbs writes
+   10, shown live beside the fields. Where the pack cannot reach the base unit
+   the derivation refuses rather than guessing, and the content is left for the
+   record's own cell — which is where Recalc lives. `InventoryItemChooser`'s
+   `ChosenItem` gained an OPTIONAL `base_unit` for this: a pack can only become
+   a content once you know what the ITEM is counted in, and the two callers that
+   build a `ChosenItem` from a row they already hold have neither the unit nor a
+   use for it.
+   The command sits on the Items tab's heading line, right-aligned — measured to
+   the same pixel as the columns eye (1232 at 1440) — and lands on the new
+   record with the crumb back. Walked live on BakeMark and left as found: a test
+   row created with `4 × 2.5 lbs (10 lbs)`, then deleted, back to 95 items.
+   **NOT built: the same button on the ITEM record's Vendor Items tab**, which
+   is the mirror (fixed item, choose the vendor) and a real thing to want when
+   adding a second source. Ask before assuming it exists.
+
    **THE VENDOR ITEM RECORD HAD ONE INBOUND LINK IN THE WHOLE APP** (Mark,
    2026-09-07: "where is the best place to edit a vendor item? I'm missing a lot
    on the item tab of the vendor detail page"). He was right, and the cause was
@@ -8316,7 +8351,8 @@ weekday column, and 003 then silently made it per-vendor-item.
 
 - **A CREATE DIALOG ASKS FOR THE FIELDS THE REST OF THE APP READS, AND STOPS**
   — `NewEmployee`'s template, now followed by `NewVendor`, `NewInventoryItem`,
-  `NewLocation`, `NewProductionItem` and `NewRecipe` (all 2026-09-03). Command
+  `NewLocation`, `NewProductionItem` and `NewRecipe` (all 2026-09-03), and
+  `NewVendorItem` (2026-09-07, where there had never been one at all). Command
   in the filter row → `ui/Dialog` → one insert carrying `org_id` EXPLICITLY
   (design rule 1) → land on the new record. Everything else is an `InlineValue`
   on that record, because a create form that also set it would be a second
