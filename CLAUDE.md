@@ -5040,6 +5040,71 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    unrecognised is SHOWN. A new way of writing nothing costs one redundant
    chip; a new way of writing an allergy costs a great deal more.
 
+   **FOUR CHANGES TO THE SCHEDULE, 2026-09-07, all Mark's.**
+   **(a) GENERATING DEFAULTS TO TOMORROW.** The dialog is opened at the END of a
+   shift, by the closer, to make the paper the overnight bake works from — so
+   the night it is about has not happened yet. Defaulting to today meant every
+   routine generation began by correcting the date, and the one time somebody
+   forgot produced a schedule for a day already made. `daysAfter` in `lib/today`
+   (the mirror of `daysBefore`), off the ORG's calendar day, so the boundary is
+   the shop's rather than UTC's.
+   **(b) TYPE, SIZE, CUT AND FINISH ARE EDITABLE, as picklists.** The note above
+   that table had them read-only as "the line's own SNAPSHOT … a rename must not
+   rewrite a printed document", and both halves are still true — neither argues
+   against this. It is BECAUSE they are the line's own copy that editing one is
+   safe: nothing here touches `production_items`, so tonight's sheet can say
+   `Letter - "H"` without the catalog learning anything. Proved on the live
+   09-07 schedule — the line's finish went Coffee Glaze → Maple Glaze and the
+   FOUR catalog rows named Javabreaker stayed Coffee Glaze. The item's NAME
+   stays read-only; it is the line's identity.
+   The options come from the catalog query the Add-item panel ALREADY runs, plus
+   the values on this schedule's own rows — the second source being the one that
+   matters, since a special-order line carries a cut no `production_items` row
+   has ever held (069). `allowNew` on top.
+   **(c) A ROW HAS ITS OWN ⋯ — Duplicate line, Delete line.** Delete is the
+   selection bar's own implementation taking the ids as a parameter (the PO
+   list's rule: the confirm and the row-count check are what gets remembered in
+   one copy and forgotten in the other), and it NAMES the single line, since
+   from a row menu "1 item" is a worse answer to "which one?" than the name you
+   just pressed.
+   **DUPLICATE IS ONLY POSSIBLE ON A SPECIAL-ORDER LINE, and that is 069's
+   partial index rather than a policy of ours**: `unique (schedule_id, item_id)
+   where par_source <> 'special_order'`. A plan line is one per item BY
+   CONSTRUCTION — 040 keyed it that way because regeneration upserts, and two
+   rows of one item would double the day's par with nothing noticing — so a
+   duplicate there is not merely refused, it is a thing the model does not have.
+   On an order it is the ordinary case (#9886 is two Mini lines differing only
+   by their note). The menu offers it DISABLED with the reason beside it —
+   "A plan line is one per item — raise the par instead" — rather than hiding
+   it, because the hint renders inline and so explains itself without a hover.
+   The copy carries `par_source` through rather than stamping `manual`, which is
+   what keeps it inside the index it is trying to satisfy.
+   **(d) THE PAR SAYS WHEN IT DISAGREES WITH THE PLAN, and what the plan said.**
+   The record has carried "N lines differ from the plan" since 040 and
+   `planned_par` has been on every row since, rendered NOWHERE — so the badge
+   sent you down 64 rows comparing a number against one you could not see
+   (Mark: "it doesn't tell which one. Flag that par").
+   **`planDeviation` in `lib/productionSchedule` is the ONE function the badge
+   counts with and the cell marks with**, so the two cannot drift into saying
+   "3 differ" over a table with two marks in it. It reads `par_source` first —
+   `plan`/`override` are the generator's own and `special_order` is a different
+   SOURCE with no plan figure to disagree with — and then `planned_par`: a
+   number means the par was CHANGED, null means the line was ADDED by hand,
+   which the plan cannot disagree with because it never carried the line.
+   **A manual par EQUAL to the plan's is not a deviation**: `par_source` stays
+   manual once touched (it also tells a regeneration to leave the line alone)
+   but "differs from the plan" is a claim about the NUMBER. 5 fixtures, checked
+   by breaking that clause.
+   A FILL beside the number, never `text-mark` (1.43:1 on white) and never a
+   colour on the figure itself — the figure is right, it is what somebody
+   decided, and what is worth an eye is that it was decided rather than derived.
+   Par took 20px for it, out of Name, which WRAPS and so loses a wrap point
+   rather than any text.
+   Walked live on the real DF02 09-07 schedule and left byte-identical (35
+   lines, all `par_source = 'plan'`, `par = planned_par`): the par edit raised
+   both the badge and a `plan 18` chip beside 24, the row menu showed Duplicate
+   disabled with its reason, and the generate dialog opened on 2026-09-08.
+
    **THE SCHEDULE'S LINE TABLE LOST TWO COLUMNS AND GAINED TWO** (Mark,
    2026-08-27): Type - Size - Cut - Finish - Name - Par - Made - Left over -
    Sold - Note. **Tray** went because a special-order line never has one and a

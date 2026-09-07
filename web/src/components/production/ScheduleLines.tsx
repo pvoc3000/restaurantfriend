@@ -9,7 +9,8 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
-import { type ScheduleLine } from "@/lib/productionSchedule";
+import { RowMenu } from "@/components/ui/RowMenu";
+import { planDeviation, type ScheduleLine } from "@/lib/productionSchedule";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
 export type ScheduleLineRow = ScheduleLine & {
@@ -90,6 +91,66 @@ function ActualCell({
   );
 }
 
+export type TaxonomyVocabulary = {
+  item_type: string[];
+  size: string[];
+  subtype: string[];
+  finish: string[];
+};
+
+/**
+ * One of the four snapshot descriptors — Type, Size, Cut, Finish.
+ *
+ * EDITABLE since 2026-09-07 (Mark: "allow editing of the type, size, cut and
+ * finish on a generated production schedule. use picklists to replace the
+ * value"), where the note above this table had them read-only as "the line's
+ * own SNAPSHOT ... a rename must not rewrite a printed document".
+ *
+ * Both halves of that are still true and neither argues against this: it is
+ * BECAUSE these are the line's own copy that editing one is safe. Nothing here
+ * touches `production_items`, so tonight's sheet can say `Letter - "H"` without
+ * the catalog learning anything, which is the purchase order's "a working
+ * document, not a frozen record" reaching the last four cells that had not had
+ * it. What must not be edited is the item's NAME, which is the line's identity
+ * and stays read-only.
+ *
+ * A PICKLIST rather than a text box, per the ask and per the app's own rule
+ * that a known vocabulary is chosen and never typed — the four columns are a
+ * closed set in practice, and free text would spell "Mini" three ways by
+ * Thursday. `allowNew` because the set is only closed in practice.
+ */
+function TaxonomyCell({
+  row,
+  column,
+  label,
+  options,
+  editable,
+}: {
+  row: ScheduleLineRow;
+  column: "item_type" | "size" | "subtype" | "finish";
+  label: string;
+  options: string[];
+  editable: boolean;
+}) {
+  const value = row[column] ?? null;
+  if (!editable) {
+    return <span className="text-muted">{value ?? "—"}</span>;
+  }
+  return (
+    <InlineValue
+      table="production_schedule_items"
+      id={row.id}
+      column={column}
+      kind="pick"
+      value={value}
+      options={options.map((o) => ({ value: o, label: o }))}
+      allowNew
+      clearable
+      ariaLabel={`${label}, ${row.item_name}`}
+    />
+  );
+}
+
 type Grouping = "type" | "tray" | "none";
 
 /**
@@ -109,14 +170,28 @@ type Grouping = "type" | "tray" | "none";
  */
 export function ScheduleLines({
   rows,
+  orgId,
+  scheduleId,
   editable,
   countable,
+  vocabulary,
 }: {
   rows: ScheduleLineRow[];
+  /** For the one write here that INSERTS — see `duplicateLine`. */
+  orgId: string;
+  scheduleId: string;
   /** Purchaser+ — the par, the note, adding and striking lines. */
   editable: boolean;
   /** Supervisor and up — the two counting cells, and only those. */
   countable: boolean;
+  /**
+   * What the catalog already calls these things, per column — the options for
+   * the four taxonomy cells. `allowNew` on top, because a night can want a cut
+   * nothing has been made in yet, and because 069's letters ARE cuts: a
+   * special-order line carries `Letter - "H"`, which no `production_items` row
+   * has ever held.
+   */
+  vocabulary: TaxonomyVocabulary;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -152,13 +227,24 @@ export function ScheduleLines({
 
   const allChecked = sorted.length > 0 && sorted.every((r) => checked.has(r.id));
 
-  async function removeChecked() {
-    const victims = sorted.filter((r) => checked.has(r.id));
+  /**
+   * ONE IMPLEMENTATION BEHIND BOTH DOORS — the selection bar and a row's own ⋯
+   * menu — taking the ids as a parameter, which is the PO list's lesson: the
+   * confirm and the row-count check are exactly the things remembered in one
+   * copy and forgotten in the other.
+   */
+  async function removeLines(ids: string[]) {
+    const victims = sorted.filter((r) => ids.includes(r.id));
     const counted = victims.filter((r) => r.made !== null || r.leftover !== null);
     const names = victims.slice(0, 6).map((r) => r.item_name).join(", ");
+    // NAME the one line when there is one: from a row menu "1 item" is a worse
+    // answer to "which one?" than the name on the row you just pressed.
     const message =
-      `Take ${victims.length} ${victims.length === 1 ? "item" : "items"} off this schedule?\n\n` +
-      `${names}${victims.length > 6 ? `, and ${victims.length - 6} more` : ""}` +
+      (victims.length === 1
+        ? `Take ${victims[0].item_name} off this schedule?\n\n`
+        : `Take ${victims.length} items off this schedule?\n\n${names}${
+            victims.length > 6 ? `, and ${victims.length - 6} more` : ""
+          }`) +
       (counted.length
         ? `\n\n${counted.length} of them ${counted.length === 1 ? "has" : "have"} a counted quantity, which will be discarded.`
         : "") +
@@ -173,7 +259,7 @@ export function ScheduleLines({
     const { data, error: err } = await supabase
       .from("production_schedule_items")
       .delete()
-      .in("id", [...checked])
+      .in("id", ids)
       .select("id");
     setBusy(false);
     if (err) {
@@ -185,6 +271,59 @@ export function ScheduleLines({
       return;
     }
     setChecked(new Set());
+    router.refresh();
+  }
+
+  /**
+   * Copy a line — same item, same par, same descriptors and note, ready to be
+   * edited into the thing you actually wanted.
+   *
+   * `par_source` is COPIED rather than set to `manual`: it is what 069's
+   * partial index tests, so a copy that "helpfully" recorded itself as manual
+   * would be refused by the index it is trying to stay inside. It is also true
+   * — a copy of an order's line is still the order's.
+   *
+   * No `planned_par`: the plan never carried this row, which `planDeviation`
+   * then reads as ADDED rather than as a par that disagrees.
+   */
+  async function duplicateLine(row: ScheduleLineRow) {
+    setBusy(true);
+    setError(null);
+    const { data, error: err } = await supabase
+      .from("production_schedule_items")
+      .insert({
+        // EXPLICITLY — design rule 1. Nothing defaults it, and an omitted one
+        // fails the insert policy's WITH CHECK and is reported as an RLS
+        // refusal rather than as the missing column it is.
+        org_id: orgId,
+        schedule_id: scheduleId,
+        item_id: row.item_id,
+        item_name: row.item_name,
+        item_type: row.item_type,
+        size: row.size,
+        subtype: row.subtype,
+        finish: row.finish,
+        tray_number: row.tray_number,
+        tally_box_size: row.tally_box_size,
+        tray_capacity: row.tray_capacity,
+        par: row.par,
+        par_source: row.par_source,
+        note: row.note,
+      })
+      .select("id");
+    setBusy(false);
+    if (err) {
+      setError(
+        /production_schedule_items_generated_line/.test(err.message)
+          ? "This schedule already has a line for that item — a plan line is one per item."
+          : err.message
+      );
+      return;
+    }
+    if ((data ?? []).length === 0) {
+      setError("Nothing was added — you may not have permission to change this schedule.");
+      return;
+    }
     router.refresh();
   }
 
@@ -222,7 +361,15 @@ export function ScheduleLines({
       label: "Type",
       width: 110,
       sortValue: (r) => r.item_type ?? "",
-      render: (r) => <span className="text-muted">{r.item_type ?? "—"}</span>,
+      render: (r) => (
+        <TaxonomyCell
+          row={r}
+          column="item_type"
+          label="Type"
+          options={vocabulary.item_type}
+          editable={editable}
+        />
+      ),
     },
     {
       key: "size",
@@ -230,7 +377,15 @@ export function ScheduleLines({
       width: 90,
       sortValue: (r) => r.size ?? "",
       hideWhenCompact: true,
-      render: (r) => <span className="text-muted">{r.size ?? "—"}</span>,
+      render: (r) => (
+        <TaxonomyCell
+          row={r}
+          column="size"
+          label="Size"
+          options={vocabulary.size}
+          editable={editable}
+        />
+      ),
     },
     {
       key: "cut",
@@ -243,7 +398,15 @@ export function ScheduleLines({
       // production item per flavour means the cut is the only thing telling
       // `Letter - "H"` from `Letter - "A"` — so a table without it shows twelve
       // identical-looking rows.
-      render: (r) => <span className="text-muted">{r.subtype ?? "—"}</span>,
+      render: (r) => (
+        <TaxonomyCell
+          row={r}
+          column="subtype"
+          label="Cut"
+          options={vocabulary.subtype}
+          editable={editable}
+        />
+      ),
     },
     {
       key: "finish",
@@ -251,12 +414,20 @@ export function ScheduleLines({
       width: 120,
       sortValue: (r) => r.finish ?? "",
       hideWhenCompact: true,
-      render: (r) => <span className="text-muted">{r.finish ?? "—"}</span>,
+      render: (r) => (
+        <TaxonomyCell
+          row={r}
+          column="finish"
+          label="Finish"
+          options={vocabulary.finish}
+          editable={editable}
+        />
+      ),
     },
     {
       key: "item",
       label: "Name",
-      width: 240,
+      width: 220,
       pinned: true,
       wrap: true,
       sortValue: (r) => r.item_name,
@@ -270,27 +441,65 @@ export function ScheduleLines({
     {
       key: "par",
       label: "Par",
-      width: 100,
+      // 20px wider than it was, which is what the mark costs. It comes out of
+      // Name (240 → 220), the one column with slack at this width: it WRAPS,
+      // so what it loses is a wrap point rather than any of its text.
+      width: 120,
       align: "right",
       sortValue: (r) => r.par,
-      render: (r) =>
-        editable ? (
-          <InlineValue
-            table="production_schedule_items"
-            id={r.id}
-            column="par"
-            kind="number"
-            align="right"
-            nullable={false}
-            value={r.par}
-            // ONE update, so the pair can't half-succeed: a par that disagrees
-            // with the plan while still claiming to have come from it is the
-            // outcome worth preventing.
-            alsoUpdate={() => ({ par_source: "manual" })}
-          />
-        ) : (
-          <span className={`${READ_ONLY_VALUE} tabular-nums`}>{r.par}</span>
-        ),
+      /**
+       * THE PAR SAYS WHEN IT DISAGREES WITH THE PLAN, and what the plan said
+       * (Mark, 2026-09-07). The record has carried "N lines differ from the
+       * plan" since 040 and `planned_par` has been on every row since, rendered
+       * nowhere — so the badge sent you down 64 rows comparing a number against
+       * one you could not see.
+       *
+       * A FILL, not `text-mark`: yellow on white is 1.43:1. And a mark rather
+       * than a colour on the number itself, because the figure is right — it is
+       * what somebody decided — and what is worth an eye is that it was decided
+       * rather than derived.
+       *
+       * `planDeviation` is the same function the badge counts with, so the two
+       * cannot disagree about how many there are.
+       */
+      render: (r) => {
+        const off = planDeviation(r);
+        const mark = off ? (
+          <span
+            className="bg-mark-fill px-1 text-[11px]"
+            title={
+              off.kind === "changed"
+                ? `The plan says ${off.planned}`
+                : "Added by hand — the plan does not carry this line"
+            }
+          >
+            {off.kind === "changed" ? `plan ${off.planned}` : "added"}
+          </span>
+        ) : null;
+        return (
+          <span className="flex items-center justify-end gap-1">
+            {mark}
+            {editable ? (
+              <InlineValue
+                table="production_schedule_items"
+                id={r.id}
+                column="par"
+                kind="number"
+                align="right"
+                nullable={false}
+                value={r.par}
+                // ONE update, so the pair can't half-succeed: a par that
+                // disagrees with the plan while still claiming to have come
+                // from it is the outcome worth preventing.
+                alsoUpdate={() => ({ par_source: "manual" })}
+                className="w-auto"
+              />
+            ) : (
+              <span className={`${READ_ONLY_VALUE} tabular-nums`}>{r.par}</span>
+            )}
+          </span>
+        );
+      },
     },
     {
       key: "made",
@@ -352,6 +561,64 @@ export function ScheduleLines({
           <span className={`${READ_ONLY_VALUE} text-muted`}>{r.note ?? "—"}</span>
         ),
     },
+    ...(editable
+      ? ([
+          {
+            key: "actions",
+            label: "",
+            // 36px button + the cell's own px-3, the same arithmetic every ⋯
+            // column uses. Unlabelled, so the Columns menu never offers it: it
+            // is a control, not a field.
+            width: 60,
+            align: "right",
+            render: (r: ScheduleLineRow) => (
+              <span className="flex justify-end">
+                <RowMenu
+                  label={`Actions for ${r.item_name}`}
+                  items={[
+                    {
+                      label: "Duplicate line",
+                      /**
+                       * ONLY ON A SPECIAL-ORDER LINE, and that is 069's unique
+                       * index rather than a policy of ours:
+                       * `unique (schedule_id, item_id) where par_source <>
+                       * 'special_order'`. A plan line is one per item BY
+                       * CONSTRUCTION — 040 keyed it that way because a
+                       * regeneration upserts, and two rows of one item would
+                       * double the day's par with nothing noticing — so a
+                       * duplicate there is not merely refused, it is a thing
+                       * the model does not have. On an order it is the ordinary
+                       * case: #9886 is two Mini lines differing only by their
+                       * note.
+                       *
+                       * DISABLED WITH THE REASON rather than hidden. The hint
+                       * renders beside the label, so it explains itself without
+                       * a hover — which the iPad has none of.
+                       */
+                      hint:
+                        r.par_source === "special_order"
+                          ? "Same item and par, ready to be edited"
+                          : "A plan line is one per item — raise the par instead",
+                      disabled: busy || r.par_source !== "special_order",
+                      onSelect: () => void duplicateLine(r),
+                    },
+                    {
+                      label: "Delete line",
+                      hint:
+                        r.made !== null || r.leftover !== null
+                          ? "It carries a counted quantity"
+                          : "Takes it off tonight's sheet",
+                      danger: true,
+                      disabled: busy,
+                      onSelect: () => void removeLines([r.id]),
+                    },
+                  ]}
+                />
+              </span>
+            ),
+          },
+        ] as DataColumn<ScheduleLineRow>[])
+      : []),
   ];
 
   const group: DataGroup<ScheduleLineRow> | undefined =
@@ -419,7 +686,7 @@ export function ScheduleLines({
           </span>
           <button
             type="button"
-            onClick={removeChecked}
+            onClick={() => void removeLines([...checked])}
             disabled={busy}
             className={DANGER_BUTTON_CLASS}
           >

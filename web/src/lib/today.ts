@@ -35,6 +35,14 @@ export function daysBefore(date: string, days: number): string {
 }
 
 /**
+ * `days` AFTER that calendar date. The mirror of `daysBefore`, and the same
+ * UTC-midnight arithmetic, so it cannot shift a date by a timezone.
+ */
+export function daysAfter(date: string, days: number): string {
+  return daysBefore(date, -days);
+}
+
+/**
  * The calendar date an INSTANT fell on, in `timeZone`, as YYYY-MM-DD.
  *
  * The same conversion as `todayInTimeZone`, pointed at a stored timestamptz

@@ -586,3 +586,44 @@ export function scheduleSourceLabel(
     ? `${inForce[0].title} + ${inForce[1].title}`
     : `${inForce[0].title} + ${inForce.length - 1} more`;
 }
+
+/**
+ * HOW THIS LINE DIFFERS FROM THE PLAN, or null if it doesn't.
+ *
+ * The schedule record has said "N lines differ from the plan" since 040 and
+ * never WHICH (Mark, 2026-09-07: "it doesn't tell which one. Flag that par") —
+ * so the badge sent you down 64 rows comparing numbers you could not see,
+ * because what the plan said is stored on the line and was rendered nowhere.
+ *
+ * ONE function, so the badge's count and the marks in the table are the same
+ * claim. Deriving them separately is how a screen comes to say "3 differ" over
+ * a table with two marks in it.
+ *
+ * `par_source` is what makes a line a deviation at all:
+ *   - `plan` / `override` — the generator's own, never a deviation.
+ *   - `special_order` — a different SOURCE, not a changed par. 069's lines come
+ *     from an order, and there is no plan figure to disagree with.
+ *   - `manual` — somebody typed it. Then `planned_par` says which kind: a
+ *     number the generator recorded means the par was CHANGED, and null means
+ *     the line was ADDED by hand, which the plan cannot disagree with because
+ *     it never carried the line at all.
+ *
+ * A manual par that equals the plan's is NOT a deviation. `par_source` stays
+ * `manual` once touched — it also tells a regeneration to leave the line alone
+ * — but "differs from the plan" is a claim about the NUMBER, and typing 24 over
+ * 24 leaves nothing to point at.
+ */
+export type PlanDeviation =
+  | { kind: "changed"; planned: number }
+  | { kind: "added" };
+
+export function planDeviation(line: {
+  par: number;
+  planned_par: number | null;
+  par_source: string;
+}): PlanDeviation | null {
+  if (line.par_source !== "manual") return null;
+  if (line.planned_par === null) return { kind: "added" };
+  if (Number(line.planned_par) === Number(line.par)) return null;
+  return { kind: "changed", planned: Number(line.planned_par) };
+}

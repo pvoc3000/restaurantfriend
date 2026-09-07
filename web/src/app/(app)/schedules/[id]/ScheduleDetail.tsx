@@ -9,9 +9,13 @@ import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
-import { packetDate, plansInForce } from "@/lib/productionSchedule";
+import { packetDate, planDeviation, plansInForce } from "@/lib/productionSchedule";
 import { meansNoAllergy } from "@/lib/specialOrders";
-import { ScheduleLines, type ScheduleLineRow } from "@/components/production/ScheduleLines";
+import {
+  ScheduleLines,
+  type ScheduleLineRow,
+  type TaxonomyVocabulary,
+} from "@/components/production/ScheduleLines";
 import { ScheduleActions } from "@/components/production/ScheduleActions";
 import { AddScheduleItems, type AddableItem } from "@/components/production/AddScheduleItems";
 import { PrintPacket } from "@/components/production/PrintPacket";
@@ -178,10 +182,42 @@ export async function ScheduleDetail({
   }));
 
   const parTotal = rows.reduce((n, r) => n + r.par, 0);
-  const manualCount = rows.filter((r) => r.par_source === "manual").length;
+  // The SAME function the Par cells mark with, so the badge's count and the
+  // marks in the table are one claim rather than two that can drift.
+  const manualCount = rows.filter((r) => planDeviation(r) !== null).length;
   const uncosted = rows.filter((r) => r.costed_at === null).length;
   const countedLines = rows.filter((r) => r.made !== null || r.leftover !== null).length;
   const soldTotal = rows.reduce((n, r) => n + (r.sold ?? 0), 0);
+
+  /**
+   * WHAT THE FOUR TAXONOMY PICKERS OFFER. No query of its own: the catalog is
+   * already fetched for the Add-item panel, and the values ON this schedule are
+   * already in `rows`.
+   *
+   * BOTH SOURCES, and the second is the one that matters: a special-order line
+   * carries a cut like `Letter - "H"` that no `production_items` row has ever
+   * held (069), so a picker built from the catalog alone would not offer the
+   * value the row it is sitting on already has.
+   */
+  const vocab = (
+    fromCatalog: (i: Record<string, unknown>) => unknown,
+    fromRow: (r: ScheduleLineRow) => string | null
+  ) =>
+    [
+      ...new Set(
+        [
+          ...(catalog ?? []).map((i) => fromCatalog(i as Record<string, unknown>)),
+          ...rows.map(fromRow),
+        ].filter((v): v is string => typeof v === "string" && v.trim() !== "")
+      ),
+    ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" }));
+
+  const vocabulary: TaxonomyVocabulary = {
+    item_type: vocab((i) => i.item_type, (r) => r.item_type),
+    size: vocab((i) => i.size, (r) => r.size),
+    subtype: vocab((i) => i.subtype, (r) => r.subtype),
+    finish: vocab((i) => i.finish, (r) => r.finish),
+  };
 
   const onSchedule = new Set(rows.map((r) => r.item_id));
   const addable: AddableItem[] = (catalog ?? [])
@@ -395,7 +431,14 @@ export async function ScheduleDetail({
         </div>
       )}
 
-      <ScheduleLines rows={rows} editable={editable} countable={countable} />
+      <ScheduleLines
+        rows={rows}
+        orgId={session.membership.org_id}
+        scheduleId={id}
+        editable={editable}
+        countable={countable}
+        vocabulary={vocabulary}
+      />
     </div>
   );
 }

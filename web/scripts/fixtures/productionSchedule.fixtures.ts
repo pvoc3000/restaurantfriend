@@ -15,7 +15,7 @@ import {
   TRAY_CELLS,
   type ScheduleLine,
   type ItemDemandSource,
-} from "../../src/lib/productionSchedule";
+  planDeviation,} from "../../src/lib/productionSchedule";
 import type { CostElement } from "../../src/lib/productionCost";
 import { test, eq } from "./harness";
 
@@ -340,4 +340,43 @@ test("the packet date is read from the ISO STRING, never through new Date()", ()
 test("a date it cannot read is passed through rather than guessed", () => {
   eq(packetDate(""), "");
   eq(packetDate("not a date"), "not a date");
+});
+
+/* -- plan deviation -------------------------------------------------------- */
+
+const devLine = (over: Partial<{ par: number; planned_par: number | null; par_source: string }> = {}) => ({
+  par: 24,
+  planned_par: 24,
+  par_source: "plan",
+  ...over,
+});
+
+test("a generated line is never a deviation", () => {
+  eq(planDeviation(devLine()), null);
+  eq(planDeviation(devLine({ par_source: "override", par: 36 })), null);
+});
+
+test("a special-order line is a different SOURCE, not a changed par", () => {
+  // 069's lines come from an order; there is no plan figure to disagree with,
+  // and marking them would put a flag on every row of a wedding.
+  eq(planDeviation(devLine({ par_source: "special_order", planned_par: null })), null);
+});
+
+test("a hand-typed par that differs names what the plan said", () => {
+  eq(planDeviation(devLine({ par_source: "manual", par: 36, planned_par: 24 })), {
+    kind: "changed",
+    planned: 24,
+  });
+});
+
+test("typing the plan's own number back is not a deviation", () => {
+  // `par_source` stays manual — it also tells a regeneration to leave the line
+  // alone — but "differs from the plan" is a claim about the NUMBER.
+  eq(planDeviation(devLine({ par_source: "manual", par: 24, planned_par: 24 })), null);
+});
+
+test("a line the plan never carried reads as ADDED, not as changed", () => {
+  eq(planDeviation(devLine({ par_source: "manual", par: 12, planned_par: null })), {
+    kind: "added",
+  });
 });

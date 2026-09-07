@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
+import { daysAfter } from "@/lib/today";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -154,8 +155,22 @@ export function GenerateSchedules({
   const supabase = createClient();
   const router = useRouter();
 
+  /**
+   * TOMORROW, not today (Mark, 2026-09-07).
+   *
+   * The dialog is opened at the END of a shift, by the closer, to make the
+   * paper the overnight bake works from — so the night it is about is the one
+   * that has not happened yet. Defaulting to today meant every routine
+   * generation began by correcting the date, and the one time somebody forgot
+   * produced a schedule for a day already made.
+   *
+   * Derived from the ORG's calendar day, which is what `today` already is, so
+   * the boundary is the shop's rather than the browser's or UTC's.
+   */
+  const defaultStart = daysAfter(today, 1);
+
   const [open, setOpen] = useState(false);
-  const [start, setStart] = useState<string | null>(today);
+  const [start, setStart] = useState<string | null>(defaultStart);
   const [days, setDays] = useState("1");
   const [selected, setSelected] = useState<Set<string>>(new Set());
   /**
@@ -186,18 +201,18 @@ export function GenerateSchedules({
     setOpen(true);
     setReceipt(null);
     setError(null);
-    setStart(today);
+    setStart(defaultStart);
     setDays("1");
     setIncludeSpecial(true);
     // Every shop this kitchen sells THROUGH, preselected. Unlike the PO
     // generator there is no per-location guard to encode here — an
     // already-generated day is reported by the function itself rather than
     // guessed at up front.
-    setSelected(new Set(shopsFor(today, 1).map((l) => l.id)));
+    setSelected(new Set(shopsFor(defaultStart, 1).map((l) => l.id)));
     setCandidates(null);
     setPullIds(new Set());
     setPulled(null);
-    void loadCandidates(today, 1);
+    void loadCandidates(defaultStart, 1);
   }
 
   /**
