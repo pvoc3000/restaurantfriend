@@ -11,7 +11,12 @@ import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/u
 import { RowMenu } from "@/components/ui/RowMenu";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { TabPicker } from "@/components/ui/TabPicker";
-import { StickyFooter } from "@/components/ui/StickyFooter";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
+import {
+  STICKY_HEAD_ROW_UNDER_CONTROLS,
+  useOverflowOnlyWhenNeeded,
+  usePublishedHeight,
+} from "@/lib/tableHead";
 import {
   WEEKDAYS,
   buildMatrix,
@@ -220,6 +225,17 @@ export function PlanMatrix({
     return seeded !== null && seeded !== slot.par ? seeded : null;
   }
   const tableRef = useRef<HTMLTableElement | null>(null);
+  // The controls band publishes its own height and the weekday labels offset
+  // against the SUM of it and the masthead, so the two bands stack rather than
+  // one painting over the other.
+  const controlsRef = useRef<HTMLDivElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  usePublishedHeight(controlsRef, "--rf-controls-h");
+  // A sticky cell inside an `overflow-x: auto` box pins to THAT box, which
+  // never scrolls vertically — so the wrapper only becomes a scroll container
+  // when the table genuinely doesn't fit, which `table-fixed` means it never
+  // does. See lib/tableHead's trap.
+  useOverflowOnlyWhenNeeded(scrollerRef);
 
   const itemNames = new Map(items.map((i) => [i.id, i.name]));
   // The step for a par is the item's OWN tally box size (037), so the number a
@@ -845,34 +861,153 @@ export function PlanMatrix({
   return (
     <div className="space-y-3">
 
-      {/* A control that changes what the list SHOWS goes with the list, never
-          in a command bar — and every one-of-N choice in this app is a
-          TabPicker. */}
-      {trays.length > 1 ? (
-        <div className="space-y-1.5">
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-            Group by
-          </span>
-          <TabPicker<MatrixGrouping>
-            ariaLabel="Group trays by"
-            value={grouping}
-            onChange={setGrouping}
-            options={[
-              { key: "tray", label: "Tray" },
-              { key: "category", label: "Category" },
-              { key: "type", label: "Item type" },
-            ]}
-          />
-        </div>
-      ) : null}
+      {/* THE COMMANDS SIT WITH THE VIEW CONTROL, AND THE BAND IS PINNED (Mark,
+          2026-09-07: move the footer's buttons "to the filter row, aligned to
+          the right… then remove the footer, and make the header sticky so the
+          filter row is always visible").
 
-      <div className="overflow-x-auto">
+          They were pinned to the FOOT of the window for exactly the reason
+          they are pinned now — a plan runs to two dozen trays, so a command
+          under the table is a scroll away from the rows you are building — and
+          at the top they arrive beside the control that changes what the list
+          SHOWS, with the weekday labels sticking directly beneath them. What
+          you need while you build is one block instead of one band at each end
+          of the screen.
+
+          THE ROW ALWAYS RENDERS, where the Group-by picker used to be the
+          whole block and appeared only past one tray: Add tray lives here now,
+          and an empty plan is precisely the one that needs it.
+
+          It publishes its measured height (`--rf-controls-h`) and the column
+          labels offset against the SUM. Measured, never a constant: this row
+          wraps the moment the pars band cannot share it. z-30 puts it over the
+          labels (20) and under the masthead (50). */}
+      <div
+        ref={controlsRef}
+        className="sticky top-[var(--rf-header-h)] z-30 bg-white py-3"
+      >
+        <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+          {/* A control that changes what the list SHOWS goes with the list,
+              never in a command bar — and every one-of-N choice in this app is
+              a TabPicker. */}
+          {trays.length > 1 ? (
+            <div className="space-y-1.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                Group by
+              </span>
+              <TabPicker<MatrixGrouping>
+                ariaLabel="Group trays by"
+                value={grouping}
+                onChange={setGrouping}
+                options={[
+                  { key: "tray", label: "Tray" },
+                  { key: "category", label: "Category" },
+                  { key: "type", label: "Item type" },
+                ]}
+              />
+            </div>
+          ) : null}
+
+          {/* The grand total, and it has nowhere else to live: the Trays
+              heading went when the footer took this over (Mark, 2026-08-08).
+              Pinned, it is still the line that stays with you while you
+              build. */}
+          <span className="text-[13px] text-muted">
+            {trays.length} tray{trays.length === 1 ? "" : "s"} on this plan
+          </span>
+
+          {editable ? (
+            <div className="ml-auto flex flex-wrap items-end justify-end gap-x-3 gap-y-2">
+              {/* ONE button weight, `BUTTON_CLASS`. In the footer these were
+                  four hand-typed near-copies at two different heights, which
+                  reads as a divider between tiers when they sit in separate
+                  clusters and as a mistake when they stand in one row — that
+                  file's own history says what happens when they drift. */}
+              <button type="button" onClick={() => setNewTray(true)} className={BUTTON_CLASS}>
+                Add tray
+              </button>
+              <button
+                type="button"
+                onClick={() => void renumber()}
+                disabled={pending || trays.length === 0}
+                className={BUTTON_CLASS}
+              >
+                Renumber trays
+              </button>
+              {/* The pars against this shop's own defaults. Always available, so
+                  the question can be asked without a duplicate or a move to
+                  prompt it — and it says the count BEFORE you turn it on, which
+                  is what you need to decide whether to. */}
+              {differing.length > 0 || review ? (
+                <div className="flex flex-wrap items-center gap-3 border-l-2 border-mark pl-3 text-[13px]">
+                  <span className="text-muted">
+                    {differing.length === 0 ? (
+                      <>Every par matches {locationCode}&rsquo;s defaults.</>
+                    ) : (
+                      <>
+                        <span className="font-medium text-ink">
+                          {differing.length} par{differing.length === 1 ? "" : "s"}
+                        </span>{" "}
+                        differ{differing.length === 1 ? "s" : ""} from {locationCode}&rsquo;s defaults.
+                      </>
+                    )}
+                  </span>
+                  {differing.length ? (
+                    <button
+                      type="button"
+                      onClick={() => setReview((v) => !v)}
+                      className={BUTTON_CLASS}
+                    >
+                      {review ? "Stop checking" : "Check pars"}
+                    </button>
+                  ) : null}
+                  {review && differing.length ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={takeAllSuggested}
+                        disabled={pending}
+                        title={`Replace those pars with ${locationCode}'s defaults`}
+                        className={BUTTON_CLASS}
+                      >
+                        Use {locationCode} defaults
+                      </button>
+                      {/* The reverse, and the riskier direction: it writes the
+                          SHOP's catalog, which every future plan seeds from. It
+                          reads as a peer of its opposite (Mark, 2026-08-08) —
+                          the app's one button weight — so the warning lives
+                          entirely in the confirm, which names the blast
+                          radius. */}
+                      <button
+                        type="button"
+                        onClick={updateAllDefaults}
+                        disabled={pending}
+                        title={`Make this plan's pars ${locationCode}'s defaults — changes the shop's catalog`}
+                        className={BUTTON_CLASS}
+                      >
+                        Update {locationCode} defaults
+                      </button>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      <div ref={scrollerRef} className="overflow-x-auto">
         {/* `table-fixed` is what makes the widths below actual widths. Without
             it the browser lays the table out by content and a long item name
             stretches its own column, so the seven days drift apart. */}
         <table ref={tableRef} className="w-full table-fixed border-collapse text-[13px]">
           <thead>
-            <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em]">
+            {/* The weekday labels stay on screen too — with a band pinned
+                directly above them, a header row that slid under it would read
+                as the table having lost its labels. The 2px rule rides as an
+                inset SHADOW rather than a border, because a sticky cell inside
+                border-collapse loses its border as it detaches. */}
+            <tr className={`text-[11px] uppercase tracking-[0.12em] ${STICKY_HEAD_ROW_UNDER_CONTROLS}`}>
               {WEEKDAYS.map((d) => (
                 <th
                   key={d.iso}
@@ -1241,95 +1376,6 @@ export function PlanMatrix({
         </p>
       ) : null}
 
-      {/* PINNED to the foot of the window (Mark, 2026-08-08). A plan runs to a
-          dozen trays and more, so a command that lived under the table was a
-          scroll away from the rows you were building. `StickyFooter` measures
-          its own height into a spacer, so the table's last row never hides
-          behind it. */}
-      {editable ? (
-        <StickyFooter spacerClassName="-mt-3">
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-            <button
-              type="button"
-              onClick={() => setNewTray(true)}
-              className="inline-flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
-            >
-              Add tray
-            </button>
-            <button
-              type="button"
-              onClick={() => void renumber()}
-              disabled={pending || trays.length === 0}
-              className="inline-flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-            >
-              Renumber trays
-            </button>
-            {/* The grand total, beside the command that changes it. It repeats
-                the heading's own count deliberately: once the footer is pinned
-                the heading has scrolled away, and this is the line that stays
-                with you while you build. */}
-            <span className="text-[13px] text-muted">
-              {trays.length} tray{trays.length === 1 ? "" : "s"} on this plan
-            </span>
-            {/* The pars against this shop's own defaults. Always available, so the
-                question can be asked without a duplicate or a move to prompt it —
-                and it says the count BEFORE you turn it on, which is what you need
-                to decide whether to. */}
-            {editable && (differing.length > 0 || review) ? (
-              <div className="flex flex-wrap items-center gap-3 border-l-2 border-mark pl-3 text-[13px]">
-                <span className="text-muted">
-                  {differing.length === 0 ? (
-                    <>Every par matches {locationCode}&rsquo;s defaults.</>
-                  ) : (
-                    <>
-                      <span className="font-medium text-ink">
-                        {differing.length} par{differing.length === 1 ? "" : "s"}
-                      </span>{" "}
-                      differ{differing.length === 1 ? "s" : ""} from {locationCode}&rsquo;s defaults.
-                    </>
-                  )}
-                </span>
-                {differing.length ? (
-                  <button
-                    type="button"
-                    onClick={() => setReview((v) => !v)}
-                    className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white"
-                  >
-                    {review ? "Stop checking" : "Check pars"}
-                  </button>
-                ) : null}
-                {review && differing.length ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={takeAllSuggested}
-                      disabled={pending}
-                      title={`Replace those pars with ${locationCode}'s defaults`}
-                      className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-40"
-                    >
-                      Use {locationCode} defaults
-                    </button>
-                    {/* The reverse, and the riskier direction: it writes the SHOP's
-                        catalog, which every future plan seeds from. It reads as a peer
-                        of its opposite (Mark, 2026-08-08) — the app's one button
-                        weight, outlined and white — so the warning lives entirely in
-                        the confirm, which names the blast radius. */}
-                    <button
-                      type="button"
-                      onClick={updateAllDefaults}
-                      disabled={pending}
-                      title={`Make this plan's pars ${locationCode}'s defaults — changes the shop's catalog`}
-                      className="inline-flex h-8 items-center border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-40"
-                    >
-                      Update {locationCode} defaults
-                    </button>
-                  </>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-        </StickyFooter>
-      ) : null}
 
       {/* The drag overlay: the two drop zones and the chip in hand. All three
           are positioned, labelled and restyled by the hook through refs — no

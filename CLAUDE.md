@@ -4343,13 +4343,37 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    rule) under a "No category" band rather than a blank one. Local state, not
    the URL: it changes nothing about what the plan is, and a plan is read in one
    sitting.
-   **The grand total sits in the sticky footer** beside Add tray — it repeats
-   the section heading's own count deliberately, because once the footer is
-   pinned the heading has scrolled away. A fixture asserts the band counts SUM
-   to the tray count, so the two figures cannot drift into disagreeing.
+   **The grand total sits in the pinned controls row** beside Add tray — it
+   repeats the section heading's own count deliberately, because once the band
+   is pinned the heading has scrolled away. (It sat in a `StickyFooter` at the
+   FOOT of the window until 2026-09-07 — see the note below.) A fixture asserts
+   the band counts SUM to the tray count, so the two figures cannot drift into
+   disagreeing.
    **The PLAN LIST has a ⋯ too — Duplicate plan and Delete plan** (Mark,
    2026-08-08), the same `ui/RowMenu` in an unlabelled last column, which keeps
    it out of the Columns menu because it is a control rather than a field.
+   **THE LIST SAYS WHICH PLAN IS IN FORCE — a CURRENT chip beside the title and
+   a Current tier** (Mark, 2026-09-07). The list said whether a plan was ACTIVE
+   and never whether it was the one the shop is running, so next month's season
+   and last spring's read exactly like the plan the kitchen is working from.
+   **`isCurrentPlan` is BOTH HALVES — active AND covering today — and each is
+   silent on its own**: an inactive plan covering today makes nothing
+   (generation reads the active ones), and an active plan opening in November is
+   not what anybody is baking this morning. It takes the ORG's calendar day, for
+   `lib/today`'s reason: a plan's dates are business dates and a UTC "today"
+   rolls at 5pm here.
+   **ACTIVE STAYS THE DEFAULT TIER.** Current is the sharper question most days
+   and it is also the one that HIDES WORK — a season you are building for
+   November is not in force, so opening on a tier that omits it would make a
+   plan you had just written look as though it had not saved. The three read
+   narrowest-first (Current ⊂ Active ⊂ All) so the counts descend.
+   **The chip's cell is a flex row, not a title with a chip appended**: the cell
+   truncates, so an appended chip is the half that gets cut. Measured — a 414px
+   title in a 220px cell truncates to 122px with the chip whole and inside the
+   cell, and the row stays 68px.
+   The two `text-mark` marks that cell carried became FILLS with it (the overlap
+   line and the kitchen's "not set"), which is the standing "fix them as you
+   touch those screens" rule; yellow on white is 1.43:1.
    **THE DUPLICATE ARRIVES INACTIVE, and that is the one deviation from "an
    exact copy".** Decision 9 makes a shop's menu the UNION of its active plans
    and their pars SUM, so an active duplicate over the same dates would silently
@@ -4436,10 +4460,37 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    their DF01 defaults so it correctly showed ZERO offers**, and stepping one
    par made exactly one appear. Delete named "…and its 24 trays carrying 225
    items", cascaded, and left no orphans.
-   **Add tray is PINNED to the foot of the window** (`ui/StickyFooter`, Mark) —
-   a plan runs to a dozen trays and more, so a command under the table was a
-   scroll away from the rows you were building. Measured: the button holds y=668
-   at both scroll extremes, and the spacer keeps the last row clear of the bar.
+   **Add tray is PINNED — at the TOP since 2026-09-07** (Mark: move the
+   footer's buttons "to the filter row, aligned to the right… then remove the
+   footer, and make the header sticky so the filter row is always visible").
+   The reason for pinning is unchanged and was `ui/StickyFooter`'s from
+   2026-08-08: a plan runs to two dozen trays, so a command under the table is a
+   scroll away from the rows you are building. What changed is which end. At the
+   top the commands arrive beside the control that changes what the list SHOWS,
+   and the weekday labels stick directly beneath them — one block instead of one
+   band at each end of the screen.
+   **THE ROW ALWAYS RENDERS**, where the Group-by picker used to be the whole
+   block and appeared only past one tray: Add tray lives here now, and an empty
+   plan is precisely the one that needs it.
+   It publishes its measured height as `--rf-controls-h` and the labels offset
+   against the SUM (`STICKY_HEAD_ROW_UNDER_CONTROLS`, new in `lib/tableHead`) —
+   measured and never a constant, because this row wraps the moment the pars
+   band cannot share it. Measured at 1280: masthead 64 → band 64–146.5 → labels
+   147–180, and with Check pars on the band wraps to 127px and the labels follow
+   to 0.5px. **The `overflow-x-auto` wrapper had to become
+   `useOverflowOnlyWhenNeeded`** — a sticky cell inside a scroll container pins
+   to THAT box, which is `lib/tableHead`'s own documented trap, and `table-fixed`
+   means this table never actually needs to scroll sideways.
+   **All five commands are `BUTTON_CLASS` now.** In the footer they were four
+   hand-typed near-copies at two heights (h-9 and h-8), which reads as a tier
+   divider across two clusters and as a mistake when they stand in one row —
+   that file's own history says what happens when they drift. Measured: 36px
+   each.
+   **Harness note:** `--rf-controls-h` is republished by a ResizeObserver, and
+   in a hidden browser pane those callbacks are starved — a reading taken right
+   after a resize showed the OLD height and a 43px overlap that does not exist.
+   Wait, re-measure, and never use `requestAnimationFrame` in the pane at all
+   (it does not fire while hidden, and a script awaiting one times out).
    Exercised against the live database and **left exactly as found**: the single
    stepper 18→24, the row stepper moving all seven, a real pointer drag moving
    Sunday between trays with its par, an Option-drag copying it, Copy creating
@@ -8833,7 +8884,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   band is `sticky top-[var(--rf-header-h)] z-30` (over the labels at 20, under
   the masthead at 50 — the ActionBar and BackToTop share 30 and never meet it,
   being at the bottom of the viewport) and publishes its own height as
-  **`--rf-guide-controls-h`**, which the guide's column labels ADD to their
+  **`--rf-controls-h`** (named `--rf-guide-controls-h` until 2026-09-07, when
+  the plan matrix became the second screen to pin a band and a second variable
+  saying the same thing would have been how two screens' offsets drift), which
+  the guide's column labels ADD to their
   offset. It has to be measured: the row wraps the moment "Group by" can't share
   it, which at 1440 it already can't — 116px at 1440, 168px at 820, with the
   masthead itself going 64 → 96. The variable is seeded 0 and cleared on

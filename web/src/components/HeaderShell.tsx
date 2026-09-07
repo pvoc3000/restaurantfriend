@@ -25,7 +25,7 @@ import { usePublishedHeight } from "@/lib/tableHead";
 export function HeaderShell({ children }: { children: React.ReactNode }) {
   const ref = useRef<HTMLElement>(null);
 
-  // The order guide publishes a second band the same way (--rf-guide-controls-h),
+  // The order guide publishes a second band the same way (--rf-controls-h),
   // so the measuring lives in one place — see lib/tableHead.
   usePublishedHeight(ref, "--rf-header-h");
 

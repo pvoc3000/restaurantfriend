@@ -88,6 +88,21 @@ export const STICKY_HEAD_ROW =
   "[&>th]:sticky [&>th]:top-[var(--rf-header-h)] [&>th]:z-20 [&>th]:bg-white [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]";
 
 /**
+ * The same again, for a table sitting under a screen's OWN sticky controls
+ * band: its cells stack below the masthead AND that band, so the two never
+ * overlap and never leave a gap.
+ *
+ * `--rf-controls-h` is 0 on every screen that has no such band, so this
+ * expression is safe anywhere — it just reduces to `STICKY_HEAD_ROW`.
+ *
+ * MEASURED and never a constant, for the reason the masthead taught: these
+ * bands wrap, so any number is right at one width and wrong at another, and
+ * being wrong means column labels sitting on top of the rows they label.
+ */
+export const STICKY_HEAD_ROW_UNDER_CONTROLS =
+  "[&>th]:sticky [&>th]:top-[calc(var(--rf-header-h)_+_var(--rf-controls-h))] [&>th]:z-20 [&>th]:bg-white [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]";
+
+/**
  * The same, for a table that scrolls inside its OWN pane — it sticks to the top
  * of the pane, and only ever competes with its own rows, so it sits at 10.
  */

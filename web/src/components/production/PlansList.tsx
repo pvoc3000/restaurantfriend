@@ -109,14 +109,23 @@ export function PlansList({
         key: "tier",
         label: "Which plans",
         defaultValue: "active",
+        // NARROWEST FIRST — Current ⊂ Active ⊂ All, so the counts descend and
+        // the three read as a funnel rather than as three unrelated views.
+        //
+        // ACTIVE STAYS THE DEFAULT. Current is the sharper question most days
+        // and it is also the one that hides work: a season you are building for
+        // November is not in force, and opening on a tier that omits it would
+        // make a plan you had just written look as though it had not saved.
         options: [
+          { value: "current", label: "Current" },
           { value: "active", label: "Active" },
           { value: "all", label: "All" },
         ],
-        matches: (r, v) => (v === "active" ? r.is_active : true),
+        matches: (r, v) =>
+          v === "current" ? isCurrentPlan(r, today) : v === "active" ? r.is_active : true,
       },
     ],
-    []
+    [today]
   );
 
   // Seeded from the ADDRESS BAR where it can be read, and only from the props

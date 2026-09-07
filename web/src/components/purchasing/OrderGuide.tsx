@@ -129,7 +129,7 @@ export function OrderGuide({
   const controlsRef = useRef<HTMLDivElement>(null);
   /** The item a jump could not reach, so its request row can say why. */
   const [jumpMiss, setJumpMiss] = useState<string | null>(null);
-  usePublishedHeight(controlsRef, "--rf-guide-controls-h");
+  usePublishedHeight(controlsRef, "--rf-controls-h");
 
   // Every screen is scroll-restored by the shell (components/ScrollMemory), but
   // the guide is the one screen its default key can't describe, so it names its
@@ -1006,7 +1006,7 @@ export function OrderGuide({
                 // Chromium, and that margin is what absorbs it.
                 <th
                   key={label}
-                  className={`sticky top-[calc(var(--rf-header-h)_+_var(--rf-guide-controls-h))] z-20 bg-white px-4 py-3 font-normal shadow-[inset_0_-2px_0_var(--rf-neutral-900)] max-[1180px]:px-2 max-[880px]:px-1 ${extra}`}
+                  className={`sticky top-[calc(var(--rf-header-h)_+_var(--rf-controls-h))] z-20 bg-white px-4 py-3 font-normal shadow-[inset_0_-2px_0_var(--rf-neutral-900)] max-[1180px]:px-2 max-[880px]:px-1 ${extra}`}
                 >
                   {label}
                 </th>
