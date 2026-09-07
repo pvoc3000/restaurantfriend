@@ -246,7 +246,7 @@ export const SECTIONS: NavSection[] = [
       // the Locations section on 2026-08-29 when they were built — see the note
       // there. A checklist is about the building, and this section is about the
       // day's numbers and the shift.
-      stub("operations", "tags", "Tags"),
+      { slug: "tags", label: "Tags", href: "/tags", built: true },
       // The production price grid (decision 10). It lives under Operations
       // because that is the slot FileMaker's own price screen occupied, and
       // because the grid prices the MENU rather than describing one item — if

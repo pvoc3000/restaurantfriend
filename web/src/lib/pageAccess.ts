@@ -122,7 +122,7 @@ export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   // policy is membership-wide regardless; the cell is what the menu shows.
   "/documents":            row("-", "W", "W", "W", "W"),
   "/soon/operations/policies":  row("-", "W", "W", "W", "W"),
-  "/soon/operations/tags":      row("-", "R", "W", "W", "W"),
+  "/tags":                 row("-", "R", "W", "W", "W"),
   "/price-grid":           row("-", "R", "W", "W", "W"),
 
   // ── Production ────────────────────────────────────────────────────────────

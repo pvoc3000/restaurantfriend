@@ -13,6 +13,7 @@
   "include": [
     "./**/*.ts",
     "../../src/lib/attachments.ts",
+    "../../src/lib/displayTags.ts",
     "../../src/lib/fileTypes.ts",
     "../../src/lib/columnOrder.ts",
     "../../src/lib/rowDrag.ts",
