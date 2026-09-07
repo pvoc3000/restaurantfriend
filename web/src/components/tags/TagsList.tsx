@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { DateField } from "@/components/ui/DateField";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { PageHeading } from "@/components/ui/PageHeading";
@@ -49,13 +51,17 @@ export function TagsList({
   rows,
   locationCode,
   today,
+  day,
   action,
 }: {
   rows: TagRow[];
   locationCode: string;
   today: string;
+  /** The day On the plan is asked about — `?date=`, default today. */
+  day: string;
   action?: React.ReactNode;
 }) {
+  const router = useRouter();
   const from = { href: "/tags", label: "Tags" };
   const [tier, setTier] = useState<Tier>("plan");
   const [search, setSearch] = useState("");
@@ -207,6 +213,19 @@ export function TagsList({
             { key: "all", label: "All tags", count: rows.length },
           ]}
         />
+        {/* The day On the plan is asked about. A real navigation (the
+            /events window's rule): the server decides which plans are in
+            force, so the day rides in the URL and the default writes none. */}
+        {/* `boxed` in the cell dress is the h-9 border the search box and the
+            tabs wear; the wrapper gives its `w-full` something to mean. */}
+        <div className="w-44">
+          <DateField
+            value={day}
+            onChange={(next) => router.push(next && next !== today ? `/tags?date=${next}` : "/tags")}
+            ariaLabel="Which day the plan is read for"
+            boxed
+          />
+        </div>
         {action && <div className="ml-auto flex items-center">{action}</div>}
       </div>
 
@@ -223,7 +242,7 @@ export function TagsList({
             {term
               ? "No tag matches that."
               : tier === "plan"
-                ? `No tag's donut is on ${locationCode}'s plan today. All tags shows every one.`
+                ? `No tag's donut is on ${locationCode}'s plan for ${day}. All tags shows every one.`
                 : "No tags yet."}
           </p>
         }

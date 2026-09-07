@@ -7,6 +7,8 @@ import {
   TAG_SIZES,
   formatTagPrice,
   imageBoxFor,
+  isoWeekday,
+  planDateParam,
   labelOrigin,
   onPlanItemIds,
   priceBoxFor,
@@ -83,14 +85,28 @@ test("the price prints as dollars and cents, ASCII only", () => {
   eq(formatTagPrice(Number.NaN), null);
 });
 
-test("on the plan means a par above zero or unstated, de-duplicated", () => {
-  const ids = onPlanItemIds([
-    { item_id: "a", planned_par: 18 },
-    { item_id: "a", planned_par: 24 },
-    { item_id: "b", planned_par: 0 },
-    { item_id: "c", planned_par: null },
-  ]);
+test("on the plan means that weekday, a par above zero or unstated, de-duplicated", () => {
+  const ids = onPlanItemIds(
+    [
+      { item_id: "a", weekday: 6, planned_par: 18 },
+      { item_id: "a", weekday: 6, planned_par: 24 },
+      { item_id: "b", weekday: 6, planned_par: 0 },
+      { item_id: "c", weekday: 6, planned_par: null },
+      { item_id: "d", weekday: 7, planned_par: 12 },
+    ],
+    6
+  );
   eq([...ids].sort(), ["a", "c"]);
+});
+
+test("the list's day is the URL's when it is a real date, else today", () => {
+  eq(isoWeekday("2026-09-06"), 7, "a Sunday");
+  eq(isoWeekday("2026-09-07"), 1, "a Monday");
+  eq(planDateParam("2026-09-12", "2026-09-06"), "2026-09-12");
+  eq(planDateParam(["2026-09-12"], "2026-09-06"), "2026-09-12");
+  eq(planDateParam(undefined, "2026-09-06"), "2026-09-06");
+  eq(planDateParam("2026-02-31", "2026-09-06"), "2026-09-06", "a rolled-over date is refused");
+  eq(planDateParam("tomorrow", "2026-09-06"), "2026-09-06");
 });
 
 test("a background is a JPEG or a PNG; a PDF is told to export", () => {

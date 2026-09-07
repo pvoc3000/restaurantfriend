@@ -147,19 +147,42 @@ export function tagSizeLabel(size: TagSize): string {
   return `${h}″ × ${w}″`;
 }
 
+/** ISO weekday of a yyyy-mm-dd, 1 = Monday … 7 = Sunday — UTC arithmetic on
+ *  the string, so a host west of Greenwich cannot move the day. */
+export function isoWeekday(iso: string): number {
+  const jsDay = new Date(`${iso}T00:00:00Z`).getUTCDay();
+  return ((jsDay + 6) % 7) + 1;
+}
+
 /**
- * Which items are ON THE SHOP'S MENU — read off the plan rows in force today
- * (`v_production_plan_days`, any weekday). "On the current plan" is read as
- * on the menu rather than on today's trays: a sign stays in the case for as
- * long as the donut is on the plan, and a par of ZERO is 043's "on the menu,
- * making none" — that donut is not in the case, so it is not on this list.
- * A null par is silence and is counted, since nothing said no.
+ * The day the list is asked about — `?date=` when it is a real calendar date,
+ * else today. A round trip rather than a regex: `new Date("2026-02-31")` does
+ * not fail, it rolls over to March 2nd.
+ */
+export function planDateParam(raw: string | string[] | undefined, today: string): string {
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return today;
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value ? value : today;
+}
+
+/**
+ * Which items are ON THE PLAN FOR A DAY — the rows of `v_production_plan_days`
+ * for the plans in force that day, narrowed to that day's WEEKDAY (Mark,
+ * 2026-09-06: a calendar picker, "on the plan finds the donuts that are on
+ * the plan for whatever day it's set to"). A par of ZERO is 043's "on the
+ * menu, making none" — not in the case that day, so not on this list. A null
+ * par is silence and is counted, since nothing said no.
  */
 export function onPlanItemIds(
-  rows: readonly { item_id: string; planned_par: number | null }[]
+  rows: readonly { item_id: string; weekday: number; planned_par: number | null }[],
+  weekday: number
 ): Set<string> {
   const ids = new Set<string>();
-  for (const r of rows) if (r.planned_par === null || r.planned_par > 0) ids.add(r.item_id);
+  for (const r of rows) {
+    if (r.weekday !== weekday) continue;
+    if (r.planned_par === null || r.planned_par > 0) ids.add(r.item_id);
+  }
   return ids;
 }
 

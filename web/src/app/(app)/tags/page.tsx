@@ -4,8 +4,10 @@ import { canEditPage } from "@/lib/pageAccess";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { resolveItemPrice } from "@/lib/productionPrice";
 import {
+  isoWeekday,
   itemLabel,
   onPlanItemIds,
+  planDateParam,
   TAG_BUCKET,
   TAG_SELECT,
   TAG_URL_TTL_SECONDS,
@@ -19,7 +21,12 @@ import { NewTag, type TagItemOption } from "@/components/tags/NewTag";
  * Tags — the case signs (095). Org-wide rows; what FOLLOWS the working shop is
  * the price on each one and whether its donut is on that shop's plan.
  */
-export default async function TagsPage() {
+export default async function TagsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ date?: string | string[] }>;
+}) {
+  const { date } = await searchParams;
   const session = await getAppSession();
   const supabase = await createClient();
   const active = session.activeLocation;
@@ -28,6 +35,9 @@ export default async function TagsPage() {
   }
   const orgId = session.membership.org_id;
   const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
+  // The day the picker is set to (default today): which plans are in force,
+  // and which weekday's trays, both follow it.
+  const day = planDateParam(date, today);
 
   // Every table here is far under PostgREST's 1,000-row cap (86 tags, ~250
   // images, 307 items, 40 grid cells), so nothing paginates.
@@ -50,14 +60,14 @@ export default async function TagsPage() {
     supabase.from("production_price_grid").select("id, price_class, price_tier, price, class_sort, tier_sort"),
     supabase.from("production_price_grid_locations").select("grid_id, location_id, price"),
     supabase.from("production_item_locations").select("item_id, location_id, price_override"),
-    // The plans in force at this shop today — dates compare as STRINGS.
+    // The plans in force at this shop on that day — dates compare as STRINGS.
     supabase
       .from("v_production_plan_days")
-      .select("item_id, planned_par")
+      .select("item_id, weekday, planned_par")
       .eq("location_id", active.id)
       .eq("plan_active", true)
-      .lte("starts_on", today)
-      .or(`ends_on.is.null,ends_on.gte.${today}`),
+      .lte("starts_on", day)
+      .or(`ends_on.is.null,ends_on.gte.${day}`),
   ]);
 
   if (error) {
@@ -77,7 +87,10 @@ export default async function TagsPage() {
     list.push(o);
     overridesByItem.set(o.item_id, list);
   }
-  const onPlan = onPlanItemIds((planRows ?? []) as { item_id: string; planned_par: number | null }[]);
+  const onPlan = onPlanItemIds(
+    (planRows ?? []) as { item_id: string; weekday: number; planned_par: number | null }[],
+    isoWeekday(day)
+  );
 
   // ONE signing batch for every background on the list, keyed by path (a
   // per-item failure would otherwise shift the zip).
@@ -128,10 +141,11 @@ export default async function TagsPage() {
 
   return (
     <TagsList
-      key={active.id}
+      key={`${active.id}:${day}`}
       rows={rows}
       locationCode={active.code}
       today={today}
+      day={day}
       action={editable && <NewTag orgId={orgId} items={itemOptions} />}
     />
   );

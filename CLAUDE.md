@@ -7726,9 +7726,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    first "The Jelly Sound" (51) points at Lemon At Work; the loader names all
    of them and the record's Item picker is the fix.
    Screens: `/tags` opens on **On the plan** — tags whose donut is on the
-   working shop's plans in force today, ANY weekday, par null or > 0
-   (`onPlanItemIds`: a sign stays in the case while the donut is on the menu)
-   — with All tags and a search that reaches everything; a selection column
+   working shop's plans in force ON THE PICKED DAY, that day's WEEKDAY, par
+   null or > 0 (`onPlanItemIds`) — with All tags and a search that reaches
+   everything. **The day is a calendar box in the filter row** (Mark, the
+   same day: "default is the current day, and 'on the plan' finds the donuts
+   that are on the plan for whatever day it's set to"), riding in the URL as
+   `?date=` because the SERVER decides which plans are in force (`/events`'
+   window rule: a `router.push`, the default writing no param;
+   `planDateParam` refuses a rolled-over date). It first read the whole
+   week; measured on DF01 the weekday matters — Monday 23, every other day
+   24. `DateField boxed` in a `w-44` wrapper is the filter row's h-9 dress;
+   `variant="field"` is the public form's 48px box and ran the row over. a selection column
    for every role (printing is a read act) and a bar with Print 2x3.5 / 2x8 /
    2x10, each counting the selected tags that have THAT background AND a
    price. `/tags/[id]`: title, item, active, description, then the three
