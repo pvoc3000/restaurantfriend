@@ -7710,9 +7710,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    x 0.462–0.537 / y 0.773–0.887 (2x8), every file agreeing to three
    decimals, which is what makes one black box per size safe. Built-in
    Helvetica-Bold at 15 / 23 pt (Mark: no font file). Sheets are plain paper,
-   cut by hand: 2x3.5 8-up (2×4 portrait), 2x8 3-up portrait, **2x10 3-up
-   LANDSCAPE** — 10" does not fit portrait — packed edge to edge, centred,
-   hairline cut marks in the margins.
+   cut by hand: 2x3.5 8-up (2×4 portrait), **2x8 AND 2x10 3-up LANDSCAPE** —
+   10" does not fit portrait, and 2x8 went landscape the same day because a
+   portrait sheet left a quarter-inch side margin inside some printers'
+   unprintable edge, losing the cut marks — packed edge to edge, centred,
+   hairline cut marks in the margins (every margin ≥ ½", fixture-pinned).
    **EVERY "2x10" FILE IS THE 2x8 ARTWORK** (2400×600 px, 8"×2"); a 2x10 is
    that art centred on a 10" black label, an inch of black each side, which
    is seamless because the backgrounds are black.

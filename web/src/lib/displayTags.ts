@@ -62,11 +62,14 @@ export type SheetLayout = {
 /**
  * PLAIN PAPER, CUT BY HAND (Mark, 2026-09-06): labels are packed edge to edge
  * and the grid is centred on a letter sheet. 2x10 3-up only fits letter in
- * LANDSCAPE — 10" against 8.5" of portrait width.
+ * LANDSCAPE — 10" against 8.5" of portrait width — and 2x8 goes landscape
+ * too (Mark, the same day): portrait left a quarter-inch side margin, which
+ * is inside the unprintable edge of some printers, so the cut marks were
+ * lost; landscape gives an inch and a half each side.
  */
 export const SHEET_LAYOUT: Record<TagSize, SheetLayout> = {
   "2x3.5": { perSheet: 8, columns: 2, rows: 4, orientation: "portrait", page: { w: 612, h: 792 }, originX: 54, originY: 108 },
-  "2x8": { perSheet: 3, columns: 1, rows: 3, orientation: "portrait", page: { w: 612, h: 792 }, originX: 18, originY: 180 },
+  "2x8": { perSheet: 3, columns: 1, rows: 3, orientation: "landscape", page: { w: 792, h: 612 }, originX: 108, originY: 90 },
   "2x10": { perSheet: 3, columns: 1, rows: 3, orientation: "landscape", page: { w: 792, h: 612 }, originX: 36, originY: 90 },
 };
 

@@ -39,16 +39,21 @@ test("every sheet's grid fits inside its page and never overlaps", () => {
   }
 });
 
-test("the 2x10 sheet is landscape and the two others portrait", () => {
+test("the 3-up sheets are landscape, the 8-up portrait", () => {
   eq(SHEET_LAYOUT["2x10"].orientation, "landscape");
   eq(SHEET_LAYOUT["2x10"].page, { w: 792, h: 612 });
-  eq(SHEET_LAYOUT["2x8"].orientation, "portrait");
+  eq(SHEET_LAYOUT["2x8"].orientation, "landscape");
+  eq(SHEET_LAYOUT["2x8"].page, { w: 792, h: 612 });
+  // Every margin clears a printer's unprintable edge (≥ 0.5" = 36 pt).
+  for (const size of TAG_SIZES) {
+    ok(SHEET_LAYOUT[size].originX >= 36 && SHEET_LAYOUT[size].originY >= 36, `${size}: margins`);
+  }
   eq(SHEET_LAYOUT["2x3.5"].orientation, "portrait");
 });
 
 test("the eighth 2x3.5 label is the second column, fourth row", () => {
   eq(labelOrigin("2x3.5", 7), { x: 54 + 252, y: 108 + 3 * 144 });
-  eq(labelOrigin("2x8", 2), { x: 18, y: 180 + 2 * 144 });
+  eq(labelOrigin("2x8", 2), { x: 108, y: 90 + 2 * 144 });
 });
 
 test("the 2x10 centres 8-inch art with an inch of black either side", () => {
