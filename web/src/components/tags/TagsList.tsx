@@ -210,8 +210,7 @@ export function TagsList({
           ariaLabel="Which tags"
           options={[
             { key: "all", label: "All tags", count: rows.length },
-            // "On plan day:" — the date box beside it finishes the sentence.
-            { key: "plan", label: "On plan day:", count: onPlanCount },
+            { key: "plan", label: "On plan", count: onPlanCount },
           ]}
         />
         {/* The day On the plan is asked about. A real navigation (the
@@ -219,14 +218,20 @@ export function TagsList({
             force, so the day rides in the URL and the default writes none. */}
         {/* `boxed` in the cell dress is the h-9 border the search box and the
             tabs wear; the wrapper gives its `w-full` something to mean. */}
-        <div className="w-44">
-          <DateField
+        {/* The day, captioned — "On plan 23 · for 09/06/2026". The count sits
+            between the cell and the box, so the box needs a word of its own or
+            the two numbers run together (Mark, 2026-09-06). */}
+        <label className="flex items-center gap-2">
+          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">for</span>
+          <span className="block w-44">
+            <DateField
             value={day}
             onChange={(next) => router.push(next && next !== today ? `/tags?date=${next}` : "/tags")}
             ariaLabel="Which day the plan is read for"
             boxed
           />
-        </div>
+          </span>
+        </label>
         {action && <div className="ml-auto flex items-center">{action}</div>}
       </div>
 
