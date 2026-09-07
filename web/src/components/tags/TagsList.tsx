@@ -7,7 +7,21 @@ import { createClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/lib/confirm";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { urlFilterParams } from "@/lib/filterMenus";
 import { deleteTags, duplicateTag } from "./tagWrites";
+
+const PATH = "/tags";
+
+/** The list's address: `?date=` when not today, `tier=all`, `q=`. The default
+ *  view writes nothing, so a bare `/tags` stays canonical. */
+function listHref(day: string, today: string, tier: Tier, search: string): string {
+  const params = new URLSearchParams();
+  if (day !== today) params.set("date", day);
+  if (tier === "all") params.set("tier", "all");
+  if (search.trim()) params.set("q", search.trim());
+  const query = params.toString();
+  return query ? `${PATH}?${query}` : PATH;
+}
 import { DateField } from "@/components/ui/DateField";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -75,11 +89,29 @@ export function TagsList({
   const supabase = createClient();
   const [busy, startTransition] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
-  const from = { href: "/tags", label: "Tags" };
-  const [tier, setTier] = useState<Tier>("plan");
-  const [search, setSearch] = useState("");
+  // Search and tier live in the URL, written with `replaceState` (a
+  // keystroke must not re-run the page) and SEEDED FROM THE ADDRESS BAR, so
+  // coming back from a record finds the view you left — `urlFilterParams`'
+  // rule, and the reason a bare `useState("")` lost the search (Mark,
+  // 2026-09-06: "type 'the' … go back to the list, search is cleared").
+  const [tier, setTierState] = useState<Tier>(() => (urlFilterParams(PATH)?.tier === "all" ? "all" : "plan"));
+  const [search, setSearchState] = useState(() => {
+    const q = urlFilterParams(PATH)?.q;
+    return typeof q === "string" ? q : "";
+  });
+  const from = { href: listHref(day, today, tier, search), label: "Tags" };
+  function setTier(next: Tier) {
+    setTierState(next);
+    window.history.replaceState(null, "", listHref(day, today, next, search));
+  }
+  function setSearch(next: string) {
+    setSearchState(next);
+    window.history.replaceState(null, "", listHref(day, today, tier, next));
+  }
   const [checked, setChecked] = useState<Set<string>>(new Set());
-  const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "title", dir: "asc" });
+  // Item first (Mark, 2026-09-06): the tags are read against the case, which
+  // is arranged by donut, and a tag's own title is the donut's stage name.
+  const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "item", dir: "asc" });
   const href = (id: string) => withFrom(`/tags/${id}`, from);
 
   const term = search.trim().toLowerCase();
@@ -296,7 +328,7 @@ export function TagsList({
           <span className="block w-44">
             <DateField
             value={day}
-            onChange={(next) => router.push(next && next !== today ? `/tags?date=${next}` : "/tags")}
+            onChange={(next) => router.push(listHref(next ?? today, today, tier, search))}
             ariaLabel="Which day the plan is read for"
             boxed
           />
