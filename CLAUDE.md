@@ -52,6 +52,30 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    per-location, staleness chips, bulk-deactivate with "inactive everywhere"
    follow-up). Then brief §D: Inventory list + item detail, vendor detail with
    editable per-location config, vendor items everywhere.
+   **THE VENDOR ITEM'S CONTENT IS EDITABLE FROM THE GRID** (Mark, 2026-09-07:
+   "I need to be able to edit the content field from the vendor item tab on the
+   inventory item detail screen"). `package_content` had been read-only in
+   `VendorItemsTable` since 2026-07-29 on the reasoning that it is DERIVED from
+   the pack beside it, so a second hand-typed copy is only a way for the two to
+   disagree — while the vendor item's own RECORD has always offered exactly this
+   cell as a plain number you type. So the rule was never "this number is
+   computed", it was "the record is where you type it", which is a rule about
+   WHERE, and it cost a trip to another screen for a correction you are looking
+   straight at. It is ONE shared table, so the vendor record's Items tab gets it
+   too: making a cell editable on one of the two screens it appears on is the
+   "I edited this and it only changed here" complaint waiting to happen.
+   **What the original note was RIGHT about survives** — a typed content can
+   silently disagree with the pack on the row, and nothing in the grid shows the
+   pack. `RecalcContent` on the record is what surfaces that: it renders only
+   when the two differ, and names the number it would write.
+   The cell NAMES ITS OWN UNIT (`Content in lbs`), which matters on the VENDOR
+   screen where every row is a different item and so a different `base_unit`;
+   and it keeps `qty`'s trimming as a `format`, so a numeric column's "50.000"
+   still reads 50 at rest while editing shows the raw number.
+   Verified against the live catalog and left as found: Restaurant Depot's All
+   Purpose Flour 50 → 45 → 50, with the derived Unit price moving $0.22 → $0.24
+   → $0.22 per lb, which is what proves the write reached the database rather
+   than the cell.
 4. 🚧 Web order guide + PO generation/processing + receiving (real Monday orders).
    Shipped: `/order-guide` — walk-order sections, item headers with par, lines
    nested (multi-favorite), three-state qty boxes, count mode
@@ -7710,6 +7734,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `grep -rln '<RowMenu\|key: "select"\|checked.size > 0'`; every other list
    already wrapped its commands in `editable`. **A selection column exists for
    its bar; if the bar has nothing a role may press, drop the column too.**
+   **Fourth hole, found 2026-09-07 while editing that file for another
+   reason: `VendorItemsTable`'s CELLS.** It took `canEdit` and spent it on the
+   ⋯ column alone, with a comment saying so — every `InlineValue` in it
+   rendered for everyone "and let the database refuse the write", which below
+   purchaser+ is a cell that opens, accepts typing, matches zero rows and
+   returns NO error. It is the one table that appears on TWO records (a
+   vendor's Items tab and an item's Vendor Items tab), so the hole was on both.
+   All six cells take `readOnly={!canEdit}` now. The 2026-09-04 sweep listed
+   the six components that had never taken an editable flag and this was not
+   among them, because it HAD the flag — **so grep for the flag being USED, not
+   for its absence.**
    **THE SHEET WAS REVISED THE SAME AFTERNOON** (Mark, on a purchaser account:
    "purchasers should have almost manager access, minus HR"): a purchaser now
    WRITES Plans, Items, Elements, Recipes, Invoices and Customers, and

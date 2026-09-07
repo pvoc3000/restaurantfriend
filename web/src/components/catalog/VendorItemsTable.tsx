@@ -36,8 +36,12 @@ export type VendorItemWithItem = CatalogVendorItem & {
  *
  * Price edits go straight to vendor_items.price — the DB trigger writes the
  * price history, so nothing is logged here (CLAUDE.md rule 6). package_content
- * is in the ITEM's base unit; the cleanup drawer has the amount × size × unit
- * calculator for the cases where that math isn't obvious.
+ * is in the ITEM's base unit.
+ *
+ * EVERY CELL TAKES `canEdit`, not just the ⋯ menu (2026-09-07). They used to
+ * render for everyone and let the database refuse, which below purchaser+ is a
+ * cell that opens, accepts typing, matches zero rows and returns NO error — the
+ * Page Permissions rule, which this table had been missed by.
  */
 export function VendorItemsTable({
   vendorItems,
@@ -67,11 +71,11 @@ export function VendorItemsTable({
   heading?: ReactNode;
   showLastOrdered?: boolean;
   /**
-   * Purchaser+, which is what the RLS policy on `vendor_items` allows. Only the
-   * ⋯ column depends on it — every other cell here is an `InlineValue` or an
-   * `ActiveToggle`, which have always rendered for everyone and let the database
-   * refuse the write. The menu is different: it OFFERS a delete, and offering
-   * one that will bounce is worse than not showing it.
+   * Purchaser+, which is what the RLS policy on `vendor_items` allows. EVERY
+   * cell reads it: an `InlineValue` that renders for everyone offers a write
+   * the database silently refuses (zero rows, no error), which is the whole
+   * reason `readOnly` exists. The ⋯ menu is gated for the sharper version of
+   * the same argument — it OFFERS a delete.
    */
   canEdit?: boolean;
 }) {
@@ -252,7 +256,13 @@ export function VendorItemsTable({
       width: 130,
       sortValue: (vi) => vi.product_id,
       render: (vi) => (
-        <InlineValue table="vendor_items" id={vi.id} column="product_id" value={vi.product_id} />
+        <InlineValue
+          readOnly={!canEdit}
+          table="vendor_items"
+          id={vi.id}
+          column="product_id"
+          value={vi.product_id}
+        />
       ),
     },
     {
@@ -261,7 +271,13 @@ export function VendorItemsTable({
       width: 130,
       sortValue: (vi) => vi.brand,
       render: (vi) => (
-        <InlineValue table="vendor_items" id={vi.id} column="brand" value={vi.brand} />
+        <InlineValue
+          readOnly={!canEdit}
+          table="vendor_items"
+          id={vi.id}
+          column="brand"
+          value={vi.brand}
+        />
       ),
     },
     {
@@ -270,7 +286,13 @@ export function VendorItemsTable({
       width: 310,
       sortValue: (vi) => vi.description,
       render: (vi) => (
-        <InlineValue table="vendor_items" id={vi.id} column="description" value={vi.description} />
+        <InlineValue
+          readOnly={!canEdit}
+          table="vendor_items"
+          id={vi.id}
+          column="description"
+          value={vi.description}
+        />
       ),
     },
     {
@@ -282,6 +304,7 @@ export function VendorItemsTable({
       sortValue: (vi) => vi.package_desc,
       render: (vi) => (
         <InlineValue
+          readOnly={!canEdit}
           table="vendor_items"
           id={vi.id}
           column="package_desc"
@@ -297,11 +320,45 @@ export function VendorItemsTable({
       width: 110,
       align: "right",
       sortValue: (vi) => (vi.package_content === null ? null : Number(vi.package_content)),
-      // Read-only (Mark, 2026-07-29). It's the base-unit total the ordering
-      // math divides by, derivable from the pack structure beside it, and a
-      // second hand-typed copy of a derived number is only ever a way for the
-      // two to disagree. The vendor item's own record derives and writes it.
-      render: (vi) => qty(vi.package_content),
+      /**
+       * EDITABLE since 2026-09-07 (Mark: "I need to be able to edit the content
+       * field from the vendor item tab on the inventory item detail screen").
+       *
+       * It was read-only from 2026-07-29 on the reasoning that it is derived
+       * from the pack beside it, so a second hand-typed copy is only a way for
+       * the two to disagree — and the vendor item's own RECORD has always
+       * offered exactly this cell, as a plain number you type. So the rule was
+       * never "this number is computed"; it was "the record is where you type
+       * it", which is a rule about where rather than about what, and it cost a
+       * trip to another screen for a correction you are looking straight at.
+       *
+       * WHAT THE ORIGINAL NOTE WAS RIGHT ABOUT, and it survives: a typed
+       * content can silently disagree with the pack stored on the row, and
+       * nothing HERE shows the pack. The record's `RecalcContent` is what
+       * surfaces that — it appears only when the two differ, and names the
+       * number it would write.
+       *
+       * The unit is the ITEM's `base_unit`, which on the vendor screen differs
+       * from row to row, so the cell names it rather than leaving a bare number
+       * announcing itself as "—, click to edit" down a column of identical
+       * cells.
+       */
+      render: (vi) => (
+        <InlineValue
+          readOnly={!canEdit}
+          table="vendor_items"
+          id={vi.id}
+          column="package_content"
+          value={vi.package_content}
+          kind="number"
+          align="right"
+          // A numeric column comes back with its scale ("18.000"), which is
+          // what `qty` has always trimmed for this cell. Display only —
+          // editing shows the raw value, which is the number you are correcting.
+          format={(v) => qty(Number(v))}
+          ariaLabel={`Content in ${unitFor(vi)}`}
+        />
+      ),
     },
     {
       key: "price",
@@ -311,6 +368,7 @@ export function VendorItemsTable({
       sortValue: (vi) => (vi.price === null ? null : Number(vi.price)),
       render: (vi) => (
         <InlineValue
+          readOnly={!canEdit}
           table="vendor_items"
           id={vi.id}
           column="price"
@@ -337,7 +395,13 @@ export function VendorItemsTable({
       width: 180,
       sortValue: (vi) => vi.notes,
       render: (vi) => (
-        <InlineValue table="vendor_items" id={vi.id} column="notes" value={vi.notes} />
+        <InlineValue
+          readOnly={!canEdit}
+          table="vendor_items"
+          id={vi.id}
+          column="notes"
+          value={vi.notes}
+        />
       ),
     },
     ...(showLastOrdered
