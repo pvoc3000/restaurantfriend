@@ -193,7 +193,6 @@ export function TagsList({
   return (
     <div className="space-y-6">
       <PageHeading title="Tags" code={locationCode} visible={visible.length} total={rows.length} noun="tags" />
-      <p className="text-sm text-muted">The display signs for the case, priced for this shop.</p>
 
       <div className="flex flex-wrap items-center gap-3">
         <TextInput
@@ -235,6 +234,27 @@ export function TagsList({
         {action && <div className="ml-auto flex items-center">{action}</div>}
       </div>
 
+      {/* Below the filters rather than under the table (Mark, 2026-09-06):
+          a list of 84 puts a bar under the table a screen away from the
+          boxes you are ticking. */}
+      {checked.size > 0 ? (
+        <div className="flex flex-wrap items-center gap-4 border border-ink bg-white px-4 py-3 text-sm">
+          <span className="font-medium">
+            {checked.size} {checked.size === 1 ? "tag" : "tags"} selected
+          </span>
+          {TAG_SIZES.map((s) => (
+            <PrintTags key={s} size={s} tags={selected} locationCode={locationCode} today={today} />
+          ))}
+          <button
+            type="button"
+            onClick={() => setChecked(new Set())}
+            className="ml-auto text-muted underline underline-offset-[3px] hover:text-ink"
+          >
+            Clear
+          </button>
+        </div>
+      ) : null}
+
       <DataTable
         rows={sorted}
         columns={columns}
@@ -254,23 +274,6 @@ export function TagsList({
         }
       />
 
-      {checked.size > 0 ? (
-        <div className="flex flex-wrap items-center gap-4 border border-ink bg-white px-4 py-3 text-sm">
-          <span className="font-medium">
-            {checked.size} {checked.size === 1 ? "tag" : "tags"} selected
-          </span>
-          {TAG_SIZES.map((s) => (
-            <PrintTags key={s} size={s} tags={selected} locationCode={locationCode} today={today} />
-          ))}
-          <button
-            type="button"
-            onClick={() => setChecked(new Set())}
-            className="ml-auto text-muted underline underline-offset-[3px] hover:text-ink"
-          >
-            Clear
-          </button>
-        </div>
-      ) : null}
     </div>
   );
 }
