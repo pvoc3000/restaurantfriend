@@ -146,6 +146,8 @@ export default async function TagsPage({
       locationCode={active.code}
       today={today}
       day={day}
+      orgId={orgId}
+      editable={editable}
       action={editable && <NewTag orgId={orgId} items={itemOptions} />}
     />
   );

@@ -40,10 +40,12 @@ export default async function TagPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<RawSearchParams>;
+  searchParams: Promise<RawSearchParams & { warning?: string }>;
 }) {
   const { id } = await params;
   const rawParams = await searchParams;
+  // What a Duplicate could not carry across — one sentence, read once.
+  const warning = typeof rawParams.warning === "string" ? rawParams.warning : null;
   const session = await getAppSession();
   const supabase = await createClient();
   const orgId = session.membership.org_id;
@@ -145,10 +147,12 @@ export default async function TagPage({
         </div>
         {editable && (
           <div className="ml-auto">
-            <TagActions tagId={id} title={row.title} imagePaths={paths} />
+            <TagActions orgId={orgId} tagId={id} title={row.title} imagePaths={paths} />
           </div>
         )}
       </div>
+
+      {warning && <p className="text-sm text-accent">{warning}</p>}
 
       <section className="space-y-4">
         <SectionHeading>Details</SectionHeading>

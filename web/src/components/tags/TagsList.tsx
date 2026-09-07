@@ -1,8 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { confirmDialog } from "@/lib/confirm";
+import { RowMenu } from "@/components/ui/RowMenu";
+import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { deleteTags, duplicateTag } from "./tagWrites";
 import { DateField } from "@/components/ui/DateField";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -52,6 +57,8 @@ export function TagsList({
   locationCode,
   today,
   day,
+  orgId,
+  editable,
   action,
 }: {
   rows: TagRow[];
@@ -59,9 +66,15 @@ export function TagsList({
   today: string;
   /** The day On the plan is asked about — `?date=`, default today. */
   day: string;
+  orgId: string;
+  /** Purchaser+: the row menu and the bar's Delete. Printing needs no gate. */
+  editable: boolean;
   action?: React.ReactNode;
 }) {
   const router = useRouter();
+  const supabase = createClient();
+  const [busy, startTransition] = useTransition();
+  const [failed, setFailed] = useState<string | null>(null);
   const from = { href: "/tags", label: "Tags" };
   const [tier, setTier] = useState<Tier>("plan");
   const [search, setSearch] = useState("");
@@ -91,6 +104,44 @@ export function TagsList({
     });
   }
   const allChecked = visible.length > 0 && visible.every((r) => checked.has(r.id));
+
+  // ONE implementation behind the bar and the row menu (`deleteOrders`' rule):
+  // the confirm names the tag when it is one, the count when it is several.
+  async function remove(targets: TagRow[]) {
+    const one = targets.length === 1 ? targets[0] : null;
+    const backgrounds = targets.reduce((n, t) => n + Object.keys(t.images).length, 0);
+    const ok = await confirmDialog({
+      title: one ? `Delete “${one.title}”?` : `Delete ${targets.length} tags?`,
+      body: `${backgrounds === 0 ? "" : `${backgrounds} background${backgrounds === 1 ? " goes" : "s go"} with ${one ? "it" : "them"}. `}This cannot be undone.`,
+      tone: "danger",
+      confirmLabel: one ? "Delete it" : "Delete them",
+    });
+    if (!ok) return;
+    setFailed(null);
+    startTransition(async () => {
+      const result = await deleteTags(
+        supabase,
+        targets.map((t) => ({ id: t.id, paths: Object.values(t.images).map((i) => i.path) }))
+      );
+      if (result.error) setFailed(result.error);
+      setChecked((prev) => {
+        const next = new Set(prev);
+        targets.forEach((t) => next.delete(t.id));
+        return next;
+      });
+      router.refresh();
+    });
+  }
+
+  function duplicate(tag: TagRow) {
+    setFailed(null);
+    startTransition(async () => {
+      const result = await duplicateTag(supabase, orgId, tag.id);
+      if (result.error || !result.id) return setFailed(result.error ?? "The copy was not created.");
+      if (result.warning) setFailed(result.warning);
+      router.push(withFrom(`/tags/${result.id}`, from));
+    });
+  }
 
   const columns: DataColumn<TagRow>[] = [
     {
@@ -179,6 +230,26 @@ export function TagsList({
       sortValue: (r) => (r.on_plan ? 0 : 1),
       render: (r) => (r.on_plan ? <span>{locationCode}</span> : <span className="text-faint">—</span>),
     },
+    // The row's own commands — unlabelled, so the Columns menu never offers it.
+    ...(editable
+      ? [
+          {
+            key: "menu",
+            label: "",
+            width: 48,
+            align: "right",
+            render: (r: TagRow) => (
+              <RowMenu
+                label={`Actions for ${r.title}`}
+                items={[
+                  { label: "Duplicate", hint: "A copy with the same backgrounds", onSelect: () => duplicate(r) },
+                  { label: "Delete", danger: true, onSelect: () => void remove([r]) },
+                ]}
+              />
+            ),
+          } satisfies DataColumn<TagRow>,
+        ]
+      : []),
   ];
 
   const sorted = useMemo(() => sortRows(visible, columns, sort), [visible, sort]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -245,6 +316,12 @@ export function TagsList({
           {TAG_SIZES.map((s) => (
             <PrintTags key={s} size={s} tags={selected} locationCode={locationCode} today={today} />
           ))}
+          {editable && (
+            <button type="button" className={DANGER_BUTTON_CLASS} disabled={busy} onClick={() => void remove(selected)}>
+              Delete
+            </button>
+          )}
+          {failed && <span className="text-accent">{failed}</span>}
           <button
             type="button"
             onClick={() => setChecked(new Set())}
@@ -255,6 +332,7 @@ export function TagsList({
         </div>
       ) : null}
 
+      {failed && checked.size === 0 && <p className="text-sm text-accent">{failed}</p>}
       <DataTable
         rows={sorted}
         columns={columns}

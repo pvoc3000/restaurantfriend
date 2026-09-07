@@ -3,13 +3,23 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog } from "@/lib/confirm";
-import { TAG_BUCKET } from "@/lib/displayTags";
+import { deleteTags, duplicateTag } from "./tagWrites";
 
-/** Delete a tag — purchaser+ (095). Row first (the image rows cascade), then
- *  its objects; every write `.select()`s its own result. */
-export function TagActions({ tagId, title, imagePaths }: { tagId: string; title: string; imagePaths: string[] }) {
+/** Duplicate and Delete — purchaser+ (095), through the same two writes the
+ *  list's bar and row menu use (`tagWrites`). */
+export function TagActions({
+  orgId,
+  tagId,
+  title,
+  imagePaths,
+}: {
+  orgId: string;
+  tagId: string;
+  title: string;
+  imagePaths: string[];
+}) {
   const router = useRouter();
   const supabase = createClient();
   const [failed, setFailed] = useState<string | null>(null);
@@ -28,16 +38,26 @@ export function TagActions({ tagId, title, imagePaths }: { tagId: string; title:
     if (!ok) return;
     setFailed(null);
     startTransition(async () => {
-      const { data, error } = await supabase.from("display_tags").delete().eq("id", tagId).select("id");
-      if (error) return setFailed(error.message);
-      if (!data || data.length === 0) return setFailed("Nothing was deleted — you may not have permission.");
-      if (imagePaths.length > 0) await supabase.storage.from(TAG_BUCKET).remove(imagePaths);
+      const result = await deleteTags(supabase, [{ id: tagId, paths: imagePaths }]);
+      if (result.error) return setFailed(result.error);
       router.push("/tags");
+    });
+  }
+
+  function duplicate() {
+    setFailed(null);
+    startTransition(async () => {
+      const result = await duplicateTag(supabase, orgId, tagId);
+      if (result.error || !result.id) return setFailed(result.error ?? "The copy was not created.");
+      router.push(`/tags/${result.id}?from=%2Ftags&fromLabel=Tags${result.warning ? `&warning=${encodeURIComponent(result.warning)}` : ""}`);
     });
   }
 
   return (
     <span className="flex items-center gap-3">
+      <button type="button" className={BUTTON_CLASS} disabled={busy} onClick={duplicate}>
+        Duplicate
+      </button>
       <button type="button" className={DANGER_BUTTON_CLASS} disabled={busy} onClick={() => void remove()}>
         Delete
       </button>
