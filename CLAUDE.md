@@ -52,6 +52,29 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    per-location, staleness chips, bulk-deactivate with "inactive everywhere"
    follow-up). Then brief §D: Inventory list + item detail, vendor detail with
    editable per-location config, vendor items everywhere.
+   **THE VENDOR'S ITEMS PANE ENDS AT THE FOOT OF THE WINDOW** (Mark,
+   2026-09-07) — `DataTable`'s new `fillViewport`, which swaps
+   `useFillViewportHeight`'s CAP for `useExactViewportHeight`'s definite height
+   on a `scroll` pane. **The two are identical on a list that already
+   overflows**, which is the case you normally see and why measuring first
+   mattered: at 720, 900 and 1000 the pane already reached 32px above the
+   bottom (the layout's own `py-8`) with the page not scrolling. What the cap
+   leaves content-sized is a SHORT list — filtering BakeMark's 95 items to 3
+   collapsed the pane 528px → 128px and stranded it at the top of a screen of
+   white, and a vendor that simply has six items does the same thing with no
+   filter at all. Measured after: 528.5px at 95 rows and at 3, page not
+   scrolling either way.
+   **NOT the default for `scroll`**, which is the wrapper's own note being
+   respected rather than overruled — dropping `min-h-64` was deliberate so that
+   "a short table is as tall as its rows and a long one stops at the window",
+   and that is right for a pane with a page under it and wrong for one that IS
+   the screen. `fill` (invoice detail, where the parent decides) still wins over
+   both, and `/events` keeps the cap.
+   Note the pane has NO BORDER, so on a short list what changes is the layout
+   holding still as you filter rather than anything you can point at; if a stub
+   table under a full-height pane ever wants marking, that is a frame and a
+   separate decision.
+
    **THE VENDOR ITEM'S CONTENT IS EDITABLE FROM THE GRID** (Mark, 2026-09-07:
    "I need to be able to edit the content field from the vendor item tab on the
    inventory item detail screen"). `package_content` had been read-only in

@@ -49,6 +49,7 @@ export function VendorItemsTable({
   showVendor = false,
   showItem = false,
   scroll = false,
+  fillViewport = false,
   from,
   filters = false,
   heading,
@@ -61,6 +62,9 @@ export function VendorItemsTable({
   showItem?: boolean;
   /** Own scroll pane with a sticky header — for vendors with hundreds of items. */
   scroll?: boolean;
+  /** With `scroll`: that pane ends at the foot of the window, however few rows
+   *  survive the filters. See `DataTable`. */
+  fillViewport?: boolean;
   /** Where links out of this table should return to. */
   from?: Crumb;
   /** Search + category + active + last-ordered bar, as on the Inventory list. */
@@ -505,6 +509,7 @@ export function VendorItemsTable({
       }
       rowClassName={(vi) => (vi.is_active ? "" : "text-faint")}
       scroll={scroll}
+      fillViewport={fillViewport}
       // No maxHeightClass: DataTable measures the remaining window instead
       // (lib/tableHead's useFillViewportHeight). The constant that used to live
       // here — 100vh − 36rem, sized around the filter bar — was 101px too tall

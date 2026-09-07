@@ -466,6 +466,7 @@ export async function VendorDetail({
                   vendorItems={itemsWithAge}
                   showItem
                   scroll
+                  fillViewport
                   from={here}
                   filters
                   showLastOrdered={session.activeLocation !== null}

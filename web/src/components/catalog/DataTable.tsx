@@ -31,6 +31,7 @@ import { useScrollMemory } from "@/lib/scrollMemory";
 import {
   STICKY_HEAD_ROW,
   STICKY_HEAD_ROW_IN_PANE,
+  useExactViewportHeight,
   useFillViewportHeight,
   useOverflowOnlyWhenNeeded,
   useViewportAtLeast,
@@ -188,6 +189,7 @@ export function DataTable<T>({
   onRowClick,
   scroll = false,
   fill = false,
+  fillViewport = false,
   maxHeightClass,
   empty,
   expand,
@@ -255,6 +257,26 @@ export function DataTable<T>({
    * same trap the receiving screen's lines pane documents.
    */
   fill?: boolean;
+  /**
+   * With `scroll`: the pane ends where the WINDOW does, whatever its rows come
+   * to (Mark, 2026-09-07, of the vendor's items: "make the vendoritem table …
+   * extend to the bottom of the screen").
+   *
+   * The difference from the cap is only visible on a SHORT list. A cap leaves
+   * the box content-sized, so filtering 95 items down to 3 collapses the table
+   * to 128px and strands it at the top of a screen of white; a definite height
+   * keeps the pane where it is and scrolls three rows inside it. On a list that
+   * already overflows the two are identical, which is why this changes nothing
+   * for the case you normally see.
+   *
+   * NOT the default for `scroll`, and the reason is in the wrapper's own note:
+   * dropping `min-h-64` was deliberate, so that "a short table is as tall as its
+   * rows and a long one stops at the window". That rule is right for a pane with
+   * a page under it and wrong for one that IS the screen — hence a caller's
+   * choice rather than a new default. `fill` (the parent decides) still wins
+   * over both.
+   */
+  fillViewport?: boolean;
   maxHeightClass?: string;
   /**
    * What to say instead of the table when there are no rows — "No vendors match
@@ -442,7 +464,13 @@ export function DataTable<T>({
   // hook said "as far as the window minus what follows you", and the smaller
   // won. Dragging down past that point did nothing at all, which reads exactly
   // as the list not being part of the split.
-  useFillViewportHeight(paneRef, scroll && !fill && !maxHeightClass && rows.length > 0);
+  // Mutually exclusive: both write to the same node's style, so a pane can be
+  // capped or sized, never both.
+  const sizesToWindow = scroll && !fill && !maxHeightClass && rows.length > 0;
+  useFillViewportHeight(paneRef, sizesToWindow && !fillViewport);
+  // The same 256px floor the cap has, not the hook's own 320: past it the page
+  // scrolls instead, and this pane has always stopped there.
+  useExactViewportHeight(paneRef, sizesToWindow && fillViewport, 256);
 
   // COMPACT: below `compactBelow` the marked columns come out, so the table
   // narrows enough to fit — which is what lets its labels stick. A threshold of
