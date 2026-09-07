@@ -209,8 +209,9 @@ export function TagsList({
           onChange={setTier}
           ariaLabel="Which tags"
           options={[
-            { key: "plan", label: "On the plan", count: onPlanCount },
             { key: "all", label: "All tags", count: rows.length },
+            // "On plan day:" — the date box beside it finishes the sentence.
+            { key: "plan", label: "On plan day:", count: onPlanCount },
           ]}
         />
         {/* The day On the plan is asked about. A real navigation (the
