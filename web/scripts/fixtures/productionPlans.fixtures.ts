@@ -5,6 +5,7 @@
 
 import {
   coversDate,
+  isCurrentPlan,
   rangesOverlap,
   overlappingPlans,
   planRange,
@@ -606,4 +607,32 @@ test("sellingShopsForKitchen returns each shop once however many plans it has", 
 test("sellingShopsForKitchen is empty when no plan reaches the kitchen", () => {
   const plans = [plan({ location_id: DF02, kitchen_location_id: DF02 })];
   eq(sellingShopsForKitchen(plans, DF01, { starts_on: "2026-10-05", ends_on: "2026-10-05" }), []);
+});
+
+/* -- current --------------------------------------------------------------- */
+
+test("a plan is current when it is active and covers today", () => {
+  ok(isCurrentPlan(plan(), "2026-10-15"));
+  ok(isCurrentPlan(plan(), "2026-10-01"));
+  ok(isCurrentPlan(plan(), "2026-10-31"));
+});
+
+test("a plan out of season is not current", () => {
+  // Next month's plan and last spring's both sit in the list looking active;
+  // this is the half nothing on the screen used to answer.
+  no(isCurrentPlan(plan(), "2026-09-30"));
+  no(isCurrentPlan(plan(), "2026-11-01"));
+});
+
+test("an inactive plan is never current, even in season", () => {
+  // Generation reads the ACTIVE plans, so a retired one makes nothing today
+  // however its dates read.
+  no(isCurrentPlan(plan({ is_active: false }), "2026-10-15"));
+});
+
+test("an open-ended plan is current from its first day on", () => {
+  const p = plan({ ends_on: null });
+  no(isCurrentPlan(p, "2026-09-30"));
+  ok(isCurrentPlan(p, "2026-10-01"));
+  ok(isCurrentPlan(p, "2099-01-01"));
 });

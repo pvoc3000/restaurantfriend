@@ -34,6 +34,28 @@ export function coversDate(plan: PlanDates, date: string): boolean {
   return plan.ends_on === null || date <= plan.ends_on;
 }
 
+/**
+ * Is this plan the one the shop is running RIGHT NOW — active, and covering
+ * today?
+ *
+ * BOTH HALVES ARE LOAD-BEARING and each is silent on its own. An inactive plan
+ * covering today makes nothing (generation reads the active ones), and an
+ * active plan whose season opens in November is not what the kitchen is
+ * working from this morning. The Active column has always answered the first
+ * half and nothing answered the second, so last spring's plan and next month's
+ * sat in the list looking exactly like the one in force.
+ *
+ * `today` is the ORG's calendar day, never the browser's or the server's — a
+ * plan's dates are business dates, and after 4pm Pacific a UTC "today" is
+ * tomorrow, which is enough to move a season boundary by a day.
+ */
+export function isCurrentPlan(
+  plan: PlanDates & { is_active: boolean },
+  today: string
+): boolean {
+  return plan.is_active && coversDate(plan, today);
+}
+
 /** Do two plans' date ranges touch at all? */
 export function rangesOverlap(a: PlanDates, b: PlanDates): boolean {
   const aEnds = a.ends_on ?? "9999-12-31";

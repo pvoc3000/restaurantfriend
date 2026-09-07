@@ -27,6 +27,7 @@ import {
   type RawSearchParams,
 } from "@/lib/filterMenus";
 import {
+  isCurrentPlan,
   overlappingPlans,
   planRange,
   duplicateTitle,
@@ -76,6 +77,7 @@ export function PlansList({
   rows,
   orgId,
   editable,
+  today,
   initialFilters,
   initialSearch = "",
   locationCode,
@@ -84,6 +86,8 @@ export function PlansList({
   rows: PlanRow[];
   orgId: string;
   editable: boolean;
+  /** The ORG's calendar day, for the Current flag. */
+  today: string;
   /** The URL's query, raw. */
   initialFilters?: RawSearchParams;
   initialSearch?: string;
@@ -375,16 +379,32 @@ export function PlansList({
       sortValue: (r) => r.title,
       render: (r) => (
         <span className="block">
-          <Link href={detailHref(r.id)} className="font-medium hover:underline">
-            {r.title}
-          </Link>
+          {/* The link takes what it needs and the flag keeps its width: the
+              cell truncates, so a chip after a long title would be the half
+              that got cut. */}
+          <span className="flex min-w-0 items-center gap-2">
+            <Link href={detailHref(r.id)} className="min-w-0 truncate font-medium hover:underline">
+              {r.title}
+            </Link>
+            {isCurrentPlan(r, today) ? (
+              <span
+                className="shrink-0 bg-mark-fill px-1 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink"
+                title={`In force today (${planRange(r)})`}
+              >
+                current
+              </span>
+            ) : null}
+          </span>
           {overlaps.has(r.id) ? (
-            // Yellow: worth an eye, not wrong. Decision 9 names this exactly.
-            <span
-              className="block text-[12px] text-mark"
-              title={`Also active here: ${overlaps.get(r.id)!.join(", ")}. Pars will sum.`}
-            >
-              overlaps {overlaps.get(r.id)!.length === 1 ? "1 other plan" : `${overlaps.get(r.id)!.length} other plans`}
+            // Worth an eye, not wrong — decision 9 names this exactly. A FILL
+            // and not `text-mark`, which on white measures 1.43:1.
+            <span className="block">
+              <span
+                className="bg-mark-fill px-1 text-[12px]"
+                title={`Also active here: ${overlaps.get(r.id)!.join(", ")}. Pars will sum.`}
+              >
+                overlaps {overlaps.get(r.id)!.length === 1 ? "1 other plan" : `${overlaps.get(r.id)!.length} other plans`}
+              </span>
             </span>
           ) : null}
         </span>
@@ -408,7 +428,10 @@ export function PlansList({
       // from the selling shop is the case FMP could not express at all.
       render: (r) =>
         r.kitchenCode === null ? (
-          <span className="text-mark" title="No kitchen set — generation will not know who makes this">
+          <span
+            className="bg-mark-fill px-1"
+            title="No kitchen set — generation will not know who makes this"
+          >
             not set
           </span>
         ) : (

@@ -25,6 +25,10 @@ export default async function PlansPage({
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canEditPage(session.membership.role, "/plans");
+  // The ORG's calendar day — what "current" and a new plan's first day both
+  // mean. `guideToday` for the reason `lib/today` exists: a UTC day rolls at
+  // 5pm here.
+  const today = guideToday(session.orgSettings.timezone ?? serverTimeZone()).date;
 
   const [{ data: plans, error }, { data: trays }, { data: slots }] = await Promise.all([
     supabase
@@ -108,6 +112,7 @@ export default async function PlansPage({
         rows={rows}
         orgId={session.membership.org_id}
         editable={editable}
+        today={today}
         initialFilters={params}
         initialSearch={parseFilterSearch(params)}
         locationCode={session.activeLocation?.code ?? null}
@@ -116,7 +121,7 @@ export default async function PlansPage({
             <NewPlan
               orgId={session.membership.org_id}
               locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
-              today={guideToday(session.orgSettings.timezone ?? serverTimeZone()).date}
+              today={today}
             />
           ) : null
         }
