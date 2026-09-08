@@ -3716,6 +3716,78 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    a row, the dough included, rendered as **"1/340 of a batch"** because that is
    how a baker says it, and anything unpriced says so on its own line rather
    than being dropped from the total.
+   **THE RECORD IS TWO COLUMNS SINCE 2026-09-08** (Mark: "move the 'default
+   pars' section into a second column next to the 'what it costs' section, and
+   make the 'last two weeks' section fit into a single column instead of
+   spanning the entire screen"). What it costs and Default pars are both narrow
+   tables that were each running the full width of the screen, so the record was
+   three short blocks stacked down 1,300px. `xl:grid-cols-[minmax(0,1fr)_minmax
+   (0,1fr)]` — `minmax(0,…)` and not a bare `1fr`, because a grid item's
+   min-width is min-content and the history's `min-w-[520px]` would otherwise
+   push its own track past half and the page sideways — with `items-start` so a
+   tall left column does not stretch the right into white space. The history
+   takes column ONE of the second row by ordinary auto placement, which is the
+   third part of the ask with no code of its own. Measured at 1440 (columns
+   48–689 / 737–1377, tops level, no overflow), 1280 (48–609 / 657–1217, the
+   pars strip's seven pens 35px each, the history's table still inside its
+   641px box with no horizontal scroll) and 1024, where it stacks.
+   Known cost, accepted: in half a column the pars table's Location cell
+   truncates the shop's NAME. The CODE is what identifies it and stays whole.
+   **THE LIST HAS A ⋯ — Duplicate and Delete** (`ProductionItemActions`, Mark,
+   2026-09-08), `InventoryItemActions`' template, purchaser+ per the Page
+   Permissions sheet.
+   **DUPLICATE COPIES WHAT THE ITEM IS, NOT WHERE IT HAS BEEN** — the master
+   row, its components and its per-shop rows (default pars and price
+   overrides), which is everything the record screen shows. Deliberately NOT a
+   plan slot, a schedule line or a par override: those are facts about menus and
+   days somebody wrote, and a copy landing on a plan would quietly double a
+   shop's production, which is why a duplicated PLAN arrives inactive. The copy
+   IS `is_active` like its original, which is safe for the mirror reason — an
+   item is made because it is on a tray, and this one is on none — while
+   **`show_on_inquiry_form` is NOT copied**, because that flag is PUBLIC and a
+   row named "… copy" must not appear on the customer inquiry form the moment it
+   exists.
+   **THE COLUMN LIST WAS WRITTEN FROM 037 AND 037 IS NOT THE CURRENT TABLE.**
+   The first real duplicate failed with `column production_items.base_element_id
+   does not exist` — **049 dropped it** ("an item is a list of components, and
+   none of them is special"). Probe the columns; do not read the migration that
+   created them. That is the same rule 096's header states for a FUNCTION, and
+   it is worth as much for a table.
+   **DELETE CAN BE REFUSED BY THE DATABASE, which is the one place this differs
+   from the inventory item's menu.** `production_plan_tray_items` (039) and
+   `production_schedule_items` (040) are `on delete restrict`, so an item on a
+   plan or on any schedule ever generated CANNOT be deleted whatever a confirm
+   says. So the count is taken first and the button is DISABLED with the reason
+   on screen — a control that can only fail is worse than a sentence
+   (`NewLocation`'s rule), and this is not `closeReadiness`' name-it-and-let-you-
+   through case, because there is no through. Everything else is stated the way
+   that menu states it: components, per-shop rows and par overrides CASCADE,
+   while special-order lines and display tags go `set null` and survive
+   unlinked.
+   **THE ⋯ COST 74 WEIGHTS AND EVERY ONE WAS MEASURED.** The total stays at
+   1340, so every column not named keeps its exact pixels (checked: Active 79,
+   Item, Type 119, Cut 129, Finish 149, On it 89 unmoved at 1440). Cost and
+   Price were 129px cells holding 64px figures, Size 99px holding "Regular",
+   Margin sat 6px above its own label — and Item gave up 6 because it WRAPS, so
+   what it loses is a wrap point rather than any text. **68, the app's usual ⋯
+   width, was not enough here**: eleven columns at a 1280 window resolve at
+   0.87px per weight, which made it a 59px cell holding 35px of room for a 36px
+   button. Widths key bumped to **v4** — a stored width outranks the declared
+   one, so without it anyone who had dragged this table would keep the old
+   numbers against a total that no longer adds up.
+   Walked live and left as found (309 items): Fudgegazi duplicated with its 5
+   components and 4 per-shop rows — including one at a shop the record does not
+   list, which is right, that row is real config — and deleted again; the
+   original's own confirm correctly read "cannot be deleted: it is on 14 plan
+   slots and 24 schedule lines" over a disabled button, with 25 special-order
+   lines and 1 display tag named as left behind.
+   **Harness note:** the pane's screenshots go blank or stale on this screen
+   while the DOM is perfectly fine, and a freshly loaded page often has not
+   hydrated, so a `.click()` on a menu trigger leaves `aria-expanded="false"`.
+   Reload, wait, and verify what opened by reading the DOM rather than by
+   looking. `compactBelow` is the other one: `matchMedia` only re-evaluates on a
+   `change` event, so after `resize_window` the wide column set survives even a
+   reload — nudge the width by a pixel to make the tier fire.
    **Per-location pars are EDITABLE AGAIN since 2026-09-04 (Mark: "we should
    be able to edit the default pars"), and the block is titled "Default pars"**
    — seven `InlineValue`s per shop through `arrayColumn`, each in its own

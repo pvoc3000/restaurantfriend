@@ -22,6 +22,7 @@ import {
   type RawSearchParams,
 } from "@/lib/filterMenus";
 import { sortRows } from "@/lib/tableSort";
+import { ProductionItemActions } from "./ProductionItemActions";
 import { formatCost, unresolvedSummary, type Cost } from "@/lib/productionCost";
 import { formatMargin, type PriceSource } from "@/lib/productionPrice";
 
@@ -278,6 +279,11 @@ export function ProductionItemsList({
   const detailHref = (id: string) =>
     withFrom(`/production-items/${id}`, { href: listHref, label: "Items" });
 
+  // Every name in the org — what a duplicate's "… copy" is checked against.
+  // The whole list, never the filtered view: a copy has to be told apart from
+  // items the current filters happen to be hiding.
+  const itemNames = useMemo(() => rows.map((r) => r.name), [rows]);
+
   const columns: DataColumn<ProductionItemRow>[] = [
     {
       key: "active",
@@ -294,7 +300,11 @@ export function ProductionItemsList({
     {
       key: "name",
       label: "Item",
-      width: 300,
+      // 294: the six it gave up are what let the ⋯ column be 74 rather than
+      // 68, which at 1280 is the difference between 40px of room for a 36px
+      // button and 35px. This column WRAPS, so what it loses is a wrap point
+      // rather than any text.
+      width: 294,
       pinned: true,
       wrap: true,
       sortValue: (r) => r.name,
@@ -329,7 +339,9 @@ export function ProductionItemsList({
     {
       key: "size",
       label: "Size",
-      width: 100,
+      // 86, not 100: "Regular" is the widest value at 53px in 62px of
+      // room. Part of what pays for the ⋯ column — see its note.
+      width: 86,
       hideWhenCompact: true,
       sortValue: (r) => r.size ?? "",
       sortTiebreaks: [(r) => r.name],
@@ -368,7 +380,8 @@ export function ProductionItemsList({
     {
       key: "cost",
       label: "Cost",
-      width: 130,
+      // 106: the widest figure is 64px and the label 55, in 82px of room.
+      width: 106,
       align: "right",
       sortValue: (r) => r.cost.cost,
       sortTiebreaks: [(r) => r.name],
@@ -381,7 +394,7 @@ export function ProductionItemsList({
     {
       key: "price",
       label: "Price",
-      width: 130,
+      width: 106,
       align: "right",
       sortValue: (r) => r.price,
       sortTiebreaks: [(r) => r.name],
@@ -400,7 +413,9 @@ export function ProductionItemsList({
     {
       key: "margin",
       label: "Margin",
-      width: 110,
+      // The LABEL is the binding constraint here (73px against a 71px
+      // "≤ 76.2%"), so it gives up only 6.
+      width: 104,
       align: "right",
       sortValue: (r) => r.margin,
       sortTiebreaks: [(r) => r.name],
@@ -416,6 +431,39 @@ export function ProductionItemsList({
         </span>
       ),
     },
+    // The row's own commands — Duplicate and Delete (Mark, 2026-09-08).
+    // Unlabelled, so it stays out of the Columns menu, and 68 = the 36px
+    // button plus the cell's padding (`VendorItemsTable`'s arithmetic; a
+    // narrower column CLIPS the target rather than shrinking it).
+    //
+    // THE TOTAL STAYS AT 1340, so every column not named here keeps the exact
+    // pixels it had — the PO list's rule. The 68 came out of measured slack
+    // rather than guessed at: Cost and Price were 129px cells holding 64px
+    // figures, Size 99px holding "Regular", Margin 6px above its own label.
+    // Nothing came from Type, Cut or Finish, which already truncate at 1440.
+    ...(editable
+      ? [
+          {
+            key: "actions",
+            label: "",
+            // 74, not the usual 68: weights are shares of the table's total,
+            // and eleven columns at a 1280 window resolve at 0.87px each — so
+            // 68 came out a 59px cell holding 35px of room for a 36px button.
+            // Measured, not guessed.
+            width: 74,
+            render: (r: ProductionItemRow) => (
+              <span className="flex justify-end">
+                <ProductionItemActions
+                  itemId={r.id}
+                  name={r.name}
+                  isActive={r.is_active}
+                  existingNames={itemNames}
+                />
+              </span>
+            ),
+          } satisfies DataColumn<ProductionItemRow>,
+        ]
+      : []),
   ];
 
   /**
@@ -512,7 +560,11 @@ export function ProductionItemsList({
       // dragged a column here would keep the old arrangement and the change
       // would look like it had not happened. Cost: dragged widths and hidden
       // columns on this one table go back to their defaults.
-      storageKey="production-items.v3"
+      // v4: four columns gave up measured slack to pay for the ⋯, and a
+      // STORED WIDTH OUTRANKS THE DECLARED ONE — without the bump anyone who
+      // had dragged this table would keep the old numbers and the new column
+      // would be squeezed against a total that no longer adds up.
+      storageKey="production-items.v4"
       compactBelow={1280}
       columnChooser
       group={groups}

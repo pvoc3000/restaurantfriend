@@ -180,37 +180,56 @@ export async function ProductionItemDetail({
         />
       </div>
 
-      <ItemComponents
-        itemId={id}
-        orgId={session.membership.org_id}
-        rows={componentRows.map(({ line, name, cost: c }) => ({
-          id: line.id,
-          elementId: line.element_id,
-          name,
-          qty: line.qty,
-          unit: line.unit,
-          cost: c.cost,
-          sort: line.sort ?? null,
-        }))}
-        total={cost}
-        options={elementOptions}
-        editable={editable}
-      />
+      {/* TWO COLUMNS (Mark, 2026-09-08: "move the 'default pars' section into a
+          second column next to the 'what it costs' section, and make the 'last
+          two weeks' section fit into a single column"). What it costs and
+          Default pars are both narrow tables that were each running the width
+          of the screen, so the record was three short blocks stacked down a
+          1,300px page.
 
-      <ProductionItemLocations
-        itemId={id}
-        orgId={session.membership.org_id}
-        pars={await loadPars(supabase, id)}
-        locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
-        gridPrice={price.cell?.price ?? null}
-        editable={editable}
-      />
+          `minmax(0,1fr)` twice rather than a bare `1fr`: a grid item's
+          min-width is min-content, so the pars table (three columns of
+          controls) and the history's `min-w-[520px]` would otherwise push
+          their own tracks wider than half and the page sideways.
+          `items-start`, so a tall left column does not stretch the right one
+          into a box of white space.
 
-      <ProductionItemHistory
-        lines={history.lines}
-        dates={fortnight.dates}
-        unavailable={history.error}
-      />
+          The history takes column ONE of the second row by ordinary auto
+          placement — it is a single column now rather than a spanning block,
+          which is the third half of the ask. */}
+      <div className="grid items-start gap-x-12 gap-y-16 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <ItemComponents
+          itemId={id}
+          orgId={session.membership.org_id}
+          rows={componentRows.map(({ line, name, cost: c }) => ({
+            id: line.id,
+            elementId: line.element_id,
+            name,
+            qty: line.qty,
+            unit: line.unit,
+            cost: c.cost,
+            sort: line.sort ?? null,
+          }))}
+          total={cost}
+          options={elementOptions}
+          editable={editable}
+        />
+
+        <ProductionItemLocations
+          itemId={id}
+          orgId={session.membership.org_id}
+          pars={await loadPars(supabase, id)}
+          locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code, name: l.name }))}
+          gridPrice={price.cell?.price ?? null}
+          editable={editable}
+        />
+
+        <ProductionItemHistory
+          lines={history.lines}
+          dates={fortnight.dates}
+          unavailable={history.error}
+        />
+      </div>
     </div>
   );
 }
