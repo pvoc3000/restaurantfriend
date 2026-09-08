@@ -5067,18 +5067,48 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    one copy and forgotten in the other), and it NAMES the single line, since
    from a row menu "1 item" is a worse answer to "which one?" than the name you
    just pressed.
-   **DUPLICATE IS ONLY POSSIBLE ON A SPECIAL-ORDER LINE, and that is 069's
-   partial index rather than a policy of ours**: `unique (schedule_id, item_id)
-   where par_source <> 'special_order'`. A plan line is one per item BY
-   CONSTRUCTION — 040 keyed it that way because regeneration upserts, and two
-   rows of one item would double the day's par with nothing noticing — so a
-   duplicate there is not merely refused, it is a thing the model does not have.
-   On an order it is the ordinary case (#9886 is two Mini lines differing only
-   by their note). The menu offers it DISABLED with the reason beside it —
-   "A plan line is one per item — raise the par instead" — rather than hiding
-   it, because the hint renders inline and so explains itself without a hover.
-   The copy carries `par_source` through rather than stamping `manual`, which is
-   what keeps it inside the index it is trying to satisfy.
+   **DUPLICATE WORKS ON EVERY LINE — migration 096, NEEDS APPLYING.** It was
+   special-order-only for one commit, because 069's key was
+   `unique (schedule_id, item_id) where par_source <> 'special_order'` and so
+   covered every line the generator did NOT write as well as the ones it did.
+   Mark, 2026-09-07: "let's relax the index so plan lines can duplicate too."
+   **THE KEY IS FOR THE GENERATOR AND NOW SAYS SO** —
+   `where par_source in ('plan', 'override')`. 040 keyed the table because
+   REGENERATION UPSERTS: `on conflict ... do update` needs exactly one row per
+   item to aim at, and a second would double the day's par with nothing
+   noticing. Every word of that is about the rows the generator writes. A
+   `manual` row is invisible to the upsert in every respect except the index —
+   the delete-stale pass already skips it by name — so the index was catching it
+   for no reason of its own.
+   **WHAT REMAINS FORBIDDEN is two rows the GENERATOR owns**, which is the
+   doubling 040 exists against; verified on the harness, where a second `plan`
+   line AND a `plan`+`override` pair are both refused by name.
+   **THE CONSEQUENCE, WHICH IS THE POINT RATHER THAN A COST:** regenerating a
+   day holding a duplicate restores the PLAN's line to the plan's par and leaves
+   the copy alone, so the item is made once per line — `manual_kept: 2` in the
+   receipt, measured. It is visible too: the copy carries no `planned_par`, so
+   `planDeviation` reads it as ADDED and the Par column marks it.
+   The copy is written `manual` unless it came from an order (then
+   `special_order`) — both true, and both outside the key.
+   **THE TRAP THIS MIGRATION NEARLY FELL INTO, and it is general: reproduce the
+   function from the last migration that TOUCHED it, not from the one you are
+   thinking about.** 096 is about 069's index, so 069's body was the obvious
+   thing to copy — and **092** is the current version, having reproduced it to
+   widen the role check to supervisor+. Copying 069 would have silently reverted
+   that, with nothing failing and nobody looking. Caught by reading the guard
+   while seeding the harness.
+   And the CONFLICT TARGET has to carry the predicate WORD FOR WORD: the
+   predicate given in `on conflict` must IMPLY the index's, and "not
+   special_order" does not imply "in ('plan','override')" — a `manual` row
+   satisfies the first and not the second. Written identically, and proved by
+   RUNNING the generator on the harness, since plpgsql plans lazily and creating
+   the function proves nothing about the inference.
+   *Probe, don't read this line:* `select indexdef from pg_indexes where
+   indexname = 'production_schedule_items_generated_line'` must end
+   `WHERE (par_source = ANY (ARRAY['plan'::text, 'override'::text]))`, and
+   `select count(*) from pg_proc where proname =
+   'generate_production_schedules'` must be 1. NOT rerunnable — the `drop index`
+   fails a second time, which is the signal it already ran.
    **(d) THE PAR SAYS WHEN IT DISAGREES WITH THE PLAN, and what the plan said.**
    The record has carried "N lines differ from the plan" since 040 and
    `planned_par` has been on every row since, rendered NOWHERE — so the badge

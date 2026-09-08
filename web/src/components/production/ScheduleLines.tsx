@@ -278,10 +278,21 @@ export function ScheduleLines({
    * Copy a line — same item, same par, same descriptors and note, ready to be
    * edited into the thing you actually wanted.
    *
-   * `par_source` is COPIED rather than set to `manual`: it is what 069's
-   * partial index tests, so a copy that "helpfully" recorded itself as manual
-   * would be refused by the index it is trying to stay inside. It is also true
-   * — a copy of an order's line is still the order's.
+   * THE COPY IS `manual` UNLESS IT CAME FROM AN ORDER, and that is migration
+   * 096's index rather than a preference: the key is now
+   * `unique (schedule_id, item_id) where par_source in ('plan', 'override')`,
+   * so the rows the GENERATOR owns are still one per item — which is the
+   * doubling 040 was written against — and anything else may repeat. A copy
+   * that kept `plan` would be refused by the very index it is trying to stay
+   * inside; `manual` is also the truthful answer, since a person made this row.
+   * A copy of an ORDER's line stays `special_order`, which is equally true and
+   * equally outside the key.
+   *
+   * What that means at regeneration, and it is the point rather than a cost:
+   * the plan's own line is restored to the plan's number and the copy is left
+   * alone (the delete-stale pass skips `manual` by name), so the item is made
+   * once for each line. Proved on the harness — `manual_kept: 2` with the plan
+   * line back at its own par.
    *
    * No `planned_par`: the plan never carried this row, which `planDeviation`
    * then reads as ADDED rather than as a par that disagrees.
@@ -307,7 +318,7 @@ export function ScheduleLines({
         tally_box_size: row.tally_box_size,
         tray_capacity: row.tray_capacity,
         par: row.par,
-        par_source: row.par_source,
+        par_source: row.par_source === "special_order" ? "special_order" : "manual",
         note: row.note,
       })
       .select("id");
@@ -315,7 +326,7 @@ export function ScheduleLines({
     if (err) {
       setError(
         /production_schedule_items_generated_line/.test(err.message)
-          ? "This schedule already has a line for that item — a plan line is one per item."
+          ? "This schedule already has a generated line for that item."
           : err.message
       );
       return;
@@ -579,27 +590,23 @@ export function ScheduleLines({
                     {
                       label: "Duplicate line",
                       /**
-                       * ONLY ON A SPECIAL-ORDER LINE, and that is 069's unique
-                       * index rather than a policy of ours:
-                       * `unique (schedule_id, item_id) where par_source <>
-                       * 'special_order'`. A plan line is one per item BY
-                       * CONSTRUCTION — 040 keyed it that way because a
-                       * regeneration upserts, and two rows of one item would
-                       * double the day's par with nothing noticing — so a
-                       * duplicate there is not merely refused, it is a thing
-                       * the model does not have. On an order it is the ordinary
-                       * case: #9886 is two Mini lines differing only by their
-                       * note.
+                       * ON EVERY LINE since migration 096 (Mark, 2026-09-07:
+                       * "let's relax the index so plan lines can duplicate
+                       * too"). It was special-order-only for one commit,
+                       * because 069's key covered every line the generator did
+                       * NOT write as well as the ones it did — which was never
+                       * what 040 keyed the table for.
                        *
-                       * DISABLED WITH THE REASON rather than hidden. The hint
-                       * renders beside the label, so it explains itself without
-                       * a hover — which the iPad has none of.
+                       * The hint says what the copy will BE rather than what it
+                       * copies: on a plan line it lands as a hand-added line,
+                       * which is what survives a regeneration and what the Par
+                       * column then marks as "added".
                        */
                       hint:
                         r.par_source === "special_order"
                           ? "Same item and par, ready to be edited"
-                          : "A plan line is one per item — raise the par instead",
-                      disabled: busy || r.par_source !== "special_order",
+                          : "A copy of this line, added by hand",
+                      disabled: busy,
                       onSelect: () => void duplicateLine(r),
                     },
                     {
