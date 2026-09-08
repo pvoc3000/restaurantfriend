@@ -31,8 +31,10 @@ import {
   orderTotals,
   readSettings,
   stageState,
+  materializationSummary,
   standingMaterializationDates,
   suggestedRushFee,
+  topUpWindow,
   suggestedTodo,
   type AttentionOrder,
   type MoneyOrder,
@@ -529,6 +531,101 @@ test("Yeastie Boys' Sunday-only order picks Sundays and nothing else", () => {
       "2026-08-30"
     ),
     ["2026-08-23", "2026-08-30"]
+  );
+});
+
+/* --------------------------------------------------------------------------
+ * THE TWO RULES MUST AGREE — this half in TypeScript, migration 099's half in
+ * SQL. Both of these were taken off the HARNESS, by running the real function
+ * against the same standing orders, so a change to either side that stops them
+ * agreeing turns one of these red rather than showing up as a record saying
+ * "next 14 days: 4 orders" over a list that holds three.
+ * -------------------------------------------------------------------------- */
+
+test("099 and this agree: Mon/Thu over 2026-09-08 … 2026-09-22", () => {
+  // The harness made exactly these four, in this order, and numbered them
+  // 10000–10003.
+  eq(
+    standingMaterializationDates(
+      { standing_days: [1, 4], starts_on: null, ends_on: null, paused: false },
+      "2026-09-08",
+      "2026-09-22"
+    ),
+    ["2026-09-10", "2026-09-14", "2026-09-17", "2026-09-21"]
+  );
+});
+
+test("099 and this agree: a starts_on in the PAST never backfills", () => {
+  // The window opens at `from`, NOT at `starts_on`. Getting this backwards is
+  // how Cafe Knotted's sixteen already-gone days would be ordered again.
+  eq(
+    standingMaterializationDates(
+      { standing_days: [1, 2, 3, 4, 5, 6, 7], starts_on: "2020-01-01", ends_on: "2026-09-11", paused: false },
+      "2026-09-08",
+      "2026-09-22"
+    ),
+    ["2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11"]
+  );
+});
+
+test("099 and this agree: December Mon/Thu is nine days", () => {
+  eq(
+    standingMaterializationDates(
+      { standing_days: [1, 4], starts_on: null, ends_on: null, paused: false },
+      "2026-12-01",
+      "2026-12-31"
+    ).length,
+    9
+  );
+});
+
+/* --------------------------------------------------------------------------
+ * THE HORIZON WINDOW
+ * -------------------------------------------------------------------------- */
+
+test("the horizon runs from TODAY, inclusive, to today + n", () => {
+  eq(topUpWindow("2026-09-08", 14), { from: "2026-09-08", through: "2026-09-22" });
+});
+
+test("a horizon of zero still covers today — tonight's bake is not optional", () => {
+  eq(topUpWindow("2026-09-08", 0), { from: "2026-09-08", through: "2026-09-08" });
+});
+
+test("a nonsense horizon out of orgs.settings cannot reach backwards", () => {
+  // `horizon_days` is a number somebody types into /settings. Negative, it
+  // would ask 099 for a range whose end precedes its start — which makes
+  // nothing, but says something false on the record's own "next N days" line.
+  eq(topUpWindow("2026-09-08", -5), { from: "2026-09-08", through: "2026-09-08" });
+  eq(topUpWindow("2026-09-08", 14.7), { from: "2026-09-08", through: "2026-09-22" });
+});
+
+/* --------------------------------------------------------------------------
+ * THE RECEIPT'S SENTENCE — "nothing was made" is the ANSWER, not a failure
+ * -------------------------------------------------------------------------- */
+
+test("a full horizon says the days already exist rather than going quiet", () => {
+  eq(
+    materializationSummary({ ok: true, created: 0, existing: 8 }),
+    "Nothing to make — all 8 days in that range already exist."
+  );
+});
+
+test("an empty range says so, and does not claim anything already exists", () => {
+  eq(materializationSummary({ ok: true, created: 0, existing: 0 }), "There were no days to make in that range.");
+});
+
+test("what it made, and what it found", () => {
+  eq(materializationSummary({ ok: true, created: 1, existing: 0 }), "Made 1 order.");
+  eq(materializationSummary({ ok: true, created: 4, existing: 3 }), "Made 4 orders, and 3 already existed.");
+});
+
+test("below supervisor+ the sentence says why, because the receipt is an OK", () => {
+  // 099 answers staff with `ok: true, skipped: "role"` so the list does not
+  // break for them. A summary reading "there were no days to make" would then
+  // be a false explanation of a permission refusal.
+  eq(
+    materializationSummary({ ok: true, created: 0, existing: 0, skipped: "role" }),
+    "You do not have permission to create orders, so nothing was made."
   );
 });
 

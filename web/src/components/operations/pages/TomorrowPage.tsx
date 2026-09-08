@@ -59,6 +59,8 @@ export type TomorrowSchedule = {
  */
 export function TomorrowPage({
   reportId,
+  orgId,
+  horizonDays,
   nextProductionDate,
   today,
   kitchenId,
@@ -72,6 +74,10 @@ export function TomorrowPage({
   stampable,
 }: {
   reportId: string;
+  orgId: string;
+  /** `orgs.settings.special_orders.horizon_days`, for the standing-order
+   *  top-up that runs when the generate dialog opens. */
+  horizonDays: number;
   nextProductionDate: string | null;
   /** The org's calendar day — the kitchen sheet's AS OF line. */
   today: string;
@@ -153,6 +159,8 @@ export function TomorrowPage({
               with exactly one obvious next act — rather than a standing
               "primary", which this app does not have. */}
           <GenerateSchedules
+            orgId={orgId}
+            horizonDays={horizonDays}
             locations={locations}
             today={nextProductionDate}
             kitchenId={kitchenId}

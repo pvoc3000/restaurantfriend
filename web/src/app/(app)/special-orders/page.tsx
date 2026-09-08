@@ -3,7 +3,7 @@ import { getAppSession } from "@/lib/session";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import { parseFilterSearch } from "@/lib/filterMenus";
-import { orderTotals, readSettings } from "@/lib/specialOrders";
+import { orderTotals, readSettings, topUpWindow } from "@/lib/specialOrders";
 import {
   SpecialOrdersList,
   type SpecialOrderRow,
@@ -40,6 +40,35 @@ export default async function SpecialOrdersPage({
   const timeZone = session.orgSettings.timezone ?? serverTimeZone();
   const today = todayInTimeZone(timeZone);
   const settings = readSettings(session.orgSettings);
+
+  /**
+   * DECISION 13'S TOP-UP, and one of the two moments it happens.
+   *
+   * Standing orders materialize themselves rather than waiting for anybody to
+   * press Instantiate, which Mark forgot often enough to ask for this. Opening
+   * the list is the first of the two moments the orders have to be REAL —
+   * generating a production schedule is the other — so it runs here, BEFORE
+   * the query below, or the days it makes would not appear until the next
+   * load.
+   *
+   * Idempotent on `(standing_order_id, event_date)`, which is what makes it
+   * safe on every render including `router.refresh()`: a second call over a
+   * full horizon creates nothing and burns no order number.
+   *
+   * IT MUST NOT BE ABLE TO BREAK THIS SCREEN. 092 widened the select policy to
+   * every member, so staff read this list — and 099 answers them with
+   * `skipped: "role"` rather than raising, for exactly that reason. What is
+   * left is the migration not being applied at all, which is reported as one
+   * muted line rather than in place of the list: a list with no wholesale days
+   * in it looks entirely normal, which is the whole reason to say so.
+   */
+  const horizon = topUpWindow(today, settings.horizonDays);
+  const { error: topUpError } = await supabase.rpc("ensure_standing_orders_materialized", {
+    p_org_id: session.membership.org_id,
+    p_from: horizon.from,
+    p_through: horizon.through,
+    p_order_id: null,
+  });
 
   /**
    * The window. Twelve years and 8,330 orders is not a list, so the default is
@@ -177,6 +206,7 @@ export default async function SpecialOrdersPage({
       initialFilters={params}
       initialSearch={parseFilterSearch(params)}
       capped={rows.length === 500}
+      topUpError={topUpError?.message ?? null}
     />
   );
 }

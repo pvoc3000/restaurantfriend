@@ -211,6 +211,7 @@ export function SpecialOrdersList({
   initialFilters,
   initialSearch = "",
   capped = false,
+  topUpError = null,
 }: {
   rows: SpecialOrderRow[];
   today: string;
@@ -225,6 +226,15 @@ export function SpecialOrdersList({
   initialFilters?: RawSearchParams;
   initialSearch?: string;
   capped?: boolean;
+  /**
+   * Why the standing-order top-up did not run, if it did not.
+   *
+   * A list missing its wholesale days looks EXACTLY like a list that has none,
+   * which is the whole reason this is surfaced rather than swallowed — 018's
+   * rule about a screen saying so when a migration is not applied yet. Null in
+   * every ordinary load, so the quiet state is the list as it was.
+   */
+  topUpError?: string | null;
 }) {
   /**
    * The reason each row wants a human, computed once and reused three times —
@@ -693,8 +703,23 @@ export function SpecialOrdersList({
           }
         />
         {capped ? (
-          <p className="text-[13px] text-mark">
-            Showing the most recent 500. Narrow the view to see further back.
+          /* A FILL, not `text-mark`: yellow-500 on white measures 1.43:1, which
+             is not a legibility complaint but text you cannot read. Fixed here
+             because this screen was open (CLAUDE.md's standing rule). */
+          <p className="text-[13px]">
+            <span className="bg-mark-fill px-1">
+              Showing the most recent 500. Narrow the view to see further back.
+            </span>
+          </p>
+        ) : null}
+        {topUpError ? (
+          <p className="text-[13px]">
+            <span className="bg-mark-fill px-1">
+              Standing orders were not topped up: {topUpError}
+            </span>
+            {topUpError.includes("ensure_standing_orders_materialized") ? (
+              <span className="ml-2 text-muted">Migration 099 has not been applied yet.</span>
+            ) : null}
           </p>
         ) : null}
       </div>

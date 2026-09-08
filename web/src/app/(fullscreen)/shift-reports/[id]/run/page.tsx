@@ -6,6 +6,7 @@ import { canEnterCounts, canReadHr } from "@/lib/roles";
 import { daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { compareForPremadeSheet } from "@/lib/productionSchedule";
 import { isDayComplete } from "@/lib/sales";
+import { readSettings } from "@/lib/specialOrders";
 import {
   pagesForShift,
   submitBlockers,
@@ -664,6 +665,8 @@ export default async function RunShiftReportPage({
       <TomorrowPage
         key="tomorrow"
         reportId={id}
+        orgId={report.org_id as string}
+        horizonDays={readSettings(session.orgSettings).horizonDays}
         nextProductionDate={nextDay}
         // The org's calendar day, for the kitchen order's AS OF line — that is
         // the day the sheet came off the printer, not the day of the event.

@@ -4921,16 +4921,126 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    real tables (its census caught all of this). Ships vestigial:
    `locations.kitchen_by_weekday` / `shops_for` retire when kitchen-on-plan
    lands.
-4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3, 4a AND THE
-   PRODUCTION HALF OF 5 DONE; 4b, 4c and recurrence not built. Migrations
-   051–058 AND 067–069 are applied and all three edge functions are
-   deployed.** *Probe, don't read this line.*
+4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3, 4a AND ALL OF 5
+   DONE; 4b and 4c not built. Migrations 051–058 and 067–069 are applied;
+   099 + 100 NEED APPLYING. All three edge functions are deployed.**
+   *Probe, don't read this line.*
    The module records, quotes, invoices, prints, emails as specialorders@, takes
    a customer's approval on a public page, takes inquiries on a public form,
-   proposes the next step as things happen, and **puts the order's donuts on a
-   real production schedule**. What remains is the inquiry form's
-   own build-your-box picker (4b), the organic-email parser (4c) and the
-   standing-order materializer (the rest of 5).
+   proposes the next step as things happen, **puts the order's donuts on a
+   real production schedule**, and **makes a wholesale account's days by
+   itself**. What remains is the inquiry form's own build-your-box picker (4b)
+   and the organic-email parser (4c).
+
+   **Shipped 2026-09-08 — AN ORDER WITH LINES COULD NOT BE DELETED (migration
+   100, NEEDS APPLYING).** Found on the harness while proving 099's "a deleted
+   day is remade" rule — which could not happen, because the delete itself
+   failed. Reproduced in isolation as a real authenticated supervisor:
+   `delete from special_orders` cascades to the order's items and payments, each
+   fires 054's AFTER DELETE log trigger, the trigger writes into
+   `special_order_events`, and that row's FK names the order the statement has
+   just deleted. The whole statement rolls back and `OrderActions` reports the
+   raw Postgres text.
+   **EVERY SPECIAL ORDER CARRYING A LINE OR A PAYMENT HAS BEEN UNDELETABLE SINCE
+   054 SHIPPED ON 2026-08-20** — which is every real order.
+   **WHY A LIVE WALK MISSED IT, and it is the lesson worth keeping:** the
+   2026-08-20 verification created an order, added a line, edited it, REMOVED THE
+   LINE (to prove the "Removed 24 ×" entry), and only then deleted the order — by
+   which point it was empty. The 2026-08-27 walk's delete was refused earlier by
+   the scheduled-order guard. The one path never walked was the ordinary one.
+   **THE GUARD GOES IN `log_special_order_event`, NOT IN THE TWO TRIGGERS.**
+   Eleven lines both paths already go through, against two ~90-line
+   reproductions of functions this migration otherwise has no business touching
+   — and 055's rule cuts both ways, since a migration that restates a function it
+   does not mean to change is how one gets silently reverted. It is also the
+   honest place: that function already returns quietly on an empty message, and
+   "there is no longer an order to record this against" is the same kind of
+   answer. Nothing is lost, because `special_order_events` cascades with the
+   order too. Verified both ways on the harness — an order with a line AND a
+   payment deletes leaving zero orphan events, and a line removed from a LIVING
+   order still logs "Removed 24 × Cruller", so the fix is not a mute.
+
+   **Shipped 2026-09-08 — DECISION 13, STANDING ORDERS MATERIALIZE THEMSELVES
+   (migration 099, NEEDS APPLYING).** Mark: "I haven't seen any special order
+   'standing orders' get created automatically. I thought this was something we
+   had built but maybe not."
+   **IT WAS NOT, AND EVERYTHING AROUND IT WAS**, which is why it read as built.
+   051 shipped `kind = 'standing_order'`, `standing_days`, `starts_on`,
+   `ends_on`, `paused` and `standing_order_id`; it created
+   `special_orders_standing_day` as the idempotency key "the materializer" would
+   be safe on; it created `special_orders_standing_idx` FOR "the materializer's
+   own sweep"; 057 set `horizon_days` to 14; `standingMaterializationDates` was
+   written and fixture-tested; and `StandingOrderBlock` has been telling anybody
+   who opened a standing order that "orders appear by themselves 14 days ahead —
+   nobody has to remember". **The function those six things describe had never
+   been written.** Measured before starting: **ZERO rows in the whole database
+   carry a `standing_order_id`**, and Cafe Knotted's last wholesale day was
+   **2026-08-23**, sixteen days earlier, loaded out of FileMaker.
+   Worth remembering as a CLASS: a feature can be complete in its schema, its
+   pure helpers, its indexes, its settings and its copy, and still not exist. The
+   probe that settles it is the one nobody had run — `select count(*) ... where
+   standing_order_id is not null`.
+   **THE FUNCTION IS `security invoker`, 068's ARGUMENT VERBATIM** — every insert
+   flows through 051's own supervisor+ policies, so a top-up cannot create an
+   order its caller could not have created by hand. **Which makes the role
+   check's SHAPE the opposite of every other guard in this schema: below
+   supervisor+ it RETURNS `{skipped: "role"}`, it does not raise.** 092 widened
+   the select policy to every member, so staff read `/special-orders` — and the
+   list calls this before it queries, so a raise would replace the whole screen
+   with a role error for the people least able to act on it.
+   **THREE DOORS, ONE FUNCTION** (013's precedent): the list's server component
+   and the generate-schedules dialog both top up the ROLLING HORIZON through
+   `topUpWindow`, and `MaterializeNow` on the record reaches past it for a
+   one-off, scoped by `p_order_id`. The horizon lives in `orgs.settings` and is
+   read by the CALLERS rather than by the function, precisely because the escape
+   hatch's whole job is to reach further.
+   **IT NEVER BACKFILLS.** `p_from` is passed in — `current_date` is UTC, which
+   after 4pm Pacific silently skips a day — and the window opens at `p_from`
+   however old `starts_on` is. Cafe Knotted's sixteen missing days have HAPPENED;
+   making them now would put orders nobody delivered onto a statement. Verified
+   by breaking it on the harness: honouring `starts_on` produced **200 orders
+   back to 2020-01-01**, which is also the `p_max` cap proving itself (uncapped
+   it would have been ~2,400).
+   **THE `exists` CHECK AND THE `on conflict do nothing` ARE TWO GUARDS, NOT
+   ONE.** The conflict clause is the race guard; the pre-check is what stops an
+   order number being burned for a day that already exists (013's rule). Proved
+   by breaking it: with the pre-check gone the rows stay correct and a NO-OP RUN
+   ADVANCES THE SEQUENCE BY EIGHT.
+   **A CANCELLED DAY STILL BLOCKS RE-CREATION**, which is 051's stated intent and
+   is now enforceable — so `OrderActions` REFUSES to delete a materialized day
+   outright rather than confirming it. Not a click-through: deleting frees the
+   slot, the next top-up makes the day again, and the donuts get made. Cancelling
+   is the only thing that means "we are not making these", and the refusal says
+   so. `standing_order_id` had no reader anywhere in `web/src`; a **Made from**
+   row on the record is the other half, since "why is this order here" had no
+   answer on screen.
+   **THE RECORD NOW SAYS WHAT HAS ACTUALLY BEEN MADE**, beside the rule it has
+   always described — "Made so far: 9 orders, through 2026-09-22", or a yellow
+   "No orders have been made from this yet." Those are two different claims and
+   for three weeks they disagreed completely; a line naming the real count is
+   what would have caught this on the screen rather than in a database probe.
+   **EIGHT OF THE TEN STANDING ORDERS ARE PAUSED BY THE MIGRATION** (Mark,
+   2026-09-08: "everything should be paused except 9762 and 9763"). The seven
+   **Yeastie Boys** orders are unpaused with `starts_on` null and 84 Bismarks
+   each, and their last real order was **February 2025** — switching the top-up
+   on without this would have made a week of orders for a dormant account, which
+   is exactly why decision 13 said the migration must materialize nothing.
+   **#10018** is an app-numbered duplicate of #9762 with an EMPTY weekday set,
+   which would have made nothing and warned about itself forever. Paused rather
+   than deleted: a standing order is the record of an arrangement, and unpausing
+   is one tap.
+   Verified: all 100 migrations replay on the Docker harness, and every rule was
+   checked as a real authenticated role — a supervisor's run makes 8 orders on
+   the right weekdays with the header snapshot and the lines copied, a second run
+   makes 0 and burns no number, a cancelled day blocks re-creation, a deleted one
+   is remade, staff get `skipped: "role"` with no error, `anon` is refused
+   execute, a non-member gets "not your organisation", a range over a year is
+   refused, and the misconfigured standing orders are NAMED. **1688 fixtures
+   pass**, 11 new, each checked by breaking it.
+   **Not built, and named so nobody thinks it was forgotten:** nothing warns when
+   a standing order's line has no `production_item_id` (it would schedule
+   nothing — `unschedulableLines` already knows how to say this), and the
+   materialized days are not shown ON the standing order's record, only counted.
 
    **Shipped 2026-08-27 — DECISION 9, SCHEDULING PRODUCTION (migrations 067 +
    068, BOTH NEED APPLYING).** 040 shipped the entire seam and left it unused
@@ -6654,13 +6764,16 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `In-Reply-To`/`References` (the stored `Email_Token` was the inbound
    SUBJECT — a threading kludge, retired); **standing orders (= wholesale,
    e.g. Cafe Knotted 370 M–Th / 700 F–Su, billed weekly in arrears)
-   MATERIALIZE THEMSELVES on a 14-day rolling horizon** — no cron and no
-   manual Instantiate (Mark forgot it in FMP): a definer
+   MATERIALIZE THEMSELVES on a 14-day rolling horizon** (BUILT 2026-09-08,
+   migration 099 — read that entry, which corrects this line in one place) —
+   no cron and no manual Instantiate (Mark forgot it in FMP):
    `ensure_standing_orders_materialized` is called from the list AND from
-   production generation, idempotent on `unique (standing_order_id,
+   the generate-schedules dialog, idempotent on `unique (standing_order_id,
    event_date)` where a CANCELLED day still blocks re-creation (cancel,
    never delete, or the donuts get ordered again), and the migration
-   materializes NOTHING; pics + documents merge into one attachments
+   materializes NOTHING. **It is INVOKER, not the definer this line
+   predicted** — 068's argument, so every insert flows through 051's own
+   supervisor+ policies; pics + documents merge into one attachments
    card on a new `special-order-attachments` bucket; **the customer approves
    a quote on a public tokenized page** (`/q/{token}`, proxy-exempt like
    `/welcome`; typed-name clickwrap; the token is minted at SEND time bound

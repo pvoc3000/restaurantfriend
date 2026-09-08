@@ -559,11 +559,15 @@ export type StandingOrder = {
  * Which dates this standing order should exist on, between `from` and `through`
  * inclusive.
  *
- * The SQL materializer (`ensure_standing_orders_materialized`) is the one that
- * writes — two callers, one implementation, 013's precedent — and this is the
- * same rule in TypeScript so the app can SAY what a top-up would do before
- * anyone presses anything. That is a deliberate second implementation of a
- * small rule, and the fixtures pin both ends of it.
+ * The SQL materializer (migration 099's `ensure_standing_orders_materialized`)
+ * is the one that WRITES — three callers, one implementation, 013's precedent —
+ * and this is the same rule in TypeScript so the app can SAY what a top-up
+ * would do before anyone presses anything. That is a deliberate second
+ * implementation of a small rule, and the fixtures pin both ends of it.
+ *
+ * The two must agree. If this ever disagrees with the function, the RECORD's
+ * "next 14 days: 4 orders" line and the orders that actually appear disagree
+ * too, which is worse than either being wrong alone.
  *
  * String dates and string comparison throughout: see `utc` above.
  */
@@ -584,6 +588,73 @@ export function standingMaterializationDates(
     if (days.includes(isoWeekday(d))) out.push(d);
   }
   return out;
+}
+
+/**
+ * What a top-up did — 099's receipt, as the three callers read it.
+ *
+ * Declared on BOTH SIDES, like every other edge-function and RPC payload in
+ * this app: the function is SQL and cannot import from `web/`, so the shape is
+ * stated here and the fixtures are what keep the two honest. Every field is
+ * optional except the counts, because a `skipped` receipt carries neither
+ * window nor rows.
+ */
+export type MaterializationReceipt = {
+  ok: boolean;
+  created: number;
+  existing: number;
+  from?: string;
+  through?: string;
+  /** `"role"` when the caller is below supervisor+ — see 099's header. */
+  skipped?: string;
+  orders?: {
+    number: string;
+    event_date: string;
+    standing_number: string;
+    title: string | null;
+  }[];
+  warnings?: { standing_number?: string; title?: string | null; reason: string }[];
+};
+
+/**
+ * The window a routine top-up covers: today through the org's horizon.
+ *
+ * ONE FUNCTION FOR BOTH AUTOMATIC CALLERS, because a list and a generate
+ * dialog reaching different distances would mean the orders you can see and
+ * the orders you can bake are two different sets — and the difference would
+ * only show on the days nobody looked at the list.
+ *
+ * The escape hatch deliberately does NOT use this: its whole job is to reach
+ * past the horizon for a one-off, which is why 099 takes the window rather
+ * than reading `horizon_days` itself.
+ */
+export function topUpWindow(today: string, horizonDays: number): { from: string; through: string } {
+  // A horizon of nothing still means TODAY — the day whose donuts are being
+  // made tonight. Clamped rather than trusted, because it comes out of
+  // `orgs.settings` where somebody can type a 0.
+  return { from: today, through: addDays(today, Math.max(0, Math.floor(horizonDays))) };
+}
+
+/**
+ * One sentence for a receipt, for the escape hatch's own panel.
+ *
+ * NAMES WHAT IT DID AND WHAT IT DID NOT, in that order, because "nothing was
+ * made" is the answer people will meet most often — the horizon is usually
+ * already full — and it reads as a failure unless the sentence says the days
+ * are already there.
+ */
+export function materializationSummary(receipt: MaterializationReceipt): string {
+  if (receipt.skipped === "role") {
+    return "You do not have permission to create orders, so nothing was made.";
+  }
+  const made = receipt.created;
+  const already = receipt.existing;
+  if (made === 0 && already === 0) return "There were no days to make in that range.";
+  if (made === 0) {
+    return `Nothing to make — all ${already} day${already === 1 ? "" : "s"} in that range already exist.`;
+  }
+  const tail = already > 0 ? `, and ${already} already existed` : "";
+  return `Made ${made} order${made === 1 ? "" : "s"}${tail}.`;
 }
 
 /* ==========================================================================

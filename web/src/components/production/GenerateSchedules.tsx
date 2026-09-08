@@ -14,7 +14,7 @@ import {
   type PullReadiness,
   type SchedulableLine,
 } from "@/lib/specialOrderSchedule";
-import { STATUS_LABEL } from "@/lib/specialOrders";
+import { STATUS_LABEL, topUpWindow } from "@/lib/specialOrders";
 import { addDays } from "@/lib/payPeriods";
 import { sellingShopsForKitchen, type PlanSummary } from "@/lib/productionPlans";
 import { createClient } from "@/lib/supabase/client";
@@ -128,6 +128,8 @@ const WARNING_TITLE: Record<string, string> = {
 };
 
 export function GenerateSchedules({
+  orgId,
+  horizonDays,
   locations,
   today,
   kitchenId,
@@ -135,6 +137,14 @@ export function GenerateSchedules({
   plans,
   primary = false,
 }: {
+  orgId: string;
+  /**
+   * `orgs.settings.special_orders.horizon_days` — how far the standing-order
+   * top-up reaches when this dialog opens. Passed rather than read here: this
+   * is a client component, and the setting is already on the session both
+   * callers hold.
+   */
+  horizonDays: number;
   locations: { id: string; code: string; name: string }[];
   today: string;
   /** The working location — the kitchen every schedule this run writes is for. */
@@ -212,7 +222,44 @@ export function GenerateSchedules({
     setCandidates(null);
     setPullIds(new Set());
     setPulled(null);
-    void loadCandidates(defaultStart, 1);
+    void openWork();
+  }
+
+  /**
+   * DECISION 13'S TOP-UP, and the second of the two moments it happens —
+   * generating tomorrow night's schedules is what guarantees tomorrow's
+   * standing orders are REAL, so the pull list below can offer them.
+   *
+   * ON OPEN, NOT IN `loadCandidates`. That function re-runs on every date and
+   * day-count change, and a write per keystroke is not what "idempotent" is
+   * for; the horizon is a fortnight and the window this dialog moves over is a
+   * day or two inside it, so once is enough.
+   *
+   * THE WINDOW IS THE HORIZON, WIDENED TO REACH THE RUN. `topUpWindow` is what
+   * the list uses, so the orders you can see and the orders you can bake are
+   * one set; a run further out than the horizon (somebody generating a fortnight
+   * ahead) extends `through` rather than being quietly short.
+   *
+   * `today` here is whatever the caller based the dialog on — the org's own day
+   * on `/schedules`, the next production date on the shift report — and both
+   * are today or later, which is what keeps 099 from being asked to make a day
+   * that has already happened.
+   *
+   * A FAILURE IS NOT REPORTED. Nothing about generating a plan schedule depends
+   * on it, `loadCandidates` runs either way, and the special orders list says so
+   * in words on the screen whose job that is.
+   */
+  async function openWork() {
+    const horizon = topUpWindow(today, horizonDays);
+    // The dialog opens on ONE day, `defaultStart`; a wider run is set
+    // afterwards and is covered by the horizon in every realistic case.
+    await supabase.rpc("ensure_standing_orders_materialized", {
+      p_org_id: orgId,
+      p_from: horizon.from,
+      p_through: defaultStart > horizon.through ? defaultStart : horizon.through,
+      p_order_id: null,
+    });
+    await loadCandidates(defaultStart, 1);
   }
 
   /**

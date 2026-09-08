@@ -10,6 +10,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 import { Switch } from "@/components/ui/Switch";
 import { WeekdayPicker } from "@/components/catalog/WeekdayPicker";
 import { addDays, standingMaterializationDates } from "@/lib/specialOrders";
+import { MaterializeNow } from "@/components/specialOrders/MaterializeNow";
 
 /** For the read-only rendering below — ISO 1 = Monday, as everywhere. */
 const DAY_NAME = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -17,12 +18,18 @@ const DAY_NAME = ["", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 /**
  * A standing order's own block — decision 13.
  *
- * NOBODY INSTANTIATES. `ensure_standing_orders_materialized` tops the horizon
- * up from the two moments that need the orders to exist: opening the list, and
- * generating a production schedule. So this block STATES what the horizon
- * holds rather than offering a button to fill it, and the escape hatch
- * ("materialize now…", for a one-off far beyond the horizon) arrives with
- * phase 5 alongside the function itself.
+ * NOBODY INSTANTIATES. Migration 099's `ensure_standing_orders_materialized`
+ * tops the horizon up from the two moments that need the orders to exist:
+ * opening the list, and opening the generate-schedules dialog. So this block
+ * STATES what the horizon holds rather than offering a button to fill it, and
+ * `MaterializeNow` beside it is the escape hatch for a one-off further out.
+ *
+ * IT SAYS WHAT HAS ACTUALLY BEEN MADE, not only what the rule implies. Those
+ * are two different claims and for the first three weeks of this module's life
+ * they disagreed completely: the block promised "orders appear by themselves 14
+ * days ahead" while ZERO existed, because the function it was describing had
+ * never been written. A line naming the real count and the furthest day made is
+ * what would have caught that on the screen rather than in a database probe.
  *
  * EDITING A STANDING ORDER CHANGES ONLY DAYS NOT YET MATERIALIZED, and the
  * block says so. That is not a limitation to apologise for — it is what makes
@@ -38,6 +45,10 @@ export function StandingOrderBlock({
   horizonDays,
   today,
   canWrite,
+  orgId,
+  number,
+  madeCount,
+  madeThrough,
 }: {
   id: string;
   standingDays: number[];
@@ -47,6 +58,12 @@ export function StandingOrderBlock({
   horizonDays: number;
   today: string;
   canWrite: boolean;
+  orgId: string;
+  number: string;
+  /** Orders this standing order has actually made, ever. */
+  madeCount: number;
+  /** The furthest day it has made, or null when it has made none. */
+  madeThrough: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -175,7 +192,31 @@ export function StandingOrderBlock({
           already made is an ordinary order — edit it there, and cancel it
           rather than deleting it, or the next top-up makes it again.
         </p>
+        {/* THE FACT, under the rule. `madeThrough` can legitimately be behind
+            the horizon — a paused order, or one whose `ends_on` has passed —
+            so it is stated rather than compared to anything. */}
+        <p className="text-muted">
+          {madeCount === 0 ? (
+            <span className="bg-mark-fill px-1">No orders have been made from this yet.</span>
+          ) : (
+            <>
+              Made so far: <span className="tabular-nums">{madeCount}</span> order
+              {madeCount === 1 ? "" : "s"}, through{" "}
+              <span className="tabular-nums">{madeThrough}</span>.
+            </>
+          )}
+        </p>
       </div>
+
+      {canWrite ? (
+        <MaterializeNow
+          orgId={orgId}
+          standingOrderId={id}
+          number={number}
+          today={today}
+          horizonDays={horizonDays}
+        />
+      ) : null}
 
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
     </section>

@@ -213,6 +213,40 @@ export async function SpecialOrderDetail({
   }
 
   const row = order as unknown as Record<string, unknown>;
+
+  /**
+   * TWO SMALL FOLLOW-UPS, and they cannot ride the `Promise.all` above because
+   * both are gated on what the record turned out to BE — `kind` and
+   * `standing_order_id` are columns of the row that was just fetched.
+   *
+   *   · a standing order counts what it has actually made, so the record can
+   *     say so rather than only describing the rule (see `StandingOrderBlock`);
+   *   · a MATERIALIZED day names the standing order behind it, because "why is
+   *     this order here and who agreed to it" has no other answer on screen.
+   *
+   * One round trip on the screens that need one, none on the rest.
+   */
+  const standingId = (row.standing_order_id as string | null) ?? null;
+  const [{ data: madeRows, count: madeCount }, { data: sourceRow }] = await Promise.all([
+    row.kind === "standing_order"
+      ? supabase
+          .from("special_orders")
+          .select("event_date", { count: "exact" })
+          .eq("standing_order_id", id)
+          .order("event_date", { ascending: false })
+          .limit(1)
+      : SKIP,
+    standingId
+      ? supabase
+          .from("special_orders")
+          .select("id, number, title")
+          .eq("id", standingId)
+          .maybeSingle()
+      : { data: null },
+  ]);
+  const madeThrough = (madeRows?.[0]?.event_date as string | null) ?? null;
+  const madeFrom = (sourceRow as { id: string; number: string; title: string | null } | null) ?? null;
+
   const kind = row.kind as SpecialOrderKind;
   const status = row.status as SpecialOrderStatus | null;
   const customer = row.customers as {
@@ -530,6 +564,7 @@ export async function SpecialOrderDetail({
               flagReason={row.flag_reason as string | null}
               lineCount={lines.length}
               paymentCount={payments.length}
+              fromStanding={madeFrom ? { number: madeFrom.number } : null}
               canWrite={canWrite}
             />
           </div>
@@ -648,6 +683,29 @@ export async function SpecialOrderDetail({
                             value={row.allergen_info as string | null} canWrite={canWrite}
                             ariaLabel="Allergen information" />
                     </Row>
+                    {/* WHY THIS ORDER EXISTS, on the days nobody typed.
+                        `standing_order_id` has been a column since 051 and had
+                        no reader anywhere, so a materialized day was
+                        indistinguishable from a hand-made one — which is the
+                        point for editing it, and exactly wrong for deciding
+                        whether to cancel it. READ-ONLY and a LINK: the row it
+                        names is where the recurrence is changed, and repointing
+                        a day at a different standing order is not a thing
+                        anybody should be able to do by picking from a list. */}
+                    {madeFrom ? (
+                      <Row label="Made from">
+                        <Link
+                          href={withFrom(`/special-orders/${madeFrom.id}`, {
+                            href: orderTabHref(id, activeTab, rawParams),
+                            label: `#${row.number as string}`,
+                          })}
+                          className="underline underline-offset-2"
+                        >
+                          {madeFrom.number}
+                          {madeFrom.title ? ` — ${madeFrom.title}` : ""}
+                        </Link>
+                      </Row>
+                    ) : null}
                   </div>
                 </section>
               }
@@ -738,6 +796,10 @@ export async function SpecialOrderDetail({
                       horizonDays={settings.horizonDays}
                       today={today}
                       canWrite={canWrite}
+                      orgId={row.org_id as string}
+                      number={row.number as string}
+                      madeCount={madeCount ?? 0}
+                      madeThrough={madeThrough}
                     />
                   ) : kind === "order" ? (
                     <section className="space-y-3">

@@ -31,6 +31,7 @@ export function OrderActions({
   paymentCount,
   canWrite,
   scheduled,
+  fromStanding,
   schedule,
 }: {
   id: string;
@@ -43,6 +44,11 @@ export function OrderActions({
   canWrite: boolean;
   /** True once a production schedule exists for this order. */
   scheduled: boolean;
+  /**
+   * The standing order this day was made from, if it was made rather than
+   * typed — `{ number }`, which is all the refusal below needs to name it.
+   */
+  fromStanding?: { number: string } | null;
   /**
    * `<ScheduleProduction>`, composed upstream — `ScheduleDetail` passes
    * `print={<PrintPacket/>}` into `ScheduleActions` the same way. It keeps this
@@ -242,6 +248,33 @@ export function OrderActions({
   }
 
   async function remove() {
+    /**
+     * REFUSED, and this is the one refusal that exists to stop the app UNDOING
+     * ITSELF. 051's `special_orders_standing_day` is unique on
+     * `(standing_order_id, event_date)` and a CANCELLED day still occupies its
+     * slot — that is deliberate, and it is what makes cancelling Thanksgiving a
+     * decision that sticks. Delete the row instead and the slot is free again,
+     * so the next top-up — the next time anybody opens the list — makes the day
+     * back, and the donuts get made.
+     *
+     * The button says what to do instead, because "cancel it" is not a lesser
+     * version of deleting here: cancelling is the ONLY thing that means
+     * "we are not making these", and it keeps the record of that.
+     *
+     * NOT a `confirmDialog` you can click through, unlike everything else on
+     * this row. A confirm is right where the reader knows something the app
+     * does not; here they cannot, because what goes wrong happens minutes later
+     * on somebody else's screen.
+     */
+    if (fromStanding) {
+      setError(
+        `This day was made from standing order ${fromStanding.number}, so deleting it would only ` +
+          `make it again the next time anybody opens the list. Cancel it instead — that is what ` +
+          `keeps it from being made.`
+      );
+      return;
+    }
+
     // REFUSED, not warned. `production_schedules.source_ref` deliberately
     // carries no FK (040: the table did not exist yet), so deleting the order
     // would leave a live schedule pointing at a uuid that is gone — a kitchen

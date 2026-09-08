@@ -6,6 +6,7 @@ import { SchedulesList, type ScheduleRow } from "@/components/production/Schedul
 import type { SchedulePlan } from "@/lib/productionSchedule";
 import { GenerateSchedules } from "@/components/production/GenerateSchedules";
 import { canEditPage } from "@/lib/pageAccess";
+import { readSettings } from "@/lib/specialOrders";
 
 /**
  * The committed days — production brief phase 4.
@@ -164,6 +165,8 @@ export default async function SchedulesPage() {
           action={
             editable && kitchen ? (
               <GenerateSchedules
+                orgId={session.membership.org_id}
+                horizonDays={readSettings(session.orgSettings).horizonDays}
                 locations={session.activeLocations.map((l) => ({
                   id: l.id,
                   code: l.code,
