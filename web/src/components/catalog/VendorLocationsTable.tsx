@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { invokeQbo } from "@/lib/qboClient";
 import { splitAccountName } from "@/lib/quickbooks";
@@ -51,10 +52,35 @@ function repSummary(row: VendorLocationRow) {
   return parts.length > 0 ? parts.join(" · ") : null;
 }
 
+/** A shop, and this vendor's config there — null until somebody sets one up. */
+type Row = { location: Shop; vl: VendorLocationRow | null };
+
+export type Shop = { id: string; code: string };
+
 /**
  * A vendor's per-location config — account, minimum and days for each shop.
  * Editable in place (spec §4.8 puts this on the vendor screen); writes go
  * through RLS, which requires purchaser or above.
+ *
+ * ONE ROW PER SHOP, WHETHER OR NOT THE VENDOR IS SET UP THERE (Mark,
+ * 2026-09-08: "I need to be able to edit its per location config", while adding
+ * a trash-collection vendor so he could file its invoice and push it to
+ * QuickBooks). It listed only the rows that already EXISTED, so a vendor
+ * created here read "Not configured at any location yet" with nothing to press
+ * — and every QuickBooks mapping a bill needs lives on this row (083), so a
+ * vendor with none of them can be filed against and never pushed. Nothing was
+ * missing but the door: 001 has had the insert policy all along, and every one
+ * of the 56 rows at DF01 came out of the FileMaker load.
+ *
+ * `ItemLocationRows`' shape, and its rule: the Active cell holds the toggle for
+ * a shop that IS set up and **Use here** for one that is not, because both
+ * answer the same question about the row.
+ *
+ * IT ENUMERATES THE ACTIVE SHOPS PLUS ANY SHOP THAT ALREADY HAS A ROW. Design
+ * rule 3 says `activeLocations` to enumerate — you do not start using a vendor
+ * at a shop that is shut — but a row that EXISTS at a closed shop is real
+ * config, and listing only the active ones would hide it. That is a latent
+ * fault in `ItemLocationRows`, which maps over the active list alone.
  */
 function VendorQboLink({
   rowId,
@@ -115,14 +141,23 @@ function VendorQboLink({
 export function VendorLocationsTable({
   qboConnected = false,
   rows,
+  locations,
+  vendorId,
+  orgId,
   codeById,
   activeLocationId,
   leading,
   editable,
 }: {
-  /** The Page Permissions sheet's cell for /vendors. */
+  /** The Page Permissions sheet's cell for /vendors — false renders values,
+   *  no switch and no "Use here". */
   editable: boolean;
   rows: VendorLocationRow[];
+  /** The shops you may set this vendor up at: `session.activeLocations`. */
+  locations: Shop[];
+  vendorId: string;
+  orgId: string;
+  /** Every shop's code, so a row at a CLOSED one still names itself. */
   codeById: Record<string, string>;
   activeLocationId: string | null;
   /** Whether to offer the QuickBooks settings at all. Read on the server, so
@@ -132,6 +167,9 @@ export function VendorLocationsTable({
   leading?: ReactNode;
 }) {
   const supabase = createClient();
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
   const [qbo, setQbo] = useState<{
     vendors: { id: string; name: string }[];
     accounts: { id: string; name: string }[];
@@ -193,22 +231,69 @@ export function VendorLocationsTable({
     return list && list.length > 0 ? resting : empty;
   }
 
-  const columns: DataColumn<VendorLocationRow>[] = [
+  // Active shops first, in the order the session lists them, then any shop that
+  // already carries a row — a closed one included. See the note above.
+  const byLocation = new Map(rows.map((r) => [r.location_id, r]));
+  const extras = rows
+    .filter((r) => !locations.some((l) => l.id === r.location_id))
+    .map((r) => ({ id: r.location_id, code: codeById[r.location_id] ?? "—" }));
+  const tableRows: Row[] = [...locations, ...extras].map((location) => ({
+    location,
+    vl: byLocation.get(location.id) ?? null,
+  }));
+
+  /**
+   * Start using this vendor at a shop — `ItemLocationRows.stockHere`, and the
+   * same one click. NOT named `useHere`: any `use` prefix reads as a hook to
+   * `react-hooks/rules-of-hooks`, which refuses it inside the click handler. Everything on the row is nullable, so the insert names only
+   * what identifies it and the cells beside it are how the rest gets filled in.
+   */
+  async function startUsingHere(locationId: string) {
+    setBusy(true);
+    setAddError(null);
+    // org_id EXPLICITLY: no table defaults it, and an insert policy's WITH
+    // CHECK is evaluated BEFORE the NOT NULL, so omitting it reports an RLS
+    // violation and sends you looking at roles (design rule 1).
+    const { error } = await supabase
+      .from("vendor_locations")
+      .insert({ org_id: orgId, vendor_id: vendorId, location_id: locationId });
+    setBusy(false);
+    if (error) setAddError(error.message);
+    else router.refresh();
+  }
+
+  const dash = <span className="text-faint">—</span>;
+
+  const columns: DataColumn<Row>[] = [
     // Active leads on every catalog table (Mark, 2026-07-23).
     {
       key: "is_active",
       label: "Active",
       width: 95,
-      sortValue: (r) => (r.is_active ? 0 : 1),
-      render: (r) => (
-        <ActiveToggle
-          readOnly={!editable}
-          table="vendor_locations"
-          id={r.id}
-          active={r.is_active}
-          label="Vendor active at this location"
-        />
-      ),
+      // Set up and off, set up and on, not set up — which is also the order you
+      // want them in when you sort by this column.
+      sortValue: (r) => (r.vl ? (r.vl.is_active ? 0 : 1) : 2),
+      render: (r) =>
+        r.vl ? (
+          <ActiveToggle
+            readOnly={!editable}
+            table="vendor_locations"
+            id={r.vl.id}
+            active={r.vl.is_active}
+            label="Vendor active at this location"
+          />
+        ) : !editable ? (
+          dash
+        ) : (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void startUsingHere(r.location.id)}
+            className="border border-ink px-2 py-0.5 text-xs text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+          >
+            Use here
+          </button>
+        ),
     },
     {
       key: "location",
@@ -217,11 +302,11 @@ export function VendorLocationsTable({
       label: "Location",
       // Wide enough for the code, the "here" badge and the rep summary.
       width: 300,
-      sortValue: (r) => codeById[r.location_id] ?? null,
+      sortValue: (r) => r.location.code,
       render: (r) => (
         <>
-          {codeById[r.location_id] ?? "—"}
-          {r.location_id === activeLocationId && (
+          {r.location.code}
+          {r.location.id === activeLocationId && (
             <span className={HERE_BADGE_CLASS}>
               here
             </span>
@@ -233,93 +318,118 @@ export function VendorLocationsTable({
       key: "account",
       label: "Account",
       width: 170,
-      sortValue: (r) => r.account_number,
-      render: (r) => (
-        <InlineValue
-          readOnly={!editable}
-          table="vendor_locations"
-          id={r.id}
-          column="account_number"
-          value={r.account_number}
-        />
-      ),
+      sortValue: (r) => r.vl?.account_number ?? null,
+      render: (r) =>
+        r.vl ? (
+          <InlineValue
+            readOnly={!editable}
+            table="vendor_locations"
+            id={r.vl.id}
+            column="account_number"
+            value={r.vl.account_number}
+          />
+        ) : (
+          dash
+        ),
     },
     {
       key: "minimum",
       label: "Minimum",
       width: 140,
       align: "right",
-      sortValue: (r) => (r.minimum_order === null ? null : Number(r.minimum_order)),
-      render: (r) => (
-        <InlineValue
-          readOnly={!editable}
-          table="vendor_locations"
-          id={r.id}
-          column="minimum_order"
-          value={r.minimum_order}
-          kind="number"
-          align="right"
-          format={(v) => money(Number(v))}
-        />
-      ),
+      sortValue: (r) =>
+        r.vl?.minimum_order == null ? null : Number(r.vl.minimum_order),
+      render: (r) =>
+        r.vl ? (
+          <InlineValue
+            readOnly={!editable}
+            table="vendor_locations"
+            id={r.vl.id}
+            column="minimum_order"
+            value={r.vl.minimum_order}
+            kind="number"
+            align="right"
+            format={(v) => money(Number(v))}
+          />
+        ) : (
+          dash
+        ),
     },
     {
       key: "order_days",
       label: "Order days",
       width: WEEKDAY_PICKER_WIDTH,
       minWidth: WEEKDAY_PICKER_WIDTH,
-      sortValue: (r) => daysKey(r.order_days),
-      render: (r) => (
-        <WeekdayPicker
-          readOnly={!editable}
-          table="vendor_locations"
-          id={r.id}
-          column="order_days"
-          value={r.order_days}
-          label="Order day"
-        />
-      ),
+      sortValue: (r) => daysKey(r.vl?.order_days ?? null),
+      render: (r) =>
+        r.vl ? (
+          <WeekdayPicker
+            readOnly={!editable}
+            table="vendor_locations"
+            id={r.vl.id}
+            column="order_days"
+            value={r.vl.order_days}
+            label="Order day"
+          />
+        ) : (
+          dash
+        ),
     },
     {
       key: "delivery_days",
       label: "Delivery days",
       width: WEEKDAY_PICKER_WIDTH,
       minWidth: WEEKDAY_PICKER_WIDTH,
-      sortValue: (r) => daysKey(r.delivery_days),
-      render: (r) => (
-        <WeekdayPicker
-          readOnly={!editable}
-          table="vendor_locations"
-          id={r.id}
-          column="delivery_days"
-          value={r.delivery_days}
-          label="Delivery day"
-        />
-      ),
+      sortValue: (r) => daysKey(r.vl?.delivery_days ?? null),
+      render: (r) =>
+        r.vl ? (
+          <WeekdayPicker
+            readOnly={!editable}
+            table="vendor_locations"
+            id={r.vl.id}
+            column="delivery_days"
+            value={r.vl.delivery_days}
+            label="Delivery day"
+          />
+        ) : (
+          dash
+        ),
     },
   ];
 
   return (
+    <>
+      {addError && <p className="mb-2 text-sm text-accent">{addError}</p>}
     <DataTable
-      rows={rows}
+      rows={tableRows}
       columns={columns}
-      rowKey={(r) => r.location_id}
+      rowKey={(r) => r.location.id}
       storageKey="rf.vendorLocations.columnWidths.v1"
       columnChooser
       leading={leading}
       defaultSort={{ key: "location" }}
       expand={{
-        summary: repSummary,
-        render: (r) => (
+        summary: (r) => (r.vl ? repSummary(r.vl) : null),
+        render: (r) =>
+          !r.vl ? (
+            // The expansion is where the rep and every QuickBooks mapping live,
+            // and all of them are columns on a row that does not exist yet. It
+            // says the one thing that IS true rather than rendering an empty
+            // form somebody would type into.
+            <p className="text-sm text-muted">
+              This vendor is not set up at {r.location.code} yet
+              {editable ? " — press Use here to start." : "."}
+            </p>
+          ) : (
           <dl className="grid max-w-md grid-cols-[6rem_1fr] gap-x-4 gap-y-1 text-sm">
             <dt className="py-0.5 text-subtle">Sales rep</dt>
             <dd>
               <InlineValue
                 readOnly={!editable}
                 table="vendor_locations"
-                id={r.id}
+                id={r.vl.id}
                 column="sales_rep"
-                value={r.sales_rep}
+                value={r.vl.sales_rep}
                 placeholder="none"
               />
             </dd>
@@ -328,9 +438,9 @@ export function VendorLocationsTable({
               <InlineValue
                 readOnly={!editable}
                 table="vendor_locations"
-                id={r.id}
+                id={r.vl.id}
                 column="rep_phone"
-                value={r.rep_phone}
+                value={r.vl.rep_phone}
                 placeholder="none"
               />
             </dd>
@@ -339,9 +449,9 @@ export function VendorLocationsTable({
               <InlineValue
                 readOnly={!editable}
                 table="vendor_locations"
-                id={r.id}
+                id={r.vl.id}
                 column="rep_email"
-                value={r.rep_email}
+                value={r.vl.rep_email}
                 placeholder="none"
               />
             </dd>
@@ -364,8 +474,8 @@ export function VendorLocationsTable({
                       every QuickBooks setting belongs on this row, the mapping
                       included. `vendors.external_ref` is now the unused one. */}
                   <VendorQboLink
-                    rowId={r.id}
-                    value={r.external_ref?.qbo?.id ?? null}
+                    rowId={r.vl.id}
+                    value={r.vl.external_ref?.qbo?.id ?? null}
                     options={qbo?.vendors ?? []}
                     placeholder={pickerPlaceholder(
                       qbo?.vendors,
@@ -380,9 +490,9 @@ export function VendorLocationsTable({
                   <InlineValue
                     readOnly={!editable}
                     table="vendor_locations"
-                    id={r.id}
+                    id={r.vl.id}
                     column="expense_account_ref"
-                    value={r.expense_account_ref}
+                    value={r.vl.expense_account_ref}
                     kind="pick"
                     clearable
                     placeholder={pickerPlaceholder(
@@ -407,9 +517,9 @@ export function VendorLocationsTable({
                   <InlineValue
                     readOnly={!editable}
                     table="vendor_locations"
-                    id={r.id}
+                    id={r.vl.id}
                     column="qbo_location_ref"
-                    value={r.qbo_location_ref}
+                    value={r.vl.qbo_location_ref}
                     kind="pick"
                     clearable
                     placeholder={
@@ -435,9 +545,9 @@ export function VendorLocationsTable({
                   <InlineValue
                     readOnly={!editable}
                     table="vendor_locations"
-                    id={r.id}
+                    id={r.vl.id}
                     column="qbo_class_ref"
-                    value={r.qbo_class_ref}
+                    value={r.vl.qbo_class_ref}
                     kind="pick"
                     clearable
                     placeholder={pickerPlaceholder(
@@ -457,9 +567,8 @@ export function VendorLocationsTable({
           </dl>
         ),
       }}
-      empty={
-        <p className="text-sm text-muted">Not configured at any location yet.</p>
-      }
+      empty={<p className="text-sm text-muted">No shops to configure.</p>}
     />
+    </>
   );
 }

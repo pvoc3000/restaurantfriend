@@ -10056,6 +10056,42 @@ weekday column, and 003 then silently made it per-vendor-item.
   round-tripped a write on Chefs Warehouse's four fields, reverted via a
   one-off local service_role script afterward (never committed) rather than
   left as test data on a live record.
+- **A VENDOR'S NAME IS EDITABLE, AND SO IS ITS CONFIG AT A SHOP IT HAS NONE
+  AT** (Mark, 2026-09-08, both while adding a trash-collection vendor "so I can
+  record an invoice and send it to quickbooks"). Two holes on one screen, and
+  the second is the one that blocked him.
+  **`VendorTitle`** is `ItemTitle`'s shape — the `h1` as an `InlineValue`,
+  keeping the DOTTED UNDERLINE where every other editable field wears a box,
+  which is that convention's one exception and not an oversight. The name had
+  been plain text since the screen shipped, so `NewVendor` could file a typo
+  nothing could correct. Both titles now pass an `ariaLabel`; without one they
+  announce the raw column ("name"), the record's heading being the one cell with
+  no `<dt>` beside it.
+  **`VendorLocationsTable` LISTS EVERY SHOP, NOT EVERY ROW** — the Active cell
+  holds the toggle where the vendor is set up and **Use here** where it is not,
+  which is `ItemLocationRows`' rule and its wording. It had rendered only the
+  rows that EXISTED, so a vendor created in the app read "Not configured at any
+  location yet" with nothing to press — and since 083 every QuickBooks mapping a
+  bill needs lives on that row, so such a vendor can be invoiced and never
+  pushed. **Nothing was missing but the door**: 001 has had the insert policy all
+  along, and all 56 rows at DF01 came out of the FileMaker load — design rule 1's
+  lesson again, "a create that a loader also performs is a create nobody has
+  tested".
+  It enumerates the ACTIVE shops PLUS any shop that already HAS a row: you do
+  not start using a vendor at a shop that is shut, but a row that exists at a
+  closed one is real config and listing only the active shops would hide it.
+  **That is a latent fault in `ItemLocationRows`**, which maps over the active
+  list alone. The expansion — the rep and the three QuickBooks pickers — says
+  the shop is not set up yet rather than rendering an empty form somebody would
+  type into, since every one of those is a column on a row that does not exist.
+  Removing a shop is the Active toggle, deliberately: "Use here" is one-way,
+  exactly like "Stock here".
+  **Don't name the handler `useHere`** — any `use` prefix reads as a hook to
+  `react-hooks/rules-of-hooks`, which then refuses it inside the click handler.
+  Walked live on Action Sales and left byte-identical: the name round-tripped
+  through the `h1`, ONLINE went from "Use here" to a real row whose account
+  number then wrote, and both were confirmed in the database before the row was
+  removed with a one-off service_role script (never committed).
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server

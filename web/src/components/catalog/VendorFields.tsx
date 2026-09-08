@@ -6,6 +6,7 @@ import { InlineValue } from "./InlineValue";
 
 export type VendorRecord = {
   id: string;
+  name: string;
   vendor_type: string | null;
   description: string | null;
   order_type: string;
@@ -27,6 +28,44 @@ export type VendorRecord = {
  * write and RLS answers for a role below purchaser+, with the error shown
  * beside the field rather than the control disappearing.
  */
+/**
+ * The vendor's NAME, as the record's `h1` (Mark, 2026-09-08: "I need to be able
+ * to edit the name of a vendor" — he was setting up a service vendor for trash
+ * collection). It had been plain text since the screen shipped: `NewVendor`
+ * asks for a name and nothing here could correct a typo in it, so the only way
+ * back was to delete the vendor and file it again.
+ *
+ * `ItemTitle`'s shape, copied rather than re-derived, including the one thing
+ * that looks like an oversight and is not: THE TITLE KEEPS THE UNDERLINE where
+ * every other editable field on a record wears a box (Mark, 2026-08-28, having
+ * tried it boxed). A box is what tells a field from a label, and an `h1` is
+ * neither.
+ */
+export function VendorTitle({
+  vendor,
+  editable,
+}: {
+  vendor: { id: string; name: string };
+  editable: boolean;
+}) {
+  return (
+    <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+      <InlineValue
+        readOnly={!editable}
+        table="vendors"
+        id={vendor.id}
+        column="name"
+        value={vendor.name}
+        // Named, or a screen reader announces the raw column ("name") — the
+        // record's own heading is the one cell with no `<dt>` beside it.
+        ariaLabel="Vendor name"
+        placeholder="Untitled vendor"
+        className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]"
+      />
+    </h1>
+  );
+}
+
 export function VendorFields({
   vendor,
   vendorTypes,

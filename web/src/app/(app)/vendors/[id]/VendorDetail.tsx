@@ -17,7 +17,7 @@ import { AddVendorReminder } from "@/components/purchasing/Reminders";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { SectionNav } from "@/components/ui/SectionNav";
-import { VendorFields } from "@/components/catalog/VendorFields";
+import { VendorFields, VendorTitle } from "@/components/catalog/VendorFields";
 import {
   VENDOR_INVOICE_CAP,
   VENDOR_PO_CAP,
@@ -368,7 +368,7 @@ export async function VendorDetail({
           it. THOSE THREE VALUES ARE COUPLED — change the sidebar's width and
           this has to move with it. Below `lg` there is no sidebar to clear. */}
       <div className="flex flex-wrap items-baseline gap-3 lg:ml-48">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">{v.name}</h1>
+        <VendorTitle vendor={v} editable={editable} />
         {!v.is_active && <span className="text-sm text-subtle">Inactive</span>}
 
         {/* "Next time we order from these people…" — recorded where the
@@ -447,6 +447,16 @@ export async function VendorDetail({
                   }))}
                   qboConnected={qboDefault !== null}
                   editable={editable}
+                  // `activeLocations` is the "use here" list — you don't start
+                  // using a vendor at a shop that is shut. `codeById` carries
+                  // every shop, so a row that already exists at a closed one
+                  // still names itself.
+                  locations={session.activeLocations.map((l) => ({
+                    id: l.id,
+                    code: l.code,
+                  }))}
+                  vendorId={v.id}
+                  orgId={session.membership.org_id}
                   codeById={Object.fromEntries(codeById)}
                   activeLocationId={session.activeLocation?.id ?? null}
                   leading={<SectionHeading>Per-location config</SectionHeading>}

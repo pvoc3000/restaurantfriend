@@ -31,6 +31,8 @@ export function ItemTitle({ item, editable }: { item: CatalogItem; editable: boo
             id={item.id}
             column="name"
             value={item.name}
+            // Same reason as `VendorTitle`: without this it announces "name".
+            ariaLabel="Item name"
             placeholder="Untitled item"
             className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]"
           />
