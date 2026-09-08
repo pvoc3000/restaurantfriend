@@ -5,6 +5,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { PickSet } from "@/components/ui/PickSet";
+import {
+  matchesVendorFilter,
+  vendorFilterOptions,
+} from "@/lib/vendorFilter";
 import { money } from "@/lib/purchaseOrders";
 import {
   agingBucket,
@@ -216,7 +221,8 @@ export function InvoiceList({
     return counts;
   }, [invoices, today]);
 
-  const visible = useMemo(() => {
+  /** Everything but the vendor filter — see the PO list for why. */
+  const beforeVendor = useMemo(() => {
     const words = filters.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return invoices.filter((i) => {
       if (filters.status !== "all" && stageOf(i) !== filters.status) return false;
@@ -235,6 +241,16 @@ export function InvoiceList({
       return words.every((w) => haystack.includes(w));
     });
   }, [invoices, filters.status, filters.aging, filters.q, today]);
+
+  const vendorOptions = useMemo(
+    () => vendorFilterOptions(beforeVendor.map((i) => i.vendors?.name), filters.vendors),
+    [beforeVendor, filters.vendors]
+  );
+
+  const visible = useMemo(
+    () => beforeVendor.filter((i) => matchesVendorFilter(i.vendors?.name, filters.vendors)),
+    [beforeVendor, filters.vendors]
+  );
 
   const sorted = useMemo(
     () =>
@@ -707,6 +723,25 @@ export function InvoiceList({
                 label: b === "all" ? "All" : AGING_LABEL[b as AgingBucket],
                 count: b === "all" ? invoices.length : agingCounts[b] ?? 0,
               }))}
+            />
+          </div>
+
+          {/* Labelled, unlike the PO list's: this row is `items-end` under
+              two other captions, so the one control without one would hang
+              its own label's height below its neighbours. */}
+          <div className="space-y-1.5">
+            <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
+              Vendor
+            </span>
+            <PickSet
+              options={vendorOptions}
+              value={filters.vendors}
+              onChange={(vendors) => update({ vendors })}
+              allLabel="All vendors"
+              noun="vendors"
+              label="Which vendors to show"
+              className="max-w-[16rem]"
+              minWidth={240}
             />
           </div>
 

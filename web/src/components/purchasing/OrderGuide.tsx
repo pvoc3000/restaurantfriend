@@ -9,6 +9,11 @@ import { withFrom } from "@/lib/breadcrumbs";
 import { useScrollMemoryKey } from "@/lib/scrollMemory";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { PickSet } from "@/components/ui/PickSet";
+import {
+  matchesVendorFilter,
+  vendorFilterOptions,
+} from "@/lib/vendorFilter";
 import { DateField } from "@/components/ui/DateField";
 import {
   applyExpansions,
@@ -81,6 +86,7 @@ export function OrderGuide({
   initialFilter,
   initialGrouping,
   initialIgnoreDays,
+  initialVendors,
   initialTerm,
   guideDate,
   today,
@@ -104,6 +110,8 @@ export function OrderGuide({
   initialFilter: GuideFilter;
   initialGrouping: GuideGrouping;
   initialIgnoreDays: boolean;
+  /** The remembered vendor filter — see GuideView.vendors. */
+  initialVendors: string[];
   /** The remembered search term — see GuideView.term. */
   initialTerm: string;
   guideDate: string;
@@ -167,6 +175,8 @@ export function OrderGuide({
   // something up regardless of when you'd order it. The walked day still
   // decides which day's pars and favorites the rows carry.
   const [ignoreDays, setIgnoreDays] = useState(initialIgnoreDays);
+  // Which vendors the walk is narrowed to — empty means all of them.
+  const [vendors, setVendors] = useState<string[]>(initialVendors);
   // Remembered with the rest of the view since 2026-08-03 (Mark). Seeded from
   // the server like the others, so the first paint is already narrowed rather
   // than showing the whole walk and then snapping — see GuideView.term for why
@@ -228,6 +238,11 @@ export function OrderGuide({
     setExpanded(new Set());
   }
 
+  function changeVendors(next: string[]) {
+    setVendors(next);
+    setExpanded(new Set());
+  }
+
   // Remember the view for the rest of the browser session. A session cookie
   // (no max-age) is what "until you log out" means here, and signOut clears it.
   useEffect(() => {
@@ -235,9 +250,10 @@ export function OrderGuide({
       filter,
       grouping,
       ignoreDays,
+      vendors,
       term,
     })}; path=/; SameSite=Lax`;
-  }, [weekday, filter, grouping, ignoreDays, term]);
+  }, [weekday, filter, grouping, ignoreDays, vendors, term]);
 
   async function commit(row: GuideRow, patch: Partial<EntryState>) {
     const current = entries.get(row.vendor_item_id) ?? { on_hand: null, qty_to_order: null };
@@ -268,7 +284,13 @@ export function OrderGuide({
     }
   }
 
-  const visibleRows = useMemo(() => {
+  /**
+   * The tier and the search applied, but NOT the vendor filter — what the
+   * vendor picker's options and counts are drawn from, so each control's
+   * counts are conditioned on the others and never on itself
+   * (`lib/filterMenus`' rule, and `vendorFilterOptions` says the same).
+   */
+  const beforeVendor = useMemo(() => {
     const words = term.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return rows.filter((row) => {
       if (
@@ -290,8 +312,23 @@ export function OrderGuide({
     });
   }, [rows, entries, term, filter, weekday, ignoreDays]);
 
+  const vendorOptions = useMemo(
+    () => vendorFilterOptions(beforeVendor.map((row) => row.vendor_name), vendors),
+    [beforeVendor, vendors]
+  );
+
+  const visibleRows = useMemo(
+    () => beforeVendor.filter((row) => matchesVendorFilter(row.vendor_name, vendors)),
+    [beforeVendor, vendors]
+  );
+
   // Counts on the buttons ignore the search box: they describe the day's work,
   // not whatever you happen to have typed.
+  //
+  // THE VENDOR FILTER IS NOT A SEARCH TERM, so it DOES narrow them. It is a
+  // standing scope with a control on screen naming it, where a term is one
+  // lookup you have usually finished with — and while you are walking one
+  // supplier's shelf, "189 favorites" is a count of a walk you are not doing.
   const filterCounts = useMemo(() => {
     const counts: Record<GuideFilter, number> = {
       all: 0,
@@ -300,13 +337,14 @@ export function OrderGuide({
       will_order: 0,
     };
     for (const row of rows) {
+      if (!matchesVendorFilter(row.vendor_name, vendors)) continue;
       const entry = entries.get(row.vendor_item_id);
       for (const f of GUIDE_FILTERS) {
         if (matchesGuideFilter(row, entry, f, weekday, ignoreDays)) counts[f] += 1;
       }
     }
     return counts;
-  }, [rows, entries, weekday, ignoreDays]);
+  }, [rows, entries, weekday, ignoreDays, vendors]);
 
   // Leaving the guide for an item must lead back to the guide — and to the day
   // you were walking, not whichever day defaults today.
@@ -861,6 +899,26 @@ export function OrderGuide({
             label: GUIDE_FILTER_LABEL[f],
             count: filterCounts[f],
           }))}
+        />
+
+        {/* A SET, not a one-of-N — "BakeMark and Chefs Warehouse" is a real
+            way to walk, and a day at DF01 spans dozens of vendors, so the
+            picker grows its own find box past eight. It sits with the tiers
+            because it NARROWS the list, left of the switch and of Group by.
+
+            IT NARROWS THE LIST AND NOTHING ELSE. The vendor totals bar and
+            Generate POs read every row (`totals` is computed from `rows`), so
+            a filtered walk can never quietly produce a partial order or read
+            as under a minimum it has met. */}
+        <PickSet
+          options={vendorOptions}
+          value={vendors}
+          onChange={changeVendors}
+          allLabel="All vendors"
+          noun="vendors"
+          label="Which vendors to walk"
+          className="max-w-[15rem]"
+          minWidth={240}
         />
 
         {/* The escape hatch from the day gates (FMP's "ignore order day"):

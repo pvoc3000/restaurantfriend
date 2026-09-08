@@ -281,6 +281,7 @@ export default async function OrderGuidePage({
       initialFilter={view.filter}
       initialGrouping={view.grouping}
       initialIgnoreDays={view.ignoreDays}
+      initialVendors={view.vendors}
       initialTerm={view.term}
       guideDate={guideDate}
       today={today}

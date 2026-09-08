@@ -325,7 +325,16 @@ export function urlFilterParams(path: string): RawSearchParams | null {
   if (window.location.pathname !== path) return null;
   const params: RawSearchParams = {};
   for (const [key, value] of new URLSearchParams(window.location.search)) {
-    if (!(key in params)) params[key] = value;
+    // A REPEATED KEY BECOMES AN ARRAY, which is what `RawSearchParams` has
+    // always been typed for and what every reader beside the vendor filter
+    // already collapses through its own `one()`. It kept only the first value
+    // until 2026-09-08, when `?vendor=A&vendor=B` — repeated rather than
+    // comma-separated, so a name may hold any character — arrived and would
+    // otherwise have come back from a Back press narrowed to one vendor.
+    const seen = params[key];
+    if (seen === undefined) params[key] = value;
+    else if (Array.isArray(seen)) seen.push(value);
+    else params[key] = [seen, value];
   }
   return params;
 }

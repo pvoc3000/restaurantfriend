@@ -8695,7 +8695,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/TabPicker` | underline tabs, loose chip rows, hand-rolled segmented bars | every one-of-N choice — filters, scopes, view modes; the order guide's segmented style. Selected cell is ALWAYS black; `count` and `href` are the only options |
   | **`ui/FilterMenus`** + `lib/filterMenus` | several `TabPicker`s stacked, or a row of hand-wired `PickList`s | a list filtering on THREE OR MORE dimensions AT ONCE — a row of labelled popup menus that AND together ("FilterMenus" is the name to call it by; NOT `catalog/ListFilters`, which is the older fixed search+category+active row). A dimension declares `matches`, never a pre-filtered list, which is what makes the option counts CONDITIONED ON THE OTHER MENUS (and never on their own, or every option but the chosen one reads 0). "All" is supplied, not declared; the bar owns the result count and a Clear, because four collapsed menus can hide a list while the screen looks unfiltered. Values live in the URL via `parseFilterValues`/`filterHref` + `history.replaceState`, and a value no option offers is DROPPED rather than obeyed. ONE dimension stays a `TabPicker` — this is not a replacement for it | The **`trailing`** slot holds a list's create command and renders RIGHT-ALIGNED ON ITS OWN LINE ABOVE the menus — it rode at the END of the filter row until 2026-08-21, which reads well only while the row fits, and `/special-orders`' search box plus six menus want ~1439px against the 1376 a 1440 window gives, so on an ordinary laptop the one control you came to press had already wrapped BELOW the filters. Its own line always, rather than a breakpoint: the wrap depends on how many menus a caller declares, so any threshold is tuned to one list and wrong for the next |
   | `ui/TextInput` | `<input type="text">` | wide free-text fields; carries the ✕ clear. Its wrapper **SHRINK-WRAPS** so a search box's `w-72` on the input decides the width — which is why **`w-full` alone does nothing**: it resolves against a span that is itself sized by the input, and the pair settles at the input's intrinsic ~20-character width. **`fullWidth`** is how to fill a form's track, and it has to say it twice (wrapper AND input) because an input in a flex row does not stretch on its own |
-  | `ui/PickSet` | a row of checkboxes | choosing SEVERAL from a known vocabulary — the shops a member may work at, a filter over locations. **EMPTY MEANS ALL**, which is 073's own rule and why that grid needed no teaching. `boxed` is `PickList`'s prop doing PickList's job: a detail FIELD wants the hairline that blackens on hover, a filter row wants the standing black rule |
+  | `ui/PickSet` | a row of checkboxes | choosing SEVERAL from a known vocabulary — the shops a member may work at, a filter over locations, **which vendors a purchasing list is narrowed to** (`lib/vendorFilter`). **EMPTY MEANS ALL**, which is 073's own rule and why that grid needed no teaching. It grows its own **find box past eight options**, `PickList`'s threshold and its reason — five shops are a list you read, eighty vendors are not; the "All …" row is never filtered by it, being the state rather than one of the values. `boxed` is `PickList`'s prop doing PickList's job: a detail FIELD wants the hairline that blackens on hover, a filter row wants the standing black rule |
   | `ui/DateField` | `<input type="date">` | EVERY date box, the PUBLIC pages included. Carries the Safari empty-date apparatus (see the date bullet); `InlineValue kind="date"` wraps it, a create form uses it directly, and **`variant="field"`** (`PickList`'s prop name, same dense-cell-vs-form-box distinction) is the bordered `h-12`/16px dress the inquiry form wears |
   | `ui/TimeField` | `<input type="time">`, or a `TextInput` you parse | a time of day in a CREATE form, where the box starts empty and the value is required — `type="time"` yields `HH:MM` or nothing, so a half-typed value can never reach a `time` column as a cast error. It carries NO empty-state apparatus, deliberately: DateField needs one because WebKit paints TODAY into an empty date, and an empty time renders as placeholder segments. An edit-in-place cell on a value already set stays `TimeCell`, which takes free text and lets Postgres parse it. It mirrors DateField's **`variant`** for that component's own stated reason — the two sit side by side, so a bordered time beside a borderless date reads as one of them being broken |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
@@ -10092,6 +10092,53 @@ weekday column, and 003 then silently made it per-vendor-item.
   through the `h1`, ONLINE went from "Use here" to a real row whose account
   number then wrote, and both were confirmed in the database before the row was
   removed with a one-off service_role script (never committed).
+- **THE THREE PURCHASING LISTS FILTER BY VENDOR, AND SEVERAL AT ONCE**
+  (`lib/vendorFilter`, Mark, 2026-09-08: "a picklist of vendors to the order
+  guide, purchase order, and invoice list… selecting multiple options should be
+  allowed"). A `ui/PickSet` in each filter row; empty means every vendor.
+  **IT FILTERS BY NAME, NOT BY ID**, which is `/sales` picking its shops by CODE
+  and for that decision's two reasons. A name IS its own label, so a vendor you
+  have chosen can still be NAMED — and unticked — on a day the window holds none
+  of its rows; an id would leave the trigger reading a uuid, or force the
+  selection to be dropped, which silently widens the view at the moment you
+  narrow the window. And it keeps the URL legible and the three session cookies
+  small, where uuids cost 37 bytes each against a 4KB budget the guide already
+  shares with its search term. Known cost, and both halves fail by showing MORE
+  rather than fewer rows: two vendors sharing a name filter as one (038's
+  reasoning — there is deliberately no unique index on `vendors.name`), and a
+  rename drops out of a selection made before it.
+  **REPEATED PARAMS, NOT A COMMA-SEPARATED VALUE** (`?vendor=A&vendor=B`), so a
+  name holding the separator needs no escaping scheme — "Smith, Jones & Co" is a
+  name somebody will eventually type. That cost `urlFilterParams` one change:
+  **a repeated key now becomes an ARRAY**, which is what `RawSearchParams` has
+  always been typed for and what Next's own searchParams do. It kept only the
+  FIRST until now, and a fixture pinned that as "matching Next's own arrays",
+  which it was not — every other reader collapses through its own `one()`, so
+  the change reached none of them, and without it a Back press came home
+  narrowed to one vendor.
+  **A CHOSEN VENDOR IS ALWAYS IN THE PICKER, at 0**, even when the view holds
+  none of its rows. Dropping it takes the control off the screen while it is
+  still narrowing the list — an empty table, and nothing to untick.
+  **THE COUNTS ARE CONDITIONED ON THE OTHER CONTROLS AND NEVER ON THEMSELVES**,
+  which is `lib/filterMenus`' rule: each list computes a `beforeVendor` set
+  (status/tier, aging, search) that the options are counted over, or every
+  vendor but the chosen one would read 0. The guide runs it the other way too —
+  **the tier counts DO narrow with the vendor filter**, where they deliberately
+  ignore the search box, because a vendor selection is a standing scope with a
+  control on screen naming it: while you walk one supplier's shelf, "230
+  favorites" is a count of a walk you are not doing.
+  **ON THE GUIDE IT NARROWS THE LIST AND NOTHING ELSE.** `totals` is
+  `vendorTotals(rows, entries)` over the UNFILTERED prop, so the vendor totals
+  bar and Generate POs are untouched — a filtered walk can never quietly produce
+  a partial order or read as under a minimum it has met.
+  Verified live at 1440 on all three: the PO list's picker offered 19 vendors
+  with counts and a find box, ticking BakeMark and Chefs Warehouse gave 23 of
+  148 orders (13 + 10) with the other vendors' counts unmoved, and **Back from a
+  PO came home with BOTH still selected** — which is the `urlFilterParams` fix
+  and would have restored one before it. The invoice list's seven vendors
+  correctly get NO find box; the guide's ten do, and BakeMark took the walk from
+  514 lines to 21 with every line reading BakeMark and the shop's own section
+  bands intact.
 - **View state in the URL, display preferences in localStorage.** Filters and
   sort describe the view (shareable, survive detail round-trips) → query string,
   written with `history.replaceState` so a keystroke doesn't re-run the server

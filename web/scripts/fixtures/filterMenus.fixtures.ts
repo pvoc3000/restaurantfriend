@@ -304,11 +304,22 @@ test("what it returns parses like any other searchParams", () => {
   eq(parseFilterSearch(live ?? {}), "cocoa");
 });
 
-test("a repeated parameter takes the FIRST, matching Next's own arrays", () => {
+test("a repeated parameter becomes an ARRAY, as Next's own searchParams do", () => {
+  // It kept only the FIRST until 2026-09-08, which this fixture used to pin —
+  // and that was a divergence from Next rather than a match for it. The vendor
+  // filter is repeated (`?vendor=A&vendor=B`, so a name may hold any
+  // character), and collapsing it would have brought a Back press home
+  // narrowed to one vendor.
   eq(
     atUrl("/elements?kind=made&kind=purchased", () => urlFilterParams("/elements")),
-    { kind: "made" }
+    { kind: ["made", "purchased"] }
   );
+  // Every OTHER reader collapses through its own `one()`, which is why the
+  // change reached none of them.
+  const live = atUrl("/elements?kind=made&kind=purchased", () =>
+    urlFilterParams("/elements")
+  );
+  eq(parseFilterValues(DIMS, live ?? {}), { kind: "made" });
 });
 
 /* -------------------------------------------------------------------------

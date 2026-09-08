@@ -3,6 +3,11 @@
 
 import { todayInTimeZone } from "./today";
 import { vendorItemTitle } from "./catalog";
+import {
+  appendVendorFilter,
+  parseVendorFilter,
+  VENDOR_FILTER_PARAM,
+} from "./vendorFilter";
 
 export type GuideRow = {
   item_location_id: string;
@@ -341,6 +346,16 @@ export type GuideView = {
   grouping: GuideGrouping;
   ignoreDays: boolean;
   /**
+   * Which vendors the walk is narrowed to — NAMES, empty meaning all of them
+   * (lib/vendorFilter). Remembered like the rest of the view: walking one
+   * supplier's shelf is a way of working, not a one-off lookup.
+   *
+   * It narrows the LIST and nothing else. The vendor totals bar and Generate
+   * POs are computed from every row, so a filtered walk can never quietly
+   * produce a partial order or read as under a minimum it has met.
+   */
+  vendors: string[];
+  /**
    * The search box (Mark, 2026-08-03: filters AND searching should survive the
    * trip to an item and back). It was deliberately left out until now, on the
    * argument that coming back to a list silently narrowed by a term you've
@@ -360,6 +375,7 @@ export const DEFAULT_GUIDE_VIEW: GuideView = {
   filter: "favorites",
   grouping: "section",
   ignoreDays: false,
+  vendors: [],
   term: "",
 };
 
@@ -386,17 +402,20 @@ export function parseGuideView(raw: string | undefined | null): GuideView {
         ? grouping
         : DEFAULT_GUIDE_VIEW.grouping,
     ignoreDays: q.get("ignore") === "1",
+    vendors: parseVendorFilter(q.getAll(VENDOR_FILTER_PARAM)),
     term: (q.get("q") ?? "").slice(0, MAX_REMEMBERED_TERM),
   };
 }
 
 export function serializeGuideView(view: GuideView): string {
-  return new URLSearchParams({
+  const params = new URLSearchParams({
     filter: view.filter,
     group: view.grouping,
     ignore: view.ignoreDays ? "1" : "0",
     q: view.term.slice(0, MAX_REMEMBERED_TERM),
-  }).toString();
+  });
+  appendVendorFilter(params, view.vendors);
+  return params.toString();
 }
 
 function groupKeyFor(row: GuideRow, mode: GuideGrouping): { label: string; sort: number } {

@@ -6,6 +6,11 @@ import type { RawSearchParams } from "./itemFilters";
 import type { SortDir } from "./tableSort";
 import { withFrom } from "./breadcrumbs";
 import { RANGES, rangeStart, type RangeKey } from "./poFilters";
+import {
+  appendVendorFilter,
+  parseVendorFilter,
+  VENDOR_FILTER_PARAM,
+} from "./vendorFilter";
 import { AGING_ORDER, BILL_STAGE_ORDER,
   type BillStage, type AgingBucket } from "./invoices";
 
@@ -54,6 +59,8 @@ export type InvoiceSortKey = (typeof INVOICE_SORT_KEYS)[number];
 export type InvoiceFilters = {
   q: string;
   status: InvoiceStatusFilter;
+  /** Vendor NAMES; empty means every vendor. See lib/vendorFilter. */
+  vendors: string[];
   aging: AgingFilter;
   range: RangeKey;
   sort: InvoiceSortKey;
@@ -75,6 +82,7 @@ export type InvoiceFilters = {
 export const DEFAULT_INVOICE_FILTERS: InvoiceFilters = {
   q: "",
   status: "open",
+  vendors: [],
   aging: "all",
   range: "90",
   sort: "due_date",
@@ -101,6 +109,10 @@ export function parseInvoiceFilters(
     // narrowed by a term you've forgotten typing is its own trap.
     q: one(params.q),
     status: isStatusFilter(status) ? status : fallback.status,
+    // Remembered, for the reason written in lib/poFilters.
+    vendors: params[VENDOR_FILTER_PARAM]
+      ? parseVendorFilter(params[VENDOR_FILTER_PARAM])
+      : fallback.vendors ?? [],
     aging: isAgingFilter(aging) ? aging : fallback.aging,
     range: RANGES.some((r) => r.key === range) ? (range as RangeKey) : fallback.range,
     sort: (INVOICE_SORT_KEYS as readonly string[]).includes(sort)
@@ -114,13 +126,15 @@ export function parseInvoiceFilters(
 export const INVOICE_VIEW_COOKIE = "rf.invoice.view";
 
 export function serializeInvoiceView(filters: InvoiceFilters): string {
-  return new URLSearchParams({
+  const params = new URLSearchParams({
     status: filters.status,
     aging: filters.aging,
     range: filters.range,
     sort: filters.sort,
     dir: filters.dir,
-  }).toString();
+  });
+  appendVendorFilter(params, filters.vendors);
+  return params.toString();
 }
 
 export function parseInvoiceView(
@@ -136,6 +150,8 @@ export function parseInvoiceView(
 
   const view: Partial<InvoiceFilters> = {};
   if (isStatusFilter(status)) view.status = status;
+  const vendors = parseVendorFilter(q.getAll(VENDOR_FILTER_PARAM));
+  if (vendors.length > 0) view.vendors = vendors;
   if (isAgingFilter(aging)) view.aging = aging;
   if (RANGES.some((r) => r.key === range)) view.range = range as RangeKey;
   if ((INVOICE_SORT_KEYS as readonly string[]).includes(sort)) {
@@ -150,6 +166,7 @@ export function invoiceFiltersToQuery(filters: InvoiceFilters): string {
   const d = DEFAULT_INVOICE_FILTERS;
   if (filters.q.trim()) params.set("q", filters.q.trim());
   if (filters.status !== d.status) params.set("status", filters.status);
+  appendVendorFilter(params, filters.vendors);
   if (filters.aging !== d.aging) params.set("aging", filters.aging);
   if (filters.range !== d.range) params.set("range", filters.range);
   if (filters.sort !== d.sort) params.set("sort", filters.sort);

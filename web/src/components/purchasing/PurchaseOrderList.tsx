@@ -4,8 +4,13 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import {
+  matchesVendorFilter,
+  vendorFilterOptions,
+} from "@/lib/vendorFilter";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { PickSet } from "@/components/ui/PickSet";
 import {
   downloadBlob,
   fetchPoDocData,
@@ -170,7 +175,12 @@ export function PurchaseOrderList({
     [orders]
   );
 
-  const visible = useMemo(() => {
+  /**
+   * Everything but the vendor filter — what the vendor picker's options and
+   * counts are drawn from, so they are conditioned on the other controls and
+   * never on themselves (lib/filterMenus' rule).
+   */
+  const beforeVendor = useMemo(() => {
     const words = filters.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
     return orders.filter((po) => {
       if (filters.status === "open") {
@@ -183,6 +193,17 @@ export function PurchaseOrderList({
       return words.every((w) => haystack.includes(w));
     });
   }, [orders, filters.status, filters.q]);
+
+  const vendorOptions = useMemo(
+    () => vendorFilterOptions(beforeVendor.map((po) => po.vendors?.name), filters.vendors),
+    [beforeVendor, filters.vendors]
+  );
+
+  const visible = useMemo(
+    () =>
+      beforeVendor.filter((po) => matchesVendorFilter(po.vendors?.name, filters.vendors)),
+    [beforeVendor, filters.vendors]
+  );
 
   const sorted = useMemo(
     () =>
@@ -888,6 +909,22 @@ export function PurchaseOrderList({
                   ? openCount
                   : statusCounts[s] ?? 0,
           }))}
+        />
+
+        {/* A SET, not a one-of-N: "BakeMark and Chefs Warehouse" is the
+            question this list is asked, and eighty vendors were never going to
+            be a row of tabs. It sits with the controls that NARROW the list,
+            left of the window, and the picker grows its own find box past
+            eight options. */}
+        <PickSet
+          options={vendorOptions}
+          value={filters.vendors}
+          onChange={(vendors) => update({ vendors })}
+          allLabel="All vendors"
+          noun="vendors"
+          label="Which vendors to show"
+          className="max-w-[16rem]"
+          minWidth={240}
         />
 
         <div className="ml-auto flex items-center gap-3">

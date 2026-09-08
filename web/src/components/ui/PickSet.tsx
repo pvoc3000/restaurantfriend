@@ -6,6 +6,7 @@ import {
   MENU_CARET,
   MENU_ITEM_CLASS,
   MENU_PANEL_CLASS,
+  MENU_SEARCH_CLASS,
   menuItemState,
   useAnchoredPanel,
 } from "@/lib/anchoredPanel";
@@ -77,10 +78,27 @@ export function PickSet({
   className?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [term, setTerm] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => {
+    setOpen(false);
+    // Cleared on the way out, so reopening is never a pre-filtered list with
+    // no visible cause — the term is a way THROUGH the options, not part of
+    // the choice.
+    setTerm("");
+  }, []);
   const box = useAnchoredPanel({ open, triggerRef, panelRef, align, onClose: close });
+
+  // PAST EIGHT, YOU TYPE — `ui/PickList`'s own threshold and its reason. Five
+  // shops are a list you read; the vendor filter opens on every supplier a
+  // window holds, which at DF01 is dozens, and a scroll through checkboxes is
+  // not how anybody finds "Chefs Warehouse".
+  const searchable = options.length > 8;
+  const needle = term.trim().toLowerCase();
+  const shown = needle
+    ? options.filter((o) => o.label.toLowerCase().includes(needle))
+    : options;
 
   const chosen = options.filter((o) => value.includes(o.value));
 
@@ -111,7 +129,7 @@ export function PickSet({
         aria-expanded={open}
         aria-label={label}
         disabled={disabled}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => (open ? close() : setOpen(true))}
         // `boxed` is `ui/PickList`'s prop, doing PickList's job, so the two
         // read as one control when they sit in the same column: a FILTER row
         // wants the black rule its neighbours have, a detail FIELD wants the
@@ -166,9 +184,22 @@ export function PickSet({
             }}
             className={MENU_PANEL_CLASS}
           >
+            {searchable && (
+              <input
+                autoFocus
+                value={term}
+                onChange={(e) => setTerm(e.target.value)}
+                placeholder="Find…"
+                className={MENU_SEARCH_CLASS}
+              />
+            )}
+
             {/* The explicit way back to everything. Ticked when nothing is,
                 because that IS the state — not a command that clears, which
-                would read as an action among a list of values. */}
+                would read as an action among a list of values. NEVER FILTERED
+                by the find box: it is the state of the picker rather than one
+                of its values, and typing three letters must not take away the
+                way back. */}
             <Checkbox
               size={18}
               checked={value.length === 0}
@@ -180,7 +211,11 @@ export function PickSet({
 
             <div className="my-1 border-t border-hairline" />
 
-            {options.map((o) => {
+            {shown.length === 0 && (
+              <p className="px-3 py-2 text-sm text-muted">Nothing matches.</p>
+            )}
+
+            {shown.map((o) => {
               const on = value.includes(o.value);
               return (
                 <Checkbox

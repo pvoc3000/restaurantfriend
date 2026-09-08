@@ -6,6 +6,11 @@ import type { SortDir } from "./tableSort";
 import { withFrom } from "./breadcrumbs";
 import { PO_STATUS_ORDER, type PoStatus } from "./purchaseOrders";
 import { daysBefore, todayInTimeZone } from "./today";
+import {
+  appendVendorFilter,
+  parseVendorFilter,
+  VENDOR_FILTER_PARAM,
+} from "./vendorFilter";
 
 /**
  * The chip row is the five statuses plus two roll-ups: `all`, and `open` —
@@ -55,6 +60,8 @@ export type PoSortKey = (typeof PO_SORT_KEYS)[number];
 export type PoFilters = {
   q: string;
   status: StatusFilter;
+  /** Vendor NAMES; empty means every vendor. See lib/vendorFilter. */
+  vendors: string[];
   range: RangeKey;
   sort: PoSortKey;
   dir: SortDir;
@@ -63,6 +70,7 @@ export type PoFilters = {
 export const DEFAULT_PO_FILTERS: PoFilters = {
   q: "",
   status: "all",
+  vendors: [],
   range: "90",
   sort: "order_date",
   dir: "desc",
@@ -93,6 +101,14 @@ export function parsePoFilters(
     // typing is its own trap.
     q: one(params.q),
     status: isStatusFilter(status) ? status : fallback.status,
+    // REMEMBERED, unlike the search box: a vendor is a standing way of working
+    // ("I only order from BakeMark on Tuesdays"), where a typed term is
+    // usually one lookup you have already finished with. The picker also says
+    // which vendors are in force at a glance, where a search box that had
+    // silently survived would not.
+    vendors: params[VENDOR_FILTER_PARAM]
+      ? parseVendorFilter(params[VENDOR_FILTER_PARAM])
+      : fallback.vendors ?? [],
     range: RANGES.some((r) => r.key === range)
       ? (range as RangeKey)
       : fallback.range,
@@ -113,12 +129,14 @@ export function parsePoFilters(
 export const PO_VIEW_COOKIE = "rf.po.view";
 
 export function serializePoView(filters: PoFilters): string {
-  return new URLSearchParams({
+  const params = new URLSearchParams({
     status: filters.status,
     range: filters.range,
     sort: filters.sort,
     dir: filters.dir,
-  }).toString();
+  });
+  appendVendorFilter(params, filters.vendors);
+  return params.toString();
 }
 
 export function parsePoView(raw: string | undefined | null): Partial<PoFilters> {
@@ -131,6 +149,8 @@ export function parsePoView(raw: string | undefined | null): Partial<PoFilters> 
 
   const view: Partial<PoFilters> = {};
   if (isStatusFilter(status)) view.status = status;
+  const vendors = parseVendorFilter(q.getAll(VENDOR_FILTER_PARAM));
+  if (vendors.length > 0) view.vendors = vendors;
   if (RANGES.some((r) => r.key === range)) view.range = range as RangeKey;
   if ((PO_SORT_KEYS as readonly string[]).includes(sort)) view.sort = sort as PoSortKey;
   if (dir === "asc" || dir === "desc") view.dir = dir;
@@ -141,6 +161,7 @@ export function poFiltersToQuery(filters: PoFilters): string {
   const params = new URLSearchParams();
   if (filters.q.trim()) params.set("q", filters.q.trim());
   if (filters.status !== DEFAULT_PO_FILTERS.status) params.set("status", filters.status);
+  appendVendorFilter(params, filters.vendors);
   if (filters.range !== DEFAULT_PO_FILTERS.range) params.set("range", filters.range);
   if (filters.sort !== DEFAULT_PO_FILTERS.sort) params.set("sort", filters.sort);
   if (filters.dir !== DEFAULT_PO_FILTERS.dir) params.set("dir", filters.dir);

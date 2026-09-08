@@ -47,6 +47,7 @@ import "./payrollBenefits.fixtures";
 import "./poDocumentFileName.fixtures";
 import "./unaddedAdds.fixtures";
 import "./poFilters.fixtures";
+import "./vendorFilter.fixtures";
 import "./productionBatches.fixtures";
 import "./productionCost.fixtures";
 import "./productionElements.fixtures";
