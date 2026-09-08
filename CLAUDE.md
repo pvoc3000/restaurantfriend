@@ -2699,6 +2699,21 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    space"), which is why the row is measured with `useFillToBottom` at a **560**
    floor — 660 became the height rather than the floor and left the page
    scrolling 58px.
+   **THE HEAD IS NOW FOUR BOXES IN TWO NESTED GRIDS, not one row** (Mark,
+   2026-09-03, correcting a four-box row that spanned the page on its own
+   terms: "I overlooked how the elements would align vertically"). It reuses
+   the CONTENT row's own `xl:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]` template
+   rather than a copy of the numbers, which is what makes "the total's right
+   edge is the document pane's right edge" true without either grid knowing the
+   other's width; each half then splits again — identity | total on the left,
+   and on the right **actions | QuickBooks, in that order since 2026-09-08**
+   (Mark, asking for the two to be swapped). `items-start` at both levels.
+   That order also retired a placement trap worth knowing if they are ever
+   swapped back: a `grid-cols-2` whose FIRST child renders NO DOM NODE does not
+   leave an empty slot — auto-placement drops the survivor into track 1 — and
+   `PushToQuickBooks` returns null outright where the org has no QuickBooks
+   connection, so leading with it needed a wrapper `div` to hold the track
+   open. `InvoiceFooter` always renders a node, so first is the safe end.
    **A BILLED QUANTITY THAT DISAGREES WITH WHAT WE RECEIVED IS FLAGGED, NOT
    COLUMNED** (Mark, reversing a Received column he had asked for an hour
    earlier: "just flagging when the billed qty != received qty is better"). A

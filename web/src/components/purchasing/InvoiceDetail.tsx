@@ -1160,45 +1160,28 @@ export function InvoiceDetail({
           </div>
         </div>
 
-        {/* RIGHT — QuickBooks | actions, matching the Bill/Amounts column's
-            width. Each renders its OWN box now (buttons, then its own prose)
-            — see `PushToQuickBooks` and `InvoiceFooter` — so this grid only
-            has to place the two boxes side by side.
+        {/* RIGHT — actions | QuickBooks, matching the Bill/Amounts column's
+            width. Each renders its OWN box (buttons, then its own prose) —
+            see `InvoiceFooter` and `PushToQuickBooks` — so this grid only has
+            to place the two boxes side by side.
 
-            THE QUICKBOOKS SLOT IS WRAPPED IN ITS OWN `div` (Mark, 2026-09-03:
+            THE ORDER IS MARK'S (2026-09-08, asking for the two columns to be
+            swapped): Void · Delete · Approve for payment sit under the total,
+            and QuickBooks takes the page's right edge.
+
+            IT ALSO RETIRES A PLACEMENT HAZARD, which is why the wrapper `div`
+            the QuickBooks slot used to carry is gone (Mark, 2026-09-03:
             "Void, Delete and Withdraw appear where the quickbook buttons
-            should be, then move into place"). A grid with `grid-cols-2`
-            whose FIRST child has NO DOM NODE AT ALL does not leave an empty
-            slot: CSS auto-placement drops the one remaining child
-            (`InvoiceFooter`) into the FIRST track, because there is nothing
-            to hold that track open. `PushToQuickBooks` NOW renders a
-            placeholder while it decides what to show, so this no longer
-            fires on an ordinary load — but it still returns `null` outright
-            once it learns the org has no QuickBooks connection at all, and
-            THAT case would flash Actions left exactly the same way without
-            this wrapper. It costs nothing to keep either way: an always-
-            present `div` is what guarantees the track stays open regardless
-            of what, if anything, ends up inside it. */}
+            should be, then move into place"). A `grid-cols-2` whose FIRST
+            child has NO DOM NODE does not leave an empty slot — auto-placement
+            drops the one remaining child into the FIRST track — and
+            `PushToQuickBooks` returns `null` outright once it learns the org
+            has no QuickBooks connection, so it used to need a wrapper to hold
+            its track open. First in the row is now `InvoiceFooter`, which
+            ALWAYS renders a node, so track 1 is held whatever QuickBooks
+            decides and an absent last child leaves nothing to shift. If these
+            are ever swapped back, the wrapper goes back with them. */}
         <div className="grid grid-cols-2 items-start gap-x-4">
-          <div>
-            <PushToQuickBooks
-              invoiceId={invoice.id}
-              vendorId={invoice.vendor_id}
-              locationId={invoice.location_id}
-              orgId={orgId}
-              status={invoice.status}
-              total={invoice.total}
-              isCredit={invoice.is_credit}
-              invoiceNumber={invoice.invoice_number}
-              invoiceDate={invoice.invoice_date}
-              dueDate={invoice.due_date}
-              financialsTouchedAt={invoice.financials_touched_at}
-              syncedAt={invoice.synced_at}
-              canPush={canEdit}
-              supabase={supabase}
-              onDone={() => router.refresh()}
-            />
-          </div>
           <InvoiceFooter
             invoiceId={invoice.id}
             status={invoice.status}
@@ -1207,6 +1190,23 @@ export function InvoiceDetail({
             canApprove={canApprove}
             canEdit={canEdit}
             closeHref={closeHref}
+            supabase={supabase}
+            onDone={() => router.refresh()}
+          />
+          <PushToQuickBooks
+            invoiceId={invoice.id}
+            vendorId={invoice.vendor_id}
+            locationId={invoice.location_id}
+            orgId={orgId}
+            status={invoice.status}
+            total={invoice.total}
+            isCredit={invoice.is_credit}
+            invoiceNumber={invoice.invoice_number}
+            invoiceDate={invoice.invoice_date}
+            dueDate={invoice.due_date}
+            financialsTouchedAt={invoice.financials_touched_at}
+            syncedAt={invoice.synced_at}
+            canPush={canEdit}
             supabase={supabase}
             onDone={() => router.refresh()}
           />
