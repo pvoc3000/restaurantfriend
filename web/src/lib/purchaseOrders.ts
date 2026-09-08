@@ -405,9 +405,9 @@ export type PendingAdd = {
  * field here (lib/calc), so this is the one place that decides what "3", "2 * 6"
  * and "1 +" each mean.
  *
- * ONE definition, because three things ask it and they must agree: the Add
- * button's own refusal, whether that button wears the fill, and whether the
- * confirm quotes the amount back.
+ * ONE definition, because two things ask it and they must agree: the Add
+ * button's own refusal, and whether the confirm quotes the amount back. The
+ * FILL is a different question — see `isPendingAdd`.
  */
 export function addableQty(raw: string): number | null {
   const n = evaluateNumeric(raw.trim());
@@ -415,8 +415,18 @@ export function addableQty(raw: string): number | null {
   return n;
 }
 
-/** Typing something is not the same as having added it. Blanks are not work. */
-function isPending(entry: PendingAdd): boolean {
+/**
+ * Anything typed in and not yet added. Blanks are not work.
+ *
+ * This is what the panel's FILL follows as well as its confirm (Mark,
+ * 2026-09-08: "the 'add to po' button should be the black focus button as soon
+ * as the user enters anything"): the two questions — is there something to
+ * lose, and which button finishes the task — have one answer, and answering
+ * them differently would put the fill on Done while a row still held typing.
+ * Whether the amount is a valid one is `addableQty`'s question and the Add
+ * button's own, asked when it is pressed.
+ */
+export function isPendingAdd(entry: PendingAdd): boolean {
   return entry.values.some((v) => v.trim() !== "");
 }
 
@@ -428,7 +438,7 @@ function isPending(entry: PendingAdd): boolean {
  * as the app having decided something it hasn't.
  */
 export function unaddedAdds(pending: PendingAdd[]): string[] {
-  return pending.filter(isPending).map((entry) => {
+  return pending.filter(isPendingAdd).map((entry) => {
     const qty = addableQty(entry.values[0] ?? "");
     return qty === null ? entry.label : `${qty} × ${entry.label}`;
   });

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
   addableQty,
+  isPendingAdd,
   money,
   PO_STATUS_LABEL,
   unaddedWarning,
@@ -207,20 +208,22 @@ export function AddPoLines({
   }, [drafts, rows, oneOff]);
 
   /**
-   * Whether anything in the panel is READY to be added — a positive amount,
-   * and for the one-off the description it cannot go without.
+   * Whether the panel is holding anything at all — the same question the
+   * confirm asks (`isPendingAdd`), because the fill and the warning are two
+   * halves of one fact: while something is typed, Add to PO is the button that
+   * finishes the task and Done is the one that throws it away.
    *
-   * Deliberately narrower than `pending`, and the two say different things: the
-   * confirm exists so nothing typed is lost, so it fires on a stray "0"; the
-   * FILL says "this is the button to press", which is a promise only a row that
-   * would actually add can keep.
+   * It goes false again the moment an add succeeds, since that clears the
+   * draft — which is what puts the fill back on Done "after the user has
+   * entered an item" (Mark, 2026-09-08).
    */
-  const readyToAdd = useMemo(() => {
-    const rows = Object.values(drafts).filter((q) => addableQty(q) !== null);
-    const oneOffReady =
-      oneOff.description.trim() !== "" && addableQty(oneOff.qty) !== null;
-    return rows.length > 0 || oneOffReady;
-  }, [drafts, oneOff]);
+  const typedIn = useMemo(() => pending.some(isPendingAdd), [pending]);
+
+  /** The one-off's half of it, for its own Add button. */
+  const oneOffTyped = useMemo(
+    () => Object.values(oneOff).some((v) => v.trim() !== ""),
+    [oneOff]
+  );
 
   // Both dialogs listen for Escape on the window, and `stopPropagation` does
   // not stop a listener on the same target — so without this, Escape while the
@@ -449,16 +452,16 @@ export function AddPoLines({
             </>
           }
           footer={
-            /* BLACK ONLY WHILE NOTHING IS READY TO ADD (Mark, 2026-09-08).
+            /* BLACK ONLY WHILE NOTHING IS TYPED IN (Mark, 2026-09-08).
                The panel-commit exception is about the one outcome a panel is
-               for, and here that outcome MOVES: with an amount typed, Add to PO
-               is what finishes the task and Done is the escape beside it. Two
-               black buttons would say nothing about which one to press — and
-               the pale one would be the one that discards the typing. */
+               for, and here that outcome MOVES: the moment anything is typed,
+               Add to PO is what finishes the task and Done is the escape beside
+               it. Two black buttons would say nothing about which one to press
+               — and the pale one would be the one that discards the typing. */
             <button
               type="button"
               onClick={() => void closePanel()}
-              className={readyToAdd ? BUTTON_CLASS : DIALOG_COMMIT_CLASS}
+              className={typedIn ? BUTTON_CLASS : DIALOG_COMMIT_CLASS}
             >
               Done
             </button>
@@ -468,10 +471,7 @@ export function AddPoLines({
 
               {tab === "oneOff" ? (
                 <OneOffForm
-                  ready={
-                    oneOff.description.trim() !== "" &&
-                    addableQty(oneOff.qty) !== null
-                  }
+                  ready={oneOffTyped}
                   draft={oneOff}
                   onDraft={(patch) => setOneOff((prev) => ({ ...prev, ...patch }))}
                   onAdd={() => void addOneOff()}
@@ -559,7 +559,7 @@ export function AddPoLines({
                           onClick={() => void add(vi)}
                           disabled={addingId === vi.id}
                           className={`${
-                            addableQty(drafts[vi.id] ?? "") === null
+                            (drafts[vi.id] ?? "").trim() === ""
                               ? BUTTON_CLASS
                               : PRIMARY_BUTTON_CLASS
                           } shrink-0`}
@@ -602,7 +602,7 @@ function OneOffForm({
   onDraft: (patch: Partial<typeof BLANK_ONE_OFF>) => void;
   onAdd: () => void;
   busy: boolean;
-  /** Enough typed in to add — the button takes the fill. See `readyToAdd`. */
+  /** Anything typed into the form — the Add button takes the fill. */
   ready: boolean;
   /** What this session has already put on the order, so the panel staying open
    *  after each add still tells you what it did. */

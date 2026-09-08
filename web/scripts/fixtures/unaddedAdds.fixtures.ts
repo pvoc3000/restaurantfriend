@@ -9,6 +9,7 @@
 import { test, eq, ok } from "./harness";
 import {
   addableQty,
+  isPendingAdd,
   unaddedAdds,
   unaddedWarning,
   type PendingAdd,
@@ -106,4 +107,18 @@ test("what counts as an order amount", () => {
   eq(addableQty("-2"), null, "negative");
   eq(addableQty("1 +"), null, "half an expression");
   eq(addableQty("case"), null, "not a number");
+});
+
+test("the fill follows anything typed, not a valid amount", () => {
+  // Mark, 2026-09-08: Add to PO takes the fill "as soon as the user enters
+  // anything". So this is deliberately looser than `addableQty` — a stray "0"
+  // blackens the row, because the row IS what finishes the task from there.
+  ok(isPendingAdd(row("Flour, All Purpose", "0")), "a zero is still typing");
+  ok(isPendingAdd(row("Flour, All Purpose", "1 +")), "half an expression");
+  ok(isPendingAdd(oneOff({ brand: "Guittard" })), "any field of the one-off form");
+  eq(isPendingAdd(row("Flour, All Purpose", "")), false, "blank");
+  eq(isPendingAdd(row("Flour, All Purpose", "  ")), false, "whitespace");
+  // The add that succeeds clears the draft, which is what puts the fill back on
+  // Done — so an added row must read exactly like an untouched one.
+  eq(isPendingAdd(oneOff()), false, "a form reset after an add");
 });
