@@ -1,3 +1,4 @@
+import { IdleLock } from "@/components/IdleLock";
 import { CalcPad } from "@/components/ui/CalcPad";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import { getAppSession } from "@/lib/session";
@@ -34,12 +35,16 @@ export default async function FullscreenLayout({
   // Not for the props — the pages fetch their own — but because this is what
   // redirects a signed-out request, and because it is cached, so the page's own
   // call costs nothing.
-  await getAppSession();
+  const session = await getAppSession();
 
   return (
     <ConfirmProvider>
       <div className="flex min-h-screen flex-col bg-white">{children}</div>
       <CalcPad />
+      {/* Here too: a report left open on the counter is exactly the risk the
+          lock exists for, and every runner persists as it goes, so a lock
+          mid-count loses nothing. */}
+      {session.registeredDevice && <IdleLock />}
     </ConfirmProvider>
   );
 }

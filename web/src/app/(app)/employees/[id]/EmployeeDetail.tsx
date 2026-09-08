@@ -260,6 +260,12 @@ export async function EmployeeDetail({
         .eq("user_id", person.user_id)
     : { data: null };
 
+  // 097: whether this member holds a PIN. A timestamp or null, never the
+  // hash; null too if the function is not there yet.
+  const { data: pinSetAt } = person.user_id && tab === "admin"
+    ? await supabase.rpc("member_pin_set_at", { p_user: person.user_id })
+    : { data: null };
+
   // Sign every document in ONE batch on the server — not a round trip per card,
   // and a URL built to expire doesn't outlive the page.
   const docs = (documentRows ?? []) as unknown as EmployeeDocument[];
@@ -799,6 +805,8 @@ export async function EmployeeDetail({
             name: l.name,
           }))}
           allowedLocationIds={(gridRows ?? []).map((g) => g.location_id as string)}
+          pinSetAt={(pinSetAt as string | null) ?? null}
+          pinSession={session.pinSession}
         />
       </section>
 

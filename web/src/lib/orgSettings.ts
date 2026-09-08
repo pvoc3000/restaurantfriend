@@ -5,14 +5,15 @@
  * default writing no parameter so the screen keeps one canonical address, and
  * anything unrecognised falling back to the first tab rather than an error.
  */
-export type SettingsTab = "general" | "messages" | "accounting";
+export type SettingsTab = "general" | "messages" | "accounting" | "devices";
 
-export const SETTINGS_TABS: SettingsTab[] = ["general", "messages", "accounting"];
+export const SETTINGS_TABS: SettingsTab[] = ["general", "messages", "accounting", "devices"];
 
 export const SETTINGS_TAB_LABEL: Record<SettingsTab, string> = {
   general: "General",
   messages: "Messages",
   accounting: "Accounting",
+  devices: "Shared devices",
 };
 
 export function parseSettingsTab(raw: string | string[] | undefined): SettingsTab {

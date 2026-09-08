@@ -79,6 +79,7 @@ import "./specialOrderProgress.fixtures";
 import "./specialOrderSchedule.fixtures";
 import "./scheduleSource.fixtures";
 import "./sales.fixtures";
+import "./sharedDevice.fixtures";
 import "./shiftReports.fixtures";
 import "./squareSalesCsv.fixtures";
 import "./tableSort.fixtures";

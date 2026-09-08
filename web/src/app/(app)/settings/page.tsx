@@ -4,6 +4,8 @@ import { canManageMembers } from "@/lib/roles";
 import { ShiftReportSettings } from "@/components/settings/ShiftReportSettings";
 import { SpecialOrderSettings } from "@/components/settings/SpecialOrderSettings";
 import { AccountingSettings, type AccountingStatus } from "@/components/settings/AccountingSettings";
+import { SharedDevices, type RegisteredDevice } from "@/components/settings/SharedDevices";
+import { thisDeviceId } from "@/app/deviceActions";
 import { SectionNav } from "@/components/ui/SectionNav";
 import {
   SETTINGS_TABS,
@@ -59,6 +61,22 @@ export default async function SettingsPage({
       p_org: session.membership.org_id,
     });
     accounting = Array.isArray(qbo) ? ((qbo[0] as AccountingStatus | undefined) ?? null) : null;
+  }
+
+  // 097: the org's shared iPads. Owner/admin-readable by policy; below that
+  // the query returns nothing and the tab says so.
+  let devices: RegisteredDevice[] = [];
+  let devicesError: string | null = null;
+  let deviceHere: string | null = null;
+  if (tab === "devices") {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("registered_devices")
+      .select("id, name, registered_at, last_seen_at, revoked_at")
+      .order("registered_at", { ascending: false });
+    if (error) devicesError = error.message;
+    devices = (data ?? []) as RegisteredDevice[];
+    deviceHere = await thisDeviceId();
   }
 
   const tabOptions = SETTINGS_TABS.map((t) => ({
@@ -124,6 +142,15 @@ export default async function SettingsPage({
           )}
           {tab === "accounting" && (
             <AccountingSettings orgId={orgId} editable={editable} initialStatus={accounting} />
+          )}
+          {tab === "devices" && (
+            <SharedDevices
+              devices={devices}
+              loadError={devicesError}
+              thisDevice={deviceHere}
+              editable={editable}
+              pinSession={session.pinSession}
+            />
           )}
         </div>
       </div>

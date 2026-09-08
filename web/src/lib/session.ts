@@ -1,7 +1,9 @@
 import { cache } from "react";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Role } from "@/lib/roles";
+import { DEVICE_COOKIE, PIN_SESSION_COOKIE } from "@/lib/sharedDevice";
 
 export type Location = {
   id: string;
@@ -81,6 +83,20 @@ export type AppSession = {
   orgSettings: OrgSettings;
   /** `orgs.name`. Empty only if the embed ever comes back null. */
   orgName: string;
+  /**
+   * This browser is a REGISTERED SHARED DEVICE (an iPad an owner/admin
+   * claimed on /settings; migration 097). Both cookies behind these are
+   * httpOnly, so the client cannot read them and the layouts pass these
+   * down as props: the idle lock mounts only here, and the masthead reads
+   * "Switch user" rather than "Sign out".
+   */
+  registeredDevice: boolean;
+  /**
+   * The session was minted by a PIN rather than a password. A PIN is not a
+   * password: /account, the Admin tab and /settings refuse a password
+   * change, a PIN change and a device registration while this is true.
+   */
+  pinSession: boolean;
 };
 
 /**
@@ -104,7 +120,11 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
     data: { user },
   } = await supabase.auth.getUser();
 
-  if (!user) redirect("/login");
+  // The proxy normally catches a signed-out request first; this is for a
+  // session that expired between the proxy and the page. A registered iPad
+  // goes back to its picker, anything else to the password screen.
+  const jar = await cookies();
+  if (!user) redirect(jar.has(DEVICE_COOKIE) ? "/lock" : "/login");
 
   // Independent of each other — locations doesn't even need the user id, RLS
   // scopes it — so they go together rather than one after the other.
@@ -190,5 +210,7 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
     // Design rule 2: business names live in the database, never in code — and
     // the payroll export needs one to name its file.
     orgName: membership.orgs?.name ?? "",
+    registeredDevice: jar.has(DEVICE_COOKIE),
+    pinSession: jar.get(PIN_SESSION_COOKIE)?.value === "1",
   };
 });

@@ -13,6 +13,7 @@ import {
   DIALOG_COMMIT_CLASS,
 } from "@/components/ui/Dialog";
 import { ROLE_LABEL, ROLE_OPTIONS, type Role } from "@/lib/roles";
+import { PIN_LENGTH, isValidPin } from "@/lib/sharedDevice";
 import { LocationAccess } from "./LocationAccess";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
@@ -49,6 +50,8 @@ export function AppAccess({
   allowedLocationIds,
   displayName,
   invitedAt,
+  pinSetAt,
+  pinSession,
 }: {
   employeeId: string;
   employeeName: string;
@@ -63,6 +66,10 @@ export function AppAccess({
   allowedLocationIds: string[];
   displayName: string | null;
   invitedAt: string | null;
+  /** 097: when this member's PIN was set, or null for none. */
+  pinSetAt: string | null;
+  /** The viewer's OWN session came from a PIN, so it may not set anybody's. */
+  pinSession: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -72,6 +79,64 @@ export function AppAccess({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+
+  // The PIN row. `set_member_pin` (097) is owner/admin — the same gate this
+  // screen is behind — and null CLEARS.
+  const [pinOpen, setPinOpen] = useState(false);
+  const [pin, setPin] = useState("");
+  const [pinAgain, setPinAgain] = useState("");
+  const [pinBusy, setPinBusy] = useState(false);
+  const [pinError, setPinError] = useState<string | null>(null);
+  const [pinSet, setPinSet] = useState<string | null>(pinSetAt);
+
+  async function writePin(value: string | null) {
+    setPinBusy(true);
+    setPinError(null);
+    setError(null);
+    const { error: rpcError } = await supabase.rpc("set_member_pin", {
+      p_user: userId,
+      p_pin: value,
+    });
+    setPinBusy(false);
+    if (rpcError) {
+      if (value === null) setError(rpcError.message);
+      else setPinError(rpcError.message);
+      return false;
+    }
+    setPinSet(value === null ? null : new Date().toISOString());
+    return true;
+  }
+
+  async function savePin() {
+    if (!isValidPin(pin)) {
+      setPinError(`A PIN is exactly ${PIN_LENGTH} digits.`);
+      return;
+    }
+    if (pin !== pinAgain) {
+      setPinError("The two PINs don’t match.");
+      return;
+    }
+    if (await writePin(pin)) {
+      setPinOpen(false);
+      setPin("");
+      setPinAgain("");
+      setNote(`${employeeName}'s PIN is set.`);
+    }
+  }
+
+  async function clearPin() {
+    if (
+      !(await confirmDialog({
+        title: `Clear ${employeeName}'s PIN?`,
+        body: "They won’t be able to unlock a shared iPad until a new one is set.",
+        confirmLabel: "Clear PIN",
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
+    if (await writePin(null)) setNote(`${employeeName}'s PIN is cleared.`);
+  }
 
   async function call(body: Record<string, unknown>) {
     setBusy(true);
@@ -226,6 +291,37 @@ export function AppAccess({
                 editable={!isOwner}
               />
             </dd>
+            <dt className="text-subtle">PIN</dt>
+            <dd className="flex flex-wrap items-center gap-3">
+              {/* Four digits for a shared iPad (097). Status only — the
+                  hash never leaves Postgres — with set and clear beside it.
+                  Withheld on a PIN session: a PIN may not mint PINs. */}
+              <span>{pinSet ? `Set ${pinSet.slice(0, 10)}` : "Not set"}</span>
+              {pinSession ? (
+                <span className="text-xs text-subtle">Sign in with a password to change it.</span>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className={BUTTON}
+                    disabled={busy || pinBusy}
+                    onClick={() => {
+                      setPin("");
+                      setPinAgain("");
+                      setPinError(null);
+                      setPinOpen(true);
+                    }}
+                  >
+                    {pinSet ? "Change PIN…" : "Set PIN…"}
+                  </button>
+                  {pinSet && (
+                    <button type="button" className={QUIET} disabled={busy || pinBusy} onClick={clearPin}>
+                      Clear
+                    </button>
+                  )}
+                </>
+              )}
+            </dd>
             <dt className="text-subtle">Role</dt>
             <dd>
               {isOwner ? (
@@ -275,6 +371,72 @@ export function AppAccess({
 
       {error && <p className="text-sm text-accent">{error}</p>}
       {note && <p className="text-sm text-muted">{note}</p>}
+
+      {pinOpen && (
+        <Dialog
+          title={pinSet ? "Change the PIN" : "Set a PIN"}
+          onClose={() => setPinOpen(false)}
+          busy={pinBusy}
+          width="max-w-sm"
+          onSubmit={() => {
+            if (!pinBusy && pin !== "" && pinAgain !== "") void savePin();
+          }}
+          footer={
+            <div className="flex items-center justify-end gap-4">
+              <button
+                type="button"
+                className={DIALOG_CANCEL_CLASS}
+                disabled={pinBusy}
+                onClick={() => setPinOpen(false)}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className={DIALOG_COMMIT_CLASS}
+                disabled={pinBusy || pin === "" || pinAgain === ""}
+                onClick={() => void savePin()}
+              >
+                {pinBusy ? "Saving…" : "Save PIN"}
+              </button>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <p className="text-sm text-muted">
+              {employeeName} will unlock a shared iPad with these four digits. Tell them
+              in person — it is not emailed.
+            </p>
+            {[
+              { id: "member-pin", label: "PIN", value: pin, set: setPin },
+              { id: "member-pin-again", label: "Again", value: pinAgain, set: setPinAgain },
+            ].map((f) => (
+              <div key={f.id} className="space-y-1.5">
+                <label
+                  htmlFor={f.id}
+                  className="block text-[11px] uppercase tracking-[0.12em] text-subtle"
+                >
+                  {f.label}
+                </label>
+                <input
+                  id={f.id}
+                  type="password"
+                  inputMode="numeric"
+                  autoComplete="off"
+                  maxLength={PIN_LENGTH}
+                  pattern="[0-9]*"
+                  value={f.value}
+                  onChange={(e) =>
+                    f.set(e.target.value.replace(/[^0-9]/g, "").slice(0, PIN_LENGTH))
+                  }
+                  className="h-9 w-full border border-ink px-3 text-sm tracking-[0.4em] outline-none focus:border-2"
+                />
+              </div>
+            ))}
+            {pinError && <p className="text-sm text-accent">{pinError}</p>}
+          </div>
+        </Dialog>
+      )}
 
       {open && (
         <Dialog

@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { supabaseEnv } from "@/lib/supabase/env";
+import { DEVICE_COOKIE } from "@/lib/sharedDevice";
 
 // Next 16's replacement for middleware.ts (same thing, new file convention).
 // Runs on every request: refreshes the Supabase auth token (writing the updated
@@ -61,6 +62,11 @@ export default async function proxy(request: NextRequest) {
   // the others reach definer RPCs, and these pages reach NOTHING. They are
   // static text with no query, no form and no parameter.
   const isLegalPage = request.nextUrl.pathname.startsWith("/legal");
+  // The shared iPad's picker (migration 097). Reached SIGNED OUT by design:
+  // after an idle lock there is no session, and the page's own data comes
+  // through a server action carrying the device cookie, never a user.
+  const isLockPage = request.nextUrl.pathname.startsWith("/lock");
+  const isRegisteredDevice = request.cookies.has(DEVICE_COOKIE);
 
   if (
     !user &&
@@ -68,15 +74,18 @@ export default async function proxy(request: NextRequest) {
     !isWelcomePage &&
     !isQuotePage &&
     !isInquiryPage &&
-    !isLegalPage
+    !isLegalPage &&
+    !isLockPage
   ) {
     const redirectUrl = request.nextUrl.clone();
-    redirectUrl.pathname = "/login";
+    // A registered iPad wakes up on its picker, not the password screen —
+    // /login stays reachable from the picker as the escape hatch.
+    redirectUrl.pathname = isRegisteredDevice ? "/lock" : "/login";
     redirectUrl.search = "";
     return NextResponse.redirect(redirectUrl);
   }
 
-  if (user && isLoginPage) {
+  if (user && (isLoginPage || isLockPage)) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/";
     redirectUrl.search = "";

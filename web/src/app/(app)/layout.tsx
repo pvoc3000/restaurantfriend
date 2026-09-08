@@ -1,6 +1,7 @@
 import { AppHeader } from "@/components/AppHeader";
 import { CalcPad } from "@/components/ui/CalcPad";
 import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
+import { IdleLock } from "@/components/IdleLock";
 import { InactiveLocationGate } from "@/components/InactiveLocationGate";
 import { PageAccessGate } from "@/components/PageAccessGate";
 import { ScrollMemory } from "@/components/ScrollMemory";
@@ -59,6 +60,10 @@ export default async function AppLayout({
           touch device — then it IS the keyboard: digits and operators
           together, so `lib/calc` expressions are typeable on an iPad. */}
       <CalcPad />
+      {/* A registered shared iPad locks back to its picker after five
+          minutes idle. Nothing on a desk browser — the session only says
+          `registeredDevice` when the device cookie is present. */}
+      {session.registeredDevice && <IdleLock />}
     </ConfirmProvider>
   );
 }

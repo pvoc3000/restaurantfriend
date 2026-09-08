@@ -4,21 +4,22 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { NAV_COOKIE } from "@/lib/navMemory";
-import { GUIDE_VIEW_COOKIE } from "@/lib/orderGuide";
-import { PO_VIEW_COOKIE } from "@/lib/poFilters";
+import { DEVICE_COOKIE } from "@/lib/sharedDevice";
+import { clearSessionCookies } from "@/lib/sessionCookies";
 
 export async function signOut() {
   const supabase = await createClient();
-  await supabase.auth.signOut();
-  // The remembered guide view, PO list view and menu are per-session state,
-  // not per-user config — the next person to sign in on this machine should
-  // start from the defaults.
+  // `local`, not the default `global`: global revokes every refresh token
+  // the user holds, and signing out of a shared iPad must not sign the
+  // manager out of their own phone.
+  await supabase.auth.signOut({ scope: "local" });
+  // The remembered views and the menu are per-session state, not per-user
+  // config — the next person on this machine starts from the defaults.
   const jar = await cookies();
-  jar.delete(GUIDE_VIEW_COOKIE);
-  jar.delete(PO_VIEW_COOKIE);
-  jar.delete(NAV_COOKIE);
-  redirect("/login");
+  clearSessionCookies(jar);
+  // A registered iPad goes back to its picker; anything else to the
+  // password screen. The device cookie itself survives a sign-out.
+  redirect(jar.has(DEVICE_COOKIE) ? "/lock" : "/login");
 }
 
 /**
