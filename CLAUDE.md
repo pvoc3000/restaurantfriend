@@ -5067,7 +5067,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    one copy and forgotten in the other), and it NAMES the single line, since
    from a row menu "1 item" is a worse answer to "which one?" than the name you
    just pressed.
-   **DUPLICATE WORKS ON EVERY LINE — migration 096, NEEDS APPLYING.** It was
+   **DUPLICATE WORKS ON EVERY LINE — migration 096, APPLIED 2026-09-07.** It was
    special-order-only for one commit, because 069's key was
    `unique (schedule_id, item_id) where par_source <> 'special_order'` and so
    covered every line the generator did NOT write as well as the ones it did.
@@ -5109,6 +5109,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `select count(*) from pg_proc where proname =
    'generate_production_schedules'` must be 1. NOT rerunnable — the `drop index`
    fails a second time, which is the signal it already ran.
+   **PostgREST cannot reach `pg_indexes`, so the LIVE probe is BEHAVIOURAL** and
+   is the better one anyway: a second `plan` line of an item must come back
+   **23505**, a `manual` duplicate must be accepted, and the generator must
+   raise `no locations given` from a null-argument RPC (two overloads would make
+   PostgREST refuse to choose instead). All three confirmed on the hosted DB the
+   day it was applied.
+   **WALKED THROUGH THE APP on the real DF02 09-07 schedule and left as found**
+   (35 lines, all `plan`, par total 380): Duplicate is enabled on a plan line
+   and reads "A copy of this line, added by hand"; pressing it produced a second
+   Javabreaker carrying the yellow **added** mark beside its 18, the badge went
+   to "1 line differs from the plan", and the header moved **380 across 35
+   items → 398 across 36** — which is the whole meaning of the change, the item
+   being made once per line. Delete line put all three figures back.
    **(d) THE PAR SAYS WHEN IT DISAGREES WITH THE PLAN, and what the plan said.**
    The record has carried "N lines differ from the plan" since 040 and
    `planned_par` has been on every row since, rendered NOWHERE — so the badge
