@@ -477,8 +477,7 @@ export async function VendorDetail({
                 {editable ? (
                   <NewVendorItem
                     orgId={session.membership.org_id}
-                    vendorId={v.id}
-                    vendorName={v.name}
+                    vendor={{ id: v.id, name: v.name }}
                     existingProductIds={(vendorItems ?? [])
                       .map((vi) => (vi.product_id ?? "") as string)
                       .filter(Boolean)}

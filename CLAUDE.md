@@ -106,9 +106,38 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the same pixel as the columns eye (1232 at 1440) — and lands on the new
    record with the crumb back. Walked live on BakeMark and left as found: a test
    row created with `4 × 2.5 lbs (10 lbs)`, then deleted, back to 95 items.
-   **NOT built: the same button on the ITEM record's Vendor Items tab**, which
-   is the mirror (fixed item, choose the vendor) and a real thing to want when
-   adding a second source. Ask before assuming it exists.
+   **THE MIRROR SHIPPED 2026-09-08** (Mark: "add a new vendor item from the
+   vendor item tab of the inventory detail screen… creates a new vendor item
+   with the current inventory item set by default"), which is what that note
+   predicted in as many words.
+   **TWO DOORS, ONE `NewVendorItem`.** A vendor item is the join of a vendor and
+   an inventory item, so it can be created from either end; pass `vendor` or
+   `item` and the dialog asks for the other, after which every field, the pack
+   derivation, the `org_id`, the landing and the confirm are identical. Two
+   components would be the `ui/Dialog` story again — those are exactly the
+   things remembered in one copy and forgotten in the other.
+   **THE ITEM DOOR OFFERS EVERY VENDOR, inactive ones marked and sunk**, with
+   `activateTable="vendors"` so choosing one asks to revive it first
+   (`NewInvoice`'s pairing). Filtering them out would hide a supplier you have
+   just started using again from the one screen you would look on — and would
+   also let a new item land under a vendor whose items this tab HIDES, so the
+   record would vanish from the list it was created on.
+   **THE DUPLICATE WARNING IS A DIFFERENT QUESTION AT EACH END**: a SKU already
+   on this vendor's list, or a vendor already supplying this item. Both warn and
+   let you through (`findPossibleRehires`' rule) — a second pack size from one
+   vendor is an ordinary thing to record. The item end reads the tab's own rows,
+   so it knows only the ACTIVE vendors; that blind spot is covered by the
+   reactivation prompt, which is the louder question anyway.
+   **THE CAPTION MOVED OUT OF THE HEADING'S CELL.** `items-end` levels BOXES, so
+   with the heading and its two-line note stacked in one cell the button dropped
+   beside the CAPTION and stopped reading as the heading's command. Heading and
+   button on one line, caption on its own beneath. Measured at 1440 and 1280:
+   the button's right edge is the table's, and heading and button bottoms are
+   the same pixel.
+   Walked live on Flour, All Purpose and left as found (13 rows, 11 under active
+   vendors): the BakeMark warning fired, a real row was created under Action
+   Sales with the pack deriving `= 25 lbs` from the item's own base unit, landed
+   on the record with the crumb back to the tab, and was deleted.
 
    **THE VENDOR ITEM RECORD HAD ONE INBOUND LINK IN THE WHOLE APP** (Mark,
    2026-09-07: "where is the best place to edit a vendor item? I'm missing a lot

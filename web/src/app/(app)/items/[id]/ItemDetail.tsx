@@ -13,6 +13,7 @@ import { RecordNav } from "@/components/ui/RecordNav";
 import { ItemFields, ItemTitle } from "@/components/catalog/ItemFields";
 import { ItemLocationRows } from "@/components/catalog/ItemLocationRows";
 import { VendorItemsTable } from "@/components/catalog/VendorItemsTable";
+import { NewVendorItem } from "@/components/catalog/NewVendorItem";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { canEditPage } from "@/lib/pageAccess";
@@ -40,6 +41,9 @@ const SELECT = `
     shop_sections ( display_name, sort_order )
   )
 `;
+
+/** What the New vendor item dialog's Vendor picker is built from. */
+type VendorRow = { id: string; name: string; is_active: boolean };
 
 /**
  * The item detail's whole body. Its own full-screen page (Mark, 2026-07-30 —
@@ -76,6 +80,7 @@ export async function ItemDetail({
     { data: categoryRows },
     { data: sectionRows },
     { data: sourceRows, error: sourceError },
+    { data: vendorRows },
   ] = await Promise.all([
       supabase.from("inventory_items").select(SELECT).eq("id", id).maybeSingle(),
       // Deactivated vendors are gone from this screen entirely — you can't
@@ -114,6 +119,15 @@ export async function ItemDetail({
       // its inventory item only through this link (013 snapshots the rest).
       wantsHistory
         ? supabase.from("vendor_items").select("id").eq("inventory_item_id", id)
+        : SKIP,
+      // What the New vendor item dialog's Vendor picker offers. EVERY vendor,
+      // not just the active ones: the picker sinks and marks the inactive, and
+      // choosing one offers to reactivate it first — so a supplier you have
+      // just started using again is reachable from the screen where you would
+      // look, and a new item can't quietly land under a vendor whose items
+      // this tab hides. 80 rows, well under PostgREST's silent 1,000 cap.
+      wantsVendorItems
+        ? supabase.from("vendors").select("id, name, is_active").order("name")
         : SKIP,
     ]);
 
@@ -305,29 +319,64 @@ export async function ItemDetail({
             </>
           )}
 
-          {tab === "vendor-items" &&
-            (viError ? (
-              <p className="text-sm text-accent">
-                Could not load vendor items: {viError.message}
+          {tab === "vendor-items" && (
+            <section className="space-y-2">
+              {/* The create command shares the heading's line, right-aligned —
+                  the vendor record's Items tab, copied rather than re-derived.
+                  It cannot ride in the table's own strip: that is a
+                  `min-w-0 flex-1` cell with the columns eye beside it, so
+                  anything right-aligned inside it stops ~48px short of the
+                  table's edge. `items-end` so a 36px button sits on the
+                  heading's baseline rather than above it. */}
+              <div className="flex flex-wrap items-end justify-between gap-3">
+                <SectionHeading count={vendorItems?.length ?? 0}>Vendor items</SectionHeading>
+                {editable ? (
+                  <NewVendorItem
+                    orgId={session.membership.org_id}
+                    // The mirror of the vendor screen's door: the ITEM is
+                    // fixed and you choose who sells it, which is the shape of
+                    // adding a second source.
+                    item={{ id: row.id, name: row.name, base_unit: row.base_unit }}
+                    vendors={((vendorRows ?? []) as VendorRow[]).map((v) => ({
+                      id: v.id,
+                      name: v.name,
+                      inactive: !v.is_active,
+                    }))}
+                    // Costs no query — the tab is already holding them. It
+                    // therefore only knows the ACTIVE vendors, which is the
+                    // right blind spot to have: choosing an inactive one
+                    // stops to offer a reactivation first, which is a louder
+                    // question than the warning would have been.
+                    existingVendorIds={((vendorItems ?? []) as unknown as CatalogVendorItem[])
+                      .map((vi) => vi.vendors?.id ?? "")
+                      .filter(Boolean)}
+                    from={here}
+                  />
+                ) : null}
+              </div>
+              {/* Its own line under the row, not stacked inside the heading's
+                  cell: `items-end` levels the BOXES, so a two-line left cell
+                  drops the button beside the caption and it stops reading as
+                  the heading's command. */}
+              <p className="text-xs text-subtle">
+                Items from deactivated vendors are hidden. Reactivate the vendor on its
+                detail screen to bring them back.
               </p>
-            ) : (
-              <VendorItemsTable
-                heading={
-                  <div className="space-y-1">
-                    <SectionHeading count={vendorItems?.length ?? 0}>Vendor items</SectionHeading>
-                    <p className="text-xs text-subtle">
-                      Items from deactivated vendors are hidden. Reactivate the vendor
-                      on its detail screen to bring them back.
-                    </p>
-                  </div>
-                }
-                vendorItems={(vendorItems ?? []) as unknown as CatalogVendorItem[]}
-                baseUnit={row.base_unit}
-                showVendor
-                from={here}
-                canEdit={editable}
-              />
-            ))}
+              {viError ? (
+                <p className="text-sm text-accent">
+                  Could not load vendor items: {viError.message}
+                </p>
+              ) : (
+                <VendorItemsTable
+                  vendorItems={(vendorItems ?? []) as unknown as CatalogVendorItem[]}
+                  baseUnit={row.base_unit}
+                  showVendor
+                  from={here}
+                  canEdit={editable}
+                />
+              )}
+            </section>
+          )}
 
           {tab === "purchase-history" &&
             (historyError ? (

@@ -30,9 +30,20 @@ import { InventoryItemChooser, type ChosenItem } from "./InventoryItemChooser";
  * The convention is to ask for the fields the rest of the app reads and stop;
  * here that reduces to the same thing.
  *
- * THE INVENTORY ITEM IS THE ONLY REQUIRED ONE. An unlinked vendor item is a
- * real state — 71 came out of FileMaker that way — but it is on NO order guide
- * until it is linked, so deliberately creating one is creating a row that does
+ * IT HAS TWO DOORS AND ONE IMPLEMENTATION (Mark, 2026-09-08: "add a new vendor
+ * item from the vendor item tab of the inventory detail screen"). A vendor item
+ * is the join of a vendor and an inventory item, so it can be created from
+ * either end — from the VENDOR, where you hold their price list and choose the
+ * item, or from the ITEM, where you are adding a second source and choose the
+ * vendor. Pass `vendor` or `item`, never both: whichever end you fix, the
+ * dialog asks for the other and everything after it is identical. Two
+ * components would be the `ui/Dialog` story again — the pack derivation, the
+ * `org_id`, the landing and the duplicate warning are all things that get
+ * remembered in one copy and forgotten in the other.
+ *
+ * THE OTHER END IS THE ONLY REQUIRED FIELD. An unlinked vendor item is a real
+ * state — 71 came out of FileMaker that way — but it is on NO order guide until
+ * it is linked, so deliberately creating one is creating a row that does
  * nothing. Everything else is editable in the grid you came from and on the
  * record you land on.
  *
@@ -46,16 +57,31 @@ import { InventoryItemChooser, type ChosenItem } from "./InventoryItemChooser";
  */
 export function NewVendorItem({
   orgId,
-  vendorId,
-  vendorName,
-  existingProductIds,
+  vendor = null,
+  item: fixedItem = null,
+  vendors = [],
+  existingProductIds = [],
+  existingVendorIds = [],
   from,
 }: {
   orgId: string;
-  vendorId: string;
-  vendorName: string;
-  /** This vendor's SKUs, for the duplicate warning. */
-  existingProductIds: string[];
+  /**
+   * The vendor's own screen: this vendor is fixed and the dialog asks which
+   * inventory item. Exactly one of `vendor` / `item` is given.
+   */
+  vendor?: { id: string; name: string } | null;
+  /**
+   * The item's own screen: this item is fixed and the dialog asks which vendor.
+   * Its `base_unit` is what the pack is derived against, so it is required
+   * here where `ChosenItem` leaves it optional.
+   */
+  item?: { id: string; name: string; base_unit: string } | null;
+  /** With `item`: every vendor, inactive ones marked — see the render. */
+  vendors?: { id: string; name: string; inactive?: boolean }[];
+  /** With `vendor`: this vendor's SKUs, for the duplicate warning. */
+  existingProductIds?: string[];
+  /** With `item`: the vendors already sourcing it, for the duplicate warning. */
+  existingVendorIds?: string[];
   /** Where the new record's breadcrumb should come back to. */
   from?: Crumb;
 }) {
@@ -66,7 +92,8 @@ export function NewVendorItem({
   const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState<string | null>(null);
 
-  const [item, setItem] = useState<ChosenItem | null>(null);
+  const [chosenItem, setChosenItem] = useState<ChosenItem | null>(null);
+  const [chosenVendor, setChosenVendor] = useState("");
   const [productId, setProductId] = useState("");
   const [brand, setBrand] = useState("");
   const [description, setDescription] = useState("");
@@ -75,6 +102,10 @@ export function NewVendorItem({
   const [packCount, setPackCount] = useState("1");
   const [packSize, setPackSize] = useState("");
   const [packUnit, setPackUnit] = useState("");
+
+  // Whichever end the caller fixed stands in for the chosen one from the start.
+  const item = fixedItem ?? chosenItem;
+  const vendorId = vendor?.id ?? chosenVendor;
 
   const baseUnit = item?.base_unit ?? "";
   // The pack's unit follows the item's until somebody says otherwise: a case of
@@ -85,17 +116,25 @@ export function NewVendorItem({
     baseUnit || "unit"
   );
 
-  const ready = item !== null;
-  const duplicate =
+  const ready = item !== null && vendorId !== "";
+
+  // Both warnings COST NO QUERY and neither blocks — `findPossibleRehires`'
+  // rule. A second pack size from the same vendor is an ordinary thing to
+  // record, so "they already supply this" is a question, not a refusal.
+  const duplicateSku =
+    vendor !== null &&
     productId.trim() !== "" &&
     existingProductIds.some(
       (p) => p.trim().toLowerCase() === productId.trim().toLowerCase()
     );
+  const duplicateVendor =
+    fixedItem !== null && vendorId !== "" && existingVendorIds.includes(vendorId);
 
   function close() {
     if (pending) return;
     setOpen(false);
-    setItem(null);
+    setChosenItem(null);
+    setChosenVendor("");
     setProductId("");
     setBrand("");
     setDescription("");
@@ -155,6 +194,12 @@ export function NewVendorItem({
     });
   }
 
+  // Neither end fixed is a caller bug, not a state to render a dialog for.
+  if (!vendor && !fixedItem) return null;
+
+  const vendorName =
+    vendor?.name ?? vendors.find((v) => v.id === vendorId)?.name ?? "This vendor";
+
   return (
     <>
       <button type="button" onClick={() => setOpen(true)} className={BUTTON_CLASS}>
@@ -163,7 +208,9 @@ export function NewVendorItem({
 
       {open && (
         <Dialog
-          title={`New item from ${vendorName}`}
+          title={
+            vendor ? `New item from ${vendor.name}` : `New vendor item for ${fixedItem!.name}`
+          }
           onClose={close}
           busy={pending}
           onSubmit={() => {
@@ -192,14 +239,39 @@ export function NewVendorItem({
           }
         >
           <div className="space-y-5">
-            <Field label="Inventory item">
-              <InventoryItemChooser value={item} onPick={setItem} autoFocus />
-              {item ? null : (
-                <p className="text-[13px] text-muted">
-                  It is on no order guide until this is set.
-                </p>
-              )}
-            </Field>
+            {vendor ? (
+              <Field label="Inventory item">
+                <InventoryItemChooser value={chosenItem} onPick={setChosenItem} autoFocus />
+                {item ? null : (
+                  <p className="text-[13px] text-muted">
+                    It is on no order guide until this is set.
+                  </p>
+                )}
+              </Field>
+            ) : (
+              <Field label="Vendor">
+                {/* Every vendor, inactive ones marked and sunk, with
+                    `activateTable` so choosing one offers to revive it first —
+                    `NewInvoice`'s pairing. Filtering them out instead would
+                    leave a shop that has just been reopened unreachable from
+                    the one screen where you would look for it, and would also
+                    let a new item land under a vendor whose items this tab
+                    hides. */}
+                <PickList
+                  variant="field"
+                  value={chosenVendor}
+                  onPick={setChosenVendor}
+                  options={vendors.map((v) => ({
+                    value: v.id,
+                    label: v.name,
+                    inactive: v.inactive,
+                  }))}
+                  activateTable="vendors"
+                  ariaLabel="Vendor"
+                  placeholder="Who sells it?"
+                />
+              </Field>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <Field label="Product ID">
@@ -294,10 +366,19 @@ export function NewVendorItem({
               </Field>
             </div>
 
-            {duplicate ? (
+            {duplicateSku ? (
               <p className="text-sm">
                 <span className="bg-mark-fill px-1">
                   {vendorName} already has an item with this product ID.
+                </span>
+              </p>
+            ) : null}
+
+            {duplicateVendor ? (
+              <p className="text-sm">
+                <span className="bg-mark-fill px-1">
+                  {vendorName} already supplies {fixedItem!.name}. Add this one for a
+                  second pack size; otherwise edit the item they already have.
                 </span>
               </p>
             ) : null}
