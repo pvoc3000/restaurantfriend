@@ -45,6 +45,7 @@ import "./packLabel.fixtures";
 import "./payPeriods.fixtures";
 import "./payrollBenefits.fixtures";
 import "./poDocumentFileName.fixtures";
+import "./unaddedAdds.fixtures";
 import "./poFilters.fixtures";
 import "./productionBatches.fixtures";
 import "./productionCost.fixtures";

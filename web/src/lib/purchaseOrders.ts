@@ -4,6 +4,7 @@
 // operations, totals row); PO detail preserves ordered-vs-received quantities
 // with dual totals and price reconciliation.
 
+import { evaluateNumeric } from "./calc";
 import { priceDiffers as numericPriceDiffers } from "./invoiceExtraction";
 
 export type PoStatus = "draft" | "sent" | "received" | "closed" | "void";
@@ -382,6 +383,85 @@ export function compareDocumentLines(
   if (!va) return 1;
   if (!vb) return -1;
   return va.localeCompare(vb, undefined, { numeric: true });
+}
+
+/**
+ * One thing the Add-item panel is holding that is NOT on the order yet — a
+ * catalog row with an amount typed into it, or a half-filled one-off form.
+ *
+ * `values` is everything typed into it with the ORDER AMOUNT FIRST, because
+ * the two questions asked of it are different: anything non-blank means the
+ * person typed something, while only the first field can say how much.
+ */
+export type PendingAdd = {
+  /** The catalog item's name, or what the one-off form is about. */
+  label: string;
+  values: string[];
+};
+
+/**
+ * The order amount a draft comes to, or null when it is not one yet — blank,
+ * mid-expression, zero or negative. Arithmetic is allowed in every numeric
+ * field here (lib/calc), so this is the one place that decides what "3", "2 * 6"
+ * and "1 +" each mean.
+ *
+ * ONE definition, because three things ask it and they must agree: the Add
+ * button's own refusal, whether that button wears the fill, and whether the
+ * confirm quotes the amount back.
+ */
+export function addableQty(raw: string): number | null {
+  const n = evaluateNumeric(raw.trim());
+  if (n === null || !Number.isFinite(n) || n <= 0) return null;
+  return n;
+}
+
+/** Typing something is not the same as having added it. Blanks are not work. */
+function isPending(entry: PendingAdd): boolean {
+  return entry.values.some((v) => v.trim() !== "");
+}
+
+/**
+ * What the panel is holding, in the words the confirm will use.
+ *
+ * The amount is named only when it really is one: a draft reading "0" or "1 +"
+ * is somebody mid-keystroke, and printing it back at them ("0 × Flour") reads
+ * as the app having decided something it hasn't.
+ */
+export function unaddedAdds(pending: PendingAdd[]): string[] {
+  return pending.filter(isPending).map((entry) => {
+    const qty = addableQty(entry.values[0] ?? "");
+    return qty === null ? entry.label : `${qty} × ${entry.label}`;
+  });
+}
+
+/**
+ * The confirm shown when the Add-item panel is dismissed with something still
+ * typed into it (Mark, 2026-09-08).
+ *
+ * The panel STAYS OPEN after each add, which is what makes this necessary:
+ * typing an amount and typing an amount THEN pressing Add to PO leave the
+ * screen looking almost the same, so Done on the first of those silently threw
+ * the quantity away — on the one screen where the cost of that is a case of
+ * something not arriving.
+ *
+ * Null when there is nothing outstanding, so the ordinary Done is still one
+ * tap. It names WHAT is loose rather than counting it, since "1 item" is a
+ * worse answer to "which one?" than the row you just typed into.
+ */
+export function unaddedWarning(
+  pending: PendingAdd[]
+): { title: string; body: string } | null {
+  const phrases = unaddedAdds(pending);
+  if (phrases.length === 0) return null;
+
+  const body =
+    phrases.length === 1
+      ? `${phrases[0]} is typed in but is not on this purchase order — Add to PO was never pressed.\n\nClosing the panel discards it.`
+      : `These are typed in but are not on this purchase order:\n\n${phrases
+          .map((p) => `· ${p}`)
+          .join("\n")}\n\nClosing the panel discards them.`;
+
+  return { title: "Close without adding?", body };
 }
 
 export function money(value: number | null | undefined) {

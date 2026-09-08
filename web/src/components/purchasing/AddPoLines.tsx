@@ -1,14 +1,18 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
+  addableQty,
   money,
   PO_STATUS_LABEL,
+  unaddedWarning,
+  type PendingAdd,
   type PoLine,
   type PurchaseOrder,
 } from "@/lib/purchaseOrders";
+import { confirmDialog } from "@/lib/confirm";
 import { packLabel } from "@/lib/catalog";
 import { evaluateNumeric } from "@/lib/calc";
 import { TextInput } from "@/components/ui/TextInput";
@@ -16,6 +20,7 @@ import { TabPicker } from "@/components/ui/TabPicker";
 import { PickList } from "@/components/ui/PickList";
 import { PACKAGE_DESC_OPTIONS } from "@/lib/units";
 import { Dialog, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
+import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { useCalcField } from "@/components/ui/CalcPad";
 
 /**
@@ -87,6 +92,14 @@ function snapshotPack(vi: PickerRow): string | null {
     }`;
   }
   return vi.package_desc ?? packLabel(vi, baseUnit);
+}
+
+/** What a row is called on screen: the catalog name, else the vendor's wording. */
+function rowLabel(vi: PickerRow): string {
+  return (
+    vi.inventory_items?.name ??
+    ([vi.brand, vi.description].filter(Boolean).join(" · ") || "this item")
+  );
 }
 
 /**
@@ -161,6 +174,81 @@ export function AddPoLines({
     return map;
   }, [lines]);
 
+  /**
+   * Everything typed into the panel that has not been added. The catalog side
+   * is iterated over `drafts` rather than `rows` — only a row somebody has
+   * typed into ever gets a key, so a vendor with 300 items costs nothing — and
+   * over ALL of them rather than the filtered set, since a quantity typed and
+   * then searched past is exactly the one that gets lost.
+   */
+  const pending = useMemo<PendingAdd[]>(() => {
+    const out: PendingAdd[] = [];
+    for (const [id, qty] of Object.entries(drafts)) {
+      if (qty.trim() === "") continue;
+      const vi = rows.find((r) => r.id === id);
+      out.push({ label: vi ? rowLabel(vi) : "this item", values: [qty] });
+    }
+    // Always offered; `unaddedWarning` drops it when every field is blank. The
+    // amount leads, and the description is what names it — a form holding only
+    // a brand is still work somebody will lose.
+    out.push({
+      label: oneOff.description.trim() || "a one-off item",
+      values: [
+        oneOff.qty,
+        oneOff.description,
+        oneOff.brand,
+        oneOff.productId,
+        oneOff.packageDesc,
+        oneOff.price,
+        oneOff.notes,
+      ],
+    });
+    return out;
+  }, [drafts, rows, oneOff]);
+
+  /**
+   * Whether anything in the panel is READY to be added — a positive amount,
+   * and for the one-off the description it cannot go without.
+   *
+   * Deliberately narrower than `pending`, and the two say different things: the
+   * confirm exists so nothing typed is lost, so it fires on a stray "0"; the
+   * FILL says "this is the button to press", which is a promise only a row that
+   * would actually add can keep.
+   */
+  const readyToAdd = useMemo(() => {
+    const rows = Object.values(drafts).filter((q) => addableQty(q) !== null);
+    const oneOffReady =
+      oneOff.description.trim() !== "" && addableQty(oneOff.qty) !== null;
+    return rows.length > 0 || oneOffReady;
+  }, [drafts, oneOff]);
+
+  // Both dialogs listen for Escape on the window, and `stopPropagation` does
+  // not stop a listener on the same target — so without this, Escape while the
+  // confirm is up would cancel it and immediately ask again.
+  const asking = useRef(false);
+
+  /**
+   * The one way out of the panel: Done, the ✕, Escape and the backdrop all come
+   * through here, so a quantity is as safe from a stray Escape as it is from
+   * the button. See `unaddedWarning`.
+   */
+  async function closePanel() {
+    if (asking.current) return;
+    const warning = unaddedWarning(pending);
+    if (warning) {
+      asking.current = true;
+      const discard = await confirmDialog({
+        ...warning,
+        confirmLabel: "Close and discard",
+        cancelLabel: "Keep adding",
+        tone: "danger",
+      });
+      asking.current = false;
+      if (!discard) return;
+    }
+    setOpen(false);
+  }
+
   async function openPanel() {
     setOpen(true);
     setError(null);
@@ -210,10 +298,10 @@ export function AddPoLines({
   }, [rows, search]);
 
   async function add(vi: PickerRow) {
-    const raw = (drafts[vi.id] ?? "").trim();
-    // Arithmetic allowed, same as every other numeric field (lib/calc.ts).
-    const n = raw === "" ? null : evaluateNumeric(raw);
-    if (n === null || !Number.isFinite(n) || n <= 0) {
+    // Arithmetic allowed, same as every other numeric field (lib/calc.ts) —
+    // and the same call that decides whether this button wears the fill.
+    const n = addableQty(drafts[vi.id] ?? "");
+    if (n === null) {
       setError("Enter an order amount greater than zero.");
       return;
     }
@@ -266,8 +354,8 @@ export function AddPoLines({
       setError("Give the item a description — it is what the vendor reads.");
       return;
     }
-    const n = evaluateNumeric(oneOff.qty.trim());
-    if (n === null || !Number.isFinite(n) || n <= 0) {
+    const n = addableQty(oneOff.qty);
+    if (n === null) {
       setError("Enter an order amount greater than zero.");
       return;
     }
@@ -317,7 +405,7 @@ export function AddPoLines({
       {open && (
         <Dialog
           title={`Add items · ${vendorName} → ${order.po_number}`}
-          onClose={() => setOpen(false)}
+          onClose={() => void closePanel()}
           width="max-w-4xl"
           bodyClassName="px-6 py-4"
           // The search sits in the dialog's TOOLBAR rather than in the scrolling
@@ -361,10 +449,16 @@ export function AddPoLines({
             </>
           }
           footer={
+            /* BLACK ONLY WHILE NOTHING IS READY TO ADD (Mark, 2026-09-08).
+               The panel-commit exception is about the one outcome a panel is
+               for, and here that outcome MOVES: with an amount typed, Add to PO
+               is what finishes the task and Done is the escape beside it. Two
+               black buttons would say nothing about which one to press — and
+               the pale one would be the one that discards the typing. */
             <button
               type="button"
-              onClick={() => setOpen(false)}
-              className={DIALOG_COMMIT_CLASS}
+              onClick={() => void closePanel()}
+              className={readyToAdd ? BUTTON_CLASS : DIALOG_COMMIT_CLASS}
             >
               Done
             </button>
@@ -374,6 +468,10 @@ export function AddPoLines({
 
               {tab === "oneOff" ? (
                 <OneOffForm
+                  ready={
+                    oneOff.description.trim() !== "" &&
+                    addableQty(oneOff.qty) !== null
+                  }
                   draft={oneOff}
                   onDraft={(patch) => setOneOff((prev) => ({ ...prev, ...patch }))}
                   onAdd={() => void addOneOff()}
@@ -460,7 +558,11 @@ export function AddPoLines({
                           type="button"
                           onClick={() => void add(vi)}
                           disabled={addingId === vi.id}
-                          className="h-9 shrink-0 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+                          className={`${
+                            addableQty(drafts[vi.id] ?? "") === null
+                              ? BUTTON_CLASS
+                              : PRIMARY_BUTTON_CLASS
+                          } shrink-0`}
                         >
                           {addingId === vi.id ? "Adding…" : "Add to PO"}
                         </button>
@@ -492,6 +594,7 @@ function OneOffForm({
   onDraft,
   onAdd,
   busy,
+  ready,
   added,
   calcField,
 }: {
@@ -499,6 +602,8 @@ function OneOffForm({
   onDraft: (patch: Partial<typeof BLANK_ONE_OFF>) => void;
   onAdd: () => void;
   busy: boolean;
+  /** Enough typed in to add — the button takes the fill. See `readyToAdd`. */
+  ready: boolean;
   /** What this session has already put on the order, so the panel staying open
    *  after each add still tells you what it did. */
   added: string[];
@@ -604,7 +709,7 @@ function OneOffForm({
           type="button"
           onClick={onAdd}
           disabled={busy}
-          className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+          className={ready ? PRIMARY_BUTTON_CLASS : BUTTON_CLASS}
         >
           {busy ? "Adding…" : "Add to PO"}
         </button>
