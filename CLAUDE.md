@@ -497,6 +497,28 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    indistinguishable from a generated one. An item already on the order RAISES
    ITS EXISTING LINE rather than creating a second line of the same SKU; each
    row shows what's already on order so the arithmetic is visible.
+   **DONE WARNS WHEN SOMETHING IS TYPED IN AND NOT ADDED** (Mark, 2026-09-08),
+   which is the panel staying open coming back around: typing an amount and
+   typing an amount THEN pressing Add to PO leave the screen looking almost the
+   same, so Done on the first threw the quantity away in silence. `closePanel`
+   is the ONE way out — Done, the ✕, Escape and the backdrop all go through it,
+   so a draft is as safe from a stray Escape as from the button — and it carries
+   a re-entrancy guard, because BOTH dialogs hear the same window keydown and
+   Escape over the confirm would otherwise cancel it and immediately ask again.
+   `unaddedWarning` NAMES what is loose rather than counting it, resolves the
+   arithmetic those fields allow ("2 * 6" reads back as 12), and covers the
+   one-off form, where a half-filled form is work with nothing else on screen to
+   say so. Null when nothing is outstanding, so the ordinary Done is one tap.
+   **THE FILL MOVES TO THE ROW THAT IS READY** (Mark, same day) — the row's
+   Add to PO goes `PRIMARY_BUTTON_CLASS` and Done gives the fill up, which is
+   `ImportTimesheets`' rule and its reason: the panel-commit exception is about
+   the ONE OUTCOME a panel is for, and here that outcome MOVES.
+   **THE FILL IS NARROWER THAN THE WARNING, and the pair is the point.** The
+   confirm exists so nothing typed is lost, so it fires on a stray `0`; the fill
+   promises the button will work, which only a row that would actually add can
+   keep. `addableQty` is the one call all three readers make — the Add button's
+   own refusal, the fill, and whether the confirm quotes the amount — so a `0`
+   warns, blackens nothing, and is never printed back as "0 × Flour".
    (b) **Every field on the order is inline-editable** ("I should be able to
    edit the information in a purchase order, especially before it's sent. At the
    very least the item amount") — ordered qty, unit price, product ID, pack, the
@@ -8672,7 +8694,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/StickyFooter` | a hand-placed `fixed bottom-0` div plus a guessed spacer | a band pinned to the foot of the window — PO paperwork, employee paperwork. MEASURES its own height into a spacer so the page's last block doesn't slide under it, minus what already follows (the layout's `py-8`), and fires a `resize` so `useFillViewportHeight` reclaims space when it SHRINKS |
   | `ui/RevealPanel` | a section that is always fully open, or a hand-rolled hover-expand | a block whose body costs more screen than it earns — both paperwork areas. Header always visible (title, count, Add as, Attach, progress, errors); the body opens on hover, on focus, or from a pinning toggle, and is ABSOLUTELY POSITIONED so it never reflows the page. **`alwaysOpen`** drops the toggle and puts the body IN FLOW, for when the panel gets a screen of its own and the crowding it was hiding from is gone |
   | `ui/fieldMetrics` `FORM_TEXTAREA` (or `FORM_FIELD_DRESS`) | a hand-typed `border border-ink bg-white …` | a multiline field in a dialog. `FORM_TEXTAREA` is the whole dress at the app's 14px form size, filling its track; `FORM_FIELD_DRESS` is the same border/ground/focus/padding WITHOUT a width or a font size, for a field in a label/field grid that supplies its own (the PO and special-order compose bodies, which inherit 16px on purpose — a big writing surface for a message about to be sent). **The padding cannot be overridden** — Tailwind resolves by stylesheet order — so a field wanting different padding writes its own dress, which is what the public pages do at `px-3`/`text-[16px]` (below 16px iOS Safari zooms on focus). Extracted after seven hand-typed copies had drifted into two |
-  | `ui/buttons` `PRIMARY_BUTTON_CLASS` | a black class string you type yourself | the ONE case where a command button on a SCREEN is filled black — a record in an abnormal state with exactly one way out (a flagged order's "Resolve the issue"), or a screen whose ONE obvious next act depends on its state — the timesheets screen fills **Import timesheets** while the pay period is empty and **Close pay period…** once it has shifts, and never both (Mark, 2026-08-22). `DIALOG_COMMIT_CLASS`'s argument outside a dialog; only ever right CONDITIONALLY, never as a screen's standing "primary" |
+  | `ui/buttons` `PRIMARY_BUTTON_CLASS` | a black class string you type yourself | the ONE case where a command button on a SCREEN is filled black — a record in an abnormal state with exactly one way out (a flagged order's "Resolve the issue"), or a screen whose ONE obvious next act depends on its state — the timesheets screen fills **Import timesheets** while the pay period is empty and **Close pay period…** once it has shifts, and never both (Mark, 2026-08-22), and the PO's Add-item panel moves the fill from Done onto the row that has an amount ready (Mark, 2026-09-08). `DIALOG_COMMIT_CLASS`'s argument outside a dialog; only ever right CONDITIONALLY, never as a screen's standing "primary" |
   | `ui/buttons` `DANGER_BUTTON_CLASS` | re-typing the red class string | any destructive command out on a screen — Delete, Void, "Deactivate everywhere". Red EVEN THOUGH most only open a confirm: a reader can't tell "opens a confirm" from "destroys" by looking. Bordered, never filled. NOT the same as `DIALOG_DANGER_CLASS` (`px-5`, a dialog footer's commit) — don't merge them. Positional classes stay at the call site |
   | `ui/FileDropZone` | `onDrop` on a div | dropping files onto a region. Its OVERLAY takes the drop (a PDF `<object>` is a plugin and swallows drag events — confirmed working over a live PDF, Mark 2026-08-04), it arms off WINDOW drag events so it's up before the pointer arrives, it vets types itself (`accept` governs only the picker), and it stops a stray drop navigating the page away |
   | `ui/SectionNav` | a second sidebar, underline tabs, or a `TabPicker` turned sideways | **the sections of one detail record** — the employee screen's Info · Employment · Events · Documents · Admin. Plain text links, no box: active bold black, inactive `text-muted`. `orientation="horizontal"` is the narrow-screen form. See "A detail screen that outgrows one page" below — REUSE THIS, don't re-derive it |
