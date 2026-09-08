@@ -5959,9 +5959,14 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `select conname from pg_constraint where conrelid =
    'public.production_schedule_items'::regclass and contype = 'u'` — must NOT
    include `production_schedule_items_schedule_id_item_id_key`;
-   `select indexname from pg_indexes where tablename =
-   'production_schedule_items'` — must include `production_schedule_items_line`;
-   and `select count(*) from pg_proc where proname =
+   its own index `production_schedule_items_line` is GONE and probing for it
+   today proves nothing — 069 dropped it and 096 narrowed its successor, so what
+   survives of 067 is the dropped constraint above and the fact that the table
+   is keyed by an INDEX at all (`production_schedule_items_generated_line`;
+   see 096 for the predicate it should carry). This clause said "must include
+   `production_schedule_items_line`" from 2026-08-27, when 069 made it false,
+   until 2026-09-07 — which is the file's own warning about probes coming true.
+   Then `select count(*) from pg_proc where proname =
    'generate_production_schedules'` — must be **ONE**, because two means the
    argument list drifted and 040's version is live beside it (033's
    `freeze_pay_period` trap).
@@ -5984,9 +5989,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    shape, because everything else here follows from it:
    `select indexname, indexdef from pg_indexes where tablename =
    'production_schedule_items' and indexname like '%line%'` — expect ONE row,
-   `production_schedule_items_generated_line`, whose definition ends
-   `WHERE (par_source <> 'special_order'::text)`, and NO
-   `production_schedule_items_line`. Then
+   `production_schedule_items_generated_line`, and NO
+   `production_schedule_items_line`. **Its PREDICATE is 096's now, not 069's**:
+   `WHERE (par_source = ANY (ARRAY['plan'::text, 'override'::text]))`, which is
+   the narrowing that let a plan line be duplicated. 069's own
+   `WHERE (par_source <> 'special_order'::text)` is what this probe expected
+   between 2026-08-27 and 2026-09-07, and finding it today means 096 has NOT
+   been applied. Then
    `select proname, count(*) from pg_proc where proname in
    ('generate_production_schedules','schedule_special_order') group by 1` —
    **1 each**, or an argument list drifted and an overload is live beside it.
@@ -8648,7 +8657,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/TimeField` | `<input type="time">`, or a `TextInput` you parse | a time of day in a CREATE form, where the box starts empty and the value is required — `type="time"` yields `HH:MM` or nothing, so a half-typed value can never reach a `time` column as a cast error. It carries NO empty-state apparatus, deliberately: DateField needs one because WebKit paints TODAY into an empty date, and an empty time renders as placeholder segments. An edit-in-place cell on a value already set stays `TimeCell`, which takes free text and lets Postgres parse it. It mirrors DateField's **`variant`** for that component's own stated reason — the two sit side by side, so a bordered time beside a borderless date reads as one of them being broken |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
   | `ui/Switch` | a rounded div you style yourself | every switch. Black on, and off is the EXACT inverse; `size="sm"` for a dense grid row. Presentational only — the write, the optimism and the error state belong to the caller, because `ActiveToggle` and the recipe sheet's AUTO switch disagree about all three |
-  | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory. `group.summary` puts a SUBTOTAL under each run and **`totals` puts a GRAND TOTAL under the whole table** — both return a map KEYED BY COLUMN, never a ReactNode, so the figures stay under the headings they sum when a column is hidden or dragged (Mark, 2026-08-05: "the values should align with their columns"). `totals` is handed the rows the table is SHOWING, so it agrees with a search rather than reporting the whole set. **`openRowKey` opens one row from OUTSIDE** — a nudge, not control: the table keeps owning which rows are open and this only ever ADDS, applied by adjusting state DURING RENDER so the row is already open on the frame that paints. Every `<tr>` carries `data-row-key`, so a caller can find it to scroll to |
+  | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory. `group.summary` puts a SUBTOTAL under each run and **`totals` puts a GRAND TOTAL under the whole table** — both return a map KEYED BY COLUMN, never a ReactNode, so the figures stay under the headings they sum when a column is hidden or dragged (Mark, 2026-08-05: "the values should align with their columns"). `totals` is handed the rows the table is SHOWING, so it agrees with a search rather than reporting the whole set. **`openRowKey` opens one row from OUTSIDE** — a nudge, not control: the table keeps owning which rows are open and this only ever ADDS, applied by adjusting state DURING RENDER so the row is already open on the frame that paints. Every `<tr>` carries `data-row-key`, so a caller can find it to scroll to. **`fillViewport` (with `scroll`) writes a DEFINITE height rather than a cap**, so the pane ends at the foot of the window however few rows survive a filter — identical on a list that already overflows, and the difference on a short one is the table not collapsing upward as you type (Mark, 2026-09-07, of the vendor's items). `fill` (the parent decides) still wins over both |
   | `catalog/ActiveToggle` | a bespoke switch | the Active column, which leads every catalog table |
   | `catalog/WeekdayPicker` | seven buttons | any day-set; its column must be `WEEKDAY_PICKER_WIDTH` |
   | `catalog/ListFilters` | a filter row | search + category + active + last-ordered, together |
@@ -9686,9 +9695,12 @@ weekday column, and 003 then silently made it per-vendor-item.
   hard load has no found set and the book simply doesn't appear; storing it
   would mean opening a pasted URL on Monday and being told you're "4 of 61" of
   Friday's search. Publishers today: `/items`, `/vendors`, `/purchase-orders`.
-  Vendor-item detail is wired and stays blank until something publishes for it —
-  its only inbound link is the order guide, whose "set" would be that day's
-  walk lines rather than a list of records.
+  Vendor-item detail is wired and stays blank until something publishes for it.
+  That is no longer for want of a WAY IN — since 2026-09-07 both vendor-item
+  grids reach it from a row's ⋯ — it is that neither of them publishes a found
+  set for `/vendor-items`, and the order guide's "set" would be that day's walk
+  lines rather than a list of records. Publishing one from those two grids is a
+  three-line follow-up nobody has asked for.
 - **Every multi-column table can hide columns** (`catalog/ColumnsMenu` +
   `lib/columnVisibility`, Mark, 2026-07-31) — the four list screens, the
   locations list, AND the tables embedded in detail screens (Mark, 2026-08-01:
