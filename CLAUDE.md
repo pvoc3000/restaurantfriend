@@ -3819,12 +3819,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    there has room for one answer while DF01 makes DF02's raised donuts and DF02
    makes its own cake. A plan is (selling location, kitchen, date range, trays),
    several may be active at once, and their UNION is that shop's menu.
-   **AND SINCE 2026-09-09 THAT KITCHEN IS PER WEEKDAY — migration 101, NEEDS
-   APPLYING, AND BEFORE THE DEPLOY** (059's order, not 012's: five screens
-   select the column, and while the generate dialog and the shift report's
-   Tomorrow page find no plans a closing supervisor cannot make the night's
-   paper. The plans screens name the migration; the schedules ones degrade
-   honestly, losing only the plan's name in their From column).
+   **AND SINCE 2026-09-09 THAT KITCHEN IS PER WEEKDAY — migration 101, APPLIED
+   2026-09-09 and IN REAL USE THE SAME HOUR.** It had to go in BEFORE the deploy
+   (059's order, not 012's: five screens select the column, and while the
+   generate dialog and the shift report's Tomorrow page find no plans a closing
+   supervisor cannot make the night's paper. The plans screens name the
+   migration; the schedules ones degrade honestly, losing only the plan's name
+   in their From column).
    *Probe, don't read this line.* Probes:
    `select column_name from information_schema.columns where table_name =
    'production_plans' and column_name in ('kitchen_by_weekday',
@@ -3904,6 +3905,23 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **0 rows with NO error**. **1743 fixtures pass**, and the three new rules
    were each checked by BREAKING them: the off-by-one turns 3 red, a
    plan-level `sellingShopsForKitchen` 2, a plan-level `plansInForce` 1.
+   **AND MARK MERGED HIS TWO PLANS WITH IT INSIDE TWO MINUTES**, which is the
+   real acceptance test and better than any walk: he renamed
+   "Fall 2026 (Th-Su) DF02" to **Fall 2026 - DF02**, carried the M-W items onto
+   it, set its Mon/Tue/Wed headers to DF01 with the new picker, and DELETED
+   "Fall 2026 (M-W) DF02". Measured after, through the real `production_day`
+   over a full week at DF02: **Mon–Wed 35 items at DF01, Thu–Sun 35 items at
+   DF02**, ONE kitchen per day and never two, with the weekend par ramp intact
+   (377 / 377 / 377 / 377 / 425 / 473 / 467) and **zero `kitchen_assumed`** —
+   the backfill's explicit strips doing exactly what they are for. The catalog
+   is unchanged in total: 5 plans → 4, 120 trays → 96, and **940 slots before
+   and 940 after**, the deleted plan's 105 Mon–Wed slots having moved onto the
+   survivor.
+   Worth knowing if a probe here ever looks wrong: a reading taken WHILE
+   somebody is editing is a reading of a half-finished plan. Mid-merge this one
+   reported Monday at DF02 with the M-W plan contributing nothing, which looked
+   like the feature failing and was the deletion having landed a minute before
+   the kitchen edit.
    **Left as it is, and named so nobody thinks it was forgotten:**
    `locations.kitchen_by_weekday` / `shops_for` (017) are now unambiguously a
    second answer, and 101 does NOT drop them — they hold real data and have a
