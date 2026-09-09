@@ -4651,88 +4651,67 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    box ready to type. Only ever pass `defaultOpen` to a picker a deliberate act
    summoned; a list that opens itself on load is a popup.
    The Trays block's explanatory paragraph is GONE (Mark).
-   **EACH DAY COLUMN'S HEADER HAS A `Clear`** (Mark, 2026-09-09), quiet
-   small-caps beside the day, taking every item off that weekday across every
-   tray after a confirm naming the day and the count. A day is how a plan is
-   read and how it is rebuilt, so "start Monday again" was otherwise a ✕ per
-   slot down twenty-four trays. Scoped from `slots` — this plan's own rows —
-   rather than from `matrix`, which grouping reorders: what is cleared is the
-   DAY, not what happens to be on screen. Rendered on every day and DISABLED on
-   an empty one rather than hidden (`NewTimesheet`'s rule), the reason being
-   the empty column beneath it. The day label is `shrink-0`, so below about a
-   1000px window the overflow costs the command's tail rather than the label —
-   measured at the header's own 11px/0.12em, MON + Clear is 75px against 142px
-   of cell at 1280 and 122px at 1024, with the kitchen picker on its own line
-   under them and nothing clipped at either width.
-   **The plan's TITLE and both its SHOPS are inline-editable** (Mark,
-   2026-08-08) — the title where you read it, in the `h1`, and Sells at / Made
-   at as `kind="pick"` cells over the ACTIVE locations (design rule 3: a closed
-   shop is not one you can plan a menu for, while `session.locations` still
-   resolves the CODE of one, so an existing plan at a closed shop still renders
-   its name). `location_id` is NOT NULL; `kitchen_location_id` is nullable and
-   "not set" stays a real state, because 039 left the kitchen open for a plan
-   written before anyone decided, and decision 9's fallback then reads it as the
-   selling shop. Two things the title needed: **`InlineValue` now forwards
-   `ariaLabel` to the `PickList` on its `kind="pick"` branch** (it only reached
-   the text/number button before), and the title cell carries `uppercase`
-   EXPLICITLY — the browser reset sets `button { text-transform: none }`, so an
-   `h1`'s own `uppercase` does not reach a button inside it. Note
-   `emptyClassName` is a text/number-branch prop and does nothing on a pick.
-   **A tray's `band` IS ITS CATEGORY** (Mark, 2026-08-08: "more intuitive").
-   Label only — the column is still `band`, which is what 039 called it and what
-   `v_production_plan_days`, the schedule snapshot and the printed packet all
-   select. Same split as `admin` displaying as "Manager": rename the word, leave
-   the schema alone. It is editable from the ⋯ menu's **Edit category**, a dialog
-   with the same `allowNew` `PickList` the create form uses (the vocabulary is
-   the org's own and legitimately grows) plus a **Clear**, because having no
-   category is a real answer — such a tray groups under "No category" rather
-   than vanishing.
-   **Group by Tray, Category or Item type** — a `ui/TabPicker` above the table,
-   since a control that changes what a list SHOWS goes with the list.
-   **Item type is FileMaker's own banding**, from Mark's DONUTS screen: it bands
-   the donut TYPE (the black CAKE / MOCHI / OLD FASHIONED rules) and orders
-   WITHIN it by cut then finish. The band key and the sort key are deliberately
-   different things — banding on type+cut+finish would put a rule above almost
-   every tray, which names nothing. **Only the FIRST item on a tray's MONDAY
-   speaks for that tray** (Mark's instruction): a tray usually carries one kind
-   of donut all week, so one representative is enough, and naming a day makes
-   the answer stable instead of depending on which cell you looked at. A tray
-   with no Monday item sinks under "No type". Measured on the real 24-tray plan:
-   Cake 4 · Old Fashioned 1 · Raised 17 · Scrap 2, summing to 24.
-   **The CUT is a SECOND band under it** (Mark, 2026-08-08) — FMP's BANANA /
-   VANILLA headings — and deliberately a lighter one: black on white with a gap
-   after the run's last tray, not a second filled rule, because a second black
-   band would read as another break of the same weight where this is a heading
-   INSIDE one. Its run is keyed by the **(type, cut) PAIR**: two types can both
-   have a "Plain" cut, and keyed on the cut alone the second Plain run loses its
-   heading and reads as a continuation of the first. `endsSubGroup` marks the
-   LAST row of each run, which is what carries the gap — pinned by a fixture
-   that asserts the exact `[tray, cut, endsSubGroup]` triples, so marking the
-   run's start instead goes red.
-   Grouping is a
-   VIEW: `production_plan_trays.sort` is untouched either way, so the packet and
-   `production_day` keep reading the plan's real order however you are looking at
-   it, and `buildMatrix` sorts a COPY (checked by breaking it — an in-place
-   `trays.sort` turns one fixture red, and only after that fixture was rewritten
-   to use its own array, because the shared one had already been reordered by an
-   earlier test and the assertion passed while the bug was live).
-   `groupLabel` is set on the FIRST row of each run and null elsewhere —
-   `DataTable`'s rule that a grouping can only band what the ORDER already
-   groups, which is why the label comes from the same function that sorts —
-   and **`groupCount` rides with it**, the trays in THAT run, computed in the
-   same function for the same reason: it is the one that knows where the run
-   ends. Rendered `text-white/55` beside the label, `DataTable`'s own band
-   treatment. The band is black with white text, the same mark every other
-   grouped list uses, and uncategorised trays SINK (`lib/tableSort`'s empty-last
-   rule) under a "No category" band rather than a blank one. Local state, not
-   the URL: it changes nothing about what the plan is, and a plan is read in one
-   sitting.
-   **The grand total sits in the pinned controls row** beside Add tray — it
-   repeats the section heading's own count deliberately, because once the band
-   is pinned the heading has scrolled away. (It sat in a `StickyFooter` at the
-   FOOT of the window until 2026-09-07 — see the note below.) A fixture asserts
-   the band counts SUM to the tray count, so the two figures cannot drift into
-   disagreeing.
+   **EACH DAY COLUMN'S HEADER IS `MON DF01 ⌄` CENTRED, WITH `Clear` CENTRED
+   BENEATH IT** (Mark, 2026-09-09, in seven passes — the Clear command, centre
+   the day, caption the picker, put the label inline, "not liking this, let's
+   try a different design", bigger type with Clear unboxed, and finally the pair
+   together rather than pushed to opposite edges).
+   **EVERYTHING SHARES ONE AXIS DOWN THE MIDDLE OF THE COLUMN.** Day-left /
+   kitchen-right put two edges in play and made the pair read as two separate
+   facts rather than as "Monday, at DF01" — which is one fact, and the reason
+   the picker needs no label.
+   **THE PAIR IS 13px, NOT THE 11 EVERY OTHER LIST'S COLUMN LABELS USE.** This
+   header is not a row of labels — it is a day and a shop you READ AND PRESS —
+   so it matches the table body's own size rather than the caption scale. 14px
+   also fits at every width (day 39.1, picker 53.4, header 60px against 58.5) if
+   it is ever wanted bigger. `Clear` stays 10px: it is a command beneath the
+   pair, not part of it.
+   **THE FOUR EARLIER ARRANGEMENTS ALL LOST THE SAME ARGUMENT WITH THE COLUMN'S
+   WIDTH**, and the numbers are worth keeping because they are what settles any
+   future attempt. A cell is 165px wide at a 1440 window, 142 at 1280, 128 at
+   1100 and 117 at 1024. A day (31px), a `Kitchen:` label (47), a picker (45,
+   54 on a five-letter code) and a bordered Clear (50) cannot share one line:
+   three of them want 150px and clip at 1280. THE FINAL PAIR WANTS 77px, so
+   nothing truncates at any width down to a 900px window — day, code and Clear
+   all whole, measured at five.
+   **THE PICKER CARRIES NO LABEL** because it is the only thing on the row that
+   names a shop and the day beside it says what it is about. That is what buys
+   the room, and it is why the label went: it was 39px sentence case and 55px in
+   the app's small-caps caption dress, which clipped on every column at every
+   width including 1440.
+   **`w-fit shrink-0` ON THE PICKER'S PEN, AND IT IS TWO BUGS AT ONCE.**
+   `PickList`'s inline trigger is `w-full`, so left to flex against the row it
+   (a) renders the width of the whole cell for a four-character code — Mark:
+   "way wider than it needs to be" — and (b) claims the line as its flex basis
+   and starves whatever sits beside it to ZERO PIXELS, which is invisible in
+   review and was caught only by measuring. Penned, it is 45.5px at every width.
+   **THE EMPHASIS IS COLOUR, NOT WEIGHT** — ink where another shop bakes this
+   day, muted where it is the shop's own. It carried `font-semibold` until this
+   pass, which inside a `th` (bold by default, measured at 700) was LIGHTER than
+   everything around it and so read as an inconsistency rather than as emphasis.
+   The plans list's own Made at column still uses weight, having no day beside
+   it to match.
+   **`Clear` takes every item off that weekday across every tray**, after a
+   confirm naming the day and the count — a day is how a plan is read and how it
+   is rebuilt, so "start Monday again" was otherwise a ✕ per slot down
+   twenty-four trays. Scoped from `slots`, this plan's own rows, rather than
+   from `matrix`, which grouping reorders: what is cleared is the DAY, not what
+   happens to be on screen. Rendered on every day and DISABLED on an empty one
+   rather than hidden (`NewTimesheet`'s rule), the reason being the empty column
+   beneath it. It was BORDERED for one arrangement and is not now (both Mark's,
+   an hour apart): the box earned its keep while Clear sat INLINE beside a label
+   and a value, where an unboxed word reads as more annotation — centred on a
+   line of its own under a 13px pair, its position and the space around it say
+   it is a control and the border was only weight. It keeps this file's quiet
+   dress, `text-subtle hover:text-ink`. Never `BUTTON_CLASS`, which is `h-9` and
+   would double the header.
+   Verified at 1440 / 1280 / 1100 / 1024: nothing truncated anywhere — the pair
+   wants 95px (day 36.5, gap 8, picker 50.8) against 165px of cell at the top
+   width and 117 at the bottom — with the pair AND Clear both centred to 0.00px
+   in all seven columns, header 58.5px, and the table never overflowing its
+   pane. At a 900px window one column's pair overflows by 7px, and only where
+   the kitchen is a FIVE-letter code (`EVENT`, picker 62): no real kitchen is,
+   and the matrix is not used that narrow.
    **The PLAN LIST has a ⋯ too — Duplicate plan and Delete plan** (Mark,
    2026-08-08), the same `ui/RowMenu` in an unlabelled last column, which keeps
    it out of the Columns menu because it is a control rather than a field.

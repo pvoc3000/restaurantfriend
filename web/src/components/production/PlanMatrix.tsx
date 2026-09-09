@@ -1102,47 +1102,58 @@ export function PlanMatrix({
                 as the table having lost its labels. The 2px rule rides as an
                 inset SHADOW rather than a border, because a sticky cell inside
                 border-collapse loses its border as it detaches. */}
-            <tr className={`text-[11px] uppercase tracking-[0.12em] ${STICKY_HEAD_ROW_UNDER_CONTROLS}`}>
+            {/* 13px, not the 11 every other list's labels use (Mark,
+                2026-09-09: "increase the size of the day of the week and
+                kitchen picklist"). This header is not a row of column labels —
+                it is a day and a shop you read and PRESS, and it matches the
+                table body's own 13px rather than the caption scale. Clear sets
+                its own smaller size; it is a command, not part of the pair. */}
+            <tr className={`text-[13px] uppercase tracking-[0.12em] ${STICKY_HEAD_ROW_UNDER_CONTROLS}`}>
               {WEEKDAYS.map((d) => {
                 const held = slots.filter((s) => s.weekday === d.iso).length;
                 const kitchen = planKitchenFor(
                   { location_id: locationId, kitchen_by_weekday: kitchenByWeekday },
                   d.iso
                 );
+                // THE SAME TYPE AS THE DAY BESIDE IT — 11px, and the weight
+                // the header row already gives everything in it (a `th` is bold
+                // by default, measured at 700). So the emphasis is COLOUR
+                // alone: ink where another shop bakes this day, muted where it
+                // is the shop's own. It carried `font-semibold` until
+                // 2026-09-09, which was LIGHTER than the 700 around it and so
+                // read as an inconsistency rather than as emphasis.
                 const kitchenClass =
-                  kitchen === locationId
-                    ? "text-[11px] text-muted"
-                    : "text-[11px] font-semibold text-ink";
+                  kitchen === locationId ? "text-[13px] text-muted" : "text-[13px] text-ink";
                 return (
                   <th
                     key={d.iso}
                     className="px-2 py-2 align-bottom"
                     style={{ width: `calc((100% - ${MENU_COLUMN}px) / 7)` }}
                   >
-                    {/* The day CENTRED over its column (Mark, 2026-09-09) —
-                        it labels the whole column, where everything under it
-                        is a control that starts at the column's left edge. */}
-                    <span className="block text-center">{d.short}</span>
+                    {/* THE DAY AND ITS KITCHEN CENTRED AS A PAIR, CLEAR
+                        CENTRED BENEATH THEM (Mark, 2026-09-09). Every element
+                        of the header now shares one axis down the middle of the
+                        column, where day-left/kitchen-right put two edges in
+                        play and made the pair read as two separate facts rather
+                        than as "Monday, at DF01".
 
-                    {/* WHO BAKES THIS DAY (101), captioned, with Clear on its
-                        line (Mark, 2026-09-09).
-                        THE CAPTION IS ITS OWN LINE, NOT INLINE, and that is a
-                        measurement rather than a preference: with `Kitchen`,
-                        the picker and Clear all on one row, the shop CODE
-                        truncates on all seven columns at a 992px content width
-                        (a 1024 window) — measured against this stylesheet, the
-                        picker gets 36px for a value that wants 40. Captioned
-                        above, the picker has 81px there and nothing truncates
-                        at any width this screen is used at. It costs the header
-                        15px, once.
-                        The wrapper drops the row's small-caps tracking so a
-                        four-letter code does not read as D F 0 1; the caption
-                        and Clear ask for it back. */}
-                    <span className="mt-1 block normal-case tracking-normal">
-                      <span className="block text-[10px] uppercase tracking-[0.12em] text-subtle">
-                        Kitchen
-                      </span>
-                      <span className="flex items-baseline gap-1.5">
+                        It is also what the column can afford: the pair wants
+                        95px of the 142 a 1280 window gives and 117 at 1024, so
+                        nothing truncates at any width this screen is used at —
+                        where the label the picker briefly carried made it three
+                        items and 150px, which clipped at 1280.
+
+                        THE PICKER NEEDS NO LABEL because it is the only thing
+                        on the row that names a shop, and the day beside it says
+                        what it is about. It keeps `w-fit shrink-0` in a pen:
+                        `PickList`'s inline trigger is `w-full`, so left to flex
+                        it renders the width of the whole cell for a
+                        four-character code (Mark: "way wider than it needs to
+                        be") and starves whatever sits beside it. Penned, it is
+                        45px — the width of "DF01 ⌄". */}
+                    <span className="flex items-baseline justify-center gap-2">
+                      <span className="shrink-0">{d.short}</span>
+                      <span className="w-fit shrink-0 normal-case tracking-normal">
                         {editable ? (
                           <PickList
                             variant="inline"
@@ -1150,35 +1161,47 @@ export function PlanMatrix({
                             options={kitchenOptions}
                             onPick={(v) => v && setKitchen(d.iso, v)}
                             ariaLabel={`Which kitchen makes ${d.long}`}
-                            className={`min-w-0 ${kitchenClass}`}
+                            className={kitchenClass}
                           />
                         ) : (
-                          <span className={`min-w-0 flex-1 truncate px-1 py-0.5 ${kitchenClass}`}>
+                          <span className={`px-1 py-0.5 ${kitchenClass}`}>
                             {kitchenOptions.find((o) => o.value === kitchen)?.label ?? "—"}
                           </span>
                         )}
-                        {/* Rendered on every day and DISABLED on an empty one,
-                            never hidden: a control that vanishes cannot be told
-                            from a feature that does not exist, and here the
-                            reason it is dead is the empty column beneath it. */}
-                        {editable ? (
-                          <button
-                            type="button"
-                            onClick={() => clearDay(d.iso, d.long)}
-                            disabled={pending || !held}
-                            title={
-                              held
-                                ? `Take all ${held} item${held === 1 ? "" : "s"} off ${d.long}`
-                                : `Nothing is on ${d.long}`
-                            }
-                            aria-label={`Clear ${d.long} on this plan`}
-                            className="shrink-0 uppercase tracking-[0.12em] text-subtle hover:text-ink disabled:cursor-not-allowed disabled:text-faint disabled:hover:text-faint"
-                          >
-                            Clear
-                          </button>
-                        ) : null}
                       </span>
                     </span>
+
+                    {/* Rendered on every day and DISABLED on an empty one,
+                        never hidden: a control that vanishes cannot be told
+                        from a feature that does not exist, and here the reason
+                        it is dead is the empty column beneath it.
+                        UNBOXED (Mark, 2026-09-09, having asked for the border
+                        one arrangement earlier and then removed it). The border
+                        was earning its keep when Clear sat INLINE beside a
+                        label and a value, where an unboxed word reads as more
+                        annotation; centred on a line of its own, under a pair
+                        that is now 13px, its position and the space around it
+                        say it is a control and the box was only weight. It
+                        keeps the quiet-control dress the rest of this file
+                        uses — `text-subtle hover:text-ink`. */}
+                    {editable ? (
+                      <span className="mt-1 flex justify-center">
+                        <button
+                          type="button"
+                          onClick={() => clearDay(d.iso, d.long)}
+                          disabled={pending || !held}
+                          title={
+                            held
+                              ? `Take all ${held} item${held === 1 ? "" : "s"} off ${d.long}`
+                              : `Nothing is on ${d.long}`
+                          }
+                          aria-label={`Clear ${d.long} on this plan`}
+                          className="text-[10px] uppercase tracking-[0.12em] text-subtle hover:text-ink disabled:cursor-not-allowed disabled:text-faint disabled:hover:text-faint"
+                        >
+                          Clear
+                        </button>
+                      </span>
+                    ) : null}
                   </th>
                 );
               })}
