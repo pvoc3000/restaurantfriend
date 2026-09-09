@@ -12,7 +12,12 @@ import {
   statusForReading,
   type CheckStatus,
 } from "@/lib/checklists";
-import { taskAgeLabel, taskTone, type CarryableTask } from "@/lib/facilityTasks";
+import {
+  taskAgeLabel,
+  taskLineLabel,
+  taskTone,
+  type CarryableTask,
+} from "@/lib/facilityTasks";
 import { STICKY_BAND_UNDER_RUNNER } from "@/lib/tableHead";
 import { WalkItem, type WalkItemRow } from "./WalkItem";
 
@@ -167,7 +172,7 @@ export function ChecklistWalk({
       {tasks.length > 0 && (
         <section className="border-2 border-hairline p-3">
           <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted">
-            Carried over — {tasks.length}
+            Pinned tasks — {tasks.length}
           </h2>
           <ul className="space-y-2">
             {tasks.map((t) => {
@@ -191,7 +196,7 @@ export function ChecklistWalk({
                   ) : null}
                   <span className="min-w-0 flex-1 pt-2">
                     <span className={t.status === "done" ? "line-through opacity-50" : ""}>
-                      {t.title}
+                      {taskLineLabel(t)}
                     </span>
                     {t.details && (
                       <span className="block text-sm text-muted">{t.details}</span>

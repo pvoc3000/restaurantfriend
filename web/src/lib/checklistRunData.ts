@@ -83,7 +83,7 @@ export async function loadChecklistRun(
   const { data: items } = await supabase
     .from("checklist_run_items")
     .select(
-      "id, prompt, section_name, sort, response_type, unit, min_value, max_value, choices, requires_photo, equipment_id, guidance, position, status, value_number, value_text, score, note, task_id",
+      "id, prompt, section_name, shop_section_id, sort, response_type, unit, min_value, max_value, choices, requires_photo, equipment_id, guidance, position, status, value_number, value_text, score, note, task_id",
     )
     .eq("run_id", runId)
     .order("sort");
@@ -93,6 +93,7 @@ export async function loadChecklistRun(
   const [
     { data: photos },
     { data: equipment },
+    { data: sections },
     { data: tasks, error: tasksError },
     { data: members },
   ] = await Promise.all([
@@ -106,10 +107,18 @@ export async function loadChecklistRun(
       .from("equipment")
       .select("id, name")
       .eq("location_id", run.location_id as string),
+    // The shop's shelves, to put a PLACE on each pinned task — `taskLineLabel`.
+    // Resolved here rather than embedded, for the reason the equipment query
+    // above is separate: one small per-location lookup shared by every row
+    // beats an embed repeated on each.
+    supabase
+      .from("shop_sections")
+      .select("id, display_name")
+      .eq("location_id", run.location_id as string),
     supabase
       .from("location_tasks")
       .select(
-        "id, title, details, status, carry_forward, target_shift, due_on, created_at, priority, assigned_to",
+        "id, title, details, status, carry_forward, target_shift, due_on, created_at, priority, assigned_to, shop_section_id",
       )
       .eq("location_id", run.location_id as string)
       .in("status", ["open", "in_progress"]),
@@ -139,11 +148,15 @@ export async function loadChecklistRun(
   const equipmentName = new Map(
     (equipment ?? []).map((e) => [e.id as string, e.name as string]),
   );
+  const sectionName = new Map<string, string>(
+    (sections ?? []).map((x) => [x.id as string, x.display_name as string]),
+  );
 
   const rows: WalkItemRow[] = (items ?? []).map((i) => ({
     id: i.id as string,
     prompt: i.prompt as string,
     section_name: (i.section_name as string | null) ?? null,
+    shop_section_id: (i.shop_section_id as string | null) ?? null,
     response_type: i.response_type as WalkItemRow["response_type"],
     unit: (i.unit as string | null) ?? null,
     min_value: i.min_value == null ? null : Number(i.min_value),
@@ -196,6 +209,10 @@ export async function loadChecklistRun(
         due_on: (t.due_on as string | null) ?? null,
         created_at: t.created_at as string,
         priority: t.priority as WalkTask["priority"],
+        // The shelf, for `taskLineLabel`. Null when the task has none, which is
+        // every one raised from a checklist before 2026-09-09 — nothing is
+        // invented for those, they just read as they always did.
+        section_name: sectionName.get((t.shop_section_id as string | null) ?? "") ?? null,
         assigned_to: assigned,
         // Named only when it is somebody ELSE's doing — a row on your own
         // checklist saying "assigned to you" is the screen telling you where

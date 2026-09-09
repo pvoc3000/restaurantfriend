@@ -71,6 +71,12 @@ export type CarryableTask = {
   priority: TaskPriority;
   /** 079. An app user (`org_members.user_id`), or null for anybody. */
   assigned_to?: string | null;
+  /**
+   * The shelf this job is at, resolved from `shop_section_id` by whoever loaded
+   * it — see `taskLineLabel`. Optional because most callers do not need it and
+   * because a task legitimately has none.
+   */
+  section_name?: string | null;
 };
 
 /**
@@ -250,6 +256,31 @@ export function taskTitleFromIssue(prompt: string, note: string | null): string 
   const n = note?.trim();
   if (!n) return prompt;
   return `${prompt} — ${n}`;
+}
+
+/**
+ * One pinned task as a line — "FOH: All trash taken out — Cans dirty" (Mark,
+ * 2026-09-09: "add the shop location before the description for the pinned
+ * task").
+ *
+ * THE SECTION IS WHERE YOU HAVE TO GO, and a walk is a route through a
+ * building: a pinned band of five jobs with no places on it makes you read
+ * every one to work out which are on your way to the next shelf. The title
+ * alone cannot say it — "All trash taken out" is true of three sections.
+ *
+ * A FUNCTION, NOT A PREFIX BAKED INTO `title` AT CREATION. The title is a
+ * stored column that `/tasks` shows in its own Title cell BESIDE a Where
+ * column, so baking the section in would print it twice there, and would freeze
+ * the name of a shelf that can be renamed. Composed at read time, one screen
+ * can show "FOH: …" and the other can keep them apart.
+ *
+ * NOTHING IS INVENTED when a task has no section — which is every one raised
+ * from a checklist before this shipped, since `shop_section_id` had no writer
+ * on that path at all. Those read exactly as they always did.
+ */
+export function taskLineLabel(task: { title: string; section_name?: string | null }): string {
+  const section = task.section_name?.trim();
+  return section ? `${section}: ${task.title}` : task.title;
 }
 
 /**

@@ -28,6 +28,7 @@ import {
   taskIsFor,
   taskAge,
   taskAgeLabel,
+  taskLineLabel,
   taskTitleFromIssue,
   taskTone,
   type CarryableTask,
@@ -186,6 +187,37 @@ test("staleTaskBanner reads correctly for exactly one", () => {
 // ---------------------------------------------------------------------------
 // Raising one from an issue
 // ---------------------------------------------------------------------------
+
+test("taskLineLabel puts the PLACE in front of the job", () => {
+  // Mark's own example, 2026-09-09: a pinned band is read as a route through
+  // the building, so each line has to say where you are going. The title alone
+  // cannot — "All trash taken out" is true of three sections.
+  eq(
+    taskLineLabel({
+      section_name: "FOH",
+      title: taskTitleFromIssue("All trash taken out", "Cans dirty"),
+    }),
+    "FOH: All trash taken out — Cans dirty",
+    "section, then the job",
+  );
+
+  // NOTHING IS INVENTED without one, which is every task raised from a
+  // checklist before this shipped — `shop_section_id` had no writer on that
+  // path, so those rows carry none and must read exactly as they always did.
+  eq(taskLineLabel({ title: "Replace the filter" }), "Replace the filter", "absent");
+  eq(
+    taskLineLabel({ section_name: null, title: "Replace the filter" }),
+    "Replace the filter",
+    "null",
+  );
+  // A section that is only whitespace is the same as none — otherwise the line
+  // opens with a stray colon.
+  eq(
+    taskLineLabel({ section_name: "   ", title: "Replace the filter" }),
+    "Replace the filter",
+    "blank",
+  );
+});
 
 test("taskTitleFromIssue reads as a job, not a fragment", () => {
   eq(

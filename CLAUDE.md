@@ -7915,6 +7915,37 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Measured at 1024, 820, 768, 600 and 375: the button is **231×44 at every
    width** (`shrink-0`, so it never wraps or squeezes), with the sentence beside
    it down to 768 and on its own line below that.
+   **THE BAND IS "PINNED TASKS" AND EACH LINE LEADS WITH ITS SHELF** (Mark,
+   2026-09-09, four wordings in one message; the label shortened again to
+   **"Pin to checklists"**, since "future" is what "pin" already means, and the
+   description to "Pinned tasks show on future checklists until someone
+   completes it").
+   **"Carried over" NAMED THE MECHANISM AND "Pinned tasks" NAMES THE THING** —
+   and it now matches the button that creates them, which "Carried over" never
+   did. One verb for one act, across the button, its done-state ("Pinned —") and
+   the band.
+   **THE SECTION IS THE HALF THAT MAKES THE BAND A ROUTE.** A pinned band of
+   five jobs with no places on it has to be read line by line to work out which
+   are on your way to the next shelf — and the title cannot say it, since "All
+   trash taken out" is true of three sections. `taskLineLabel` composes
+   "FOH: All trash taken out — Cans dirty".
+   **`location_tasks.shop_section_id` HAS EXISTED SINCE 075 AND THIS PATH HAD
+   NEVER WRITTEN IT.** Every task raised from a checklist arrived with an empty
+   Where — on the Tasks screen as well as in the band — so this fills a column
+   that was already there rather than adding one. It writes the run item's
+   **id**, not its snapshotted `section_name`: a task outlives the run, so it
+   should follow a shelf that gets renamed, where the run's own copy is
+   deliberately frozen (076's decision 1).
+   **COMPOSED AT READ TIME, NEVER BAKED INTO `title`.** The title is a stored
+   column that `/tasks` shows in its own Title cell BESIDE a Where column, so a
+   prefix would print the section twice there — and would freeze a name that can
+   change. One function, and each screen decides whether it wants the place in
+   the line.
+   **NOTHING IS INVENTED for a task with no section**, which is every one raised
+   before this: they read exactly as they always did. Pinned by fixtures for
+   absent, null and whitespace-only, and checked by breaking the composer.
+   The walk's own grouping still uses the run's snapshotted `section_name`; the
+   new `shop_section_id` on `WalkItemRow` is only ever carried onto a task.
    **AND THE TASKS DIALOGS' TEXTAREAS WERE GREY** where every field beside them
    was black (Mark, 2026-08-30: "most fields have black borders, details is
    grey"). `NewTask` and `ResolveTask` were the only two form textareas in the

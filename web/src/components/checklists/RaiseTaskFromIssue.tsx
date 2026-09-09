@@ -22,7 +22,8 @@ import { taskTitleFromIssue } from "@/lib/facilityTasks";
  * THE BUTTON NAMES THE MECHANISM, NOT THE RECORD (Mark, 2026-09-09, in two
  * steps: "it's unclear what the button does/will do", and then — reading the
  * description that answered it — "I think a different label for the button is
- * needed. 'Pin to future checklists' or something like that").
+ * needed. 'Pin to future checklists' or something like that", shortened the
+ * next minute to "Pin to checklists" — "future" is what "pin" already means).
  *
  * HE WAS ALSO ASKING A QUESTION ABOUT BEHAVIOUR AND THE ANSWER IS YES: "if the
  * user doesn't raise a task, then, the next time a checklist is run the issue
@@ -57,6 +58,7 @@ export function RaiseTaskFromIssue({
   prompt,
   note,
   taskId,
+  shopSectionId,
 }: {
   runItemId: string;
   orgId: string;
@@ -64,6 +66,11 @@ export function RaiseTaskFromIssue({
   prompt: string;
   note: string | null;
   taskId: string | null;
+  /**
+   * The shelf this item is on, carried onto the task — see below. Null on an
+   * unsectioned item, which is a real state.
+   */
+  shopSectionId: string | null;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -95,6 +102,15 @@ export function RaiseTaskFromIssue({
           // wrong; both, in that order, so the task reads as a job rather than
           // as a fragment.
           title: taskTitleFromIssue(prompt, note),
+          // WHERE THE JOB IS, carried from the item. `location_tasks` has had
+          // this column since 075 and nothing on this path had ever written it,
+          // so every task raised from a checklist arrived with an empty Where —
+          // on the Tasks screen AND in the pinned band, which is what made a
+          // band of five jobs unreadable as a route. The id and not the run
+          // item's snapshotted `section_name`: the task is a live record, so it
+          // should follow a shelf that gets renamed rather than freeze the name
+          // this run happened to capture.
+          shop_section_id: shopSectionId,
           source_run_item_id: runItemId,
           created_by: uid,
         })
@@ -130,7 +146,7 @@ export function RaiseTaskFromIssue({
         disabled={busy}
         className="min-h-11 shrink-0 border border-ink bg-white px-3 text-[13px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
       >
-        {busy ? "Pinning…" : "Pin to future checklists"}
+        {busy ? "Pinning…" : "Pin to checklists"}
       </button>
       {/* The error REPLACES the description rather than joining it. Both are
           the same sentence-shaped thing in the same slot, and stacked they
@@ -141,7 +157,7 @@ export function RaiseTaskFromIssue({
         <span className="text-[13px] text-accent">{failed}</span>
       ) : (
         <span className="text-[13px] leading-snug text-muted">
-          It becomes a task, and stays until somebody closes it.
+          Pinned tasks show on future checklists until someone completes it.
         </span>
       )}
     </span>

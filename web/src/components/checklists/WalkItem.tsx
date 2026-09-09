@@ -21,6 +21,10 @@ export type WalkItemRow = {
   id: string;
   prompt: string;
   section_name: string | null;
+  /** The live shelf, carried onto a task when this item is pinned. The
+   *  `section_name` above is the run's own SNAPSHOT and is what the walk groups
+   *  by; this is what a task should follow, since a task outlives the run. */
+  shop_section_id: string | null;
   response_type: ResponseType;
   unit: string | null;
   min_value: number | null;
@@ -502,6 +506,7 @@ export function WalkItem({
               prompt={row.prompt}
               note={row.note}
               taskId={row.task_id}
+              shopSectionId={row.shop_section_id}
             />
           )}
         </div>
