@@ -16,10 +16,12 @@ import {
   BATCH_LOG_RANGES,
   DEFAULT_BATCH_LOG_RANGE,
   batchLogRangeHref,
-  batchLogRangeStart,
+  batchLogWindowBounds,
+  batchLogWindowFromPicker,
   parseBatchLogRange,
+  parseBatchLogWindow,
 } from "../../src/lib/batchLogFilters";
-import { eq, ok, test } from "./harness";
+import { eq, test } from "./harness";
 
 test("parseBatchLogRange: every declared key survives a round trip", () => {
   for (const r of BATCH_LOG_RANGES) eq(parseBatchLogRange(r.key), r.key, r.key);
@@ -33,17 +35,39 @@ test("parseBatchLogRange: anything else falls back rather than erroring", () => 
   eq(parseBatchLogRange(["365", "30"]), "365", "an array takes the first");
 });
 
-test("batchLogRangeStart: a window counts back from the ORG's day", () => {
-  // Los Angeles is a day behind UTC late in the evening, which is the whole
-  // reason this takes a timezone: on a UTC host the window would start a day
-  // early and drop the log somebody is working right now.
-  eq(batchLogRangeStart("all", "America/Los_Angeles"), null, "all time has no floor");
-  const thirty = batchLogRangeStart("30", "America/Los_Angeles");
-  const ninety = batchLogRangeStart("90", "America/Los_Angeles");
-  const year = batchLogRangeStart("365", "America/Los_Angeles");
-  ok(thirty !== null && ninety !== null && year !== null, "the bounded ranges have a floor");
-  ok(year! < ninety! && ninety! < thirty!, "a longer window reaches further back");
-  ok(/^\d{4}-\d{2}-\d{2}$/.test(thirty!), "an ISO date, which is what log_date compares as");
+test("batchLogWindowBounds: a preset counts back from the ORG's day, through today", () => {
+  const TUE = "2026-09-08";
+  eq(batchLogWindowBounds("all", TUE), null, "all time has no floor");
+  eq(batchLogWindowBounds("30", TUE), { from: "2026-08-09", to: TUE });
+  eq(batchLogWindowBounds("90", TUE), { from: "2026-06-10", to: TUE });
+  eq(batchLogWindowBounds("365", TUE), { from: "2025-09-08", to: TUE });
+  eq(batchLogWindowBounds({ from: "2026-08-01", to: "2026-08-31" }, TUE), { from: "2026-08-01", to: "2026-08-31" });
+});
+
+test("parseBatchLogWindow: a key, a pair, half a pair, and a key over a pair", () => {
+  eq(parseBatchLogWindow({ range: "30" }), "30");
+  eq(parseBatchLogWindow({ from: "2026-08-01", to: "2026-08-31" }), { from: "2026-08-01", to: "2026-08-31" });
+  eq(parseBatchLogWindow({ from: "2026-08-01" }), DEFAULT_BATCH_LOG_RANGE);
+  eq(parseBatchLogWindow({ range: "all", from: "2026-08-01", to: "2026-08-31" }), "all");
+  // The breadcrumb's `from` is a PATH and never reads as a window.
+  eq(parseBatchLogWindow({ from: "/plans", fromLabel: "Plans" }), DEFAULT_BATCH_LOG_RANGE);
+});
+
+test("batchLogWindowFromPicker: a pair that is a preset is stored by key", () => {
+  const TUE = "2026-09-08";
+  eq(batchLogWindowFromPicker({ from: "2026-06-10", to: TUE }, TUE), "90");
+  eq(batchLogWindowFromPicker(null, TUE), "all");
+  eq(batchLogWindowFromPicker({ from: "2026-08-01", to: "2026-08-31" }, TUE), { from: "2026-08-01", to: "2026-08-31" });
+});
+
+test("batchLogRangeHref: a custom pair writes from/to and replaces a stale pair", () => {
+  eq(batchLogRangeHref({ from: "2026-08-01", to: "2026-08-31" }, {}), "/batch-logs?from=2026-08-01&to=2026-08-31");
+  eq(batchLogRangeHref("30", { from: "2026-08-01", to: "2026-08-31" }), "/batch-logs?range=30", "a preset drops the old pair");
+  eq(
+    batchLogRangeHref({ from: "2026-08-01", to: "2026-08-31" }, { from: "/plans", fromLabel: "Plans" }),
+    "/batch-logs?from=2026-08-01&fromLabel=Plans&to=2026-08-31",
+    "the breadcrumb's from is a path and is superseded by the window's"
+  );
 });
 
 test("batchLogRangeHref: the DEFAULT writes no parameter", () => {

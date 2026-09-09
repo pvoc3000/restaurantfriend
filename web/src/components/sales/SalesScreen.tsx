@@ -3,13 +3,12 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { RangePicker } from "@/components/ui/RangePicker";
+import { matchingPreset } from "@/lib/dateRange";
 import { PickSet } from "@/components/ui/PickSet";
-import { DateField } from "@/components/ui/DateField";
 import { formatCents } from "@/lib/tipPool";
 import {
-  SALES_RANGES,
-  SALES_RANGE_LABEL,
+  salesRangePresets,
   SALES_PREVIOUS_LABEL,
   formatFraction,
   tipFraction,
@@ -54,6 +53,8 @@ export function SalesScreen({
   prevRange,
   yearRange,
   rangeKey,
+  today,
+  periods,
   shops,
   initialPicked,
   yesterday,
@@ -73,6 +74,9 @@ export function SalesScreen({
   prevRange: DateRange;
   yearRange: DateRange;
   rangeKey: SalesRangeKey;
+  /** The org's calendar day, and the pay-period calendar the presets read. */
+  today: string;
+  periods: readonly { start_date: string; end_date: string }[];
   shops: SalesLocation[];
   initialPicked: string[];
   yesterday: string;
@@ -82,8 +86,7 @@ export function SalesScreen({
   params: RawSearchParams;
 }) {
   const router = useRouter();
-  const [customFrom, setCustomFrom] = useState(range.from);
-  const [customTo, setCustomTo] = useState(range.to);
+  const presets = useMemo(() => salesRangePresets(today, periods), [today, periods]);
 
   // THE SHOP FILTER IS LOCAL STATE, and the URL follows it rather than driving
   // it. Every tick used to be a `router.push` — 886ms and a history entry each,
@@ -336,12 +339,25 @@ export function SalesScreen({
         {revertError ? <p className="text-xs text-accent">{revertError}</p> : null}
       <div className="flex flex-wrap items-end gap-x-6 gap-y-3">
         <Field label="Period">
-          <TabPicker
-            options={SALES_RANGES.map((k) => ({ key: k, label: SALES_RANGE_LABEL[k] }))}
-            value={rangeKey}
-            onChange={(k) => go({ range: k === "period" ? null : k })}
-            ariaLabel="Which period to show"
-          />
+          {/* A preset stays a KEY in the URL, so "this pay period" is still
+              this pay period next week; a pair tapped on the calendar is the
+              old Custom view, `from`/`to`. Never clearable — this screen
+              always shows SOME window. */}
+          <div className="w-64">
+            <RangePicker
+              value={range}
+              onChange={(picked) => {
+                if (!picked) return;
+                const preset = matchingPreset(picked, presets, today);
+                if (preset) go({ range: preset.key === "period" ? null : preset.key, from: null, to: null });
+                else go({ range: "custom", from: picked.from, to: picked.to });
+              }}
+              presets={presets}
+              today={today}
+              ariaLabel="Which period to show"
+              clearable={false}
+            />
+          </div>
         </Field>
 
         {shops.length > 1 ? (
@@ -360,37 +376,6 @@ export function SalesScreen({
               label="Which shops to show"
               className="min-w-[11rem]"
             />
-          </Field>
-        ) : null}
-
-        {rangeKey === "custom" ? (
-          <Field label="From / to">
-            {/* `DateField` fires onChange only on a COMPLETE date, so there is
-                no half-typed state to wait out and no blur to hook — navigating
-                straight from the change is safe. `resolveSalesRange` falls back
-                per END, so setting one and not the other is a working view
-                rather than an error. */}
-            <div className="flex items-center gap-2">
-              <DateField
-                value={customFrom}
-                onChange={(v) => {
-                  setCustomFrom(v ?? "");
-                  go({ from: v, to: customTo });
-                }}
-                variant="field"
-                ariaLabel="From"
-              />
-              <span className="text-muted">–</span>
-              <DateField
-                value={customTo}
-                onChange={(v) => {
-                  setCustomTo(v ?? "");
-                  go({ from: customFrom, to: v });
-                }}
-                variant="field"
-                ariaLabel="To"
-              />
-            </div>
           </Field>
         ) : null}
 

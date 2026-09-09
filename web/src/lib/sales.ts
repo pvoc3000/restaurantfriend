@@ -26,6 +26,7 @@ export type SalesDay = {
 };
 
 export type DateRange = { from: string; to: string };
+import type { RangePreset } from "./dateRange";
 
 export type SalesTotals = {
   netSalesCents: number;
@@ -429,6 +430,23 @@ export const SALES_PREVIOUS_LABEL: Record<SalesRangeKey, string> = {
   ytd: "last year to date",
   custom: "last period",
 };
+
+/**
+ * The `ui/RangePicker`'s presets on this screen (Mark, 2026-09-08, replacing
+ * the Period tabs): the five named windows, resolved through
+ * `resolveSalesRange` so the picker and the page cannot disagree about what
+ * "this pay period" is. `custom` is not a preset — it is the calendar.
+ */
+export function salesRangePresets(
+  today: string,
+  periods: readonly { start_date: string; end_date: string }[]
+): RangePreset[] {
+  return SALES_RANGES.filter((k) => k !== "custom").map((k) => ({
+    key: k,
+    label: SALES_RANGE_LABEL[k],
+    range: () => resolveSalesRange(k, today, periods).range,
+  }));
+}
 
 export function parseSalesRange(raw: string | undefined | null): SalesRangeKey {
   // Anything unrecognised falls back to the default rather than erroring: a

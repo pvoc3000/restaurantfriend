@@ -5,15 +5,19 @@ import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import type { SortDir } from "@/lib/tableSort";
+import { useRouter } from "next/navigation";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { RangePicker } from "@/components/ui/RangePicker";
 import { TextInput } from "@/components/ui/TextInput";
 import { READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { batchDate } from "@/lib/productionBatches";
 import {
-  BATCH_LOG_RANGES,
+  BATCH_LOG_PRESETS,
+  batchLogWindowBounds,
+  batchLogWindowFromPicker,
   batchLogRangeHref,
-  type BatchLogRange,
+  type BatchLogWindow,
 } from "@/lib/batchLogFilters";
 
 export type BatchLogRow = {
@@ -60,6 +64,7 @@ const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: BatchLogRow) => string> =
 export function BatchLogsIndex({
   rows,
   range,
+  today,
   params,
   locationCode,
   action,
@@ -71,8 +76,10 @@ export function BatchLogsIndex({
    * is not local state: it bounds the query, so it has to reach the server
    * component, which means the URL (see lib/batchLogFilters).
    */
-  range: BatchLogRange;
-  /** Whatever else is in the URL, so a range chip keeps it. */
+  range: BatchLogWindow;
+  /** The org's calendar day — the presets and the Today tier resolve on it. */
+  today: string;
+  /** Whatever else is in the URL, so a range keeps it. */
   params: Record<string, string | string[] | undefined>;
   /** The working shop, for the heading's count line. */
   locationCode?: string | null;
@@ -91,7 +98,7 @@ export function BatchLogsIndex({
   const [term, setTerm] = useState("");
   const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "date", dir: "desc" });
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const router = useRouter();
 
   const counts = useMemo(
     () => ({
@@ -273,21 +280,20 @@ export function BatchLogsIndex({
           aria-label="Search batch logs"
           className="w-64"
         />
-        {/* HREF CELLS, not an onChange — this one is a navigation, because the
-            rows it wants do not exist on the client yet. The order guide's day
-            strip is the same control for the same reason. */}
-        <div className="space-y-1.5">
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-            Show
-          </span>
-          <TabPicker
+        {/* A NAVIGATION, not local state — the rows it wants do not exist on
+            the client yet (the order guide's day strip, for the same reason).
+            The Show tabs became this picker on 2026-09-08 (Mark), its presets
+            being those four. */}
+        <div className="w-64">
+          <RangePicker
+            value={batchLogWindowBounds(range, today)}
+            onChange={(picked) =>
+              router.push(batchLogRangeHref(batchLogWindowFromPicker(picked, today), params))
+            }
+            presets={BATCH_LOG_PRESETS}
+            today={today}
             ariaLabel="How far back to look"
-            value={range}
-            options={BATCH_LOG_RANGES.map((r) => ({
-              key: r.key,
-              label: r.label,
-              href: batchLogRangeHref(r.key, params),
-            }))}
+            placeholder="All time"
           />
         </div>
         <TabPicker

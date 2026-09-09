@@ -5,7 +5,7 @@ import { getAppSession } from "@/lib/session";
 import { canLogBatch } from "@/lib/roles";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { addDays } from "@/lib/productionBatches";
-import { batchLogRangeStart, parseBatchLogRange } from "@/lib/batchLogFilters";
+import { batchLogWindowBounds, parseBatchLogWindow } from "@/lib/batchLogFilters";
 import { BatchLogsIndex, type BatchLogRow } from "@/components/production/BatchLogsIndex";
 import { GenerateBatches } from "@/components/production/GenerateBatches";
 
@@ -72,7 +72,7 @@ export default async function BatchLogsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const rawParams = await searchParams;
-  const range = parseBatchLogRange(rawParams.range);
+  const range = parseBatchLogWindow(rawParams);
   const session = await getAppSession();
   const supabase = await createClient();
   const editable = canLogBatch(session.membership.role);
@@ -88,10 +88,14 @@ export default async function BatchLogsPage({
   // edge is not, and stays fixed: generation is allowed to run ahead of time
   // (040's rule), so a log dated next week is real work you must be able to
   // reach — but nothing is ever generated a year out, so there is no window to
-  // choose. A range chip that moved both edges would let you hide tomorrow's
-  // log by asking for less history, which is two questions on one control.
-  const from = batchLogRangeStart(range, timeZone);
-  const to = addDays(today, 21);
+  // choose. A preset that moved both edges would let you hide tomorrow's log
+  // by asking for less history, which is two questions on one control. A
+  // CUSTOM pair tapped on the calendar is the exception, and deliberately: two
+  // dates somebody chose are both edges, and "August" must not include next
+  // week.
+  const bounds = batchLogWindowBounds(range, today);
+  const from = bounds?.from ?? null;
+  const to = typeof range === "string" ? addDays(today, 21) : range.to;
 
   const [{ data: logs, error }, { data: members }] = await Promise.all([
     // POSTGREST RETURNS AT MOST 1,000 ROWS AND SAYS NOTHING ABOUT IT, and All
@@ -144,6 +148,7 @@ export default async function BatchLogsPage({
       <BatchLogsIndex
         rows={rows}
         range={range}
+        today={today}
         params={rawParams}
         locationCode={active.code}
         action={

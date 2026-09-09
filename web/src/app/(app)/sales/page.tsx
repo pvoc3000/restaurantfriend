@@ -214,6 +214,8 @@ export default async function SalesPage({
         prevRange={openingSlice(previousRange(resolved.range), elapsedDays)}
         yearRange={openingSlice(lastYearRange(resolved.range), elapsedDays)}
         rangeKey={rangeKey}
+        today={today}
+        periods={periods}
         shops={shops}
         initialPicked={picked}
         yesterday={previousDay(today)}
