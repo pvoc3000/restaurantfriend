@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { canEnterCounts, canReadHr } from "@/lib/roles";
+import { canEnterCounts } from "@/lib/roles";
 import { daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { compareForPremadeSheet } from "@/lib/productionSchedule";
 import { isDayComplete } from "@/lib/sales";
@@ -288,11 +288,16 @@ export default async function RunShiftReportPage({
     // The shop's own position vocabulary. `employees.position` is the third of
     // the three this schema carries and the one that holds the abbreviations a
     // supervisor actually writes — "DF", "Sr. DF" — where `timesheets.position`
-    // holds Homebase's Role. Owner/admin only, so below that the picker falls
-    // back to whatever is already on the row plus anything typed.
-    canReadHr(role)
-      ? supabase.from("employees").select("position").not("position", "is", null)
-      : SKIP,
+    // holds Homebase's Role.
+    //
+    // THROUGH A DEFINER (103), not a plain select on `employees`, which is what
+    // this was until 2026-09-09 and which made the picker EMPTY for exactly the
+    // people this page is for: 020 keeps `employees_select` at owner/admin
+    // because the row carries an address and a DOB, so a supervisor's select
+    // matched zero rows and returned no error. Same reasoning and same shape as
+    // `special_order_takers` two lines up — that one already reached the roster
+    // of NAMES this way, and only the vocabulary of JOBS was left behind.
+    supabase.rpc("employee_positions", { p_org_id: report.org_id }),
     ratingsQuery(supabase, id),
     wants("premades")
       ? supabase
@@ -356,16 +361,14 @@ export default async function RunShiftReportPage({
     (supervisorRows as { id: string; name: string }[] | null) ?? []
   ).map((t) => ({ value: t.id, label: t.name }));
 
-  // Distinct and sorted here rather than in SQL: PostgREST has no DISTINCT, and
-  // 445 rows of one short column is cheaper to de-duplicate than to think about.
-  const positions = [
-    ...new Set(
-      ((positionRows as { position: string | null }[] | null) ?? [])
-        .map((p) => (p.position ?? "").trim())
-        .filter((p) => p !== "")
-    ),
-  ]
-    .sort((a, b) => a.localeCompare(b))
+  // `title`, not `position` — `position` is a reserved word in a `returns table`
+  // list, so 103 names its one column for the job rather than for the source
+  // column. 103 returns these already distinct, trimmed and sorted, so this is a
+  // shape change and nothing more; the empty-string guard stays as a belt,
+  // since a blank option is invisible in a list and unpickable back out again.
+  const positions = ((positionRows as { title: string | null }[] | null) ?? [])
+    .map((p) => (p.title ?? "").trim())
+    .filter((p) => p !== "")
     .map((p) => ({ value: p, label: p }));
 
   const ratingRows: RatingRow[] = ((ratings as Record<string, unknown>[] | null) ?? []).map(

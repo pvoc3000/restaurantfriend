@@ -40,6 +40,11 @@ const SCORES: PickOption[] = [5, 4, 3, 2, 1, 0].map((n) => ({
  * table to owner/admin, so a supervisor cannot read a colleague's row at all.
  * That is not a UI choice; a direct query returns zero rows and no error.
  *
+ * AND SO DO THE POSITIONS, through `employee_positions` (103). They came off
+ * `employees` directly until 2026-09-09, which meant the picker below was EMPTY
+ * for every supervisor — the same silent zero rows, on the page a supervisor is
+ * the whole audience for, while owner/admin saw the full seventeen.
+ *
  * THE ROSTER IS TYPED. `timesheets` would be the natural source and is
  * unusable: punches are not imported until after the pay period ends, so at
  * 9pm tonight's own shift is not in the table.

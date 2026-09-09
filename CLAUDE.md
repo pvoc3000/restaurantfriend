@@ -7274,6 +7274,64 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    so the no-ratings version currently reaches NOBODY. Inviting the 8 real
    supervisors is what fills it. And what the email LOOKS LIKE when it lands is
    the one leg no probe can settle.
+   **THE POSITION PICKER WAS EMPTY FOR EVERY SUPERVISOR — migration 103, NEEDS
+   APPLYING** (Mark, 2026-09-09: "no positions are populating the position
+   picklist on the rating page"). *Probe, don't read this line.*
+   **THE FIRST SUPERVISOR TO USE THIS SCREEN FOUND IT, which is the whole
+   story**: the note directly above says nobody held the role yet, and the day
+   somebody did, the page's one vocabulary control turned out to be reachable
+   only by the two roles that do not write shift reports. It read the shop's
+   own titles straight off `employees.position`, and 020 gates
+   `employees_select` to OWNER/ADMIN because that row carries a home address
+   and a date of birth — so a supervisor's select **matched zero rows and
+   returned NO error**, the picker opened holding nothing, and owner/admin saw
+   a full seventeen. Reproduced on the harness as a real authenticated
+   supervisor before anything was written: `count(*) from employees` = 0.
+   **THE ASYMMETRY IS WHAT MAKES IT AN OVERSIGHT RATHER THAN A DECISION.** The
+   roster of NAMES on that same page has come through `special_order_takers`
+   (053) since the day it shipped, for exactly this reason and with a comment
+   saying so — the definer was called TWO LINES ABOVE the raw select. Only the
+   vocabulary of JOBS was left behind.
+   **103 IS 020's OWN PREDICTION, VERBATIM** — "a supervisor phone list and a
+   'my own record' view are both real future needs and both COLUMN-scoped, so
+   each arrives as a definer function naming the safe columns … never by
+   loosening this." RLS filters ROWS; "a supervisor may read this one column"
+   is a COLUMN rule. `employee_positions(p_org_id)` is the third outing of
+   044's `production_operators` shape and the SAFEST of them: a name identifies
+   a person, where this returns a distinct set of job titles and cannot be
+   joined back to anybody. Supervisor+, matching `special_order_takers`; the
+   run page already refuses below that, so the check is the stale-session
+   backstop rather than the gate.
+   **EVERY EMPLOYEE, not just the active ones**, which is where it departs from
+   `special_order_takers` — and the departure is measured. That function drops
+   the terminated because somebody who left in 2019 is not who just answered
+   the phone, which is a claim about PEOPLE; a vocabulary has no such
+   staleness. Over the live catalog all employees give **17** distinct titles
+   and non-inactive give **9**, and the eight lost include Overnight Baker,
+   General Manager, Kitchen Supervisor, PA and Sr. AB — every one a job
+   somebody does at this shop today, absent only because whoever fills it is
+   recorded under another title or a stale status. Offering a title nobody
+   holds costs one row in a list of seventeen; withholding one costs somebody
+   typing it by hand. `allowNew` stays regardless, so a title this has never
+   seen is enterable and is never a reason to widen anything here.
+   **THE RETURNED COLUMN IS `title`, NOT `position`** — `position` is a
+   RESERVED WORD in a `returns table` list and Postgres refuses it outright,
+   which the harness caught and reading had not. Quoting works and is worse:
+   the OUT parameter would then shadow `employees.position` inside the body.
+   **APPLY IT BEFORE DEPLOYING** (059's order, not 012's): the page calls the
+   RPC, so a deploy in front of the migration leaves the picker empty for
+   EVERYONE until the SQL runs — which is the same silence, briefly widened.
+   It is rerunnable (`create or replace`, nothing dropped).
+   Verified on the harness as real authenticated roles: all 103 migrations
+   replay, a supervisor gets the vocabulary where a direct select gets zero
+   rows, the owner gets the SAME answer (one path, not two), staff and a
+   non-member are refused BY NAME, a null org raises from the first statement,
+   `anon` is refused execute, and `pg_proc` holds exactly one. Checked by
+   BREAKING it — dropping the trim, the blank guard and the DISTINCT returns a
+   blank option and `DF` twice under two spellings, which is the garbage the
+   guards exist for. **1762 fixtures pass.**
+   Not verified in the browser: the pane lands on the shared-device PIN lock
+   (097) and there is no way past it from here.
 
 4i. ✅ **WHICH SHOPS A MEMBER MAY WORK AT — migration 073, APPLIED and
    verified live 2026-08-29.** Mark: "in my FMP version of the app, I could give
