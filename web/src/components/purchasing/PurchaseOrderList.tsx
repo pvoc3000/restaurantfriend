@@ -896,6 +896,36 @@ export function PurchaseOrderList({
           className="w-64"
         />
 
+        {/* The window, straight after the search (Mark, 2026-09-08: "search
+            box, rangepicker, vendor picklist, tabpicker"). It was a row of six
+            tabs pushed to the right edge; the picker's presets ARE those six,
+            and the calendar is what the tabs could never offer. */}
+        <div className="w-64">
+          <RangePicker
+            value={poRangeBounds(filters.range, today)}
+            onChange={setRange}
+            presets={PO_RANGE_PRESETS}
+            today={today}
+            ariaLabel="Date window"
+            placeholder="All time"
+          />
+        </div>
+
+        {/* A SET, not a one-of-N: "BakeMark and Chefs Warehouse" is the
+            question this list is asked, and eighty vendors were never going to
+            be a row of tabs. It sits with the controls that NARROW the list,
+            and the picker grows its own find box past eight options. */}
+        <PickSet
+          options={vendorOptions}
+          value={filters.vendors}
+          onChange={(vendors) => update({ vendors })}
+          allLabel="All vendors"
+          noun="vendors"
+          label="Which vendors to show"
+          className="max-w-[16rem]"
+          minWidth={240}
+        />
+
         <TabPicker
           ariaLabel="Status"
           value={filters.status}
@@ -916,36 +946,6 @@ export function PurchaseOrderList({
                   : statusCounts[s] ?? 0,
           }))}
         />
-
-        {/* A SET, not a one-of-N: "BakeMark and Chefs Warehouse" is the
-            question this list is asked, and eighty vendors were never going to
-            be a row of tabs. It sits with the controls that NARROW the list,
-            and the picker grows its own find box past eight options. */}
-        <PickSet
-          options={vendorOptions}
-          value={filters.vendors}
-          onChange={(vendors) => update({ vendors })}
-          allLabel="All vendors"
-          noun="vendors"
-          label="Which vendors to show"
-          className="max-w-[16rem]"
-          minWidth={240}
-        />
-
-        {/* The window, beside the vendors it narrows with (Mark, 2026-09-08:
-            "left align it so it sits next to the vendor picklist"). It was a
-            row of six tabs pushed to the right edge; the picker's presets ARE
-            those six, and the calendar is what the tabs could never offer. */}
-        <div className="w-64">
-          <RangePicker
-            value={poRangeBounds(filters.range, today)}
-            onChange={setRange}
-            presets={PO_RANGE_PRESETS}
-            today={today}
-            ariaLabel="Date window"
-            placeholder="All time"
-          />
-        </div>
       </div>
 
       {capped && (
