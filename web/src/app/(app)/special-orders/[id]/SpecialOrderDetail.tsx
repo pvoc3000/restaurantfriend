@@ -562,9 +562,6 @@ export async function SpecialOrderDetail({
               kind={kind}
               status={status}
               flagReason={row.flag_reason as string | null}
-              lineCount={lines.length}
-              paymentCount={payments.length}
-              fromStanding={madeFrom ? { number: madeFrom.number } : null}
               canWrite={canWrite}
             />
           </div>

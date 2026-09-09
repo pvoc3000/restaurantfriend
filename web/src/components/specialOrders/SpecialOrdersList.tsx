@@ -3,6 +3,12 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
+import {
+  SPECIAL_ORDER_VIEW_COOKIE,
+  hasViewParams,
+  viewCookieValue,
+} from "@/lib/specialOrderView";
+import { SpecialOrderActions } from "@/components/specialOrders/SpecialOrderActions";
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { NewSpecialOrder } from "@/components/specialOrders/NewSpecialOrder";
@@ -365,19 +371,44 @@ export function SpecialOrdersList({
     ];
   }, [rows, today, attention]);
 
+  /**
+   * The address bar wins when it carries a view; otherwise the props do.
+   *
+   * `urlFilterParams` returns an EMPTY OBJECT on a bare `/special-orders`, not
+   * null — the path matches, there is simply no query — so the plain
+   * `urlFilterParams(PATH) ?? initialFilters` this used to be would have
+   * ignored the server's remembered view and left the filter bar saying
+   * "Upcoming" over rows the server had already filtered to something else.
+   * That mismatch is the one thing worse than not remembering at all.
+   */
+  const seed = (): RawSearchParams => {
+    const live = urlFilterParams(PATH);
+    return hasViewParams(live) ? (live as RawSearchParams) : initialFilters ?? {};
+  };
+
   const [search, setSearch] = useState(() => {
     const live = urlFilterParams(PATH);
-    return live ? parseFilterSearch(live) : initialSearch;
+    return hasViewParams(live) ? parseFilterSearch(live as RawSearchParams) : initialSearch;
   });
   const [filters, setFilters] = useState<FilterValues>(() =>
-    parseFilterValues(dimensions, urlFilterParams(PATH) ?? initialFilters ?? {})
+    parseFilterValues(dimensions, seed())
   );
-  const [sort, setSort] = useState<ListSort | null>(() =>
-    parseListSort(urlFilterParams(PATH) ?? initialFilters ?? {}, SORT_KEYS)
-  );
+  const [sort, setSort] = useState<ListSort | null>(() => parseListSort(seed(), SORT_KEYS));
 
+  /**
+   * ONE PLACE WRITES THE VIEW, and it writes it twice — to the URL, so a
+   * breadcrumb and a Back press are honest, and to a session cookie, so a HARD
+   * load lands where you left off (Mark, 2026-09-08). Keeping them together is
+   * what stops the two disagreeing about what the view currently is; storing
+   * the href's own query means the cookie needs no second serializer.
+   *
+   * A session cookie (no max-age) is what "until you log out" means here, and
+   * `clearSessionCookies` drops it.
+   */
   function writeUrl(f: FilterValues, q: string, s: ListSort | null) {
-    window.history.replaceState(null, "", filterHref(PATH, dimensions, f, q, s));
+    const href = filterHref(PATH, dimensions, f, q, s);
+    window.history.replaceState(null, "", href);
+    document.cookie = `${SPECIAL_ORDER_VIEW_COOKIE}=${viewCookieValue(href)}; path=/; SameSite=Lax`;
   }
   const changeFilters = (next: FilterValues) => { setFilters(next); writeUrl(next, search, sort); };
   const changeSearch = (next: string) => { setSearch(next); writeUrl(filters, next, sort); };
@@ -634,6 +665,38 @@ export function SpecialOrdersList({
         );
       },
     },
+    /**
+     * THE ROW'S OWN COMMANDS (Mark, 2026-09-08) — `ProductionItemsList`'s
+     * shape, three weeks after the PO list made the same argument: acting on
+     * one order meant opening it, and this list is where you are already
+     * looking at the one you mean.
+     *
+     * UNLABELLED, which is what keeps it out of the Columns menu — it is a
+     * control rather than a field, and hiding it would hide the only door.
+     *
+     * WRITE ROLES ONLY. Both entries write, so below that the `⋯` would open an
+     * empty panel — unlike the PO list's, which keeps "Open purchase order" for
+     * every reader. `/special-orders` is staff-READ (the page-permissions
+     * sheet), so this is a real state and not a hypothetical one.
+     */
+    ...(canWrite
+      ? [
+          {
+            key: "actions",
+            label: "",
+            // 74, `ProductionItemsList`' measured value and for its reason:
+            // weights are shares of the table's TOTAL, so a 68 that is
+            // comfortable on a nine-column table is not on an eleven-column
+            // one. Verified at 1280 — see the note on the total below.
+            width: 74,
+            render: (r: SpecialOrderRow) => (
+              <span className="flex justify-end">
+                <SpecialOrderActions id={r.id} number={r.number} />
+              </span>
+            ),
+          } satisfies DataColumn<SpecialOrderRow>,
+        ]
+      : []),
   ];
 
   const sorted = sortRows(visible, columns, sort ?? NATURAL_SORT);

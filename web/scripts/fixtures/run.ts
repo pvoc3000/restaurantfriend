@@ -72,6 +72,7 @@ import "./recipeCosts.fixtures";
 import "./receiving.fixtures";
 import "./recordSet.fixtures";
 import "./roles.fixtures";
+import "./specialOrderWrites.fixtures";
 import "./specialOrders.fixtures";
 import "./specialOrderDocs.fixtures";
 import "./specialOrderLines.fixtures";

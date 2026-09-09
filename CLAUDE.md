@@ -4922,8 +4922,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `locations.kitchen_by_weekday` / `shops_for` retire when kitchen-on-plan
    lands.
 4g. 🚧 **Special Orders** — specced 2026-08-16; **phases 1–3, 4a AND ALL OF 5
-   DONE; 4b and 4c not built. Migrations 051–058 and 067–069 are applied;
-   099 + 100 NEED APPLYING. All three edge functions are deployed.**
+   DONE; 4b and 4c not built. Migrations 051–058, 067–069 and 099 + 100 are
+   ALL APPLIED (099 + 100 by Mark, 2026-09-08). All three edge functions are
+   deployed.**
    *Probe, don't read this line.*
    The module records, quotes, invoices, prints, emails as specialorders@, takes
    a customer's approval on a public page, takes inquiries on a public form,
@@ -4932,8 +4933,97 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    itself**. What remains is the inquiry form's own build-your-box picker (4b)
    and the organic-email parser (4c).
 
+   **Shipped 2026-09-08 — THE LIST'S ROWS HAVE THEIR OWN ⋯** (Mark: "add a
+   'more options' button column to the special order list screen with
+   'duplicate' and 'delete' options to start"). `ProductionItemsList`'s shape,
+   three weeks after the PO list made the same argument: acting on ONE order
+   meant opening it, and the list is where you are already looking at the one
+   you mean. Unlabelled last column, so it stays out of the Columns menu — it is
+   a control rather than a field, and hiding it would hide the only door.
+   **BOTH VERBS LIVE IN `lib/specialOrderWrites`, WHICH IS THE POINT.** The
+   record's command row does the same two things, and a delete on this table has
+   THREE refusals and a confirm that counts what goes — precisely the things the
+   PO list names as "remembered in one copy and forgotten in the other". Ninety
+   lines moved out of `OrderActions` rather than being written a second time, and
+   the two pure halves — `deleteRefusal` and `deleteConfirmMessage` — are what
+   the two doors must agree about, so they are fixture-tested where a component
+   is not.
+   **IT PRE-COMPUTES NOTHING.** The row carries no line count, no schedule link
+   and no `standing_order_id`, so Delete reads what it needs when it is pressed:
+   one indexed read for one click, against widening the list's own query with
+   three columns every row pays for and one row in fifty uses. That also means
+   both doors ask the same question of the same data rather than of whatever
+   each happened to hold — `OrderActions` lost `lineCount`, `paymentCount` and
+   `fromStanding` outright.
+   **A REFUSAL IS AN `alertDialog`, NOT A LINE IN THE CELL.**
+   `InventoryItemActions` prints its errors under the ⋯ and can afford to; these
+   are three-sentence refusals and this column is ~65px, so in flow they would
+   wrap to twenty lines and push the table apart. `lib/confirm`'s `notice` is
+   its own answer for "an error the reader must see".
+   **THE STANDING-ORDER CONFIRM IS A DIFFERENT QUESTION**, which only became
+   visible once one function wrote both: deleting a DAY should have been
+   cancelled, where deleting a RECURRENCE should have been PAUSED — and the days
+   it has already made survive it (051's `on delete set null`), which is worth
+   saying because what actually stops is the making, silently. The refusals are
+   ORDERED, and the materialized-day one outranks the scheduled one: both are
+   true of a scheduled wholesale day and only one is about something the app
+   would undo by itself.
+   **WRITE ROLES ONLY** — both entries write, so below that the ⋯ would open an
+   empty panel, unlike the PO list's, which keeps Preview and Download for every
+   reader. `/special-orders` is staff-READ in the permissions sheet, so that is
+   a real state.
+   Measured at 1440 and 1280: nothing clipped, no page overflow, the cell 76px
+   and 67px around a 36px button. Walked live and left as found — the refusal
+   fired on the real materialized day 10021 naming standing order 9762, a
+   duplicate of it landed as lead #10036 with its line and no `standing_order_id`,
+   and deleting THAT copy through the record's own button worked, which is also
+   migration 100 proving itself on a real order carrying a line.
+
+   **Shipped 2026-09-08 — THE LIST REMEMBERS ITS VIEW ACROSS A HARD LOAD**
+   (Mark: "make sure that the filter settings persist across page loads.
+   'Upcoming' keeps getting set"). They already survived everything EXCEPT a
+   hard load, which is what made this confusing to describe: the filters live in
+   the URL, so a reload of the same address keeps them, and `lib/navMemory`'s
+   `paths` puts them back when you leave the section and come back — but `paths`
+   is IN MEMORY ONLY, deliberately, and "a hard load has nothing worth
+   restoring" is true of a record somebody was reading yesterday and false of a
+   list's own filters. Opening the app landed on a bare `/special-orders`, and a
+   bare URL means the `view` dimension's default, which is Upcoming.
+   **A SESSION COOKIE, this app's answer to exactly that three times over**
+   (`rf.guide.view`, `rf.po.view`, `rf.invoice.view`), and the order guide's
+   stated reason applies word for word: the nav link is a bare path with no
+   query to carry, AND the server must know the view before it queries — the
+   window under the filters is "a month back" unless the view is `past` or
+   `all`, so a client-side restore would fetch a month and then filter to a
+   view that wanted a decade.
+   **WHAT IS STORED IS THE HREF'S OWN QUERY STRING, VERBATIM** — whatever
+   `filterHref` just wrote, not a parsed shape. The dimensions have changed
+   twice already and a second schema for them here is a second thing to keep in
+   step; reading it back is `URLSearchParams`, and anything that no longer means
+   something is dropped by `parseFilterValues` exactly as a hand-edited URL is.
+   ONE function writes the view and writes it twice — URL and cookie together —
+   so the two cannot disagree about what the view currently is.
+   **IT REPLACES, IT DOES NOT MERGE.** A request carrying ANY view key uses its
+   own view outright: merging would quietly add this browser's other filters to
+   a shared link, so a colleague opening `?status=order` would also get whichever
+   kitchen you happen to have selected. Proved live — `?view=upcoming` came up
+   Upcoming with every other menu on All while the cookie held four filters.
+   **`urlFilterParams` RETURNS AN EMPTY OBJECT ON A BARE PATH, NOT NULL**, which
+   is the trap this had to dodge: the list's `urlFilterParams(PATH) ??
+   initialFilters` would therefore have ignored the server's remembered view and
+   left the filter bar saying "Upcoming" over rows the server had already
+   filtered to something else. A screen disagreeing with itself is worse than
+   not remembering at all. `hasViewParams` is the test both ends use, and an
+   EMPTY value counts as a value — `?q=` is a cleared search box, which is a
+   view somebody chose.
+   Verified live end to end: setting view/status/kitchen/sort wrote a cookie
+   mirroring the URL to the character, and a hard load of the bare
+   `/special-orders` came back **All orders · Order · DF02 · Customer ▲, 133 of
+   500**, with the menus and the rows agreeing. `clearSessionCookies` drops it
+   with the rest, so a shared iPad does not hand the next person your view.
+
    **Shipped 2026-09-08 — AN ORDER WITH LINES COULD NOT BE DELETED (migration
-   100, NEEDS APPLYING).** Found on the harness while proving 099's "a deleted
+   100, APPLIED 2026-09-08).** Found on the harness while proving 099's "a deleted
    day is remade" rule — which could not happen, because the delete itself
    failed. Reproduced in isolation as a real authenticated supervisor:
    `delete from special_orders` cascades to the order's items and payments, each
@@ -4961,7 +5051,7 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    order still logs "Removed 24 × Cruller", so the fix is not a mute.
 
    **Shipped 2026-09-08 — DECISION 13, STANDING ORDERS MATERIALIZE THEMSELVES
-   (migration 099, NEEDS APPLYING).** Mark: "I haven't seen any special order
+   (migration 099, APPLIED 2026-09-08 and LIVE).** Mark: "I haven't seen any special order
    'standing orders' get created automatically. I thought this was something we
    had built but maybe not."
    **IT WAS NOT, AND EVERYTHING AROUND IT WAS**, which is why it read as built.
@@ -5037,7 +5127,18 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    execute, a non-member gets "not your organisation", a range over a year is
    refused, and the misconfigured standing orders are NAMED. **1688 fixtures
    pass**, 11 new, each checked by breaking it.
-   **Not built, and named so nobody thinks it was forgotten:** nothing warns when
+   **THE FIRST REAL RUN, measured the same day it was applied.** *Probe, don't
+   read this line.* `select public.ensure_standing_orders_materialized(null,
+   null, null)` raises **"no organisation given"** from its first statement,
+   which proves the body runs; `select count(*) from special_orders where
+   standing_order_id is not null` was **15** an hour after Mark applied it — Cafe
+   Knotted's 2026-09-08 through 2026-09-22, every day of the week, #9762 taking
+   Mon–Thu and #9763 Fri–Sun, numbered 10021–10035 and each carrying "Print
+   Order"; and `select number, paused from special_orders where kind =
+   'standing_order'` shows the seven Yeastie Boys rows PAUSED with those two
+   live. #10018 is gone — Mark deleted the duplicate rather than leaving it
+   paused.
+      **Not built, and named so nobody thinks it was forgotten:** nothing warns when
    a standing order's line has no `production_item_id` (it would schedule
    nothing — `unschedulableLines` already knows how to say this), and the
    materialized days are not shown ON the standing order's record, only counted.

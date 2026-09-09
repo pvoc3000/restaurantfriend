@@ -1,8 +1,15 @@
+import { cookies } from "next/headers";
+
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { RawSearchParams } from "@/lib/filterMenus";
 import { parseFilterSearch } from "@/lib/filterMenus";
+import {
+  SPECIAL_ORDER_VIEW_COOKIE,
+  hasViewParams,
+  parseSpecialOrderView,
+} from "@/lib/specialOrderView";
 import { orderTotals, readSettings, topUpWindow } from "@/lib/specialOrders";
 import {
   SpecialOrdersList,
@@ -36,6 +43,24 @@ export default async function SpecialOrdersPage({
   const params = await searchParams;
   const session = await getAppSession();
   const supabase = await createClient();
+
+  /**
+   * THE VIEW THE READER LAST HAD, when this request carries none of its own.
+   *
+   * The filters live in the URL, so a reload keeps them and a breadcrumb brings
+   * them back; what they did not survive was a HARD load, because the nav's
+   * `paths` memory is in-session only and the menu's link is a bare
+   * `/special-orders`. See `lib/specialOrderView` for why this is a cookie and
+   * why it REPLACES rather than merges.
+   *
+   * It has to happen HERE and not only in the browser: the window a few lines
+   * down is chosen from `view`, so a client-side restore would query a month of
+   * orders and then filter to a view that wanted a decade.
+   */
+  const remembered = parseSpecialOrderView(
+    (await cookies()).get(SPECIAL_ORDER_VIEW_COOKIE)?.value
+  );
+  const viewParams = hasViewParams(params) ? params : { ...params, ...remembered };
 
   const timeZone = session.orgSettings.timezone ?? serverTimeZone();
   const today = todayInTimeZone(timeZone);
@@ -80,7 +105,7 @@ export default async function SpecialOrdersPage({
   // match the `view` dimension's option values in `SpecialOrdersList` — a
   // window that disagrees with the filter shows an empty list and blames the
   // filter for it.
-  const view = Array.isArray(params.view) ? params.view[0] : params.view;
+  const view = Array.isArray(viewParams.view) ? viewParams.view[0] : viewParams.view;
   const showAll = view === "past" || view === "all";
   const since = new Date(`${today}T00:00:00Z`);
   since.setUTCDate(since.getUTCDate() - 30);
@@ -203,8 +228,8 @@ export default async function SpecialOrdersPage({
       kitchens={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
       defaultLocationId={session.activeLocation?.id ?? null}
       takenBy={session.membership.display_name ?? session.email}
-      initialFilters={params}
-      initialSearch={parseFilterSearch(params)}
+      initialFilters={viewParams}
+      initialSearch={parseFilterSearch(viewParams)}
       capped={rows.length === 500}
       topUpError={topUpError?.message ?? null}
     />

@@ -9,6 +9,13 @@ import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/u
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { TextInput } from "@/components/ui/TextInput";
 import { FLAG_TODO, type SpecialOrderKind, type SpecialOrderStatus } from "@/lib/specialOrders";
+import {
+  deleteConfirmMessage,
+  deleteRefusal,
+  deleteSpecialOrder,
+  duplicateSpecialOrder,
+  readDeleteContext,
+} from "@/lib/specialOrderWrites";
 
 /**
  * The commands that act on the whole order.
@@ -27,11 +34,8 @@ export function OrderActions({
   kind,
   status,
   flagReason,
-  lineCount,
-  paymentCount,
   canWrite,
   scheduled,
-  fromStanding,
   schedule,
 }: {
   id: string;
@@ -39,16 +43,17 @@ export function OrderActions({
   kind: SpecialOrderKind;
   status: SpecialOrderStatus | null;
   flagReason: string | null;
-  lineCount: number;
-  paymentCount: number;
   canWrite: boolean;
-  /** True once a production schedule exists for this order. */
-  scheduled: boolean;
   /**
-   * The standing order this day was made from, if it was made rather than
-   * typed — `{ number }`, which is all the refusal below needs to name it.
+   * True once a production schedule exists for this order — read by CANCEL,
+   * which warns that cancelling does not unschedule.
+   *
+   * The DELETE no longer takes it, nor the line and payment counts, nor the
+   * standing order behind a materialized day: `readDeleteContext` gathers all
+   * four itself so that this component and the list's row menu ask the same
+   * question of the same data rather than of whatever each happened to hold.
    */
-  fromStanding?: { number: string } | null;
+  scheduled: boolean;
   /**
    * `<ScheduleProduction>`, composed upstream — `ScheduleDetail` passes
    * `print={<PrintPacket/>}` into `ScheduleActions` the same way. It keeps this
@@ -154,175 +159,56 @@ export function OrderActions({
   }
 
   /**
-   * Decision 13's one mechanism. The copy arrives as a LEAD with no dates and
-   * no payments — a duplicate of a paid order that claimed to be paid would be
-   * a fiction, and the stage dates belong to the event that happened.
+   * Decision 13's one mechanism, and the LIST does it too since 2026-09-08 —
+   * so the rule lives in `lib/specialOrderWrites` and this is one of its two
+   * callers. What used to be ninety lines here is the same ninety lines there,
+   * where the row menu can reach them.
    */
-  async function duplicate() {
+  function duplicate() {
     setError(null);
     start(async () => {
-      const { data: source, error: readError } = await supabase
-        .from("special_orders")
-        .select("*")
-        .eq("id", id)
-        .maybeSingle();
-      if (readError || !source) {
-        setError(readError?.message ?? "Could not read this order.");
+      const result = await duplicateSpecialOrder(supabase, id, number);
+      if ("error" in result) {
+        setError(result.error);
         return;
       }
-
-      const { data: nextNumber, error: numberError } = await supabase.rpc(
-        "next_special_order_number",
-        { p_org_id: source.org_id }
-      );
-      if (numberError || !nextNumber) {
-        setError(numberError?.message ?? "Could not allocate an order number.");
-        return;
-      }
-
-      const copy = { ...(source as Record<string, unknown>) };
-      // Identity and history do not travel.
-      for (const key of [
-        "id", "number", "legacy_id", "legacy_seq", "created_at", "updated_at",
-        "created_by", "updated_by", "date_initiated", "quote_sent_at",
-        "quote_returned_at", "invoice_sent_at", "invoice_paid_at",
-        "receipt_sent_at", "delivery_scheduled_at", "order_printed_at",
-        "order_scheduled_at", "production_schedule_id", "standing_order_id",
-        "inbound_subject", "inbound_message_id", "flag_reason",
-        "source_payload", "external_ref",
-      ]) {
-        delete copy[key];
-      }
-      copy.number = nextNumber;
-      // A copy is always a real ORDER starting as a lead, even when the source
-      // was a template or a standing order — that is what "start from one"
-      // means, and it is the only way a template is ever used.
-      copy.kind = "order";
-      copy.status = "lead";
-      copy.standing_days = null;
-      copy.starts_on = null;
-      copy.ends_on = null;
-      copy.paused = false;
-      copy.source = "app";
-      copy.todo = "Respond to Email/Call";
-
-      const { data: created, error: insertError } = await supabase
-        .from("special_orders")
-        .insert(copy)
-        .select("id")
-        .single();
-      if (insertError || !created) {
-        setError(insertError?.message ?? "The copy could not be created.");
-        return;
-      }
-
-      // The lines travel; the payments emphatically do not.
-      const { data: lines } = await supabase
-        .from("special_order_items")
-        .select("*")
-        .eq("order_id", id);
-      if (lines?.length) {
-        const copies = lines.map((l) => {
-          const line = { ...(l as Record<string, unknown>) };
-          for (const key of ["id", "created_at", "updated_at", "legacy_key"]) delete line[key];
-          line.order_id = created.id;
-          return line;
-        });
-        const { error: lineError } = await supabase.from("special_order_items").insert(copies);
-        if (lineError) {
-          setError(`The order was copied but its lines were not: ${lineError.message}`);
-          return;
-        }
-      }
-
-      await supabase.from("special_order_events").insert({
-        org_id: source.org_id,
-        order_id: created.id,
-        message: `Duplicated from order ${number}`,
-        source: "app",
-      });
-
       router.refresh();
-      router.push(`/special-orders/${created.id as string}`);
+      router.push(`/special-orders/${result.id}`);
     });
   }
 
-  async function remove() {
-    /**
-     * REFUSED, and this is the one refusal that exists to stop the app UNDOING
-     * ITSELF. 051's `special_orders_standing_day` is unique on
-     * `(standing_order_id, event_date)` and a CANCELLED day still occupies its
-     * slot — that is deliberate, and it is what makes cancelling Thanksgiving a
-     * decision that sticks. Delete the row instead and the slot is free again,
-     * so the next top-up — the next time anybody opens the list — makes the day
-     * back, and the donuts get made.
-     *
-     * The button says what to do instead, because "cancel it" is not a lesser
-     * version of deleting here: cancelling is the ONLY thing that means
-     * "we are not making these", and it keeps the record of that.
-     *
-     * NOT a `confirmDialog` you can click through, unlike everything else on
-     * this row. A confirm is right where the reader knows something the app
-     * does not; here they cannot, because what goes wrong happens minutes later
-     * on somebody else's screen.
-     */
-    if (fromStanding) {
-      setError(
-        `This day was made from standing order ${fromStanding.number}, so deleting it would only ` +
-          `make it again the next time anybody opens the list. Cancel it instead — that is what ` +
-          `keeps it from being made.`
-      );
-      return;
-    }
-
-    // REFUSED, not warned. `production_schedules.source_ref` deliberately
-    // carries no FK (040: the table did not exist yet), so deleting the order
-    // would leave a live schedule pointing at a uuid that is gone — a kitchen
-    // document with a dead backlink and nothing to explain it. Unscheduling
-    // first is one click and is what the confirm points at.
-    if (scheduled) {
-      setError(
-        "This order's production is scheduled. Unschedule it first — deleting now would leave the kitchen holding a schedule with nothing behind it."
-      );
-      return;
-    }
-
-    const damage = [
-      lineCount ? `${lineCount} line${lineCount === 1 ? "" : "s"}` : null,
-      paymentCount ? `${paymentCount} payment${paymentCount === 1 ? "" : "s"}` : null,
-    ].filter(Boolean);
-
-    if (
-      !(await confirmDialog({
-        ...splitConfirmMessage(
-          `Delete order ${number}?\n\n${
-            damage.length
-              ? `This also removes ${damage.join(" and ")}, and everything in its history. `
-              : ""
-          }Deleting is for a typo. An order that is not happening should be CANCELLED, which keeps the record.`
-        ),
-        confirmLabel: "Delete",
-        tone: "danger",
-      }))
-    ) {
-      return;
-    }
+  /**
+   * THE GUARDS AND THE CONFIRM ARE `lib/specialOrderWrites`', not this
+   * component's, and that is the point of the module: the list's `⋯` deletes
+   * the same rows, and a delete on this table has three refusals and a message
+   * that counts what goes — exactly the things a second copy gets subtly wrong.
+   *
+   * `readDeleteContext` reads the counts itself rather than taking the props
+   * this component holds, so both doors ask the same question of the same data.
+   */
+  function remove() {
     setError(null);
     start(async () => {
-      // `.select()` its own result: with no matching policy Postgres removes
-      // zero rows and PostgREST returns NO error, and a cheerful success that
-      // also NAVIGATES reads as the order having been deleted.
-      const { data, error: e } = await supabase
-        .from("special_orders")
-        .delete()
-        .eq("id", id)
-        .select("id");
-      if (e) {
-        setError(e.message);
+      const ctx = await readDeleteContext(supabase, id);
+      if ("error" in ctx) {
+        setError(ctx.error);
         return;
       }
-      if (!data?.length) {
-        setError("Nothing was deleted — the database refused it and said nothing.");
+      const refusal = deleteRefusal(ctx);
+      if (refusal) {
+        setError(refusal);
+        return;
+      }
+      const ok = await confirmDialog({
+        ...splitConfirmMessage(deleteConfirmMessage(ctx)),
+        confirmLabel: "Delete",
+        tone: "danger",
+      });
+      if (!ok) return;
+
+      const result = await deleteSpecialOrder(supabase, id);
+      if ("error" in result) {
+        setError(result.error);
         return;
       }
       router.refresh();
