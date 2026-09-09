@@ -13,6 +13,7 @@ import "./columnOrder.fixtures";
 import "./columnWidths.fixtures";
 import "./orgSettings.fixtures";
 import "./dateInput.fixtures";
+import "./dateRange.fixtures";
 import "./columnVisibility.fixtures";
 import "./rowDrag.fixtures";
 import "./pickList.fixtures";

@@ -11,7 +11,7 @@ import { BOXED_FIELD, BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
  * and the same call as the Columns eye (an icon earns its place where a word
  * would read as a label).
  */
-function CalendarIcon() {
+export function CalendarIcon() {
   return (
     <svg
       aria-hidden
