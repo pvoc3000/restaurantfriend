@@ -7,6 +7,7 @@ import { daysBefore, serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { compareForPremadeSheet } from "@/lib/productionSchedule";
 import { isDayComplete } from "@/lib/sales";
 import { readSettings } from "@/lib/specialOrders";
+import { ordersForKitchen } from "@/lib/specialOrderSchedule";
 import {
   pagesForShift,
   submitBlockers,
@@ -329,10 +330,19 @@ export default async function RunShiftReportPage({
     wants("tomorrow") && nextDay
       ? supabase
           .from("special_orders")
-          // ONLY THE ID. The page stopped listing these (see `TomorrowOrder`);
-          // what it does with them is hand them to the packet, which fetches
-          // each order's document data itself.
-          .select("id")
+          // THE TWO LOCATION COLUMNS COME TOO, and only so they can be thrown
+          // away — see `orders` below, which narrows to THIS KITCHEN. The page
+          // itself still wants nothing but the id (see `TomorrowOrder`): what
+          // it does with them is hand them to the packet, which fetches each
+          // order's document data for itself.
+          //
+          // Narrowed in JS rather than in the query because the rule is
+          // `ordersForKitchen`, which is pure and fixture-pinned — a PostgREST
+          // `.or(...)` spelling of the same coalesce would be a second copy of
+          // it in a second language. The cost is a handful of rows: this is ONE
+          // date, and the whole org has 24 committed orders in the next
+          // fortnight.
+          .select("id, kitchen_location_id, location_id")
           .eq("kind", "order")
           .eq("event_date", nextDay)
       : SKIP,
@@ -495,9 +505,47 @@ export default async function RunShiftReportPage({
     );
   const settledToday = todayIsSettled ? storedToday : null;
 
-  const orders: TomorrowOrder[] = ((tomorrowOrders as Record<string, unknown>[] | null) ?? []).map(
-    (o) => ({ id: o.id as string })
-  );
+  /**
+   * Tomorrow's special orders THAT THIS KITCHEN IS MAKING.
+   *
+   * THE FILTER IS THE WHOLE OF THIS (Mark, 2026-09-09, of a closing DF01
+   * report: "a special order (the knotted standing order) is included in the
+   * documents. Why?"). There was no filter at all — the query asked for every
+   * committed order in the ORG on that date — so DF01's packet printed the
+   * kitchen sheet for #10023, Cafe Knotted's wholesale day, which is DF02's
+   * pickup AND DF02's kitchen and has nothing to do with DF01. The query
+   * directly above it had always scoped `production_schedules` by
+   * `kitchen_location_id`; this one scoped by nothing.
+   *
+   * IT WAS LATENT FOR TEN DAYS AND THEN BECAME NIGHTLY. The omission shipped
+   * with the runner on 2026-08-28, when there were almost no upcoming orders to
+   * leak — Cafe Knotted's last real day was 2026-08-23 and the standing orders
+   * had never been materialized. Migration 099 (2026-09-08) started minting one
+   * a day, and 19 of the 24 upcoming orders are that account, so from that day
+   * every DF01 closing report picked one up.
+   *
+   * `ordersForKitchen` uses `scheduleKitchen` and not `kitchen_location_id`
+   * outright, which is the same coalesce
+   * `schedule_special_order` and the generate dialog apply: an order's two
+   * location columns are both nullable, so one carrying a pickup shop and no
+   * kitchen belongs to that shop's kitchen. Measured today it changes nothing —
+   * all 24 upcoming orders carry a kitchen — but a hand-typed order is exactly
+   * the case that would not, since `createSpecialOrder` defaults the pickup
+   * shop to where you are standing and deliberately does not default a kitchen.
+   *
+   * An order with NEITHER reaches no packet, which is the honest answer rather
+   * than a gap: this is paper a kitchen bakes from, so printing it everywhere
+   * would have it MADE TWICE. It is still on the Info page's "also that day"
+   * (which includes the unassigned, and marks them) and on /special-orders.
+   */
+  const orders: TomorrowOrder[] = ordersForKitchen(
+    ((tomorrowOrders as Record<string, unknown>[] | null) ?? []).map((o) => ({
+      id: o.id as string,
+      kitchen_location_id: (o.kitchen_location_id as string | null) ?? null,
+      location_id: (o.location_id as string | null) ?? null,
+    })),
+    kitchenId
+  ).map((o) => ({ id: o.id }));
 
   const schedules: TomorrowSchedule[] = (
     (tomorrowSchedules as Record<string, unknown>[] | null) ?? []

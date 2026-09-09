@@ -20,6 +20,7 @@ import {
   inGenerationRun,
   pullReadiness,
   scheduleDraft,
+  ordersForKitchen,
   scheduleKitchen,
   scheduleTitle,
   type PullCandidate,
@@ -341,6 +342,38 @@ test("pullReadiness: the disqualifiers, each by name", () => {
   // Ordering matters: a scheduled order that is ALSO flagged must read as done,
   // or the dialog offers to schedule it a second time.
   eq(why({ production_schedule_id: "s-1", flag_reason: "x" }), "already scheduled", "done first");
+});
+
+test("ordersForKitchen: the packet gets THIS kitchen's orders and no others", () => {
+  // The real leak, at the real numbers (Mark, 2026-09-09): a closing DF01
+  // report's packet printed #10023, Cafe Knotted's DF02 wholesale day, because
+  // the query behind it asked for every committed order in the ORG on that date
+  // and narrowed by nothing.
+  const night = [
+    { id: "10023", kitchen_location_id: "df02", location_id: "df02" },
+    { id: "9739", kitchen_location_id: "df01", location_id: "df01" },
+    // A hand-typed order: `createSpecialOrder` defaults the pickup shop to
+    // where you are standing and deliberately does not default a kitchen.
+    { id: "pickup-only", kitchen_location_id: null, location_id: "df01" },
+    // Made at DF01 for DF02's counter — the kitchen decides, not the counter.
+    { id: "cross", kitchen_location_id: "df01", location_id: "df02" },
+    // Neither. Reaches NO packet, deliberately: printing it at both kitchens
+    // would have it made twice.
+    { id: "orphan", kitchen_location_id: null, location_id: null },
+  ];
+
+  eq(
+    ordersForKitchen(night, "df01").map((o) => o.id),
+    ["9739", "pickup-only", "cross"],
+    "df01"
+  );
+  eq(ordersForKitchen(night, "df02").map((o) => o.id), ["10023"], "df02");
+  // Nothing is printed twice and nothing is invented.
+  eq(
+    ordersForKitchen(night, "df01").length + ordersForKitchen(night, "df02").length,
+    night.length - 1,
+    "every order but the orphan reaches exactly one kitchen"
+  );
 });
 
 test("scheduleKitchen: kitchen, then pickup shop, then nothing", () => {

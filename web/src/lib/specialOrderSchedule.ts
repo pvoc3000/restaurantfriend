@@ -251,6 +251,38 @@ export function scheduleKitchen(o: {
 }
 
 /**
+ * The orders on a date that a given KITCHEN is making — the packet's own
+ * scoping, and the fix for a leak worth naming (Mark, 2026-09-09, of a closing
+ * DF01 report: "a special order (the knotted standing order) is included in the
+ * documents. Why?").
+ *
+ * It was in there because the shift report asked for every committed order in
+ * the ORG on that date and narrowed by nothing at all, while the query beside
+ * it had always scoped production schedules by their kitchen. Measured over the
+ * fortnight after the report: 15 wrong-kitchen order sheets would have been
+ * printed and 15 right ones kept, with DF01 picking up one of Cafe Knotted's
+ * DF02 wholesale days EVERY NIGHT.
+ *
+ * `scheduleKitchen`, so an order carrying a pickup shop and no kitchen belongs
+ * to that shop's kitchen — the same coalesce `schedule_special_order` and the
+ * generate dialog apply, rather than a fourth answer to one question.
+ *
+ * AN ORDER WITH NEITHER REACHES NO KITCHEN, and that is the honest answer
+ * rather than a gap: this is paper somebody bakes from, so handing it to every
+ * kitchen would have it MADE TWICE. It stays visible on the report's own "also
+ * that day" block, which includes the unassigned and marks them, and on
+ * /special-orders.
+ *
+ * A function rather than a `.filter` at the call site so that dropping the
+ * scoping is something a fixture notices.
+ */
+export function ordersForKitchen<
+  T extends { kitchen_location_id: string | null; location_id: string | null },
+>(orders: readonly T[], kitchenId: string): T[] {
+  return orders.filter((o) => scheduleKitchen(o) === kitchenId);
+}
+
+/**
  * Is this order READY FOR PRODUCTION? (Mark, 2026-08-27, asking that only those
  * be offered when generating a night.)
  *

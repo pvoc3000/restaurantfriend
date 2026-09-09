@@ -7449,6 +7449,45 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    The empty states became tier-aware in the same pass, because the old generic
    "No shift reports here yet." was written for a screen whose first tab was a
    queue — on Drafts the useful sentence is "everything here has been sent".
+   **THE PACKET PRINTED ANOTHER SHOP'S SPECIAL ORDERS** (Mark, 2026-09-09, of a
+   closing DF01 report: "a special order (the knotted standing order) is
+   included in the documents. Why?"). Because the query behind Print All
+   Documents asked for **every committed order in the ORG on that date and
+   narrowed by nothing at all** — no kitchen, no pickup shop — while the query
+   directly beside it had always scoped `production_schedules` by
+   `kitchen_location_id`. Reproduced exactly: DF01's 09-09 closing report,
+   packet for 09-10, **1 order before and 0 after** — #10023, Cafe Knotted's
+   wholesale day, whose pickup AND kitchen are both DF02.
+   **IT WAS LATENT FOR TEN DAYS AND THEN BECAME NIGHTLY**, which is why it
+   surfaced now and not in August. The omission shipped with the runner on
+   2026-08-28, when there were almost no upcoming orders to leak — Cafe
+   Knotted's last real day was 2026-08-23 and the standing orders had never been
+   materialized. **Migration 099 (2026-09-08) started minting one a day**, and
+   19 of the 24 upcoming orders are that account, so from that day every DF01
+   closing report picked one up. Worth knowing as a CLASS: a feature that fills
+   an empty table is how a dormant scoping bug wakes up.
+   **`ordersForKitchen` in `lib/specialOrderSchedule` is the fix**, over
+   `scheduleKitchen` — so an order carrying a pickup shop and no kitchen belongs
+   to that shop's kitchen, the same coalesce `schedule_special_order` and the
+   generate dialog apply rather than a fourth answer to one question. Measured
+   today it changes nothing (all 24 upcoming orders carry a kitchen) and a
+   HAND-TYPED order is exactly the case that would not, since
+   `createSpecialOrder` defaults the pickup shop to where you are standing and
+   deliberately does not default a kitchen.
+   **AN ORDER WITH NEITHER REACHES NO PACKET, and that is the answer rather than
+   a gap**: this is paper a kitchen bakes from, so handing it to every kitchen
+   would have it MADE TWICE. It stays on the report's own "also that day" block,
+   which includes the unassigned and marks them, and on /special-orders.
+   Narrowed in JS rather than in the query, because the rule already existed and
+   a PostgREST `.or(...)` spelling of the same coalesce would be a second copy
+   of it in a second language. The cost is a handful of rows — ONE date, against
+   an org holding 24 committed orders in the next fortnight.
+   A FUNCTION rather than a `.filter` at the call site so that dropping the
+   scoping is something a fixture notices; checked by dropping it, and it goes
+   red. Measured over the fortnight after the report: **15 wrong-kitchen order
+   sheets removed, 15 right ones kept** — DF01 keeps its 09-12 baby shower, DF02
+   keeps all fourteen Cafe Knotted days — and **0 orders reach nobody**.
+   **1764 fixtures pass.**
 
 4i. ✅ **WHICH SHOPS A MEMBER MAY WORK AT — migration 073, APPLIED and
    verified live 2026-08-29.** Mark: "in my FMP version of the app, I could give
