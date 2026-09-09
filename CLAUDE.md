@@ -7488,6 +7488,52 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    sheets removed, 15 right ones kept** — DF01 keeps its 09-12 baby shower, DF02
    keeps all fourteen Cafe Knotted days — and **0 orders reach nobody**.
    **1764 fixtures pass.**
+   **BACK AND NEXT ARE ARROWS** (Mark, 2026-09-09: "instead of 'back' and 'next'
+   labels for the nav buttons lets use large arrow glyphs in the footer", then
+   "thicker arrows please. fat.", then "the arrows on row 1 do not match", then
+   "row 3 looks better"). Four passes, and each one taught something.
+   **REACH FOR THE BIGGER GLYPH BEFORE THE BIGGER SIZE — the receiving caret's
+   lesson deciding something a second time.** `→` (U+2192) shipped first and is
+   a HAIRLINE in the UI font: a long thin shaft on a small head, so at 32px it
+   carried no more ink than the 14px word it replaced and reading it as "larger"
+   rested entirely on the font size. **U+279C**, the heavy round-tipped arrow,
+   is a thick solid shaft and a big head, so the weight comes from the character.
+   U+2794 (heavy wide-headed) is its near twin and was the runner-up.
+   **ONE GLYPH, MIRRORED, AND THAT IS THE POINT.** The obvious answer was the
+   `⬅`/`➡` pair (U+2B05 + U+27A1), which is fatter still and needs no transform
+   — and Mark spotted at a glance what a Unicode block boundary does: they are
+   drawn by different hands, so side by side at 32px the two heads are visibly
+   different shapes. A `scaleX(-1)` transform sounds like the compromise and is
+   the opposite — it makes the two IDENTICAL by construction, and no font update
+   can drift them apart. `inline-block` on the mirrored span is load-bearing; a
+   transform does nothing to an inline box.
+   Also rejected, each for its own reason: `◀`/`▶`, the most ink of anything
+   tried, are triangles rather than arrows and already mean "disclose" here;
+   U+27A4 is a solid wedge with no shaft that reads as a media control; and
+   U+2B9C/U+2B9E, the other true pair, renders as **TOFU** — checked, not
+   assumed. **No U+FE0E**, and that is a fact about U+279C rather than an
+   oversight: it is not an emoji at all, so nothing can paint it in colour. The
+   pair that WOULD have needed one is the pair this rejected.
+   **32px WITH `leading-none`, SO THE BAR DOES NOT GROW.** The cell is
+   `min-h-14` with `py-3`, so 12 + 32 + 12 is exactly 56 — measured at **56px
+   before and after**, on every page and on the last one, where Send stays a
+   WORD because it is a commit rather than navigation. `leading-none` is
+   load-bearing in that sum: at the default line-height the glyph would claim
+   ~40px and push every page's content up by 8.
+   **THE WORD SURVIVES AS THE ACCESSIBLE NAME** — `aria-label` wins over the
+   content, so a screen reader says "Back" and not "heavy round-tipped
+   rightwards arrow", with `title` for a desk browser's hover. The iPad has no
+   hover and does not need one here: a full-width arrow in a wizard footer is as
+   unambiguous as this app gets.
+   **`FOOTER_CELL` became `inline-flex items-center justify-center`** rather
+   than leaning on a button's own centring, which is a UA behaviour and not a
+   stated one — it starts to matter when two of four cells hold a 32px glyph in
+   a 56px box.
+   **Harness note that cost a pass:** a canvas `measureText` with
+   `ui-sans-serif` in the font string DOES NOT RESOLVE, so it silently measures
+   a fallback — it reported `→` at 24×20 when the browser paints a hairline.
+   Measure a glyph AS RENDERED in the page, which is what the "measure a title
+   as rendered" rule already says for text.
 
 4i. ✅ **WHICH SHOPS A MEMBER MAY WORK AT — migration 073, APPLIED and
    verified live 2026-08-29.** Mark: "in my FMP version of the app, I could give

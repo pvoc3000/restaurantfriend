@@ -32,9 +32,55 @@ import { usePublishedHeight } from "@/lib/tableHead";
  * rather than a save. What none of them touches is the tables that OWN these
  * facts — that is `submit_shift_report`, once, at the end.
  */
-/** One dress for every footer cell, so a four-across row cannot drift. */
+/** One dress for every footer cell, so a four-across row cannot drift.
+ *
+ *  `inline-flex items-center justify-center` rather than leaning on a button's
+ *  own centring, which is a UA behaviour and not a stated one — it matters now
+ *  that two of the four hold a 32px glyph in a 56px cell rather than a line of
+ *  14px text. `ui/buttons` states it the same way. */
 const FOOTER_CELL =
-  "min-h-14 px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white disabled:opacity-35";
+  "inline-flex min-h-14 items-center justify-center px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white disabled:opacity-35";
+
+/**
+ * Back and Next are ARROWS, not words (Mark, 2026-09-09: "instead of 'back' and
+ * 'next' labels for the nav buttons lets use large arrow glyphs in the footer").
+ *
+ * SIZED SO THE FOOTER DOES NOT GROW, which is what picks 32 out of the air:
+ * the cell is `min-h-14` (56px) with `py-3`, so 12 + 32 + 12 is exactly 56 and
+ * the bar stays the height it has always been. `leading-none` is load-bearing
+ * in that sum — at the default line-height a 32px glyph would claim ~40px and
+ * push every page's content up by 8.
+ *
+ * REACH FOR THE BIGGER GLYPH BEFORE THE BIGGER SIZE — the receiving caret's
+ * lesson, deciding something for the second time. `→` (U+2192) shipped first
+ * and Mark's answer was "thicker arrows please. fat.": in the UI font that
+ * character is a HAIRLINE, a long thin shaft on a small head, so at 32px it
+ * carried no more ink than the 14px word it replaced and reading it as "larger"
+ * rested entirely on the font size. U+2794 is the heavy wide-headed arrow — a
+ * thick solid shaft and a big head — so the weight comes from the character and
+ * the size stays where the layout wants it.
+ *
+ * ONE GLYPH, MIRRORED, AND THAT IS THE POINT (Mark, 2026-09-09: "the arrows on
+ * row 1 do not match"). The obvious answer was the `⬅`/`➡` pair (U+2B05 and
+ * U+27A1), which is fatter still and needs no transform — and they are drawn by
+ * different hands in different blocks, so side by side at 32px the heads are
+ * visibly different shapes. A transform standing in for a character sounds like
+ * the compromise and is the opposite: `scaleX(-1)` makes the two IDENTICAL by
+ * construction, and no font update can ever drift them apart.
+ *
+ * NOT `◀`/`▶`, which carry the most ink of anything tried and are triangles
+ * rather than arrows, and which already mean "disclose" in this app — the order
+ * guide's item triangle and the receiving screen's reader's notes. Not U+27A4
+ * either, a solid wedge with no shaft that reads as a media control. And
+ * U+2B9C/U+2B9E, the other true pair, renders as TOFU here — checked, not
+ * assumed.
+ *
+ * NO U+FE0E, and that is a fact about this character rather than an oversight:
+ * U+279C is not an emoji at all, so nothing can decide to paint it in colour.
+ * The pair that WOULD have needed one is the pair this rejected.
+ */
+const FOOTER_ARROW = "\u279C";
+const FOOTER_GLYPH = "text-[32px] leading-none tracking-normal";
 
 export function ShiftReportRunner({
   reportId,
@@ -438,13 +484,23 @@ export function ShiftReportRunner({
         >
           Pause &amp; close
         </button>
+        {/* THE WORD SURVIVES AS THE ACCESSIBLE NAME. `aria-label` wins over
+            the content, so a screen reader says "Back" rather than
+            "leftwards arrow", and `title` gives a desk browser the same word
+            on hover — which the iPad has no equivalent of, and does not need:
+            a full-width arrow in a wizard's footer is about as unambiguous as
+            this app gets. */}
         <button
           type="button"
-          className={FOOTER_CELL}
+          className={`${FOOTER_CELL} ${FOOTER_GLYPH}`}
           onClick={() => setIndex(index - 1)}
           disabled={busy !== null || first}
+          aria-label="Back"
+          title="Back"
         >
-          Back
+          {/* `inline-block` is load-bearing — a transform does nothing to an
+              inline box. */}
+          <span className="inline-block -scale-x-100">{FOOTER_ARROW}</span>
         </button>
         {last ? (
           <button
@@ -467,11 +523,13 @@ export function ShiftReportRunner({
         ) : (
           <button
             type="button"
-            className={FOOTER_CELL}
+            className={`${FOOTER_CELL} ${FOOTER_GLYPH}`}
             onClick={() => setIndex(index + 1)}
             disabled={busy !== null}
+            aria-label="Next"
+            title="Next"
           >
-            Next
+            {FOOTER_ARROW}
           </button>
         )}
       </footer>
