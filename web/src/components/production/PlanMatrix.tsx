@@ -384,6 +384,54 @@ export function PlanMatrix({
     });
   }
 
+  /**
+   * Take EVERY item off one weekday, across every tray on the plan (Mark,
+   * 2026-09-09). The column header's own command: a day is how a plan is read
+   * and how it is rebuilt, so "start Monday again" is a real thing to want and
+   * was otherwise a ✕ per slot down twenty-four trays.
+   *
+   * Scoped from `slots`, which is exactly this plan's rows, rather than from
+   * `matrix` — the matrix is a VIEW that grouping reorders, and what is being
+   * cleared is the day rather than what happens to be on screen. One statement,
+   * `.select()`ed and counted like every other write here.
+   *
+   * The par goes with the row, which is the point: clearing is not "make none
+   * that day" (that is a par of 0, and it keeps the item on the tray) but
+   * "nothing is on the case that day".
+   */
+  async function clearDay(iso: number, long: string) {
+    const held = slots.filter((s) => s.weekday === iso);
+    if (!held.length) return;
+    if (
+      !(await confirmDialog({
+        ...splitConfirmMessage(
+          `Clear ${long} on this plan, taking ${held.length} item${
+            held.length === 1 ? "" : "s"
+          } off ${
+            new Set(held.map((s) => s.tray_id)).size === 1 ? "its tray" : "their trays"
+          }?`
+        ),
+        confirmLabel: `Clear ${long}`,
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
+    run(async (supabase) => {
+      const { data, error } = await supabase
+        .from("production_plan_tray_items")
+        .delete()
+        .in(
+          "id",
+          held.map((s) => s.id)
+        )
+        .select("id");
+      return error || !data?.length
+        ? error?.message ?? `${long} could not be cleared.`
+        : null;
+    });
+  }
+
   /** One box up or down on a single slot. */
   function stepSlot(slot: TraySlot, direction: 1 | -1) {
     const next = stepPar(slot.par, stepFor(slot.itemId), direction);
@@ -1008,15 +1056,45 @@ export function PlanMatrix({
                 inset SHADOW rather than a border, because a sticky cell inside
                 border-collapse loses its border as it detaches. */}
             <tr className={`text-[11px] uppercase tracking-[0.12em] ${STICKY_HEAD_ROW_UNDER_CONTROLS}`}>
-              {WEEKDAYS.map((d) => (
-                <th
-                  key={d.iso}
-                  className="px-2 py-2 text-left"
-                  style={{ width: `calc((100% - ${MENU_COLUMN}px) / 7)` }}
-                >
-                  {d.short}
-                </th>
-              ))}
+              {WEEKDAYS.map((d) => {
+                const held = slots.filter((s) => s.weekday === d.iso).length;
+                return (
+                  <th
+                    key={d.iso}
+                    className="px-2 py-2 text-left"
+                    style={{ width: `calc((100% - ${MENU_COLUMN}px) / 7)` }}
+                  >
+                    <span className="flex items-baseline justify-between gap-2">
+                      {/* `shrink-0` on the DAY: below about a 1000px window the
+                          pair outgrows a column, and what must survive is the
+                          label you read the header for. Measured at 11px with
+                          the header's own tracking, the widest pair is MON +
+                          Clear at 81px against 139px of cell at 1280. */}
+                      <span className="shrink-0">{d.short}</span>
+                      {/* Rendered on every day and DISABLED on an empty one,
+                          never hidden: a control that vanishes cannot be told
+                          from a feature that does not exist, and here the
+                          reason it is dead is the empty column beneath it. */}
+                      {editable ? (
+                        <button
+                          type="button"
+                          onClick={() => clearDay(d.iso, d.long)}
+                          disabled={pending || !held}
+                          title={
+                            held
+                              ? `Take all ${held} item${held === 1 ? "" : "s"} off ${d.long}`
+                              : `Nothing is on ${d.long}`
+                          }
+                          aria-label={`Clear ${d.long} on this plan`}
+                          className="shrink-0 text-subtle hover:text-ink disabled:cursor-not-allowed disabled:text-faint disabled:hover:text-faint"
+                        >
+                          Clear
+                        </button>
+                      ) : null}
+                    </span>
+                  </th>
+                );
+              })}
               <th className="px-1 py-2" style={{ width: MENU_COLUMN }}>
                 <span className="sr-only">Tray actions</span>
               </th>
