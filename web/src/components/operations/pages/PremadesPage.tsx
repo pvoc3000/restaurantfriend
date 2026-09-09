@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
-import { STICKY_HEAD_ROW_IN_PANE } from "@/lib/tableHead";
+import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
 import { CountField, TextField } from "./fields";
 
 export type PremadeRow = {
@@ -192,9 +192,11 @@ export function PremadesPage({
             pixels apart, and thirty rows down a sheet the only thing telling
             them apart is a heading that has scrolled off the top.
 
-            AT 0, not under a masthead: this is the `(fullscreen)` runner, whose
-            own black banner is not sticky and scrolls away, so the top of the
-            viewport is where the labels belong.
+            UNDER THE BANNER, not at 0: that bar is sticky as of 2026-09-09 and
+            publishes its own measured height, so the labels stack beneath it
+            rather than sliding under it. `--rf-header-h` would be wrong here —
+            there is no masthead on a `(fullscreen)` route, so it is sitting at
+            its seed.
 
             ON THE `th`, never the `tr` — WebKit does not honour sticky on a row
             in a border-collapse table, and iPad Safari at the 16.4 floor is
@@ -203,7 +205,7 @@ export function PremadesPage({
             collapsed border the moment it detaches. */}
         <thead>
           <tr
-            className={`text-xs font-semibold uppercase tracking-[0.08em] ${STICKY_HEAD_ROW_IN_PANE}`}
+            className={`text-xs font-semibold uppercase tracking-[0.08em] ${STICKY_HEAD_ROW_UNDER_RUNNER}`}
           >
             <th className="py-2 pr-3 text-left">Type</th>
             <th className="py-2 pr-3 text-left">Sub type</th>

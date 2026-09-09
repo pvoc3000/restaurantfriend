@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import { useRouter } from "next/navigation";
 import { CHECKLIST_KIND_LABEL, type ChecklistKind } from "@/lib/checklists";
 import { SHIFT_SLOT_LABEL } from "@/lib/employeeEvents";
@@ -7,6 +8,7 @@ import { ChecklistWalk, type WalkTask } from "./ChecklistWalk";
 import { FinishChecklist } from "./FinishChecklist";
 import type { WalkItemRow } from "./WalkItem";
 import type { ChecklistRunData } from "@/lib/checklistRunData";
+import { usePublishedHeight } from "@/lib/tableHead";
 
 /**
  * One dress for both footer buttons, so the pair cannot drift — and it carries
@@ -57,6 +59,15 @@ export function WalkRunner({
 }) {
   const router = useRouter();
 
+  // The banner's measured height, for the section bands that stick under it.
+  // This header has been sticky since it shipped; what is new is that anything
+  // BELOW it now needs to know how tall it is — and it wraps, so the number has
+  // to be measured. `ChecklistPage` mounts the same walk inside the shift
+  // report's runner, which publishes the same variable from its own banner, so
+  // the bands read one offset and behave identically on both surfaces.
+  const bannerRef = useRef<HTMLElement | null>(null);
+  usePublishedHeight(bannerRef, "--rf-runner-h");
+
   const isOpen = run.status === "open";
   // The runner serves checklists, walkthroughs AND inspection logs, so its copy
   // names the KIND rather than assuming one — "Finish this checklist?" would be
@@ -86,7 +97,7 @@ export function WalkRunner({
 
   return (
     <>
-      <header className="sticky top-0 z-20 bg-ink px-4 py-3 text-white">
+      <header ref={bannerRef} className="sticky top-0 z-20 bg-ink px-4 py-3 text-white">
         <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
           <h1 className="text-[15px] font-bold uppercase tracking-[0.08em]">
             {run.title}

@@ -7383,6 +7383,50 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    checked by putting the page back: all four go red, including the one saying
    nobody is asked about batches — which is the blocker that would otherwise
    return in silence with it.
+   **EVERY TITLE AND HEADER ON THE RUNNER STICKS** (Mark, 2026-09-09: "make all
+   titles and headers in the shift report sticky"), which finishes the sentence
+   the premades fix started an hour earlier.
+   **THE BLACK BANNER PUBLISHES ITS OWN MEASURED HEIGHT AS `--rf-runner-h`**,
+   seeded 0 in `globals.css`, and everything beneath stacks against it. It is
+   measured for the masthead's reason: the bar WRAPS — one line at a desk, two
+   on a portrait iPad — so any constant is right at one width and wrong at
+   another, and wrong here means a page's column labels sitting on the rows they
+   label. **A NEW VARIABLE RATHER THAN `--rf-header-h`**, which on a
+   `(fullscreen)` route is sitting at its 4rem seed because no masthead is
+   mounted to publish it: offsetting against that would float every header 64px
+   into nothing. And the seed is **0 where the masthead's is 4rem**, because
+   this is published from a layout effect — at 0 the worst first frame is a
+   header flush to the top, which is where it sat before any of this.
+   **`WalkRunner` HAD A STICKY BANNER FROM THE DAY IT SHIPPED and this shell
+   never did**, which is the tell that this was an omission rather than a
+   decision. It publishes the same variable now, so `ChecklistWalk` — mounted by
+   BOTH runners — reads one offset and behaves identically on each. Making it
+   sticky on one of the two surfaces a shared component appears on is the "I
+   edited this and it only changed here" complaint waiting to happen.
+   **WHAT STICKS: the banner, the premades and elements column labels, and the
+   checklist's black shop-section bands.** A band stays pinned for exactly as
+   long as its own `<section>` is on screen and is then pushed off by the next,
+   because a sticky element is bounded by its containing block and each band is
+   the first child of its section — free, and the behaviour you want. Move a
+   band out of its section and it would stick for the whole document.
+   **WHAT DOES NOT, and each for a reason.** The SALES table's head, because
+   that table has exactly TWO rows: a sticky range is bounded by the table's own
+   box, so it could never pin — the class would be decoration. Tomorrow's
+   `SectionHeading` over a three-row list, for the same reason, and because that
+   component is shared with every detail screen in the app. And the field labels
+   on Report and Submit, which are labels over a box rather than headers over
+   anything that scrolls.
+   **MEASURED on a standalone replica of the runner's exact shell**, since the
+   pane cannot get past the PIN lock: banner top **0 at every scroll position**,
+   published height 57 against a measured bottom of 56.5, the thead holding at
+   **57** — flush under the banner, no gap and no overlap — through 900px and
+   then correctly releasing at −172 once its own table has gone by, and at
+   scrollTop 2305 the three bands reading **−297.5 / 57 / 309.5**, which is one
+   band pinned and its neighbours where they belong.
+   **The footer gained `z-30`**, the banner's rung. It had none, which was safe
+   only while nothing else here was sticky — a `z-20` table head would now paint
+   OVER the four buttons on a viewport short enough for the two to meet, and
+   those four are the way out.
 
 4i. ✅ **WHICH SHOPS A MEMBER MAY WORK AT — migration 073, APPLIED and
    verified live 2026-08-29.** Mark: "in my FMP version of the app, I could give

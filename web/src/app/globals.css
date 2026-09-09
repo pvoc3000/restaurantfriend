@@ -52,6 +52,20 @@
      matrix became the second screen to pin one: a second variable saying the
      same thing is how two screens' offsets drift. */
   --rf-controls-h: 0px;
+
+  /* A CHROME-LESS FULL-SCREEN RUNNER'S OWN BANNER — the shift report's black
+     title bar and the checklist walk's, republished by whichever one is
+     mounted. The `(fullscreen)` group has no masthead, so `--rf-header-h` is
+     sitting at its seed on those routes and means nothing there; this is the
+     thing that is actually above the content, and the tables and section bands
+     inside stick under it.
+
+     Seeded at 0, unlike the masthead's, and the difference matters: this is
+     published from a layout effect, so between the server's paint and that
+     effect a non-zero default would push every header down by the height of a
+     bar that has not been measured yet. At 0 the worst first frame is a header
+     flush to the top, which is where it sat before any of this. */
+  --rf-runner-h: 0px;
 }
 
 /* A table that has to scroll sideways gives up its sticky column labels — and

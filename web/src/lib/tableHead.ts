@@ -118,6 +118,43 @@ export const STICKY_HEAD_ROW_IN_PANE =
   "[&>th]:sticky [&>th]:top-0 [&>th]:z-10 [&>th]:bg-white [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]";
 
 /**
+ * Head-row classes for a table on a CHROME-LESS FULL-SCREEN route — the shift
+ * report's runner and the checklist walk. Its cells stick under that surface's
+ * own black banner, at whatever height the banner currently is.
+ *
+ * `--rf-runner-h` and NOT `--rf-header-h`, which on those routes is sitting at
+ * its seed because no masthead is mounted to publish it — offsetting against it
+ * would leave every header floating 64px below where it belongs. The seed here
+ * is 0, so the worst first frame is a header flush to the top.
+ *
+ * MEASURED and never a constant, for the reason the masthead taught: a banner
+ * wraps, so any number is right at one width and wrong at another, and being
+ * wrong means column labels sitting on top of the rows they label.
+ */
+export const STICKY_HEAD_ROW_UNDER_RUNNER =
+  "[&>th]:sticky [&>th]:top-[var(--rf-runner-h)] [&>th]:z-20 [&>th]:bg-white [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]";
+
+/**
+ * The same offset for a BAND that is not a table head — the checklist walk's
+ * black shop-section headings.
+ *
+ * On the element itself rather than through a `[&>…]` selector, because there
+ * is no row to reach into: it is one `h2` per section.
+ *
+ * z-10, a rung BELOW the head rows: they never meet (a band and a table head
+ * are on different pages), and the lower number keeps the ladder honest about
+ * what this is — a heading inside the content, not chrome.
+ *
+ * WHAT MAKES IT WORK IS THAT EACH BAND IS THE FIRST CHILD OF ITS OWN SECTION.
+ * A sticky element is bounded by its containing block, so a band stays pinned
+ * for exactly as long as its own section is on screen and is then pushed off by
+ * the next one — which is the behaviour you want and is free. Move a band out
+ * of its section and it will stick for the whole document instead.
+ */
+export const STICKY_BAND_UNDER_RUNNER =
+  "sticky top-[var(--rf-runner-h)] z-10";
+
+/**
  * The GRAND TOTAL row, pinned to the foot of whatever scrolls it (Mark,
  * 2026-08-22: "make the totals sticky at the bottom").
  *

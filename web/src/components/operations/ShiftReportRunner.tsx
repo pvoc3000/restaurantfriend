@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useSyncExternalStore, useTransition } from "react";
+import { useRef, useState, useSyncExternalStore, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/lib/confirm";
@@ -17,6 +17,7 @@ import {
   type ShiftSlot,
 } from "@/lib/shiftReports";
 import { salesSnapshot, serverSalesSnapshot, subscribeSales } from "@/lib/shiftReportSales";
+import { usePublishedHeight } from "@/lib/tableHead";
 
 /**
  * The report itself: a full-screen, tablet-first walk through the pages this
@@ -94,6 +95,11 @@ export function ShiftReportRunner({
   const [busy, setBusy] = useState<string | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();
+
+  // The black banner's measured height, for everything that sticks under it —
+  // see the header itself for why this is measured and not written down.
+  const bannerRef = useRef<HTMLElement | null>(null);
+  usePublishedHeight(bannerRef, "--rf-runner-h");
 
   // Published by the Sales page when it reads Square. Null on an opening
   // report, which has no sales page at all — and then the email says so
@@ -337,7 +343,24 @@ export function ShiftReportRunner({
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="bg-ink px-6 py-5 text-center">
+      {/* THE TITLE STAYS ON SCREEN (Mark, 2026-09-09: "make all titles and
+          headers in the shift report sticky"). It is the only thing that says
+          which of eight pages you are on and what it is for, and it was the
+          first thing to leave as soon as anybody scrolled.
+
+          It PUBLISHES ITS OWN MEASURED HEIGHT, because everything that sticks
+          beneath it has to stack under it and this bar WRAPS — one line at a
+          desk, two on a portrait iPad — so any constant is right at one width
+          and wrong at another, and being wrong here means a page's column
+          labels sitting on top of the rows they label. Measured, never written
+          down: the masthead's own lesson.
+
+          `WalkRunner` has had a sticky banner since it shipped; this shell was
+          the odd one out. */}
+      <header
+        ref={bannerRef}
+        className="sticky top-0 z-30 bg-ink px-6 py-5 text-center"
+      >
         <h1 className="text-lg font-bold uppercase tracking-[0.08em] text-white">
           Shift report — page {index + 1} of {order.length} — {pageTitle(page)}
         </h1>
@@ -387,7 +410,11 @@ export function ShiftReportRunner({
           through: Back is disabled on page 1 rather than absent, so nothing
           shifts under a thumb. 44px targets throughout — this is read at arm's
           length by somebody who is tired. */}
-      <footer className="sticky bottom-0 grid grid-cols-4 divide-x divide-white/20 border-t border-white/20 bg-ink">
+      {/* z-30, the banner's own rung. It had none, which was safe only while
+          nothing else on this surface was sticky — a sticky table head at z-20
+          would now paint OVER these four buttons on a viewport short enough for
+          the two to meet, and these four are the way out. */}
+      <footer className="sticky bottom-0 z-30 grid grid-cols-4 divide-x divide-white/20 border-t border-white/20 bg-ink">
         {/* ONE CELL, TWO HONEST WORDS. On your own draft this really does
             cancel the report, so it says Cancel; on a sent one, or somebody
             else's, there is nothing to discard and it is the same plain leave

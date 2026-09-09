@@ -13,6 +13,7 @@ import {
   type CheckStatus,
 } from "@/lib/checklists";
 import { taskAgeLabel, taskTone, type CarryableTask } from "@/lib/facilityTasks";
+import { STICKY_BAND_UNDER_RUNNER } from "@/lib/tableHead";
 import { WalkItem, type WalkItemRow } from "./WalkItem";
 
 export type WalkTask = CarryableTask & {
@@ -265,8 +266,24 @@ export function ChecklistWalk({
       {bands.map((band) => (
         <section key={band.section} className="space-y-0">
           {/* A band that DELIMITS is black — the mark this app uses for the
-              masthead, the ActionBar and every grouped list. */}
-          <h2 className="flex items-baseline justify-between gap-3 bg-ink px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-white">
+              masthead, the ActionBar and every grouped list.
+
+              IT STICKS UNDER THE RUNNER'S BANNER (Mark, 2026-09-09: "make all
+              titles and headers in the shift report sticky"). Seventy items
+              deep, the shelf you are standing at is the one thing the screen
+              stops telling you — and the count beside it moves as you tick, so
+              it is worth having in view rather than only at the top of a
+              section you left four rows ago.
+
+              It stays pinned for exactly as long as its own SECTION is on
+              screen, and is then pushed off by the next band, because a sticky
+              element is bounded by its containing block and each band is the
+              first child of its own `<section>`. That is free and it is the
+              behaviour you want; move the band out of the section and it would
+              stick for the whole document instead. */}
+          <h2
+            className={`flex items-baseline justify-between gap-3 bg-ink px-3 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-white ${STICKY_BAND_UNDER_RUNNER}`}
+          >
             <span>{band.section}</span>
             <span className="text-white/55">
               {band.rows.filter((r) => r.status !== "pending").length} of{" "}

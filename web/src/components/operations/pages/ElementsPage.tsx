@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { CountField, TextField } from "./fields";
+import { STICKY_HEAD_ROW_UNDER_RUNNER } from "@/lib/tableHead";
 
 export type ElementBatchRow = {
   batchId: string;
@@ -93,8 +94,15 @@ export function ElementsPage({
           <col className="w-[16%]" />
           <col className="w-[20%]" />
         </colgroup>
+        {/* Sticky under the runner's banner, like every other header on this
+            surface — even though this page is currently on no shift at all
+            (the batch report was retired 2026-09-09). One line, so that if it
+            ever comes back it comes back behaving like its neighbours rather
+            than as the one table whose labels scroll away. */}
         <thead>
-          <tr className="border-b-2 border-ink text-xs font-semibold uppercase tracking-[0.08em]">
+          <tr
+            className={`text-xs font-semibold uppercase tracking-[0.08em] ${STICKY_HEAD_ROW_UNDER_RUNNER}`}
+          >
             <th className="py-2 text-left">#</th>
             <th className="py-2 text-left">Element</th>
             <th className="py-2 text-left">Batch</th>
