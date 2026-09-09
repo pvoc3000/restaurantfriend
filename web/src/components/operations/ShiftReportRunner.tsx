@@ -38,14 +38,14 @@ import { usePublishedHeight } from "@/lib/tableHead";
  * `inline-flex items-center justify-center` rather than leaning on a button's
  * own centring, which is a UA behaviour and not a stated one.
  *
- * `py-2`, not `py-3`, and that is arithmetic rather than taste: a cell now
- * holds a 28px icon over a 10px word with 2px between them, so 8 + 40 + 8 is
+ * `py-[7px]`, not `py-3`, and that is arithmetic rather than taste: a cell now
+ * holds a 28px icon over a 12px word with 2px between them, so 7 + 42 + 7 is
  * EXACTLY the `min-h-14` (56px) the bar has always been. At `py-3` it would be
- * 64 and every page would lose eight pixels of content. Change either size and
- * this has to be recomputed — 28/11 wants `py-[7px]` to land on the same 56.
+ * 66 and every page would lose ten pixels of content. Change either size and
+ * this has to be recomputed: 28/10 lands on the same 56 with a plain `py-2`.
  */
 const FOOTER_CELL =
-  "inline-flex min-h-14 items-center justify-center px-4 py-2 text-white disabled:opacity-35";
+  "inline-flex min-h-14 items-center justify-center px-4 py-[7px] text-white disabled:opacity-35";
 
 /**
  * THE FOOTER IS ICONS WITH THE WORD KEPT UNDER THEM (Mark, 2026-09-09, choosing
@@ -111,17 +111,16 @@ const ICON_SEND = "M382-208 122-468l90-90 170 170 366-366 90 90-456 456Z";
 const FOOTER_SEND = "text-[var(--rf-green-300)]";
 
 /**
- * 28px of artwork over a 10px word — Mark's, off eight pairs rendered side by
+ * 28px of artwork over a 12px word — Mark's, off eight pairs rendered side by
  * side (26/9, 26/10, 26/12, 24/12, then 28/11, 28/10 and 28/12).
  *
- * KNOWN AND DELIBERATE: 10px is BELOW this surface's documented type scale,
- * whose floor is the 12px of its small-caps labels and column heads. 26/12 was
- * built first for exactly that reason and 28/12 was rendered beside this one —
- * at that size the word starts competing with the icon rather than captioning
- * it. A caption under an icon is arguably its own element rather than a label
- * in that scale: it is read as part of the button, not as a heading over
- * something. If the scale is ever tightened, this is the one place that has to
- * argue for itself.
+ * AND IT LANDS BACK ON THIS SURFACE'S OWN TYPE SCALE, whose floor is the 12px
+ * of its small-caps labels and column heads — which is worth saying because the
+ * two runners-up did not: 28/11 and 28/10 were both shipped for a few minutes
+ * and both would have introduced a size below that floor, on the argument that
+ * a caption under an icon is its own element rather than a label in the scale.
+ * That argument was never needed. The icon is what carries the size difference
+ * and the word stays the size every other label on this screen is.
  */
 function FooterLabel({ icon, word }: { icon: string; word: string }) {
   return (
@@ -129,7 +128,7 @@ function FooterLabel({ icon, word }: { icon: string; word: string }) {
       <svg width="28" height="28" viewBox="0 -960 960 960" aria-hidden="true">
         <path fill="currentColor" d={icon} />
       </svg>
-      <span className="text-[10px] font-bold uppercase leading-none tracking-[0.08em]">
+      <span className="text-[12px] font-bold uppercase leading-none tracking-[0.08em]">
         {word}
       </span>
     </span>

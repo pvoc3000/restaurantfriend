@@ -7537,19 +7537,22 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    INK on a dark ground is the same move `text-mark` makes on the masthead, and
    this file's own rule says so: "the one place `text-mark` is right is on
    BLACK". The yellow it replaces measures 9.85:1, so the bar got brighter.
-   **28px OF ARTWORK OVER A 10px WORD, AND THE BAR DOES NOT GROW.** 8 + 28 + 2 +
-   10 + 8 is exactly the `min-h-14` (56px) it has always been — change either
-   size and the padding has to be recomputed (28/11 wants `py-[7px]` to land on
-   the same 56). Eight pairs were rendered side by side to get there. **10px is
-   BELOW this surface's documented type scale**, whose floor is the 12px of its
-   small-caps labels; 26/12 was built first for that reason and 28/12 rendered
-   beside it, where the word starts competing with the icon rather than
-   captioning it. A caption under an icon is arguably its own element — read as
-   part of the button, not as a heading over something — and it was chosen by
-   looking. If the scale is ever tightened, this is the place that has to argue
-   for itself. wght **700**, not RecordNav's 300, because these sit on a black
-   bar at arm's length where 300 is a hairline; same family, different weight,
-   which is what a weight axis is for.
+   **28px OF ARTWORK OVER A 12px WORD, AND THE BAR DOES NOT GROW.** 7 + 28 + 2 +
+   12 + 7 is exactly the `min-h-14` (56px) it has always been — **measured at 56
+   on all three states** — and change either size and the padding has to be
+   recomputed (28/10 lands on the same 56 with a plain `py-2`). Eight pairs were
+   rendered side by side to get there: 26/9, 26/10, 26/12, 24/12, then 28/11,
+   28/10 and 28/12.
+   **AND IT LANDS BACK ON THIS SURFACE'S OWN TYPE SCALE**, whose floor is the
+   12px of its small-caps labels and column heads. Worth recording because the
+   two runners-up did not: 28/11 and 28/10 were each shipped for a few minutes
+   and each would have put a new size below that floor, on the argument that a
+   caption under an icon is its own element rather than a label in the scale.
+   **That argument turned out not to be needed** — the ICON carries the size
+   difference and the word stays the size every other label on this screen is.
+   wght **700**, not RecordNav's 300, because these sit on a black bar at arm's
+   length where 300 is a hairline; same family, different weight, which is what
+   a weight axis is for.
    **`FOOTER_CELL` became `inline-flex items-center justify-center`** rather
    than leaning on a button's own centring, which is a UA behaviour and not a
    stated one.
