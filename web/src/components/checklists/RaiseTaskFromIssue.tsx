@@ -18,6 +18,20 @@ import { taskTitleFromIssue } from "@/lib/facilityTasks";
  * ONCE RAISED IT SAYS SO. The run item carries `task_id`, so night two reads
  * "reported" and offers a link rather than a second button. Without that, three
  * supervisors flag the same fryer on three nights and file three tasks.
+ *
+ * AND IT SAYS WHAT IT WILL DO BEFORE YOU PRESS IT (Mark, 2026-09-09: "it's
+ * unclear what the button does/will do"). This is the exception the "stop
+ * writing hints" rule names — a line earns its place when it states a fact the
+ * reader CANNOT SEE — and here that fact is the whole point of the feature:
+ * raising a task is not filing it somewhere and forgetting it, it puts the job
+ * on the top of every checklist at this shop until somebody closes it. Nothing
+ * on the button, the row or the screen says so, and it is the difference
+ * between a note and an obligation.
+ *
+ * ONE FACT, NOT TWO. The task also lands on /tasks, and that is deliberately
+ * left out: it is the ordinary consequence of making a task, and the "see the
+ * task" link this becomes the moment you press it goes straight there. The
+ * carry-forward is the half nobody would guess.
  */
 export function RaiseTaskFromIssue({
   runItemId,
@@ -92,16 +106,27 @@ export function RaiseTaskFromIssue({
   }
 
   return (
-    <span className="flex items-center gap-2">
+    <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <button
         type="button"
         onClick={raise}
         disabled={busy}
-        className="min-h-11 border border-ink bg-white px-3 text-[13px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+        className="min-h-11 shrink-0 border border-ink bg-white px-3 text-[13px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
       >
         {busy ? "Raising…" : "Raise a task"}
       </button>
-      {failed && <span className="text-[13px] text-accent">{failed}</span>}
+      {/* The error REPLACES the description rather than joining it. Both are
+          the same sentence-shaped thing in the same slot, and stacked they
+          would read as one long line where the half that matters is the red
+          half. Nothing is lost: the description is ambient, and it comes back
+          on the next attempt. */}
+      {failed ? (
+        <span className="text-[13px] text-accent">{failed}</span>
+      ) : (
+        <span className="text-[13px] leading-snug text-muted">
+          It stays on every checklist here until somebody does it.
+        </span>
+      )}
     </span>
   );
 }

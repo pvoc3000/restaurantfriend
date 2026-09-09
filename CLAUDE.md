@@ -7875,6 +7875,29 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    inversions they borrow: those are `h-9` at 12px, the DESK metrics, and this
    screen is tablet-first where 36px is under the 44px a thumb wants.
 
+   **"RAISE A TASK" SAYS WHAT IT WILL DO** (Mark, 2026-09-09: "when the 'raise a
+   task' button appears on a checklist, it's unclear what the button does/will
+   do. Can you add a short description to the right of the button?").
+   **THIS IS THE EXCEPTION THE "STOP WRITING HINTS" RULE NAMES**, and it is worth
+   saying why rather than treating it as that rule bending: a line earns its
+   place when it states a fact the reader CANNOT SEE, and here that fact is the
+   whole point of the feature. Raising a task is not filing something and
+   forgetting it — it puts the job at the top of every checklist at this shop
+   until somebody closes it, which is the carry-forward this module was built
+   around. Nothing on the button, the row or the screen said so, and it is the
+   difference between a note and an obligation.
+   **ONE FACT, NOT TWO.** The task also lands on /tasks, and that is deliberately
+   left out: it is the ordinary consequence of making a task, and the "see the
+   task" link the button becomes the moment you press it goes straight there.
+   The carry-forward is the half nobody would guess.
+   **THE ERROR REPLACES THE DESCRIPTION rather than joining it** — they are the
+   same sentence-shaped thing in the same slot, and stacked they read as one
+   long line whose red half is the one that matters. Nothing is lost, the
+   description being ambient and back on the next attempt.
+   The button gained `shrink-0` and the wrapper `flex-wrap`, so the sentence
+   wraps its own text rather than squeezing the control. Measured at 1024, 820,
+   768, 600 and 375: beside the button down to 600, and on its own line at 375,
+   which is the honest failure.
    **AND THE TASKS DIALOGS' TEXTAREAS WERE GREY** where every field beside them
    was black (Mark, 2026-08-30: "most fields have black borders, details is
    grey"). `NewTask` and `ResolveTask` were the only two form textareas in the
