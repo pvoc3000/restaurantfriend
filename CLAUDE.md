@@ -3922,9 +3922,15 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    reported Monday at DF02 with the M-W plan contributing nothing, which looked
    like the feature failing and was the deletion having landed a minute before
    the kitchen edit.
-   **AND THE LOCATION'S OWN MAPPING IS RETIRED — migration 102, NEEDS
-   APPLYING** (Mark, 2026-09-09: "remove the location kitchen mapping and
-   shops_for"). 017 put `kitchen_by_weekday` and `shops_for` on `locations`;
+   **AND THE LOCATION'S OWN MAPPING IS RETIRED — migration 102, APPLIED
+   2026-09-09** (Mark, same day: "remove the location kitchen mapping and
+   shops_for"). *Probe, don't read this line* — every other "NEEDS APPLYING" in
+   this file has been wrong at some point. Probe:
+   `select count(*) from information_schema.columns where table_name =
+   'locations' and column_name in ('kitchen_by_weekday','shops_for')` → **0**,
+   with `locations` still selectable and `production_plans.kitchen_by_weekday`
+   untouched (all three confirmed against the hosted DB after Mark applied it).
+   017 put `kitchen_by_weekday` and `shops_for` on `locations`;
    039 said they would be vestigial "the day kitchen-on-plan lands" and 101 made
    that true twice over by giving the PLAN a column of the same name and shape,
    one level down and on the axis that owns the question. 102 drops both, the
