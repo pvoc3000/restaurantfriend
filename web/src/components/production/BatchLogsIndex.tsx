@@ -144,7 +144,19 @@ export function BatchLogsIndex({
         const ag = groupOf(a), bg = groupOf(b);
         // Dates band newest first, like the schedules list: an ascending band
         // would put last month at the top of the screen.
-        if (ag !== bg) return (ag < bg ? -1 : 1) * (grouping === "date" ? -1 : 1);
+        // SORTING BY THE COLUMN YOU ARE GROUPED BY TURNS THE BANDS OVER
+        // (Mark, 2026-09-09, of the schedules list, which had this same bug and
+        // the same cause). Inside a band every row shares the grouped value, so
+        // the within-run comparison below is a NO-OP and a hardcoded lead means
+        // the arrow moves nothing at all. Both groupings have a same-named sort
+        // key, so `grouping === sort.key` is exactly "you are sorting by what
+        // you are grouped by"; otherwise the group keeps its own lead —
+        // ascending, except by DATE, where "most recent first" is what anybody
+        // means.
+        if (ag !== bg) {
+          const lead = grouping === sort.key ? dir : grouping === "date" ? -1 : 1;
+          return (ag < bg ? -1 : 1) * lead;
+        }
       }
       const av = value(a), bv = value(b);
       if (av < bv) return -1 * dir;

@@ -65,6 +65,7 @@ import "./inventoryItems.fixtures";
 import "./productionItems.fixtures";
 import "./productionPlans.fixtures";
 import "./scheduleWrites.fixtures";
+import "./scheduleSort.fixtures";
 import "./productionScale.fixtures";
 import "./productionSchedule.fixtures";
 import "./purchaseRequests.fixtures";

@@ -636,3 +636,96 @@ export function planDeviation(line: {
   if (Number(line.planned_par) === Number(line.par)) return null;
   return { kind: "changed", planned: Number(line.planned_par) };
 }
+
+/* ==========================================================================
+ * ORDERING THE SCHEDULES LIST
+ * ========================================================================== */
+
+/** Just enough of a schedule row to order it. */
+export type SortableSchedule = {
+  schedule_date: string;
+  sellsCode: string;
+  kitchenCode: string;
+  source: string;
+  lineCount: number;
+  parTotal: number;
+  countedLines: number;
+  printedAt: string | null;
+  regenerations: number;
+};
+
+export type ScheduleGrouping = "date" | "kitchen" | "sells" | "none";
+
+const SCHEDULE_GROUP_KEY: Record<
+  Exclude<ScheduleGrouping, "none">,
+  (r: SortableSchedule) => string
+> = {
+  date: (r) => r.schedule_date,
+  kitchen: (r) => r.kitchenCode,
+  sells: (r) => r.sellsCode,
+};
+
+function scheduleSortValue(r: SortableSchedule, key: string): string | number {
+  switch (key) {
+    case "date": return r.schedule_date;
+    case "sells": return r.sellsCode;
+    case "kitchen": return r.kitchenCode;
+    case "source": return r.source;
+    case "lines": return r.lineCount;
+    case "par": return r.parTotal;
+    case "counted": return r.countedLines;
+    case "printed": return r.printedAt ?? "";
+    case "regenerated": return r.regenerations;
+    default: return r.schedule_date;
+  }
+}
+
+/**
+ * The schedules list's order — the GROUP leads and the chosen column sorts
+ * within each run, which is `DataTable`'s rule (it bands a run of like-labelled
+ * rows, so it can only band what the order already groups).
+ *
+ * **SORTING BY THE COLUMN THE LIST IS GROUPED BY TURNS THE BANDS OVER** (Mark,
+ * 2026-09-09: "changing the sort direction of the date column on the schedule
+ * list page doesn't actually change the sort direction"). It didn't, and it
+ * could not: the group led with a HARDCODED direction, and inside a date band
+ * every row carries the same date — so the within-run comparison was a no-op
+ * and the arrow moved nothing. The default grouping is Date, so this was the
+ * first thing anybody would try.
+ *
+ * The three groupings each have a same-named sort key, so `grouping ===
+ * sort.key` is exactly "you are sorting by what you are grouped by". When they
+ * agree the direction drives the BANDS, which is the only thing left for it to
+ * drive; when they do not, the group keeps its own lead and the column sorts
+ * inside each run as before.
+ *
+ * A GROUP'S OWN LEAD IS ASCENDING EXCEPT BY DATE, where "most recent first" is
+ * what anybody means and an ascending band would open on last month.
+ *
+ * Tiebreaks always read ascending whichever way the primary points — the rule
+ * `lib/tableSort` states, and for its reason: flipping a column reverses the
+ * order you CHOSE, not the stable fallback used where that column cannot
+ * decide.
+ */
+export function sortSchedules<T extends SortableSchedule>(
+  rows: readonly T[],
+  sort: { key: string; dir: "asc" | "desc" },
+  grouping: ScheduleGrouping
+): T[] {
+  const dir = sort.dir === "asc" ? 1 : -1;
+  const groupOf = grouping === "none" ? null : SCHEDULE_GROUP_KEY[grouping];
+  return [...rows].sort((a, b) => {
+    if (groupOf) {
+      const ag = groupOf(a), bg = groupOf(b);
+      if (ag !== bg) {
+        const lead = grouping === sort.key ? dir : grouping === "date" ? -1 : 1;
+        return (ag < bg ? -1 : 1) * lead;
+      }
+    }
+    const av = scheduleSortValue(a, sort.key), bv = scheduleSortValue(b, sort.key);
+    if (av < bv) return -1 * dir;
+    if (av > bv) return 1 * dir;
+    if (a.sellsCode !== b.sellsCode) return a.sellsCode < b.sellsCode ? -1 : 1;
+    return a.kitchenCode < b.kitchenCode ? -1 : 1;
+  });
+}

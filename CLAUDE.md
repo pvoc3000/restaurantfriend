@@ -5481,6 +5481,31 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    list the moment the receipt arrives, so finishing means putting the receipt
    away, and it is a button that closes.
 
+   **SORTING BY THE COLUMN A LIST IS GROUPED BY TURNS THE BANDS OVER** (Mark,
+   2026-09-09: "changing the sort direction of the date column on the schedule
+   list page doesn't actually change the sort direction"). It didn't, and it
+   COULD NOT. `DataTable` bands a run of like-labelled rows, so a grouped list
+   sorts by the group FIRST and by the chosen column WITHIN each run — and the
+   group led with a HARDCODED direction. Inside a date band every row carries
+   the same date, so the within-run comparison was a no-op and the arrow moved
+   nothing at all.
+   **THE FIX IS ONE CLAUSE: when the grouping and the sort name the same field,
+   the direction drives the BANDS**, which by then is the only thing left for it
+   to drive. Every grouping on these lists has a same-named sort key, so
+   `grouping === sort.key` IS "you are sorting by what you are grouped by". A
+   group the sort does not name keeps its own lead — ascending, except by DATE,
+   where "most recent first" is what anybody means and an ascending band would
+   open the list on last month.
+   **THE SAME BUG WAS IN THREE LISTS AND ONLY ONE WAS REPORTED.**
+   `/schedules` (default grouping DATE, so the Date column was the first thing
+   anybody would try), **`/timesheets` (default grouping EMPLOYEE — sorting by
+   Employee did nothing)** and `/batch-logs` (default grouping none, so it bit
+   only once you picked one). Fixed in all three; grep for a comparator that
+   leads with a group before adding a fourth.
+   The schedules comparator moved to `lib/productionSchedule.sortSchedules` to
+   be fixture-tested — **a comparator inside a `useMemo` is exactly where this
+   hid**. 10 fixtures, checked in BOTH directions: restoring the hardcoded lead
+   turns 3 red, and letting the direction drive every band turns 2.
    **THE SELECTION BAR DELETES** (Mark, 2026-09-09: "in the box that appears
    when selecting multiple schedules … add a delete button"). The bar had held
    only Print packet since it shipped, so removing a night meant opening it.

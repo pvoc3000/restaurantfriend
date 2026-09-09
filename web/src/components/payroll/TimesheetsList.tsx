@@ -276,12 +276,24 @@ export function TimesheetsList({
     const dir = sort.dir === "asc" ? 1 : -1;
     const groupOf = grouping === "none" ? null : GROUP_LABEL[grouping];
     return [...shown].sort((a, b) => {
-      // The group leads, ALWAYS ascending — the runs are a table of contents,
-      // not the thing you sorted, and flipping a column shouldn't reverse the
-      // employee list. Inside a run the chosen column decides.
+      // The group leads ASCENDING — the runs are a table of contents, not the
+      // thing you sorted, and flipping a column shouldn't reverse the employee
+      // list. Inside a run the chosen column decides.
+      //
+      // EXCEPT WHEN YOU ARE SORTING BY THE COLUMN YOU ARE GROUPED BY, where
+      // turning the bands over is the only thing left for the direction to do
+      // (Mark, 2026-09-09, of the schedules list, which had this same bug and
+      // the same cause: inside a band every row shares the grouped value, so
+      // the comparison below is a no-op and the arrow moved nothing). All three
+      // groupings have a same-named sort key. The default grouping here is
+      // EMPLOYEE, so the column this bit first — sorting by Employee did
+      // nothing.
       if (groupOf) {
         const ag = groupOf(a), bg = groupOf(b);
-        if (ag !== bg) return ag < bg ? -1 : 1;
+        if (ag !== bg) {
+          const lead = grouping === sort.key ? dir : 1;
+          return (ag < bg ? -1 : 1) * lead;
+        }
       }
       const av = value(a), bv = value(b);
       if (av < bv) return -1 * dir;

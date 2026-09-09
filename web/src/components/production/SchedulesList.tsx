@@ -13,6 +13,8 @@ import { usePublishRecordSet } from "@/lib/recordSet";
 import {
   packetDate,
   plansInForce,
+  sortSchedules,
+  type ScheduleGrouping,
   scheduleSourceLabel,
   type SchedulePlan,
 } from "@/lib/productionSchedule";
@@ -42,7 +44,8 @@ export type ScheduleRow = {
 
 type Tier = "upcoming" | "today" | "unprinted" | "all";
 
-type Grouping = "date" | "kitchen" | "sells" | "none";
+/** Re-exported name for the local reads below; `lib/productionSchedule` owns it. */
+type Grouping = ScheduleGrouping;
 
 const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: ScheduleRow) => string> = {
   date: (r) => packetDate(r.schedule_date),
@@ -58,12 +61,6 @@ const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: ScheduleRow) => string>
  * It stayed invisible while only one night existed; found on the batch log's
  * own week and fixed in both places at once.
  */
-const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: ScheduleRow) => string> = {
-  date: (r) => r.schedule_date,
-  kitchen: (r) => r.kitchenCode,
-  sells: (r) => r.sellsCode,
-};
-
 /**
  * The nights, most recent first.
  *
@@ -152,42 +149,9 @@ export function SchedulesList({
     });
   }, [rows, plans, tier, term, today]);
 
-  const visible = useMemo(() => {
-    const value = (r: ScheduleRow): string | number => {
-      switch (sort.key) {
-        case "date": return r.schedule_date;
-        case "sells": return r.sellsCode;
-        case "kitchen": return r.kitchenCode;
-        case "source": return r.source;
-        case "lines": return r.lineCount;
-        case "par": return r.parTotal;
-        case "counted": return r.countedLines;
-        case "printed": return r.printedAt ?? "";
-        case "regenerated": return r.regenerations;
-        default: return r.schedule_date;
-      }
-    };
-    const dir = sort.dir === "asc" ? 1 : -1;
-    const groupOf = grouping === "none" ? null : GROUP_KEY[grouping];
-    return [...shown].sort((a, b) => {
-      // The group leads, ALWAYS ascending — a run is a table of contents, not
-      // the thing you sorted. Except by DATE, where "most recent first" is what
-      // anyone means and an ascending band would put last month at the top.
-      if (groupOf) {
-        const ag = groupOf(a), bg = groupOf(b);
-        if (ag !== bg) {
-          const lead = grouping === "date" ? -1 : 1;
-          return (ag < bg ? -1 : 1) * lead;
-        }
-      }
-      const av = value(a), bv = value(b);
-      if (av < bv) return -1 * dir;
-      if (av > bv) return 1 * dir;
-      // Tiebreaks always read ascending whichever way the primary points.
-      if (a.sellsCode !== b.sellsCode) return a.sellsCode < b.sellsCode ? -1 : 1;
-      return a.kitchenCode < b.kitchenCode ? -1 : 1;
-    });
-  }, [shown, sort, grouping]);
+  // The order lives in `lib/productionSchedule` so it can be fixture-tested —
+  // a comparator inside a `useMemo` is exactly where the group-leads bug hid.
+  const visible = useMemo(() => sortSchedules(shown, sort, grouping), [shown, sort, grouping]);
 
   usePublishRecordSet(
     "/schedules",
