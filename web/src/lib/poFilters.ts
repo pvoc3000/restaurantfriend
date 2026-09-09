@@ -7,6 +7,12 @@ import { withFrom } from "./breadcrumbs";
 import { PO_STATUS_ORDER, type PoStatus } from "./purchaseOrders";
 import { daysBefore, todayInTimeZone } from "./today";
 import {
+  matchingPreset,
+  parseRangeParams,
+  type DateRange,
+  type RangePreset,
+} from "./dateRange";
+import {
   appendVendorFilter,
   parseVendorFilter,
   VENDOR_FILTER_PARAM,
@@ -32,11 +38,17 @@ function isStatusFilter(value: string): value is StatusFilter {
  * The list is bounded by a date window rather than paged: 16.8k POs exist, but
  * the working set is "this Monday and the recent past". `all` is available for
  * archive digs and is deliberately the slow path.
+ *
+ * These are the `ui/RangePicker`'s PRESETS on this screen (Mark, 2026-09-08:
+ * "use the options from the window tabpicker as presets") — the same six the
+ * tabs offered, and their keys are still what the URL and the session cookie
+ * carry, so a remembered `range=90` from before the picker still means what
+ * it meant. Every one runs THROUGH TODAY, unlike `lib/dateRange`'s rolling
+ * presets, which end yesterday: on an ordering day the orders you just
+ * generated are the ones you came for.
  */
 export const RANGES = [
-  // Today and the rolling week are the ordering-day windows: on a Monday you
-  // want the POs you just generated, not a quarter of history (Mark,
-  // 2026-07-27). `days: 0` means "on or after today", so Today is a single day.
+  // `days: 0` means "on or after today", so Today is a single day.
   { key: "0", label: "Today", days: 0 },
   { key: "7", label: "7 days", days: 7 },
   { key: "30", label: "30 days", days: 30 },
@@ -46,6 +58,41 @@ export const RANGES = [
 ] as const;
 
 export type RangeKey = (typeof RANGES)[number]["key"];
+
+function isRangeKey(value: string): value is RangeKey {
+  return RANGES.some((r) => r.key === value);
+}
+
+/** A preset by key, or a pair of dates somebody tapped on the calendar. */
+export type PoRange = RangeKey | DateRange;
+
+export const PO_RANGE_PRESETS: RangePreset[] = RANGES.map((r) => ({
+  key: r.key,
+  label: r.label,
+  range: (today: string) =>
+    r.days === null ? null : { from: daysBefore(today, r.days), to: today },
+}));
+
+/**
+ * The dates a range resolves to on `today`, or null for all time. This is
+ * what the query and the picker both read, so they cannot disagree.
+ */
+export function poRangeBounds(range: PoRange, today: string): DateRange | null {
+  if (typeof range !== "string") return range;
+  return PO_RANGE_PRESETS.find((p) => p.key === range)?.range(today) ?? null;
+}
+
+/**
+ * What the picker handed back, as a filter value: a pair that IS one of the
+ * presets on `today` is stored by KEY, so "90 days" stays 90 days tomorrow
+ * rather than freezing into the dates it happened to be today; a pair that
+ * is none of them is stored as itself; a clear is all time.
+ */
+export function poRangeFromPicker(picked: DateRange | null, today: string): PoRange {
+  const preset = matchingPreset(picked, PO_RANGE_PRESETS, today);
+  if (preset) return preset.key as RangeKey;
+  return picked ?? "all";
+}
 
 export const PO_SORT_KEYS = [
   "po_number",
@@ -62,7 +109,7 @@ export type PoFilters = {
   status: StatusFilter;
   /** Vendor NAMES; empty means every vendor. See lib/vendorFilter. */
   vendors: string[];
-  range: RangeKey;
+  range: PoRange;
   sort: PoSortKey;
   dir: SortDir;
 };
@@ -92,6 +139,7 @@ export function parsePoFilters(
 ): PoFilters {
   const status = one(params.status);
   const range = one(params.range);
+  const custom = parseRangeParams(params.from, params.to);
   const sort = one(params.sort);
   const dir = one(params.dir);
   const fallback = { ...DEFAULT_PO_FILTERS, ...remembered };
@@ -109,9 +157,9 @@ export function parsePoFilters(
     vendors: params[VENDOR_FILTER_PARAM]
       ? parseVendorFilter(params[VENDOR_FILTER_PARAM])
       : fallback.vendors ?? [],
-    range: RANGES.some((r) => r.key === range)
-      ? (range as RangeKey)
-      : fallback.range,
+    // A key wins over a pair; a pair wins over the fallback; half a pair is
+    // nothing (`parseRangeParams`' rule).
+    range: isRangeKey(range) ? range : (custom ?? fallback.range),
     sort: (PO_SORT_KEYS as readonly string[]).includes(sort)
       ? (sort as PoSortKey)
       : fallback.sort,
@@ -131,10 +179,10 @@ export const PO_VIEW_COOKIE = "rf.po.view";
 export function serializePoView(filters: PoFilters): string {
   const params = new URLSearchParams({
     status: filters.status,
-    range: filters.range,
     sort: filters.sort,
     dir: filters.dir,
   });
+  appendRange(params, filters.range);
   appendVendorFilter(params, filters.vendors);
   return params.toString();
 }
@@ -144,6 +192,7 @@ export function parsePoView(raw: string | undefined | null): Partial<PoFilters> 
   const q = new URLSearchParams(raw);
   const status = q.get("status") ?? "";
   const range = q.get("range") ?? "";
+  const custom = parseRangeParams(q.get("from") ?? undefined, q.get("to") ?? undefined);
   const sort = q.get("sort") ?? "";
   const dir = q.get("dir");
 
@@ -151,7 +200,8 @@ export function parsePoView(raw: string | undefined | null): Partial<PoFilters> 
   if (isStatusFilter(status)) view.status = status;
   const vendors = parseVendorFilter(q.getAll(VENDOR_FILTER_PARAM));
   if (vendors.length > 0) view.vendors = vendors;
-  if (RANGES.some((r) => r.key === range)) view.range = range as RangeKey;
+  if (isRangeKey(range)) view.range = range;
+  else if (custom) view.range = custom;
   if ((PO_SORT_KEYS as readonly string[]).includes(sort)) view.sort = sort as PoSortKey;
   if (dir === "asc" || dir === "desc") view.dir = dir;
   return view;
@@ -162,10 +212,19 @@ export function poFiltersToQuery(filters: PoFilters): string {
   if (filters.q.trim()) params.set("q", filters.q.trim());
   if (filters.status !== DEFAULT_PO_FILTERS.status) params.set("status", filters.status);
   appendVendorFilter(params, filters.vendors);
-  if (filters.range !== DEFAULT_PO_FILTERS.range) params.set("range", filters.range);
+  if (filters.range !== DEFAULT_PO_FILTERS.range) appendRange(params, filters.range);
   if (filters.sort !== DEFAULT_PO_FILTERS.sort) params.set("sort", filters.sort);
   if (filters.dir !== DEFAULT_PO_FILTERS.dir) params.set("dir", filters.dir);
   return params.toString();
+}
+
+/** `range=<key>` for a preset, `from=&to=` for a custom pair. */
+function appendRange(params: URLSearchParams, range: PoRange): void {
+  if (typeof range === "string") params.set("range", range);
+  else {
+    params.set("from", range.from);
+    params.set("to", range.to);
+  }
 }
 
 export function poListHref(filters: PoFilters): string {
@@ -181,16 +240,10 @@ export function poDetailHref(id: string, filters: PoFilters): string {
 }
 
 /**
- * The earliest order_date the window includes, or null for all time.
- *
- * Takes the ORG's timezone, not a Date: "today" has to be the org's calendar
- * day or a Today window computed on a UTC host starts hiding the afternoon's
- * orders (the same trap migration 007 exists to close for the guide — see
- * lib/today). The coarse windows barely noticed; a one-day window would.
+ * The earliest order_date a PRESET window includes, or null for all time.
+ * Kept for `/invoices`, which still filters by these keys as a row of tabs;
+ * the PO list reads `poRangeBounds` instead.
  */
 export function rangeStart(range: RangeKey, timeZone: string): string | null {
-  const days = RANGES.find((r) => r.key === range)?.days ?? null;
-  if (days === null) return null;
-  const today = todayInTimeZone(timeZone);
-  return days === 0 ? today : daysBefore(today, days);
+  return poRangeBounds(range, todayInTimeZone(timeZone))?.from ?? null;
 }

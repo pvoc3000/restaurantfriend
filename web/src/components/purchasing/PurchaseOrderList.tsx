@@ -11,6 +11,8 @@ import {
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { PickSet } from "@/components/ui/PickSet";
+import { RangePicker } from "@/components/ui/RangePicker";
+import type { DateRange } from "@/lib/dateRange";
 import {
   downloadBlob,
   fetchPoDocData,
@@ -35,10 +37,11 @@ import {
   poListHref,
   serializePoView,
   PO_VIEW_COOKIE,
-  RANGES,
+  PO_RANGE_PRESETS,
+  poRangeBounds,
+  poRangeFromPicker,
   type PoFilters,
   type PoSortKey,
-  type RangeKey,
   type StatusFilter,
 } from "@/lib/poFilters";
 import { urlFilterParams } from "@/lib/filterMenus";
@@ -96,12 +99,15 @@ const GROUP_LABEL: Partial<Record<PoSortKey, (po: PoListRow) => string>> = {
 export function PurchaseOrderList({
   orders,
   initialFilters,
+  today,
   activeLocationCode,
   capped,
   editable,
 }: {
   orders: PoListRow[];
   initialFilters: PoFilters;
+  /** The org's calendar day — what the presets and the window resolve on. */
+  today: string;
   activeLocationCode: string;
   capped: boolean;
   /**
@@ -157,8 +163,8 @@ export function PurchaseOrderList({
   // well as pushing: the push re-renders the server component but does NOT
   // remount this one, so state seeded from props would otherwise keep showing
   // the old window on the chips.
-  function setRange(range: RangeKey) {
-    const next = { ...filters, range };
+  function setRange(picked: DateRange | null) {
+    const next = { ...filters, range: poRangeFromPicker(picked, today) };
     setFilters(next);
     router.push(poListHref(next));
   }
@@ -914,8 +920,7 @@ export function PurchaseOrderList({
         {/* A SET, not a one-of-N: "BakeMark and Chefs Warehouse" is the
             question this list is asked, and eighty vendors were never going to
             be a row of tabs. It sits with the controls that NARROW the list,
-            left of the window, and the picker grows its own find box past
-            eight options. */}
+            and the picker grows its own find box past eight options. */}
         <PickSet
           options={vendorOptions}
           value={filters.vendors}
@@ -927,15 +932,18 @@ export function PurchaseOrderList({
           minWidth={240}
         />
 
-        <div className="ml-auto flex items-center gap-3">
-          <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-            Window
-          </span>
-          <TabPicker
-            ariaLabel="Date window"
-            value={filters.range}
+        {/* The window, beside the vendors it narrows with (Mark, 2026-09-08:
+            "left align it so it sits next to the vendor picklist"). It was a
+            row of six tabs pushed to the right edge; the picker's presets ARE
+            those six, and the calendar is what the tabs could never offer. */}
+        <div className="w-64">
+          <RangePicker
+            value={poRangeBounds(filters.range, today)}
             onChange={setRange}
-            options={RANGES.map((r) => ({ key: r.key, label: r.label }))}
+            presets={PO_RANGE_PRESETS}
+            today={today}
+            ariaLabel="Date window"
+            placeholder="All time"
           />
         </div>
       </div>

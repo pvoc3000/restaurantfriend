@@ -142,6 +142,10 @@ test("matchingPreset names the preset a range IS, first match winning", () => {
   eq(matchingPreset({ from: "2026-09-01", to: "2026-09-07" }, ["today", "last_week"], TUE)?.key, "last_week");
   eq(matchingPreset({ from: "2026-09-02", to: "2026-09-07" }, ["today", "last_week"], TUE), null);
   eq(matchingPreset(null, ["today"], TUE), null);
+  // A preset that means "no range" matches a null value, and nothing else.
+  const all = { key: "all", label: "All time", range: () => null };
+  eq(matchingPreset(null, ["today", all], TUE)?.key, "all");
+  eq(matchingPreset({ from: TUE, to: TUE }, [all, "today"], TUE)?.key, "today");
   // A caller's own preset is matched like a built-in one.
   const custom = { key: "pp", label: "This pay period", range: () => ({ from: "2026-08-31", to: "2026-09-13" }) };
   eq(matchingPreset({ from: "2026-08-31", to: "2026-09-13" }, [custom, "this_week"], TUE)?.label, "This pay period");

@@ -18,7 +18,7 @@ import {
   type RangePresetSpec,
 } from "@/lib/dateRange";
 import { CalendarIcon } from "@/components/ui/DateField";
-import { BOXED_FIELD, BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
+import { BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
 
 /**
  * A RANGE of dates, for filtering a list by them (Mark, 2026-09-08).
@@ -63,6 +63,7 @@ export function RangePicker({
   placeholder = "Any date",
   clearable = true,
   disabled = false,
+  boxed = false,
   className = "",
 }: {
   /** The range in force, or null for no filter. */
@@ -79,6 +80,13 @@ export function RangePicker({
   /** Offer a ✕ that sets the value back to null. */
   clearable?: boolean;
   disabled?: boolean;
+  /**
+   * `PickSet`'s prop and its two dresses: a FILTER ROW wants the standing
+   * black rule the search box and the vendor picker wear (the default — Mark,
+   * 2026-09-08: "a solid border"), a detail FIELD wants the hairline that
+   * blackens on hover.
+   */
+  boxed?: boolean;
   /** For width — the box is `w-full` of whatever it is put in. */
   className?: string;
 }) {
@@ -86,7 +94,7 @@ export function RangePicker({
   const panelRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   /** The month the grid shows, as any ISO day inside it. */
-  const [month, setMonth] = useState(() => monthStart(value?.from ?? today));
+  const [month, setMonth] = useState(() => monthStart(value?.to ?? today));
   /** The first tap, while waiting for the second. */
   const [start, setStart] = useState<string | null>(null);
   /** The day under the pointer, so the range-to-be shows before the second tap. */
@@ -101,14 +109,17 @@ export function RangePicker({
   const box = useAnchoredPanel({ open, triggerRef, panelRef, onClose: close });
 
   const openPanel = () => {
-    // Open on the month of the range in force, else today's.
-    setMonth(monthStart(value?.from ?? today));
+    // Open on the month the range ENDS in, else today's. The end, not the
+    // start: a "90 days" window starts three months back, and a calendar
+    // opening on June when you came to tap a day this week is a page-turn
+    // before every custom range. For every preset the end IS today.
+    setMonth(monthStart(value?.to ?? today));
     setStart(null);
     setHover(null);
     setOpen(true);
   };
 
-  const apply = (next: DateRange) => {
+  const apply = (next: DateRange | null) => {
     onChange(next);
     close();
   };
@@ -122,7 +133,9 @@ export function RangePicker({
   };
 
   const preset = matchingPreset(value, presets, today);
-  const face = value ? (preset?.label ?? formatRange(value)) : null;
+  // A preset's NAME where the range is one — "All time" for a null value if
+  // the caller offers such a preset — else the dates, else the placeholder.
+  const face = preset?.label ?? (value ? formatRange(value) : null);
 
   /** What the grid paints as the range: the pending pair while picking, else the value. */
   const painted: DateRange | null =
@@ -133,7 +146,13 @@ export function RangePicker({
   return (
     <>
       <span
-        className={`flex items-center ${BOXED_FIELD_BORDER} ${BOXED_FIELD} bg-white ${
+        // `h-9`, not `BOXED_FIELD`'s `min-h-9`: this box never wraps, and a
+        // minimum lets the 36px button inside push the border out to 38 —
+        // measured 2px taller than the PickSet beside it. 36 is the app's own
+        // button height (`BUTTON_CLASS`), which is what a filter row lines up on.
+        className={`flex h-9 w-full items-center ${
+          boxed ? BOXED_FIELD_BORDER : "border border-ink"
+        } bg-white ${
           disabled ? "opacity-35" : ""
         } ${className}`}
       >
@@ -145,7 +164,7 @@ export function RangePicker({
           aria-expanded={open}
           aria-label={ariaLabel}
           onClick={() => (open ? close() : openPanel())}
-          className="flex h-9 min-w-0 flex-1 items-center gap-2 px-2 text-left text-sm hover:bg-neutral-100 disabled:hover:bg-white"
+          className="flex h-full min-w-0 flex-1 items-center gap-2 px-2 text-left text-sm hover:bg-neutral-100 disabled:hover:bg-white"
         >
           <span className={`min-w-0 flex-1 truncate tabular-nums ${face ? "" : "text-faint"}`}>
             {face ?? placeholder}
@@ -165,7 +184,7 @@ export function RangePicker({
             // `TextInput`'s ✕: untabbable, so Tab goes to the next filter.
             tabIndex={-1}
             onClick={() => onChange(null)}
-            className="h-9 shrink-0 px-2 text-xs text-muted hover:text-ink"
+            className="h-full shrink-0 px-2 text-xs text-muted hover:text-ink"
           >
             ✕
           </button>

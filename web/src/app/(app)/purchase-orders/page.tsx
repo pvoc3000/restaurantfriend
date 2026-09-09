@@ -5,10 +5,10 @@ import type { RawSearchParams } from "@/lib/itemFilters";
 import {
   parsePoFilters,
   parsePoView,
-  rangeStart,
+  poRangeBounds,
   PO_VIEW_COOKIE,
 } from "@/lib/poFilters";
-import { serverTimeZone } from "@/lib/today";
+import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import type { PoStatus } from "@/lib/purchaseOrders";
 import { PurchaseOrderList } from "@/components/purchasing/PurchaseOrderList";
 import { canEditPage } from "@/lib/pageAccess";
@@ -64,11 +64,9 @@ export default async function PurchaseOrdersPage({
 
   // The org's calendar day, not the host's — a Today window on a UTC host
   // would otherwise start hiding this afternoon's orders (see lib/today).
-  const start = rangeStart(
-    filters.range,
-    session.orgSettings.timezone ?? serverTimeZone()
-  );
-  if (start) query = query.gte("order_date", start);
+  const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
+  const bounds = poRangeBounds(filters.range, today);
+  if (bounds) query = query.gte("order_date", bounds.from).lte("order_date", bounds.to);
 
   const { data: orders, error } = await query;
 
@@ -140,6 +138,7 @@ export default async function PurchaseOrdersPage({
     <PurchaseOrderList
       orders={rows}
       initialFilters={filters}
+      today={today}
       activeLocationCode={session.activeLocation.code}
       capped={rows.length === 500}
       editable={canEditPage(session.membership.role, "/purchase-orders")}

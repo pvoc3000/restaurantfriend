@@ -24,7 +24,8 @@ export type DateRange = { from: string; to: string };
 export type RangePreset = {
   key: string;
   label: string;
-  range: (today: string) => DateRange;
+  /** Null means NO range — "All time" — which the picker applies as a clear. */
+  range: (today: string) => DateRange | null;
 };
 
 /* -- calendar arithmetic ------------------------------------------------- */
@@ -266,11 +267,12 @@ export function matchingPreset(
   presets: readonly RangePresetSpec[],
   today: string
 ): RangePreset | null {
-  if (!range) return null;
   for (const spec of presets) {
     const p = resolvePreset(spec);
     const r = p.range(today);
-    if (r.from === range.from && r.to === range.to) return p;
+    if (r === null ? range === null : range !== null && r.from === range.from && r.to === range.to) {
+      return p;
+    }
   }
   return null;
 }
