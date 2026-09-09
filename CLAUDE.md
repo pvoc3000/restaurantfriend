@@ -5481,6 +5481,35 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    list the moment the receipt arrives, so finishing means putting the receipt
    away, and it is a button that closes.
 
+   **THE SELECTION BAR DELETES** (Mark, 2026-09-09: "in the box that appears
+   when selecting multiple schedules … add a delete button"). The bar had held
+   only Print packet since it shipped, so removing a night meant opening it.
+   **ONE IMPLEMENTATION BEHIND BOTH DOORS**, `components/production/scheduleWrites`,
+   taking the ids as a parameter — the PO list's rule and its reason: what gets
+   remembered in one copy and forgotten in the other is the `.select()` row-count
+   check (a delete matching no policy removes ZERO rows and returns NO error, and
+   on the record that cheerful success also NAVIGATES) and what the confirm NAMES.
+   **THE CONFIRM IS PURE AND FIXTURE-TESTED**, which is how a real defect was
+   caught before it shipped: keying the singular sentence on "every row is a
+   special order" reads correctly on ONE night and then says "This came from a
+   special order" over a selection of five. Three branches, not two.
+   **ONE NIGHT NAMES ITSELF, A SELECTION IS COUNTED** — from a record the date is
+   the useful fact, from a bar over fifteen ticked rows one row's date is a worse
+   answer to "which ones?" than the number. It sums the items going with them,
+   names counted quantities where any night carries them (somebody stood at a
+   bench for those), and **a MIXED selection gets BOTH last sentences**: the
+   plan one is FALSE of a special-order night (the generator only ever touches
+   `source = 'plan'`, and this route bypasses `unschedule_special_order`'s
+   printed/counted guard), so either alone would be true of some of what is
+   going and a silent omission about the rest.
+   **GATED ON `editable`, NOT ON `stampable`.** Printing STAMPS a night and is
+   supervisor+ (044); deleting one is a purchaser's write. They are different
+   rungs, so the bar can legitimately exist for somebody who may print and not
+   delete — which is why `SchedulesList` now takes both flags. Red, like the
+   record's own Delete and every destructive command on a screen: a reader
+   cannot tell "opens a confirm" from "destroys" by looking.
+   Measured at 1280: Print packet and Delete both 36px on the same top, 16px
+   apart, Clear holding the bar's right edge, no wrap.
    **THE FROM COLUMN NAMES THE PLAN** (Mark, 2026-08-27: "instead of 'Plan' can
    the from column say the name of the plan instead?"). "Plan" was true of every
    plan schedule and so distinguished none of them, where "SUMMER 2026 (DF01)"

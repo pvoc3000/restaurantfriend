@@ -9,6 +9,7 @@ import { resolveItemPrice } from "@/lib/productionPrice";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { deleteSchedules, deleteSchedulesMessage } from "@/components/production/scheduleWrites";
 
 // THE SHARED CLASS, not a local copy. There were FOUR hand-typed near-copies of
 // this button in the module — here, `AddScheduleItems`, `PrintPacket` and the
@@ -183,40 +184,29 @@ export function ScheduleActions({
   }
 
   async function remove() {
-    // THE LAST LINE IS SOURCE-AWARE, because on a special-order schedule the
-    // plan sentence is simply false — regenerating rebuilds nothing here (the
-    // generator only ever touches `source = 'plan'`), and this route also
-    // bypasses `unschedule_special_order`'s printed/counted guard. The FK's
-    // `set null` clears the order's `production_schedule_id`, but its
-    // `order_scheduled_at` is left claiming production is scheduled.
-    const message =
-      `Delete the ${scheduleDate} schedule for ${sellsCode}?\n\n` +
-      `${lineCount} ${lineCount === 1 ? "item" : "items"} go with it` +
-      (hasActuals ? `, including counted quantities somebody entered` : "") +
-      `.\n\n` +
-      (source === "special_order"
-        ? `This came from a special order. Unscheduling it from the order is the ordinary way back — that also clears the order's Production scheduled date, and refuses if the night has been printed or counted.`
-        : `Generating the day again would rebuild it from the plans.`);
+    // The confirm and the write are BOTH `scheduleWrites`' — the schedules
+    // list's selection bar deletes through the same pair, and what would drift
+    // between two copies is exactly the `.select()` row-count check and the
+    // source-aware last line.
+    const message = deleteSchedulesMessage([
+      {
+        schedule_date: scheduleDate,
+        sellsCode,
+        source,
+        lineCount,
+        // The record is handed a boolean rather than a count; one is enough for
+        // the sentence, which only asks whether ANY line was counted.
+        countedLines: hasActuals ? 1 : 0,
+      },
+    ]);
     if (!(await confirmDialog({ ...splitConfirmMessage(message), confirmLabel: "Delete", tone: "danger" }))) return;
 
     setBusy("delete");
     setError(null);
-    // `.select()` its own result: a delete matching no policy removes zero rows
-    // and returns NO error, and a cheerful false success that also NAVIGATES
-    // reads as the schedule having been deleted.
-    const { data, error: err } = await supabase
-      .from("production_schedules")
-      .delete()
-      .eq("id", scheduleId)
-      .select("id");
-    if (err) {
+    const result = await deleteSchedules(supabase, [scheduleId]);
+    if ("error" in result) {
       setBusy(null);
-      setError(err.message);
-      return;
-    }
-    if ((data ?? []).length === 0) {
-      setBusy(null);
-      setError("Nothing was deleted — you may not have permission.");
+      setError(result.error);
       return;
     }
     router.push("/schedules");

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
@@ -16,6 +17,10 @@ import {
   type SchedulePlan,
 } from "@/lib/productionSchedule";
 import { PrintPacket } from "@/components/production/PrintPacket";
+import { deleteSchedules, deleteSchedulesMessage } from "@/components/production/scheduleWrites";
+import { createClient } from "@/lib/supabase/client";
+import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 
 export type ScheduleRow = {
   id: string;
@@ -76,6 +81,7 @@ export function SchedulesList({
   rows,
   plans,
   stampable,
+  editable,
   today,
   locationCode,
   action,
@@ -83,18 +89,27 @@ export function SchedulesList({
   rows: ScheduleRow[];
   /** Every plan, active or not — `plansInForce` decides which are in force. */
   plans: SchedulePlan[];
-  /** Supervisor and up — the only thing this list writes is the print stamp. */
+  /** Supervisor and up — who may print, which STAMPS the night (044). */
   stampable: boolean;
+  /**
+   * Purchaser and up, per the Page Permissions sheet — who may DELETE a night.
+   * Separate from `stampable` because the two are different rungs and the bar
+   * can legitimately exist for somebody who may print and not delete.
+   */
+  editable: boolean;
   today: string;
   /** The working shop, for the heading's count line. */
   locationCode?: string | null;
   /** The screen's create command, beside the title. */
   action?: ReactNode;
 }) {
+  const router = useRouter();
   const [tier, setTier] = useState<Tier>("upcoming");
   const [grouping, setGrouping] = useState<Grouping>("date");
   const [term, setTerm] = useState("");
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [failed, setFailed] = useState<string | null>(null);
   const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "date", dir: "desc" });
 
   const counts = useMemo(
@@ -186,6 +201,43 @@ export function SchedulesList({
       else next.add(id);
       return next;
     });
+  }
+
+  /**
+   * Delete the ticked nights (Mark, 2026-09-09).
+   *
+   * The confirm and the write are `scheduleWrites`' — the same pair the
+   * record's own Delete goes through, so what is NAMED and the `.select()`
+   * row-count check cannot drift between the two doors.
+   *
+   * It reads the rows out of `rows`, not `visible`: a selection survives a
+   * filter change, so a night ticked and then filtered off screen is still
+   * going, and the confirm has to be able to count it. `.filter` rather than a
+   * lookup per id, because the set is small and the ORDER of the message's
+   * facts should follow the list rather than the order things were ticked.
+   */
+  async function removeChecked() {
+    const going = rows.filter((r) => checked.has(r.id));
+    if (!going.length) return;
+    if (
+      !(await confirmDialog({
+        ...splitConfirmMessage(deleteSchedulesMessage(going)),
+        confirmLabel: going.length === 1 ? "Delete" : `Delete ${going.length}`,
+        tone: "danger",
+      }))
+    ) {
+      return;
+    }
+    setDeleting(true);
+    setFailed(null);
+    const result = await deleteSchedules(createClient(), going.map((r) => r.id));
+    setDeleting(false);
+    if ("error" in result) {
+      setFailed(result.error);
+      return;
+    }
+    setChecked(new Set());
+    router.refresh();
   }
 
   const allChecked = visible.length > 0 && visible.every((r) => checked.has(r.id));
@@ -433,6 +485,23 @@ export function SchedulesList({
             stampable={stampable}
             onPrinted={() => setChecked(new Set())}
           />
+          {/* RED, like the record's own Delete and every other destructive
+              command out on a screen — a reader cannot tell "opens a confirm"
+              from "destroys" by looking. Gated on `editable`, not on
+              `stampable`: printing STAMPS a night and is supervisor+ (044),
+              where deleting one is a purchaser's write, so the bar can exist
+              for somebody who may print and not delete. */}
+          {editable ? (
+            <button
+              type="button"
+              onClick={removeChecked}
+              disabled={deleting}
+              className={DANGER_BUTTON_CLASS}
+            >
+              {deleting ? "Deleting…" : "Delete"}
+            </button>
+          ) : null}
+          {failed ? <span className="text-accent">{failed}</span> : null}
           <button
             type="button"
             onClick={() => setChecked(new Set())}

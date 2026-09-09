@@ -160,6 +160,7 @@ export default async function SchedulesPage() {
           rows={rows}
           plans={plans}
           stampable={countable}
+          editable={editable}
           today={today}
           locationCode={kitchen?.code ?? null}
           action={
