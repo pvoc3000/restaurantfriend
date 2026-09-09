@@ -16,6 +16,7 @@ import {
   nextTrayNumber,
   duplicateTitle,
   planKitchen,
+  planIsAtLocation,
   sellingShopsForKitchen,
   NO_CATEGORY,
   NO_TYPE,
@@ -558,6 +559,29 @@ test("planKitchen falls back to the selling shop when the kitchen is unset", () 
   // makes its own". Without this the plan matches NO kitchen and disappears
   // from every list in the app.
   eq(planKitchen(plan({ location_id: DF02, kitchen_location_id: null })), DF02);
+});
+
+test("a plan belongs to the shop that SELLS it, even when another shop bakes", () => {
+  // The case the 2026-08-28 kitchen-only scoping hid: DF02's own menu, made at
+  // DF01, was invisible from the counter that sells it.
+  ok(planIsAtLocation(plan({ location_id: DF02, kitchen_location_id: DF01 }), DF02), "DF02 sells it");
+});
+
+test("a plan belongs to the shop that BAKES it too", () => {
+  ok(planIsAtLocation(plan({ location_id: DF02, kitchen_location_id: DF01 }), DF01), "DF01 bakes it");
+});
+
+test("a plan with no kitchen belongs to its selling shop and nobody else", () => {
+  // `planKitchen`'s fallback is what made this work under kitchen-only
+  // scoping; here the selling clause covers it, so a null must never be read
+  // as matching some other shop.
+  const p = plan({ location_id: DF02, kitchen_location_id: null });
+  ok(planIsAtLocation(p, DF02), "its own shop");
+  ok(!planIsAtLocation(p, DF01), "not a shop it has nothing to do with");
+});
+
+test("a plan at neither shop belongs to neither", () => {
+  ok(!planIsAtLocation(plan({ location_id: DF02, kitchen_location_id: DF02 }), DF01), "DF01 is uninvolved");
 });
 
 test("sellingShopsForKitchen finds the shop a kitchen bakes for", () => {

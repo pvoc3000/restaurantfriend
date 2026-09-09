@@ -93,6 +93,30 @@ export function planKitchen(plan: {
 }
 
 /**
+ * Is this plan one of the working shop's — either it SELLS what the plan makes,
+ * or it BAKES it (Mark, 2026-09-09: "loosen it … where either the sells at or
+ * make at locations are the working location").
+ *
+ * The list was scoped on the KITCHEN alone from 2026-08-28, which is the right
+ * question for the generate dialog and the wrong one for a list: decision 9
+ * makes a shop's menu the union of the plans that SELL there, so a plan DF01
+ * bakes for DF02 is DF02's menu — and under kitchen-only scoping it was
+ * invisible from the counter that sells it.
+ *
+ * NOTE WHAT THIS RETIRES: `planKitchen`'s fallback was load-bearing there —
+ * without it a plan with no kitchen matched no shop and vanished from every
+ * list. Here the selling clause covers that plan by itself, so a null kitchen
+ * simply never matches on its own and the trap cannot bite. Written as the two
+ * raw columns rather than through `planKitchen` to say exactly that.
+ */
+export function planIsAtLocation(
+  plan: { location_id: string; kitchen_location_id: string | null },
+  locationId: string
+): boolean {
+  return plan.location_id === locationId || plan.kitchen_location_id === locationId;
+}
+
+/**
  * The shops that SELL what this kitchen makes, over a date range.
  *
  * `generate_production_schedules` is asked for SELLING shops and works out the

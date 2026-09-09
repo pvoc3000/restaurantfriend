@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { PlansList, type PlanRow } from "@/components/production/PlansList";
-import { planKitchen } from "@/lib/productionPlans";
+import { planIsAtLocation } from "@/lib/productionPlans";
 import { NewPlan } from "@/components/production/NewPlan";
 import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
 import { canEditPage } from "@/lib/pageAccess";
@@ -66,23 +66,27 @@ export default async function PlansPage({
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
 
   /* --------------------------------------------------------------------------
-   * SCOPED TO THE WORKING KITCHEN (Mark, 2026-08-28).
+   * SCOPED TO EITHER SHOP ON THE PLAN (Mark, 2026-09-09) — the working location
+   * SELLS what it makes, or BAKES it.
    *
-   * A plan carries TWO shops and this list is filtered on the one that MAKES —
-   * `planKitchen`, so a plan with no kitchen set falls back to its selling shop
-   * rather than belonging to nobody and disappearing from every list.
+   * It was the KITCHEN alone from 2026-08-28, which is the right question for
+   * the generate dialog (a run is aimed at a kitchen) and the wrong one here:
+   * decision 9 makes a shop's menu the union of the plans that SELL there, so
+   * DF02's own menu was invisible from DF02 whenever DF01 baked it.
    *
    * The rows themselves are untouched: both columns stay, so a plan DF01 bakes
    * for DF02 still says so. What changes is which plans are yours to read.
    * ------------------------------------------------------------------------ */
   const workingId = session.activeLocation?.id ?? null;
   const mine = workingId
-    ? (plans ?? []).filter(
-        (p) =>
-          planKitchen({
+    ? (plans ?? []).filter((p) =>
+        planIsAtLocation(
+          {
             location_id: p.location_id as string,
             kitchen_location_id: (p.kitchen_location_id ?? null) as string | null,
-          }) === workingId
+          },
+          workingId
+        )
       )
     : (plans ?? []);
 
