@@ -128,7 +128,7 @@ export async function ScheduleDetail({
       // asking for the same thing on the list's From column).
       supabase
         .from("production_plans")
-        .select("id, title, location_id, kitchen_location_id, is_active, starts_on, ends_on"),
+        .select("id, title, location_id, kitchen_by_weekday, is_active, starts_on, ends_on"),
     ]);
 
   // NOT folded into the page's own error, and not swallowed either. An empty
@@ -251,7 +251,7 @@ export async function ScheduleDetail({
             id: pl.id as string,
             title: (pl.title ?? "") as string,
             location_id: pl.location_id as string,
-            kitchen_location_id: (pl.kitchen_location_id ?? null) as string | null,
+            kitchen_by_weekday: (pl.kitchen_by_weekday ?? null) as (string | null)[] | null,
             is_active: Boolean(pl.is_active),
             starts_on: pl.starts_on as string,
             ends_on: (pl.ends_on ?? null) as string | null,

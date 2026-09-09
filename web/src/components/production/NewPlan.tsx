@@ -7,18 +7,21 @@ import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
+import { defaultKitchenStrip } from "@/lib/productionPlans";
 import { DateField } from "@/components/ui/DateField";
 
 /**
  * A new plan — `NewEmployee`'s template.
  *
- * It asks for the four things a plan cannot be without: what it is called,
- * where it SELLS, where it is MADE, and when it starts. The trays come next, on
- * the record, because building a display case is the work rather than a field.
+ * It asks for the three things a plan cannot be without: what it is called,
+ * where it SELLS, and when it starts. The trays come next, on the record,
+ * because building a display case is the work rather than a field.
  *
- * The kitchen defaults to the selling shop, which is true of most plans and
- * makes the exception — decision 9's whole reason for existing — an explicit
- * choice rather than something you have to remember to check.
+ * IT NO LONGER ASKS WHERE IT IS MADE (migration 101). A plan's kitchen is now
+ * per WEEKDAY, edited in the matrix's own column headers, so there is nothing
+ * here that could ask the question once and be right — and a field that set all
+ * seven days would be the second answer 101 exists to remove. Every day starts
+ * at the selling shop, which is what the old field defaulted to anyway.
  */
 export function NewPlan({
   orgId,
@@ -37,7 +40,6 @@ export function NewPlan({
 
   const [title, setTitle] = useState("");
   const [locationId, setLocationId] = useState("");
-  const [kitchenId, setKitchenId] = useState("");
   const [startsOn, setStartsOn] = useState<string | null>(today);
   const [endsOn, setEndsOn] = useState<string | null>(null);
 
@@ -46,14 +48,8 @@ export function NewPlan({
   function close() {
     if (pending) return;
     setOpen(false);
-    setTitle(""); setLocationId(""); setKitchenId("");
+    setTitle(""); setLocationId("");
     setStartsOn(today); setEndsOn(null); setFailed(null);
-  }
-
-  function pickLocation(id: string) {
-    setLocationId(id);
-    // Default the kitchen to the shop, but never overwrite a deliberate choice.
-    if (!kitchenId) setKitchenId(id);
   }
 
   function add() {
@@ -66,7 +62,12 @@ export function NewPlan({
         .insert({
           org_id: orgId,                 // explicitly — design rule 1
           location_id: locationId,
-          kitchen_location_id: kitchenId || null,
+          // SEVEN EXPLICIT COPIES OF THE SELLING SHOP, never null (101). It
+          // costs nothing and it keeps `kitchen_assumed` meaning "nobody said"
+          // — left null, the generation receipt would carry that warning per
+          // item per day for every ordinary day, which is the noise that
+          // teaches people to stop reading receipts.
+          kitchen_by_weekday: defaultKitchenStrip(locationId),
           title: title.trim(),
           starts_on: startsOn,
           ends_on: endsOn,
@@ -138,26 +139,10 @@ export function NewPlan({
                 variant="field"
                 ariaLabel="Selling location"
                 value={locationId}
-                onPick={pickLocation}
+                onPick={setLocationId}
                 options={options}
                 placeholder="Which shop…"
               />
-            </Field>
-
-            <Field label="Made at">
-              <PickList
-                variant="field"
-                ariaLabel="Kitchen"
-                value={kitchenId}
-                onPick={setKitchenId}
-                options={options}
-                placeholder="Which kitchen…"
-              />
-              <p className="text-[13px] text-muted">
-                Usually the same shop. Set a different kitchen when one shop
-                makes part of another&rsquo;s menu — that plan&rsquo;s items then
-                appear on the kitchen&rsquo;s own paperwork.
-              </p>
             </Field>
 
             <div className="flex flex-wrap gap-6">

@@ -15,8 +15,9 @@ import {
   stepPar,
   nextTrayNumber,
   duplicateTitle,
-  planKitchen,
-  planIsAtLocation,
+  planKitchenFor,
+  planKitchens,
+  defaultKitchenStrip,
   sellingShopsForKitchen,
   NO_CATEGORY,
   NO_TYPE,
@@ -31,7 +32,7 @@ const DF02 = "loc-df02";
 
 function plan(over: Partial<PlanSummary> = {}): PlanSummary {
   return {
-    id: "p1", title: "October", location_id: DF02, kitchen_location_id: DF02,
+    id: "p1", title: "October", location_id: DF02, kitchen_by_weekday: null,
     starts_on: "2026-10-01", ends_on: "2026-10-31", is_active: true, ...over,
   };
 }
@@ -85,8 +86,11 @@ test("an open-ended plan overlaps everything after it starts", () => {
 test("DF01 making DF02's raised while DF02 makes its own cake is TWO overlapping plans", () => {
   // Decision 9's own example, and the thing the schema deliberately permits.
   const plans = [
-    plan({ id: "raised", title: "DF02 raised", kitchen_location_id: DF01 }),
-    plan({ id: "cake", title: "DF02 cake", kitchen_location_id: DF02 }),
+    // 101 does NOT retire this case: two kitchens on ONE day, split by ITEM,
+    // is still two overlapping plans. What it retires is two kitchens on
+    // DIFFERENT days, which is one plan now.
+    plan({ id: "raised", title: "DF02 raised", kitchen_by_weekday: defaultKitchenStrip(DF01) }),
+    plan({ id: "cake", title: "DF02 cake", kitchen_by_weekday: defaultKitchenStrip(DF02) }),
   ];
   const warn = overlappingPlans(plans);
   eq(warn.get("raised"), ["DF02 cake"]);
@@ -546,58 +550,93 @@ test("duplicateTitle ignores surrounding whitespace when checking what's taken",
 
 /* -- which kitchen makes it, and who sells it ------------------------------ */
 //
-// The rule /plans, /schedules and the generate dialog are all scoped by since
-// 2026-08-28. Every case here is one where the obvious implementation makes a
-// plan belong to nobody, which is silent and total: it simply vanishes.
+// Since migration 101 a plan's kitchen is PER WEEKDAY — Mark's case is one menu
+// baked at DF01 on Mon–Wed and at DF02 on Thu–Sun, which used to need two plans
+// and therefore two copies of every tray. Slot 0 is Monday.
+//
+// The subscript is the thing to get right: off by one, a whole shop's week of
+// kitchens shifts by a day and nothing says so.
 
-test("planKitchen takes the kitchen when one is set", () => {
-  eq(planKitchen(plan({ location_id: DF02, kitchen_location_id: DF01 })), DF01);
+/** DF01 Mon–Wed, DF02 (as a null, i.e. the selling shop) Thu–Sun. */
+const SPLIT_WEEK = [DF01, DF01, DF01, null, null, null, null];
+
+test("planKitchenFor reads the slot for that ISO weekday", () => {
+  const p = plan({ location_id: DF02, kitchen_by_weekday: SPLIT_WEEK });
+  eq(planKitchenFor(p, 1), DF01, "Monday");
+  eq(planKitchenFor(p, 3), DF01, "Wednesday");
+  eq(planKitchenFor(p, 4), DF02, "Thursday");
+  eq(planKitchenFor(p, 7), DF02, "Sunday");
 });
 
-test("planKitchen falls back to the selling shop when the kitchen is unset", () => {
-  // 039 left the kitchen nullable and decision 9 reads a null as "the shop
-  // makes its own". Without this the plan matches NO kitchen and disappears
-  // from every list in the app.
-  eq(planKitchen(plan({ location_id: DF02, kitchen_location_id: null })), DF02);
+test("planKitchenFor is ONE-BASED on the ISO weekday and zero-based in the array", () => {
+  // The off-by-one, pinned on its own: a strip naming DF01 on Monday alone must
+  // answer DF01 for weekday 1 and the selling shop for weekday 2.
+  const p = plan({ location_id: DF02, kitchen_by_weekday: [DF01, null, null, null, null, null, null] });
+  eq(planKitchenFor(p, 1), DF01);
+  eq(planKitchenFor(p, 2), DF02);
 });
 
-test("a plan belongs to the shop that SELLS it, even when another shop bakes", () => {
-  // The case the 2026-08-28 kitchen-only scoping hid: DF02's own menu, made at
-  // DF01, was invisible from the counter that sells it.
-  ok(planIsAtLocation(plan({ location_id: DF02, kitchen_location_id: DF01 }), DF02), "DF02 sells it");
+test("planKitchenFor falls back to the selling shop on a null slot", () => {
+  // Decision 9's reading of a null, moved from per-plan to per-day by 101.
+  // Without it the day matches NO kitchen and vanishes from every list.
+  eq(planKitchenFor(plan({ location_id: DF02, kitchen_by_weekday: null }), 4), DF02);
+  eq(planKitchenFor(plan({ location_id: DF02, kitchen_by_weekday: SPLIT_WEEK }), 5), DF02);
 });
 
-test("a plan belongs to the shop that BAKES it too", () => {
-  ok(planIsAtLocation(plan({ location_id: DF02, kitchen_location_id: DF01 }), DF01), "DF01 bakes it");
+test("planKitchens names every kitchen the week uses, first-used first", () => {
+  eq(planKitchens(plan({ location_id: DF02, kitchen_by_weekday: SPLIT_WEEK })), [DF01, DF02]);
 });
 
-test("a plan with no kitchen belongs to its selling shop and nobody else", () => {
-  // `planKitchen`'s fallback is what made this work under kitchen-only
-  // scoping; here the selling clause covers it, so a null must never be read
-  // as matching some other shop.
-  const p = plan({ location_id: DF02, kitchen_location_id: null });
-  ok(planIsAtLocation(p, DF02), "its own shop");
-  ok(!planIsAtLocation(p, DF01), "not a shop it has nothing to do with");
+test("planKitchens is one entry on a week baked in one place", () => {
+  // A list column that read "DF02 DF02 DF02 …" would say nothing; the point of
+  // the column is which days leave the building.
+  eq(planKitchens(plan({ location_id: DF02, kitchen_by_weekday: null })), [DF02]);
+  eq(planKitchens(plan({ location_id: DF02, kitchen_by_weekday: defaultKitchenStrip(DF02) })), [DF02]);
 });
 
-test("a plan at neither shop belongs to neither", () => {
-  ok(!planIsAtLocation(plan({ location_id: DF02, kitchen_location_id: DF02 }), DF01), "DF01 is uninvolved");
+test("defaultKitchenStrip is seven copies of the selling shop", () => {
+  // Written EXPLICITLY on create rather than left null, so `kitchen_assumed`
+  // keeps meaning "nobody said" instead of firing on every ordinary day.
+  eq(defaultKitchenStrip(DF02).length, 7);
+  ok(defaultKitchenStrip(DF02).every((k) => k === DF02), "every slot is the shop");
 });
 
 test("sellingShopsForKitchen finds the shop a kitchen bakes for", () => {
   const plans = [
-    plan({ id: "a", location_id: DF01, kitchen_location_id: DF01 }),
-    plan({ id: "b", location_id: DF02, kitchen_location_id: DF01 }),
-    plan({ id: "c", location_id: DF02, kitchen_location_id: DF02 }),
+    plan({ id: "a", location_id: DF01, kitchen_by_weekday: defaultKitchenStrip(DF01) }),
+    plan({ id: "b", location_id: DF02, kitchen_by_weekday: defaultKitchenStrip(DF01) }),
+    plan({ id: "c", location_id: DF02, kitchen_by_weekday: defaultKitchenStrip(DF02) }),
   ];
-  const range = { starts_on: "2026-10-05", ends_on: "2026-10-05" };
+  const range = { starts_on: "2026-10-05", ends_on: "2026-10-05" }; // a Monday
   // DF01's kitchen sells through BOTH shops — decision 9's whole case.
   eq(sellingShopsForKitchen(plans, DF01, range).sort(), [DF01, DF02]);
   eq(sellingShopsForKitchen(plans, DF02, range), [DF02]);
 });
 
+test("sellingShopsForKitchen asks the kitchen of each DATE in the window", () => {
+  // The bug this function shipped with in 2026-08-28 and could not have fixed,
+  // the answer not existing until 101: a plan baked at DF01 on Mon–Wed must not
+  // offer its shop for a Thursday run.
+  const plans = [plan({ location_id: DF02, kitchen_by_weekday: SPLIT_WEEK })];
+  const mon = { starts_on: "2026-10-05", ends_on: "2026-10-05" };
+  const thu = { starts_on: "2026-10-08", ends_on: "2026-10-08" };
+  eq(sellingShopsForKitchen(plans, DF01, mon), [DF02], "Monday is DF01's");
+  eq(sellingShopsForKitchen(plans, DF01, thu), [], "Thursday is not");
+  eq(sellingShopsForKitchen(plans, DF02, thu), [DF02], "Thursday is DF02's own");
+  eq(sellingShopsForKitchen(plans, DF02, mon), [], "Monday is not");
+});
+
+test("sellingShopsForKitchen takes a window that spans both halves of the split", () => {
+  // A week-long run reaches every weekday, so BOTH kitchens are offered the
+  // shop — which is right: generating either writes the days that are theirs.
+  const plans = [plan({ location_id: DF02, kitchen_by_weekday: SPLIT_WEEK })];
+  const week = { starts_on: "2026-10-05", ends_on: "2026-10-11" };
+  eq(sellingShopsForKitchen(plans, DF01, week), [DF02]);
+  eq(sellingShopsForKitchen(plans, DF02, week), [DF02]);
+});
+
 test("sellingShopsForKitchen counts a null-kitchen plan as its own shop", () => {
-  const plans = [plan({ location_id: DF02, kitchen_location_id: null })];
+  const plans = [plan({ location_id: DF02, kitchen_by_weekday: null })];
   const range = { starts_on: "2026-10-05", ends_on: "2026-10-05" };
   eq(sellingShopsForKitchen(plans, DF02, range), [DF02]);
   eq(sellingShopsForKitchen(plans, DF01, range), []);
@@ -606,22 +645,32 @@ test("sellingShopsForKitchen counts a null-kitchen plan as its own shop", () => 
 test("sellingShopsForKitchen ignores inactive plans", () => {
   // Generation reads the ACTIVE plans, so a retired one would offer a shop
   // that then generates nothing and reports an empty run.
-  const plans = [plan({ location_id: DF02, kitchen_location_id: DF01, is_active: false })];
+  const plans = [plan({ location_id: DF02, kitchen_by_weekday: defaultKitchenStrip(DF01), is_active: false })];
   eq(sellingShopsForKitchen(plans, DF01, { starts_on: "2026-10-05", ends_on: "2026-10-05" }), []);
 });
 
 test("sellingShopsForKitchen ignores a plan whose dates miss the window", () => {
-  const plans = [plan({ location_id: DF02, kitchen_location_id: DF01 })]; // October
+  const plans = [plan({ location_id: DF02, kitchen_by_weekday: defaultKitchenStrip(DF01) })]; // October
   eq(sellingShopsForKitchen(plans, DF01, { starts_on: "2026-11-01", ends_on: "2026-11-03" }), []);
   // Touching at one end is enough — a run that reaches the plan's first day
   // legitimately generates it.
   eq(sellingShopsForKitchen(plans, DF01, { starts_on: "2026-09-28", ends_on: "2026-10-01" }), [DF02]);
 });
 
+test("sellingShopsForKitchen ignores the days a plan does not cover", () => {
+  // A window overlapping the plan's range is not enough: the DATE has to be
+  // inside it too, or a run reaching a plan's last Monday would offer its shop
+  // on the strength of a Thursday the plan has already ended before.
+  const plans = [plan({ location_id: DF02, kitchen_by_weekday: SPLIT_WEEK, ends_on: "2026-10-07" })];
+  // 10-05..10-11 overlaps, but every DF02 day (Thu–Sun) is past ends_on.
+  eq(sellingShopsForKitchen(plans, DF02, { starts_on: "2026-10-05", ends_on: "2026-10-11" }), []);
+  eq(sellingShopsForKitchen(plans, DF01, { starts_on: "2026-10-05", ends_on: "2026-10-11" }), [DF02]);
+});
+
 test("sellingShopsForKitchen returns each shop once however many plans it has", () => {
   const plans = [
-    plan({ id: "a", location_id: DF02, kitchen_location_id: DF01 }),
-    plan({ id: "b", location_id: DF02, kitchen_location_id: DF01, title: "October B" }),
+    plan({ id: "a", location_id: DF02, kitchen_by_weekday: defaultKitchenStrip(DF01) }),
+    plan({ id: "b", location_id: DF02, kitchen_by_weekday: defaultKitchenStrip(DF01), title: "October B" }),
   ];
   // Overlapping plans are the FEATURE (their pars sum), so two of them must
   // not offer the same shop twice or `p_location_ids` generates it twice.
@@ -629,7 +678,7 @@ test("sellingShopsForKitchen returns each shop once however many plans it has", 
 });
 
 test("sellingShopsForKitchen is empty when no plan reaches the kitchen", () => {
-  const plans = [plan({ location_id: DF02, kitchen_location_id: DF02 })];
+  const plans = [plan({ location_id: DF02, kitchen_by_weekday: defaultKitchenStrip(DF02) })];
   eq(sellingShopsForKitchen(plans, DF01, { starts_on: "2026-10-05", ends_on: "2026-10-05" }), []);
 });
 

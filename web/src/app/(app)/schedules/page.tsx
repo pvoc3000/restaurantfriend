@@ -79,7 +79,7 @@ export default async function SchedulesPage() {
     // matching a different one.
     supabase
       .from("production_plans")
-      .select("id, title, location_id, kitchen_location_id, is_active, starts_on, ends_on"),
+      .select("id, title, location_id, kitchen_by_weekday, is_active, starts_on, ends_on"),
   ]);
 
   if (error) {
@@ -113,7 +113,7 @@ export default async function SchedulesPage() {
     id: p.id as string,
     title: (p.title ?? "") as string,
     location_id: p.location_id as string,
-    kitchen_location_id: (p.kitchen_location_id ?? null) as string | null,
+    kitchen_by_weekday: (p.kitchen_by_weekday ?? null) as (string | null)[] | null,
     is_active: Boolean(p.is_active),
     starts_on: p.starts_on as string,
     ends_on: (p.ends_on ?? null) as string | null,

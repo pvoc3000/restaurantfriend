@@ -202,6 +202,27 @@ lines and the printed page are the same document, and reprinting is free.
 
 ### 9. Kitchen lives on the PLAN; multiple plans are concurrently active
 
+> **AMENDED 2026-09-09 (migration 101): the kitchen is PER WEEKDAY.** A plan is
+> (selling location, date range, trays) plus a seven-slot
+> `kitchen_by_weekday`; the single `kitchen_location_id` is DROPPED. Mark:
+> "place a kitchen field above each day's column … By default the kitchen would
+> be set to the receiving location for every day of the week, but we could
+> change it." Everything below still holds — a null slot still reads as the
+> selling shop, overlapping plans still sum, generation still groups by kitchen
+> — read "the plan's kitchen" as "that weekday's kitchen" throughout.
+>
+> WHY: one menu baked in two places on DIFFERENT days needed two plans, and a
+> tray is a physical case position at the selling shop that does not change on
+> Thursday, so the shop ended up with two tray 01s that are the same shelf and
+> every edit had to be made to both.
+>
+> WHAT IT DOES NOT REPLACE: two kitchens on ONE day, split by ITEM — the DF01
+> raised / DF02 cake example below — is still two overlapping plans. That is
+> why `production_day` groups by (kitchen, item).
+>
+> The plans LIST is scoped to the SELLING shop alone (Mark: "A plan is for a
+> location"), a plan no longer having one kitchen to scope by.
+
 Mark's brief flagged where-made vs where-sold as a known FMP mistake (it lived
 on the Location table). The fix: a plan is
 **(selling location, kitchen, date range, trays)**, and — lifting FMP's
@@ -292,8 +313,9 @@ by business concept.
   **`production_item_locations`** — per-location config: `par_by_weekday`
   (the 009 seven-slot array idiom), active, price override.
   **`production_item_elements`** — the BOM edge: item FK, element FK, qty, unit.
-- **`production_plans`** — org, selling `location_id`, `kitchen_location_id`,
-  start/end dates, title, active.
+- **`production_plans`** — org, selling `location_id`, `kitchen_by_weekday`
+  (seven ISO slots since 101; `kitchen_location_id` is dropped), start/end
+  dates, title, active.
   **`production_plan_trays`** — plan FK, tray number, row/tier label.
   **`production_plan_tray_items`** — tray FK, weekday, item FK (a slot may
   hold several items; usually one).
@@ -547,7 +569,10 @@ brief says; refuse and name the rest.
 ### What this module makes vestigial
 
 `locations.kitchen_by_weekday` and `shops_for` (017) — superseded by
-kitchen-on-plan. Retire from the Location record UI when this ships.
+kitchen-on-plan, and since 101 by a column of the same name and shape one level
+down. Nothing derives from them; they still have an editor on the location
+record (`ProductionMapping`). Retire when Mark asks — 101 deliberately left
+them alone rather than delete a screen block unasked.
 
 ---
 

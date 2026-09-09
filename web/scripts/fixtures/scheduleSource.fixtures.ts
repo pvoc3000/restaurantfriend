@@ -29,7 +29,7 @@ function plan(over: Partial<SchedulePlan> = {}): SchedulePlan {
     id: "plan-1",
     title: "SUMMER 2026 (DF01)",
     location_id: DF01,
-    kitchen_location_id: DF01,
+    kitchen_by_weekday: [DF01, DF01, DF01, DF01, DF01, DF01, DF01],
     is_active: true,
     starts_on: "2026-08-08",
     ends_on: null,
@@ -105,7 +105,11 @@ test("plansInForce: the KITCHEN has to match too", () => {
   // A shop running two plans into two kitchens produces two schedules, and each
   // is fed by one of them. Without this test the DF02-kitchen plan would put
   // its name on the DF01-kitchen night.
-  const toDF02 = plan({ id: "b", title: "OVERNIGHT", kitchen_location_id: DF02 });
+  const toDF02 = plan({
+    id: "b",
+    title: "OVERNIGHT",
+    kitchen_by_weekday: [DF02, DF02, DF02, DF02, DF02, DF02, DF02],
+  });
   eq(plansInForce(schedule(), [plan(), toDF02]).map((p) => p.title), ["SUMMER 2026 (DF01)"], "one");
   eq(
     plansInForce(schedule({ kitchen_location_id: DF02 }), [plan(), toDF02]).map((p) => p.title),
@@ -115,11 +119,29 @@ test("plansInForce: the KITCHEN has to match too", () => {
 });
 
 test("plansInForce: a plan with NO kitchen falls back to its selling shop", () => {
-  // 039 leaves it nullable — "a plan can be written before anyone has decided
+  // 039 left it nullable — "a plan can be written before anyone has decided
   // which kitchen takes it" — and decision 9 reads that as the selling shop.
-  const undecided = plan({ kitchen_location_id: null });
+  // 101 keeps the reading and moves it per day.
+  const undecided = plan({ kitchen_by_weekday: null });
   eq(plansInForce(schedule(), [undecided]).length, 1, "matches its own shop");
   eq(plansInForce(schedule({ kitchen_location_id: DF02 }), [undecided]).length, 0, "not another");
+});
+
+test("plansInForce: the kitchen is asked of the SCHEDULE'S OWN WEEKDAY", () => {
+  // Migration 101's case, and the one a plan-level comparison gets wrong in
+  // both directions: one plan baked at DF01 on Mon–Wed and at DF02 on Thu–Sun
+  // feeds BOTH of that shop's schedules, and each night has to find it.
+  const split = plan({
+    location_id: DF02,
+    kitchen_by_weekday: [DF01, DF01, DF01, DF02, DF02, DF02, DF02],
+  });
+  // 2026-10-05 is a Monday; 2026-10-08 a Thursday.
+  const mon = { schedule_date: "2026-10-05", location_id: DF02 };
+  const thu = { schedule_date: "2026-10-08", location_id: DF02 };
+  eq(plansInForce(schedule({ ...mon, kitchen_location_id: DF01 }), [split]).length, 1, "Monday at DF01");
+  eq(plansInForce(schedule({ ...mon, kitchen_location_id: DF02 }), [split]).length, 0, "not DF02 on Monday");
+  eq(plansInForce(schedule({ ...thu, kitchen_location_id: DF02 }), [split]).length, 1, "Thursday at DF02");
+  eq(plansInForce(schedule({ ...thu, kitchen_location_id: DF01 }), [split]).length, 0, "not DF01 on Thursday");
 });
 
 test("plansInForce: the date range includes BOTH its ends", () => {

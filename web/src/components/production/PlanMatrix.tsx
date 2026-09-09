@@ -30,6 +30,8 @@ import {
   type TraySlot,
   type MatrixGrouping,
   type ItemTaxonomy,
+  defaultKitchenStrip,
+  planKitchenFor,
 } from "@/lib/productionPlans";
 import { useSlotDrag, type SlotDragSource, type SlotDropTarget } from "@/lib/planSlotDrag";
 import { withSlot } from "@/lib/production";
@@ -95,6 +97,8 @@ export function PlanMatrix({
   locationId,
   locationCode,
   bands,
+  kitchenByWeekday,
+  kitchenOptions,
   reviewDefaults = false,
   editable,
 }: {
@@ -114,6 +118,15 @@ export function PlanMatrix({
   locationCode: string;
   /** The band vocabulary already in use across this org's plans. */
   bands: string[];
+  /**
+   * WHICH KITCHEN BAKES EACH DAY — seven ISO slots, slot 0 = Monday
+   * (migration 101). Null, or a null slot, means the selling shop makes its own
+   * that day; new plans are written with seven explicit copies of the selling
+   * shop, so a null is only ever a row that predates 101.
+   */
+  kitchenByWeekday: (string | null)[] | null;
+  /** The shops a day can be assigned to — active ones, `PickList` options. */
+  kitchenOptions: { value: string; label: string; hint?: string }[];
   /**
    * Open in review mode — every par that disagrees with its shop default
    * offers it. How a DUPLICATED plan arrives; see `review` below for the other
@@ -381,6 +394,40 @@ export function PlanMatrix({
         .eq("id", rowId)
         .select("id");
       return error || !data?.length ? error?.message ?? "That could not be removed." : null;
+    });
+  }
+
+  /**
+   * WHICH KITCHEN BAKES THIS DAY (Mark, 2026-09-09: "place a kitchen field
+   * above each day's column … By default the kitchen would be set to the
+   * receiving location for every day of the week, but we could change it").
+   *
+   * The whole of migration 101 from the screen's side. Before it, one plan had
+   * one kitchen, so a week baked in two places needed TWO PLANS — and then a
+   * shop has two tray 01s that are the same physical shelf, and every edit has
+   * to be made to both.
+   *
+   * `withSlot` writes ONE slot and pads the strip to seven, which is what makes
+   * a legacy null column safe: the first pick materialises the whole week from
+   * the selling shop and sets the day you touched, rather than leaving six
+   * nulls behind that the reader would then have to notice.
+   */
+  function setKitchen(weekday: number, kitchenId: string) {
+    const strip = withSlot(
+      kitchenByWeekday ?? defaultKitchenStrip(locationId),
+      weekday - 1,
+      kitchenId,
+      7
+    );
+    run(async (supabase) => {
+      const { data, error } = await supabase
+        .from("production_plans")
+        .update({ kitchen_by_weekday: strip })
+        .eq("id", planId)
+        .select("id");
+      return error || !data?.length
+        ? error?.message ?? "That kitchen could not be changed."
+        : null;
     });
   }
 
@@ -1058,10 +1105,14 @@ export function PlanMatrix({
             <tr className={`text-[11px] uppercase tracking-[0.12em] ${STICKY_HEAD_ROW_UNDER_CONTROLS}`}>
               {WEEKDAYS.map((d) => {
                 const held = slots.filter((s) => s.weekday === d.iso).length;
+                const kitchen = planKitchenFor(
+                  { location_id: locationId, kitchen_by_weekday: kitchenByWeekday },
+                  d.iso
+                );
                 return (
                   <th
                     key={d.iso}
-                    className="px-2 py-2 text-left"
+                    className="px-2 py-2 text-left align-bottom"
                     style={{ width: `calc((100% - ${MENU_COLUMN}px) / 7)` }}
                   >
                     <span className="flex items-baseline justify-between gap-2">
@@ -1091,6 +1142,40 @@ export function PlanMatrix({
                           Clear
                         </button>
                       ) : null}
+                    </span>
+                    {/* WHO BAKES THIS DAY (101). On its own line under the
+                        label rather than beside it: the header cell already
+                        holds two things at 11px, and a shop code is the answer
+                        to a different question from the day it sits under.
+                        Muted where it is the shop's own kitchen, in ink where
+                        it is somebody else's — the same treatment the list's
+                        Made at column gives it, so one glance down the row
+                        finds the days that leave the building. */}
+                    <span className="mt-1 flex normal-case tracking-normal">
+                      {editable ? (
+                        <PickList
+                          variant="inline"
+                          value={kitchen}
+                          options={kitchenOptions}
+                          onPick={(v) => v && setKitchen(d.iso, v)}
+                          ariaLabel={`Which kitchen makes ${d.long}`}
+                          className={
+                            kitchen === locationId
+                              ? "text-[11px] text-muted"
+                              : "text-[11px] font-semibold text-ink"
+                          }
+                        />
+                      ) : (
+                        <span
+                          className={
+                            kitchen === locationId
+                              ? "text-[11px] text-muted"
+                              : "text-[11px] font-semibold text-ink"
+                          }
+                        >
+                          {kitchenOptions.find((o) => o.value === kitchen)?.label ?? "—"}
+                        </span>
+                      )}
                     </span>
                   </th>
                 );

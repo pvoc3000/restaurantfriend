@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { guideToday, serverTimeZone } from "@/lib/orderGuide";
 import { PlansList, type PlanRow } from "@/components/production/PlansList";
-import { planIsAtLocation } from "@/lib/productionPlans";
+import { planKitchens, planMigrationHint } from "@/lib/productionPlans";
 import { NewPlan } from "@/components/production/NewPlan";
 import { parseFilterSearch, type RawSearchParams } from "@/lib/filterMenus";
 import { canEditPage } from "@/lib/pageAccess";
@@ -33,7 +33,7 @@ export default async function PlansPage({
   const [{ data: plans, error }, { data: trays }, { data: slots }] = await Promise.all([
     supabase
       .from("production_plans")
-      .select("id, title, location_id, kitchen_location_id, starts_on, ends_on, is_active, notes")
+      .select("id, title, location_id, kitchen_by_weekday, starts_on, ends_on, is_active, notes")
       .order("starts_on", { ascending: false }),
     supabase.from("production_plan_trays").select("id, plan_id"),
     supabase.from("production_plan_tray_items").select("id, tray_id"),
@@ -43,7 +43,7 @@ export default async function PlansPage({
     return (
       <p className="text-sm text-accent">
         Could not load plans: {error.message}
-        {/production_plan/.test(error.message) ? " — migration 039 has not been applied yet." : ""}
+        {planMigrationHint(error.message)}
       </p>
     );
   }
@@ -66,43 +66,39 @@ export default async function PlansPage({
   const codeById = new Map(session.locations.map((l) => [l.id, l.code]));
 
   /* --------------------------------------------------------------------------
-   * SCOPED TO EITHER SHOP ON THE PLAN (Mark, 2026-09-09) — the working location
-   * SELLS what it makes, or BAKES it.
+   * SCOPED TO THE SELLING SHOP (Mark, 2026-09-09: "A plan is for a location").
    *
-   * It was the KITCHEN alone from 2026-08-28, which is the right question for
-   * the generate dialog (a run is aimed at a kitchen) and the wrong one here:
-   * decision 9 makes a shop's menu the union of the plans that SELL there, so
-   * DF02's own menu was invisible from DF02 whenever DF01 baked it.
+   * It was the KITCHEN from 2026-08-28, and briefly either shop; migration 101
+   * settles it, because a plan no longer HAS one kitchen — its week can be
+   * baked in two places, so "whose plan is this" can only be answered by the
+   * shop whose display case it describes.
    *
-   * The rows themselves are untouched: both columns stay, so a plan DF01 bakes
-   * for DF02 still says so. What changes is which plans are yours to read.
+   * The rows themselves are untouched: the Kitchen column stays and now names
+   * every kitchen the week uses, so a plan DF01 bakes on Monday still says so.
    * ------------------------------------------------------------------------ */
   const workingId = session.activeLocation?.id ?? null;
   const mine = workingId
-    ? (plans ?? []).filter((p) =>
-        planIsAtLocation(
-          {
-            location_id: p.location_id as string,
-            kitchen_location_id: (p.kitchen_location_id ?? null) as string | null,
-          },
-          workingId
-        )
-      )
+    ? (plans ?? []).filter((p) => p.location_id === workingId)
     : (plans ?? []);
 
   const rows: PlanRow[] = mine.map((p) => ({
     id: p.id as string,
     title: p.title as string,
     location_id: p.location_id as string,
-    kitchen_location_id: (p.kitchen_location_id ?? null) as string | null,
+    kitchen_by_weekday: (p.kitchen_by_weekday ?? null) as (string | null)[] | null,
     starts_on: p.starts_on as string,
     ends_on: (p.ends_on ?? null) as string | null,
     is_active: (p.is_active ?? true) as boolean,
     notes: (p.notes ?? null) as string | null,
     sellsCode: codeById.get(p.location_id as string) ?? "—",
-    kitchenCode: p.kitchen_location_id
-      ? codeById.get(p.kitchen_location_id as string) ?? "—"
-      : null,
+    // EVERY kitchen the week uses, in the order it first appears — one code on
+    // a plan baked in one place, two on a week that splits (101). Resolved
+    // through `planKitchens`, so a null slot reads as the selling shop rather
+    // than as a gap.
+    kitchenCodes: planKitchens({
+      location_id: p.location_id as string,
+      kitchen_by_weekday: (p.kitchen_by_weekday ?? null) as (string | null)[] | null,
+    }).map((id) => codeById.get(id) ?? "—"),
     trayCount: trayCount.get(p.id as string) ?? 0,
     slotCount: slotCount.get(p.id as string) ?? 0,
   }));

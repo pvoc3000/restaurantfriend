@@ -39,7 +39,12 @@ import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 export type PlanRow = PlanSummary & {
   notes: string | null;
   sellsCode: string;
-  kitchenCode: string | null;
+  /**
+   * Every kitchen the week uses, first-used first (101) — one code where the
+   * plan is baked in one place, two where the week splits. Never empty:
+   * `planKitchens` resolves a null slot to the selling shop.
+   */
+  kitchenCodes: string[];
   trayCount: number;
   slotCount: number;
 };
@@ -194,7 +199,7 @@ export function PlansList({
       [
         r.title,
         r.sellsCode,
-        r.kitchenCode ?? "",
+        r.kitchenCodes.join(" "),
         r.notes ?? "",
         r.starts_on,
         r.ends_on ?? "",
@@ -247,7 +252,7 @@ export function PlansList({
         .insert({
           org_id: orgId,
           location_id: row.location_id,
-          kitchen_location_id: row.kitchen_location_id,
+          kitchen_by_weekday: row.kitchen_by_weekday,
           title,
           starts_on: row.starts_on,
           ends_on: row.ends_on,
@@ -431,23 +436,25 @@ export function PlansList({
       key: "kitchen",
       label: "Made at",
       width: 110,
-      sortValue: (r) => r.kitchenCode ?? "",
+      sortValue: (r) => r.kitchenCodes.join(" "),
       sortTiebreaks: [(r) => r.title],
       // The whole reason this module exists as designed. A kitchen that differs
-      // from the selling shop is the case FMP could not express at all.
-      render: (r) =>
-        r.kitchenCode === null ? (
-          <span
-            className="bg-mark-fill px-1"
-            title="No kitchen set — generation will not know who makes this"
-          >
-            not set
-          </span>
-        ) : (
-          <span className={r.kitchenCode === r.sellsCode ? "text-muted" : "font-medium"}>
-            {r.kitchenCode}
-          </span>
-        ),
+      // from the selling shop is the case FMP could not express at all — and
+      // since 101 a week can use two, so this is a LIST rather than a code.
+      //
+      // "not set" is gone with the single column: every day resolves to some
+      // shop, so there is no state left where generation would not know who
+      // makes this. A day left at the selling shop reads muted, exactly as one
+      // code did.
+      render: (r) => (
+        <span className="flex flex-wrap gap-x-1.5">
+          {r.kitchenCodes.map((c) => (
+            <span key={c} className={c === r.sellsCode ? "text-muted" : "font-medium"}>
+              {c}
+            </span>
+          ))}
+        </span>
+      ),
     },
     {
       key: "dates",

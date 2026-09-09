@@ -10,6 +10,7 @@ import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { PlanMatrix } from "@/components/production/PlanMatrix";
 import {
   overlappingPlans,
+  planMigrationHint,
   planRange,
   REVIEW_DEFAULTS_PARAM,
   type PlanSummary,
@@ -38,12 +39,12 @@ export async function PlanDetail({
     await Promise.all([
       supabase
         .from("production_plans")
-        .select("id, title, location_id, kitchen_location_id, starts_on, ends_on, is_active, notes")
+        .select("id, title, location_id, kitchen_by_weekday, starts_on, ends_on, is_active, notes")
         .eq("id", id)
         .maybeSingle(),
       supabase
         .from("production_plans")
-        .select("id, title, location_id, kitchen_location_id, starts_on, ends_on, is_active"),
+        .select("id, title, location_id, kitchen_by_weekday, starts_on, ends_on, is_active"),
       supabase
         .from("production_plan_trays")
         .select("id, tray_number, band, sort")
@@ -64,7 +65,7 @@ export async function PlanDetail({
     return (
       <p className="text-sm text-accent">
         Could not load this plan: {error.message}
-        {/production_plan/.test(error.message) ? " — migration 039 has not been applied yet." : ""}
+        {planMigrationHint(error.message)}
       </p>
     );
   }
@@ -96,9 +97,7 @@ export async function PlanDetail({
     return (
       <p className="text-sm text-accent">
         Could not load this plan&rsquo;s trays: {slotsError.message}
-        {/par/.test(slotsError.message)
-          ? " — migration 043 has not been applied yet."
-          : ""}
+        {planMigrationHint(slotsError.message)}
       </p>
     );
   }
@@ -197,30 +196,6 @@ export async function PlanDetail({
             ) : (
               <span className={READ_ONLY_VALUE}>
                 {codeById.get(plan.location_id as string) ?? "—"}
-              </span>
-            )}
-          </Row>
-          <Row label="Made at">
-            {editable ? (
-              // Nullable, and "not set" is a real state — 039 left the kitchen
-              // open because a plan can be written before anyone has decided
-              // which one takes it, and decision 9's fallback then reads it as
-              // the selling shop.
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="production_plans"
-                id={id}
-                column="kitchen_location_id"
-                kind="pick"
-                value={(plan.kitchen_location_id ?? null) as string | null}
-                options={locationOptions}
-                ariaLabel="Made at"
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>
-                {plan.kitchen_location_id
-                  ? codeById.get(plan.kitchen_location_id as string) ?? "—"
-                  : <span className="bg-mark-fill px-1">not set</span>}
               </span>
             )}
           </Row>
@@ -324,6 +299,12 @@ export async function PlanDetail({
             finish: (i.finish ?? null) as string | null,
           }))}
           bands={bands}
+          // WHICH KITCHEN BAKES EACH DAY (101) — seven ISO slots, edited in the
+          // matrix's own column headers, where the single "Made at" field used
+          // to be a row in the block above. One answer per day and no second
+          // field claiming to say the same thing.
+          kitchenByWeekday={(plan.kitchen_by_weekday ?? null) as (string | null)[] | null}
+          kitchenOptions={locationOptions}
           locationId={plan.location_id as string}
           locationCode={codeById.get(plan.location_id as string) ?? "this shop"}
           // Set by a duplicate: the new plan opens offering each shop's own

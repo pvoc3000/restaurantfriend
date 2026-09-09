@@ -341,7 +341,7 @@ export default async function RunShiftReportPage({
     wants("tomorrow")
       ? supabase
           .from("production_plans")
-          .select("id, title, location_id, kitchen_location_id, starts_on, ends_on, is_active")
+          .select("id, title, location_id, kitchen_by_weekday, starts_on, ends_on, is_active")
       : SKIP,
   ]);
 

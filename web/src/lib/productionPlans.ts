@@ -1,12 +1,21 @@
 /**
  * Plans — production brief decision 9.
  *
- * A plan is (selling location, kitchen, date range, trays). Several plans for
- * one shop may be active at once, and their UNION is that shop's menu: DF01
- * makes DF02's raised donuts while DF02 makes its own cake donuts, which is two
- * answers for one shop and exactly what `locations.kitchen_by_weekday` could
- * never hold.
+ * A plan is (selling location, date range, trays) plus a KITCHEN PER WEEKDAY.
+ * Several plans for one shop may be active at once, and their UNION is that
+ * shop's menu: DF01 makes DF02's raised donuts while DF02 makes its own cake
+ * donuts, which is two answers for one shop on ONE DAY and still needs two
+ * overlapping plans.
+ *
+ * The per-weekday kitchen (migration 101) is the OTHER case — one menu baked in
+ * two places on different days — which used to need two plans and therefore two
+ * copies of every tray. A tray is a physical case position at the selling shop
+ * and it does not change on Thursday; who bakes it does.
  */
+
+// A RELATIVE import: this module is compiled into the Node fixture run, which
+// is plain CommonJS and does not resolve the `@/` alias.
+import { addDays, isoWeekday } from "./payPeriods";
 
 export const WEEKDAYS = [
   { iso: 1, short: "Mon", long: "Monday" },
@@ -67,53 +76,71 @@ export type PlanSummary = {
   id: string;
   title: string;
   location_id: string;
-  kitchen_location_id: string | null;
+  /**
+   * Which kitchen MAKES it, per ISO weekday — slot 0 = Monday … slot 6 = Sunday
+   * (migration 101). A null slot, or a null column, means the SELLING shop
+   * makes its own that day.
+   */
+  kitchen_by_weekday: (string | null)[] | null;
   starts_on: string;
   ends_on: string | null;
   is_active: boolean;
 };
 
+/** A plan's kitchen columns, for the two functions below and their callers. */
+export type PlanKitchens = { location_id: string; kitchen_by_weekday: (string | null)[] | null };
+
 /**
- * WHICH KITCHEN MAKES THIS PLAN'S DONUTS.
+ * WHICH KITCHEN MAKES THIS PLAN'S DONUTS ON ONE WEEKDAY.
  *
- * `kitchen_location_id` is NULLABLE — 039 left it open for a plan written
- * before anyone had decided — and decision 9's reading of a null is that the
- * selling shop makes its own. `plansInForce` has always applied that fallback;
- * this is the same rule with a name, so the three screens that now scope
- * themselves by kitchen cannot each remember it differently.
+ * `kitchen_by_weekday` is seven slots, ISO, and a null slot means the SELLING
+ * shop makes its own that day — decision 9's fallback, which migration 101
+ * moved from per-plan to per-day without changing what it means. The whole
+ * reason it is per day is Mark's own case (2026-09-09): DF02's week is baked at
+ * DF01 on Mon–Wed and at DF02 on Thu–Sun, which used to need two plans and
+ * therefore two copies of every tray.
  *
- * Getting it wrong is silent and total: without the fallback a plan whose
- * kitchen is unset belongs to NO shop and vanishes from every list.
+ * GETTING THE SUBSCRIPT WRONG BY ONE SHIFTS A WHOLE WEEK OF KITCHENS BY A DAY,
+ * silently — 040's warning about `par_by_weekday`, now true of this. The array
+ * is ZERO-BASED in TypeScript and ONE-BASED in Postgres, so this takes an ISO
+ * weekday (1 = Monday) and subtracts, exactly as `defaultParFor` does. There
+ * are fixtures on both ends of that.
  */
-export function planKitchen(plan: {
-  location_id: string;
-  kitchen_location_id: string | null;
-}): string {
-  return plan.kitchen_location_id ?? plan.location_id;
+export function planKitchenFor(plan: PlanKitchens, weekday: number): string {
+  return plan.kitchen_by_weekday?.[weekday - 1] ?? plan.location_id;
 }
 
 /**
- * Is this plan one of the working shop's — either it SELLS what the plan makes,
- * or it BAKES it (Mark, 2026-09-09: "loosen it … where either the sells at or
- * make at locations are the working location").
+ * Every kitchen this plan uses across the week, first-used first.
  *
- * The list was scoped on the KITCHEN alone from 2026-08-28, which is the right
- * question for the generate dialog and the wrong one for a list: decision 9
- * makes a shop's menu the union of the plans that SELL there, so a plan DF01
- * bakes for DF02 is DF02's menu — and under kitchen-only scoping it was
- * invisible from the counter that sells it.
- *
- * NOTE WHAT THIS RETIRES: `planKitchen`'s fallback was load-bearing there —
- * without it a plan with no kitchen matched no shop and vanished from every
- * list. Here the selling clause covers that plan by itself, so a null kitchen
- * simply never matches on its own and the trap cannot bite. Written as the two
- * raw columns rather than through `planKitchen` to say exactly that.
+ * What a LIST column shows, where a single code no longer answers the question:
+ * one entry on a plan baked in one place, two on a week that splits. Resolved,
+ * so a null slot appears as the selling shop rather than as a gap.
  */
-export function planIsAtLocation(
-  plan: { location_id: string; kitchen_location_id: string | null },
-  locationId: string
-): boolean {
-  return plan.location_id === locationId || plan.kitchen_location_id === locationId;
+export function planKitchens(plan: PlanKitchens): string[] {
+  const out: string[] = [];
+  for (const d of WEEKDAYS) {
+    const k = planKitchenFor(plan, d.iso);
+    if (!out.includes(k)) out.push(k);
+  }
+  return out;
+}
+
+/**
+ * The seven slots a NEW plan starts with, and what a picker writes into when
+ * the column is still null.
+ *
+ * EXPLICIT, never left null (Mark, 2026-09-09: "By default the kitchen would be
+ * set to the receiving location for every day of the week, but we could change
+ * it"). It costs nothing and it keeps `kitchen_assumed` meaning what it has
+ * always meant — nobody said — rather than becoming a warning that fires on
+ * every deliberately-ordinary day. Measured on the harness: without this, the
+ * generation receipt carries a `kitchen_assumed` line per item per day for the
+ * half of the week a shop bakes for itself, which is exactly the noise that
+ * teaches people to stop reading receipts.
+ */
+export function defaultKitchenStrip(locationId: string): string[] {
+  return WEEKDAYS.map(() => locationId);
 }
 
 /**
@@ -142,11 +169,20 @@ export function sellingShopsForKitchen(
   range: PlanDates
 ): string[] {
   const out = new Set<string>();
+  const last = range.ends_on ?? range.starts_on;
   for (const p of plans) {
     if (!p.is_active) continue;
-    if (planKitchen(p) !== kitchenId) continue;
     if (!rangesOverlap(p, range)) continue;
-    out.add(p.location_id);
+    // PER DATE, not per plan (101). The kitchen is a fact about a WEEKDAY now,
+    // so a plan baked at DF01 on Mon–Wed must not offer its shop for a Thursday
+    // run — which is the weekday-blindness this function shipped with in
+    // 2026-08-28 and could not have fixed, the answer not existing yet.
+    for (let d = range.starts_on; d <= last; d = addDays(d, 1)) {
+      if (!coversDate(p, d)) continue;
+      if (planKitchenFor(p, isoWeekday(d)) !== kitchenId) continue;
+      out.add(p.location_id);
+      break;
+    }
   }
   return [...out];
 }
@@ -530,4 +566,23 @@ export function nextTrayNumber(existing: readonly string[], from: string): strin
     if (!taken.has(candidate)) return candidate;
   }
   return `${from} copy`;
+}
+
+/**
+ * Which migration a failed plan query is probably waiting on.
+ *
+ * A missing COLUMN must say so by name (018's pattern): PostgREST answers a
+ * select naming an unknown column with an error and no rows, and `?? []` would
+ * render that as a shop with no plans — a claim about the menu, and a false
+ * one.
+ *
+ * `kitchen_by_weekday` is checked FIRST because it is the newest: 101 drops
+ * `kitchen_location_id` in the same statement, so between deploying and
+ * applying it, every query here fails on that column and nothing else.
+ */
+export function planMigrationHint(message: string): string {
+  if (/kitchen_by_weekday/.test(message)) return " — migration 101 has not been applied yet.";
+  if (/\bpar\b/.test(message)) return " — migration 043 has not been applied yet.";
+  if (/production_plan/.test(message)) return " — migration 039 has not been applied yet.";
+  return "";
 }

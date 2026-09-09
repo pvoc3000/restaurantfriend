@@ -28,6 +28,8 @@
  */
 
 import { convert } from "./units";
+import { planKitchenFor } from "./productionPlans";
+import { isoWeekday } from "./payPeriods";
 import {
   batchYield,
   versionBatchCost,
@@ -504,7 +506,8 @@ export type SchedulePlan = {
   id: string;
   title: string;
   location_id: string;
-  kitchen_location_id: string | null;
+  /** Seven ISO slots since migration 101; null means the selling shop. */
+  kitchen_by_weekday: (string | null)[] | null;
   is_active: boolean;
   starts_on: string;
   ends_on: string | null;
@@ -525,8 +528,14 @@ export type ScheduleOrigin = {
  * Mirrors `production_day`'s own `planned` CTE — active, this SELLING location,
  * and the date inside `[starts_on, ends_on]` — plus the kitchen, because a shop
  * running two plans into two kitchens produces two schedules and each is fed by
- * one of them. 039 leaves a plan's kitchen nullable and decision 9 reads that as
- * the selling shop, so the fallback is applied here too.
+ * one of them.
+ *
+ * THE KITCHEN IS ASKED OF THE SCHEDULE'S OWN WEEKDAY (migration 101). A plan
+ * baked at DF01 on Mon–Wed and DF02 on Thu–Sun feeds BOTH of that shop's
+ * schedules, and each date has to be matched against the slot that produced it
+ * — a plan-level comparison would name it on one half of the week and lose it
+ * on the other. Decision 9's fallback (a null slot means the selling shop)
+ * lives in `planKitchenFor`, so it is applied here by construction.
  *
  * Dates compare as STRINGS, never through `new Date`, which is UTC midnight and
  * moves a plan's first day for everyone west of Greenwich (`lib/productionPlans`
@@ -540,7 +549,7 @@ export function plansInForce<T extends SchedulePlan>(
     (p) =>
       p.is_active &&
       p.location_id === schedule.location_id &&
-      (p.kitchen_location_id ?? p.location_id) === schedule.kitchen_location_id &&
+      planKitchenFor(p, isoWeekday(schedule.schedule_date)) === schedule.kitchen_location_id &&
       p.starts_on <= schedule.schedule_date &&
       (p.ends_on === null || p.ends_on >= schedule.schedule_date)
   );

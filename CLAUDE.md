@@ -3819,6 +3819,96 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    there has room for one answer while DF01 makes DF02's raised donuts and DF02
    makes its own cake. A plan is (selling location, kitchen, date range, trays),
    several may be active at once, and their UNION is that shop's menu.
+   **AND SINCE 2026-09-09 THAT KITCHEN IS PER WEEKDAY — migration 101, NEEDS
+   APPLYING, AND BEFORE THE DEPLOY** (059's order, not 012's: five screens
+   select the column, and while the generate dialog and the shift report's
+   Tomorrow page find no plans a closing supervisor cannot make the night's
+   paper. The plans screens name the migration; the schedules ones degrade
+   honestly, losing only the plan's name in their From column).
+   *Probe, don't read this line.* Probes:
+   `select column_name from information_schema.columns where table_name =
+   'production_plans' and column_name in ('kitchen_by_weekday',
+   'kitchen_location_id')` — ONE row, the first; and
+   `select count(*) from production_plans where cardinality(kitchen_by_weekday)
+   <> 7` — 0. Mark: "the only way to have donuts
+   made for DF2 at DF1 M-W and DF2 Th-Su is to have two separate plans … any
+   change to the schedule requires the user to change 2 schedules instead of
+   just one. A better solution … is to place a kitchen field above each day's
+   column."
+   **THE TWO-PLAN WORKAROUND MADE A TRAY LOOK LIKE IT CHANGED ON THURSDAY.** A
+   tray is a physical case position at the SELLING shop and it does not change;
+   what varies by day is who bakes it. So DF02 had two tray 01s that are the
+   same shelf, and every edit had to be made to both. `kitchen_by_weekday` is
+   seven ISO slots on the plan (`par_by_weekday`'s idiom) and
+   **`kitchen_location_id` IS DROPPED, not kept as a default** (Mark: "we would
+   retire the plan's 'made at' field as it would conflict"): a plan-level field
+   applying only where a day says nothing is exactly 016's
+   `nextDeliveryDate` shape. Decision 9's fallback is UNCHANGED in meaning — a
+   null slot says the selling shop makes its own — it is just said per day.
+   **NOTHING BELOW THE VIEW CHANGED, which is why this was cheap.**
+   `production_day` filters `v.weekday = wd.weekday` and THEN groups by
+   `v.kitchen_location_id`, so every row it sees already shares one weekday;
+   `production_schedules` is already unique on (location, date, kitchen) so one
+   seller may have two schedules a day; and `generate_production_schedules`
+   reads `distinct d.kitchen_location_id` and loops, 040's "the kitchen is NOT
+   a parameter: the DAY tells you which kitchens are involved" being what makes
+   it indifferent. The substance is ONE expression inside
+   `v_production_plan_days`. Neither function is reproduced in 101 (055's rule).
+   **AN ARRAY CANNOT CARRY A FOREIGN KEY**, where the column had
+   `on delete set null` — so a deleted location leaves a dangling uuid. It
+   fails LOUDLY (`production_schedules.kitchen_location_id` is
+   `not null references locations`), and shops are deactivated rather than
+   deleted here, so it is a live edge and not a live risk.
+   **AND THE ARRAY SUBSCRIPT COMES BACK.** 049's view celebrated that 043 had
+   left "no array subscript anywhere in this file"; one returns, on a different
+   axis, and 040's warning applies word for word — off by one shifts a whole
+   shop's WHOLE WEEK of kitchens by a day. What makes it safe is that the
+   subscript is `s.weekday`, the slot's own column. The app-side twin is
+   `planKitchenFor`, ONE-BASED on the ISO weekday and zero-based in the array,
+   with a fixture on exactly that.
+   **`cardinality`, NEVER `array_length(x, 1)`** — 076's lesson, and the
+   harness proved it again: an empty array makes `array_length` NULL and A
+   CHECK PASSES ON NULL. (017's own check on `locations.kitchen_by_weekday` has
+   that hole; 101 does not fix it.)
+   **A NEW PLAN IS WRITTEN WITH SEVEN EXPLICIT COPIES OF THE SELLING SHOP**
+   (`defaultKitchenStrip`), never left null. It costs nothing and it keeps
+   `kitchen_assumed` meaning "nobody said" rather than firing on every ordinary
+   day — measured on the harness, a null strip puts that warning on the
+   generation receipt PER ITEM PER DAY for the half of the week a shop bakes
+   for itself, which is the noise that teaches people to stop reading receipts.
+   **THIS DOES NOT REPLACE OVERLAPPING PLANS.** Two kitchens on ONE day split
+   by ITEM — decision 9's own DF01-raised / DF02-cake example — is still two
+   plans, which is why `production_day` groups by (kitchen, item) and why
+   `kitchen_split` exists on overrides. 101 is the DIFFERENT-DAYS case only.
+   **THE PLANS LIST IS SCOPED TO THE SELLING SHOP ALONE** (Mark: "A plan is for
+   a location"), which retires both the 2026-08-28 kitchen scoping and the
+   either-shop rule that stood for four hours on 2026-09-09: a plan no longer
+   HAS one kitchen to scope by. `planIsAtLocation` and `planKitchen` are gone;
+   the Made at COLUMN stays and now lists every kitchen the week uses
+   (`planKitchens`), muted where it is the shop's own.
+   **`sellingShopsForKitchen` ASKS PER DATE NOW**, which fixes a weekday
+   blindness it shipped with and could not have fixed — the answer did not
+   exist. A plan baked at DF01 on Mon–Wed no longer offers its shop for a
+   Thursday run. `plansInForce` likewise reads the SCHEDULE'S OWN WEEKDAY, or a
+   split plan would name itself on half the week and lose itself on the other.
+   The matrix's day header is now day · Clear over a kitchen `PickList`;
+   `NewPlan` no longer asks where it is made, there being nothing it could ask
+   once and be right about.
+   **Verified on the harness**: all 101 migrations replay; the backfill turns a
+   plan naming DF01 into seven copies and leaves a null-kitchen plan null; the
+   view resolves Mon–Wed DF01 / Thu–Sun DF02; `production_day` agrees per DATE
+   with no change to the function; the check refuses a short array AND an empty
+   one; and **generation produced exactly Mark's case from ONE plan** — DF02
+   selling, 2026-09-07..09 at DF01 and 09-10..13 at DF02, one line each. As
+   real roles a purchaser writes a day's kitchen (1 row) and a staffer changes
+   **0 rows with NO error**. **1743 fixtures pass**, and the three new rules
+   were each checked by BREAKING them: the off-by-one turns 3 red, a
+   plan-level `sellingShopsForKitchen` 2, a plan-level `plansInForce` 1.
+   **Left as it is, and named so nobody thinks it was forgotten:**
+   `locations.kitchen_by_weekday` / `shops_for` (017) are now unambiguously a
+   second answer, and 101 does NOT drop them — they hold real data and have a
+   live editor (`ProductionMapping`), and deleting a block off a screen is a
+   decision to take deliberately. One commit when Mark wants it.
    **OVERLAP IS DELIBERATELY NOT A CONSTRAINT.** 027 taught the btree_gist
    exclusion idiom and this is exactly where NOT to reach for it: overlapping
    ranges are the feature, and even "the same item on two of one shop's plans"
@@ -3837,8 +3927,6 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    selling, DF01 kitchen, tray 01, Bananaversary on Saturday, stored as
    `weekday=6` and rendered in the Saturday column — then DELETED, leaving 0
    plans, 0 trays, 0 slots.
-   **`locations.kitchen_by_weekday` / `shops_for` are now VESTIGIAL** and should
-   be retired from the Location record; that is not done yet.
    **Shipped, phase 4 — migration 040, APPLIED** (this line said NEEDS APPLYING
    until 2026-08-08; probed that day — the tables select and `production_day`
    executes. *Probe, don't read this file.*) `/schedules` +
@@ -4530,6 +4618,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    box ready to type. Only ever pass `defaultOpen` to a picker a deliberate act
    summoned; a list that opens itself on load is a popup.
    The Trays block's explanatory paragraph is GONE (Mark).
+   **EACH DAY COLUMN'S HEADER HAS A `Clear`** (Mark, 2026-09-09), quiet
+   small-caps beside the day, taking every item off that weekday across every
+   tray after a confirm naming the day and the count. A day is how a plan is
+   read and how it is rebuilt, so "start Monday again" was otherwise a ✕ per
+   slot down twenty-four trays. Scoped from `slots` — this plan's own rows —
+   rather than from `matrix`, which grouping reorders: what is cleared is the
+   DAY, not what happens to be on screen. Rendered on every day and DISABLED on
+   an empty one rather than hidden (`NewTimesheet`'s rule), the reason being
+   the empty column beneath it. The day label is `shrink-0`, so below about a
+   1000px window the overflow costs the command's tail rather than the label —
+   measured at the header's own 11px/0.12em, MON + Clear is 75px against 142px
+   of cell at 1280 and 122px at 1024, with the kitchen picker on its own line
+   under them and nothing clipped at either width.
    **The plan's TITLE and both its SHOPS are inline-editable** (Mark,
    2026-08-08) — the title where you read it, in the `h1`, and Sells at / Made
    at as `kind="pick"` cells over the ACTIVE locations (design rule 3: a closed
