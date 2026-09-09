@@ -32,54 +32,109 @@ import { usePublishedHeight } from "@/lib/tableHead";
  * rather than a save. What none of them touches is the tables that OWN these
  * facts — that is `submit_shift_report`, once, at the end.
  */
-/** One dress for every footer cell, so a four-across row cannot drift.
+/**
+ * One dress for every footer cell, so a four-across row cannot drift.
  *
- *  `inline-flex items-center justify-center` rather than leaning on a button's
- *  own centring, which is a UA behaviour and not a stated one — it matters now
- *  that two of the four hold a 32px glyph in a 56px cell rather than a line of
- *  14px text. `ui/buttons` states it the same way. */
+ * `inline-flex items-center justify-center` rather than leaning on a button's
+ * own centring, which is a UA behaviour and not a stated one.
+ *
+ * `py-2`, not `py-3`, and that is arithmetic rather than taste: a cell now
+ * holds a 28px icon over a 10px word with 2px between them, so 8 + 40 + 8 is
+ * EXACTLY the `min-h-14` (56px) the bar has always been. At `py-3` it would be
+ * 64 and every page would lose eight pixels of content. Change either size and
+ * this has to be recomputed — 28/11 wants `py-[7px]` to land on the same 56.
+ */
 const FOOTER_CELL =
-  "inline-flex min-h-14 items-center justify-center px-4 py-3 text-sm font-bold uppercase tracking-[0.08em] text-white disabled:opacity-35";
+  "inline-flex min-h-14 items-center justify-center px-4 py-2 text-white disabled:opacity-35";
 
 /**
- * Back and Next are ARROWS, not words (Mark, 2026-09-09: "instead of 'back' and
- * 'next' labels for the nav buttons lets use large arrow glyphs in the footer").
+ * THE FOOTER IS ICONS WITH THE WORD KEPT UNDER THEM (Mark, 2026-09-09, choosing
+ * it out of eight mockups: "material symbols with a small word under it (H) but
+ * with a check mark instead of an arrow for send. And send is green").
  *
- * SIZED SO THE FOOTER DOES NOT GROW, which is what picks 32 out of the air:
- * the cell is `min-h-14` (56px) with `py-3`, so 12 + 32 + 12 is exactly 56 and
- * the bar stays the height it has always been. `leading-none` is load-bearing
- * in that sum — at the default line-height a 32px glyph would claim ~40px and
- * push every page's content up by 8.
+ * MATERIAL SYMBOLS AS REAL ARTWORK, WHICH IS WHAT THIS APP ALREADY DOES —
+ * `RecordNav`'s four record-book buttons and the Columns eye, Apache 2.0,
+ * inlined as one `currentColor` path each rather than taking an icon
+ * dependency. And it settles the same complaint RecordNav's own note records
+ * from 2026-07-31, when those four had shipped as TYPED CHARACTERS while the
+ * eye was artwork: "two families of arrow in one app is the sort of thing you
+ * can't unsee". The Dingbat U+279C that stood here for an afternoon was the
+ * typed half of exactly that split.
  *
- * REACH FOR THE BIGGER GLYPH BEFORE THE BIGGER SIZE — the receiving caret's
- * lesson, deciding something for the second time. `→` (U+2192) shipped first
- * and Mark's answer was "thicker arrows please. fat.": in the UI font that
- * character is a HAIRLINE, a long thin shaft on a small head, so at 32px it
- * carried no more ink than the 14px word it replaced and reading it as "larger"
- * rested entirely on the font size. U+2794 is the heavy wide-headed arrow — a
- * thick solid shaft and a big head — so the weight comes from the character and
- * the size stays where the layout wants it.
+ * SF Symbols were asked about and cannot be used here, for two independent
+ * reasons: Apple's licence covers app UIs on Apple platforms rather than a
+ * website, and there is no delivery route anyway — the glyphs live in a private
+ * system font that no `font-family` exposes, so the only access is undocumented
+ * Private Use Area codepoints that are tofu everywhere else. They are the right
+ * answer for phase 5's SwiftUI app, where they are native and free.
  *
- * ONE GLYPH, MIRRORED, AND THAT IS THE POINT (Mark, 2026-09-09: "the arrows on
- * row 1 do not match"). The obvious answer was the `⬅`/`➡` pair (U+2B05 and
- * U+27A1), which is fatter still and needs no transform — and they are drawn by
- * different hands in different blocks, so side by side at 32px the heads are
- * visibly different shapes. A transform standing in for a character sounds like
- * the compromise and is the opposite: `scaleX(-1)` makes the two IDENTICAL by
- * construction, and no font update can ever drift them apart.
+ * WHY THE WORD STAYS. A bare `✕` cannot say which of two things this button is:
+ * the first cell is Cancel on your own draft and Close on a sent report or
+ * somebody else's, which is a distinction that file already argues for at
+ * length. Same for "Pause & close", where the "& close" is the half that tells
+ * you it LEAVES. The words are the ones that were already there, unshortened —
+ * an icon was added, nothing was taken away — and they are what gives each
+ * button its accessible name, so no `aria-label` is needed and the artwork is
+ * `aria-hidden`.
  *
- * NOT `◀`/`▶`, which carry the most ink of anything tried and are triangles
- * rather than arrows, and which already mean "disclose" in this app — the order
- * guide's item triangle and the receiving screen's reader's notes. Not U+27A4
- * either, a solid wedge with no shaft that reads as a media control. And
- * U+2B9C/U+2B9E, the other true pair, renders as TOFU here — checked, not
- * assumed.
- *
- * NO U+FE0E, and that is a fact about this character rather than an oversight:
- * U+279C is not an emoji at all, so nothing can decide to paint it in colour.
- * The pair that WOULD have needed one is the pair this rejected.
+ * wght 700 rather than RecordNav's 300: these sit over 12px bold uppercase type
+ * on a black bar at arm's length, where 300 reads as hairline. Same family,
+ * different weight, which is what a weight axis is for.
  */
-const FOOTER_ARROW = "\u279C";
+const ICON_CLOSE =
+  "m256-168-88-88 224-224-224-224 88-88 224 224 224-224 88 88-224 224 224 224-88 88-224-224-224 224Z";
+const ICON_PAUSE = "M544-139v-682h252v682H544Zm-380 0v-682h252v682H164Z";
+const ICON_BACK = "m368-417 202 202-90 89-354-354 354-354 90 89-202 202h466v126H368Z";
+const ICON_NEXT = "M592-417H126v-126h466L390-745l90-89 354 354-354 354-90-89 202-202Z";
+const ICON_SEND = "M382-208 122-468l90-90 170 170 366-366 90 90-456 456Z";
+
+/**
+ * SEND IS GREEN, AND IT IS `--rf-green-300` (Mark, 2026-09-09: "send is green,
+ * not yellow/orange").
+ *
+ * MEASURED, because the obvious token is the wrong one. `--color-go-ink`
+ * (green-600) is built to be INK ON WHITE, where it passes at 5.34:1; on this
+ * bar it is **3.54:1**, under AA. `--color-go` (green-200) is the other way —
+ * 14.44:1, and so pale that against the white cells beside it the tick reads as
+ * off-white rather than as green. green-300 is 11.24:1 and unmistakably green,
+ * which is the pair of things this needs.
+ *
+ * A FILL-RANGE VALUE USED AS INK ON A DARK GROUND is the same move `text-mark`
+ * makes on the masthead, and that file's rule says so in as many words: yellow
+ * is a fill and never an ink, "the one place `text-mark` is right is on BLACK".
+ * Green behaves identically. For reference the yellow this replaces measures
+ * 9.85:1, so the bar got brighter rather than dimmer.
+ *
+ * `var(--rf-green-300)` directly, since no semantic token names it — the same
+ * way the bill-stage ladder reaches for `--rf-green-300` for Paid.
+ */
+const FOOTER_SEND = "text-[var(--rf-green-300)]";
+
+/**
+ * 28px of artwork over a 10px word — Mark's, off eight pairs rendered side by
+ * side (26/9, 26/10, 26/12, 24/12, then 28/11, 28/10 and 28/12).
+ *
+ * KNOWN AND DELIBERATE: 10px is BELOW this surface's documented type scale,
+ * whose floor is the 12px of its small-caps labels and column heads. 26/12 was
+ * built first for exactly that reason and 28/12 was rendered beside this one —
+ * at that size the word starts competing with the icon rather than captioning
+ * it. A caption under an icon is arguably its own element rather than a label
+ * in that scale: it is read as part of the button, not as a heading over
+ * something. If the scale is ever tightened, this is the one place that has to
+ * argue for itself.
+ */
+function FooterLabel({ icon, word }: { icon: string; word: string }) {
+  return (
+    <span className="flex flex-col items-center gap-0.5">
+      <svg width="28" height="28" viewBox="0 -960 960 960" aria-hidden="true">
+        <path fill="currentColor" d={icon} />
+      </svg>
+      <span className="text-[10px] font-bold uppercase leading-none tracking-[0.08em]">
+        {word}
+      </span>
+    </span>
+  );
+}
 const FOOTER_GLYPH = "text-[32px] leading-none tracking-normal";
 
 export function ShiftReportRunner({
@@ -474,7 +529,7 @@ export function ShiftReportRunner({
           onClick={() => void cancel()}
           disabled={busy !== null}
         >
-          {canDiscard ? "Cancel" : "Close"}
+          <FooterLabel icon={ICON_CLOSE} word={canDiscard ? "Cancel" : "Close"} />
         </button>
         <button
           type="button"
@@ -482,7 +537,7 @@ export function ShiftReportRunner({
           onClick={pause}
           disabled={busy !== null}
         >
-          Pause &amp; close
+          <FooterLabel icon={ICON_PAUSE} word={"Pause & close"} />
         </button>
         {/* THE WORD SURVIVES AS THE ACCESSIBLE NAME. `aria-label` wins over
             the content, so a screen reader says "Back" rather than
@@ -495,17 +550,13 @@ export function ShiftReportRunner({
           className={`${FOOTER_CELL} ${FOOTER_GLYPH}`}
           onClick={() => setIndex(index - 1)}
           disabled={busy !== null || first}
-          aria-label="Back"
-          title="Back"
         >
-          {/* `inline-block` is load-bearing — a transform does nothing to an
-              inline box. */}
-          <span className="inline-block -scale-x-100">{FOOTER_ARROW}</span>
+          <FooterLabel icon={ICON_BACK} word="Back" />
         </button>
         {last ? (
           <button
             type="button"
-            className={`${FOOTER_CELL} text-mark`}
+            className={`${FOOTER_CELL} ${FOOTER_SEND}`}
             onClick={send}
             disabled={busy !== null || isSent || !canSend || blockers.length > 0}
             title={
@@ -518,7 +569,7 @@ export function ShiftReportRunner({
                     : undefined
             }
           >
-            Send
+            <FooterLabel icon={ICON_SEND} word="Send" />
           </button>
         ) : (
           <button
@@ -526,10 +577,8 @@ export function ShiftReportRunner({
             className={`${FOOTER_CELL} ${FOOTER_GLYPH}`}
             onClick={() => setIndex(index + 1)}
             disabled={busy !== null}
-            aria-label="Next"
-            title="Next"
           >
-            {FOOTER_ARROW}
+            <FooterLabel icon={ICON_NEXT} word="Next" />
           </button>
         )}
       </footer>

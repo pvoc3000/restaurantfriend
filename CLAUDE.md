@@ -7488,52 +7488,83 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    sheets removed, 15 right ones kept** — DF01 keeps its 09-12 baby shower, DF02
    keeps all fourteen Cafe Knotted days — and **0 orders reach nobody**.
    **1764 fixtures pass.**
-   **BACK AND NEXT ARE ARROWS** (Mark, 2026-09-09: "instead of 'back' and 'next'
-   labels for the nav buttons lets use large arrow glyphs in the footer", then
-   "thicker arrows please. fat.", then "the arrows on row 1 do not match", then
-   "row 3 looks better"). Four passes, and each one taught something.
-   **REACH FOR THE BIGGER GLYPH BEFORE THE BIGGER SIZE — the receiving caret's
-   lesson deciding something a second time.** `→` (U+2192) shipped first and is
-   a HAIRLINE in the UI font: a long thin shaft on a small head, so at 32px it
-   carried no more ink than the 14px word it replaced and reading it as "larger"
-   rested entirely on the font size. **U+279C**, the heavy round-tipped arrow,
-   is a thick solid shaft and a big head, so the weight comes from the character.
-   U+2794 (heavy wide-headed) is its near twin and was the runner-up.
-   **ONE GLYPH, MIRRORED, AND THAT IS THE POINT.** The obvious answer was the
-   `⬅`/`➡` pair (U+2B05 + U+27A1), which is fatter still and needs no transform
-   — and Mark spotted at a glance what a Unicode block boundary does: they are
-   drawn by different hands, so side by side at 32px the two heads are visibly
-   different shapes. A `scaleX(-1)` transform sounds like the compromise and is
-   the opposite — it makes the two IDENTICAL by construction, and no font update
-   can drift them apart. `inline-block` on the mirrored span is load-bearing; a
-   transform does nothing to an inline box.
-   Also rejected, each for its own reason: `◀`/`▶`, the most ink of anything
-   tried, are triangles rather than arrows and already mean "disclose" here;
-   U+27A4 is a solid wedge with no shaft that reads as a media control; and
-   U+2B9C/U+2B9E, the other true pair, renders as **TOFU** — checked, not
-   assumed. **No U+FE0E**, and that is a fact about U+279C rather than an
-   oversight: it is not an emoji at all, so nothing can paint it in colour. The
-   pair that WOULD have needed one is the pair this rejected.
-   **32px WITH `leading-none`, SO THE BAR DOES NOT GROW.** The cell is
-   `min-h-14` with `py-3`, so 12 + 32 + 12 is exactly 56 — measured at **56px
-   before and after**, on every page and on the last one, where Send stays a
-   WORD because it is a commit rather than navigation. `leading-none` is
-   load-bearing in that sum: at the default line-height the glyph would claim
-   ~40px and push every page's content up by 8.
-   **THE WORD SURVIVES AS THE ACCESSIBLE NAME** — `aria-label` wins over the
-   content, so a screen reader says "Back" and not "heavy round-tipped
-   rightwards arrow", with `title` for a desk browser's hover. The iPad has no
-   hover and does not need one here: a full-width arrow in a wizard footer is as
-   unambiguous as this app gets.
+   **THE FOOTER IS ICONS WITH THE WORD KEPT UNDER THEM** (Mark, 2026-09-09,
+   over six passes: "instead of 'back' and 'next' labels for the nav buttons
+   lets use large arrow glyphs", "thicker arrows please. fat.", "the arrows on
+   row 1 do not match", "row 3 looks better", then — off eight mockups —
+   "material symbols with a small word under it (H) but with a check mark
+   instead of an arrow for send. And send is green", and finally the sizes).
+   **IT LANDED ON MATERIAL SYMBOLS, WHICH IS WHAT THIS APP ALREADY DOES** —
+   `RecordNav`'s record-book buttons and the Columns eye, Apache 2.0, inlined as
+   one `currentColor` path each rather than an icon dependency. That also
+   settles the complaint RecordNav's own note records from 2026-07-31, when its
+   four had shipped as TYPED CHARACTERS while the eye was artwork: **"two
+   families of arrow in one app is the sort of thing you can't unsee"**. The
+   Unicode arrows below were the typed half of exactly that split, which is why
+   they lasted an afternoon.
+   **THE UNICODE ROUTE IS WORTH KEEPING AS A RECORD, because it is a good
+   demonstration of why a type family beats a pile of codepoints.** `→` (U+2192)
+   went in first and is a HAIRLINE in the UI font, carrying no more ink than the
+   14px word it replaced — the receiving caret's "reach for the bigger GLYPH
+   before the bigger size", deciding something a second time. `⬅`/`➡`
+   (U+2B05/U+27A1) are fatter and come from DIFFERENT BLOCKS, so the two heads
+   are visibly different shapes; Mark caught that at a glance. U+279C mirrored
+   with `scaleX(-1)` fixed the matching by construction and shipped for an hour.
+   And the moment Cancel, Pause and Send were asked for too, the approach fell
+   over on its own terms: `❚❚` merged into a solid square that reads as STOP,
+   `✈` rendered a third the size of everything beside it, and `➤` for Send
+   pointed the same way as Next. **Unicode glyphs are not optically sized as a
+   set and never will be.**
+   **SF SYMBOLS WERE ASKED ABOUT AND CANNOT BE USED HERE**, for two independent
+   reasons: Apple's licence covers app UIs on Apple platforms rather than a
+   website, and there is no delivery route anyway — the glyphs live in a private
+   system font no `font-family` exposes, so the only access is undocumented
+   Private Use Area codepoints that are tofu everywhere else. **They are the
+   right answer for phase 5's SwiftUI app**, where they are native and free.
+   **THE WORD STAYS, AND THAT IS THE HALF THAT MATTERS.** A bare `✕` cannot say
+   which of two things the first cell is — Cancel on your own draft, Close on a
+   sent report or somebody else's — which this file already argues for at
+   length; same for "Pause & close", where "& close" is the half that says it
+   LEAVES. The words are the ones that were already there, UNSHORTENED: an icon
+   was added and nothing was taken away. They are also each button's accessible
+   name, so no `aria-label` is needed and the artwork is `aria-hidden`.
+   **SEND IS GREEN AND IT IS `--rf-green-300`, WHICH IS A MEASUREMENT.** The
+   obvious token is the wrong one: `--color-go-ink` (green-600) is built to be
+   INK ON WHITE, where it passes at 5.34:1, and on this bar it is **3.54:1**,
+   under AA. `--color-go` (green-200) is the other way — 14.44:1, and so pale
+   that beside the white cells the tick reads as off-white rather than green.
+   green-300 is **11.24:1** and unmistakably green. A fill-range value used as
+   INK on a dark ground is the same move `text-mark` makes on the masthead, and
+   this file's own rule says so: "the one place `text-mark` is right is on
+   BLACK". The yellow it replaces measures 9.85:1, so the bar got brighter.
+   **28px OF ARTWORK OVER A 10px WORD, AND THE BAR DOES NOT GROW.** 8 + 28 + 2 +
+   10 + 8 is exactly the `min-h-14` (56px) it has always been — change either
+   size and the padding has to be recomputed (28/11 wants `py-[7px]` to land on
+   the same 56). Eight pairs were rendered side by side to get there. **10px is
+   BELOW this surface's documented type scale**, whose floor is the 12px of its
+   small-caps labels; 26/12 was built first for that reason and 28/12 rendered
+   beside it, where the word starts competing with the icon rather than
+   captioning it. A caption under an icon is arguably its own element — read as
+   part of the button, not as a heading over something — and it was chosen by
+   looking. If the scale is ever tightened, this is the place that has to argue
+   for itself. wght **700**, not RecordNav's 300, because these sit on a black
+   bar at arm's length where 300 is a hairline; same family, different weight,
+   which is what a weight axis is for.
    **`FOOTER_CELL` became `inline-flex items-center justify-center`** rather
    than leaning on a button's own centring, which is a UA behaviour and not a
-   stated one — it starts to matter when two of four cells hold a 32px glyph in
-   a 56px box.
-   **Harness note that cost a pass:** a canvas `measureText` with
-   `ui-sans-serif` in the font string DOES NOT RESOLVE, so it silently measures
-   a fallback — it reported `→` at 24×20 when the browser paints a hairline.
-   Measure a glyph AS RENDERED in the page, which is what the "measure a title
-   as rendered" rule already says for text.
+   stated one.
+   **TWO HARNESS NOTES, each of which cost a pass.** A canvas `measureText` with
+   `ui-sans-serif` in the font string DOES NOT RESOLVE and silently measures a
+   fallback — it reported `→` at 24×20 when the browser paints a hairline, so
+   measure a glyph AS RENDERED, which is what the "measure a title as rendered"
+   rule already says for text. And **the browser pane has a TAB CAP**: at nine
+   open tabs `navigate` to a new file and `tabs_create` both fail with errors
+   that read like a missing or unreadable file. Close tabs when you finish
+   verifying — the memory note already says so.
+   **AND AN ENTITY IN A JSX *ATTRIBUTE* IS NOT DECODED**, unlike one in JSXText:
+   `word="Pause &amp; close"` renders the five characters `&amp;`. Caught before
+   it shipped, and the mirror image of the SWC whitespace trap this file already
+   documents for entities in text.
 
 4i. ✅ **WHICH SHOPS A MEMBER MAY WORK AT — migration 073, APPLIED and
    verified live 2026-08-29.** Mark: "in my FMP version of the app, I could give
