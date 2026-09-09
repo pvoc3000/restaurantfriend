@@ -36,7 +36,9 @@ export function IdleLock() {
       if (locking) return;
       if (idleExpired(last, Date.now())) {
         locking = true;
-        void lockDevice();
+        // A HARD navigation, once the session is gone — see `lockDevice` for
+        // why the action does not redirect itself.
+        void lockDevice().then(() => window.location.assign("/lock"));
       }
     };
 

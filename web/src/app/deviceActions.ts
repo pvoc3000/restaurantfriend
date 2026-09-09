@@ -2,7 +2,6 @@
 
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 
 import { clearSessionCookies, type CookieJar } from "@/lib/sessionCookies";
 import {
@@ -98,17 +97,27 @@ export async function forgetDevice(id: string): Promise<void> {
 }
 
 /**
- * Lock: end THIS browser's session and go to the picker. `scope: "local"`
- * is load-bearing — supabase-js defaults to `global`, which revokes every
- * refresh token the user holds, so locking the shared iPad would sign the
- * manager out of their own phone.
+ * Lock: end THIS browser's session. `scope: "local"` is load-bearing —
+ * supabase-js defaults to `global`, which revokes every refresh token the
+ * user holds, so locking the shared iPad would sign the manager out of their
+ * own phone.
+ *
+ * It does NOT `redirect()`. The caller does `window.location.assign("/lock")`
+ * once this resolves, and that is not a stylistic choice: a server action
+ * that signs out and redirects also makes Next re-render the page it was
+ * called from, whose `getAppSession` now finds no user and throws a redirect
+ * of its own — two navigations from one router state, and whichever lands
+ * last wins. Measured 2026-09-09: the masthead's form happened to land on
+ * /lock, the idle lock happened to land on /login. A hard navigation after
+ * the action returns is one navigation, and it empties the client-side Maps
+ * on the way, which the unlock already relies on.
  */
-export async function lockDevice(): Promise<never> {
+export async function lockDevice(): Promise<{ ok: true }> {
   const supabase = await createClient();
   await supabase.auth.signOut({ scope: "local" });
   const jar = await cookies();
   clearSessionCookies(jar);
-  redirect("/lock");
+  return { ok: true };
 }
 
 type FunctionCall =

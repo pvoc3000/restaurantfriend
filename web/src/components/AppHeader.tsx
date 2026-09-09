@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 
 import { signOut } from "@/app/actions";
-import { lockDevice } from "@/app/deviceActions";
+import { SwitchUser } from "@/components/SwitchUser";
 import { AppNav } from "@/components/AppNav";
 import { HeaderShell } from "@/components/HeaderShell";
 import { GearIcon, IconButton, OrgIcon } from "@/components/ui/IconButton";
@@ -87,14 +87,18 @@ export async function AppHeader({ session }: { session: AppSession }) {
                 password screen: "Switch user" locks the device (a local
                 sign-out) and lands on /lock. Sign out proper stays on
                 /account for the case where somebody really means it. */}
-            <form action={session.registeredDevice ? lockDevice : signOut} className="flex">
-              <button
-                type="submit"
-                className="text-[12px] font-semibold uppercase tracking-[0.06em] text-white/60 hover:text-white"
-              >
-                {session.registeredDevice ? "Switch user" : "Sign out"}
-              </button>
-            </form>
+            {session.registeredDevice ? (
+              <SwitchUser />
+            ) : (
+              <form action={signOut} className="flex">
+                <button
+                  type="submit"
+                  className="text-[12px] font-semibold uppercase tracking-[0.06em] text-white/60 hover:text-white"
+                >
+                  Sign out
+                </button>
+              </form>
+            )}
           </>
         }
       />
