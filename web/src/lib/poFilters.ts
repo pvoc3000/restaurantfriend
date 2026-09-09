@@ -5,7 +5,7 @@ import type { RawSearchParams } from "./itemFilters";
 import type { SortDir } from "./tableSort";
 import { withFrom } from "./breadcrumbs";
 import { PO_STATUS_ORDER, type PoStatus } from "./purchaseOrders";
-import { daysBefore, todayInTimeZone } from "./today";
+import { daysBefore } from "./today";
 import {
   matchingPreset,
   parseRangeParams,
@@ -59,7 +59,7 @@ export const RANGES = [
 
 export type RangeKey = (typeof RANGES)[number]["key"];
 
-function isRangeKey(value: string): value is RangeKey {
+export function isRangeKey(value: string): value is RangeKey {
   return RANGES.some((r) => r.key === value);
 }
 
@@ -219,7 +219,7 @@ export function poFiltersToQuery(filters: PoFilters): string {
 }
 
 /** `range=<key>` for a preset, `from=&to=` for a custom pair. */
-function appendRange(params: URLSearchParams, range: PoRange): void {
+export function appendRange(params: URLSearchParams, range: PoRange): void {
   if (typeof range === "string") params.set("range", range);
   else {
     params.set("from", range.from);
@@ -237,13 +237,4 @@ export function poDetailHref(id: string, filters: PoFilters): string {
     href: poListHref(filters),
     label: "POs",
   });
-}
-
-/**
- * The earliest order_date a PRESET window includes, or null for all time.
- * Kept for `/invoices`, which still filters by these keys as a row of tabs;
- * the PO list reads `poRangeBounds` instead.
- */
-export function rangeStart(range: RangeKey, timeZone: string): string | null {
-  return poRangeBounds(range, todayInTimeZone(timeZone))?.from ?? null;
 }

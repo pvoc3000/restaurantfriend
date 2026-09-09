@@ -6,10 +6,10 @@ import type { RawSearchParams } from "@/lib/itemFilters";
 import {
   parseInvoiceFilters,
   parseInvoiceView,
-  rangeStart,
   INVOICE_VIEW_COOKIE,
 } from "@/lib/invoiceFilters";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
+import { poRangeBounds } from "@/lib/poFilters";
 import type { InvoiceStatus } from "@/lib/invoices";
 import { InvoiceList } from "@/components/purchasing/InvoiceList";
 import { canEditPage } from "@/lib/pageAccess";
@@ -65,7 +65,7 @@ export default async function InvoicesPage({
   const timeZone = session.orgSettings.timezone ?? serverTimeZone();
   const today = todayInTimeZone(timeZone);
 
-  const start = rangeStart(filters.range, timeZone);
+  const bounds = poRangeBounds(filters.range, today);
   const locationId = session.activeLocation.id;
 
   // THE SELECT LIST IS WRITTEN OUT AT EACH CALL SITE, not passed in. A helper
@@ -83,7 +83,7 @@ export default async function InvoicesPage({
     .eq("location_id", locationId)
     .order("invoice_date", { ascending: false })
     .limit(500);
-  if (start) query = query.gte("invoice_date", start);
+  if (bounds) query = query.gte("invoice_date", bounds.from).lte("invoice_date", bounds.to);
 
   let { data: invoices, error } = await query;
 
@@ -105,7 +105,7 @@ export default async function InvoicesPage({
       .eq("location_id", locationId)
       .order("invoice_date", { ascending: false })
       .limit(500);
-    if (start) retry = retry.gte("invoice_date", start);
+    if (bounds) retry = retry.gte("invoice_date", bounds.from).lte("invoice_date", bounds.to);
     const fallback = await retry;
     invoices = fallback.data as unknown as typeof invoices;
     error = fallback.error;

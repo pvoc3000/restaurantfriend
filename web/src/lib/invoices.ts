@@ -264,7 +264,7 @@ export const AGING_LABEL: Record<AgingBucket, string> = {
  * render (lib/today `todayInTimeZone`). It is not a Date and it is not the
  * host's day: a UTC server would otherwise start calling this afternoon's bills
  * overdue at 4pm Pacific — the same trap migration 007 exists to close for the
- * order guide, and the one `rangeStart` already respects.
+ * order guide, and the one `poRangeBounds` already respects.
  *
  * Due TODAY is `due7`, not overdue. You have until the end of the day.
  *

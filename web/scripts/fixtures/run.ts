@@ -29,6 +29,7 @@ import "./invoiceDate.fixtures";
 import "./invoiceMatch.fixtures";
 import "./lastPurchase.fixtures";
 import "./invoices.fixtures";
+import "./invoiceFilters.fixtures";
 import "./filedInvoice.fixtures";
 import "./invoicePages.fixtures";
 import "./billsFromReadings.fixtures";

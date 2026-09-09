@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { PickSet } from "@/components/ui/PickSet";
+import { PickList } from "@/components/ui/PickList";
+import { RangePicker } from "@/components/ui/RangePicker";
+import { PO_RANGE_PRESETS, poRangeBounds, poRangeFromPicker } from "@/lib/poFilters";
+import type { DateRange } from "@/lib/dateRange";
 import {
   matchesVendorFilter,
   vendorFilterOptions,
@@ -30,12 +34,10 @@ import {
   parseInvoiceFilters,
   serializeInvoiceView,
   INVOICE_VIEW_COOKIE,
-  RANGES,
   type AgingFilter,
   type InvoiceFilters,
   type InvoiceSortKey,
   type InvoiceStatusFilter,
-  type RangeKey,
 } from "@/lib/invoiceFilters";
 import { urlFilterParams } from "@/lib/filterMenus";
 import { makeComparator, type SortValue } from "@/lib/tableSort";
@@ -197,8 +199,8 @@ export function InvoiceList({
   // The date window is a SERVER filter, so it has to re-run the page —
   // router.push rather than replaceState, and setFilters as well, because the
   // push re-renders the server component without remounting this one.
-  function setRange(range: RangeKey) {
-    const next = { ...filters, range };
+  function setRange(picked: DateRange | null) {
+    const next = { ...filters, range: poRangeFromPicker(picked, today) };
     setFilters(next);
     router.push(invoiceListHref(next));
   }
@@ -627,135 +629,104 @@ export function InvoiceList({
         </div>
       </div>
 
-      {/* Two rows, and which control sits on which is deliberate: three
-          TabPickers on one line do not fit at 1440 (vendor detail measured four
-          wanting 1441px against 1329 available). Typing controls and the status
-          on the first, the two remaining pickers on the second. */}
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-4">
-          <TextInput
-            value={filters.q}
-            onValueChange={(q) => update({ q })}
-            placeholder="Search invoice number, vendor or PO…"
-            clearLabel="Clear the search"
-            className="w-72"
+      {/* ONE ROW, in Mark's order (2026-09-08): search · range · vendors ·
+          due · status, with the two commands at the right edge. It was two
+          rows of TabPickers under captions; the window is a `RangePicker` now
+          and Due is a `PickList`, and neither needs a caption, because a
+          picker's own face names what it is set to. */}
+      <div className="flex flex-wrap items-center gap-4">
+        <TextInput
+          value={filters.q}
+          onValueChange={(q) => update({ q })}
+          placeholder="Search invoice number, vendor or PO…"
+          clearLabel="Clear the search"
+          className="w-72"
+        />
+
+        <div className="w-64">
+          <RangePicker
+            value={poRangeBounds(filters.range, today)}
+            onChange={setRange}
+            presets={PO_RANGE_PRESETS}
+            today={today}
+            ariaLabel="Date window"
+            placeholder="All time"
           />
-
-          <TabPicker
-            ariaLabel="Status"
-            value={filters.status}
-            onChange={(status) => update({ status })}
-            options={statusTabs.map((s) => ({
-              key: s,
-              label: s === "all" ? "All" : BILL_STAGE_LABEL[s],
-              count: s === "all" ? invoices.length : statusCounts[s] ?? 0,
-            }))}
-          />
-
-          {/* MOVED HERE, beside New invoice (Mark, 2026-09-03) — it had its
-              own row below the filters, on its own, which put it nowhere
-              near the other command on this screen.
-              A GROUP WITH ITS OWN `ml-auto`, not `NewInvoice`'s own — that
-              button's trigger carries `ml-auto` baked in on the assumption
-              it is the only thing to the right of the search/status
-              controls, and putting Check QuickBooks as a plain sibling
-              before it read right ONLY at a width where the row happened
-              not to have much leftover space (Mark: it "is placed to the
-              right of the status picker, not to the left of the new
-              invoice button… in a different section"). Wider, that leftover
-              space is exactly what `NewInvoice`'s `ml-auto` consumes, which
-              shoves it away from Check QuickBooks rather than beside it.
-              This wrapper is the fix: sized to its own content (no
-              `flex-grow`), so `NewInvoice`'s inner `ml-auto` finds nothing
-              left to eat and the two buttons pack together with an ordinary
-              `gap-3`, while the WRAPPER's own `ml-auto` is what claims the
-              outer row's leftover space and puts the pair at the right
-              edge — at any width. */}
-          <div className="ml-auto flex flex-wrap items-center gap-3">
-            <button
-              type="button"
-              className={BUTTON_CLASS}
-              disabled={qboBusy}
-              onClick={() => void checkQuickBooks()}
-            >
-              {qboBusy ? "Checking QuickBooks…" : "Check QuickBooks"}
-            </button>
-            {qboError && <span className="text-[13px] text-accent">{qboError}</span>}
-
-            {/* The create command — where New employee sits, which is the
-                template this follows. */}
-            {canEdit && (
-              <NewInvoice
-                orgId={orgId}
-                locationId={locationId}
-                vendors={vendors}
-                today={today}
-                // The vendor's id lives on the embed, not as its own column on
-                // the row — the duplicate check only ever compares within one
-                // vendor, so that's the shape it wants.
-                existing={invoices.map((i) => ({
-                  id: i.id,
-                  vendor_id: i.vendors?.id ?? "",
-                  invoice_number: i.invoice_number,
-                  invoice_date: i.invoice_date,
-                  total: i.total,
-                  status: i.status,
-                }))}
-              />
-            )}
-          </div>
         </div>
 
-        <div className="flex flex-wrap items-end gap-4">
-          {/* The label sits ABOVE its picker (Mark, 2026-08-01): a five-cell bar
-              with a label to its left starts 130px in and no longer lines up
-              with the search box above it. */}
-          <div className="space-y-1.5">
-            <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
-              Due
-            </span>
-            <TabPicker
-              ariaLabel="Aging"
-              value={filters.aging}
-              onChange={(aging) => update({ aging })}
-              options={agingTabs.map((b) => ({
-                key: b,
-                label: b === "all" ? "All" : AGING_LABEL[b as AgingBucket],
-                count: b === "all" ? invoices.length : agingCounts[b] ?? 0,
+        <PickSet
+          options={vendorOptions}
+          value={filters.vendors}
+          onChange={(vendors) => update({ vendors })}
+          allLabel="All vendors"
+          noun="vendors"
+          label="Which vendors to show"
+          className="max-w-[16rem]"
+          minWidth={240}
+        />
+
+        {/* Due, as a list rather than a row of tabs (Mark, 2026-09-08). The
+            counts ride as HINTS, which is where the tabs carried them. */}
+        <PickList
+          ariaLabel="Due"
+          variant="field"
+          value={filters.aging}
+          onPick={(aging) => update({ aging: aging as AgingFilter })}
+          options={agingTabs.map((b) => ({
+            value: b,
+            label: b === "all" ? "Any due date" : AGING_LABEL[b as AgingBucket],
+            hint: String(b === "all" ? invoices.length : agingCounts[b] ?? 0),
+          }))}
+          className="w-44"
+        />
+
+        <TabPicker
+          ariaLabel="Status"
+          value={filters.status}
+          onChange={(status) => update({ status })}
+          options={statusTabs.map((s) => ({
+            key: s,
+            label: s === "all" ? "All" : BILL_STAGE_LABEL[s],
+            count: s === "all" ? invoices.length : statusCounts[s] ?? 0,
+          }))}
+        />
+
+        {/* The two commands, at the right edge (Mark, 2026-09-03). A GROUP
+            WITH ITS OWN `ml-auto`, not `NewInvoice`'s own: that trigger
+            carries `ml-auto` baked in, and as a plain sibling Check
+            QuickBooks read right only at a width where the row happened to
+            have little leftover space. Sized to its content, so the inner
+            `ml-auto` finds nothing to eat and the pair packs at `gap-3`. */}
+        <div className="ml-auto flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className={BUTTON_CLASS}
+            disabled={qboBusy}
+            onClick={() => void checkQuickBooks()}
+          >
+            {qboBusy ? "Checking QuickBooks…" : "Check QuickBooks"}
+          </button>
+          {qboError && <span className="text-[13px] text-accent">{qboError}</span>}
+
+          {canEdit && (
+            <NewInvoice
+              orgId={orgId}
+              locationId={locationId}
+              vendors={vendors}
+              today={today}
+              // The vendor's id lives on the embed, not as its own column on
+              // the row — the duplicate check only ever compares within one
+              // vendor, so that's the shape it wants.
+              existing={invoices.map((i) => ({
+                id: i.id,
+                vendor_id: i.vendors?.id ?? "",
+                invoice_number: i.invoice_number,
+                invoice_date: i.invoice_date,
+                total: i.total,
+                status: i.status,
               }))}
             />
-          </div>
-
-          {/* Labelled, unlike the PO list's: this row is `items-end` under
-              two other captions, so the one control without one would hang
-              its own label's height below its neighbours. */}
-          <div className="space-y-1.5">
-            <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
-              Vendor
-            </span>
-            <PickSet
-              options={vendorOptions}
-              value={filters.vendors}
-              onChange={(vendors) => update({ vendors })}
-              allLabel="All vendors"
-              noun="vendors"
-              label="Which vendors to show"
-              className="max-w-[16rem]"
-              minWidth={240}
-            />
-          </div>
-
-          <div className="ml-auto space-y-1.5">
-            <span className="block text-[12px] uppercase tracking-[0.12em] text-subtle">
-              Window
-            </span>
-            <TabPicker
-              ariaLabel="Date window"
-              value={filters.range}
-              onChange={setRange}
-              options={RANGES.map((r) => ({ key: r.key, label: r.label }))}
-            />
-          </div>
+          )}
         </div>
       </div>
 

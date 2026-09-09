@@ -5,7 +5,8 @@
 import type { RawSearchParams } from "./itemFilters";
 import type { SortDir } from "./tableSort";
 import { withFrom } from "./breadcrumbs";
-import { RANGES, rangeStart, type RangeKey } from "./poFilters";
+import { appendRange, isRangeKey, type PoRange } from "./poFilters";
+import { parseRangeParams } from "./dateRange";
 import {
   appendVendorFilter,
   parseVendorFilter,
@@ -62,7 +63,12 @@ export type InvoiceFilters = {
   /** Vendor NAMES; empty means every vendor. See lib/vendorFilter. */
   vendors: string[];
   aging: AgingFilter;
-  range: RangeKey;
+  /**
+   * The PO list's window, key or custom pair — `lib/poFilters` owns the
+   * presets so the two lists cannot drift on what "90 days" means, and the
+   * `ui/RangePicker` on this screen offers the same six.
+   */
+  range: PoRange;
   sort: InvoiceSortKey;
   dir: SortDir;
 };
@@ -101,6 +107,7 @@ export function parseInvoiceFilters(
   const status = one(params.status);
   const aging = one(params.aging);
   const range = one(params.range);
+  const custom = parseRangeParams(params.from, params.to);
   const sort = one(params.sort);
   const dir = one(params.dir);
   const fallback = { ...DEFAULT_INVOICE_FILTERS, ...remembered };
@@ -114,7 +121,7 @@ export function parseInvoiceFilters(
       ? parseVendorFilter(params[VENDOR_FILTER_PARAM])
       : fallback.vendors ?? [],
     aging: isAgingFilter(aging) ? aging : fallback.aging,
-    range: RANGES.some((r) => r.key === range) ? (range as RangeKey) : fallback.range,
+    range: isRangeKey(range) ? range : (custom ?? fallback.range),
     sort: (INVOICE_SORT_KEYS as readonly string[]).includes(sort)
       ? (sort as InvoiceSortKey)
       : fallback.sort,
@@ -129,10 +136,10 @@ export function serializeInvoiceView(filters: InvoiceFilters): string {
   const params = new URLSearchParams({
     status: filters.status,
     aging: filters.aging,
-    range: filters.range,
     sort: filters.sort,
     dir: filters.dir,
   });
+  appendRange(params, filters.range);
   appendVendorFilter(params, filters.vendors);
   return params.toString();
 }
@@ -145,6 +152,7 @@ export function parseInvoiceView(
   const status = q.get("status") ?? "";
   const aging = q.get("aging") ?? "";
   const range = q.get("range") ?? "";
+  const custom = parseRangeParams(q.get("from") ?? undefined, q.get("to") ?? undefined);
   const sort = q.get("sort") ?? "";
   const dir = q.get("dir");
 
@@ -153,7 +161,8 @@ export function parseInvoiceView(
   const vendors = parseVendorFilter(q.getAll(VENDOR_FILTER_PARAM));
   if (vendors.length > 0) view.vendors = vendors;
   if (isAgingFilter(aging)) view.aging = aging;
-  if (RANGES.some((r) => r.key === range)) view.range = range as RangeKey;
+  if (isRangeKey(range)) view.range = range;
+  else if (custom) view.range = custom;
   if ((INVOICE_SORT_KEYS as readonly string[]).includes(sort)) {
     view.sort = sort as InvoiceSortKey;
   }
@@ -168,7 +177,7 @@ export function invoiceFiltersToQuery(filters: InvoiceFilters): string {
   if (filters.status !== d.status) params.set("status", filters.status);
   appendVendorFilter(params, filters.vendors);
   if (filters.aging !== d.aging) params.set("aging", filters.aging);
-  if (filters.range !== d.range) params.set("range", filters.range);
+  if (filters.range !== d.range) appendRange(params, filters.range);
   if (filters.sort !== d.sort) params.set("sort", filters.sort);
   if (filters.dir !== d.dir) params.set("dir", filters.dir);
   return params.toString();
@@ -185,11 +194,3 @@ export function invoiceDetailHref(id: string, filters: InvoiceFilters): string {
     label: "Invoices",
   });
 }
-
-/**
- * The earliest invoice_date the window includes. Same function the PO list
- * uses, re-exported so the two lists cannot drift apart on what "90 days"
- * means — and it takes the ORG's timezone for the reason written there.
- */
-export { rangeStart, RANGES };
-export type { RangeKey };
