@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { STICKY_HEAD_ROW_IN_PANE } from "@/lib/tableHead";
 import { CountField, TextField } from "./fields";
 
 export type PremadeRow = {
@@ -186,8 +187,24 @@ export function PremadesPage({
           <col className="w-[13%]" />
           <col className="w-[19%]" />
         </colgroup>
+        {/* THE LABELS STAY ON SCREEN (Mark, 2026-09-09: "so the user knows what
+            they're entering"). Made and Left are two identical boxes eight
+            pixels apart, and thirty rows down a sheet the only thing telling
+            them apart is a heading that has scrolled off the top.
+
+            AT 0, not under a masthead: this is the `(fullscreen)` runner, whose
+            own black banner is not sticky and scrolls away, so the top of the
+            viewport is where the labels belong.
+
+            ON THE `th`, never the `tr` — WebKit does not honour sticky on a row
+            in a border-collapse table, and iPad Safari at the 16.4 floor is
+            what this is walked on. The 2px rule rides in the class as an inset
+            shadow for the same reason the constant does: a sticky cell loses a
+            collapsed border the moment it detaches. */}
         <thead>
-          <tr className="border-b-2 border-ink text-xs font-semibold uppercase tracking-[0.08em]">
+          <tr
+            className={`text-xs font-semibold uppercase tracking-[0.08em] ${STICKY_HEAD_ROW_IN_PANE}`}
+          >
             <th className="py-2 pr-3 text-left">Type</th>
             <th className="py-2 pr-3 text-left">Sub type</th>
             <th className="py-2 pr-3 text-left">Name</th>

@@ -7332,6 +7332,57 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    guards exist for. **1762 fixtures pass.**
    Not verified in the browser: the pane lands on the shared-device PIN lock
    (097) and there is no way past it from here.
+   **103 IS APPLIED** (Mark, 2026-09-09) — probed the same day:
+   `select public.employee_positions(null)` raises **"no organisation given"**,
+   which proves the body runs, and a real org id from a service_role script
+   answers **"Not your organisation"**, which is 014's footgun (no `auth.uid()`
+   to resolve) and is itself proof the org guard runs.
+   **THE BATCH REPORT IS RETIRED, so the opener no longer has a page for it**
+   (Mark, 2026-09-09: "we are no longer doing the batch report, so we can skip
+   that page for the morning shift"). `elements` comes off `OPENING_PAGES` and
+   is now on NO shift; opening goes 6 pages to 5.
+   **THE PAGE, ITS COMPONENT AND ITS QUERIES ALL SURVIVE, UNREACHED.** Every one
+   of them already sat behind a `wants("elements")` that is simply always false
+   now, so nothing lies and nothing half-runs — which is why this is not the
+   Leads band's "revert it whole, no dead predicate left behind". That rule is
+   about a predicate that still CLAIMS something; these are guards that have
+   stopped being asked. One line brings the page back, and a fixture goes red if
+   somebody does it by accident.
+   **`OPENING_PAGES` IS NOW IDENTICAL TO `SHORT_PAGES` AND STAYS ITS OWN LIST**:
+   the two are the same by coincidence rather than by rule — mid and off-site
+   hold those five because there is no kitchen and no till, opening holds them
+   because one page was retired — and merging them would put that decision
+   behind a name that argues against it.
+   **THE PREMADES COLUMN LABELS STICK** (Mark, same day: "so the user knows what
+   they're entering"). Made and Left are two identical boxes eight pixels apart,
+   and thirty rows down the sheet the only thing telling them apart is a heading
+   that has scrolled off.
+   **THE CLASS ALONE WAS A NO-OP, AND THE CAUSE IS `lib/tableHead`'s OWN
+   DOCUMENTED TRAP — in the file it is documented in.** `main` carried
+   `overflow-y-auto`, which made it an overflow SCROLL CONTAINER, and a sticky
+   cell pins to its nearest such ancestor. But the shell is `min-h-screen` with
+   height AUTO, so that box is content-sized and never scrolls — measured
+   `scrollHeight` 2097 against `clientHeight` 2097 — while the WINDOW does. So
+   the labels pinned to a box that cannot move and left with the page:
+   **measured at −511px after a 600px scroll**, against 0 and holding once the
+   class came off. That class had never done anything except break this.
+   Measured on a standalone replica of the runner's exact flex shell rather than
+   argued, because the browser pane cannot get past the shared-device PIN lock
+   (097) to reach the real screen. Verify it there when you next have a session.
+   **If this surface ever wants a genuinely fixed banner and footer**, the
+   answer is a DEFINITE height on the shell — **`h-dvh`, never `h-screen`**,
+   since iOS Safari's `100vh` is the LARGE viewport and would hide the footer
+   under the browser chrome — and `overflow-y-auto` comes back at the same time.
+   One without the other is exactly what was there.
+   `STICKY_HEAD_ROW_IN_PANE` is what the labels wear, and its doc now says what
+   it always meant: it sticks at 0, which suits a table in its own pane AND a
+   chrome-less full-screen page whose banner scrolls away. The masthead variants
+   offset against `--rf-header-h`, which on a `(fullscreen)` route is the seed
+   value rather than a masthead that is there.
+   **1763 fixtures pass**, and the four that pin the retirement were each
+   checked by putting the page back: all four go red, including the one saying
+   nobody is asked about batches — which is the blocker that would otherwise
+   return in silence with it.
 
 4i. ✅ **WHICH SHOPS A MEMBER MAY WORK AT — migration 073, APPLIED and
    verified live 2026-08-29.** Mark: "in my FMP version of the app, I could give

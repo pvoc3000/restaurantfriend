@@ -346,8 +346,25 @@ export function ShiftReportRunner({
       {/* 16px IS THIS SURFACE'S BODY SIZE. The app's own base is 15px (a desk
           size), and anything unstyled here inherits it — a `ui/Checkbox` label
           beside 16px rows, for instance. Setting it once on main is what makes
-          the scale hold for elements no page sizes explicitly. */}
-      <main className="flex-1 overflow-y-auto px-6 py-8 text-[16px]">
+          the scale hold for elements no page sizes explicitly.
+
+          NO `overflow-y-auto` HERE, AND PUTTING IT BACK BREAKS THE PREMADES
+          HEADER. It carried one until 2026-09-09 and that class never did
+          anything: the shell is `min-h-screen` with height auto, so this box is
+          content-sized and its scrollHeight always equals its clientHeight —
+          measured 2097 against 2097 — while the WINDOW is what really scrolls.
+          What it did do was make this an `overflow` scroll CONTAINER, and a
+          sticky cell pins to its nearest such ancestor: so the premades column
+          labels pinned to a box that never moves and left with the page,
+          measured at −511px after a 600px scroll. That is `lib/tableHead`'s own
+          documented trap, in the file it is documented in.
+
+          If this surface ever wants a genuinely fixed banner and footer the
+          answer is a DEFINITE height on the shell (`h-dvh`, not `h-screen` —
+          iOS Safari's `100vh` is the large viewport and would hide the footer
+          under the browser chrome), and the `overflow-y-auto` comes back at the
+          same time. One without the other is what was here. */}
+      <main className="flex-1 px-6 py-8 text-[16px]">
         {busy ? <ProgressBand label={busy} /> : null}
         {failed ? (
           <p className="mb-6 border border-accent px-4 py-3 text-sm text-accent">{failed}</p>

@@ -103,8 +103,16 @@ export const STICKY_HEAD_ROW_UNDER_CONTROLS =
   "[&>th]:sticky [&>th]:top-[calc(var(--rf-header-h)_+_var(--rf-controls-h))] [&>th]:z-20 [&>th]:bg-white [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]";
 
 /**
- * The same, for a table that scrolls inside its OWN pane — it sticks to the top
- * of the pane, and only ever competes with its own rows, so it sits at 10.
+ * The same, for a table whose SCROLLER'S OWN TOP EDGE is where the labels
+ * belong — it sticks at 0, and competes only with its own rows, so it sits
+ * at 10.
+ *
+ * TWO CASES, not one, which is why the name is narrower than the meaning. A
+ * table that scrolls inside its own pane is the original; the other is a
+ * CHROME-LESS full-screen page — the shift report's runner, whose black banner
+ * scrolls away and leaves nothing above the labels to offset against. The
+ * masthead variants would offset against `--rf-header-h`, which on those routes
+ * is the seed value and not a masthead that is there.
  */
 export const STICKY_HEAD_ROW_IN_PANE =
   "[&>th]:sticky [&>th]:top-0 [&>th]:z-10 [&>th]:bg-white [&>th]:shadow-[inset_0_-2px_0_var(--rf-neutral-900)]";

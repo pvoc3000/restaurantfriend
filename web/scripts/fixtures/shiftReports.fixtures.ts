@@ -21,25 +21,38 @@ import {
 // pagesForShift — the mirror rule
 // ---------------------------------------------------------------------------
 
-test("closing gets eight pages, opening six, mid and off-site five", () => {
+test("closing gets eight pages, and every other shift five", () => {
   // Each gained ONE when the checklist page landed (2026-08-29): every shift
   // can be asked for a walk, including a mid.
+  //
+  // Opening was SIX until 2026-09-09, when the batch report was retired and its
+  // page went with it — which is what makes it five like the other two, by
+  // coincidence rather than by rule (see `OPENING_PAGES`).
   eq(pagesForShift("closing").length, 8, "closing");
-  eq(pagesForShift("opening").length, 6, "opening");
+  eq(pagesForShift("opening").length, 5, "opening");
   eq(pagesForShift("mid").length, 5, "mid");
   eq(pagesForShift("off_site").length, 5, "off_site");
 });
 
-test("PREMADES AND ELEMENTS ARE MIRRORS — never both, never neither by accident", () => {
+test("THE BATCH REPORT IS RETIRED — the elements page is on NO shift", () => {
+  // Mark, 2026-09-09: "we are no longer doing the batch report, so we can skip
+  // that page for the morning shift." The page TYPE survives, and so does its
+  // component and every query behind it — all of them behind a
+  // `wants("elements")` that this makes permanently false. This is what says
+  // so out loud, so putting the page back is a decision rather than a slip.
   for (const shift of ["closing", "opening", "mid", "off_site"] as const) {
-    const pages = pagesForShift(shift);
-    const both = pages.includes("premades") && pages.includes("elements");
-    no(both, `${shift} must not carry both production pages`);
+    no(pagesForShift(shift).includes("elements"), `${shift} must not ask for the bake`);
   }
+});
+
+test("ONLY THE CLOSER COUNTS PREMADES — nothing is left over at 6am", () => {
+  // What survives of the mirror rule. The two production pages could never both
+  // appear; one of them is now on nothing, so what is left to pin is that the
+  // OTHER is still the closer's alone.
   ok(pagesForShift("closing").includes("premades"), "the closer counts leftovers");
-  no(pagesForShift("closing").includes("elements"), "the closer did not do the bake");
-  ok(pagesForShift("opening").includes("elements"), "the opener reports the bake");
-  no(pagesForShift("opening").includes("premades"), "nothing is left over at 6am");
+  for (const shift of ["opening", "mid", "off_site"] as const) {
+    no(pagesForShift(shift).includes("premades"), `${shift} premades`);
+  }
 });
 
 test("every shift gets the five that are always there", () => {
@@ -81,7 +94,7 @@ test("pagesForShift returns a COPY — a caller sorting it cannot corrupt the ne
 
 test("the banner numbers what it was given", () => {
   const pages = pagesForShift("opening");
-  eq(pageBanner(pages[2], 2, pages.length), "Shift report — page 3 of 6 — Elements made");
+  eq(pageBanner(pages[2], 2, pages.length), "Shift report — page 3 of 5 — Checklist");
 });
 
 // ---------------------------------------------------------------------------
@@ -199,19 +212,31 @@ test("READINESS IS SHIFT-DEPENDENT: an opening report is complete with no paper 
   eq(opening, [], "an opening report must not be asked about the closer's work");
 });
 
-test("an opening report IS asked about its batches", () => {
-  const out = submitBlockers({
-    ...READY,
-    shift: "opening",
-    taskSpecialOrdersDone: false,
-    taskSchedulesDone: false,
-    scheduledLines: 0,
-    countedLines: 0,
-    countedBatches: 1,
-    scheduledBatches: 4,
-  });
-  eq(out.length, 1);
-  ok(out[0].includes("3 of 4"), out[0]);
+test("NOBODY IS ASKED ABOUT BATCHES ANY MORE — the page is on no shift", () => {
+  // This asserted the opposite until 2026-09-09, and it was right to: an
+  // opening report that had counted 1 of 4 batches was blocked from sending.
+  // With the batch report retired the clause is unreachable on every shift,
+  // because it is guarded by `pages.includes("elements")`.
+  //
+  // Kept rather than deleted, and inverted, because it is the one thing that
+  // would go red if somebody put the page back without noticing that the
+  // blocker comes with it.
+  for (const shift of ["closing", "opening", "mid", "off_site"] as const) {
+    const out = submitBlockers({
+      ...READY,
+      shift,
+      taskSpecialOrdersDone: true,
+      taskSchedulesDone: true,
+      scheduledLines: 0,
+      countedLines: 0,
+      countedBatches: 1,
+      scheduledBatches: 4,
+    });
+    no(
+      out.some((line) => /batch/i.test(line)),
+      `${shift}: ${out.join(" · ")}`
+    );
+  }
 });
 
 test("a mid shift is asked about neither", () => {

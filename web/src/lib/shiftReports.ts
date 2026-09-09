@@ -23,10 +23,14 @@ export { SHIFT_SLOT_LABEL };
 /**
  * The pages, in FileMaker's own order.
  *
- * `premades` and `elements` are MIRRORS and never both appear: the opening
- * supervisor records what the overnight bake produced, the closer records what
- * was left of it (Mark, 2026-08-28). Mid and off-site get neither — an
- * off-site shift has no kitchen for a batch log to be about.
+ * `premades` and `elements` were MIRRORS and never both appeared: the opening
+ * supervisor recorded what the overnight bake produced, the closer records what
+ * was left of it (Mark, 2026-08-28). Mid and off-site got neither — an off-site
+ * shift has no kitchen for a batch log to be about.
+ *
+ * `elements` IS ON NO SHIFT SINCE 2026-09-09 — the shop stopped keeping the
+ * batch report. The page survives here and everywhere else it is named, behind
+ * guards that are now always false; see `OPENING_PAGES`.
  */
 export type ShiftReportPage =
   | "info"
@@ -81,10 +85,26 @@ const CLOSING_PAGES: ShiftReportPage[] = [
   "submit",
 ];
 
+/**
+ * NO ELEMENTS PAGE SINCE 2026-09-09 (Mark: "we are no longer doing the batch
+ * report, so we can skip that page for the morning shift"). The opener recorded
+ * what the overnight bake produced; the shop has stopped keeping that log, so
+ * asking for it is asking somebody to fill in a form nobody reads.
+ *
+ * That leaves this list IDENTICAL to `SHORT_PAGES` and it stays a list of its
+ * own, deliberately: the two are the same by coincidence rather than by rule.
+ * Mid and off-site hold these five because there is no kitchen and no till;
+ * opening holds them because one page was retired, and opening is the shift
+ * most likely to grow one back. Merging them would put that decision behind a
+ * name that argues against it.
+ *
+ * The `elements` page, its component and its queries all survive, unreached —
+ * every one of them is behind a `wants("elements")` that is now always false,
+ * so nothing lies and one line here brings it back.
+ */
 const OPENING_PAGES: ShiftReportPage[] = [
   "info",
   "ratings",
-  "elements",
   "checklist",
   "report",
   "submit",
