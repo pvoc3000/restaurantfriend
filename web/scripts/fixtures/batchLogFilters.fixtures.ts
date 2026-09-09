@@ -39,6 +39,9 @@ test("batchLogWindowBounds: a preset counts back from the ORG's day, through tod
   const TUE = "2026-09-08";
   eq(batchLogWindowBounds("all", TUE), null, "all time has no floor");
   eq(batchLogWindowBounds("30", TUE), { from: "2026-08-09", to: TUE });
+  // Last week ends YESTERDAY where the day counts end today.
+  eq(batchLogWindowBounds("last_week", TUE), { from: "2026-09-01", to: "2026-09-07" });
+  eq(batchLogWindowFromPicker({ from: "2026-09-01", to: "2026-09-07" }, TUE), "last_week");
   eq(batchLogWindowBounds("90", TUE), { from: "2026-06-10", to: TUE });
   eq(batchLogWindowBounds("365", TUE), { from: "2025-09-08", to: TUE });
   eq(batchLogWindowBounds({ from: "2026-08-01", to: "2026-08-31" }, TUE), { from: "2026-08-01", to: "2026-08-31" });

@@ -7,6 +7,7 @@ import { daysBefore } from "./today";
 import {
   matchingPreset,
   parseRangeParams,
+  RANGE_PRESETS,
   type DateRange,
   type RangePreset,
 } from "./dateRange";
@@ -28,6 +29,11 @@ import {
  * of the two screens carrying four chips nobody presses.
  */
 export const BATCH_LOG_RANGES = [
+  // Mark's "Last week" (2026-09-08): seven days ago through YESTERDAY —
+  // `lib/dateRange`'s own definition, where the day-count presets beside it
+  // run through today. A week that ended last night is a complete thing to
+  // ask about, which is the question this option is for.
+  { key: "last_week", label: "Last week", days: null },
   { key: "30", label: "30 days", days: 30 },
   { key: "90", label: "90 days", days: 90 },
   { key: "365", label: "1 year", days: 365 },
@@ -55,7 +61,11 @@ export const BATCH_LOG_PRESETS: RangePreset[] = BATCH_LOG_RANGES.map((r) => ({
   key: r.key,
   label: r.label,
   range: (today: string) =>
-    r.days === null ? null : { from: daysBefore(today, r.days), to: today },
+    r.key === "last_week"
+      ? RANGE_PRESETS.last_week.range(today)
+      : r.days === null
+        ? null
+        : { from: daysBefore(today, r.days), to: today },
 }));
 
 /** A preset by key, or a pair somebody tapped on the calendar. */
