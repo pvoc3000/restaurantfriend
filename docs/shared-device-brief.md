@@ -113,3 +113,26 @@ cascades the PIN.
 
 Harness note: the stub's `service_role` has no `BYPASSRLS`, so its plain
 selects on the new tables return 0 rows — check counts as `postgres`.
+
+## Walked live (2026-09-09, after 097 was applied and the function deployed)
+
+In the browser pane against the real database: a PIN set through `/account`;
+the pane registered on `/settings › Shared devices` (row marked "this one",
+the Register button withdrawn, the cookie invisible to script); Switch user →
+`/lock` straight onto the keypad under the one name holding a PIN, the device
+named beneath; four 9s → "Wrong PIN."; the right PIN → `/` by a hard
+navigation as that person, `amr: otp` on the token; `/account`, the Admin
+tab's PIN row and the devices tab all refusing in words on the PIN session;
+and, with the pane hidden for five minutes, the WAKE locking it back to
+`/lock` — the timer does not run in a hidden pane, which is the iPad-asleep
+case the `visibilitychange` check exists for.
+
+**One bug the walk found, fixed the same hour.** `lockDevice` used to
+`redirect("/lock")` from inside the action. A server action that signs out
+and redirects also makes Next re-render the page it was called from, whose
+`getAppSession` then throws its own redirect — two navigations from one
+router state, and whichever lands last wins. The masthead's form happened to
+land on `/lock`; the idle lock happened to land on `/login`. The action now
+returns and the CLIENT does `window.location.assign("/lock")`
+(`components/SwitchUser`, `IdleLock`). The same shape as the unlock's
+ending, and for the same reason it is a hard navigation.

@@ -8466,9 +8466,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    Verified on the Docker harness as real roles (all 100 files replay; every
    refusal by name; the fifth failure `locked` at 900s; revoke idempotent;
    the membership delete cascades the PIN) and the three screens in the
-   browser pre-migration, each naming the missing table in a sentence. **NOT
-   yet walked live** — the picker, the keypad and the idle lock need 097
-   applied and the function deployed; the brief's Deploy section is the order.
+   browser pre-migration, each naming the missing table in a sentence.
+   **WALKED LIVE 2026-09-09** once 097 was applied and the function deployed:
+   the whole loop — register, Switch user, wrong PIN, right PIN, the three
+   refusals on a PIN session, and the idle lock firing on WAKE.
+   **THE WALK FOUND ONE BUG: NEVER `redirect()` FROM AN ACTION THAT SIGNS
+   OUT.** Next re-renders the calling page inside the action, that page's
+   `getAppSession` finds no user and throws ITS redirect, and the two race —
+   the masthead landed on /lock, the idle lock on /login. `lockDevice` now
+   returns and the client hard-navigates (`components/SwitchUser`,
+   `IdleLock`). `signOut` keeps its redirect because it is a document form
+   with no client to navigate, and has always landed where it says.
    **1678 fixtures pass**, 11 new.
 
 5. SwiftUI floor app (only after 4 is proven in real use)
