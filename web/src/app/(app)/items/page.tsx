@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
-import { staleBucket, type StaleBucket } from "@/lib/lastOrdered";
+import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { type CatalogItem } from "@/lib/catalog";
 import { parseItemFilters, type RawSearchParams } from "@/lib/itemFilters";
 import { ItemsList } from "@/components/catalog/ItemsList";
@@ -24,7 +24,6 @@ const SELECT = `
 
 export type ItemRow = CatalogItem & {
   last_order_date: string | null;
-  stale: StaleBucket;
 };
 
 export default async function ItemsPage({
@@ -76,11 +75,13 @@ export default async function ItemsPage({
     }
   }
 
-  const today = new Date();
+  // The org's calendar day, not the host's — the Last-ordered presets are
+  // functions of it (see lib/today).
+  const today = todayInTimeZone(session.orgSettings.timezone ?? serverTimeZone());
   const rows: ItemRow[] = items.map((item) => {
     const il = item.inventory_item_locations[0] ?? null;
     const last_order_date = il ? lastOrderedByIl.get(il.id) ?? null : null;
-    return { ...item, last_order_date, stale: staleBucket(last_order_date, today) };
+    return { ...item, last_order_date };
   });
 
   const categories = [
@@ -93,6 +94,7 @@ export default async function ItemsPage({
       categories={categories}
       activeLocationCode={session.activeLocation?.code ?? null}
       initialFilters={initialFilters}
+      today={today}
       orgId={session.membership.org_id}
       editable={canEditPage(session.membership.role, "/items")}
     />

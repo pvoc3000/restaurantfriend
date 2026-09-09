@@ -30,6 +30,7 @@ import "./invoiceMatch.fixtures";
 import "./lastPurchase.fixtures";
 import "./invoices.fixtures";
 import "./invoiceFilters.fixtures";
+import "./itemFilters.fixtures";
 import "./filedInvoice.fixtures";
 import "./invoicePages.fixtures";
 import "./billsFromReadings.fixtures";

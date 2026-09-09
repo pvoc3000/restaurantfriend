@@ -4,7 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { STALE_ORDER, STALE_LABEL } from "@/lib/lastOrdered";
+import { inRange } from "@/lib/dateRange";
+import { RangePicker } from "@/components/ui/RangePicker";
 import { qty } from "@/lib/catalog";
 import { urlFilterParams } from "@/lib/filterMenus";
 import {
@@ -14,7 +15,7 @@ import {
   type ActiveFilter,
   type ItemFilters,
   type SortKey,
-  type StaleFilter,
+  LAST_ORDERED_PRESETS,
 } from "@/lib/itemFilters";
 import { makeComparator, type SortDir, type SortValue } from "@/lib/tableSort";
 import { usePublishRecordSet } from "@/lib/recordSet";
@@ -89,6 +90,7 @@ export function ItemsList({
   categories,
   activeLocationCode,
   initialFilters,
+  today,
   orgId,
   editable,
 }: {
@@ -96,6 +98,8 @@ export function ItemsList({
   categories: string[];
   activeLocationCode: string | null;
   initialFilters: ItemFilters;
+  /** The org's calendar day — what the Last-ordered presets resolve on. */
+  today: string;
   orgId: string;
   /** The Page Permissions sheet's cell for /items — false hides New item,
    *  the selection column and the bulk Deactivate bar. */
@@ -130,7 +134,14 @@ export function ItemsList({
       if (filters.active === "active" && !i.is_active) return false;
       if (filters.active === "inactive" && i.is_active) return false;
       if (filters.category && i.category !== filters.category) return false;
-      if (filters.stale !== "any" && i.stale !== filters.stale) return false;
+      // A range over the last order date; an item never ordered here has no
+      // date to fall inside one, so any range hides it.
+      if (
+        filters.last &&
+        (!i.last_order_date || !inRange(i.last_order_date, filters.last))
+      ) {
+        return false;
+      }
       if (!t) return true;
       return (
         i.name.toLowerCase().includes(t) ||
@@ -170,12 +181,6 @@ export function ItemsList({
       [sorted, filters]
     )
   );
-
-  const staleCounts = useMemo(() => {
-    const c: Record<string, number> = {};
-    for (const i of items) c[i.stale] = (c[i.stale] ?? 0) + 1;
-    return c;
-  }, [items]);
 
   const visibleIds = visible.map((i) => i.id);
   const allVisibleChecked =
@@ -393,7 +398,8 @@ export function ItemsList({
         </p>
       </div>
 
-      {/* Search + category */}
+      {/* Search · last ordered · category · active (Mark, 2026-09-08, placing
+          the range picker "between the search bar and category picklist"). */}
       <div className="flex flex-wrap items-end gap-2">
         <TextInput
           value={filters.q}
@@ -402,6 +408,19 @@ export function ItemsList({
           clearLabel="Clear the search"
           className="w-72"
         />
+        {/* Last ordered, as a range over the date rather than the four age
+            tabs it replaced. Its presets are those tabs' three bands; a
+            client filter, so it writes the URL like the others. */}
+        <div className="w-64">
+          <RangePicker
+            value={filters.last}
+            onChange={(last) => update({ last })}
+            presets={LAST_ORDERED_PRESETS}
+            today={today}
+            ariaLabel="Last ordered"
+            placeholder="Last ordered any time"
+          />
+        </div>
         {/* A PickList, not a native <select> (Mark, 2026-08-01 — he named this
             one). Past 8 categories it also gains the find box, which the OS
             menu could never offer on an iPad. */}
@@ -432,26 +451,6 @@ export function ItemsList({
             />
           </div>
         ) : null}
-      </div>
-
-      {/* Last-ordered filter — same buckets as the cleanup queue. The label
-          sits ON ITS OWN LINE above the tabs (Mark, 2026-08-01): the bar is
-          five cells wide and a label beside it pushed the whole thing off the
-          left margin every other filter row starts at. */}
-      <div className="space-y-1.5">
-        <span className="block text-xs uppercase tracking-[0.12em] text-faint">
-          Last ordered
-        </span>
-        <TabPicker
-          ariaLabel="Last ordered"
-          value={filters.stale}
-          onChange={(stale) => update({ stale })}
-          options={(["any", ...STALE_ORDER] as StaleFilter[]).map((t) => ({
-            key: t,
-            label: t === "any" ? "Any age" : STALE_LABEL[t],
-            count: t === "any" ? items.length : staleCounts[t] ?? 0,
-          }))}
-        />
       </div>
 
       {editable && checked.size > 0 && (
