@@ -19,19 +19,36 @@ import { taskTitleFromIssue } from "@/lib/facilityTasks";
  * "reported" and offers a link rather than a second button. Without that, three
  * supervisors flag the same fryer on three nights and file three tasks.
  *
- * AND IT SAYS WHAT IT WILL DO BEFORE YOU PRESS IT (Mark, 2026-09-09: "it's
- * unclear what the button does/will do"). This is the exception the "stop
- * writing hints" rule names — a line earns its place when it states a fact the
- * reader CANNOT SEE — and here that fact is the whole point of the feature:
- * raising a task is not filing it somewhere and forgetting it, it puts the job
- * on the top of every checklist at this shop until somebody closes it. Nothing
- * on the button, the row or the screen says so, and it is the difference
- * between a note and an obligation.
+ * THE BUTTON NAMES THE MECHANISM, NOT THE RECORD (Mark, 2026-09-09, in two
+ * steps: "it's unclear what the button does/will do", and then — reading the
+ * description that answered it — "I think a different label for the button is
+ * needed. 'Pin to future checklists' or something like that").
  *
- * ONE FACT, NOT TWO. The task also lands on /tasks, and that is deliberately
- * left out: it is the ordinary consequence of making a task, and the "see the
- * task" link this becomes the moment you press it goes straight there. The
- * carry-forward is the half nobody would guess.
+ * HE WAS ALSO ASKING A QUESTION ABOUT BEHAVIOUR AND THE ANSWER IS YES: "if the
+ * user doesn't raise a task, then, the next time a checklist is run the issue
+ * will not appear on it?" It will not. A run reads exactly two things — its OWN
+ * `checklist_run_items`, scoped `.eq("run_id", runId)`, and the shop's open
+ * `location_tasks`. Nothing anywhere looks at a previous run. So a flagged item
+ * that nobody pins is recorded on that night's run and in that night's emailed
+ * report, and is never seen again.
+ *
+ * WHICH IS WHY "Raise a task" WAS THE WRONG LABEL. It named the ROW that gets
+ * written, which is true and is not what the person standing there is deciding.
+ * What they are deciding is whether this survives tonight. The pinning is the
+ * consequence they cannot see and the reason the button exists, so it goes on
+ * the face of it.
+ *
+ * THE DESCRIPTION SWAPPED JOBS WITH THE LABEL. It used to carry the
+ * carry-forward and deliberately left out that a task record is created, on the
+ * grounds that "Raise a task" had already said so. With the label naming the
+ * mechanism instead, the record is now the unsaid half, so the line names it —
+ * and names the only way it ends.
+ *
+ * THE LABEL STAYS TRUE FOR THE TASK'S WHOLE LIFE, checked rather than assumed:
+ * `carry_forward` is `not null default true` (075) and is written ONLY at
+ * creation, by `NewTask`'s own switch. Nothing edits it afterwards, so a task
+ * pinned here cannot quietly stop being pinned. If that ever changes, this
+ * label is the thing that starts lying.
  */
 export function RaiseTaskFromIssue({
   runItemId,
@@ -56,7 +73,7 @@ export function RaiseTaskFromIssue({
   if (taskId) {
     return (
       <span className="text-[13px] text-muted">
-        Reported —{" "}
+        Pinned —{" "}
         <Link href={`/tasks?open=${taskId}`} className="underline">
           see the task
         </Link>
@@ -113,7 +130,7 @@ export function RaiseTaskFromIssue({
         disabled={busy}
         className="min-h-11 shrink-0 border border-ink bg-white px-3 text-[13px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
       >
-        {busy ? "Raising…" : "Raise a task"}
+        {busy ? "Pinning…" : "Pin to future checklists"}
       </button>
       {/* The error REPLACES the description rather than joining it. Both are
           the same sentence-shaped thing in the same slot, and stacked they
@@ -124,7 +141,7 @@ export function RaiseTaskFromIssue({
         <span className="text-[13px] text-accent">{failed}</span>
       ) : (
         <span className="text-[13px] leading-snug text-muted">
-          It stays on every checklist here until somebody does it.
+          It becomes a task, and stays until somebody closes it.
         </span>
       )}
     </span>
