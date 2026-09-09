@@ -7427,6 +7427,28 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    only while nothing else here was sticky — a `z-20` table head would now paint
    OVER the four buttons on a viewport short enough for the two to meet, and
    those four are the way out.
+   **THE NEEDS-ATTENTION TAB IS GONE AND DRAFTS IS THE DEFAULT** (Mark,
+   2026-09-09). It was the list's opening view and it was a tier over a queue
+   that is normally EMPTY — the wrong shape for the screen you land on, where
+   Drafts is what somebody comes here to finish. Three tabs now: Drafts · Sent ·
+   All.
+   **NEITHER HALF OF WHAT IT COUNTED IS LOST**, which is what makes this a tab
+   going rather than a feature. `attentionReason` still paints the Status cell
+   yellow ("Sent, but not emailed", "Still a draft") — the first of those is the
+   hole that function exists to close, a flush that succeeded beside a mail that
+   did not — and `missingNights` still produces the sentence over the table.
+   Both stay pure and fixture-tested; neither lost a caller.
+   **THE MISSING-NIGHT SENTENCE NOW SHOWS ON EVERY TIER**, which is the one
+   judgement in here. It was tied to that tab because it was HALF OF ITS COUNT
+   and explained the half you could not see — the nights have no ROW, so no
+   filter can reach them. With the count gone there is nothing left to explain,
+   and the FACT belongs to the shop's last seven days rather than to any tier,
+   so leaving it behind a filter would have been the only remaining way to lose
+   it. The 2026-08-31 note about it appearing in the table's empty slot is
+   history twice over now: it renders above the table, always.
+   The empty states became tier-aware in the same pass, because the old generic
+   "No shift reports here yet." was written for a screen whose first tab was a
+   queue — on Drafts the useful sentence is "everything here has been sent".
 
 4i. ✅ **WHICH SHOPS A MEMBER MAY WORK AT — migration 073, APPLIED and
    verified live 2026-08-29.** Mark: "in my FMP version of the app, I could give

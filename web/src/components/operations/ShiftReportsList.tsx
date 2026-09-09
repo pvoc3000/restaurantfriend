@@ -32,7 +32,23 @@ export type ShiftReportRow = {
   updatedAt: string;
 };
 
-type Tier = "attention" | "draft" | "sent" | "all";
+/**
+ * NO "NEEDS ATTENTION" TIER SINCE 2026-09-09 (Mark: "let's get rid of the
+ * 'needs attention' tab on the shift report list page. Make 'drafts' the
+ * default tab").
+ *
+ * It was the list's opening view and it was a tier over a QUEUE that is
+ * normally empty — which is the wrong shape for the screen you land on. Drafts
+ * is what somebody comes here to finish.
+ *
+ * NEITHER HALF OF WHAT IT COUNTED IS LOST, which is why this is a tab going
+ * rather than a feature: the per-row reason still paints the Status cell yellow
+ * ("Sent, but not emailed", "Still a draft"), and the missing-night sweep is
+ * still a sentence over the table — now on every tier rather than only on the
+ * one you had to choose. What goes is a fourth way to filter, and a landing
+ * view whose usual answer was "nothing".
+ */
+type Tier = "draft" | "sent" | "all";
 
 /** How far back the missing-night sweep looks. Shorter than the page's own
  *  window, because a gap three weeks old is history rather than a task. */
@@ -66,7 +82,7 @@ export function ShiftReportsList({
 }) {
   const router = useRouter();
   const supabase = createClient();
-  const [tier, setTier] = useState<Tier>("attention");
+  const [tier, setTier] = useState<Tier>("draft");
   const [search, setSearch] = useState("");
   const [failed, setFailed] = useState<string | null>(null);
   const [, startTransition] = useTransition();
@@ -108,7 +124,6 @@ export function ShiftReportsList({
     [rows, today]
   );
 
-  const attentionCount = withReason.filter((r) => r.reason !== null).length + gaps.length;
   const draftCount = rows.filter((r) => r.status === "draft").length;
   const sentCount = rows.filter((r) => r.status === "sent").length;
 
@@ -116,7 +131,6 @@ export function ShiftReportsList({
     const term = search.trim().toLowerCase();
     return withReason
       .filter((r) => {
-        if (tier === "attention") return r.reason !== null;
         if (tier === "draft") return r.status === "draft";
         if (tier === "sent") return r.status === "sent";
         return true;
@@ -250,8 +264,7 @@ export function ShiftReportsList({
   ];
 
   // The nights this shop was open and nobody reported. It has no ROW of its
-  // own — there is no report to show — so it is a sentence under the tab whose
-  // count it is half of.
+  // own — there is no report to show — so it is a sentence over the table.
   const gapsNote =
     gaps.length > 0 ? (
       <p className="text-sm">
@@ -284,13 +297,13 @@ export function ShiftReportsList({
         compactBelow={1280}
         columnChooser
         empty={
-          tier === "attention" ? (
-            <p className="text-sm text-muted">
-              {gaps.length > 0 ? "No reports need attention." : "Nothing needs attention."}
-            </p>
-          ) : (
-            <p className="text-sm text-muted">No shift reports here yet.</p>
-          )
+          <p className="text-sm text-muted">
+            {tier === "draft"
+              ? "No drafts — everything here has been sent."
+              : tier === "sent"
+                ? "Nothing has been sent yet."
+                : "No shift reports here yet."}
+          </p>
         }
         leading={
           <div className="space-y-3">
@@ -309,7 +322,6 @@ export function ShiftReportsList({
               value={tier}
               onChange={setTier}
               options={[
-                { key: "attention", label: "Needs attention", count: attentionCount },
                 { key: "draft", label: "Drafts", count: draftCount },
                 { key: "sent", label: "Sent", count: sentCount },
                 { key: "all", label: "All", count: rows.length },
@@ -330,14 +342,17 @@ export function ShiftReportsList({
               />
             </div>
           </div>
-          {/* UNDER THE TABS, NOT OVER THEM (Mark, 2026-09-03). The missing
-              nights are counted ON the Needs attention tab, so the sentence
-              that explains that count belongs beneath the tab carrying it —
-              above, it read as a banner about the screen rather than as the
-              detail of one tier. One place now rather than two: it sits
-              directly over the table whether or not the table has rows, so the
-              empty slot no longer has to stand in for it. */}
-          {tier === "attention" ? gapsNote : null}
+          {/* UNDER THE TABS, NOT OVER THEM (Mark, 2026-09-03), and ON EVERY
+              TIER since the Needs-attention tab went (2026-09-09).
+
+              It was shown on that one tier because it was half of that tab's
+              count, and it explained the half you could not see. With the tab
+              gone there is no count to explain — but the FACT is unchanged and
+              belongs to the shop's last seven days rather than to any tier, so
+              hiding it behind a filter would be the only way left to lose it.
+              It has no ROW of its own (there is no report to show), so no
+              filter can reach it and none should try. */}
+          {gapsNote}
           </div>
         }
       />
