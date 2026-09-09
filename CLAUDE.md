@@ -3922,11 +3922,26 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    reported Monday at DF02 with the M-W plan contributing nothing, which looked
    like the feature failing and was the deletion having landed a minute before
    the kitchen edit.
-   **Left as it is, and named so nobody thinks it was forgotten:**
-   `locations.kitchen_by_weekday` / `shops_for` (017) are now unambiguously a
-   second answer, and 101 does NOT drop them — they hold real data and have a
-   live editor (`ProductionMapping`), and deleting a block off a screen is a
-   decision to take deliberately. One commit when Mark wants it.
+   **AND THE LOCATION'S OWN MAPPING IS RETIRED — migration 102, NEEDS
+   APPLYING** (Mark, 2026-09-09: "remove the location kitchen mapping and
+   shops_for"). 017 put `kitchen_by_weekday` and `shops_for` on `locations`;
+   039 said they would be vestigial "the day kitchen-on-plan lands" and 101 made
+   that true twice over by giving the PLAN a column of the same name and shape,
+   one level down and on the axis that owns the question. 102 drops both, the
+   Production block and `ProductionMapping` come off the location record, and
+   `backfill-locations.mjs` stops reading FMP's `KitchenLocation` /
+   `ShopForLocations_t` (its `toId`, `codeById` and unknown-code report went
+   with them — nothing it writes names another location now).
+   **WHAT IT DESTROYS, measured before dropping**: DF01 all-DF01 with
+   `shops_for` DF01/DF02/DF03, EVENT a stray Monday, four shops empty — and
+   **DF02's row, which is Mark's split week EXACTLY as the merged plan states
+   it**, Mon–Wed DF01 / Thu–Sun DF02. That is the corroboration worth keeping:
+   017 had the real arrangement right and the record wrong, and the plan now
+   says the same thing where a date range, a tray and a par can be said with it.
+   No view, function or constraint read either column. `if exists` is
+   deliberately NOT used — a silent no-op would make a re-run look like a
+   success — so the second run fails by name, verified on the harness along with
+   all 102 replaying and the 017 check constraint going with its column.
    **OVERLAP IS DELIBERATELY NOT A CONSTRAINT.** 027 taught the btree_gist
    exclusion idiom and this is exactly where NOT to reach for it: overlapping
    ranges are the feature, and even "the same item on two of one shop's plans"

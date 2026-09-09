@@ -171,6 +171,20 @@ export async function PlanDetail({
               (plan.title as string)
             )}
           </h1>
+          {/* THE DATES BESIDE THE NAME (Mark, 2026-09-09), in parentheses and
+              with no label — a plan is identified by what it is called AND when
+              it runs, and "Fall 2026 - DF02" alone does not say which autumn.
+              It is a rendering of `starts_on`/`ends_on`, which are edited two
+              rows below; putting a second editor here would be two answers to
+              one question. */}
+          <span className="text-[13px] text-muted">
+            (
+            {planRange({
+              starts_on: plan.starts_on as string,
+              ends_on: (plan.ends_on ?? null) as string | null,
+            })}
+            )
+          </span>
           {!plan.is_active ? (
             <span className="text-[12px] uppercase tracking-[0.12em] text-muted">Inactive</span>
           ) : null}
@@ -199,6 +213,24 @@ export async function PlanDetail({
               </span>
             )}
           </Row>
+          {/* MARK'S ORDER (2026-09-09): the two facts you set once on
+              the top row, the two dates on the second. `In force` is
+              gone from the grid — it is beside the title now, and a
+              derived range stated an inch under the dates it is derived
+              from was the same fact twice. */}
+          <Row label="Notes">
+            {editable ? (
+              <InlineValue
+                boxed={BOXED_FIELDS}
+                table="production_plans"
+                id={id}
+                column="notes"
+                value={(plan.notes ?? null) as string | null}
+              />
+            ) : (
+              <span className={READ_ONLY_VALUE}>{(plan.notes as string) ?? "—"}</span>
+            )}
+          </Row>
           <Row label="Starts">
             {editable ? (
               <InlineValue
@@ -219,27 +251,6 @@ export async function PlanDetail({
               />
             ) : (
               <span className={READ_ONLY_VALUE}>{(plan.ends_on as string) ?? "—"}</span>
-            )}
-          </Row>
-          <Row label="In force">
-            <span className={`${READ_ONLY_VALUE} text-muted`}>
-              {planRange({
-                starts_on: plan.starts_on as string,
-                ends_on: (plan.ends_on ?? null) as string | null,
-              })}
-            </span>
-          </Row>
-          <Row label="Notes">
-            {editable ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="production_plans"
-                id={id}
-                column="notes"
-                value={(plan.notes ?? null) as string | null}
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{(plan.notes as string) ?? "—"}</span>
             )}
           </Row>
         </dl>

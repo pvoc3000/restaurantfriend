@@ -11,7 +11,6 @@ import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { AddressFields } from "@/components/location/AddressFields";
 import { OperationsFields } from "@/components/location/OperationsFields";
 import { OperatingHours } from "@/components/location/OperatingHours";
-import { ProductionMapping } from "@/components/location/ProductionMapping";
 import { WorkingHere } from "@/components/location/WorkingHere";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { canEditPage } from "@/lib/pageAccess";
@@ -32,8 +31,6 @@ type LocationRecord = {
   open_days: number[] | null;
   open_time_by_weekday: (string | null)[] | null;
   close_time_by_weekday: (string | null)[] | null;
-  kitchen_by_weekday: (string | null)[] | null;
-  shops_for: string[] | null;
 };
 
 type EmailProvider = { kind?: string; from?: string; reply_to?: string; secret_ref?: string };
@@ -81,8 +78,7 @@ export async function LocationDetail({
       .select(
         `id, code, name, public_name, kind, is_active, address, settings,
          tax_rate, labor_rate, register_count, open_days,
-         open_time_by_weekday, close_time_by_weekday,
-         kitchen_by_weekday, shops_for`
+         open_time_by_weekday, close_time_by_weekday`
       )
       .eq("id", id)
       .maybeSingle(),
@@ -313,22 +309,6 @@ export async function LocationDetail({
           taxRate={location.tax_rate}
           laborRate={location.labor_rate}
           registerCount={location.register_count}
-          editable={editable}
-        />
-      </section>
-
-      {/* ---- production ----------------------------------------------- */}
-      <section className="space-y-2">
-        <Heading>Production</Heading>
-        <p className="max-w-[72ch] text-xs text-subtle">
-          Recorded here, read by nothing yet — the Production module will want
-          them, and they came out of the old system with the rest of this record.
-        </p>
-        <ProductionMapping
-          locationId={location.id}
-          locations={session.locations}
-          kitchenByWeekday={location.kitchen_by_weekday}
-          shopsFor={location.shops_for}
           editable={editable}
         />
       </section>

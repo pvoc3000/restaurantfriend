@@ -1,0 +1,55 @@
+-- ============================================================================
+-- 102 — the LOCATION's production mapping is retired
+-- ============================================================================
+--
+-- Mark, 2026-09-09: "remove the location kitchen mapping and shops_for".
+--
+-- 017 gave `locations` a seven-slot `kitchen_by_weekday` and a `shops_for`
+-- list, lifted out of FileMaker, which put where-a-thing-is-MADE on the
+-- LOCATION. 039's header said they "become vestigial the day kitchen-on-plan
+-- lands" and named them again in the production brief; 101 made that true twice
+-- over by giving the PLAN a column of the same name and shape, one level down
+-- and on the axis that owns the question.
+--
+-- WHY THEY SURVIVED 101 AND GO NOW: they held real data and had a live editor
+-- on the location record, and deleting a block off a screen is a decision to
+-- take deliberately rather than fold into a migration about plans. This is that
+-- decision, asked for by name.
+--
+-- ----------------------------------------------------------------------------
+-- WHAT IS LOST, measured before dropping so the answer is a fact rather than a
+-- reassurance:
+--
+--   DF01  kitchen Mon–Sun DF01              shops_for DF01, DF02, DF03
+--   DF02  kitchen Mon–Wed DF01, Thu–Sun DF02  shops_for DF02, DF01, DF03
+--   EVENT kitchen Mon DF02, rest null       shops_for (none)
+--   DF03/DF04/DF05/ONLINE  both empty
+--
+-- **DF02's row is Mark's split week, exactly as the merged plan now states it**
+-- — Mon–Wed at DF01, Thu–Sun at DF02. That is the corroboration worth keeping:
+-- 017 was describing the real arrangement correctly and storing it on the wrong
+-- record, and `production_plans.kitchen_by_weekday` now says the same thing
+-- where a date range, a tray and a par can be said with it. DF01's row says
+-- only "DF01 makes its own", which is the default; EVENT's is a stray.
+--
+-- Nothing in the schema READS either column — no view, no function, no
+-- constraint, and 101 checked. In `web/src` the only readers were the location
+-- record's own `ProductionMapping` block, which this commit deletes, and
+-- `migration/backfill-locations.mjs`, which stops writing them.
+-- ----------------------------------------------------------------------------
+--
+-- The check constraint `locations_kitchen_by_weekday_len` goes with its column,
+-- which is Postgres doing it rather than this file forgetting: named here so
+-- the omission reads as deliberate. (It is also the one with 076's hole —
+-- `array_length(x, 1) = 7` passes on an empty array, because array_length
+-- returns NULL there and a CHECK passes on NULL. 101's own check uses
+-- `cardinality`. Nothing to fix now; worth knowing why the two differ if this
+-- file is ever read beside them.)
+--
+-- NOT RERUNNABLE: the second run finds no columns to drop. `if exists` is
+-- deliberately NOT used — a silent no-op would make a re-run look like a
+-- success, and this migration's whole content is the drop.
+
+alter table locations
+  drop column kitchen_by_weekday,
+  drop column shops_for;

@@ -568,11 +568,11 @@ brief says; refuse and name the rest.
 
 ### What this module makes vestigial
 
-`locations.kitchen_by_weekday` and `shops_for` (017) — superseded by
-kitchen-on-plan, and since 101 by a column of the same name and shape one level
-down. Nothing derives from them; they still have an editor on the location
-record (`ProductionMapping`). Retire when Mark asks — 101 deliberately left
-them alone rather than delete a screen block unasked.
+`locations.kitchen_by_weekday` and `shops_for` (017) — **DROPPED by migration
+102 (2026-09-09)**, superseded by kitchen-on-plan and then by 101's column of
+the same name and shape one level down. The Production block is off the
+location record and `backfill-locations.mjs` no longer reads FMP's
+`KitchenLocation` / `ShopForLocations_t`.
 
 ---
 

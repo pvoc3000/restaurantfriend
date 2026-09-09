@@ -1109,73 +1109,75 @@ export function PlanMatrix({
                   { location_id: locationId, kitchen_by_weekday: kitchenByWeekday },
                   d.iso
                 );
+                const kitchenClass =
+                  kitchen === locationId
+                    ? "text-[11px] text-muted"
+                    : "text-[11px] font-semibold text-ink";
                 return (
                   <th
                     key={d.iso}
-                    className="px-2 py-2 text-left align-bottom"
+                    className="px-2 py-2 align-bottom"
                     style={{ width: `calc((100% - ${MENU_COLUMN}px) / 7)` }}
                   >
-                    <span className="flex items-baseline justify-between gap-2">
-                      {/* `shrink-0` on the DAY: below about a 1000px window the
-                          pair outgrows a column, and what must survive is the
-                          label you read the header for. Measured at 11px with
-                          the header's own tracking, the widest pair is MON +
-                          Clear at 81px against 139px of cell at 1280. */}
-                      <span className="shrink-0">{d.short}</span>
-                      {/* Rendered on every day and DISABLED on an empty one,
-                          never hidden: a control that vanishes cannot be told
-                          from a feature that does not exist, and here the
-                          reason it is dead is the empty column beneath it. */}
-                      {editable ? (
-                        <button
-                          type="button"
-                          onClick={() => clearDay(d.iso, d.long)}
-                          disabled={pending || !held}
-                          title={
-                            held
-                              ? `Take all ${held} item${held === 1 ? "" : "s"} off ${d.long}`
-                              : `Nothing is on ${d.long}`
-                          }
-                          aria-label={`Clear ${d.long} on this plan`}
-                          className="shrink-0 text-subtle hover:text-ink disabled:cursor-not-allowed disabled:text-faint disabled:hover:text-faint"
-                        >
-                          Clear
-                        </button>
-                      ) : null}
-                    </span>
-                    {/* WHO BAKES THIS DAY (101). On its own line under the
-                        label rather than beside it: the header cell already
-                        holds two things at 11px, and a shop code is the answer
-                        to a different question from the day it sits under.
-                        Muted where it is the shop's own kitchen, in ink where
-                        it is somebody else's — the same treatment the list's
-                        Made at column gives it, so one glance down the row
-                        finds the days that leave the building. */}
-                    <span className="mt-1 flex normal-case tracking-normal">
-                      {editable ? (
-                        <PickList
-                          variant="inline"
-                          value={kitchen}
-                          options={kitchenOptions}
-                          onPick={(v) => v && setKitchen(d.iso, v)}
-                          ariaLabel={`Which kitchen makes ${d.long}`}
-                          className={
-                            kitchen === locationId
-                              ? "text-[11px] text-muted"
-                              : "text-[11px] font-semibold text-ink"
-                          }
-                        />
-                      ) : (
-                        <span
-                          className={
-                            kitchen === locationId
-                              ? "text-[11px] text-muted"
-                              : "text-[11px] font-semibold text-ink"
-                          }
-                        >
-                          {kitchenOptions.find((o) => o.value === kitchen)?.label ?? "—"}
-                        </span>
-                      )}
+                    {/* The day CENTRED over its column (Mark, 2026-09-09) —
+                        it labels the whole column, where everything under it
+                        is a control that starts at the column's left edge. */}
+                    <span className="block text-center">{d.short}</span>
+
+                    {/* WHO BAKES THIS DAY (101), captioned, with Clear on its
+                        line (Mark, 2026-09-09).
+                        THE CAPTION IS ITS OWN LINE, NOT INLINE, and that is a
+                        measurement rather than a preference: with `Kitchen`,
+                        the picker and Clear all on one row, the shop CODE
+                        truncates on all seven columns at a 992px content width
+                        (a 1024 window) — measured against this stylesheet, the
+                        picker gets 36px for a value that wants 40. Captioned
+                        above, the picker has 81px there and nothing truncates
+                        at any width this screen is used at. It costs the header
+                        15px, once.
+                        The wrapper drops the row's small-caps tracking so a
+                        four-letter code does not read as D F 0 1; the caption
+                        and Clear ask for it back. */}
+                    <span className="mt-1 block normal-case tracking-normal">
+                      <span className="block text-[10px] uppercase tracking-[0.12em] text-subtle">
+                        Kitchen
+                      </span>
+                      <span className="flex items-baseline gap-1.5">
+                        {editable ? (
+                          <PickList
+                            variant="inline"
+                            value={kitchen}
+                            options={kitchenOptions}
+                            onPick={(v) => v && setKitchen(d.iso, v)}
+                            ariaLabel={`Which kitchen makes ${d.long}`}
+                            className={`min-w-0 ${kitchenClass}`}
+                          />
+                        ) : (
+                          <span className={`min-w-0 flex-1 truncate px-1 py-0.5 ${kitchenClass}`}>
+                            {kitchenOptions.find((o) => o.value === kitchen)?.label ?? "—"}
+                          </span>
+                        )}
+                        {/* Rendered on every day and DISABLED on an empty one,
+                            never hidden: a control that vanishes cannot be told
+                            from a feature that does not exist, and here the
+                            reason it is dead is the empty column beneath it. */}
+                        {editable ? (
+                          <button
+                            type="button"
+                            onClick={() => clearDay(d.iso, d.long)}
+                            disabled={pending || !held}
+                            title={
+                              held
+                                ? `Take all ${held} item${held === 1 ? "" : "s"} off ${d.long}`
+                                : `Nothing is on ${d.long}`
+                            }
+                            aria-label={`Clear ${d.long} on this plan`}
+                            className="shrink-0 uppercase tracking-[0.12em] text-subtle hover:text-ink disabled:cursor-not-allowed disabled:text-faint disabled:hover:text-faint"
+                          >
+                            Clear
+                          </button>
+                        ) : null}
+                      </span>
                     </span>
                   </th>
                 );

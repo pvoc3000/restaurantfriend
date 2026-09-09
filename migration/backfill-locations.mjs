@@ -158,16 +158,8 @@ const { data: live, error: readError } = await db
   .order('code');
 if (readError) { console.error('reading locations:', readError.message); process.exit(1); }
 
-const idByCode = Object.fromEntries(live.map((l) => [l.code, l.id]));
-const codeById = Object.fromEntries(live.map((l) => [l.id, l.code]));
-/** Codes FMP names that we have no row for — reported, never invented. */
-const unknownCodes = new Set();
-const toId = (code) => {
-  const c = String(code ?? '').trim();
-  if (c === '') return null;
-  if (!idByCode[c]) { unknownCodes.add(c); return null; }
-  return idByCode[c];
-};
+// The code → id map, its unknown-code report and `toId` went with the kitchen
+// mapping (102): nothing this script writes names another location any more.
 
 const updates = [];
 let noMerRow = 0;
@@ -180,8 +172,12 @@ for (const loc of live) {
     .sort((a, b) => a - b);
   const openTimes = seven(get(row, 'OperatingHours_Open_time')).map(time);
   const closeTimes = seven(get(row, 'OperatingHours_Close_time')).map(time);
-  const kitchen = seven(get(row, 'KitchenLocation')).map(toId);
-  const shopsFor = lines(get(row, 'ShopForLocations_t')).map(toId).filter(Boolean);
+  // FMP's `KitchenLocation` and `ShopForLocations_t` are NOT read any more.
+  // 017 stored them on `locations`; 101 gave the PLAN a kitchen per weekday and
+  // 102 dropped the location columns, so there is nowhere here to put them and
+  // writing them would fail. What FileMaker knew is not lost — DF02's own row
+  // said Mon–Wed DF01 / Thu–Sun DF02, which is exactly what the DF02 plan now
+  // states, alongside the dates, trays and pars that make it actionable.
 
   // All-null arrays say nothing; store null rather than seven nulls, which is
   // what the length constraint's "is null or 7" branch exists for.
@@ -208,8 +204,6 @@ for (const loc of live) {
       open_days: openDays,
       open_time_by_weekday: someTime ? openTimes : null,
       close_time_by_weekday: someTime ? closeTimes : null,
-      kitchen_by_weekday: kitchen.some(Boolean) ? kitchen : null,
-      shops_for: shopsFor,
       address,
       settings,
     },
@@ -221,9 +215,6 @@ const hhmm = (t) => (t ? t.slice(0, 5) : '—');
 
 console.log(`Location.mer: ${rows.length - 1} rows · live locations: ${live.length}`);
 if (noMerRow) console.log(`  ${noMerRow} live location(s) have no .mer row and are left alone`);
-if (unknownCodes.size) {
-  console.log(`  codes named by FMP with no location row (left null): ${[...unknownCodes].join(', ')}`);
-}
 console.log('');
 
 for (const u of updates) {
@@ -236,12 +227,6 @@ for (const u of updates) {
       ? DAYS.map((d, i) => `${d} ${hhmm(p.open_time_by_weekday[i])}-${hhmm(p.close_time_by_weekday[i])}`).join('  ')
       : '—'
   }`);
-  console.log(`  produced at   ${
-    p.kitchen_by_weekday
-      ? DAYS.map((d, i) => `${d} ${codeById[p.kitchen_by_weekday[i]] ?? '—'}`).join('  ')
-      : '—'
-  }`);
-  console.log(`  shops for     ${p.shops_for.map((id) => codeById[id]).join(', ') || '—'}`);
   console.log(`  billing email ${p.address?.billing?.email ?? '—'}`);
   console.log(`  settings      ${
     u.strippedKeys.length ? `drop ${u.strippedKeys.join(', ')} → ` : 'unchanged → '
