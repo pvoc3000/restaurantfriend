@@ -4668,9 +4668,18 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    dropped — one field claiming to answer a question that now has seven answers,
    016's `nextDeliveryDate` trap — so it must stay text. `READ_ONLY_VALUE` gives
    it the editable cells' padding, or the column kinks.
+   **NOTES RUNS THE WHOLE ROW** (Mark, 2026-09-09) — `Row`'s new `wide`, which
+   is `sm:col-span-3` on the VALUE and never on the label, the label column
+   being what makes every row in the block line up. At `sm` this `dl` is four
+   tracks (label · value · label · value), so a row alone on its line otherwise
+   stops halfway and leaves the right half blank; the span takes it across the
+   remaining three. Breakpoint-scoped because below `sm` there are only two
+   tracks and the value is already the last.
    Measured at 1280: two rows of two over one, both label columns aligned
-   (left 55.5, right 359.8), the pointer text centred in its row and the page
-   not overflowing.
+   (left 55.5, right 359.8), the pointer text centred in its row, Notes
+   starting on the same left edge as every other value and ending on the grid's
+   own right edge — 448.5px against a normal value's 144.3 — and the page not
+   overflowing.
    **EACH DAY COLUMN'S HEADER IS `MON DF01 ⌄` CENTRED, WITH `Clear` CENTRED
    BENEATH IT** (Mark, 2026-09-09, in seven passes — the Clear command, centre
    the day, caption the picker, put the label inline, "not liking this, let's

@@ -254,7 +254,7 @@ export async function PlanDetail({
               <span className={READ_ONLY_VALUE}>{(plan.ends_on as string) ?? "—"}</span>
             )}
           </Row>
-          <Row label="Notes">
+          <Row label="Notes" wide>
             {editable ? (
               <InlineValue
                 boxed={BOXED_FIELDS}
@@ -342,13 +342,33 @@ export async function PlanDetail({
   );
 }
 
-function Row({ label, children }: { label: string; children: React.ReactNode }) {
+function Row({
+  label,
+  wide = false,
+  children,
+}: {
+  label: string;
+  /**
+   * Run the VALUE to the end of the row (Mark, 2026-09-09, of Notes).
+   *
+   * At `sm` this `dl` is four tracks — label, value, label, value — so a row
+   * that is alone on its line otherwise stops halfway and leaves the right half
+   * blank. `col-span-3` takes the value across the remaining three. Below `sm`
+   * there are only two tracks and the value is already the last, so the span is
+   * breakpoint-scoped rather than unconditional.
+   *
+   * It is the VALUE that spans, never the label: the label column is what makes
+   * every row in the block line up.
+   */
+  wide?: boolean;
+  children: React.ReactNode;
+}) {
   return (
     <>
       <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
         {label}
       </dt>
-      <dd className="min-w-0">{children}</dd>
+      <dd className={`min-w-0 ${wide ? "sm:col-span-3" : ""}`}>{children}</dd>
     </>
   );
 }
