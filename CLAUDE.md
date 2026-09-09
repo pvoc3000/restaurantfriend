@@ -4651,6 +4651,26 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    box ready to type. Only ever pass `defaultOpen` to a picker a deliberate act
    summoned; a list that opens itself on load is a popup.
    The Trays block's explanatory paragraph is GONE (Mark).
+   **THE RECORD'S BLOCK IS Sells at | Made at · Starts | Ends · Notes** (Mark,
+   2026-09-09, in two passes). The first swapped the three fields around and
+   moved the date range beside the TITLE, in parentheses and unlabelled — a plan
+   is identified by what it is called AND when it runs, and "Fall 2026 - DF02"
+   alone does not say which autumn. It stays a rendering of
+   `starts_on`/`ends_on`, which are edited two rows below; a second editor up
+   there would be two answers to one question.
+   **`Made at` IS A SIGNPOST, NOT A FIELD** — it reads "Set below, per day." and
+   is read-only. 101 moved the kitchen onto the seven day columns and took this
+   row out of the block with it, which left the record silent about where
+   anything is MADE: a reader met `MON DF01 ⌄` in the header with nothing having
+   told them DF01 was a kitchen (Mark: "it's unclear what the kitchen picker is
+   doing"). The row says where the answer lives and that there are seven of
+   them. An EDITOR here would be exactly the single "Made at" 101 deliberately
+   dropped — one field claiming to answer a question that now has seven answers,
+   016's `nextDeliveryDate` trap — so it must stay text. `READ_ONLY_VALUE` gives
+   it the editable cells' padding, or the column kinks.
+   Measured at 1280: two rows of two over one, both label columns aligned
+   (left 55.5, right 359.8), the pointer text centred in its row and the page
+   not overflowing.
    **EACH DAY COLUMN'S HEADER IS `MON DF01 ⌄` CENTRED, WITH `Clear` CENTRED
    BENEATH IT** (Mark, 2026-09-09, in seven passes — the Clear command, centre
    the day, caption the picker, put the label inline, "not liking this, let's

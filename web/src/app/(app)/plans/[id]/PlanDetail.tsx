@@ -213,23 +213,24 @@ export async function PlanDetail({
               </span>
             )}
           </Row>
-          {/* MARK'S ORDER (2026-09-09): the two facts you set once on
-              the top row, the two dates on the second. `In force` is
-              gone from the grid — it is beside the title now, and a
-              derived range stated an inch under the dates it is derived
-              from was the same fact twice. */}
-          <Row label="Notes">
-            {editable ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="production_plans"
-                id={id}
-                column="notes"
-                value={(plan.notes ?? null) as string | null}
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{(plan.notes as string) ?? "—"}</span>
-            )}
+          {/* MADE AT IS A SIGNPOST, NOT A FIELD (Mark, 2026-09-09: "it's
+              unclear what the kitchen picker is doing … we put back 'Made At'
+              but with text that says 'Set Below.'").
+
+              101 moved the kitchen onto the seven day columns and took this row
+              out of the block with it, which left the record silent about
+              where anything is made — so a reader met `MON DF01 ⌄` in the
+              header with nothing having told them DF01 was a KITCHEN. The row
+              is back, in the slot beside Sells at, saying where the answer
+              lives and that there is one per day.
+
+              IT STAYS READ-ONLY, and that is the whole point of it. An editor
+              here would be the single "Made at" 101 deliberately dropped — one
+              field claiming to answer a question that now has seven answers,
+              which is 016's `nextDeliveryDate` trap. `READ_ONLY_VALUE` gives it
+              the editable cells' own padding so the column does not kink. */}
+          <Row label="Made at">
+            <span className={`${READ_ONLY_VALUE} text-muted`}>Set below, per day.</span>
           </Row>
           <Row label="Starts">
             {editable ? (
@@ -251,6 +252,19 @@ export async function PlanDetail({
               />
             ) : (
               <span className={READ_ONLY_VALUE}>{(plan.ends_on as string) ?? "—"}</span>
+            )}
+          </Row>
+          <Row label="Notes">
+            {editable ? (
+              <InlineValue
+                boxed={BOXED_FIELDS}
+                table="production_plans"
+                id={id}
+                column="notes"
+                value={(plan.notes ?? null) as string | null}
+              />
+            ) : (
+              <span className={READ_ONLY_VALUE}>{(plan.notes as string) ?? "—"}</span>
             )}
           </Row>
         </dl>
