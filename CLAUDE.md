@@ -11074,14 +11074,23 @@ weekday column, and 003 then silently made it per-vendor-item.
   line and gives the four above it a row they always fit. **On a tablet it is
   not there at all** — see build step 4 — so the band is one row and 80px
   against the desk's 116.
-  **AND THE DAY PICKER CARRIES `relative top-[7.75px]`, WHICH IS `items-end`
-  LEVELS BOXES NOT TEXT FOR THE SECOND TIME** (Mark, 2026-09-10, wanting the
-  date's baseline on the sub-line's). The boxes really were level — both
-  bottoms measure 57.0 — while the type was not: a 36px input holding 20px text
-  CENTRES it, so its baseline sits 10.25px above its own bottom where a 12px
-  line in an 18px line box sits 4.5px above its own. `items-baseline` cannot
-  fix it, because a flex item's baseline is its FIRST line and that is the
-  `h1`. Measured 0.00 after, at every width.
+  **THE DAY PICKER SITS ON THE TITLE'S BASELINE — `self-start relative
+  top-[0.25px]`** (Mark, 2026-09-10, in two passes: the sub-line's baseline
+  first, then "let's try aligning the datepicker with the page title
+  instead"). `items-end` LEVELS BOXES, NOT TEXT, for the second time in this
+  file: the boxes really were level while a 36px input holding 20px text
+  CENTRES it, so its baseline sits 25.75px below its own top where the 28px
+  title in a 35px line box sits 28px below its own.
+  **`self-start` IS THE MECHANISM AND THE OFFSET IS ONLY THE POLISH**, and
+  that split is the part worth keeping. The row must stay `items-end` for the
+  commands beside it, so the one item that wants the TOP opts out — and
+  everything below the title then stops mattering, where a pure relative
+  offset (measured −16.75, and the first version shipped) is a number about
+  the distance down to a block that can grow a line. **`items-baseline` is not
+  the answer either**: a flex item's baseline is its FIRST line, so it works
+  here by accident and breaks on any block whose first line is not the one you
+  meant. Measured 0.00 at 1440 and 820, the second with the weekday chip and
+  the Today link both on the row.
   **An `<input>` takes no children, so the zero-sized probe goes in an
   OFF-SCREEN REPLICA** — a clone and the probe in one inline formatting context
   — which is the only way to read a form control's text baseline. Worth
