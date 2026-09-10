@@ -9906,6 +9906,58 @@ weekday column, and 003 then silently made it per-vendor-item.
   (Mark, 2026-07-26): `ActionBarButton` still has a `primary` white-fill
   variant, but nothing uses it, because against the bar's own black a white cell
   read as a different kind of object rather than as the important one.
+- **THE CLASSIC MAC LOOK IS PARKED ON `/invoices`, AND ONLY THERE** (Mark,
+  2026-09-10: "apply the mac look to the actual invoice page. we'll park it
+  there and live with it a bit before implementing across the app"). It
+  started as a for-fun preview and was tuned over an afternoon; **do not roll
+  it out to other screens until Mark says so** — living with it is the point.
+  It breaks two design-system rules on purpose, **no shadows** and **no
+  textures**, and whether those exceptions earn their place is the question
+  being answered.
+  **Where it lives:** `web/src/styles/mac-look.css`, imported UNLAYERED in
+  `globals.css` right after the design-system import — unlayered is what lets
+  its rules outrank the controls' own `hover:bg-ink`, `hover:bg-neutral-100`
+  and `focus:border-2` with no `!important`. Two opt-in classes, applied by
+  hand in `InvoiceList.tsx`:
+  - **`mac-control`** — Check QuickBooks, New invoice (through `NewInvoice`'s
+    new `triggerClassName`), and the Window, Vendors, Due and Status pickers.
+    At rest a hard 3px black shadow down and right; on hover the classic 50%
+    grey, a checkerboard of single black and white pixels with a 1px white
+    outline on the type; on press the control drops 3px into its shadow and
+    keeps the dots. Instant state changes, no transitions.
+  - **`mac-field`** — the search box. Sunken: a 1px border plus a hard 2px
+    black shadow inside along the top and left (the mirror of the raised
+    controls), 39px tall growing DOWNWARD so its top meets theirs and its
+    bottom meets their shadows, no hover, no press. The hint text is gone: a
+    magnifier sits in the clear button's slot while the box is empty
+    (`TextInput`'s new opt-in `icon` prop), and the hint's words moved to
+    `aria-label`, the field's only name.
+  **Tried and rejected, so nobody reinvents them:** a 5px shadow (3px), 2×2
+  dots (1px was better), a solid-black flip on press (just dropping into the
+  shadow was better), a 2px border on the search box, and a dotted hover on
+  the search box.
+  **Four traps the tuning hit, all handled in the CSS and worth knowing before
+  rolling it out:**
+  - **A one-pixel checkerboard smears to flat grey whenever its box starts at a
+    fractional pixel**, which is wherever layout puts it. `background-attachment:
+    fixed` pins the pattern to the screen's pixel grid. **iOS Safari ignores
+    fixed attachment**, so on the iPad the dots can smear again — unsolved.
+  - **Where the border sits on a WRAPPER around a button** (the date window),
+    the class goes on the wrapper, and the inner button needs help: the
+    browser's own button style resets `text-shadow` to none (so descendants
+    `inherit` it) and the button's own hover paints grey over the dots (so
+    descendants go transparent).
+  - **Growing a control downward in a bottom-aligned row** takes a -3px bottom
+    margin, and on the search box it has to go on `TextInput`'s wrapper (via
+    `span:has(> input.mac-field)`) so the clear button and the magnifier centre
+    on the full height.
+  - **The search box's focus no longer thickens its border** — the unlayered
+    `border-width` outranks `focus:border-2`, so the caret is the only focus
+    cue. Accepted for now; revisit before it spreads.
+  **To remove it:** delete `mac-look.css`, its import in `globals.css`, and the
+  `mac-control` / `mac-field` classes, `triggerClassName` and the search box's
+  `icon` in `InvoiceList.tsx`, then put its `placeholder` back. The two new
+  props are opt-in and harmless to leave.
 - **A DETAIL SCREEN'S EDITABLE FIELDS WEAR A BOX — read
   `docs/detail-field-styling-brief.md` before restyling one.** Proven on
   `/special-orders/[id]` (2026-08-28) and adopted for every record screen

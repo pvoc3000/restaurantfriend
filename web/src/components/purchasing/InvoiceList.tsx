@@ -682,7 +682,7 @@ export function InvoiceList({
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            className={BUTTON_CLASS}
+            className={`${BUTTON_CLASS} mac-control`}
             disabled={qboBusy}
             onClick={() => void checkQuickBooks()}
           >
@@ -692,6 +692,7 @@ export function InvoiceList({
 
           {canEdit && (
             <NewInvoice
+              triggerClassName="mac-control"
               orgId={orgId}
               locationId={locationId}
               vendors={vendors}
@@ -732,12 +733,17 @@ export function InvoiceList({
             span the input itself sized and the pair settles at ~20
             characters. */}
         <div className="min-w-[13rem] max-w-[18rem] flex-1">
+          {/* THE MAC LOOK, parked on this screen (Mark, 2026-09-10) — see
+              `styles/mac-look.css`. The hint text became a magnifier, so the
+              words it carried move to `aria-label`, the field's only name. */}
           <TextInput
             value={filters.q}
             onValueChange={(q) => update({ q })}
-            placeholder="Search invoice number, vendor or PO…"
+            aria-label="Search invoice number, vendor or PO"
             clearLabel="Clear the search"
             fullWidth
+            className="mac-field"
+            icon={<SearchGlyph />}
           />
         </div>
 
@@ -751,6 +757,7 @@ export function InvoiceList({
               today={today}
               ariaLabel="Date window"
               placeholder="All time"
+              className="mac-control"
             />
           </div>
         </ControlField>
@@ -763,7 +770,7 @@ export function InvoiceList({
             allLabel="All vendors"
             noun="vendors"
             label="Which vendors to show"
-            className="max-w-[16rem]"
+            className="max-w-[16rem] mac-control"
             minWidth={240}
           />
         </ControlField>
@@ -782,6 +789,7 @@ export function InvoiceList({
               hint: String(b === "all" ? invoices.length : agingCounts[b] ?? 0),
             }))}
             fit
+            className="mac-control"
           />
         </ControlField>
 
@@ -803,6 +811,7 @@ export function InvoiceList({
               hint: String(s === "all" ? invoices.length : statusCounts[s] ?? 0),
             }))}
             fit
+            className="mac-control"
           />
         </ControlField>
 
@@ -874,5 +883,24 @@ export function InvoiceList({
         empty={<p className="text-sm text-muted">No invoices in this window.</p>}
       />
     </div>
+  );
+}
+
+/**
+ * Material Symbols Outlined "search", the same family as the columns eye —
+ * inlined as one `currentColor` path rather than adding an icon dependency.
+ * The search box's magnifier on this screen while the Mac look is parked here.
+ */
+function SearchGlyph() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      viewBox="0 -960 960 960"
+      width="18"
+      height="18"
+      fill="currentColor"
+    >
+      <path d="M784-120 532-372q-30 24-69 38t-83 14q-109 0-184.5-75.5T120-580q0-109 75.5-184.5T380-840q109 0 184.5 75.5T640-580q0 44-14 83t-38 69l252 252-56 56ZM380-400q75 0 127.5-52.5T560-580q0-75-52.5-127.5T380-760q-75 0-127.5 52.5T200-580q0 75 52.5 127.5T380-400Z" />
+    </svg>
   );
 }

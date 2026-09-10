@@ -1,0 +1,95 @@
+/*
+ * THE CLASSIC MAC LOOK — A PARKED EXPERIMENT, /invoices ONLY (Mark, 2026-09-10:
+ * "apply the mac look to the actual invoice page. we'll park it there and live
+ * with it a bit before implementing across the app").
+ *
+ * Two opt-in classes and nothing else, so removing it is deleting this file,
+ * its import in globals.css, and the class names on the invoice list. It breaks
+ * two design-system rules on purpose — no shadows, and no textures — and that
+ * is the question living with it is meant to answer.
+ *
+ * UNLAYERED, and that is load-bearing: it is imported outside Tailwind's
+ * layers, and unlayered CSS outranks layered CSS regardless of specificity, so
+ * these rules beat the controls' own `hover:bg-ink`, `hover:bg-neutral-100` and
+ * `focus:border-2` without an `!important` anywhere.
+ */
+
+/* ---- .mac-control: buttons and picklists -------------------------------- */
+
+/* At rest: a hard black shadow 3px down and right, no blur. State changes are
+   instant, as they were on the old Mac — no fades. */
+.mac-control {
+  box-shadow: 3px 3px 0 0 #000;
+  transition: none;
+}
+
+/* Hover: classic Mac 50% grey — a checkerboard of single black and white
+   pixels, a 2x2 SVG tile drawn with crisp edges.
+
+   `background-attachment: fixed` pins the pattern to the SCREEN rather than
+   the control. A one-pixel checkerboard smears to flat grey whenever its box
+   starts at a fractional pixel, and a control's position is whatever the row's
+   layout gives it (measured in the preview: 549.19px and 734.41px on a 2x
+   display, one crisp and one smeared). Fixed puts every dot on one whole-pixel
+   grid, which is also how the old Mac drew it. iOS Safari IGNORES fixed
+   attachment, so on the iPad the dots can smear again — a known cost.
+
+   A 2x2-square mesh was tried and Mark preferred this finer one. */
+.mac-control:hover {
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2' shape-rendering='crispEdges'%3E%3Crect width='1' height='1'/%3E%3Crect x='1' y='1' width='1' height='1'/%3E%3C/svg%3E");
+  background-size: 2px 2px;
+  background-attachment: fixed;
+  image-rendering: pixelated;
+  color: #000;
+  /* A 1px white outline so black type reads over the dots. */
+  text-shadow: 1px 0 #fff, -1px 0 #fff, 0 1px #fff, 0 -1px #fff,
+               1px 1px #fff, -1px -1px #fff, 1px -1px #fff, -1px 1px #fff;
+}
+
+/* Everything INSIDE a hovered control:
+   - `text-shadow: inherit` is for the date window, whose border sits on a box
+     AROUND a button — the browser's own style for buttons resets text-shadow
+     to none, so without this the outline never reaches the dates.
+   - `background-color: transparent` is for that same inner button, whose own
+     `hover:bg-neutral-100` would otherwise paint grey over the dots. */
+.mac-control:hover * {
+  color: #000;
+  text-shadow: inherit;
+  background-color: transparent;
+}
+
+/* Press: the control drops 3px into its own shadow and keeps its dots. A
+   solid-black flip, like a classic push button, was tried and Mark preferred
+   this. */
+.mac-control:active {
+  transform: translate(3px, 3px);
+  box-shadow: none;
+}
+
+/* ---- .mac-field: the search box ---------------------------------------- */
+
+/* SUNKEN, the old Mac text field: a 1px border with a hard 2px black shadow
+   INSIDE along the top and left, so those edges read 3px and the bottom and
+   right 1px, as if lit from the upper left — the mirror of the raised controls
+   beside it. No hover effect and no press.
+
+   Known cost: the input's own `focus:border-2` is outranked, so focus no
+   longer thickens the border; the caret is the focus cue. */
+.mac-field {
+  border-width: 1px;
+  box-shadow: inset 2px 2px 0 0 #000;
+  height: 100%;
+}
+
+/* 3px TALLER, GROWING DOWNWARD. The raised controls only look 3px taller
+   because their shadow hangs below them, and the filter row aligns by bottom
+   edge, so plain extra height would push this box's top up instead. The -3px
+   bottom margin keeps its top level with theirs and lets its bottom meet their
+   shadows. It sits on TextInput's WRAPPER (via :has), not the input, so the
+   clear button and the magnifier — both positioned against that wrapper —
+   centre on the full 39px. `:has` is inside the app's Safari 16.4 floor. */
+span:has(> input.mac-field) {
+  height: 39px;
+  margin-bottom: -3px;
+}

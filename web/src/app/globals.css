@@ -3,6 +3,11 @@
    sit BELOW Tailwind's utilities — unlayered CSS would beat every utility
    class and paint e.g. white nav links black. */
 @import "../styles/ds/styles.css" layer(base);
+/* The classic Mac look, parked on /invoices only (Mark, 2026-09-10). UNLAYERED
+   on purpose — see the header of mac-look.css — so its rules outrank the
+   controls' own Tailwind hover and focus styles. Delete this line, that file
+   and the class names on the invoice list to remove it. */
+@import "../styles/mac-look.css";
 
 /* Expose the design-system tokens to Tailwind v4 utilities so `text-ink`,
    `bg-go` etc. work alongside raw var() usage. Names stay semantic. */

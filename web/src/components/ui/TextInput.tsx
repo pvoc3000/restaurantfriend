@@ -59,6 +59,7 @@ export function TextInput({
   fullWidth = false,
   size = "md",
   className = "",
+  icon,
   ...rest
 }: Omit<React.ComponentProps<"input">, "value" | "onChange" | "className" | "size"> & {
   value: string;
@@ -76,6 +77,16 @@ export function TextInput({
   fullWidth?: boolean;
   /** Height and type size. Leave it alone unless the row genuinely can't fit. */
   size?: keyof typeof SIZE_CLASS;
+  /**
+   * A glyph shown in the field's right-hand slot WHILE IT IS EMPTY — a
+   * magnifier in place of a search box's hint text (Mark, 2026-09-10, on
+   * /invoices). It occupies exactly the slot the clear button uses, and the
+   * two can never show together: this one only when there is nothing typed,
+   * the ✕ only when there is. Decorative and click-through; a caller that
+   * drops its placeholder for this must pass an `aria-label` instead, or the
+   * field loses its only name.
+   */
+  icon?: React.ReactNode;
   /**
    * WIDTH, and nothing else. Height, type size, padding and the rule are set
    * here — a height passed through this string is a coin toss, because Tailwind
@@ -134,6 +145,14 @@ export function TextInput({
         } ${fullWidth ? "w-full" : ""} ${className}`}
         {...rest}
       />
+      {icon && value === "" && (
+        <span
+          aria-hidden
+          className="pointer-events-none absolute inset-y-0 right-0 flex w-9 items-center justify-center text-ink"
+        >
+          {icon}
+        </span>
+      )}
       {showClear && (
         <button
           type="button"

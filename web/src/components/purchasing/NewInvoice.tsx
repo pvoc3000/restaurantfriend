@@ -61,12 +61,19 @@ export function NewInvoice({
   /** Every invoice in the window, for the duplicate warning — the same list the
    *  screen already has, so this costs no query. */
   existing,
+  triggerClassName = "",
 }: {
   orgId: string;
   locationId: string;
   vendors: { id: string; name: string; inactive?: boolean }[];
   today: string;
   existing: DuplicateCandidate[];
+  /**
+   * Extra classes on the "New invoice" trigger button. Added for the classic
+   * Mac look parked on /invoices (`styles/mac-look.css`, Mark 2026-09-10); the
+   * button's own dress is unchanged without it.
+   */
+  triggerClassName?: string;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -192,7 +199,7 @@ export function NewInvoice({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="ml-auto inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+        className={`ml-auto inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35 ${triggerClassName}`}
       >
         New invoice
       </button>
