@@ -294,16 +294,14 @@ export function BatchLogsIndex({
           load-bearing, since `TextInput`'s wrapper shrink-wraps. `items-end`
           sits the uncaptioned search on the line of the captioned fields. */}
       <div className="flex flex-wrap items-end gap-4">
-        <div className="min-w-[13rem] max-w-[18rem] flex-1">
-          <TextInput
-            value={term}
-            onValueChange={setTerm}
-            aria-label="Search date, kitchen or note"
-            clearLabel="Clear the search"
-            fullWidth
-            icon={<SearchGlyph />}
-          />
-        </div>
+        <TextInput
+          value={term}
+          onValueChange={setTerm}
+          aria-label="Search date, kitchen or note"
+          clearLabel="Clear the search"
+          search
+          icon={<SearchGlyph />}
+        />
 
         {/* A NAVIGATION, not local state — the rows it wants do not exist on
             the client yet (the order guide's day strip, for the same reason).

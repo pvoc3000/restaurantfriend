@@ -728,6 +728,19 @@ export function SpecialOrdersList({
         visible={visible.length}
         total={rows.length}
         noun="orders"
+        // The create command rides in the TITLE row (Mark, 2026-09-10), where it
+        // had been the filter bar's `rowAction`.
+        action={
+          canWrite ? (
+            <NewSpecialOrder
+              orgId={orgId}
+              kitchens={kitchens}
+              defaultLocationId={defaultLocationId}
+              today={today}
+              takenBy={takenBy}
+            />
+          ) : null
+        }
       />
 
       <div className="space-y-3">
@@ -755,17 +768,6 @@ export function SpecialOrdersList({
           }
           // `PageHeading` states the count now — see `showCount`.
           showCount={false}
-          rowAction={
-            canWrite ? (
-              <NewSpecialOrder
-                orgId={orgId}
-                kitchens={kitchens}
-                defaultLocationId={defaultLocationId}
-                today={today}
-                takenBy={takenBy}
-              />
-            ) : undefined
-          }
         />
         {capped ? (
           /* A FILL, not `text-mark`: yellow-500 on white measures 1.43:1, which

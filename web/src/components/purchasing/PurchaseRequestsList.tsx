@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { sortRows } from "@/lib/tableSort";
@@ -381,16 +382,25 @@ export function PurchaseRequestsList({
 
   return (
     <div className="space-y-4">
-      {/* The module's model header (`PurchaseOrderList`): title, then a
-          small-caps line leading with the shop. */}
-      <div>
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Purchase Requests
-        </h1>
-        <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
-          {locationCode} · {visible.length} of {rows.length} requests
-        </p>
-      </div>
+      {/* The shared header, with the create command in the TITLE row (Mark,
+          2026-09-10) where it had ridden at the filter row's right edge. */}
+      <PageHeading
+        title="Purchase Requests"
+        code={locationCode}
+        visible={visible.length}
+        total={rows.length}
+        noun="requests"
+        action={
+          canFile ? (
+            <NewPurchaseRequest
+              orgId={orgId}
+              locationId={locationId}
+              userId={userId}
+              locationCode={locationCode}
+            />
+          ) : null
+        }
+      />
 
       <div className="space-y-3">
         <div className="flex flex-wrap items-end gap-3">
@@ -417,17 +427,6 @@ export function PurchaseRequestsList({
               Showing the most recent 500.
             </span>
           ) : null}
-          {canFile && (
-            // `flex-1 justify-end`, not `ml-auto` — `SEARCH_PEN`'s reason.
-            <div className="flex flex-1 justify-end">
-              <NewPurchaseRequest
-                orgId={orgId}
-                locationId={locationId}
-                userId={userId}
-                locationCode={locationCode}
-              />
-            </div>
-          )}
         </div>
       </div>
 

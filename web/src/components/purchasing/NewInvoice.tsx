@@ -199,7 +199,7 @@ export function NewInvoice({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={`ml-auto inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35 ${triggerClassName}`}
+        className={`ml-auto inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35 ${triggerClassName}`}
       >
         New invoice
       </button>
@@ -319,7 +319,7 @@ export function NewInvoice({
                 className="border border-hairline px-4 py-4 text-sm"
               >
                 <div className="flex flex-wrap items-center gap-3">
-                  <label className="inline-flex h-9 cursor-pointer items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white">
+                  <label className="inline-flex h-9 cursor-pointer items-center mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white">
                     Choose a file
                     <input
                       type="file"

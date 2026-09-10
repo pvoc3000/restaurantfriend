@@ -359,14 +359,25 @@ export function EmployeesList({
         visible={shown.length}
         total={rows.length}
         noun="people"
+        // The create command rides in the TITLE row (Mark, 2026-09-10).
+        action={
+          <NewEmployee
+            orgId={orgId}
+            // The FULL set, not `shown` — the rehire check has to see the 417
+            // former employees a filter is hiding.
+            roster={rows}
+            locationOptions={locationOptions}
+            positions={positions}
+            today={today}
+          />
+        }
       />
 
       <div className="space-y-3">
-        {/* THE SEARCH ROW (Mark, 2026-09-03): `items-end` and `ml-auto` put
-            the command level with the search box and the filter menus, on the
-            page's right edge. Every menu is captioned since 2026-09-10, and
-            Status joined them here as a PickList — it was a TabPicker on a row
-            of its own underneath. */}
+        {/* THE SEARCH ROW. Every menu is captioned since 2026-09-10, and Status
+            joined them here as a PickList — it was a TabPicker on a row of its
+            own underneath. The create command, which rode at this row's right
+            edge from 2026-09-03, is in the title row since 2026-09-10. */}
         <div className="flex flex-wrap items-end gap-4">
           <TextInput
             value={search}
@@ -418,18 +429,6 @@ export function EmployeesList({
               fit
             />
           </ControlField>
-          {/* `flex-1 justify-end`, not `ml-auto` — `SEARCH_PEN`'s reason. */}
-          <div className="flex flex-1 justify-end">
-            <NewEmployee
-              orgId={orgId}
-              // The FULL set, not `shown` — the rehire check has to see the 417
-              // former employees a filter is hiding.
-              roster={rows}
-              locationOptions={locationOptions}
-              positions={positions}
-              today={today}
-            />
-          </div>
         </div>
 
       </div>

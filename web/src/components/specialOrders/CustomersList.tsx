@@ -227,6 +227,9 @@ export function CustomersList({
         visible={visible.length}
         total={rows.length}
         noun="customers"
+        // The create command rides in the TITLE row (Mark, 2026-09-10), where it
+        // had been the filter bar's `rowAction`.
+        action={canWrite ? <NewCustomer orgId={orgId} roster={rows} /> : null}
       />
 
       <FilterMenus
@@ -253,7 +256,6 @@ export function CustomersList({
             />
           </div>
         }
-        rowAction={canWrite ? <NewCustomer orgId={orgId} roster={rows} /> : undefined}
       />
 
     <DataTable

@@ -711,7 +711,7 @@ export function PurchaseOrderDetail({
           three. Same destination, and the route keeps its own name. */}
       <Link
         href={receiveHref}
-        className="flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white"
+        className="flex h-9 items-center mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white"
       >
         Reconcile PO
       </Link>
@@ -730,7 +730,7 @@ export function PurchaseOrderDetail({
         <button
           disabled={busy}
           onClick={() => void fileUnfiled(unfiledReadings(attachments))}
-          className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+          className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
           title={fileReadingsLabel(unfiledReadings(attachments))}
         >
           File as bill
@@ -744,7 +744,7 @@ export function PurchaseOrderDetail({
         <button
           disabled={busy}
           onClick={close}
-          className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+          className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
         >
           Close order
         </button>

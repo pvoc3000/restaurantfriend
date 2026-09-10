@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
@@ -39,12 +38,9 @@ export type PayrollBenefitRow = {
 export function PayrollBenefitsList({
   rows,
   editable,
-  action,
 }: {
   rows: PayrollBenefitRow[];
   editable: boolean;
-  /** The screen's create command, right-aligned above the table. */
-  action?: ReactNode;
 }) {
   const columns: DataColumn<PayrollBenefitRow>[] = [
     {
@@ -165,12 +161,6 @@ export function PayrollBenefitsList({
 
   return (
     <div className="space-y-4">
-      {/* This list has no search and no tabs, so the command's row IS the
-          filter row — a standalone strip above the table, which is where every
-          other list puts it and what lands it on the page's right edge rather
-          than 48px short of it inside `DataTable`'s own `leading`. */}
-      {action ? <div className="flex justify-end">{action}</div> : null}
-
       <DataTable
       rows={rows}
       columns={columns}

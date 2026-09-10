@@ -929,16 +929,14 @@ export function PurchaseOrderList({
           so the search would have to drop to 176 to fit, which is a cramped
           box bought with the width the window ISN'T. */}
       <div className="flex flex-wrap items-end gap-4">
-        <div className="min-w-[13rem] max-w-[18rem] flex-1">
-          <TextInput
-            value={filters.q}
-            onValueChange={(q) => update({ q })}
-            aria-label="Search PO number or vendor"
-            clearLabel="Clear the search"
-            fullWidth
-            icon={<SearchGlyph />}
-          />
-        </div>
+        <TextInput
+          value={filters.q}
+          onValueChange={(q) => update({ q })}
+          aria-label="Search PO number or vendor"
+          clearLabel="Clear the search"
+          search
+          icon={<SearchGlyph />}
+        />
 
         {/* The window, straight after the search (Mark, 2026-09-08: "search
             box, rangepicker, vendor picklist, tabpicker"). It was a row of six
@@ -1051,7 +1049,7 @@ export function PurchaseOrderList({
               trigger={
                 batchBusy?.includes(":") ? "Rendering…" : "Documents"
               }
-              triggerClassName="flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+              triggerClassName="flex h-9 items-center mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
               caret
               disabled={batchBusy !== null}
               minWidth={260}
@@ -1088,7 +1086,7 @@ export function PurchaseOrderList({
                       selectedDrafts.length === 1 ? "" : "s"
                     } sent, sent_via from each vendor's order type`
               }
-              className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+              className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
             >
               {batchBusy === "sent"
                 ? "Saving…"
@@ -1104,7 +1102,7 @@ export function PurchaseOrderList({
                       selectedReceivable.length === 1 ? "" : "s"
                     } at the ordered quantity. Lines already counted are left alone.`
               }
-              className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+              className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
             >
               {batchBusy === "received"
                 ? "Receiving…"
@@ -1120,7 +1118,7 @@ export function PurchaseOrderList({
                       selectedCloseable.length === 1 ? "" : "s"
                     }: reconciled and filed, done being worked on.`
               }
-              className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+              className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
             >
               {batchBusy === "closed" ? "Closing…" : `Close (${selectedCloseable.length})`}
             </button>

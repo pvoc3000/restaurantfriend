@@ -13,7 +13,7 @@ import { zonedParts } from "@/lib/timeZone";
 import { parseWorkdayStart, workdayFor, formatWorkdayStart } from "@/lib/workday";
 
 const BUTTON =
-  "inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:cursor-not-allowed disabled:border-hairline disabled:bg-white disabled:text-faint disabled:hover:bg-white disabled:hover:text-faint";
+  "inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:cursor-not-allowed disabled:border-hairline disabled:bg-white disabled:text-faint disabled:hover:bg-white disabled:hover:text-faint";
 
 export type RecalcRow = {
   id: string;

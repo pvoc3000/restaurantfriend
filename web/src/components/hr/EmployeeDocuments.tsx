@@ -316,7 +316,7 @@ export function EmployeeDocuments({
               type="button"
               disabled={busyLabel !== null}
               onClick={() => fileRef.current?.click()}
-              className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+              className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
             >
               Attach&hellip;
             </button>

@@ -471,7 +471,7 @@ export function PickList({
               // one set of controls at one height.
               `flex ${
                 size === "lg" ? "h-12 text-[16px]" : "h-9 text-sm"
-              } items-center gap-2 border border-ink bg-white px-3 text-left hover:bg-neutral-100 disabled:opacity-35 ${
+              } mac-control items-center gap-2 border border-ink bg-white px-3 text-left hover:bg-neutral-100 disabled:opacity-35 ${
                 empty ? "text-faint" : ""
               } ${className}`
             : variant === "masthead"

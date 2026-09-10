@@ -606,7 +606,7 @@ export function Receiving({
               disabled={saving || toFill.length === 0}
               onClick={() => void receiveBulk()}
               title="Fills only lines with nothing counted yet. Anything already counted is left alone."
-              className="h-9 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+              className="h-9 mac-control border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
             >
               {toFill.length === 0
                 ? "All counted"
@@ -724,7 +724,7 @@ export function Receiving({
               type="button"
               disabled={saving}
               onClick={() => void undoBulk()}
-              className="ml-auto h-8 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
+              className="ml-auto h-8 mac-control border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
             >
               Undo
             </button>
@@ -937,7 +937,7 @@ export function Receiving({
                       disabled={saving}
                       onClick={() => matchTo(matching, l)}
                       title={`Set this line's product ID to ${sku}`}
-                      className="ml-auto h-9 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
+                      className="ml-auto h-9 mac-control border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
                     >
                       Match
                     </button>

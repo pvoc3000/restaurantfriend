@@ -331,7 +331,7 @@ export function DerivedDay({
         </h1>
         <Link
           href="/schedules"
-          className="inline-flex h-9 items-center border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white"
+          className="inline-flex h-9 items-center mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white"
         >
           Schedules
         </Link>
@@ -420,7 +420,7 @@ export function DerivedDay({
               <button
                 type="button"
                 onClick={() => setAdding(true)}
-                className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white"
+                className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white"
               >
                 Add an item…
               </button>

@@ -9734,8 +9734,11 @@ weekday column, and 003 then silently made it per-vendor-item.
   checklists, tasks (and maintenance), plans, schedules, recipes, batch logs and
   vendors now pass their create command as `PageHeading`'s `action`, bottom-
   aligned with the count line, and their filter rows hold filters only (the
-  tags and batch-log command strips are gone too). The paragraph below still
-  describes every other list; a NEW list follows the title-row form.
+  tags and batch-log command strips are gone too). **Six more followed the same
+  day:** Inventory (whose Active tabs became a captioned Show picklist, every
+  filter captioned), inspection logs, equipment, shop sections, employees,
+  benefits, purchase requests, special orders and customers. The paragraph below still describes every other list; a NEW list
+  follows the title-row form.
   **THE HEADER CARRIES NO COMMAND. THE CREATE BUTTON GOES IN THE FILTER ROW,
   RIGHT-ALIGNED** (Mark, 2026-09-03: they "are all over the place. Sometimes in
   the header area, sometimes lined up with the filter tabpicker objects,
@@ -9924,22 +9927,33 @@ weekday column, and 003 then silently made it per-vendor-item.
   (Mark, 2026-07-26): `ActionBarButton` still has a `primary` white-fill
   variant, but nothing uses it, because against the bar's own black a white cell
   read as a different kind of object rather than as the important one.
-- **THE CLASSIC MAC LOOK IS PARKED ON `/invoices`, AND ONLY THERE** (Mark,
-  2026-09-10: "apply the mac look to the actual invoice page. we'll park it
-  there and live with it a bit before implementing across the app"). It
-  started as a for-fun preview and was tuned over an afternoon; **do not roll
-  it out to other screens until Mark says so** — living with it is the point.
-  It breaks two design-system rules on purpose, **no shadows** and **no
-  textures**, and whether those exceptions earn their place is the question
-  being answered.
+- **THE CLASSIC MAC LOOK IS APP-WIDE** (Mark, 2026-09-10: "apply the mac look
+  across the entire app", after an afternoon parked on `/invoices`). It breaks
+  two design-system rules on purpose, **no shadows** and **no textures**.
   **Where it lives:** `web/src/styles/mac-look.css`, imported UNLAYERED in
   `globals.css` right after the design-system import — unlayered is what lets
   its rules outrank the controls' own `hover:bg-ink`, `hover:bg-neutral-100`
-  and `focus:border-2` with no `!important`. Two opt-in classes, applied by
-  hand in `InvoiceList.tsx`:
-  - **`mac-control`** — Check QuickBooks, New invoice (through `NewInvoice`'s
-    new `triggerClassName`), and the Window, Vendors, Due and Status pickers.
-    At rest a hard 3px black shadow down and right; on hover a SOLID light
+  and `focus:border-2` with no `!important`. Two classes, carried by the
+  SHARED PARTS so a control gets the look by being built from them:
+  `mac-control` is in `BUTTON_CLASS`, `PRIMARY_BUTTON_CLASS`,
+  `DANGER_BUTTON_CLASS`, `DIALOG_COMMIT_CLASS`, `DIALOG_DANGER_CLASS`, a
+  `PickList variant="field"` trigger (filter rows AND dialog forms), and the
+  unboxed filter-row dress of `PickSet` and `RangePicker`; `mac-field` is on
+  every `TextInput search`. The ~43 hand-rolled copies of the plain command
+  button were swept to carry `mac-control` too. **A NEW BUTTON uses
+  `BUTTON_CLASS`, or it will not look like its neighbours.**
+  **`mac-own-hover`** is on the black and red ones (`PRIMARY_*`, `DANGER_*`,
+  both dialog commits): they take the shadow and the press and keep their OWN
+  hover, because a grey fill on a black commit reads as disabled and on a red
+  one loses the warning. Verified: a hovered dialog commit stays neutral-800
+  with white type while a picker beside it turns `#c0c0c0`.
+  **DELIBERATELY WITHOUT IT:** `TabPicker`, checkboxes and switches, the boxed
+  detail-field dresses (`InlineValue`, boxed pickers, dates), the masthead and
+  tablet bars, row ⋯ menus and the columns eye, text-only buttons (dialog
+  Cancel), ordinary form `TextInput`s, and ~31 denser hand-rolled buttons with
+  their own sizes (small Clear/Link buttons, table-row buttons, the public
+  login, welcome and inquiry pages).
+  - **`mac-control`** — at rest a hard 3px black shadow down and right; on hover a SOLID light
     grey, `#c0c0c0` (Mark, 2026-09-10 — it replaced the classic 50%
     checkerboard of single black and white pixels, and a solid `#808080` was
     tried first and read too dark); on press the control drops 3px into its

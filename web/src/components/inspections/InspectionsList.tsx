@@ -154,11 +154,10 @@ export function InspectionsList({
         code={locationCode}
         total={rows.length}
         noun="inspections"
+        // The create command rides in the TITLE row (Mark, 2026-09-10).
+        action={action}
       />
       <p className="text-sm text-muted">Health and physical inspection reports.</p>
-      {/* No search and no tiers on a list this size, so the command's own strip
-          is the filter row (/payroll-benefits' shape). */}
-      {action && <div className="flex items-center">{action}</div>}
       <DataTable
         rows={sorted}
         columns={columns}

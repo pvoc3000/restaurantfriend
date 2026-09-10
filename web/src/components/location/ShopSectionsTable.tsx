@@ -214,12 +214,15 @@ export function ShopSectionsTable({
         visible={shown.length}
         total={rows.length}
         noun="shop sections"
+        // The create command rides in the TITLE row (Mark, 2026-09-10), where
+        // it had sat in the filter row since 2026-09-03.
+        action={
+          editable ? (
+            <AddShopSection orgId={orgId} locationId={locationId} areas={areas} />
+          ) : null
+        }
       />
 
-      {/* THE COMMAND SITS IN THE FILTER ROW, right-aligned (Mark, 2026-09-03:
-          the action buttons "are all over the place… I think they should be in
-          line with the search field and filter tabpickers"). One place across
-          the app, so nothing has to be hunted for. */}
       <div className="flex flex-wrap items-end gap-4">
         <TextInput
           value={search}
@@ -229,12 +232,6 @@ export function ShopSectionsTable({
           search
           icon={<SearchGlyph />}
         />
-        {editable ? (
-          // `flex-1 justify-end`, not `ml-auto` — `SEARCH_PEN`'s reason.
-          <div className="flex flex-1 justify-end">
-            <AddShopSection orgId={orgId} locationId={locationId} areas={areas} />
-          </div>
-        ) : null}
       </div>
 
       {failed && <p className="text-sm text-accent">Could not delete: {failed}</p>}

@@ -506,16 +506,14 @@ export function BatchItemsTable({
       // 2026-09-09.
       leading={
         <div className="flex flex-wrap items-end gap-4">
-          <div className="min-w-[13rem] max-w-[18rem] flex-1">
-            <TextInput
-              value={term}
-              onValueChange={setTerm}
-              aria-label="Search batches"
-              clearLabel="Clear the search"
-              fullWidth
-              icon={<SearchGlyph />}
-            />
-          </div>
+          <TextInput
+            value={term}
+            onValueChange={setTerm}
+            aria-label="Search batches"
+            clearLabel="Clear the search"
+            search
+            icon={<SearchGlyph />}
+          />
           <ControlField label="Status">
             <PickList
               ariaLabel="Which statuses to show"

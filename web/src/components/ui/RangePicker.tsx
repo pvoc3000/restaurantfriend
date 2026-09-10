@@ -242,7 +242,9 @@ export function RangePicker({
         // measured 2px taller than the PickSet beside it. 36 is the app's own
         // button height (`BUTTON_CLASS`), which is what a filter row lines up on.
         className={`flex h-9 w-full items-center ${
-          boxed ? BOXED_FIELD_BORDER : "border border-ink"
+          // The filter-row dress carries the Mac look (`styles/mac-look.css`);
+          // the boxed detail-field dress does not.
+          boxed ? BOXED_FIELD_BORDER : "mac-control border border-ink"
         } bg-white ${
           disabled ? "opacity-35" : ""
         } ${className}`}

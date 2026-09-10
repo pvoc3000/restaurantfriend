@@ -1296,7 +1296,7 @@ export function InvoiceDetail({
                     <button
                       type="button"
                       onClick={() => void linkPrinted(p.hit!.id)}
-                      className="h-8 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
+                      className="h-8 mac-control border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
                     >
                       Link
                     </button>

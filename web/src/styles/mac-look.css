@@ -1,12 +1,22 @@
 /*
- * THE CLASSIC MAC LOOK — A PARKED EXPERIMENT, /invoices ONLY (Mark, 2026-09-10:
- * "apply the mac look to the actual invoice page. we'll park it there and live
- * with it a bit before implementing across the app").
+ * THE CLASSIC MAC LOOK — APP-WIDE since 2026-09-10 (Mark: "apply the mac look
+ * across the entire app"), after an afternoon parked on /invoices.
  *
- * Two opt-in classes and nothing else, so removing it is deleting this file,
- * its import in globals.css, and the class names on the invoice list. It breaks
- * two design-system rules on purpose — no shadows, and no textures — and that
- * is the question living with it is meant to answer.
+ * STILL TWO CLASSES, but they now ride on the SHARED PARTS rather than on one
+ * screen's call sites, so a control gets the look by being built from them:
+ *   - `mac-control` — `BUTTON_CLASS`, `PRIMARY_BUTTON_CLASS`,
+ *     `DANGER_BUTTON_CLASS`, `DIALOG_COMMIT_CLASS`, `DIALOG_DANGER_CLASS`, a
+ *     `PickList variant="field"` trigger, and the filter-row (unboxed) dress of
+ *     `PickSet` and `RangePicker`; plus the hand-rolled copies of the plain
+ *     command button, swept to carry it.
+ *   - `mac-field` — every search box (`TextInput search`).
+ * DELIBERATELY NOT: `TabPicker`, checkboxes and switches, the boxed detail-field
+ * dresses (`InlineValue`, boxed pickers and dates), the masthead and tablet
+ * bars, row ⋯ menus and the columns eye, text-only buttons, and ordinary form
+ * `TextInput`s. Removing the look is taking the classes off those parts and the
+ * import out of globals.css.
+ *
+ * It breaks two design-system rules on purpose — no shadows, and no textures.
  *
  * UNLAYERED, and that is load-bearing: it is imported outside Tailwind's
  * layers, and unlayered CSS outranks layered CSS regardless of specificity, so
@@ -28,8 +38,13 @@
    #808080 came first). It replaced the classic 50% checkerboard of single
    black and white pixels. Black type on it is ~12.6:1, so the white outline
    the dots needed went with them, and so did the fixed-attachment trick that
-   kept the dots from smearing at fractional pixels (and never worked on iOS). */
-.mac-control:hover {
+   kept the dots from smearing at fractional pixels (and never worked on iOS).
+
+   NOT ON `mac-own-hover` — the black commit and the red destructive buttons.
+   Their hover is part of what they MEAN (a black cell inverting, a red one
+   filling red), and a grey fill on either reads as disabled. They keep the
+   shadow and the press. */
+.mac-control:not(.mac-own-hover):hover {
   background-color: #c0c0c0;
   color: #000;
 }
@@ -38,7 +53,7 @@
    the date window, whose border sits on a box AROUND a button: that button's
    own `hover:bg-neutral-100` would otherwise paint light grey over the mid
    grey. */
-.mac-control:hover * {
+.mac-control:not(.mac-own-hover):hover * {
   color: #000;
   background-color: transparent;
 }

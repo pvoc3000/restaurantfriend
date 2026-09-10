@@ -208,6 +208,8 @@ export function EquipmentList({
         visible={shown.length}
         total={rows.length}
         noun="equipment"
+        // The create command rides in the TITLE row (Mark, 2026-09-10).
+        action={action}
       />
 
       <div className="flex flex-wrap items-end gap-4">
@@ -219,9 +221,6 @@ export function EquipmentList({
           search
           icon={<SearchGlyph />}
         />
-        {/* `flex-1 justify-end`, not `ml-auto` — an auto margin would take the
-            free space before the search could flex (`SEARCH_PEN`). */}
-        {action ? <div className="flex flex-1 justify-end">{action}</div> : null}
       </div>
 
       <DataTable

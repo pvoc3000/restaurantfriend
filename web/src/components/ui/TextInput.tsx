@@ -152,7 +152,11 @@ export function TextInput({
         // Before `${className}`, so a caller can still override.
         className={`border border-ink bg-white pl-3 pr-9 outline-none focus:border-2 ${
           SIZE_CLASS[size]
-        } ${fullWidth || search ? "w-full" : ""} ${className}`}
+        } ${fullWidth || search ? "w-full" : ""} ${
+          // Every search box is the Mac look's sunken field
+          // (`styles/mac-look.css`); ordinary form fields are not.
+          search ? "mac-field" : ""
+        } ${className}`}
         {...rest}
       />
       {icon && value === "" && (

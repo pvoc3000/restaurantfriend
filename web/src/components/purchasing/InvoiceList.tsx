@@ -683,7 +683,7 @@ export function InvoiceList({
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            className={`${BUTTON_CLASS} mac-control`}
+            className={BUTTON_CLASS}
             disabled={qboBusy}
             onClick={() => void checkQuickBooks()}
           >
@@ -693,7 +693,6 @@ export function InvoiceList({
 
           {canEdit && (
             <NewInvoice
-              triggerClassName="mac-control"
               orgId={orgId}
               locationId={locationId}
               vendors={vendors}
@@ -733,20 +732,14 @@ export function InvoiceList({
             SHRINK-WRAPS, so `w-full` on the input alone resolves against a
             span the input itself sized and the pair settles at ~20
             characters. */}
-        <div className="min-w-[13rem] max-w-[18rem] flex-1">
-          {/* THE MAC LOOK, parked on this screen (Mark, 2026-09-10) — see
-              `styles/mac-look.css`. The hint text became a magnifier, so the
-              words it carried move to `aria-label`, the field's only name. */}
-          <TextInput
-            value={filters.q}
-            onValueChange={(q) => update({ q })}
-            aria-label="Search invoice number, vendor or PO"
-            clearLabel="Clear the search"
-            fullWidth
-            className="mac-field"
-            icon={<SearchGlyph />}
-          />
-        </div>
+        <TextInput
+          value={filters.q}
+          onValueChange={(q) => update({ q })}
+          aria-label="Search invoice number, vendor or PO"
+          clearLabel="Clear the search"
+          search
+          icon={<SearchGlyph />}
+        />
 
         <ControlField label="Window">
           {/* `w-52`, measured — see the PO list, whose range cell this is. */}
@@ -757,9 +750,7 @@ export function InvoiceList({
               presets={PO_RANGE_PRESETS}
               today={today}
               ariaLabel="Date window"
-              placeholder="All time"
-              className="mac-control"
-            />
+              placeholder="All time"            />
           </div>
         </ControlField>
 
@@ -771,7 +762,7 @@ export function InvoiceList({
             allLabel="All vendors"
             noun="vendors"
             label="Which vendors to show"
-            className="max-w-[16rem] mac-control"
+            className="max-w-[16rem]"
             minWidth={240}
           />
         </ControlField>
@@ -789,9 +780,7 @@ export function InvoiceList({
               label: b === "all" ? "Any due date" : AGING_LABEL[b as AgingBucket],
               hint: String(b === "all" ? invoices.length : agingCounts[b] ?? 0),
             }))}
-            fit
-            className="mac-control"
-          />
+            fit          />
         </ControlField>
 
         {/* A LIST RATHER THAN A ROW OF TABS (Mark, 2026-09-10) — the fourth
@@ -811,9 +800,7 @@ export function InvoiceList({
               label: s === "all" ? "All" : BILL_STAGE_LABEL[s],
               hint: String(s === "all" ? invoices.length : statusCounts[s] ?? 0),
             }))}
-            fit
-            className="mac-control"
-          />
+            fit          />
         </ControlField>
 
       </div>

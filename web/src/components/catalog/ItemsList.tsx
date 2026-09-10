@@ -23,7 +23,8 @@ import { DataTable, type DataColumn } from "./DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { ControlField } from "@/components/ui/ControlField";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { NewInventoryItem } from "./NewInventoryItem";
 import { InventoryItemActions } from "./InventoryItemActions";
 import { PickList } from "@/components/ui/PickList";
@@ -388,20 +389,32 @@ export function ItemsList({
 
   return (
     <div className="space-y-4">
-      {/* The module's model header — see `VendorsList`. */}
-      <div>
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          Inventory
-        </h1>
-        <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
-          {activeLocationCode ? `${activeLocationCode} · ` : ""}
-          {visible.length} of {items.length} inventory items
-        </p>
-      </div>
+      {/* The create command rides in the TITLE row (Mark, 2026-09-10: "move
+          the action button into the identity row top right aligned"). */}
+      <PageHeading
+        title="Inventory"
+        code={activeLocationCode}
+        visible={visible.length}
+        total={items.length}
+        noun="inventory items"
+        action={
+          editable ? (
+            <NewInventoryItem
+              orgId={orgId}
+              categories={categories}
+              existingNames={itemNames}
+            />
+          ) : null
+        }
+      />
 
-      {/* Search · last ordered · category · active (Mark, 2026-09-08, placing
-          the range picker "between the search bar and category picklist"). */}
-      <div className="flex flex-wrap items-end gap-2">
+      {/* Search · last ordered · category · show (Mark, 2026-09-08, placing
+          the range picker "between the search bar and category picklist").
+          Every control but the search is CAPTIONED and Active is a picklist
+          (Mark, 2026-09-10) — `ui/ControlField`'s rule: a collapsed control
+          names its own dimension. `items-end` puts the uncaptioned search on
+          the line of the fields. */}
+      <div className="flex flex-wrap items-end gap-4">
         <TextInput
           value={filters.q}
           onValueChange={(q) => update({ q })}
@@ -413,47 +426,44 @@ export function ItemsList({
         {/* Last ordered, as a range over the date rather than the four age
             tabs it replaced. Its presets are those tabs' three bands; a
             client filter, so it writes the URL like the others. */}
-        <div className="w-64">
-          <RangePicker
-            value={filters.last}
-            onChange={(last) => update({ last })}
-            presets={LAST_ORDERED_PRESETS}
-            today={today}
-            ariaLabel="Last ordered"
-            placeholder="Last ordered any time"
-          />
-        </div>
+        <ControlField label="Last ordered">
+          <div className="w-64">
+            <RangePicker
+              value={filters.last}
+              onChange={(last) => update({ last })}
+              presets={LAST_ORDERED_PRESETS}
+              today={today}
+              ariaLabel="Last ordered"
+              placeholder="Any time"
+            />
+          </div>
+        </ControlField>
         {/* A PickList, not a native <select> (Mark, 2026-08-01 — he named this
             one). Past 8 categories it also gains the find box, which the OS
             menu could never offer on an iPad. */}
-        <PickList
-          variant="field"
-          ariaLabel="Category"
-          value={filters.category}
-          onPick={(category) => update({ category })}
-          options={[
-            { value: "", label: "All categories" },
-            ...categories.map((c) => ({ value: c, label: c })),
-          ]}
-          className="w-56"
-        />
-
-        <TabPicker
-          ariaLabel="Active state"
-          value={filters.active}
-          onChange={(active) => update({ active })}
-          options={ACTIVE_TABS}
-        />
-        {editable ? (
-          // `flex-1 justify-end`, not `ml-auto` — `SEARCH_PEN`'s reason.
-          <div className="flex flex-1 justify-end">
-            <NewInventoryItem
-              orgId={orgId}
-              categories={categories}
-              existingNames={itemNames}
-            />
-          </div>
-        ) : null}
+        <ControlField label="Category">
+          <PickList
+            variant="field"
+            ariaLabel="Category"
+            value={filters.category}
+            onPick={(category) => update({ category })}
+            options={[
+              { value: "", label: "All categories" },
+              ...categories.map((c) => ({ value: c, label: c })),
+            ]}
+            className="w-56"
+          />
+        </ControlField>
+        <ControlField label="Show">
+          <PickList
+            variant="field"
+            ariaLabel="Active state"
+            value={filters.active}
+            onPick={(active) => update({ active: active as ActiveFilter })}
+            options={ACTIVE_TABS.map((t) => ({ value: t.key, label: t.label }))}
+            fit
+          />
+        </ControlField>
       </div>
 
       {editable && checked.size > 0 && (
@@ -462,7 +472,7 @@ export function ItemsList({
           <button
             disabled={busy}
             onClick={() => deactivate("here")}
-            className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+            className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
           >
             Deactivate here{activeLocationCode ? ` (${activeLocationCode})` : ""}
           </button>

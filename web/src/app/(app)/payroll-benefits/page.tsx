@@ -87,12 +87,17 @@ export default async function PayrollBenefitsPage() {
     <div className="space-y-6">
       {/* Org-wide, and the list does not filter, so there is nothing to count
           "of" — the total alone is the honest line. */}
-      <PageHeading title="Benefits" total={rows.length} noun="benefits" />
+      {/* The create command rides in the TITLE row (Mark, 2026-09-10). */}
+      <PageHeading
+        title="Benefits"
+        total={rows.length}
+        noun="benefits"
+        action={<AddPayrollBenefit orgId={session.membership.org_id} />}
+      />
 
       <PayrollBenefitsList
         rows={rows}
         editable={canEditPage(session.membership.role, "/payroll-benefits")}
-        action={<AddPayrollBenefit orgId={session.membership.org_id} />}
       />
     </div>
   );

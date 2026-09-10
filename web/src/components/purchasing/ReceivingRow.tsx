@@ -306,7 +306,7 @@ export function ReceivingRow({
                     action.hasOverride ? " for this location" : ""
                   }, so future orders quote it.`
             }
-            className="h-9 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+            className="h-9 mac-control border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
           >
             {action.stage === "po" ? "Update PO" : "Update vendor"}
           </button>

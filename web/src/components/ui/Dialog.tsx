@@ -192,8 +192,11 @@ export function Dialog({
 export const DIALOG_CANCEL_CLASS =
   "text-[12px] font-semibold uppercase tracking-[0.06em] text-muted hover:text-ink disabled:opacity-35";
 
+// `mac-control mac-own-hover` on both commits (Mark, 2026-09-10: the Mac look
+// app-wide, `styles/mac-look.css`): the shadow and the press, keeping their own
+// hover. Cancel is text and gets neither.
 export const DIALOG_COMMIT_CLASS =
-  "inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white hover:bg-neutral-800 disabled:bg-neutral-300 disabled:text-white";
+  "mac-control mac-own-hover inline-flex h-9 items-center bg-ink px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white hover:bg-neutral-800 disabled:bg-neutral-300 disabled:text-white";
 
 /** A destructive commit — the accent edge, filled on hover, as everywhere else. */
 export const DIALOG_DANGER_CLASS =

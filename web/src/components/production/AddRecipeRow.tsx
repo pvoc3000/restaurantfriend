@@ -145,7 +145,7 @@ export function AddRecipeRow({
               setError(null);
               setPicking(true);
             }}
-            className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+            className="inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
           >
             {pending ? "Adding…" : `Add ${what}`}
           </button>
@@ -175,7 +175,7 @@ export function AddRecipeRow({
         type="button"
         disabled={pending || !draft.trim()}
         onClick={addTyped}
-        className="inline-flex h-9 shrink-0 items-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+        className="inline-flex h-9 shrink-0 items-center whitespace-nowrap mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
       >
         {pending ? "Adding…" : `Add ${what}`}
       </button>

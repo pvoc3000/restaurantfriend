@@ -953,16 +953,14 @@ export function OrderGuide({
           `items-end` levels the BOXES, so the search sits on the same line as
           three fields that each carry a caption above them. */}
       <div className="flex flex-wrap items-end gap-4 text-sm">
-        <div className="min-w-[13rem] max-w-[18rem] flex-1">
-          <TextInput
-            value={term}
-            onValueChange={setTerm}
-            aria-label="Jump to item, vendor or section"
-            clearLabel="Clear the search"
-            fullWidth
-            icon={<SearchGlyph />}
-          />
-        </div>
+        <TextInput
+          value={term}
+          onValueChange={setTerm}
+          aria-label="Jump to item, vendor or section"
+          clearLabel="Clear the search"
+          search
+          icon={<SearchGlyph />}
+        />
 
         {/* EVERY PICKER IS CAPTIONED NOW (Mark, 2026-09-10: "put labels above
             the picklists"), which retires the argument made the day before

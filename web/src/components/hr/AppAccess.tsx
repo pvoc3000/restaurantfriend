@@ -205,7 +205,7 @@ export function AppAccess({
   const isOwner = role === "owner";
 
   const BUTTON =
-    "h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+    "h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
   const QUIET =
     "text-[12px] uppercase tracking-[0.06em] text-accent hover:underline disabled:opacity-35";
 

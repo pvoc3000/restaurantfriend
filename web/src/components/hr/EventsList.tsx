@@ -531,6 +531,10 @@ export function EventsList({
                     value={search}
                     onValueChange={changeSearch}
                     fullWidth
+                    // The Mac look's sunken search field; this one keeps its
+                    // own 9rem floor (the single-line bar), so it is dressed
+                    // directly rather than through `search`.
+                    className="mac-field"
                     aria-label="Search events"
                     clearLabel="Clear the search"
                     icon={<SearchGlyph />}

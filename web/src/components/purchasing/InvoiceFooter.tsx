@@ -185,7 +185,7 @@ export function InvoiceFooter({
   }
 
   const button =
-    "h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+    "h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
 
   // ITS OWN BOX NOW, matching `PushToQuickBooks`'s shape (Mark, 2026-09-03) —
   // a button row, then its own prose stacked beneath, in the fourth grid

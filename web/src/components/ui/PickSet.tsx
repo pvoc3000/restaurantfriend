@@ -162,7 +162,9 @@ export function PickSet({
         // does. Unboxed it stays content-sized, because a filter row packs its
         // controls rather than stretching them.
         className={`flex h-9 items-center gap-2 bg-white px-3 text-[13px] hover:bg-neutral-100 disabled:opacity-40 ${
-          boxed ? `${BOXED_FIELD_BORDER} w-full` : "border border-ink"
+          // The filter-row dress carries the Mac look (`styles/mac-look.css`);
+          // the boxed detail-field dress does not.
+          boxed ? `${BOXED_FIELD_BORDER} w-full` : "mac-control border border-ink"
         } ${className}`}
       >
         <span className="truncate">{summary}</span>

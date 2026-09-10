@@ -28,7 +28,7 @@
  * differently from another's.
  */
 export const DANGER_BUTTON_CLASS =
-  "h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35";
+  "mac-control mac-own-hover h-9 border border-accent bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-35";
 
 /**
  * The ordinary command button — the ONE button this design system has.
@@ -69,8 +69,11 @@ export const DANGER_BUTTON_CLASS =
  * what they mean, not in how big they are, and that file's own history says
  * what happens when they drift.
  */
+// `mac-control` on all three (Mark, 2026-09-10: the Mac look app-wide) — see
+// `styles/mac-look.css`. The black and red ones add `mac-own-hover`, which keeps
+// their own hover colour and takes the shadow and the press.
 export const PRIMARY_BUTTON_CLASS =
-  "inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-ink px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-white hover:text-ink disabled:opacity-35";
+  "mac-control mac-own-hover inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-ink px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-white transition-colors hover:bg-white hover:text-ink disabled:opacity-35";
 
 export const BUTTON_CLASS =
-  "inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+  "mac-control inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";

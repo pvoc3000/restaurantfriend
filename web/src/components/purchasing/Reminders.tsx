@@ -337,7 +337,7 @@ export function AddVendorReminder({
       <button
         type="button"
         onClick={() => setComposing(true)}
-        className="h-9 border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
+        className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
       >
         Add reminder…
       </button>

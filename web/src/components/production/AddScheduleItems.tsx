@@ -179,7 +179,7 @@ export function AddScheduleItems({
                     type="button"
                     onClick={() => add(item)}
                     disabled={busy === item.id}
-                    className="h-9 shrink-0 border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
+                    className="h-9 shrink-0 mac-control border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white disabled:opacity-35"
                   >
                     {busy === item.id ? "Adding…" : "Add"}
                   </button>
