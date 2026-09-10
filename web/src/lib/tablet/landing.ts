@@ -1,5 +1,5 @@
-// THE TABLET LANDING PAGE'S TILES, AND THE BAR'S TWO QUESTIONS — where Back
-// goes, and what the screen is called (Mark, 2026-09-09).
+// THE TABLET LANDING PAGE'S TILES, AND THE BAR'S ONE QUESTION — where Back
+// goes (Mark, 2026-09-09).
 //
 // Pure, fixture-tested. The tiles are Mark's own list, in his groups and his
 // words; the hrefs are the desk routes, because the tablet shell reuses every
@@ -9,7 +9,7 @@
 
 import { parseTrail } from "../breadcrumbs";
 import type { RawSearchParams } from "../filterMenus";
-import { SECTIONS, findSection, findSub, resolveRoute } from "../nav";
+import { findSection, findSub, resolveRoute } from "../nav";
 import { canReachPage } from "../pageAccess";
 import type { Role } from "../roles";
 import { TABLET_HOME } from "../shell";
@@ -115,20 +115,4 @@ export function tabletBackHref(pathname: string, params: RawSearchParams): strin
   }
 
   return TABLET_HOME;
-}
-
-/**
- * What the bar calls the screen — the menu's own label for the sub-section,
- * which is a detail route's list name too (/vendors/9 is still Vendors). The
- * two utilities the menu never names are named here.
- */
-export function tabletTitle(pathname: string): string {
-  if (pathname === TABLET_HOME) return "Home";
-  if (pathname === "/account" || pathname.startsWith("/account/")) return "Your settings";
-  if (pathname === "/settings" || pathname.startsWith("/settings/")) return "Settings";
-  const position = resolveRoute(pathname);
-  if (!position) return "";
-  const section = SECTIONS.find((s) => s.slug === position.sectionSlug);
-  const sub = section && findSub(section, position.subSlug);
-  return sub?.label ?? section?.label ?? "";
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useRef } from "react";
 
 import { SwitchUser } from "@/components/SwitchUser";
@@ -12,7 +13,6 @@ import { BAR_CELL } from "./barCell";
 import { BarLabel, ICON_HOME, ICON_PERSON } from "./BarLabel";
 import { BarRecordNav } from "./BarRecordNav";
 import { TabletBack } from "./TabletBack";
-import { TabletTitle } from "./TabletTitle";
 
 /**
  * THE TABLET SHELL'S WHOLE CHROME — one black bar, no menus (Mark,
@@ -20,8 +20,12 @@ import { TabletTitle } from "./TabletTitle";
  * simple nav bar. We would just need a back button … a home button … If we're
  * in a detail view the nav buttons to go to next/last would be helpful.")
  *
- * Back · Home · [record book] · title · shop · Switch user. Every cell is a
- * 64px box with the icon over its word, the runners' footer idiom.
+ * Back · Home · [record book], and — ON THE LANDING PAGE ONLY — the shop
+ * picker and Switch user (Mark, 2026-09-09: "to make room for other controls,
+ * location switching and the account button only need to be on the
+ * landing/home page. I don't think we need the title of the page in the menu
+ * bar, either"). Every cell is a 64px box with the icon over its word, the
+ * runners' footer idiom. No title: the page's own heading says what it is.
  *
  * IT PUBLISHES `--rf-header-h`, not `--rf-runner-h`. Every list in the app
  * offsets its sticky column labels against the masthead's variable
@@ -45,6 +49,7 @@ export function TabletBar({
 }) {
   const ref = useRef<HTMLElement>(null);
   usePublishedHeight(ref, "--rf-header-h");
+  const atHome = usePathname() === TABLET_HOME;
 
   return (
     <header ref={ref} className="sticky top-0 z-50 bg-ink text-white">
@@ -54,17 +59,19 @@ export function TabletBar({
           <BarLabel icon={ICON_HOME} word="Home" />
         </Link>
         <BarRecordNav />
-        <TabletTitle />
-        <div className="flex items-center gap-4 px-3">
-          <WorkingLocation locations={locations} working={working} size="lg" />
-          {registeredDevice ? (
-            <SwitchUser size="lg" />
-          ) : (
-            <Link href="/account" className={BAR_CELL}>
-              <BarLabel icon={ICON_PERSON} word="Account" />
-            </Link>
-          )}
-        </div>
+        <div className="min-w-0 flex-1" />
+        {atHome && (
+          <div className="flex items-center gap-4 px-3">
+            <WorkingLocation locations={locations} working={working} size="lg" />
+            {registeredDevice ? (
+              <SwitchUser size="lg" />
+            ) : (
+              <Link href="/account" className={BAR_CELL}>
+                <BarLabel icon={ICON_PERSON} word="Account" />
+              </Link>
+            )}
+          </div>
+        )}
       </div>
     </header>
   );

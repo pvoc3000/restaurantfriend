@@ -1,6 +1,6 @@
 // The shell switch (lib/shell) and the tablet landing's pure half
 // (lib/tablet/landing): which shell a browser gets, which tiles a role sees,
-// where Back goes and what the bar calls a screen.
+// where Back goes.
 
 import { SECTIONS } from "../../src/lib/nav";
 import { canReachPage } from "../../src/lib/pageAccess";
@@ -8,7 +8,6 @@ import { TABLET_HOME, parseShell, resolveShell } from "../../src/lib/shell";
 import {
   LANDING_GROUPS,
   tabletBackHref,
-  tabletTitle,
   tilesForRole,
 } from "../../src/lib/tablet/landing";
 import { eq, ok, test } from "./harness";
@@ -103,14 +102,4 @@ test("a list, or a route the menu does not know, goes home", () => {
 
 test("a half trail — from with no label — is ignored", () => {
   eq(tabletBackHref("/vendors/9", { from: "/items" }), "/vendors");
-});
-
-// -------------------------------------------------------------- tabletTitle
-
-test("the title is the menu's own label, for a list and its records alike", () => {
-  eq(tabletTitle("/vendors"), "Vendors");
-  eq(tabletTitle("/vendors/9"), "Vendors");
-  eq(tabletTitle(TABLET_HOME), "Home");
-  eq(tabletTitle("/account"), "Your settings");
-  eq(tabletTitle("/nowhere"), "");
 });
