@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import { FilterMenus } from "@/components/ui/FilterMenus";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { sortRows } from "@/lib/tableSort";
@@ -134,7 +134,7 @@ export function EventsList({
 
     return [
       {
-        // Driven by the TabPicker below rather than by a menu, because it is the
+        // Driven by the Show picklist below rather than by a menu, because it is the
         // one control that has to explain that one half is complete and the
         // other is a window. It rides here so it lands in the URL and its counts
         // condition like every other dimension.
@@ -270,7 +270,7 @@ export function EventsList({
   /**
    * THE TIER IS A DIMENSION AND NOT A MENU. It rides in `dimensions` so it lands
    * in the URL, is parsed back, and narrows `visible` like everything else — but
-   * it is DRAWN as the TabPicker above, so the menu row must not offer it too.
+   * it is DRAWN as the Show picklist above, so the menu row must not offer it too.
    * A second control saying the same thing three inches away is one of them
    * being wrong the moment they disagree.
    *
@@ -491,27 +491,18 @@ export function EventsList({
               Tier still leads, because that is the reading order: which
               population, then how much of it.
 
-              NEITHER IS CAPTIONED (Mark: "you don't need 'how far back', it's
-              obvious from the choices"). Every cell names itself, which is the
-              same reason the vendor screen's age filter lost its label — and it
-              is what makes the row a constant 36px, so the tier picker and the
-              whole table under it no longer move by the height of a caption
-              that existed on two tiers of three. The `ariaLabel`s stay: "7 days"
-              read aloud on its own names nothing. */}
-          <div className="flex flex-wrap items-end gap-3">
-            <TabPicker
-              ariaLabel="Which events"
-              value={tier}
-              onChange={changeTier}
-              options={TIERS.map((t) => ({ key: t, label: TIER_LABEL[t], count: tierCounts[t] }))}
-            />
-            <TabPicker
-              ariaLabel="How far back to read shift ratings"
-              value={windowKey}
-              onChange={changeWindow}
-              options={RATING_WINDOWS.map((k) => ({ key: k, label: RATING_WINDOW_LABEL[k] }))}
-            />
-          </div>
+              BOTH ARE CAPTIONED PICKLISTS since 2026-09-10 (Mark), reversing
+              the 2026-08-26 "neither is captioned": a tab row names every
+              choice by standing there, where a collapsed picker shows one value
+              and has to say what dimension it is. The captions are on both
+              pickers on every tier, so the row is still a constant height and
+              the table under it still does not move between tiers.
+
+              ONE LINE WITH THE MENUS (Mark, 2026-09-10: "make the filter row
+              on the events page a single line"). Search, Show and Window ride
+              in `FilterMenus`' `leading` slot, which is the first cells of the
+              bar's own wrapping row, so the four menus follow them on the same
+              line. The search flexes so the line holds at a laptop width. */}
           <FilterMenus
             rows={tiered}
             total={rows.length}
@@ -526,20 +517,56 @@ export function EventsList({
             // `PageHeading` states the count now, and this bar said it again a
             // few pixels below (Mark, 2026-09-03).
             showCount={false}
+            // Search · Show · Window, then the bar's own four menus, all on one
+            // wrapping row. The captions use the MENUS' dress (11px semibold,
+            // `space-y-1.5`) rather than `ControlField`'s, so every label on the
+            // line sits at the same height.
             leading={
-              <div className="space-y-1.5">
-                <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                  Search
-                </span>
-                <TextInput
-                  value={search}
-                  onValueChange={changeSearch}
-                  className="w-64"
-                  aria-label="Search events"
-                  clearLabel="Clear the search"
-                  icon={<SearchGlyph />}
-                />
-              </div>
+              <>
+                <div className="min-w-[9rem] max-w-[18rem] flex-1 space-y-1.5">
+                  <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                    Search
+                  </span>
+                  <TextInput
+                    value={search}
+                    onValueChange={changeSearch}
+                    fullWidth
+                    aria-label="Search events"
+                    clearLabel="Clear the search"
+                    icon={<SearchGlyph />}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                    Show
+                  </span>
+                  <PickList
+                    ariaLabel="Which events"
+                    variant="field"
+                    value={tier}
+                    onPick={(v) => changeTier(v as Tier)}
+                    options={TIERS.map((t) => ({
+                      value: t,
+                      label: TIER_LABEL[t],
+                      hint: String(tierCounts[t]),
+                    }))}
+                    fit
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
+                    Window
+                  </span>
+                  <PickList
+                    ariaLabel="How far back to read shift ratings"
+                    variant="field"
+                    value={windowKey}
+                    onPick={(v) => changeWindow(v as RatingWindowKey)}
+                    options={RATING_WINDOWS.map((k) => ({ value: k, label: RATING_WINDOW_LABEL[k] }))}
+                    fit
+                  />
+                </div>
+              </>
             }
           />
           {nameError ? (

@@ -3484,6 +3484,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    ratings to Notes & warnings while counting itself as two.
    **THE TWO PICKERS SHARE ONE ROW, ON EVERY TIER, AND NEITHER IS CAPTIONED**
    (Mark, 2026-08-26, in three passes — one line, no caption, always visible).
+   **SUPERSEDED 2026-09-10 (Mark):** both are captioned `PickList`s now (Show,
+   Window), and they ride in `FilterMenus`' `leading` slot beside a flexing
+   Search, so the whole filter bar — Search · Show · Window · Kind · Shop · By
+   · Score — is ONE line, measured at 1280 and 1440 with every caption and box
+   level. The "always visible" half below still stands.
    **THE WINDOW WAS HIDDEN UNDER Notes & warnings AND THAT WAS WRONG ON A FACT,
    not on a judgement.** It was hidden on the grounds that a control which does
    nothing is one people stop trusting — but the window is NOT inert there: the
