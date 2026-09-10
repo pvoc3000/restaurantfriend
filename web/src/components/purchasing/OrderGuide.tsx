@@ -752,7 +752,7 @@ export function OrderGuide({
 
           An EMPTY list renders no band (Mark, 2026-09-10): the other band takes
           the first column, and with no reminder due "Add reminder" lives in the
-          title row instead. */}
+          strip above the title row instead. */}
       {bands && (
       <div className="grid gap-4 md:grid-cols-2 md:items-start">
         {reminders.length > 0 && (
@@ -786,6 +786,27 @@ export function OrderGuide({
           (Mark, 2026-09-03) — `PurchaseOrderList`'s header, which is this
           module's model. It rode BESIDE the title from 2026-07-29 until then. */}
       <div className="space-y-3">
+        {/* ADD REMINDER AND REFRESH SIT ABOVE THE TITLE ROW, right-aligned
+            (Mark, 2026-09-10: they had moved into the title row beside the day
+            picker, and belong above it). With a reminder due, "Add reminder"
+            is in that band's header instead. */}
+        <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1">
+          {reminders.length > 0 ? null : (
+            <Reminders
+              reminders={reminders}
+              guideDate={guideDate}
+              locationId={locationId}
+              orgId={orgId}
+              canWrite={canGeneratePos}
+            />
+          )}
+          <button
+            onClick={() => router.refresh()}
+            className="text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+          >
+            Refresh
+          </button>
+        </div>
         <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
           {/* The module's model header (`PurchaseOrderList`): the count sits
               UNDER the title and leads with the shop. */}
@@ -800,27 +821,10 @@ export function OrderGuide({
 
           {/* THE DAY PICKER IS AT THE RIGHT, TOP-ALIGNED, in the Mac look
               (Mark, 2026-09-10: "make the date picker macos style, and align it
-              to the right") — the identity row's command position. It is the
-              LAST thing in the row, and Today sits before the weekday, so the
-              box keeps its place whether or not that link is showing.
-              With no reminder due, "Add reminder" lives here too (Mark,
-              2026-09-03); with one on screen it is in that band's header. */}
+              to the right") — the identity row's command position, and the
+              only thing there. Today sits before the weekday, so the box keeps
+              its place whether or not that link is showing. */}
           <div className="ml-auto flex flex-wrap items-center gap-x-6 gap-y-2">
-            {reminders.length > 0 ? null : (
-              <Reminders
-                reminders={reminders}
-                guideDate={guideDate}
-                locationId={locationId}
-                orgId={orgId}
-                canWrite={canGeneratePos}
-              />
-            )}
-            <button
-              onClick={() => router.refresh()}
-              className="text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-            >
-              Refresh
-            </button>
             <span className="flex items-center gap-2">
               {guideDate !== today && (
                 <Link
