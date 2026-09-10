@@ -154,8 +154,8 @@ test("matchingPreset names the preset a range IS, first match winning", () => {
 /* -- display and URL ----------------------------------------------------- */
 
 test("formatRange collapses a single day", () => {
-  eq(formatRange({ from: "2026-09-01", to: "2026-09-08" }), "09/01/2026 – 09/08/2026");
-  eq(formatRange({ from: TUE, to: TUE }), "09/08/2026");
+  eq(formatRange({ from: "2026-09-01", to: "2026-09-08" }), "09/01/26 – 09/08/26");
+  eq(formatRange({ from: TUE, to: TUE }), "09/08/26");
 });
 
 test("parseRangeParams takes two real dates in order and nothing else", () => {

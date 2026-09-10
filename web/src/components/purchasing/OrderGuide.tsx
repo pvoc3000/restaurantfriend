@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -8,6 +8,7 @@ import { money } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import { useScrollMemoryKey } from "@/lib/scrollMemory";
 import { useShell } from "@/components/ShellProvider";
+import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
 import { PickSet } from "@/components/ui/PickSet";
@@ -77,28 +78,6 @@ const SHOW_ITEM_PAR: boolean = false;
  * every load (design rule 4). Entries are written per line as you walk, so a
  * closed laptop loses nothing.
  */
-/**
- * A control in the guide's sticky band, under its caption.
- *
- * The caption is the app's own small-caps field label — `/items`' Last-ordered
- * rule (Mark, 2026-08-01), which put a filter's label ABOVE its control rather
- * than beside it so that every control in a row starts on one margin. Four of
- * these share a line, so having the stack in one place is also what keeps that
- * line straight: a caption typed twice is a caption that drifts.
- *
- * VISUAL ONLY. Each control carries its own `ariaLabel`, which is longer and
- * says more ("Which vendors to walk"), so this is not a `<label>` and nothing
- * is announced twice.
- */
-function ControlField({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <span className="flex flex-col gap-1">
-      <span className="text-xs uppercase tracking-[0.12em] text-subtle">{label}</span>
-      {children}
-    </span>
-  );
-}
-
 export function OrderGuide({
   rows,
   lastPurchases,

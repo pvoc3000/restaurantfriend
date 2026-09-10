@@ -9,6 +9,7 @@ import {
   vendorFilterOptions,
 } from "@/lib/vendorFilter";
 import { TextInput } from "@/components/ui/TextInput";
+import { ControlField } from "@/components/ui/ControlField";
 import { PickList } from "@/components/ui/PickList";
 import { PickSet } from "@/components/ui/PickSet";
 import { RangePicker } from "@/components/ui/RangePicker";
@@ -903,44 +904,79 @@ export function PurchaseOrderList({
         </div>
       </div>
 
-      <div className="flex flex-wrap items-center gap-4">
-        <TextInput
-          value={filters.q}
-          onValueChange={(q) => update({ q })}
-          placeholder="Search PO number or vendor…"
-          clearLabel="Clear the search"
-          className="w-64"
-        />
+      {/* ONE ROW, CAPTIONED (Mark, 2026-09-10: "caption the filter row
+          elements like we did the order guide", and "make the search bar flex
+          width so we can get everything on one row on a tablet").
+
+          THE SEARCH BOX IS WHAT FLEXES, which is what makes the single row a
+          rule rather than a hope: it is the one control here with no natural
+          width — the range is as wide as two dates, the pickers as wide as
+          their vocabularies — so giving it the leftover is the only
+          arrangement that fits every window without a breakpoint. `fullWidth`
+          is load-bearing: `TextInput`'s wrapper SHRINK-WRAPS, so a `w-full` on
+          the input alone resolves against a span the input itself sized and
+          the pair settles at ~20 characters.
+
+          `items-end` levels the BOXES, so the uncaptioned search sits on the
+          line of three fields that each carry a caption above them.
+
+          MEASURED: one row at 1440, 1280, 1024 and **820 — the portrait iPad
+          this is read on** — with the search giving up 853 → 233px as the
+          window closes, nothing clipped and no horizontal overflow. It wraps
+          at 768, and a 12rem floor does not rescue it: the three fields plus
+          their gaps are 524px of a 705px row once the scrollbar is counted,
+          so the search would have to drop to 176 to fit, which is a cramped
+          box bought with the width the window ISN'T. */}
+      <div className="flex flex-wrap items-end gap-4">
+        <div className="min-w-[13rem] flex-1">
+          <TextInput
+            value={filters.q}
+            onValueChange={(q) => update({ q })}
+            placeholder="Search PO number or vendor…"
+            clearLabel="Clear the search"
+            fullWidth
+          />
+        </div>
 
         {/* The window, straight after the search (Mark, 2026-09-08: "search
             box, rangepicker, vendor picklist, tabpicker"). It was a row of six
             tabs pushed to the right edge; the picker's presets ARE those six,
             and the calendar is what the tabs could never offer. */}
-        <div className="w-64">
-          <RangePicker
-            value={poRangeBounds(filters.range, today)}
-            onChange={setRange}
-            presets={PO_RANGE_PRESETS}
-            today={today}
-            ariaLabel="Date window"
-            placeholder="All time"
-          />
-        </div>
+        {/* `w-52` since the face lost half its year (2026-09-10) — a picked
+            range is the widest thing this control ever says, and
+            "09/01/26 – 09/10/26" is 136.1px of ink where the four-digit
+            version needed the 256px this cell used to have. MEASURED rather
+            than guessed: 192 clipped it by 11, because the trigger gives 16px
+            back to the clear button and the face `truncate`s in silence. */}
+        <ControlField label="Window">
+          <div className="w-52">
+            <RangePicker
+              value={poRangeBounds(filters.range, today)}
+              onChange={setRange}
+              presets={PO_RANGE_PRESETS}
+              today={today}
+              ariaLabel="Date window"
+              placeholder="All time"
+            />
+          </div>
+        </ControlField>
 
         {/* A SET, not a one-of-N: "BakeMark and Chefs Warehouse" is the
             question this list is asked, and eighty vendors were never going to
             be a row of tabs. It sits with the controls that NARROW the list,
             and the picker grows its own find box past eight options. */}
-        <PickSet
-          options={vendorOptions}
-          value={filters.vendors}
-          onChange={(vendors) => update({ vendors })}
-          allLabel="All vendors"
-          noun="vendors"
-          label="Which vendors to show"
-          className="max-w-[16rem]"
-          minWidth={240}
-        />
+        <ControlField label="Vendors">
+          <PickSet
+            options={vendorOptions}
+            value={filters.vendors}
+            onChange={(vendors) => update({ vendors })}
+            allLabel="All vendors"
+            noun="vendors"
+            label="Which vendors to show"
+            className="max-w-[16rem]"
+            minWidth={240}
+          />
+        </ControlField>
 
         {/* A LIST RATHER THAN A ROW OF TABS (Mark, 2026-09-10), which is the
             conversion `/invoices` made for its Due tabs and the order guide
@@ -959,29 +995,31 @@ export function PurchaseOrderList({
             AND THE CHOSEN STATUS IS ALWAYS IN THE LIST — see `statusTabs`,
             where keeping it is what makes the trigger read "Received" rather
             than the raw column value on a window that holds none. */}
-        <PickList
-          ariaLabel="Status"
-          variant="field"
-          value={filters.status}
-          onPick={(status) => update({ status: status as StatusFilter })}
-          options={statusTabs.map((s) => ({
-            value: s,
-            label:
-              s === "all"
-                ? "All"
-                : s === "open"
-                  ? "Open"
-                  : PO_STATUS_LABEL[s as PoStatus],
-            hint: String(
-              s === "all"
-                ? orders.length
-                : s === "open"
-                  ? openCount
-                  : statusCounts[s] ?? 0
-            ),
-          }))}
-          className="w-40"
-        />
+        <ControlField label="Status">
+          <PickList
+            ariaLabel="Status"
+            variant="field"
+            value={filters.status}
+            onPick={(status) => update({ status: status as StatusFilter })}
+            options={statusTabs.map((s) => ({
+              value: s,
+              label:
+                s === "all"
+                  ? "All"
+                  : s === "open"
+                    ? "Open"
+                    : PO_STATUS_LABEL[s as PoStatus],
+              hint: String(
+                s === "all"
+                  ? orders.length
+                  : s === "open"
+                    ? openCount
+                    : statusCounts[s] ?? 0
+              ),
+            }))}
+            className="w-40"
+          />
+        </ControlField>
       </div>
 
       {capped && (

@@ -279,11 +279,24 @@ export function matchingPreset(
 
 /* -- display -------------------------------------------------------------- */
 
+/**
+ * A TWO-DIGIT YEAR, which is a width decision (Mark, 2026-09-10: "make the
+ * range picker display dates with only two decimals for the year so it doesn't
+ * need to be so wide"). A picked range is the widest thing this control ever
+ * says, so its face sets the field's width, and two dates at four digits each
+ * spend 30-odd pixels on the century twice over.
+ *
+ * Safe here in a way it is not on a document: this is a FILTER's face, read
+ * beside a list whose own date column carries the full year, and never a date
+ * anybody transcribes. `lib/specialOrderDocs`' own `usDate` — the one a quote
+ * and an invoice print — keeps four digits and no leading zeros, and the two
+ * must not be merged.
+ */
 function usDate(iso: string): string {
-  return `${iso.slice(5, 7)}/${iso.slice(8, 10)}/${iso.slice(0, 4)}`;
+  return `${iso.slice(5, 7)}/${iso.slice(8, 10)}/${iso.slice(2, 4)}`;
 }
 
-/** "09/01/2026 – 09/08/2026", or one date when the range is a single day. */
+/** "09/01/26 – 09/08/26", or one date when the range is a single day. */
 export function formatRange(range: DateRange): string {
   return range.from === range.to
     ? usDate(range.from)

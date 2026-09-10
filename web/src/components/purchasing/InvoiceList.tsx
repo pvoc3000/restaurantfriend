@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { TextInput } from "@/components/ui/TextInput";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { PickSet } from "@/components/ui/PickSet";
+import { ControlField } from "@/components/ui/ControlField";
 import { PickList } from "@/components/ui/PickList";
 import { RangePicker } from "@/components/ui/RangePicker";
 import { PO_RANGE_PRESETS, poRangeBounds, poRangeFromPicker } from "@/lib/poFilters";
@@ -634,7 +635,24 @@ export function InvoiceList({
           rows of TabPickers under captions; the window is a `RangePicker` now
           and Due is a `PickList`, and neither needs a caption, because a
           picker's own face names what it is set to. */}
-      <div className="flex flex-wrap items-center gap-4">
+      <div className="flex flex-wrap items-end gap-4">
+        {/* THE SEARCH DOES NOT FLEX HERE, where the PO list's does, and the
+            difference is measured rather than stylistic. That row fits on one
+            line at every width, so handing the leftover to the search is what
+            keeps it there. THIS row cannot: its Status `TabPicker` alone is
+            478px with five stages and their counts, which with the window, the
+            vendors, Due and the two commands wants ~1567px against the 1376 a
+            1440 window gives — so the commands wrap to a second line, and they
+            reach the right edge by the `ml-auto` below.
+
+            **An auto margin absorbs a flex line's free space BEFORE any
+            flex-grow does**, so a `flex-1` search and that `ml-auto` cannot
+            both work: the search would be starved on any width where the row
+            did fit. Converting Status to a `PickList` is what would make this
+            row a single line, and it is not asked for.
+
+            `items-end` all the same, so the search sits on the line of the
+            captioned fields rather than floating against their captions. */}
         <TextInput
           value={filters.q}
           onValueChange={(q) => update({ q })}
@@ -643,60 +661,79 @@ export function InvoiceList({
           className="w-72"
         />
 
-        <div className="w-64">
-          <RangePicker
-            value={poRangeBounds(filters.range, today)}
-            onChange={setRange}
-            presets={PO_RANGE_PRESETS}
-            today={today}
-            ariaLabel="Date window"
-            placeholder="All time"
-          />
-        </div>
+        <ControlField label="Window">
+          {/* `w-52`, measured — see the PO list, whose range cell this is. */}
+          <div className="w-52">
+            <RangePicker
+              value={poRangeBounds(filters.range, today)}
+              onChange={setRange}
+              presets={PO_RANGE_PRESETS}
+              today={today}
+              ariaLabel="Date window"
+              placeholder="All time"
+            />
+          </div>
+        </ControlField>
 
-        <PickSet
-          options={vendorOptions}
-          value={filters.vendors}
-          onChange={(vendors) => update({ vendors })}
-          allLabel="All vendors"
-          noun="vendors"
-          label="Which vendors to show"
-          className="max-w-[16rem]"
-          minWidth={240}
-        />
+        <ControlField label="Vendors">
+          <PickSet
+            options={vendorOptions}
+            value={filters.vendors}
+            onChange={(vendors) => update({ vendors })}
+            allLabel="All vendors"
+            noun="vendors"
+            label="Which vendors to show"
+            className="max-w-[16rem]"
+            minWidth={240}
+          />
+        </ControlField>
 
         {/* Due, as a list rather than a row of tabs (Mark, 2026-09-08). The
             counts ride as HINTS, which is where the tabs carried them. */}
-        <PickList
-          ariaLabel="Due"
-          variant="field"
-          value={filters.aging}
-          onPick={(aging) => update({ aging: aging as AgingFilter })}
-          options={agingTabs.map((b) => ({
-            value: b,
-            label: b === "all" ? "Any due date" : AGING_LABEL[b as AgingBucket],
-            hint: String(b === "all" ? invoices.length : agingCounts[b] ?? 0),
-          }))}
-          className="w-44"
-        />
+        <ControlField label="Due">
+          <PickList
+            ariaLabel="Due"
+            variant="field"
+            value={filters.aging}
+            onPick={(aging) => update({ aging: aging as AgingFilter })}
+            options={agingTabs.map((b) => ({
+              value: b,
+              label: b === "all" ? "Any due date" : AGING_LABEL[b as AgingBucket],
+              hint: String(b === "all" ? invoices.length : agingCounts[b] ?? 0),
+            }))}
+            className="w-44"
+          />
+        </ControlField>
 
-        <TabPicker
-          ariaLabel="Status"
-          value={filters.status}
-          onChange={(status) => update({ status })}
-          options={statusTabs.map((s) => ({
-            key: s,
-            label: s === "all" ? "All" : BILL_STAGE_LABEL[s],
-            count: s === "all" ? invoices.length : statusCounts[s] ?? 0,
-          }))}
-        />
+        {/* STILL A `TabPicker`, deliberately: it shows its whole vocabulary,
+            so it is the one control in this row that does not need its caption
+            to say what it is about — it gets one anyway, because a row where
+            three fields are captioned and the fourth is not reads as an
+            oversight. `/items` has captioned a TabPicker since 2026-08-01. */}
+        <ControlField label="Status">
+          <TabPicker
+            ariaLabel="Status"
+            value={filters.status}
+            onChange={(status) => update({ status })}
+            options={statusTabs.map((s) => ({
+              key: s,
+              label: s === "all" ? "All" : BILL_STAGE_LABEL[s],
+              count: s === "all" ? invoices.length : statusCounts[s] ?? 0,
+            }))}
+          />
+        </ControlField>
 
-        {/* The two commands, at the right edge (Mark, 2026-09-03). A GROUP
-            WITH ITS OWN `ml-auto`, not `NewInvoice`'s own: that trigger
-            carries `ml-auto` baked in, and as a plain sibling Check
-            QuickBooks read right only at a width where the row happened to
-            have little leftover space. Sized to its content, so the inner
-            `ml-auto` finds nothing to eat and the pair packs at `gap-3`. */}
+        {/* The two commands, at the right edge (Mark, 2026-09-03). A GROUP,
+            not `NewInvoice`'s own `ml-auto`: that trigger carries one baked
+            in, and as a plain sibling Check QuickBooks read right only at a
+            width where the row happened to have little leftover space. Sized
+            to its content, so the inner `ml-auto` finds nothing to eat and the
+            pair packs at `gap-3`.
+
+            It KEEPS its `ml-auto` (2026-09-10), unlike the PO list's, because
+            this row wraps and the cluster lands on a line of its own — where
+            the auto margin is the only thing holding it at the right edge.
+            See the search box above for why the two cannot both have it. */}
         <div className="ml-auto flex flex-wrap items-center gap-3">
           <button
             type="button"
