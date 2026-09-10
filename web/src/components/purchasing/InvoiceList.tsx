@@ -651,34 +651,51 @@ export function InvoiceList({
           again (2026-09-10) — see `ui/ControlField` for why a control that
           shows ONE value has to name its own dimension where a row of tabs
           did not. */}
-      <div className="flex flex-wrap items-end gap-4">
-        {/* THE SEARCH DOES NOT FLEX HERE, where the PO list's does, and the
-            difference is measured rather than stylistic. That row has FOUR
-            things in it and fits on one line down to 820, so handing the
-            leftover to the search is what keeps it there. This one has SIX —
-            the same four plus Due and the two commands — and measured after
-            the Status conversion it is one line at 1440 and two at 1280,
-            which is an ordinary laptop. So the cluster still lands on a line
-            of its own most of the time, and the `ml-auto` below is the only
-            thing holding it at the right edge when it does.
+      {/* `flex-wrap-reverse`, WHICH IS THE WHOLE OF BOTH ANSWERS (Mark,
+          2026-09-10: "make the invoice search bar flex width too. Is it
+          possible for the action buttons to appear above the filter buttons
+          when the row wraps?").
 
-            **An auto margin absorbs a flex line's free space BEFORE any
-            flex-grow does**, so a `flex-1` search and that `ml-auto` cannot
-            both work: the search would be starved at 1440, where the row DOES
-            fit and the margin would eat all 47px of slack. Flexing it buys
-            nothing at 1280 either — the fields alone are 1041px of a 1216px
-            row, so the search cannot reach its floor and the row wraps
-            whatever the search is told to do.
+          IT IS, AND ONLY THIS WAY. CSS cannot ask whether a row wrapped, so
+          the usual answers are a breakpoint (right at one width, wrong at the
+          next) or a permanent command strip (a line spent even where the row
+          fits). `wrap-reverse` reverses the CROSS axis: lines stack upward, so
+          the LAST items — these two commands — are the ones that rise, and
+          nothing at all changes on a width where the row does not wrap.
 
-            `items-end` all the same, so the search sits on the line of the
-            captioned fields rather than floating against their captions. */}
-        <TextInput
-          value={filters.q}
-          onValueChange={(q) => update({ q })}
-          placeholder="Search invoice number, vendor or PO…"
-          clearLabel="Clear the search"
-          className="w-72"
-        />
+          AND IT IS WHAT FREES THE SEARCH. The commands' `ml-auto` had to go
+          with it, because **an auto margin absorbs a flex line's free space
+          BEFORE any flex-grow does**, so a `flex-1` search and that margin
+          could never both work. Nothing is lost: `justify-end` right-aligns
+          the commands on the line they rise to, and on a line the search has
+          filled there is no free space for it to act on. One rule, both cases.
+
+          `items-start`, NOT `items-end`, and it is not a typo. With the cross
+          axis reversed, cross-START is the bottom — so this is the bottom
+          alignment the captioned fields want, spelled the way the reversal
+          leaves it.
+
+          KNOWN COST: focus order stays DOM order, so when the row wraps a
+          keyboard reaches the commands AFTER the filters that are drawn below
+          them. These are independent controls rather than a sequence, so it
+          reads as a mismatch and not a trap; if it ever bites, the fix is a
+          real command strip above, not `order`. */}
+      <div className="flex flex-wrap-reverse items-start justify-end gap-4">
+        {/* THE SEARCH FLEXES, the PO list's arrangement (Mark, 2026-09-10):
+            it is the one control here with no natural width, so it takes the
+            leftover. `fullWidth` is load-bearing — `TextInput`'s wrapper
+            SHRINK-WRAPS, so `w-full` on the input alone resolves against a
+            span the input itself sized and the pair settles at ~20
+            characters. */}
+        <div className="min-w-[13rem] flex-1">
+          <TextInput
+            value={filters.q}
+            onValueChange={(q) => update({ q })}
+            placeholder="Search invoice number, vendor or PO…"
+            clearLabel="Clear the search"
+            fullWidth
+          />
+        </div>
 
         <ControlField label="Window">
           {/* `w-52`, measured — see the PO list, whose range cell this is. */}
@@ -752,11 +769,13 @@ export function InvoiceList({
             to its content, so the inner `ml-auto` finds nothing to eat and the
             pair packs at `gap-3`.
 
-            It KEEPS its `ml-auto` (2026-09-10), unlike the PO list's, because
-            this row wraps and the cluster lands on a line of its own — where
-            the auto margin is the only thing holding it at the right edge.
-            See the search box above for why the two cannot both have it. */}
-        <div className="ml-auto flex flex-wrap items-center gap-3">
+            ITS `ml-auto` IS GONE (2026-09-10) and the row's `justify-end`
+            does that job now — see the row, where the same change is what
+            lets the search flex. On a line these two share with the fields,
+            the search has eaten the free space and neither has anything to
+            do; on the line they rise to alone, `justify-end` holds them at
+            the right edge exactly as the margin did. */}
+        <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
             className={BUTTON_CLASS}
