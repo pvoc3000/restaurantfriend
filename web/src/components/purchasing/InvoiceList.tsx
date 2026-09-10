@@ -4,7 +4,6 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TextInput } from "@/components/ui/TextInput";
-import { TabPicker } from "@/components/ui/TabPicker";
 import { PickSet } from "@/components/ui/PickSet";
 import { ControlField } from "@/components/ui/ControlField";
 import { PickList } from "@/components/ui/PickList";
@@ -576,15 +575,30 @@ export function InvoiceList({
    * happens to be in that state, where "Open 0" says nothing is outstanding,
    * which is the answer you came for.
    */
+  /**
+   * An empty stage is DROPPED — a list of every stage this window does not
+   * contain says nothing — EXCEPT the one you are currently filtered to, which
+   * is always here (2026-09-10, the PO list's rule).
+   *
+   * The exception is what a collapsed control needs and a row of tabs did not:
+   * narrow the window until your chosen stage has no invoices and the option
+   * would vanish, leaving `PickList` to fall back to the raw column value and
+   * render a lowercase "submitted". Kept, the trigger reads "Submitted" and
+   * the list reads "Submitted 0" — you filtered to Submitted and this window
+   * holds none.
+   */
   const statusTabs: InvoiceStatusFilter[] = [
     "all",
     "open",
-    ...BILL_STAGE_ORDER.filter((s) => s !== "open" && (statusCounts[s] ?? 0) > 0),
+    ...BILL_STAGE_ORDER.filter(
+      (s) => s !== "open" && ((statusCounts[s] ?? 0) > 0 || s === filters.status)
+    ),
   ];
 
+  /** Same rule — this one has been a `PickList` since 2026-09-08. */
   const agingTabs: AgingFilter[] = [
     "all",
-    ...AGING_ORDER.filter((b) => (agingCounts[b] ?? 0) > 0),
+    ...AGING_ORDER.filter((b) => (agingCounts[b] ?? 0) > 0 || b === filters.aging),
   ];
 
   return (
@@ -632,24 +646,29 @@ export function InvoiceList({
 
       {/* ONE ROW, in Mark's order (2026-09-08): search · range · vendors ·
           due · status, with the two commands at the right edge. It was two
-          rows of TabPickers under captions; the window is a `RangePicker` now
-          and Due is a `PickList`, and neither needs a caption, because a
-          picker's own face names what it is set to. */}
+          rows of TabPickers under captions; the window is a `RangePicker` and
+          Due and Status are `PickList`s, and every one of them is captioned
+          again (2026-09-10) — see `ui/ControlField` for why a control that
+          shows ONE value has to name its own dimension where a row of tabs
+          did not. */}
       <div className="flex flex-wrap items-end gap-4">
         {/* THE SEARCH DOES NOT FLEX HERE, where the PO list's does, and the
-            difference is measured rather than stylistic. That row fits on one
-            line at every width, so handing the leftover to the search is what
-            keeps it there. THIS row cannot: its Status `TabPicker` alone is
-            478px with five stages and their counts, which with the window, the
-            vendors, Due and the two commands wants ~1567px against the 1376 a
-            1440 window gives — so the commands wrap to a second line, and they
-            reach the right edge by the `ml-auto` below.
+            difference is measured rather than stylistic. That row has FOUR
+            things in it and fits on one line down to 820, so handing the
+            leftover to the search is what keeps it there. This one has SIX —
+            the same four plus Due and the two commands — and measured after
+            the Status conversion it is one line at 1440 and two at 1280,
+            which is an ordinary laptop. So the cluster still lands on a line
+            of its own most of the time, and the `ml-auto` below is the only
+            thing holding it at the right edge when it does.
 
             **An auto margin absorbs a flex line's free space BEFORE any
             flex-grow does**, so a `flex-1` search and that `ml-auto` cannot
-            both work: the search would be starved on any width where the row
-            did fit. Converting Status to a `PickList` is what would make this
-            row a single line, and it is not asked for.
+            both work: the search would be starved at 1440, where the row DOES
+            fit and the margin would eat all 47px of slack. Flexing it buys
+            nothing at 1280 either — the fields alone are 1041px of a 1216px
+            row, so the search cannot reach its floor and the row wraps
+            whatever the search is told to do.
 
             `items-end` all the same, so the search sits on the line of the
             captioned fields rather than floating against their captions. */}
@@ -705,21 +724,24 @@ export function InvoiceList({
           />
         </ControlField>
 
-        {/* STILL A `TabPicker`, deliberately: it shows its whole vocabulary,
-            so it is the one control in this row that does not need its caption
-            to say what it is about — it gets one anyway, because a row where
-            three fields are captioned and the fourth is not reads as an
-            oversight. `/items` has captioned a TabPicker since 2026-08-01. */}
+        {/* A LIST RATHER THAN A ROW OF TABS (Mark, 2026-09-10) — the fourth
+            time, after `/invoices`' own Due, the order guide's tier and
+            grouping, and the PO list's status. Here it was the widest thing in
+            the row by a distance: **478px** with five stages and their counts,
+            against 160 as a list, and that 478 was the whole reason this row
+            could not be one line at any width. */}
         <ControlField label="Status">
-          <TabPicker
+          <PickList
             ariaLabel="Status"
+            variant="field"
             value={filters.status}
-            onChange={(status) => update({ status })}
+            onPick={(status) => update({ status: status as InvoiceStatusFilter })}
             options={statusTabs.map((s) => ({
-              key: s,
+              value: s,
               label: s === "all" ? "All" : BILL_STAGE_LABEL[s],
-              count: s === "all" ? invoices.length : statusCounts[s] ?? 0,
+              hint: String(s === "all" ? invoices.length : statusCounts[s] ?? 0),
             }))}
+            className="w-40"
           />
         </ControlField>
 
