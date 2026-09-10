@@ -749,11 +749,8 @@ export function InvoiceList({
         </div>
 
         <ControlField label="Window">
-          {/* `w-60`, not the PO list's `w-52`: this screen's controls are set
-              in ChicagoFLF (the Mac look, `styles/mac-look.css`), whose digits
-              run wider — measured, "09/01/26 – 09/10/26" needs 161px where the
-              system font needed 131, and `w-52` left it 141 and truncated. */}
-          <div className="w-60">
+          {/* `w-52`, measured — see the PO list, whose range cell this is. */}
+          <div className="w-52">
             <RangePicker
               value={poRangeBounds(filters.range, today)}
               onChange={setRange}
