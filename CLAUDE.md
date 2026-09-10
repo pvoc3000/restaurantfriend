@@ -11059,6 +11059,15 @@ weekday column, and 003 then silently made it per-vendor-item.
   a collapsed control has to state.** Above rather than beside — `/items`'
   Last-ordered rule — and VISUAL only, each control keeping its own longer
   `ariaLabel` so nothing is announced twice.
+  **A PICKER IN A FILTER ROW PASSES `fit`** (Mark, 2026-09-10: "they're
+  taking more room than they need to"), which sizes its trigger to its WIDEST
+  OPTION — never to the current value, which would resize the control on every
+  pick and shove the row along. It renders every option hidden in one grid cell
+  so CSS finds the max width in the real font; no JS measurement, so tracking
+  cannot fool it. Opt-in: a cell already has a width. Measured: Status 160 →
+  100 and holding at 100 on "Received". A filter-row search is
+  `flex-1 min-w-[13rem] max-w-[18rem]` — it flexes on a narrow window and
+  stops at the app's ordinary search width on a wide one.
   **`ui/ControlField` IS THE PART**, lifted out of the guide when the PO and
   invoice lists became the second and third callers. Reach for it; a caption
   typed four times is a caption that drifts. A row holding one wants
