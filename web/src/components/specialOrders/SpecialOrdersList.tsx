@@ -12,6 +12,7 @@ import { SpecialOrderActions } from "@/components/specialOrders/SpecialOrderActi
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
+import { SEARCH_PEN } from "@/components/ui/fieldMetrics";
 import { NewSpecialOrder } from "@/components/specialOrders/NewSpecialOrder";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { StickyFooter } from "@/components/ui/StickyFooter";
@@ -738,14 +739,14 @@ export function SpecialOrdersList({
           values={filters}
           onChange={changeFilters}
           leading={
-            <div className="space-y-1.5">
+            <div className={`${SEARCH_PEN} space-y-1.5`}>
               <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                 Search
               </span>
               <TextInput
                 value={search}
                 onValueChange={changeSearch}
-                className="w-56"
+                fullWidth
                 aria-label="Search special orders"
                 clearLabel="Clear the search"
                 icon={<SearchGlyph />}

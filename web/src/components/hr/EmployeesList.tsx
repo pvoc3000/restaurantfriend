@@ -373,7 +373,7 @@ export function EmployeesList({
             onValueChange={setSearch}
             aria-label="Search people"
             clearLabel="Clear the search"
-            className="w-72"
+            search
             icon={<SearchGlyph />}
           />
           <ControlField label="Location">
@@ -418,7 +418,8 @@ export function EmployeesList({
               fit
             />
           </ControlField>
-          <div className="ml-auto">
+          {/* `flex-1 justify-end`, not `ml-auto` — `SEARCH_PEN`'s reason. */}
+          <div className="flex flex-1 justify-end">
             <NewEmployee
               orgId={orgId}
               // The FULL set, not `shown` — the rehire check has to see the 417

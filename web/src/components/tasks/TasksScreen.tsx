@@ -471,7 +471,7 @@ export function TasksScreen({
           onValueChange={setSearch}
           aria-label="Search"
           clearLabel="Clear the search"
-          className="w-72"
+          search
           icon={<SearchGlyph />}
         />
         <ControlField label="Show">

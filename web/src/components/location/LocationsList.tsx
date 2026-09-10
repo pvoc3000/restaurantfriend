@@ -200,14 +200,12 @@ export function LocationsList({
           onValueChange={setSearch}
           aria-label="Search locations"
           clearLabel="Clear the search"
-          // h-9 and text-sm, like every other list's search box — without them
-          // the input takes the browser's default height and stands taller
-          // than the same field on Vendors, Inventory and the PO list.
-          className="w-72"
+          search
           icon={<SearchGlyph />}
         />
         {editable ? (
-          <div className="ml-auto">
+          // `flex-1 justify-end`, not `ml-auto` — `SEARCH_PEN`'s reason.
+          <div className="flex flex-1 justify-end">
             <NewLocation orgId={orgId} existingCodes={rows.map((r) => r.code)} />
           </div>
         ) : null}

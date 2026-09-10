@@ -179,7 +179,7 @@ export function CustomerPicker({
           aria-label="Find a customer"
           clearLabel="Clear the search"
           disabled={disabled}
-          className="w-full max-w-sm"
+          search
           icon={<SearchGlyph />}
         />
         <button

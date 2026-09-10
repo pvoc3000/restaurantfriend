@@ -397,7 +397,7 @@ export function PurchaseRequestsList({
           <TextInput
             value={search}
             onValueChange={changeSearch}
-            className="w-64"
+            search
             aria-label="Search purchase requests"
             clearLabel="Clear the search"
             icon={<SearchGlyph />}
@@ -418,7 +418,8 @@ export function PurchaseRequestsList({
             </span>
           ) : null}
           {canFile && (
-            <div className="ml-auto">
+            // `flex-1 justify-end`, not `ml-auto` — `SEARCH_PEN`'s reason.
+            <div className="flex flex-1 justify-end">
               <NewPurchaseRequest
                 orgId={orgId}
                 locationId={locationId}

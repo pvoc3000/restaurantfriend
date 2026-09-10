@@ -216,10 +216,12 @@ export function EquipmentList({
           onValueChange={setSearch}
           aria-label="Search equipment"
           clearLabel="Clear the search"
-          className="w-72"
+          search
           icon={<SearchGlyph />}
         />
-        {action ? <div className="ml-auto">{action}</div> : null}
+        {/* `flex-1 justify-end`, not `ml-auto` — an auto margin would take the
+            free space before the search could flex (`SEARCH_PEN`). */}
+        {action ? <div className="flex flex-1 justify-end">{action}</div> : null}
       </div>
 
       <DataTable

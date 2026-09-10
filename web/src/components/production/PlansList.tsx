@@ -556,7 +556,7 @@ export function PlansList({
           onValueChange={changeSearch}
           aria-label="Search plans"
           clearLabel="Clear the search"
-          className="w-64"
+          search
           icon={<SearchGlyph />}
         />
         <ControlField label="Show">

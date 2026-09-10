@@ -331,7 +331,7 @@ export function ShiftReportsList({
               onValueChange={setSearch}
               aria-label="Search the reports"
               clearLabel="Clear the search"
-              className="w-72"
+              search
               icon={<SearchGlyph />}
             />
             {/* A captioned PICKLIST rather than tabs (Mark, 2026-09-10), the

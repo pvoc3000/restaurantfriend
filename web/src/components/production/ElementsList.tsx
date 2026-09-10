@@ -9,6 +9,7 @@ import { ElementActions } from "@/components/production/ElementActions";
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
+import { SEARCH_PEN } from "@/components/ui/fieldMetrics";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
@@ -451,16 +452,14 @@ export function ElementsList({
           showCount={false}
           rowAction={action}
           leading={
-            <div className="space-y-1.5">
+            <div className={`${SEARCH_PEN} space-y-1.5`}>
               <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
                 Search
               </span>
               <TextInput
                 value={search}
                 onValueChange={changeSearch}
-                // w-56 rather than w-64 for the same measurement as the
-                // menus beside it: the bar has to hold on one line.
-                className="w-56"
+                fullWidth
                 aria-label="Search elements"
                 clearLabel="Clear the search"
                 icon={<SearchGlyph />}

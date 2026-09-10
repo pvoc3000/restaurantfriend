@@ -156,10 +156,7 @@ export function ChecklistTemplatesList({
           onValueChange={setSearch}
           aria-label="Search templates"
           clearLabel="Clear the search"
-          // w-56, not the usual w-72: with the view tabs now in this row the
-          // bar wants 1221px of a 1184px line at 1280 and the command wraps.
-          // `ElementsList` narrows its own for the same measurement.
-          className="w-56"
+          search
           icon={<SearchGlyph />}
         />
         <ControlField label="Kind">

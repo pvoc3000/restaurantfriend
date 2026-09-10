@@ -122,7 +122,7 @@ export function InventoryItemChooser({
         value={term}
         onValueChange={setTerm}
         clearLabel="Clear the search"
-        className="w-full"
+        search
         aria-label="Search inventory items"
         icon={<SearchGlyph />}
       />

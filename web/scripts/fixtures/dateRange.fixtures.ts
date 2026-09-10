@@ -1,9 +1,10 @@
 // `lib/dateRange` — the range picker's arithmetic and presets.
 //
-// Checked by BREAKING each rule: a Sunday-first week turns the grid and the
-// week presets red, a `slice(0,10)` on a local Date turns the month ends red
-// west of Greenwich, and dropping the round trip in `parseRangeParams` lets
-// February 31st through as a March window.
+// Checked by BREAKING each rule: a Monday-first GRID turns the calendar tests
+// red (the calendar is Sunday-first since 2026-09-10) while a Sunday-first
+// `weekStart` turns the week presets red, a `slice(0,10)` on a local Date turns
+// the month ends red west of Greenwich, and dropping the round trip in
+// `parseRangeParams` lets February 31st through as a March window.
 
 import { test, eq } from "./harness";
 import {
@@ -19,6 +20,8 @@ import {
   normalizeRange,
   parseRangeParams,
   RANGE_PRESETS,
+  sundayOnOrBefore,
+  WEEKDAY_LETTERS,
   weekStart,
 } from "../../src/lib/dateRange";
 
@@ -68,23 +71,36 @@ test("inRange is inclusive at both ends", () => {
 
 /* -- the grid ------------------------------------------------------------ */
 
-test("monthGrid is six Monday-first weeks covering the month", () => {
+test("sundayOnOrBefore", () => {
+  eq(sundayOnOrBefore(TUE), "2026-09-06");
+  eq(sundayOnOrBefore("2026-09-06"), "2026-09-06");
+  eq(sundayOnOrBefore("2026-09-12"), "2026-09-06");
+});
+
+test("monthGrid is six SUNDAY-first weeks covering the month", () => {
   const grid = monthGrid(TUE);
   eq(grid.length, 6);
   eq(grid[0].length, 7);
-  // September 2026 begins on a Tuesday, so the grid opens on Monday the 31st.
-  eq(grid[0][0], { iso: "2026-08-31", inMonth: false });
-  eq(grid[0][1], { iso: "2026-09-01", inMonth: true });
-  eq(grid[4][2], { iso: "2026-09-30", inMonth: true });
-  eq(grid[4][3], { iso: "2026-10-01", inMonth: false });
-  eq(grid[5][6], { iso: "2026-10-11", inMonth: false });
+  // September 2026 begins on a Tuesday, so the grid opens on Sunday the 30th.
+  eq(grid[0][0], { iso: "2026-08-30", inMonth: false });
+  eq(grid[0][2], { iso: "2026-09-01", inMonth: true });
+  eq(grid[4][3], { iso: "2026-09-30", inMonth: true });
+  eq(grid[4][4], { iso: "2026-10-01", inMonth: false });
+  eq(grid[5][6], { iso: "2026-10-10", inMonth: false });
 });
 
-test("a month that starts on a Monday still gets six rows", () => {
-  // June 2026 starts on a Monday.
-  const grid = monthGrid("2026-06-15");
-  eq(grid[0][0], { iso: "2026-06-01", inMonth: true });
+test("a month that starts on a Sunday still gets six rows, from its own 1st", () => {
+  // February 2026 starts on a Sunday.
+  const grid = monthGrid("2026-02-15");
+  eq(grid[0][0], { iso: "2026-02-01", inMonth: true });
   eq(grid.length, 6);
+});
+
+test("the calendar's letters match the grid, while the week presets stay Monday", () => {
+  eq(WEEKDAY_LETTERS[0], "S");
+  eq(WEEKDAY_LETTERS[1], "M");
+  // `weekStart` is untouched by the Sunday-first calendar (tested above).
+  eq(weekStart("2026-09-06"), "2026-08-31");
 });
 
 test("monthLabel", () => {

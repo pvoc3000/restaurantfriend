@@ -191,7 +191,9 @@ export function FilterMenus<T>({
             </div>
           );
         })}
-        {rowAction ? <div className="ml-auto">{rowAction}</div> : null}
+        {/* `flex-1 justify-end`, not `ml-auto`: an auto margin takes the row's
+            free space before a flexing search in `leading` can (`SEARCH_PEN`). */}
+        {rowAction ? <div className="flex flex-1 justify-end">{rowAction}</div> : null}
       </div>
 
       {/* Always stated, never only when filtered: "470 of 470" is a fact worth

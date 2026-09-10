@@ -437,7 +437,7 @@ export function AddPoLines({
                     onValueChange={setSearch}
                     aria-label="Search this vendor's items"
                     clearLabel="Clear the search"
-                    className="w-72"
+                    search
                     icon={<SearchGlyph />}
                   />
                   <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">

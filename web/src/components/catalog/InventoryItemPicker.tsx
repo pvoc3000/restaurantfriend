@@ -222,7 +222,7 @@ export function InventoryItemPicker({
         onValueChange={setTerm}
         aria-label="Search inventory items by name"
         clearLabel="Clear the search"
-        className={wide ? "w-full" : "w-80"}
+        search
         icon={<SearchGlyph />}
       />
       {canSearch && results.length === 0 && (

@@ -772,7 +772,7 @@ export function TimesheetsList({
           onValueChange={setSearch}
           aria-label="Search timesheets"
           clearLabel="Clear the search"
-          className="w-64"
+          search
           icon={<SearchGlyph />}
         />
 
@@ -817,7 +817,8 @@ export function TimesheetsList({
             control that vanishes can't be told from a feature that doesn't
             exist, and the filter row shouldn't change width as you page between
             periods. The reason is already in words directly below. */}
-        <div className="ml-auto flex items-center gap-3">
+        {/* `flex-1 justify-end`, not `ml-auto` — `SEARCH_PEN`'s reason. */}
+        <div className="flex flex-1 items-center justify-end gap-3">
           <NewTimesheet
             employees={employees}
             locations={locations}

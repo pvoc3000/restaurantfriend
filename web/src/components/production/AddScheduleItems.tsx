@@ -136,7 +136,7 @@ export function AddScheduleItems({
               value={term}
               onValueChange={setTerm}
               aria-label="Search items"
-              className="w-full"
+              search
               icon={<SearchGlyph />}
             />
           }

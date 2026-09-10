@@ -396,7 +396,7 @@ export function SchedulesList({
           value={term}
           onValueChange={setTerm}
           aria-label="Search schedules"
-          className="w-64"
+          search
           icon={<SearchGlyph />}
         />
         {/* Captioned PICKLISTS rather than tabs (Mark, 2026-09-10), the

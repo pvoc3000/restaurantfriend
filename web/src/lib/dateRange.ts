@@ -87,8 +87,19 @@ export function inRange(iso: string, range: DateRange): boolean {
 
 export type GridDay = { iso: string; inMonth: boolean };
 
+/** The Sunday on or before `iso` — the first cell of a calendar row. */
+export function sundayOnOrBefore(iso: string): string {
+  return daysBefore(iso, isoWeekdayOf(iso) % 7);
+}
+
 /**
- * Six weeks of seven days, Monday first, covering `monthIso`'s month.
+ * Six weeks of seven days, SUNDAY first, covering `monthIso`'s month.
+ *
+ * SUNDAY FIRST ON THE CALENDAR ONLY (Mark, 2026-09-10: "make the week go
+ * Sunday through Saturday instead of Monday through Sunday"). That is how a
+ * wall calendar reads here, and the grid is a picture of the month rather than
+ * a statement about the business week. `weekStart` — which the "This week" and
+ * "Previous week" presets rest on — stays Monday, the schema's ISO convention.
  *
  * ALWAYS six rows, so the panel is the same height whichever month is showing
  * — a calendar that grows a row when you press › moves the preset buttons
@@ -98,7 +109,7 @@ export type GridDay = { iso: string; inMonth: boolean };
 export function monthGrid(monthIso: string): GridDay[][] {
   const first = monthStart(monthIso);
   const month = first.slice(0, 7);
-  let cursor = weekStart(first);
+  let cursor = sundayOnOrBefore(first);
   const weeks: GridDay[][] = [];
   for (let w = 0; w < 6; w += 1) {
     const week: GridDay[] = [];
@@ -111,7 +122,8 @@ export function monthGrid(monthIso: string): GridDay[][] {
   return weeks;
 }
 
-export const WEEKDAY_LETTERS = ["M", "T", "W", "T", "F", "S", "S"] as const;
+/** The calendar's column heads, Sunday first — `monthGrid`'s order. */
+export const WEEKDAY_LETTERS = ["S", "M", "T", "W", "T", "F", "S"] as const;
 
 const MONTH_NAMES = [
   "January",

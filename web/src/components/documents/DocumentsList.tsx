@@ -176,7 +176,7 @@ export function DocumentsList({ rows, action }: { rows: DocumentRow[]; action?: 
           value={q}
           onValueChange={setQ}
           aria-label="Search documents"
-          className="w-72"
+          search
           icon={<SearchGlyph />}
         />
         <ControlField label="Category">

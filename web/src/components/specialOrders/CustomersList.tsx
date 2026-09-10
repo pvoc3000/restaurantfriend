@@ -7,6 +7,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
+import { SEARCH_PEN } from "@/components/ui/fieldMetrics";
 import { NewCustomer } from "@/components/specialOrders/NewCustomer";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { withFrom } from "@/lib/breadcrumbs";
@@ -238,14 +239,14 @@ export function CustomersList({
         // `PageHeading` states the count now — see `showCount`.
         showCount={false}
         leading={
-          <div className="space-y-1.5">
+          <div className={`${SEARCH_PEN} space-y-1.5`}>
             <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
               Search
             </span>
             <TextInput
               value={search}
               onValueChange={changeSearch}
-              className="w-64"
+              fullWidth
               aria-label="Search customers"
               clearLabel="Clear the search"
               icon={<SearchGlyph />}

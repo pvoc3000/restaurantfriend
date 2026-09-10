@@ -63,7 +63,7 @@ export function ListFilters({
           onValueChange={onTerm}
           aria-label={placeholder}
           clearLabel="Clear the search"
-          className="w-72"
+          search
           icon={<SearchGlyph />}
         />
 

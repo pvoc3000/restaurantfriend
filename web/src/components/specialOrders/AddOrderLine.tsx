@@ -8,6 +8,7 @@ import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
+import { SEARCH_PEN } from "@/components/ui/fieldMetrics";
 import { money } from "@/lib/specialOrders";
 import type { OrderLineRow } from "./OrderLines";
 
@@ -185,7 +186,7 @@ export function AddOrderLine({
   return (
     <div className="space-y-3 border border-hairline p-4">
       <div className="flex flex-wrap items-end gap-3">
-        <div className="space-y-1.5">
+        <div className={`${SEARCH_PEN} space-y-1.5`}>
           <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
             Find an item
           </span>
@@ -194,7 +195,7 @@ export function AddOrderLine({
             onValueChange={setSearch}
             aria-label="Find a production item"
             clearLabel="Clear the search"
-            className="w-72"
+            fullWidth
             autoFocus
             icon={<SearchGlyph />}
           />

@@ -226,11 +226,12 @@ export function ShopSectionsTable({
           onValueChange={setSearch}
           aria-label="Search shop sections"
           clearLabel="Clear the search"
-          className="w-72"
+          search
           icon={<SearchGlyph />}
         />
         {editable ? (
-          <div className="ml-auto">
+          // `flex-1 justify-end`, not `ml-auto` — `SEARCH_PEN`'s reason.
+          <div className="flex flex-1 justify-end">
             <AddShopSection orgId={orgId} locationId={locationId} areas={areas} />
           </div>
         ) : null}

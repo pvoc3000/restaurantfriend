@@ -219,7 +219,7 @@ export function LinkCustomer({
             onValueChange={setTerm}
             aria-label="Find a customer by name, company, email or phone"
             clearLabel="Clear the search"
-            className="w-80"
+            search
             icon={<SearchGlyph />}
           />
 

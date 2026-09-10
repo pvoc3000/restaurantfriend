@@ -315,7 +315,7 @@ export function TagsList({
           onValueChange={setSearch}
           aria-label="Search tags"
           clearLabel="Clear the search"
-          className="w-72"
+          search
           icon={<SearchGlyph />}
         />
         {/* A PICKLIST RATHER THAN TABS (Mark, 2026-09-10), the purchasing

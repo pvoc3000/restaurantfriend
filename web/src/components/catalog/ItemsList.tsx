@@ -407,7 +407,7 @@ export function ItemsList({
           onValueChange={(q) => update({ q })}
           aria-label="Search name or category"
           clearLabel="Clear the search"
-          className="w-72"
+          search
           icon={<SearchGlyph />}
         />
         {/* Last ordered, as a range over the date rather than the four age
@@ -445,7 +445,8 @@ export function ItemsList({
           options={ACTIVE_TABS}
         />
         {editable ? (
-          <div className="ml-auto">
+          // `flex-1 justify-end`, not `ml-auto` — `SEARCH_PEN`'s reason.
+          <div className="flex flex-1 justify-end">
             <NewInventoryItem
               orgId={orgId}
               categories={categories}

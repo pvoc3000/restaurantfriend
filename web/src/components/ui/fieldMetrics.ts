@@ -163,3 +163,26 @@ export const FORM_FIELD_DRESS =
  * across all of them, which is what makes it a constant rather than a pattern.
  */
 export const FORM_TEXTAREA = `w-full ${FORM_FIELD_DRESS} text-sm`;
+
+/**
+ * EVERY SEARCH BOX FLEXES, BETWEEN 13rem AND 18rem (Mark, 2026-09-10: "make all
+ * the search bars flex with that max width"). It takes the leftover of whatever
+ * row it stands in, so a filter row holds on one line on a narrower window, and
+ * stops at 288px — the width every search box had when they were fixed — so a
+ * wide window never gets a box longer than any term anybody types.
+ *
+ * `TextInput search` applies it to the field's own wrapper. Where the search
+ * sits inside a caption block (`FilterMenus`' `leading`), the BLOCK is the flex
+ * item, so it wears this and the input takes `fullWidth`.
+ *
+ * AN `ml-auto` SIBLING STARVES IT: an auto margin absorbs a line's free space
+ * before any flex-grow, leaving the search at its 13rem floor. A command pushed
+ * right beside a search goes in `flex flex-1 justify-end` instead.
+ *
+ * GROW 999, NOT 1, so the search fills to its ceiling BEFORE that command
+ * wrapper takes anything. At equal weights the two split the row's free space
+ * and the wrapper took half of what the search wanted — measured on /items. Once
+ * the search hits 18rem it freezes and the leftover goes to the wrapper, which is
+ * what pushes the command to the right edge.
+ */
+export const SEARCH_PEN = "min-w-[13rem] max-w-[18rem] flex-[999_1_0%]";

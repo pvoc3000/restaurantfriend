@@ -320,7 +320,7 @@ export function RecipesList({
         <TextInput
           value={search}
           onValueChange={changeSearch}
-          className="w-64"
+          search
           aria-label="Search recipes"
           clearLabel="Clear the search"
           icon={<SearchGlyph />}

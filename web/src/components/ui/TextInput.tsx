@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { SEARCH_PEN } from "@/components/ui/fieldMetrics";
 
 /**
  * The standard boxed text field — and the only one with a CLEAR button (Mark,
@@ -57,11 +58,18 @@ export function TextInput({
   onValueChange,
   clearLabel = "Clear this field",
   fullWidth = false,
+  search = false,
   size = "md",
   className = "",
   icon,
   ...rest
 }: Omit<React.ComponentProps<"input">, "value" | "onChange" | "className" | "size"> & {
+  /**
+   * A SEARCH BOX's width: flex to fill the row between 13rem and 18rem
+   * (`SEARCH_PEN`, Mark, 2026-09-10). Replaces a width class — pass this and
+   * no `className` width.
+   */
+  search?: boolean;
   value: string;
   /** Called for typing AND for the clear button, which passes "". */
   onValueChange: (next: string) => void;
@@ -125,7 +133,9 @@ export function TextInput({
     // at the ✕ itself doesn't count as leaving the field and unmount the thing
     // you are reaching for.
     <span
-      className={`relative ${fullWidth ? "flex w-full" : "inline-flex"}`}
+      className={`relative ${
+        search ? `flex ${SEARCH_PEN}` : fullWidth ? "flex w-full" : "inline-flex"
+      }`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
@@ -142,7 +152,7 @@ export function TextInput({
         // Before `${className}`, so a caller can still override.
         className={`border border-ink bg-white pl-3 pr-9 outline-none focus:border-2 ${
           SIZE_CLASS[size]
-        } ${fullWidth ? "w-full" : ""} ${className}`}
+        } ${fullWidth || search ? "w-full" : ""} ${className}`}
         {...rest}
       />
       {icon && value === "" && (
