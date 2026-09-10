@@ -9,7 +9,7 @@ import {
   vendorFilterOptions,
 } from "@/lib/vendorFilter";
 import { TextInput } from "@/components/ui/TextInput";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
 import { PickSet } from "@/components/ui/PickSet";
 import { RangePicker } from "@/components/ui/RangePicker";
 import type { DateRange } from "@/lib/dateRange";
@@ -859,10 +859,26 @@ export function PurchaseOrderList({
    * Open sits second because it's the working list — everything after it is a
    * way of narrowing that, and All is the archive.
    */
+  /**
+   * The two roll-ups, then whichever raw statuses are worth offering.
+   *
+   * An empty raw status is DROPPED — "Draft 0" says only that nothing is in
+   * that state right now, where "Open 0" says nothing is outstanding, which is
+   * the answer you came for — EXCEPT the one you are currently filtered to.
+   * That one is always here (2026-09-10), because the control has to be able
+   * to say what the list is showing: narrow the window until your chosen
+   * status has no orders and the option would otherwise vanish, leaving
+   * `PickList` to fall back to the raw column value and render a lowercase
+   * "received". With it kept, the trigger reads "Received" and the list reads
+   * "Received 0", which is the true and useful sentence — you filtered to
+   * Received and this window holds none.
+   */
   const statusTabs: StatusFilter[] = [
     "all",
     "open",
-    ...PO_STATUS_ORDER.filter((s) => (statusCounts[s] ?? 0) > 0),
+    ...PO_STATUS_ORDER.filter(
+      (s) => (statusCounts[s] ?? 0) > 0 || s === filters.status
+    ),
   ];
 
   return (
@@ -926,25 +942,45 @@ export function PurchaseOrderList({
           minWidth={240}
         />
 
-        <TabPicker
+        {/* A LIST RATHER THAN A ROW OF TABS (Mark, 2026-09-10), which is the
+            conversion `/invoices` made for its Due tabs and the order guide
+            made for its tier and grouping. Same reason each time: a tab row
+            spends its width whether or not you are looking at it, and this row
+            already carries a search box, a range and a vendor set.
+
+            THE COUNTS RIDE AS HINTS, which is where the tabs carried them.
+            What it costs is the count of the status you are ON at rest; what
+            it buys is that all of them are still one tap away.
+
+            NO FIND BOX, which needs no asking for: `PickList` grows one past
+            eight options or with `allowNew`, and `statusTabs` is at most seven
+            — the two roll-ups plus whichever raw statuses are non-empty.
+
+            AND THE CHOSEN STATUS IS ALWAYS IN THE LIST — see `statusTabs`,
+            where keeping it is what makes the trigger read "Received" rather
+            than the raw column value on a window that holds none. */}
+        <PickList
           ariaLabel="Status"
+          variant="field"
           value={filters.status}
-          onChange={(status) => update({ status })}
+          onPick={(status) => update({ status: status as StatusFilter })}
           options={statusTabs.map((s) => ({
-            key: s,
+            value: s,
             label:
               s === "all"
                 ? "All"
                 : s === "open"
                   ? "Open"
                   : PO_STATUS_LABEL[s as PoStatus],
-            count:
+            hint: String(
               s === "all"
                 ? orders.length
                 : s === "open"
                   ? openCount
-                  : statusCounts[s] ?? 0,
+                  : statusCounts[s] ?? 0
+            ),
           }))}
+          className="w-40"
         />
       </div>
 
