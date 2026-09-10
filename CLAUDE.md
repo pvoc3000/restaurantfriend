@@ -10621,6 +10621,55 @@ weekday column, and 003 then silently made it per-vendor-item.
   scroll and stopped the panel closing at all, which is the case the listener
   exists for. Test BOTH halves after touching this; each one hides the other's
   failure.
+  **AND SINCE 2026-09-10 THE SCROLL RULE REALLY MEASURES MOVEMENT** (Mark:
+  picklists "are finicky on tablets… out of 10 taps, 8 times the keyboard won't
+  display"). Testing the event TARGET is a proxy — right about a pane, wrong
+  about iOS, where **`window.scrollY` tracks the VISUAL viewport**, so pinching,
+  or Safari zooming to a focused field, or the keyboard sliding up to reveal it,
+  all fire a page scroll while nothing in the layout has moved an inch. The
+  panel closed on its own keyboard, taking the field being focused with it. It
+  re-reads the trigger now and closes only if that has really moved:
+  `getBoundingClientRect` is in LAYOUT viewport coordinates and so is
+  indifferent to zoom, which is exactly the discrimination needed. Deliberate
+  consequence — **a `position: fixed` trigger's panel no longer closes on a page
+  scroll**, because the trigger genuinely has not moved (the masthead's picker,
+  verified still glued at its 2px offset). `resize` is deliberately NOT given
+  the same test: a window that changes SHAPE moves the edges the fitting pass
+  measured against, and that pass observes only the panel, so closing is the
+  honest answer — safe on iPad, where a Safari tab's keyboard resizes the visual
+  viewport and fires no window resize at all. Revisit if this app is ever added
+  to the Home Screen, where a standalone window IS resized by the keyboard.
+  **THE FIND BOX IS 16px, AND THAT IS THE THRESHOLD RATHER THAN A SIZE.** Below
+  it iOS Safari zooms the whole page when a field takes focus — the rule this
+  file states for the inquiry form, the shift report and the checklist runner,
+  and the one input that had missed it, because it is the only field the app
+  CREATES rather than lays out and because **`PickList`'s `size="lg"` dresses
+  the TRIGGER and never reaches the panel**. 16 everywhere rather than only on
+  `lg`: the tablet shell reuses the desk lists as they are, so a `md` picklist
+  on `/vendors` is read on the iPad as often as anything built for it.
+  **AND THE PANEL OPENS INSIDE THE TAP — `flushSync`, in both `PickList` and
+  `PickSet`.** WebKit raises the software keyboard for a programmatic `focus()`
+  only while it is PROCESSING A USER GESTURE, and that flag lives on the
+  event-dispatch call stack — where **React 18/19 flush discrete updates in a
+  MICROTASK**, after the handler has returned. So `autoFocus` gave the find box
+  focus and a caret and no keyboard. It is worse here than for an ordinary field
+  because the panel mounts on a SECOND render: `useAnchoredPanel` has to measure
+  the trigger before the caller may draw anything. `flushSync` puts the render,
+  the commit, the measuring layout effect and the re-render it schedules all
+  inside the handler's own stack; the explicit `focus()` after it is insurance,
+  not the mechanism.
+  **The probe is one line and it is decisive: `t.click()` then read
+  `document.activeElement` SYNCHRONOUSLY.** After the change it is the find box;
+  with the old open path it is `BODY`. Nothing else in the app needs this —
+  every other `autoFocus` opens a dialog or an inline editor the reader then
+  taps into — but reach for it for any control that must raise a keyboard from a
+  tap.
+  **Harness note:** the pane lands on the shared-device PIN lock (097), so all
+  of this was measured on a standalone page mounting the REAL components,
+  bundled with `npx esbuild` against `tsconfig.json` (entry inside `web/`, or
+  node_modules will not resolve) and linked to the dev server's own compiled
+  stylesheet — without it every Tailwind class is inert and a 14px find box
+  measures a passing 16.
   **An anchored panel is `z-[70]` — above everything, dialogs included.** It
   was `z-50`, chosen to clear the ActionBar, and that held until a `PickList`
   appeared INSIDE a `ui/Dialog` (`z-[60]`): the invite panel's role picker
