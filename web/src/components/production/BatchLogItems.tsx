@@ -304,14 +304,16 @@ export function BatchLogItems({
                 the tablet's taller rows four tabs are 164px, which is more than
                 a short pane holds, and a column that cannot scroll paints its
                 last tab over the pane's own border. */}
-            <div className={`min-h-0 shrink-0 overflow-y-auto ${touch ? "w-36" : "w-28"}`}>
+            <div className="min-h-0 w-28 shrink-0 overflow-y-auto">
               <SectionNav
                 items={PANE_SECTIONS}
                 value={pane}
                 onSelect={setPane}
                 ariaLabel="What to show about this batch"
-                // Wide enough for INSTRUCTIONS on one line at either size (Mark,
-                // 2026-09-09: "give more width or padding to the tabs").
+                // 112px — INSTRUCTIONS at 12px small caps is ~100, so one
+                // column width holds the tabs at either size; the tablet's
+                // wider 144 went back to the content once the type came down
+                // to 12 (Mark, 2026-09-09, both asks).
                 size={touch ? "lg" : "md"}
               />
             </div>
