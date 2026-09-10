@@ -11046,17 +11046,34 @@ weekday column, and 003 then silently made it per-vendor-item.
   four never has one. Reach for this when a control band is over-full, NOT as a
   general preference — the TabPicker is still the default.
   **AND A COLLAPSED PICKER NEEDS ITS CAPTION — every one of them** (Mark,
-  2026-09-10, the day after: "put labels above the picklists"). This shipped
-  with a caption on Group by alone, on the argument that a picker's own face
-  names what it is set to and only that one's did not. Right about Group by,
-  wrong to stop there: at rest the guide's three read "Favorites", "All
-  vendors" and "Shop section", three VALUES of three different dimensions with
+  2026-09-10, the day after: "put labels above the picklists", then "caption
+  the filter row elements like we did the order guide" for both purchasing
+  lists). The guide shipped with a caption on Group by alone, on the argument
+  that a picker's own face names what it is set to and only that one's did not.
+  Right about Group by, wrong to stop there: at rest the guide's three read
+  "Favorites", "All vendors" and "Shop section", and the PO row's read "All
+  time", "All vendors", "All" — three VALUES of three different dimensions with
   nothing saying which is which, where a TabPicker had at least shown its whole
   vocabulary. **The caption is what a collapsed control gives up, so it is what
   a collapsed control has to state.** Above rather than beside — `/items`'
   Last-ordered rule — and VISUAL only, each control keeping its own longer
-  `ariaLabel` so nothing is announced twice. One shared stack per band
-  (`ControlField` on the guide), because a caption typed four times drifts.
+  `ariaLabel` so nothing is announced twice.
+  **`ui/ControlField` IS THE PART**, lifted out of the guide when the PO and
+  invoice lists became the second and third callers. Reach for it; a caption
+  typed four times is a caption that drifts. A row holding one wants
+  `items-end`, so an UNCAPTIONED control — a search box, a command — sits on
+  the line of the fields rather than floating against their captions. A
+  `TabPicker` in such a row gets one too, though it does not need it:
+  three captioned fields and a bare fourth reads as an oversight, and
+  `/items` has captioned a TabPicker since 2026-08-01.
+  **A `RangePicker`'S FACE CARRIES A TWO-DIGIT YEAR** (Mark, 2026-09-10) —
+  `formatRange`'s own private `usDate`, one slice, and **NOT
+  `lib/specialOrderDocs`' `usDate`**, which a quote and an invoice PRINT and
+  which keeps four digits. Safe on a filter, read beside a list whose date
+  column carries the full year and never transcribed. Its cell went 256px →
+  **`w-52`**, measured: 192 clipped "09/01/26 – 09/10/26" by 11px, because the
+  trigger gives 16px back to the clear button and the face `truncate`s in
+  silence.
   **THE FLEXIBLE CONTROL IS WHAT MAKES A SINGLE ROW A RULE** rather than a
   hope. A band's pickers are as wide as their vocabularies and its switches as
   wide as their words; the SEARCH BOX is the only thing in it with no natural
@@ -11068,7 +11085,17 @@ weekday column, and 003 then silently made it per-vendor-item.
   search sits on the line of captioned fields.
   Measured on the guide: one row at 1440 / 1280 / 1024 / 820 / 768 with the
   search giving up 885 → 725 → 469 → 265 → 213px, all bottoms on one pixel, no
-  overflow. **A 13rem floor rather than 15 is what buys 768.**
+  overflow. **A 13rem floor rather than 15 is what buys 768.** On the PO list,
+  one row at 1440 / 1280 / 1024 / **820, the portrait iPad**, 853 → 233px; it
+  wraps at 768 and a lower floor does not rescue it (524px of fields and gaps
+  in a 705px row once the scrollbar is counted).
+  **THE ONE THING THAT DEFEATS IT IS AN `ml-auto` SIBLING**: an auto margin
+  absorbs a flex line's free space BEFORE any flex-grow does, so a `flex-1`
+  search and a right-pinned command cluster cannot both work. `/invoices` keeps
+  the `ml-auto` and a fixed search for exactly that reason — its Status
+  `TabPicker` is 478px, so that row wraps at any width and the cluster needs
+  the margin to reach the right edge. Where the row DOES fit, drop the
+  `ml-auto`: the last item's right edge is already the row's.
   **THE PO LIST'S STATUS went 697px → 160**, and its row's content 1365 → 828
   at 1440 — where 1365 was one pixel inside the 1376 a 1440 window gives, so
   the row fitted on the widest screen in the building and nowhere else.
