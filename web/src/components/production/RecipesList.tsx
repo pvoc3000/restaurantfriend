@@ -312,6 +312,7 @@ export function RecipesList({
         visible={visible.length}
         total={rows.length}
         noun="recipes"
+        action={action}
       />
 
       {/* Its own filter row, above the table — `PlansList`'s change and reason. */}
@@ -338,7 +339,6 @@ export function RecipesList({
             fit
           />
         </ControlField>
-        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
     <DataTable
       rows={sorted}

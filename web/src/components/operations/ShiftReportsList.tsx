@@ -286,6 +286,20 @@ export function ShiftReportsList({
         visible={visible.length}
         total={rows.length}
         noun="shift reports"
+        action={
+          <NewShiftReport
+            orgId={orgId}
+            locationId={locationId}
+            locationCode={locationCode}
+            today={today}
+            myEmployeeId={myEmployeeId}
+            existing={rows.map((r) => ({
+              date: r.reportDate,
+              shift: r.shift,
+              status: r.status,
+            }))}
+          />
+        }
       />
 
       {failed ? <p className="text-sm text-accent">{failed}</p> : null}
@@ -309,8 +323,8 @@ export function ShiftReportsList({
         }
         leading={
           <div className="space-y-3">
-          {/* SEARCH FIRST, then the tiers, then the command — the order every
-              other list uses (Mark, 2026-09-03). */}
+          {/* SEARCH FIRST, then the tiers — the order every other list uses
+              (Mark, 2026-09-03). The command is in the title row (2026-09-10). */}
           <div className="flex flex-wrap items-end gap-3">
             <TextInput
               value={search}
@@ -337,20 +351,6 @@ export function ShiftReportsList({
                 fit
               />
             </ControlField>
-            <div className="ml-auto">
-              <NewShiftReport
-                orgId={orgId}
-                locationId={locationId}
-                locationCode={locationCode}
-                today={today}
-                myEmployeeId={myEmployeeId}
-                existing={rows.map((r) => ({
-                  date: r.reportDate,
-                  shift: r.shift,
-                  status: r.status,
-                }))}
-              />
-            </div>
           </div>
           {/* UNDER THE TABS, NOT OVER THEM (Mark, 2026-09-03), and ON EVERY
               TIER since the Needs-attention tab went (2026-09-09).

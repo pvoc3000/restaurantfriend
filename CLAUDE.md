@@ -9729,6 +9729,13 @@ weekday column, and 003 then silently made it per-vendor-item.
   genuinely cannot reach it (`/checklists`, whose filters sit below the view
   tabs; `/benefits`, `/prices`, `/timesheets`, `/sales`, which do not filter at
   that level), `visible` is omitted and the line states the total alone.
+  **SUPERSEDED 2026-09-10 FOR TEN SCREENS (Mark): "move the action buttons in
+  the filter row … to the identity row."** Shift reports, tags, documents,
+  checklists, tasks (and maintenance), plans, schedules, recipes, batch logs and
+  vendors now pass their create command as `PageHeading`'s `action`, bottom-
+  aligned with the count line, and their filter rows hold filters only (the
+  tags and batch-log command strips are gone too). The paragraph below still
+  describes every other list; a NEW list follows the title-row form.
   **THE HEADER CARRIES NO COMMAND. THE CREATE BUTTON GOES IN THE FILTER ROW,
   RIGHT-ALIGNED** (Mark, 2026-09-03: they "are all over the place. Sometimes in
   the header area, sometimes lined up with the filter tabpicker objects,

@@ -33,11 +33,9 @@ import { NewChecklistTemplate } from "./NewChecklistTemplate";
  * bookmark and come back to; the `onChange` is the same navigation for a plain
  * click. The DEFAULT writes no parameter, so `/checklists` stays canonical.
  *
- * THE COMMAND SITS IN THE LIST'S OWN CONTROL ROW, right-aligned (Mark,
- * 2026-09-03, reversing his 2026-08-30 call that it belonged beside the title).
- * It is still the VIEW's own command rather than the screen's — Start a walk on
- * one tab, New template on the other — so it is handed to whichever list is
- * rendered rather than living up here.
+ * THE COMMAND SITS IN THE TITLE ROW (Mark, 2026-09-10, reversing 2026-09-03's
+ * move into the filter row). It is still the VIEW's own command — Start a walk
+ * on one view, New template on the other — so it follows `view`.
  *
  * There IS a one-line description under the heading again (Mark, 2026-09-03) —
  * what the screen is for, in a sentence, rather than the paragraph explaining
@@ -99,6 +97,24 @@ export function ChecklistsScreen({
         code={locationCode}
         total={view === "walks" ? runs.length : templates.length}
         noun={view === "walks" ? "checklists" : "templates"}
+        action={
+          view === "walks"
+            ? canWalk && (
+                <StartWalk
+                  templates={startable}
+                  today={today}
+                  orgId={orgId}
+                  locationId={locationId}
+                />
+              )
+            : canEdit && (
+                <NewChecklistTemplate
+                  orgId={orgId}
+                  locationId={locationId}
+                  locationCode={locationCode}
+                />
+              )
+        }
       />
 
       {view === "walks" ? (
@@ -107,16 +123,6 @@ export function ChecklistsScreen({
           startable={startable}
           locationCode={locationCode}
           viewTabs={viewTabs}
-          action={
-            canWalk && (
-              <StartWalk
-                templates={startable}
-                today={today}
-                orgId={orgId}
-                locationId={locationId}
-              />
-            )
-          }
         />
       ) : (
         <ChecklistTemplatesList
@@ -124,15 +130,6 @@ export function ChecklistsScreen({
           locationCode={locationCode}
           editable={canEdit}
           viewTabs={viewTabs}
-          action={
-            canEdit && (
-              <NewChecklistTemplate
-                orgId={orgId}
-                locationId={locationId}
-                locationCode={locationCode}
-              />
-            )
-          }
         />
       )}
     </div>

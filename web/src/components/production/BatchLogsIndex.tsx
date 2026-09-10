@@ -283,17 +283,8 @@ export function BatchLogsIndex({
         visible={visible.length}
         total={rows.length}
         noun="logs"
+        action={action}
       />
-
-      {/* THE COMMAND STRIP, above the filter row and right-aligned — the
-          invoice list's arrangement (Mark, 2026-09-10). `justify-end` on the
-          row rather than `ml-auto` on the button, and the inner group keeps the
-          command content-sized. */}
-      {action ? (
-        <div className="flex justify-end">
-          <div className="flex flex-wrap items-center gap-3">{action}</div>
-        </div>
-      ) : null}
 
       {/* THE FILTER ROW, left-aligned: search · window · show · group by.
           The two TabPickers became captioned `PickList`s (Mark, 2026-09-10),

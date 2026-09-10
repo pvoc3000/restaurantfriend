@@ -385,6 +385,7 @@ export function SchedulesList({
         visible={visible.length}
         total={rows.length}
         noun="schedules"
+        action={action}
       />
 
       {/* Its own filter row, above the table — `PlansList`'s change and for its
@@ -431,7 +432,6 @@ export function SchedulesList({
             fit
           />
         </ControlField>
-        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
       <DataTable

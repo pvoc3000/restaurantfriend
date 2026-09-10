@@ -539,6 +539,7 @@ export function PlansList({
         visible={visible.length}
         total={rows.length}
         noun="plans"
+        action={action}
       />
 
       {failed ? <p className="mb-3 text-[13px] text-accent">{failed}</p> : null}
@@ -572,7 +573,6 @@ export function PlansList({
             fit
           />
         </ControlField>
-        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
     <DataTable

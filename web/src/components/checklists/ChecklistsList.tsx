@@ -45,20 +45,12 @@ export function ChecklistsList({
   rows,
   startable,
   locationCode,
-  action,
   viewTabs,
   heading,
 }: {
   rows: RunRow[];
   startable: StartableTemplate[];
   locationCode: string;
-  /**
-   * The screen's create command, right-aligned at the end of this row (Mark,
-   * 2026-09-03, moving it down out of the title row). A NODE rather than a
-   * flag: only the page knows which command this list is for, and what it may
-   * pass it.
-   */
-  action?: ReactNode;
   /**
    * The screen's view tabs (Checklists | Templates), rendered as the FIRST cell
    * of this row (Mark, 2026-09-03) — they used to sit on a line of their own
@@ -218,7 +210,6 @@ export function ChecklistsList({
             fit
           />
         </ControlField>
-        {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
       <DataTable

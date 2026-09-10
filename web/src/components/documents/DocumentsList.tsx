@@ -163,7 +163,13 @@ export function DocumentsList({ rows, action }: { rows: DocumentRow[]; action?: 
 
   return (
     <div className="space-y-6">
-      <PageHeading title="Documents" total={rows.length} visible={sorted.length} noun="documents" />
+      <PageHeading
+        title="Documents"
+        total={rows.length}
+        visible={sorted.length}
+        noun="documents"
+        action={action}
+      />
       <p className="text-sm text-muted">The forms, checklists, signs and manuals the shops print.</p>
       <div className="flex flex-wrap items-end gap-3">
         <TextInput
@@ -183,7 +189,6 @@ export function DocumentsList({ rows, action }: { rows: DocumentRow[]; action?: 
             fit
           />
         </ControlField>
-        {action}
       </div>
       <DataTable
         rows={sorted}

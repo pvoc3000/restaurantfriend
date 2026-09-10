@@ -19,6 +19,7 @@ import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { ControlField } from "@/components/ui/ControlField";
+import { PageHeading } from "@/components/ui/PageHeading";
 import { NewVendor } from "./NewVendor";
 import { PickList } from "@/components/ui/PickList";
 import type { VendorRow } from "@/app/(app)/vendors/page";
@@ -269,15 +270,18 @@ export function VendorsList({
 
   return (
     <div className="space-y-4">
-      {/* `PurchaseOrderList`'s header, which is the module's model (Mark,
-          2026-09-03): the count sits UNDER the title and leads with the shop. */}
-      <div>
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">Vendors</h1>
-        <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
-          {activeLocationCode ? `${activeLocationCode} · ` : ""}
-          {visible.length} of {vendors.length} vendors
-        </p>
-      </div>
+      <PageHeading
+        title="Vendors"
+        code={activeLocationCode}
+        visible={visible.length}
+        total={vendors.length}
+        noun="vendors"
+        action={
+          editable ? (
+            <NewVendor orgId={orgId} types={types} existingNames={vendors.map((v) => v.name)} />
+          ) : null
+        }
+      />
 
       <div className="flex flex-wrap items-end gap-2">
         <TextInput
@@ -318,11 +322,6 @@ export function VendorsList({
             fit
           />
         </ControlField>
-        {editable ? (
-          <div className="ml-auto">
-            <NewVendor orgId={orgId} types={types} existingNames={vendors.map((v) => v.name)} />
-          </div>
-        ) : null}
       </div>
 
       <DataTable
