@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { homeHref } from "@/lib/nav";
 import { getAppSession } from "@/lib/session";
+import { TABLET_HOME } from "@/lib/shell";
 
 /**
  * THE APP LANDS ON THE LOCATIONS LIST (Mark, 2026-08-20: "can you make the
@@ -29,8 +30,12 @@ import { getAppSession } from "@/lib/session";
  * list from staff, supervisors and purchasers, so for them `/` lands on the
  * first screen their menu offers instead of on a refusal. `homeHref` is the
  * rule, beside the menu it reads.
+ *
+ * UNDER THE TABLET SHELL (2026-09-09) home is `/start`, the landing page of
+ * actions — there is no menu to offer a first screen, so the first question
+ * becomes "what do you need to do", and the working shop sits in the bar.
  */
 export default async function HomePage() {
   const session = await getAppSession();
-  redirect(homeHref(session.membership.role));
+  redirect(session.shell === "tablet" ? TABLET_HOME : homeHref(session.membership.role));
 }

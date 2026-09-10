@@ -5,6 +5,8 @@ import { IdleLock } from "@/components/IdleLock";
 import { InactiveLocationGate } from "@/components/InactiveLocationGate";
 import { PageAccessGate } from "@/components/PageAccessGate";
 import { ScrollMemory } from "@/components/ScrollMemory";
+import { ShellProvider } from "@/components/ShellProvider";
+import { TabletBar } from "@/components/tablet/TabletBar";
 import { getAppSession } from "@/lib/session";
 
 // Everything inside the (app) route group is signed-in + location-scoped.
@@ -26,7 +28,22 @@ export default async function AppLayout({
     // whole shell because the questions are asked from the masthead's drawers
     // as well as from the page.
     <ConfirmProvider>
-      <AppHeader session={session} />
+      <ShellProvider shell={session.shell}>
+      {/* TWO SHELLS OVER ONE ROUTE TREE (Mark, 2026-09-09). The desk gets the
+          masthead and its two-tier menu; a tablet gets one black bar and a
+          landing page of actions (`/start`). `session.shell` decides — the
+          `rf.shell` cookie, defaulting to tablet on a registered shared iPad.
+          Both publish `--rf-header-h`, so every sticky table head below is
+          right under either. */}
+      {session.shell === "tablet" ? (
+        <TabletBar
+          locations={session.workableLocations}
+          working={session.activeLocation}
+          registeredDevice={session.registeredDevice}
+        />
+      ) : (
+        <AppHeader session={session} />
+      )}
       {/* The page gutter. 48px on a desk, 16px below 1280 — an iPad portrait
           window has no 96px to spare, and the order guide's row is the widest
           thing in the app (Mark, 2026-07-29: "we should be designing responsive
@@ -64,6 +81,7 @@ export default async function AppLayout({
           minutes idle. Nothing on a desk browser — the session only says
           `registeredDevice` when the device cookie is present. */}
       {session.registeredDevice && <IdleLock />}
+      </ShellProvider>
     </ConfirmProvider>
   );
 }

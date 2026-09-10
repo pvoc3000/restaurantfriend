@@ -2,6 +2,10 @@
 
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { useEffect } from "react";
+
+import { useShell } from "@/components/ShellProvider";
+import { publishRecordNav } from "@/lib/recordNavSlot";
 import { carryQuery, useRecordPosition } from "@/lib/recordSet";
 
 /**
@@ -43,6 +47,20 @@ export function RecordNav({
 }) {
   const position = useRecordPosition(listKey, id);
   const current = useSearchParams();
+  const shell = useShell();
+
+  // UNDER THE TABLET SHELL THE BOOK LIVES IN THE BAR (2026-09-09). The page
+  // takes the bar's seat for as long as it is mounted and renders nothing
+  // here; `tablet/BarRecordNav` walks the same set through the same hooks.
+  // An effect, not a render-time write: the seat is a module store the bar
+  // subscribes to, and writing it during render would notify mid-render.
+  useEffect(() => {
+    if (shell !== "tablet") return;
+    publishRecordNav({ listKey, id, carry });
+    return () => publishRecordNav(null);
+  }, [shell, listKey, id, carry]);
+
+  if (shell === "tablet") return null;
   if (!position) return null;
   const step = (href: string | null) => (href ? carryQuery(href, current, carry) : null);
 

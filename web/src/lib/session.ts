@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Role } from "@/lib/roles";
 import { DEVICE_COOKIE, PIN_SESSION_COOKIE } from "@/lib/sharedDevice";
+import { SHELL_COOKIE, resolveShell, type Shell } from "@/lib/shell";
 
 export type Location = {
   id: string;
@@ -97,6 +98,12 @@ export type AppSession = {
    * change, a PIN change and a device registration while this is true.
    */
   pinSession: boolean;
+  /**
+   * Which chrome the `(app)` layout mounts — the desk masthead or the tablet
+   * bar (`lib/shell`). The `rf.shell` cookie decides; absent, a registered
+   * shared device is a tablet. Every page underneath is the same page.
+   */
+  shell: Shell;
 };
 
 /**
@@ -212,5 +219,6 @@ export const getAppSession = cache(async function getAppSession(): Promise<AppSe
     orgName: membership.orgs?.name ?? "",
     registeredDevice: jar.has(DEVICE_COOKIE),
     pinSession: jar.get(PIN_SESSION_COOKIE)?.value === "1",
+    shell: resolveShell(jar.get(SHELL_COOKIE)?.value, jar.has(DEVICE_COOKIE)),
   };
 });

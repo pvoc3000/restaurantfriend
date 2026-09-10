@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { DEVICE_COOKIE } from "@/lib/sharedDevice";
+import { SHELL_COOKIE, type Shell } from "@/lib/shell";
 import { clearSessionCookies } from "@/lib/sessionCookies";
 
 export async function signOut() {
@@ -39,6 +40,27 @@ export async function setActiveLocation(locationId: string) {
 
   if (error) throw error;
 
+  revalidatePath("/", "layout");
+}
+
+/**
+ * Which shell THIS BROWSER gets — the desk masthead or the tablet bar
+ * (`lib/shell`). A device property, so it is set server-side (Safari caps a
+ * script-written cookie at seven days) for a year, and it is NOT in
+ * `clearSessionCookies`: the iPad must still be a tablet after a lock, an
+ * unlock or a sign-out. The caller hard-navigates to `/` afterwards so the
+ * new shell's own landing paints; the layout revalidation is for any tab
+ * that stays put.
+ */
+export async function setShell(shell: Shell) {
+  const jar = await cookies();
+  jar.set(SHELL_COOKIE, shell, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: 365 * 24 * 60 * 60,
+  });
   revalidatePath("/", "layout");
 }
 

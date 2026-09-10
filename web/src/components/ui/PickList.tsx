@@ -450,7 +450,14 @@ export function PickList({
                 // picker and yellow is what it is FOR. A second one that isn't
                 // about the working location wants the colour split out to a
                 // prop, not this dress reused.
-                `flex h-6 items-center gap-2 bg-transparent text-left text-[12px] font-semibold uppercase tracking-[0.06em] text-mark hover:text-mark-fill disabled:opacity-35 ${className}`
+                //
+                // `size="lg"` is the tablet bar's (2026-09-09): the same
+                // dress at a 64px thumb target and 16px type, stated here
+                // for the reason `field` states its own — a caller's `h-16`
+                // could not be relied on to beat this `h-6`.
+                `flex ${
+                  size === "lg" ? "h-16 px-3 text-[16px]" : "h-6 text-[12px]"
+                } items-center gap-2 bg-transparent text-left font-semibold uppercase tracking-[0.06em] text-mark hover:text-mark-fill disabled:opacity-35 ${className}`
               : // The same resting dress InlineValue wears, so an editable cell
                 // reads as editable whether it takes typing or a choice — the
                 // dotted underline, or the bounding box where the caller has

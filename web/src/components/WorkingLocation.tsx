@@ -37,12 +37,15 @@ import type { Location } from "@/lib/session";
 export function WorkingLocation({
   locations,
   working,
+  size = "md",
 }: {
   /** The ones you MAY WORK AT — `session.workableLocations`. This control
    *  offers a SWITCH, so it must never list a shop `set_my_member_profile`
    *  would refuse; `activeLocations` is the list for enumerating shops. */
   locations: Location[];
   working: Location | null;
+  /** "lg" on the tablet bar — the same yellow, at a thumb's size. */
+  size?: "md" | "lg";
 }) {
   const [pending, startTransition] = useTransition();
 
@@ -63,6 +66,7 @@ export function WorkingLocation({
   return (
     <PickList
       variant="masthead"
+      size={size}
       align="right"
       // The trigger is four characters wide and the rows are a code plus a
       // shop's full name, so the panel needs its own floor — at the default

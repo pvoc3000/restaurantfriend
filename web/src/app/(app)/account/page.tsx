@@ -35,6 +35,7 @@ export default async function AccountPage() {
         pinSetAt={(pinSetAt as string | null) ?? null}
         pinSession={session.pinSession}
         registeredDevice={session.registeredDevice}
+        shell={session.shell}
       />
     </div>
   );

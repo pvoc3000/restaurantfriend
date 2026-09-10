@@ -3,11 +3,13 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
-import { setDisplayName, signOut } from "@/app/actions";
+import { setDisplayName, setShell, signOut } from "@/app/actions";
 import { READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { Switch } from "@/components/ui/Switch";
 import { TextInput } from "@/components/ui/TextInput";
 import { PIN_LENGTH, isValidPin } from "@/lib/sharedDevice";
+import type { Shell } from "@/lib/shell";
 import { createClient } from "@/lib/supabase/client";
 
 /**
@@ -41,6 +43,7 @@ export function AccountSettings({
   pinSetAt,
   pinSession,
   registeredDevice,
+  shell,
 }: {
   displayName: string | null;
   email: string;
@@ -53,9 +56,24 @@ export function AccountSettings({
   pinSession: boolean;
   /** This browser is a registered shared iPad: the masthead says Switch user, so Sign out lives here. */
   registeredDevice: boolean;
+  /** The chrome this browser gets — `lib/shell`. */
+  shell: Shell;
 }) {
   const router = useRouter();
   const supabase = createClient();
+
+  // THE SHELL SWITCH (2026-09-09). Not a credential, so it is not gated on
+  // `pinSession`; a device property, so it is this BROWSER's and not the
+  // member's. A hard navigation to `/` afterwards, because `/` is where the
+  // two shells part ways and a soft refresh would leave you on a settings
+  // page whose bar had just changed shape under you.
+  const [switching, setSwitching] = useState(false);
+  const toggleShell = () => {
+    setSwitching(true);
+    void setShell(shell === "tablet" ? "desk" : "tablet")
+      .then(() => window.location.assign("/"))
+      .catch(() => setSwitching(false));
+  };
 
   const [name, setName] = useState(displayName ?? "");
   const [naming, startNaming] = useTransition();
@@ -175,6 +193,19 @@ export function AccountSettings({
         <dt className="text-subtle">Works at</dt>
         <dd>
           <span className={READ_ONLY_VALUE}>{shops === null ? "All shops" : shops.join(" · ")}</span>
+        </dd>
+
+        <dt className="text-subtle">Tablet layout</dt>
+        <dd className="flex items-center gap-3">
+          <Switch
+            on={shell === "tablet"}
+            onToggle={toggleShell}
+            disabled={switching}
+            ariaLabel="Tablet layout on this device"
+          />
+          <span className="text-muted">
+            {shell === "tablet" ? "One bar and a page of actions." : "The menu, on this device."}
+          </span>
         </dd>
       </dl>
 

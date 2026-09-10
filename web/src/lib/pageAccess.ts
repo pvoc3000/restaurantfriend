@@ -155,6 +155,12 @@ export const PAGE_ACCESS: Record<string, Record<Role, PageAccess>> = {
   // ── Special Orders ────────────────────────────────────────────────────────
   "/special-orders":       row("R", "W", "W", "W", "W"),
   "/customers":            row("R", "R", "W", "W", "W"),
+
+  // ── The tablet landing page ───────────────────────────────────────────────
+  // Not on the sheet — it did not exist. A page of doors, each of which is
+  // gated by ITS OWN row (`tilesForRole`), so the page itself is open to
+  // everyone: what a role sees on it is what the sheet already says.
+  "/start":                row("R", "R", "R", "R", "R"),
 };
 
 /**
