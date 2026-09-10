@@ -298,6 +298,18 @@ export function TagsList({
     <div className="space-y-6">
       <PageHeading title="Tags" code={locationCode} visible={visible.length} total={rows.length} noun="tags" />
 
+      {/* THE COMMAND STRIP, above the filter row and right-aligned (Mark,
+          2026-09-10) — the invoice list's arrangement. `justify-end` on the
+          row, and an inner content-sized group, because `NewTag`'s trigger
+          carries its own `ml-auto`: as a full-width row's only child that
+          margin is harmless, but the group is what keeps it so. */}
+      {action ? (
+        <div className="flex justify-end">
+          <div className="flex items-center gap-3">{action}</div>
+        </div>
+      ) : null}
+
+      {/* The filter row, left-aligned. */}
       <div className="flex flex-wrap items-center gap-3">
         <TextInput
           value={search}
@@ -335,7 +347,6 @@ export function TagsList({
           />
           </span>
         </label>
-        {action && <div className="ml-auto flex items-center">{action}</div>}
       </div>
 
       {/* Below the filters rather than under the table (Mark, 2026-09-06):
