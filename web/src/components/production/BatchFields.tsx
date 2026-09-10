@@ -106,7 +106,7 @@ export function BatchFields({
       }`}
     >
       <dl
-        className={`grid grid-cols-[7.5rem_minmax(0,1fr)] content-start items-center gap-x-3 gap-y-2 text-sm ${
+        className={`flex flex-col gap-3 text-sm ${
           fill ? "min-h-0 overflow-y-auto pr-1" : ""
         }`}
       >
@@ -178,7 +178,7 @@ export function BatchFields({
       </dl>
 
       <dl
-        className={`grid grid-cols-[7.5rem_minmax(0,1fr)] content-start items-center gap-x-3 gap-y-2 text-sm ${
+        className={`flex flex-col gap-3 text-sm ${
           fill ? "min-h-0 overflow-y-auto pr-1" : ""
         }`}
       >
@@ -303,13 +303,20 @@ function Triple({
  * column's full width, the pane is ten short rows instead of five tall ones,
  * and it fits the fixed height without scrolling.
  */
+/**
+ * LABEL OVER FIELD (Mark, 2026-09-09: "try putting the label above the fields
+ * on the info tab"), the way the Notes block has always been set. Two tracks —
+ * label beside value — spent 7.5rem of every row on a word, which in a pane
+ * split into two columns left the value ~200px; stacked, the value has the
+ * whole column and the label costs a 14px line.
+ */
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <>
+    <div className="min-w-0">
       <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
         {label}
       </dt>
-      <dd className="min-w-0">{children}</dd>
-    </>
+      <dd className="mt-0.5 min-w-0">{children}</dd>
+    </div>
   );
 }
