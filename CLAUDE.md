@@ -11030,9 +11030,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   both big lists; the PO list; cleanup ×3; receiving's layout control
   (`size="sm"` for its fixed-height band).
   **A ONE-OF-N GOES TO A `PickList` WHEN THE ROW CANNOT AFFORD IT**, which is
-  the only reason so far and has now been taken three times: `/invoices`' Due
-  tabs (2026-09-08), **the order guide's tier and grouping** and **the PO
-  list's status** (both 2026-09-10, Mark).
+  the only reason so far and has now been taken four times: `/invoices`' Due
+  tabs (2026-09-08), then **the order guide's tier and grouping**, **the PO
+  list's status** and **`/invoices`' status** (all 2026-09-10, Mark). There
+  are no `TabPicker`s left in any of those three filter rows.
   A TabPicker spends its width whether or not you are looking at it — the
   guide's four tiers wanted 460px and its three groupings 373 — and that band
   is sticky for a 66,000px walk, so it wrapped at EVERY width including 1440
@@ -11105,7 +11106,14 @@ weekday column, and 003 then silently made it per-vendor-item.
   control has to be able to say what the list is showing. Without it
   `PickList` correctly falls back to the raw column value — and a trigger
   reading a lowercase `received` under a "Current" heading is the tell. Any
-  conversion whose options are derived from counts has this hazard.
+  control whose options are derived from COUNTS has this hazard whether or not
+  it was ever a TabPicker: `/invoices`' Due had been a `PickList` since
+  2026-09-08 and carried it latent until the same pass fixed both.
+  **`/invoices`' STATUS went 478px → 160**, which took that row from two lines
+  to one at 1440. It is still two at 1280, because six controls is more than
+  four — its fields alone are 1041px of a 1216px row — so its command cluster
+  keeps the `ml-auto` and its search stays fixed, where the PO list's four fit
+  down to 820 and its search flexes.
   **A MODE GOES ON ITS OWN ROW.** "Ignore ordering days" is neither a field nor
   a value — no vocabulary to collapse and a sentence for a label — so on the
   fields' line it was the thing that wrapped. Beneath them it costs a short
