@@ -105,7 +105,7 @@ export function BatchActions({
             disabled={busy !== null}
             className={DANGER_BUTTON_CLASS}
           >
-            {busy === "delete" ? "Deleting…" : "Delete"}
+            {busy === "delete" ? "Deleting…" : "Delete batch"}
           </button>
         ) : null}
       </div>

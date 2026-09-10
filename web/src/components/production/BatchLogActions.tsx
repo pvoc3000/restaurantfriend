@@ -124,7 +124,7 @@ export function BatchLogActions({
           </button>
         )}
         <button type="button" onClick={remove} disabled={busy !== null} className={BAR_CELL}>
-          <BarLabel icon={ICON_TRASH} word={busy === "delete" ? "Deleting…" : "Delete"} />
+          <BarLabel icon={ICON_TRASH} word={busy === "delete" ? "Deleting…" : "Delete log"} />
         </button>
         {error ? <p className="px-3 text-sm text-[var(--rf-red-300)]">{error}</p> : null}
       </>
@@ -159,7 +159,7 @@ export function BatchLogActions({
           disabled={busy !== null}
           className={DANGER_BUTTON_CLASS}
         >
-          {busy === "delete" ? "Deleting…" : "Delete"}
+          {busy === "delete" ? "Deleting…" : "Delete log"}
         </button>
       </div>
       {error ? <p className="text-sm text-accent">{error}</p> : null}

@@ -312,13 +312,17 @@ export function BatchLogItems({
             </div>
 
             {pane === "info" ? (
-              // EACH COLUMN SCROLLS ITSELF now, rather than the tab scrolling as
-              // one (Mark, 2026-08-09: "make the history section fill the
-              // frame"). It has to work that way round: filling means taking a
-              // share of a definite height, and inside a single scroller there
-              // is no height to share — every child is as tall as its content.
-              // So this box stops scrolling and hands its height down.
-              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
+              // THE INFO TAB SCROLLS AS ONE (Mark, 2026-09-09: "why are photo,
+              // notes and delete stuck in the pane when adjusting its size?").
+              // It used to be three scrollers — each column filling the pane
+              // and scrolling itself — because the HISTORY needed a column of
+              // its own to fill (Mark, 2026-08-09). With the history on its own
+              // tab there is nothing left to fill, and per-column scrolling
+              // meant dragging the pane moved the fields while the photo, the
+              // notes and Delete sat where they were. One scroller, and the
+              // whole tab moves together; `fill` off on the fields for the same
+              // reason.
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4 overflow-y-auto pr-1">
                 <BatchFields
                   row={selected}
                   orgId={orgId}
@@ -327,9 +331,8 @@ export function BatchLogItems({
                     selected.element_id ? versionsByElement[selected.element_id] ?? [] : []
                   }
                   editable={editable}
-                  fill={wide}
                 />
-                <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                   <BatchActions
                     batchId={selected.id}
                     elementName={selected.element_name}
