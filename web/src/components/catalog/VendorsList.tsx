@@ -18,7 +18,7 @@ import { DataTable, type DataColumn } from "./DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { ControlField } from "@/components/ui/ControlField";
 import { NewVendor } from "./NewVendor";
 import { PickList } from "@/components/ui/PickList";
 import type { VendorRow } from "@/app/(app)/vendors/page";
@@ -292,24 +292,32 @@ export function VendorsList({
             one): the OS menu was the last thing on this row that didn't look
             like the app. "All types" is a real choice with a real label, so it
             reads at full strength rather than as a placeholder. */}
-        <PickList
-          variant="field"
-          ariaLabel="Vendor type"
-          value={filters.type}
-          onPick={(type) => update({ type })}
-          options={[
-            { value: "", label: "All types" },
-            ...types.map((t) => ({ value: t, label: t })),
-          ]}
-          className="w-48"
-        />
+        {/* Captioned (Mark, 2026-09-10), with Active a PickList now too — the
+            purchasing lists' conversion. */}
+        <ControlField label="Type">
+          <PickList
+            variant="field"
+            ariaLabel="Vendor type"
+            value={filters.type}
+            onPick={(type) => update({ type })}
+            options={[
+              { value: "", label: "All types" },
+              ...types.map((t) => ({ value: t, label: t })),
+            ]}
+            className="w-48"
+          />
+        </ControlField>
 
-        <TabPicker
-          ariaLabel="Active state"
-          value={filters.active}
-          onChange={(active) => update({ active })}
-          options={ACTIVE_TABS}
-        />
+        <ControlField label="Show">
+          <PickList
+            variant="field"
+            ariaLabel="Active state"
+            value={filters.active}
+            onPick={(active) => update({ active: active as ActiveFilter })}
+            options={ACTIVE_TABS.map((t) => ({ value: t.key, label: t.label }))}
+            fit
+          />
+        </ControlField>
         {editable ? (
           <div className="ml-auto">
             <NewVendor orgId={orgId} types={types} existingNames={vendors.map((v) => v.name)} />
