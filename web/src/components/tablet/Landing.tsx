@@ -35,10 +35,14 @@ export function Landing({
             {group.tiles.map((tile) => {
               const s = state[tile.key];
               return (
-                <li key={tile.key}>
+                // `flex` on the cell and `flex-1` on the link: the grid stretches
+                // every LI to its row's height, but a link inside is only as
+                // tall as its own label, so a two-line tile stood 11px taller
+                // than the one-line tiles beside it (Mark, 2026-09-09).
+                <li key={tile.key} className="flex">
                   <Link
                     href={s?.href ?? tile.href}
-                    className="flex min-h-24 flex-col justify-center gap-1 border border-ink bg-white px-5 py-4 no-underline transition-colors hover:bg-neutral-100 active:bg-neutral-200"
+                    className="flex min-h-24 flex-1 flex-col justify-center gap-1 border border-ink bg-white px-5 py-4 no-underline transition-colors hover:bg-neutral-100 active:bg-neutral-200"
                   >
                     <span className="font-bold uppercase tracking-[0.04em] text-ink">{tile.label}</span>
                     {s?.note && <span className="text-[14px] text-muted">{s.note}</span>}
