@@ -5,6 +5,7 @@ import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog
 import type { SortDir } from "@/lib/tableSort";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { useRememberedView } from "@/lib/viewMemory";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import {
@@ -478,9 +479,9 @@ export function BatchItemsTable({
           <TextInput
             value={term}
             onValueChange={setTerm}
-            placeholder="Search element, shift, batch…"
             aria-label="Search batches"
             className="w-64"
+            icon={<SearchGlyph />}
           />
           {touch ? null : (
             <div className="space-y-1.5">

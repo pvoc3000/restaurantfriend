@@ -8,6 +8,7 @@ import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { WorkingHere } from "./WorkingHere";
 import { locationDetailHref } from "@/lib/locations";
 import { usePublishRecordSet } from "@/lib/recordSet";
@@ -197,13 +198,13 @@ export function LocationsList({
         <TextInput
           value={search}
           onValueChange={setSearch}
-          placeholder="Search locations"
           aria-label="Search locations"
           clearLabel="Clear the search"
           // h-9 and text-sm, like every other list's search box — without them
           // the input takes the browser's default height and stands taller
           // than the same field on Vendors, Inventory and the PO list.
           className="w-72"
+          icon={<SearchGlyph />}
         />
         {editable ? (
           <div className="ml-auto">

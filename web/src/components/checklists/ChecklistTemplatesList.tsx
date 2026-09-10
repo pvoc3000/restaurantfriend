@@ -6,6 +6,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { SHIFT_SLOT_LABEL } from "@/lib/employeeEvents";
 import {
   CHECKLIST_KIND_LABEL,
@@ -158,13 +159,13 @@ export function ChecklistTemplatesList({
         <TextInput
           value={search}
           onValueChange={setSearch}
-          placeholder="Search templates…"
           aria-label="Search templates"
           clearLabel="Clear the search"
           // w-56, not the usual w-72: with the view tabs now in this row the
           // bar wants 1221px of a 1184px line at 1280 and the command wraps.
           // `ElementsList` narrows its own for the same measurement.
           className="w-56"
+          icon={<SearchGlyph />}
         />
         <TabPicker
           ariaLabel="Kind"

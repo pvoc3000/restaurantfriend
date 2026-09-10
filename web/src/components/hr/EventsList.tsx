@@ -8,6 +8,7 @@ import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { sortRows } from "@/lib/tableSort";
 import { withFrom } from "@/lib/breadcrumbs";
 import { employeeTabHref } from "@/lib/employees";
@@ -533,10 +534,10 @@ export function EventsList({
                 <TextInput
                   value={search}
                   onValueChange={changeSearch}
-                  placeholder="Name, note, supervisor…"
                   className="w-64"
                   aria-label="Search events"
                   clearLabel="Clear the search"
+                  icon={<SearchGlyph />}
                 />
               </div>
             }

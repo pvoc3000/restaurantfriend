@@ -28,6 +28,7 @@ import { Checkbox } from "@/components/ui/Checkbox";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { sortRows, type SortDir } from "@/lib/tableSort";
 import { withFrom } from "@/lib/breadcrumbs";
@@ -301,10 +302,10 @@ export function TagsList({
         <TextInput
           value={search}
           onValueChange={setSearch}
-          placeholder="Search tags"
           aria-label="Search tags"
           clearLabel="Clear the search"
           className="w-72"
+          icon={<SearchGlyph />}
         />
         <TabPicker<Tier>
           value={term ? "all" : tier}

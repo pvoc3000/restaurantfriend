@@ -7,6 +7,7 @@ import { batchDate } from "@/lib/productionBatches";
 import { DateField } from "@/components/ui/DateField";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 
 /**
  * "Generate a batch log" — migration 045.
@@ -178,7 +179,7 @@ export function GenerateBatches({
       <button
         type="button"
         onClick={openDialog}
-        className="border border-ink bg-white px-4 py-2 text-[13px] font-semibold uppercase tracking-[0.06em] hover:bg-ink hover:text-white"
+        className={BUTTON_CLASS}
       >
         New batch log
       </button>

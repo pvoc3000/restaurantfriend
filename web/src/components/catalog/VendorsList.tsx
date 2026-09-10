@@ -17,6 +17,7 @@ import {
 import { DataTable, type DataColumn } from "./DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { NewVendor } from "./NewVendor";
 import { PickList } from "@/components/ui/PickList";
@@ -282,9 +283,10 @@ export function VendorsList({
         <TextInput
           value={filters.q}
           onValueChange={(q) => update({ q })}
-          placeholder="Search name, type, account…"
+          aria-label="Search name, type, account"
           clearLabel="Clear the search"
           className="w-72"
+          icon={<SearchGlyph />}
         />
         {/* A PickList, not a native <select> (Mark, 2026-08-01 — he named this
             one): the OS menu was the last thing on this row that didn't look

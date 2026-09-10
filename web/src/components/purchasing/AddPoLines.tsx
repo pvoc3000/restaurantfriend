@@ -17,6 +17,7 @@ import { confirmDialog } from "@/lib/confirm";
 import { packLabel } from "@/lib/catalog";
 import { evaluateNumeric } from "@/lib/calc";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { PickList } from "@/components/ui/PickList";
 import { PACKAGE_DESC_OPTIONS } from "@/lib/units";
@@ -434,9 +435,10 @@ export function AddPoLines({
                     autoFocus
                     value={search}
                     onValueChange={setSearch}
-                    placeholder="Search this vendor's items"
+                    aria-label="Search this vendor's items"
                     clearLabel="Clear the search"
                     className="w-72"
+                    icon={<SearchGlyph />}
                   />
                   <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
                     {filtered.length} of {rows.length} active

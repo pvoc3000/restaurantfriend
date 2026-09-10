@@ -9,6 +9,7 @@ import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { NewShiftReport } from "./NewShiftReport";
 import {
@@ -313,9 +314,10 @@ export function ShiftReportsList({
             <TextInput
               value={search}
               onValueChange={setSearch}
-              placeholder="Search the reports…"
+              aria-label="Search the reports"
               clearLabel="Clear the search"
               className="w-72"
+              icon={<SearchGlyph />}
             />
             <TabPicker
               ariaLabel="Which shift reports"

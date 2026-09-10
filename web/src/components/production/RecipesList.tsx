@@ -7,6 +7,7 @@ import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { withFrom } from "@/lib/breadcrumbs";
 import { sortRows } from "@/lib/tableSort";
@@ -316,10 +317,10 @@ export function RecipesList({
         <TextInput
           value={search}
           onValueChange={changeSearch}
-          placeholder="Search recipes"
           className="w-64"
           aria-label="Search recipes"
           clearLabel="Clear the search"
+          icon={<SearchGlyph />}
         />
         <TabPicker
           ariaLabel="Which recipes"

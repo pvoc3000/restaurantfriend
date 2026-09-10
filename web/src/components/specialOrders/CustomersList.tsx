@@ -6,6 +6,7 @@ import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { NewCustomer } from "@/components/specialOrders/NewCustomer";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { withFrom } from "@/lib/breadcrumbs";
@@ -244,10 +245,10 @@ export function CustomersList({
             <TextInput
               value={search}
               onValueChange={changeSearch}
-              placeholder="Name, company, email…"
               className="w-64"
               aria-label="Search customers"
               clearLabel="Clear the search"
+              icon={<SearchGlyph />}
             />
           </div>
         }

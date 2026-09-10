@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { customerLabel } from "@/lib/specialOrders";
 
 type CustomerRow = {
@@ -216,9 +217,10 @@ export function LinkCustomer({
             autoFocus
             value={term}
             onValueChange={setTerm}
-            placeholder="Name, company, email or phone…"
+            aria-label="Find a customer by name, company, email or phone"
             clearLabel="Clear the search"
             className="w-80"
+            icon={<SearchGlyph />}
           />
 
           {canSearch && results.length > 0 && (

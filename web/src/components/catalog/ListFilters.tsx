@@ -2,6 +2,7 @@
 
 import { STALE_ORDER, STALE_LABEL, type StaleBucket } from "@/lib/lastOrdered";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { PickList } from "@/components/ui/PickList";
 
@@ -60,9 +61,10 @@ export function ListFilters({
         <TextInput
           value={term}
           onValueChange={onTerm}
-          placeholder={placeholder}
+          aria-label={placeholder}
           clearLabel="Clear the search"
           className="w-72"
+          icon={<SearchGlyph />}
         />
 
         {categories && onCategory && (

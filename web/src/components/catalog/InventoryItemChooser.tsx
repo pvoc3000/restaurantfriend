@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { inventorySearchWords } from "@/lib/catalog";
 
 type ItemRow = {
@@ -53,14 +54,12 @@ export function InventoryItemChooser({
   value,
   onPick,
   autoFocus = false,
-  placeholder = "Search inventory items by name…",
 }: {
   /** What is currently chosen, or null. The caller owns it. */
   value: ChosenItem | null;
   /** Null when the choice is cleared. */
   onPick: (item: ChosenItem | null) => void;
   autoFocus?: boolean;
-  placeholder?: string;
 }) {
   const supabase = createClient();
   const [term, setTerm] = useState("");
@@ -122,10 +121,10 @@ export function InventoryItemChooser({
         autoFocus={autoFocus}
         value={term}
         onValueChange={setTerm}
-        placeholder={placeholder}
         clearLabel="Clear the search"
         className="w-full"
         aria-label="Search inventory items"
+        icon={<SearchGlyph />}
       />
 
       {error && <span className="text-xs text-accent">{error}</span>}

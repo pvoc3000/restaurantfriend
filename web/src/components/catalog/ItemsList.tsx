@@ -22,6 +22,7 @@ import { usePublishRecordSet } from "@/lib/recordSet";
 import { DataTable, type DataColumn } from "./DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { NewInventoryItem } from "./NewInventoryItem";
 import { InventoryItemActions } from "./InventoryItemActions";
@@ -404,9 +405,10 @@ export function ItemsList({
         <TextInput
           value={filters.q}
           onValueChange={(q) => update({ q })}
-          placeholder="Search name or category…"
+          aria-label="Search name or category"
           clearLabel="Clear the search"
           className="w-72"
+          icon={<SearchGlyph />}
         />
         {/* Last ordered, as a range over the date rather than the four age
             tabs it replaced. Its presets are those tabs' three bands; a

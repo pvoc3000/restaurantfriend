@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { sortRows, type SortDir } from "@/lib/tableSort";
 import { withFrom } from "@/lib/breadcrumbs";
@@ -131,9 +132,9 @@ export function DocumentsList({ rows, action }: { rows: DocumentRow[]; action?: 
         <TextInput
           value={q}
           onValueChange={setQ}
-          placeholder="Search title, category, description"
           aria-label="Search documents"
           className="w-72"
+          icon={<SearchGlyph />}
         />
         {action}
       </div>

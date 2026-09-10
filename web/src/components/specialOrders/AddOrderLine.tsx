@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { money } from "@/lib/specialOrders";
 import type { OrderLineRow } from "./OrderLines";
 
@@ -191,11 +192,11 @@ export function AddOrderLine({
           <TextInput
             value={search}
             onValueChange={setSearch}
-            placeholder="Angry Samoa, Bismark, mini…"
             aria-label="Find a production item"
             clearLabel="Clear the search"
             className="w-72"
             autoFocus
+            icon={<SearchGlyph />}
           />
         </div>
         {/* BLACK, which is the panel-commit exception rather than a breach of

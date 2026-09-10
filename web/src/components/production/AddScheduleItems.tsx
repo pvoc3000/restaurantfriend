@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
 
 export type AddableItem = {
@@ -134,9 +135,9 @@ export function AddScheduleItems({
             <TextInput
               value={term}
               onValueChange={setTerm}
-              placeholder="Search the menu…"
               aria-label="Search items"
               className="w-full"
+              icon={<SearchGlyph />}
             />
           }
           footer={

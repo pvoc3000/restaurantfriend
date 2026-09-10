@@ -8,6 +8,7 @@ import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog
 import type { SortDir } from "@/lib/tableSort";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import {
@@ -392,9 +393,9 @@ export function SchedulesList({
         <TextInput
           value={term}
           onValueChange={setTerm}
-          placeholder="Search shop, kitchen, note…"
           aria-label="Search schedules"
           className="w-64"
+          icon={<SearchGlyph />}
         />
         <TabPicker
           ariaLabel="Which schedules"

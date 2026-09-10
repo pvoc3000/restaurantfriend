@@ -7,6 +7,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { expiryState } from "@/lib/employeeDocuments";
 
 const WIDTHS_KEY = "rf.equipment.columnWidths.v1";
@@ -213,10 +214,10 @@ export function EquipmentList({
         <TextInput
           value={search}
           onValueChange={setSearch}
-          placeholder="Search equipment…"
           aria-label="Search equipment"
           clearLabel="Clear the search"
           className="w-72"
+          icon={<SearchGlyph />}
         />
         {action ? <div className="ml-auto">{action}</div> : null}
       </div>

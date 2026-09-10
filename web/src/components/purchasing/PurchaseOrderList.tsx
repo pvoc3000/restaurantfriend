@@ -9,6 +9,7 @@ import {
   vendorFilterOptions,
 } from "@/lib/vendorFilter";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { ControlField } from "@/components/ui/ControlField";
 import { PickList } from "@/components/ui/PickList";
 import { PickSet } from "@/components/ui/PickSet";
@@ -932,9 +933,10 @@ export function PurchaseOrderList({
           <TextInput
             value={filters.q}
             onValueChange={(q) => update({ q })}
-            placeholder="Search PO number or vendor…"
+            aria-label="Search PO number or vendor"
             clearLabel="Clear the search"
             fullWidth
+            icon={<SearchGlyph />}
           />
         </div>
 

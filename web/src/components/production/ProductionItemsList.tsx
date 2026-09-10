@@ -7,6 +7,7 @@ import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { withFrom } from "@/lib/breadcrumbs";
 import {
@@ -531,12 +532,12 @@ export function ProductionItemsList({
               <TextInput
                 value={search}
                 onValueChange={changeSearch}
-                placeholder="Name, dough, finish…"
                 // w-56 rather than w-64 for the same measurement as the
                 // menus beside it: the bar has to hold on one line.
                 className="w-56"
                 aria-label="Search items"
                 clearLabel="Clear the search"
+                icon={<SearchGlyph />}
               />
             </div>
           }

@@ -10,6 +10,7 @@ import { useScrollMemoryKey } from "@/lib/scrollMemory";
 import { useShell } from "@/components/ShellProvider";
 import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { PickList } from "@/components/ui/PickList";
 import { PickSet } from "@/components/ui/PickSet";
 import {
@@ -953,9 +954,10 @@ export function OrderGuide({
           <TextInput
             value={term}
             onValueChange={setTerm}
-            placeholder="Jump to item, vendor or section…"
+            aria-label="Jump to item, vendor or section"
             clearLabel="Clear the search"
             fullWidth
+            icon={<SearchGlyph />}
           />
         </div>
 

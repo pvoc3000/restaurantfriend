@@ -8,6 +8,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { TaskPhotos, type TaskPhoto } from "./TaskPhotos";
 import { SHIFT_SLOT_LABEL, SHIFT_SLOT_OPTIONS } from "@/lib/employeeEvents";
@@ -466,10 +467,10 @@ export function TasksScreen({
         <TextInput
           value={search}
           onValueChange={setSearch}
-          placeholder="Search…"
           aria-label="Search"
           clearLabel="Clear the search"
           className="w-72"
+          icon={<SearchGlyph />}
         />
         <TabPicker
           ariaLabel="Which"

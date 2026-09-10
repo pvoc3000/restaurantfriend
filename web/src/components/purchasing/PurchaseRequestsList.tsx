@@ -6,6 +6,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { sortRows } from "@/lib/tableSort";
 import { dateInTimeZone } from "@/lib/today";
 import {
@@ -396,10 +397,10 @@ export function PurchaseRequestsList({
           <TextInput
             value={search}
             onValueChange={changeSearch}
-            placeholder="Search requests"
             className="w-64"
             aria-label="Search purchase requests"
             clearLabel="Clear the search"
+            icon={<SearchGlyph />}
           />
           <TabPicker
             ariaLabel="Which requests"

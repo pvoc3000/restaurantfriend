@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 
 import { createClient } from "@/lib/supabase/client";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { customerLabel } from "@/lib/specialOrders";
 import {
   EMPTY_DRAFT,
@@ -175,11 +176,11 @@ export function CustomerPicker({
         <TextInput
           value={term}
           onValueChange={setTerm}
-          placeholder="Name, company, email or phone…"
           aria-label="Find a customer"
           clearLabel="Clear the search"
           disabled={disabled}
           className="w-full max-w-sm"
+          icon={<SearchGlyph />}
         />
         <button
           type="button"

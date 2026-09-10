@@ -6,6 +6,7 @@ import { useExactViewportHeight } from "@/lib/tableHead";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { Switch } from "@/components/ui/Switch";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { useRememberedView } from "@/lib/viewMemory";
 import { clampSplit, setSplit, useSplit } from "@/lib/paneSplit";
 import { BatchItemsTable, type BatchRow } from "@/components/production/BatchItemsTable";
@@ -210,9 +211,9 @@ export function BatchLogItems({
           <TextInput
             value={term}
             onValueChange={setTerm}
-            placeholder="Search element, shift, batch…"
             aria-label="Search batches"
             className="w-64"
+            icon={<SearchGlyph />}
           />
         </div>
       ) : null}

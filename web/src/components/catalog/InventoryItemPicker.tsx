@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_DANGER_CLASS } from "@/components/ui/Dialog";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { inventorySearchWords } from "@/lib/catalog";
 
 type ItemRow = {
@@ -219,9 +220,10 @@ export function InventoryItemPicker({
         autoFocus
         value={term}
         onValueChange={setTerm}
-        placeholder="Search inventory items by name…"
+        aria-label="Search inventory items by name"
         clearLabel="Clear the search"
         className={wide ? "w-full" : "w-80"}
+        icon={<SearchGlyph />}
       />
       {canSearch && results.length === 0 && (
         <span className="text-xs text-subtle">No items match.</span>

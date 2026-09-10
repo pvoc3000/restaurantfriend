@@ -9,6 +9,7 @@ import { DateField } from "@/components/ui/DateField";
 import { PickList } from "@/components/ui/PickList";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { packetDate } from "@/lib/productionSchedule";
 
@@ -561,9 +562,9 @@ function AddOverride({
         <TextInput
           value={term}
           onValueChange={setTerm}
-          placeholder="Search the menu…"
           aria-label="Search items"
           className="w-full"
+          icon={<SearchGlyph />}
         />
       }
       footer={

@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue } from "@/components/catalog/InlineValue";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { AddShopSection } from "./AddShopSection";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
@@ -223,10 +224,10 @@ export function ShopSectionsTable({
         <TextInput
           value={search}
           onValueChange={setSearch}
-          placeholder="Search sections"
           aria-label="Search shop sections"
           clearLabel="Clear the search"
           className="w-72"
+          icon={<SearchGlyph />}
         />
         {editable ? (
           <div className="ml-auto">

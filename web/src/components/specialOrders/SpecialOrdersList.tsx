@@ -11,6 +11,7 @@ import {
 import { SpecialOrderActions } from "@/components/specialOrders/SpecialOrderActions";
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { NewSpecialOrder } from "@/components/specialOrders/NewSpecialOrder";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { StickyFooter } from "@/components/ui/StickyFooter";
@@ -744,10 +745,10 @@ export function SpecialOrdersList({
               <TextInput
                 value={search}
                 onValueChange={changeSearch}
-                placeholder="Number, customer, event…"
                 className="w-56"
                 aria-label="Search special orders"
                 clearLabel="Clear the search"
+                icon={<SearchGlyph />}
               />
             </div>
           }

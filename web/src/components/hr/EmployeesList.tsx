@@ -6,6 +6,7 @@ import Link from "next/link";
 
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { PickList } from "@/components/ui/PickList";
 import {
@@ -368,10 +369,10 @@ export function EmployeesList({
           <TextInput
             value={search}
             onValueChange={setSearch}
-            placeholder="Search people"
             aria-label="Search people"
             clearLabel="Clear the search"
             className="w-72"
+            icon={<SearchGlyph />}
           />
           <PickList
             value={location}

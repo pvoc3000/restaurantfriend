@@ -10,6 +10,7 @@ import {
 } from "@/lib/shiftFocus";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { PAY_PERIOD_STATUS_LABEL, type PayPeriodStatus } from "@/lib/payPeriods";
 import {
@@ -769,10 +770,10 @@ export function TimesheetsList({
         <TextInput
           value={search}
           onValueChange={setSearch}
-          placeholder="Search this pay period"
           aria-label="Search timesheets"
           clearLabel="Clear the search"
           className="w-64"
+          icon={<SearchGlyph />}
         />
 
         <div className="space-y-1.5">

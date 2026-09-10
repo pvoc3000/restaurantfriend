@@ -8,6 +8,7 @@ import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { createClient } from "@/lib/supabase/client";
 import { usePublishRecordSet } from "@/lib/recordSet";
@@ -550,10 +551,10 @@ export function PlansList({
         <TextInput
           value={search}
           onValueChange={changeSearch}
-          placeholder="Search plans"
           aria-label="Search plans"
           clearLabel="Clear the search"
           className="w-64"
+          icon={<SearchGlyph />}
         />
         <TabPicker
           ariaLabel="Which plans"
