@@ -6,7 +6,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { RowMenu } from "@/components/ui/RowMenu";
@@ -105,7 +106,8 @@ export function PlansList({
   const router = useRouter();
 
   /**
-   * ONE DIMENSION, so it stays a `TabPicker` — see the recipes list, which
+   * ONE DIMENSION, so it is one captioned `PickList` (a `TabPicker` until
+   * 2026-09-10) — see the recipes list, which
    * borrows `lib/filterMenus`' URL contract the same way and for the same
    * reason. `defaultValue` is what keeps a plain `/plans` on ACTIVE.
    */
@@ -191,8 +193,8 @@ export function PlansList({
   // them (`planRange`, the same function that renders it) as well as the stored
   // ISO — the schedules list's lesson, where searching what was on screen found
   // nothing because the row stored the other spelling.
-  // Search first, so the tab counts describe the list you are looking at —
-  // `FilterMenus`' rule, applied to a TabPicker.
+  // Search first, so the picker's counts describe the list you are looking
+  // at — `FilterMenus`' rule, applied to a single picker.
   const searched = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
@@ -556,16 +558,20 @@ export function PlansList({
           className="w-64"
           icon={<SearchGlyph />}
         />
-        <TabPicker
-          ariaLabel="Which plans"
-          value={filters.tier ?? "active"}
-          onChange={changeTier}
-          options={dimensions[0].options.map((o) => ({
-            key: o.value,
-            label: o.label,
-            count: counts[o.value],
-          }))}
-        />
+        <ControlField label="Show">
+          <PickList
+            ariaLabel="Which plans"
+            variant="field"
+            value={filters.tier ?? "active"}
+            onPick={changeTier}
+            options={dimensions[0].options.map((o) => ({
+              value: o.value,
+              label: o.label,
+              hint: String(counts[o.value] ?? 0),
+            }))}
+            fit
+          />
+        </ControlField>
         {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
