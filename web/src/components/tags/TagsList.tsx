@@ -26,7 +26,8 @@ import { DateField } from "@/components/ui/DateField";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { Checkbox } from "@/components/ui/Checkbox";
 import { PageHeading } from "@/components/ui/PageHeading";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { usePublishRecordSet } from "@/lib/recordSet";
@@ -309,8 +310,9 @@ export function TagsList({
         </div>
       ) : null}
 
-      {/* The filter row, left-aligned. */}
-      <div className="flex flex-wrap items-center gap-3">
+      {/* The filter row, left-aligned. Captioned pickers over an uncaptioned
+          search, so `items-end` puts the search on the line of the fields. */}
+      <div className="flex flex-wrap items-end gap-4">
         <TextInput
           value={search}
           onValueChange={setSearch}
@@ -319,34 +321,42 @@ export function TagsList({
           className="w-72"
           icon={<SearchGlyph />}
         />
-        <TabPicker<Tier>
-          value={term ? "all" : tier}
-          onChange={setTier}
-          ariaLabel="Which tags"
-          options={[
-            { key: "all", label: "All tags", count: rows.length },
-            { key: "plan", label: "On plan", count: onPlanCount },
-          ]}
-        />
-        {/* The day On the plan is asked about. A real navigation (the
-            /events window's rule): the server decides which plans are in
-            force, so the day rides in the URL and the default writes none. */}
-        {/* `boxed` in the cell dress is the h-9 border the search box and the
-            tabs wear; the wrapper gives its `w-full` something to mean. */}
-        {/* The day, captioned — "On plan 23 · for 09/06/2026". The count sits
-            between the cell and the box, so the box needs a word of its own or
-            the two numbers run together (Mark, 2026-09-06). */}
-        <label className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">for</span>
-          <span className="block w-44">
-            <DateField
-            value={day}
-            onChange={(next) => router.push(listHref(next ?? today, today, tier, search))}
-            ariaLabel="Which day the plan is read for"
-            boxed
+        {/* A PICKLIST RATHER THAN TABS (Mark, 2026-09-10), the purchasing
+            lists' conversion: counts ride as hints, `fit` sizes the trigger
+            to its widest option. A search still reaches the whole set, so
+            while one is typed the picker reads All tags. */}
+        <ControlField label="Show">
+          <PickList
+            ariaLabel="Which tags"
+            variant="field"
+            value={term ? "all" : tier}
+            onPick={(next) => setTier(next as Tier)}
+            options={[
+              { value: "all", label: "All tags", hint: String(rows.length) },
+              { value: "plan", label: "On plan", hint: String(onPlanCount) },
+            ]}
+            fit
           />
-          </span>
-        </label>
+        </ControlField>
+        {/* The day On the plan is asked about — shown ONLY while the picker
+            reads On plan (Mark, 2026-09-10). Under All tags it decides
+            nothing about which rows appear, so it went with the tier it
+            belongs to. A real navigation (the /events window's rule): the
+            server decides which plans are in force, so the day rides in the
+            URL and the default writes none. The wrapper gives `boxed`'s
+            `w-full` something to mean. */}
+        {(term ? "all" : tier) === "plan" && (
+          <ControlField label="For">
+            <span className="block w-44">
+              <DateField
+                value={day}
+                onChange={(next) => router.push(listHref(next ?? today, today, tier, search))}
+                ariaLabel="Which day the plan is read for"
+                boxed
+              />
+            </span>
+          </ControlField>
+        )}
       </div>
 
       {/* Below the filters rather than under the table (Mark, 2026-09-06):
