@@ -11030,8 +11030,9 @@ weekday column, and 003 then silently made it per-vendor-item.
   both big lists; the PO list; cleanup ×3; receiving's layout control
   (`size="sm"` for its fixed-height band).
   **A ONE-OF-N GOES TO A `PickList` WHEN THE ROW CANNOT AFFORD IT**, which is
-  the only reason so far and has now been taken twice: `/invoices`' Due tabs
-  (2026-09-08) and **the order guide's tier and grouping (2026-09-10, Mark)**.
+  the only reason so far and has now been taken three times: `/invoices`' Due
+  tabs (2026-09-08), **the order guide's tier and grouping** and **the PO
+  list's status** (both 2026-09-10, Mark).
   A TabPicker spends its width whether or not you are looking at it — the
   guide's four tiers wanted 460px and its three groupings 373 — and that band
   is sticky for a 66,000px walk, so it wrapped at EVERY width including 1440
@@ -11068,6 +11069,16 @@ weekday column, and 003 then silently made it per-vendor-item.
   Measured on the guide: one row at 1440 / 1280 / 1024 / 820 / 768 with the
   search giving up 885 → 725 → 469 → 265 → 213px, all bottoms on one pixel, no
   overflow. **A 13rem floor rather than 15 is what buys 768.**
+  **THE PO LIST'S STATUS went 697px → 160**, and its row's content 1365 → 828
+  at 1440 — where 1365 was one pixel inside the 1376 a 1440 window gives, so
+  the row fitted on the widest screen in the building and nowhere else.
+  **IT ALSO SURFACED A RULE WORTH COPYING: keep the CHOSEN value in the
+  vocabulary even when its count is 0.** That list drops an empty raw status
+  on purpose, and the one you are FILTERED TO is the exception, because the
+  control has to be able to say what the list is showing. Without it
+  `PickList` correctly falls back to the raw column value — and a trigger
+  reading a lowercase `received` under a "Current" heading is the tell. Any
+  conversion whose options are derived from counts has this hazard.
   **A MODE GOES ON ITS OWN ROW.** "Ignore ordering days" is neither a field nor
   a value — no vocabulary to collapse and a sentence for a label — so on the
   fields' line it was the thing that wrapped. Beneath them it costs a short
