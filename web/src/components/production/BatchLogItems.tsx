@@ -13,6 +13,7 @@ import { BatchFields, type BatchFieldsRow } from "@/components/production/BatchF
 import { BatchActions } from "@/components/production/BatchActions";
 import { BatchHistory } from "@/components/production/BatchHistory";
 import { BatchRecipe } from "@/components/production/BatchRecipe";
+import { StickyFooter } from "@/components/ui/StickyFooter";
 
 type Pane = "info" | "ingredients" | "instructions" | "history";
 
@@ -105,6 +106,7 @@ export function BatchLogItems({
   removable,
   touch = false,
   crumbs,
+  footerLeading,
 }: {
   rows: BatchRow[];
   /** The same batches, carrying what the PANE needs. Keyed by id. */
@@ -127,6 +129,14 @@ export function BatchLogItems({
    * and render their crumbs where they always did.
    */
   crumbs?: ReactNode;
+  /**
+   * The tablet footer's first cell — Add batch, which is the RECORD's command
+   * and needs the log's ids. The footer is drawn HERE because its other cell,
+   * Delete batch, acts on the SELECTED batch, and only this component knows
+   * which that is (Mark, 2026-09-09: the footer is Add batch · Delete batch,
+   * with Complete/Reopen and Delete log gone from the tablet).
+   */
+  footerLeading?: ReactNode;
 }) {
   const [picked, setPicked] = useState<string | null>(null);
   const [pane, setPane] = useState<Pane>("info");
@@ -339,16 +349,19 @@ export function BatchLogItems({
                   }
                   editable={editable}
                 />
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-                  <BatchActions
-                    batchId={selected.id}
-                    elementName={selected.element_name}
-                    batchNumber={selected.batch_number}
-                    hasYield={selected.yield_count !== null || selected.yield_size !== null}
-                    photoPath={selected.photo_path}
-                    removable={removable}
-                  />
-                </div>
+                {/* On the tablet this command is a footer cell instead. */}
+                {touch ? null : (
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <BatchActions
+                      batchId={selected.id}
+                      elementName={selected.element_name}
+                      batchNumber={selected.batch_number}
+                      hasYield={selected.yield_count !== null || selected.yield_size !== null}
+                      photoPath={selected.photo_path}
+                      removable={removable}
+                    />
+                  </div>
+                )}
               </div>
             ) : pane === "history" ? (
               <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
@@ -405,6 +418,31 @@ export function BatchLogItems({
         )}
       </section>
     </div>
+    {touch ? (
+      // The shift report's footer, on a record: black, pinned, icon over
+      // word, flush to the pane above and the window below. Wrapped in a div
+      // with `-mt-4` for the reason BatchLogRecord used to give: StickyFooter's
+      // spacer must be the last thing in the page's rhythm or it inherits a
+      // margin nothing above it counts.
+      <div className="-mt-4">
+        <StickyFooter flush>
+          <div className="flex items-stretch bg-ink px-2 text-white">
+            {footerLeading}
+            {selected ? (
+              <BatchActions
+                batchId={selected.id}
+                elementName={selected.element_name}
+                batchNumber={selected.batch_number}
+                hasYield={selected.yield_count !== null || selected.yield_size !== null}
+                photoPath={selected.photo_path}
+                removable={removable}
+                variant="bar"
+              />
+            ) : null}
+          </div>
+        </StickyFooter>
+      </div>
+    ) : null}
     </>
   );
 }

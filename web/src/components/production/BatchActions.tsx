@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { BAR_CELL } from "@/components/tablet/barCell";
+import { BarLabel, ICON_TRASH } from "@/components/tablet/BarLabel";
 import { BATCH_PHOTO_BUCKET } from "@/lib/batchPhotos";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
@@ -35,6 +37,7 @@ export function BatchActions({
   hasYield,
   photoPath,
   removable,
+  variant = "button",
 }: {
   batchId: string;
   elementName: string;
@@ -45,6 +48,9 @@ export function BatchActions({
   /** Purchaser+ — 044's delete policy, which is deliberately narrower than the
    *  supervisor+ one that governs editing a batch. */
   removable: boolean;
+  /** `bar` is the tablet footer's cell (Mark, 2026-09-09: "Move the 'delete
+   *  batch' button to the footer"). */
+  variant?: "button" | "bar";
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -94,6 +100,17 @@ export function BatchActions({
   // thing that survives three refactors before somebody wires it to the wrong
   // value. Deleting is purchaser+ and is now the only command here.
   if (!removable) return null;
+
+  if (variant === "bar") {
+    return (
+      <>
+        <button type="button" onClick={remove} disabled={busy !== null} className={BAR_CELL}>
+          <BarLabel icon={ICON_TRASH} word={busy === "delete" ? "Deleting…" : "Delete batch"} />
+        </button>
+        {error ? <p className="self-center px-3 text-sm text-[var(--rf-red-300)]">{error}</p> : null}
+      </>
+    );
+  }
 
   return (
     <div className="space-y-3">

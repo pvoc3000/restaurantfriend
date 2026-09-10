@@ -15,7 +15,6 @@ import { type BatchFieldsRow } from "@/components/production/BatchFields";
 import { BATCH_PHOTO_BUCKET, BATCH_PHOTO_TTL_SECONDS } from "@/lib/batchPhotos";
 import { BatchLogActions } from "@/components/production/BatchLogActions";
 import { NewBatch } from "@/components/production/NewBatch";
-import { StickyFooter } from "@/components/ui/StickyFooter";
 
 /**
  * One batch log — the MASTER record, and its batches.
@@ -265,18 +264,23 @@ export async function BatchLogRecord({
   // report's. Every pixel above the pinned frame comes out of the list, and on
   // a 768px-tall screen that strip and heading were a third of it.
   const touch = session.shell === "tablet";
+  const addBatch = editable ? (
+    <NewBatch
+      orgId={session.membership.org_id}
+      logId={id}
+      locationId={log.location_id as string}
+      locationCode={kitchenCode}
+      logDate={logDate}
+      variant={touch ? "bar" : "button"}
+    />
+  ) : null;
+  // THE TABLET FOOTER IS Add batch · Delete batch AND NOTHING ELSE (Mark,
+  // 2026-09-09) — Complete/Reopen and Delete log are desk commands, on the
+  // strip below. The pane draws that footer, since Delete batch is about the
+  // batch it is showing.
   const commands = (
     <>
-      {editable ? (
-        <NewBatch
-          orgId={session.membership.org_id}
-          logId={id}
-          locationId={log.location_id as string}
-          locationCode={kitchenCode}
-          logDate={logDate}
-          variant={touch ? "bar" : "button"}
-        />
-      ) : null}
+      {addBatch}
       <BatchLogActions
         logId={id}
         status={(log.status ?? "open") as string}
@@ -285,7 +289,6 @@ export async function BatchLogRecord({
         batches={rows.length}
         outstanding={rows.length - done}
         editable={editable}
-        variant={touch ? "bar" : "button"}
       />
     </>
   );
@@ -384,34 +387,10 @@ export async function BatchLogRecord({
           removable={removable}
           touch={touch}
           crumbs={touch ? crumbs : undefined}
+          footerLeading={touch ? addBatch : undefined}
         />
       )}
 
-      {touch ? (
-        // The shift report's footer, on a record: black, pinned, icon over
-        // word. `StickyFooter` measures itself into a spacer so the pinned
-        // frame above ends where the bar begins rather than under it.
-        //
-        // WRAPPED IN A DIV, and the div is load-bearing. `StickyFooter` renders
-        // two siblings — the spacer and the fixed bar — so placed straight in
-        // this `space-y-4` column the FIXED bar is the last child and the
-        // spacer is not, which hands the spacer a 16px bottom margin that
-        // nothing above it counts: `useExactViewportHeight` measures to the
-        // spacer's bottom EDGE, so the page overshot the window by exactly that
-        // margin in both orientations. The wrapper is the last child instead,
-        // carries no margin inside, and the page is one viewport tall.
-        //
-        // `-mt-4` cancels the page's own rhythm above the wrapper and `flush`
-        // drops the footer's card dress, so the pane ends exactly where the bar
-        // begins (Mark: "way too much padding between the bottom footer and the
-        // bottom pane" — it was 56px). Full-bleed black, like the shift
-        // report's; the cells carry the gutter.
-        <div className="-mt-4">
-          <StickyFooter flush>
-            <div className="flex items-stretch bg-ink px-2 text-white">{commands}</div>
-          </StickyFooter>
-        </div>
-      ) : null}
     </div>
   );
 }
