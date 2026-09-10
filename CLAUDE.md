@@ -9129,9 +9129,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    **SHELL DECIDES POSTURE, VIEWPORT DECIDES DENSITY** is the rule it settled.
    Under the tablet shell (`session.shell`, read by the server component) the
    record loses its heading, its "0 of 2 done" and its status/generated-by/
-   not-printed strip, and its three commands — Add batch · Mark complete ·
-   Delete — go to a `ui/StickyFooter` dressed as the shift report's black bar
-   (`variant="bar"` on `NewBatch` and `BatchLogActions`); `BatchItemsTable`'s
+   not-printed strip, and its commands go to a `ui/StickyFooter` dressed as the
+   shift report's black bar (`variant="bar"` on `NewBatch`, `BatchActions` and
+   `BatchLogActions`); `BatchItemsTable`'s
    `touch` drops the Group-by picker and the columns eye and forces the compact
    set (Element · Par · On hand · Made · Status), which is also the set a narrow
    desk window gets. Nothing about the desk changed but the tabs.
@@ -9161,8 +9161,58 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    shares the breadcrumb row, right-aligned — the record hands its crumbs INTO
    `BatchLogItems`, whose remembered term the table takes as a controlled
    `term`/`onTermChange`; the pane's tabs are `SectionNav size="lg"` in a
-   scrolling `w-36` column, and the tablet's default split is half; and
+   scrolling column, and the tablet's default split is half; and
    **`DataTable resetFooter={false}`** hides the reset-widths line on the iPad.
+
+   **AND A SECOND ROUND THE SAME EVENING, once he had it on the iPad.** Each
+   is small; together they are what the screen actually needed.
+   **THE INFO TAB SCROLLS AS ONE** (Mark: "why are photo, notes and delete
+   stuck in the pane when adjusting its size?"). It was THREE scrollers — each
+   column filling the pane and scrolling itself — which existed so the HISTORY
+   could fill its column (2026-08-09). With the history on its own tab there is
+   nothing left to fill, and per-column scrolling meant dragging the divider
+   moved the fields while the photo, the notes and Delete sat where they were.
+   One scroller, and `fill` comes off `BatchFields` on that tab.
+   **NO FRAME ON THE TABLET** ("it's eating space"): the black bar already says
+   where the pane begins, so the border and its 16px of inner padding — ~34px of
+   a 768px screen — go. The desk keeps its frame.
+   **`StickyFooter` GAINED `flush`**, for a bar that is its own backdrop: no
+   white card, no padding, no `FOOTER_GAP`. With the wrapper at `-mt-4` the pane
+   ends exactly where the bar begins; it was 56px of nothing before.
+   **THE INFO TAB IS TWO BY TWO WITH LABELS ABOVE THE FIELDS** (Mark, in two
+   asks): identity (Status · Order · Prepared by · Recipe version | Scale) on
+   the left, the four AMOUNTS on the right, Notes and Photo beneath. Two `dl`s
+   rather than one four-track grid, so a long value in one column cannot push
+   the other's rows out of step, and `sm:` not `lg:` — a portrait iPad has the
+   width for two columns. Stacking the label over its field gives the value the
+   whole column where a 7.5rem label track left it ~200px, at 14px a row. **The
+   Batch field is GONE** — the pane's own black bar names the number.
+   **THE SCALE IS A FIELD, AND ONE FIELD IN TWO PLACES.** `scale_label` has
+   been on `production_batches` since 044 with NO writer anywhere; it now sits
+   beside Recipe version (a `kind="pick"` over that version's own scale column
+   labels, `allowNew`, the `%` column filtered out because a baker's percentage
+   is not a batch size) — AND the size picker above the Ingredients tab writes
+   the same column (Mark: "make them the same field/ui element"). `BatchRecipe`
+   takes `batchId` and `scaleLabel`: with a batch it writes and DERIVES the
+   shown column from the row, holding a `pendingLabel` so the picker does not
+   snap back during the write; without one it keeps its own local pick. So the
+   amounts a batch shows are the ones that were weighed.
+   **THE RECIPE TABS READ AT ARM'S LENGTH**: 16px ingredients and steps on the
+   tablet (`BatchRecipe size="lg"`), 12px on the desk, with the tabs themselves
+   back to 12px — they went to 14 and Mark asked for them down again, so the
+   size prop is the PADDING and the column is `w-28` at both sizes.
+   **AN AMOUNT IS SET AS A FIGURE AND A UNIT, NOT A STRING**: figure
+   right-aligned, gap, unit left-aligned in a fixed slot, so down the list the
+   numbers line up on their ones column and the units on their first letter.
+   Two spans, never `formatCell`'s one string, which is why it is passed
+   `{ qty, unit: null }` for the left half.
+   **THE FOOTER IS `Batch` · `Batch`** — Add and Delete, the glyph carrying the
+   verb (Mark: "the glyph says add or delete"). Complete/Reopen and Delete log
+   are DESK commands and stay on the strip; **the footer moved INTO
+   `BatchLogItems`**, because Delete batch acts on the SELECTED batch and only
+   that component knows which. The record passes Add batch down as
+   `footerLeading`. Both deletes now say what they delete — the confirms always
+   did, the buttons did not.
 
    **THE RESTING `↕` IS GONE FROM EVERY LIST** (Mark: "Why? Those can go
    away"). `ColumnHeader` draws the arrow on the SORTED column only; the
@@ -9776,7 +9826,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/TimeField` | `<input type="time">`, or a `TextInput` you parse | a time of day in a CREATE form, where the box starts empty and the value is required — `type="time"` yields `HH:MM` or nothing, so a half-typed value can never reach a `time` column as a cast error. It carries NO empty-state apparatus, deliberately: DateField needs one because WebKit paints TODAY into an empty date, and an empty time renders as placeholder segments. An edit-in-place cell on a value already set stays `TimeCell`, which takes free text and lets Postgres parse it. It mirrors DateField's **`variant`** for that component's own stated reason — the two sit side by side, so a bordered time beside a borderless date reads as one of them being broken |
   | `ui/Checkbox` | `<input type="checkbox">` | every checkbox, no exceptions |
   | `ui/Switch` | a rounded div you style yourself | every switch. Black on, and off is the EXACT inverse; `size="sm"` for a dense grid row. Presentational only — the write, the optimism and the error state belong to the caller, because `ActiveToggle` and the recipe sheet's AUTO switch disagree about all three |
-  | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory. `group.summary` puts a SUBTOTAL under each run and **`totals` puts a GRAND TOTAL under the whole table** — both return a map KEYED BY COLUMN, never a ReactNode, so the figures stay under the headings they sum when a column is hidden or dragged (Mark, 2026-08-05: "the values should align with their columns"). `totals` is handed the rows the table is SHOWING, so it agrees with a search rather than reporting the whole set. **`openRowKey` opens one row from OUTSIDE** — a nudge, not control: the table keeps owning which rows are open and this only ever ADDS, applied by adjusting state DURING RENDER so the row is already open on the frame that paints. Every `<tr>` carries `data-row-key`, so a caller can find it to scroll to. **`fillViewport` (with `scroll`) writes a DEFINITE height rather than a cap**, so the pane ends at the foot of the window however few rows survive a filter — identical on a list that already overflows, and the difference on a short one is the table not collapsing upward as you type (Mark, 2026-09-07, of the vendor's items). `fill` (the parent decides) still wins over both |
+  | `catalog/DataTable` + `ColumnHeader` | `<table>` | every list: sort, resizable columns, sticky head, 56px rows, pane scroll memory. `group.summary` puts a SUBTOTAL under each run and **`totals` puts a GRAND TOTAL under the whole table** — both return a map KEYED BY COLUMN, never a ReactNode, so the figures stay under the headings they sum when a column is hidden or dragged (Mark, 2026-08-05: "the values should align with their columns"). `totals` is handed the rows the table is SHOWING, so it agrees with a search rather than reporting the whole set. **`openRowKey` opens one row from OUTSIDE** — a nudge, not control: the table keeps owning which rows are open and this only ever ADDS, applied by adjusting state DURING RENDER so the row is already open on the frame that paints. Every `<tr>` carries `data-row-key`, so a caller can find it to scroll to. **`fillViewport` (with `scroll`) writes a DEFINITE height rather than a cap**, so the pane ends at the foot of the window however few rows survive a filter — identical on a list that already overflows, and the difference on a short one is the table not collapsing upward as you type (Mark, 2026-09-07, of the vendor's items). `fill` (the parent decides) still wins over both. **`resetFooter={false}`** hides the reset-widths line, which is desk furniture on a shared iPad |
   | `catalog/ActiveToggle` | a bespoke switch | the Active column, which leads every catalog table |
   | `catalog/WeekdayPicker` | seven buttons | any day-set; its column must be `WEEKDAY_PICKER_WIDTH` |
   | `catalog/ListFilters` | a filter row | search + category + active + last-ordered, together |
@@ -9788,13 +9838,13 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/ProgressBand` | a word in a button's label | something slow on a screen that's ALREADY painted (an invoice read is 30s+); same indeterminate bar, never a Dialog — the work behind it must stay usable |
   | `ui/Pane` + `PaneHeader` | a bordered div with a header band you style yourself | a framed column standing beside another (receiving's document + lines): one FIXED-height band so the two rules line up, and `overflow-hidden` so nothing paints over the frame |
   | `ui/DocumentChip` | a bordered div with a thumbnail strip | a filed document in a list — PO attachments, employee paperwork. Full-bleed preview (image, or PDF via `<object>`) with the text semi-opaque over it; the plugin is `pointer-events-none` and a transparent anchor takes the click |
-  | `ui/StickyFooter` | a hand-placed `fixed bottom-0` div plus a guessed spacer | a band pinned to the foot of the window — PO paperwork, employee paperwork. MEASURES its own height into a spacer so the page's last block doesn't slide under it, minus what already follows (the layout's `py-8`), and fires a `resize` so `useFillViewportHeight` reclaims space when it SHRINKS |
+  | `ui/StickyFooter` | a hand-placed `fixed bottom-0` div plus a guessed spacer | a band pinned to the foot of the window — PO paperwork, employee paperwork. MEASURES its own height into a spacer so the page's last block doesn't slide under it, minus what already follows (the layout's `py-8`), and fires a `resize` so `useFillViewportHeight` reclaims space when it SHRINKS. **`flush` drops the card** — no white backdrop, no padding, no gap — for a bar that is its own backdrop (the tablet's black footers). **Inside a `space-y-*` column it needs a wrapper div**: it renders the spacer and the FIXED bar as siblings, so with the bar last the spacer inherits a margin `useExactViewportHeight` never counts |
   | `ui/RevealPanel` | a section that is always fully open, or a hand-rolled hover-expand | a block whose body costs more screen than it earns — both paperwork areas. Header always visible (title, count, Add as, Attach, progress, errors); the body opens on hover, on focus, or from a pinning toggle, and is ABSOLUTELY POSITIONED so it never reflows the page. **`alwaysOpen`** drops the toggle and puts the body IN FLOW, for when the panel gets a screen of its own and the crowding it was hiding from is gone |
   | `ui/fieldMetrics` `FORM_TEXTAREA` (or `FORM_FIELD_DRESS`) | a hand-typed `border border-ink bg-white …` | a multiline field in a dialog. `FORM_TEXTAREA` is the whole dress at the app's 14px form size, filling its track; `FORM_FIELD_DRESS` is the same border/ground/focus/padding WITHOUT a width or a font size, for a field in a label/field grid that supplies its own (the PO and special-order compose bodies, which inherit 16px on purpose — a big writing surface for a message about to be sent). **The padding cannot be overridden** — Tailwind resolves by stylesheet order — so a field wanting different padding writes its own dress, which is what the public pages do at `px-3`/`text-[16px]` (below 16px iOS Safari zooms on focus). Extracted after seven hand-typed copies had drifted into two |
   | `ui/buttons` `PRIMARY_BUTTON_CLASS` | a black class string you type yourself | the ONE case where a command button on a SCREEN is filled black — a record in an abnormal state with exactly one way out (a flagged order's "Resolve the issue"), or a screen whose ONE obvious next act depends on its state — the timesheets screen fills **Import timesheets** while the pay period is empty and **Close pay period…** once it has shifts, and never both (Mark, 2026-08-22), and the PO's Add-item panel moves the fill from Done onto the row being typed into (Mark, 2026-09-08). `DIALOG_COMMIT_CLASS`'s argument outside a dialog; only ever right CONDITIONALLY, never as a screen's standing "primary" |
   | `ui/buttons` `DANGER_BUTTON_CLASS` | re-typing the red class string | any destructive command out on a screen — Delete, Void, "Deactivate everywhere". Red EVEN THOUGH most only open a confirm: a reader can't tell "opens a confirm" from "destroys" by looking. Bordered, never filled. NOT the same as `DIALOG_DANGER_CLASS` (`px-5`, a dialog footer's commit) — don't merge them. Positional classes stay at the call site |
   | `ui/FileDropZone` | `onDrop` on a div | dropping files onto a region. Its OVERLAY takes the drop (a PDF `<object>` is a plugin and swallows drag events — confirmed working over a live PDF, Mark 2026-08-04), it arms off WINDOW drag events so it's up before the pointer arrives, it vets types itself (`accept` governs only the picker), and it stops a stray drop navigating the page away |
-  | `ui/SectionNav` | a second sidebar, underline tabs, or a `TabPicker` turned sideways | **the sections of one detail record** — the employee screen's Info · Employment · Events · Documents · Admin. Plain text links, no box: active bold black, inactive `text-muted`. `orientation="horizontal"` is the narrow-screen form. See "A detail screen that outgrows one page" below — REUSE THIS, don't re-derive it |
+  | `ui/SectionNav` | a second sidebar, underline tabs, or a `TabPicker` turned sideways | **the sections of one detail record** — the employee screen's Info · Employment · Events · Documents · Admin. Plain text links, no box: active bold black, inactive `text-muted`. `orientation="horizontal"` is the narrow-screen form; **`size="lg"` is the tablet's**, and it is PADDING only — the type stayed 12px after 14 read as too big. See "A detail screen that outgrows one page" below — REUSE THIS, don't re-derive it |
   | `tablet/TabletBar` + `tablet/BarLabel` | a hand-rolled bar, or a second masthead | the tablet shell's whole chrome (build step 4p): Back · Home · record book · title · shop · Switch user, each a 64px cell with a wght-700 Material Symbols icon over its word. Mounted by the `(app)` layout when `session.shell === "tablet"`; publishes `--rf-header-h`. `barCell.ts` is layout only — colour stays at the call site |
   | `ui/RecordNav` + `lib/recordSet` | going back to the list for the next record | FMP's book on a detail screen: the LIST publishes its found set, the detail walks it. **It carries `?tab=` by default**, so paging a tabbed record stays on the tab you are on — name a record's tab parameter `tab` and nothing else is needed |
   | `DataTable columnChooser` | a bespoke checklist, or placing `ColumnsMenu` yourself | show/hide columns on a list — the table puts it above its own last column header; pair it with `DataColumn.pinned` on the column that IS the row |
@@ -9926,7 +9976,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   sits over THREE boxes.
   Known cost, accepted: **`/batch-logs/[id]`'s detail pane shows about three
   fields before it scrolls** — it was already scrolling and is drag-resizable,
-  but it is the one place the 36px rule is visibly expensive.
+  but it is the one place the 36px rule is visibly expensive. (Measured against
+  that pane's ONE column with side labels; 2026-09-09 made it two columns with
+  the label over each field, which costs a 14px line per row and gives the
+  value the whole column back. Re-measure before quoting the figure.)
 
 - **USE LITERAL TYPOGRAPHIC CHARACTERS IN JSX TEXT, NEVER HTML ENTITIES**
   (found 2026-08-30). **SWC strips the leading whitespace of a JSXText node that
