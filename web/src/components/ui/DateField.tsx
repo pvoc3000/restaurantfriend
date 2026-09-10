@@ -1,7 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { formatTypedDate, parseTypedDate } from "@/lib/dateInput";
+import { monthStart } from "@/lib/dateRange";
+import { todayInTimeZone } from "@/lib/today";
+import { useAnchoredPanel } from "@/lib/anchoredPanel";
+import { CalendarGrid } from "@/components/ui/CalendarGrid";
 import { BOXED_FIELD, BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
 
 /**
@@ -27,6 +32,10 @@ export function CalendarIcon() {
   );
 }
 
+/** A day button under the calendar — `ui/RangePicker`'s preset dress. */
+const PANEL_BUTTON =
+  "inline-flex h-8 items-center whitespace-nowrap border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+
 /**
  * A date box you can TYPE INTO, PASTE INTO, or pick from a calendar.
  *
@@ -36,40 +45,42 @@ export function CalendarIcon() {
  * edit-in-place cell.
  *
  * ------------------------------------------------------------------------
- * THE VISIBLE BOX IS TEXT; THE NATIVE DATE INPUT IS STILL HERE, HIDDEN.
+ * THE BOX IS TEXT, AND THE CALENDAR IS OURS.
  *
  * Mark, 2026-09-01: "All fields using the calendar picker should still allow
  * the user to enter the date directly rather than rely on the calendar picker
  * UI. Sometimes it's faster to type the date or even paste the date than fumble
- * around with the picker."
+ * around with the picker." So the box is `type="text"`, parsed by
+ * `lib/dateInput` (which is where the accepted formats and the refusals are
+ * written down, and fixture-tested).
  *
- * A native `<input type="date">` cannot be pasted into in ANY engine — there is
- * no text in it to replace, only three spin fields — and this component made
- * the typing half worse than the platform: an empty one was `opacity-0` over a
- * blank with `onClick` opening the picker, so on the commonest case of all, a
- * date not yet set, there was nowhere to put a caret.
+ * THE CALENDAR ICON OPENS `ui/CalendarGrid` IN AN ANCHORED PANEL — the range
+ * picker's own month grid (Mark, 2026-09-10: "roll our own date picker control
+ * so it matches rangepicker"). It replaced a native `<input type="date">` kept
+ * at 1px only so `showPicker()` could open the BROWSER's calendar, and that
+ * hidden input was the source of every date bug this component has had: Safari
+ * painted TODAY into an empty one, so a null read as a delivery that had
+ * already happened (three attempts to style it away, 2026-08-02); and iPad
+ * Safari would not open a picker for an input it could not see, while the
+ * `try` swallowed the refusal, so tapping the icon did nothing and said nothing
+ * (2026-09-10). Our panel looks the same on the desk and the iPad, matches the
+ * range filters, and has no engine to argue with.
  *
- * So the box is `type="text"`, parsed by `lib/dateInput` (which is where the
- * accepted formats and the refusals are written down, and fixture-tested), and
- * the native input survives at 1px, transparent and untabbable, for one job:
- * `showPicker()` throws on an element that is not RENDERED, and the calendar
- * button is worth keeping — on a tablet it is the fast way, which is the half
- * of Mark's sentence that was already true.
- *
- * WHAT THIS RETIRES. Everything the previous version was mostly about: Safari
- * paints TODAY into an empty date input, so a null column read as a delivery
- * that had already happened, and no amount of styling reaches WebKit's
- * per-segment sub-pseudo-elements (three attempts, 2026-08-02). A text box
- * paints what it is given. The hidden input can paint whatever it likes at 1px.
+ * One tap picks and closes. Today and Clear sit under the grid (Clear only when
+ * the field may be empty and is not). `max` greys out every later day. Arrow
+ * keys walk the grid from the date already chosen; Escape closes and returns
+ * focus to the calendar button. Today is the DEVICE's calendar day, read when
+ * the panel opens — this component is told no organisation timezone, and a shop
+ * iPad's own clock is the shop's.
  *
  * ------------------------------------------------------------------------
  * WHEN IT COMMITS, AND WHY NOT ON EVERY KEYSTROKE.
  *
  * On BLUR and on Enter, not on change. `9/1/2026` passes through `9`, `9/`,
  * `9/1` — all unreadable — on its way to being a date, and a control that
- * committed as you typed would either write nonsense or fight the caret. The
- * native input's own change still commits immediately, because a value picked
- * from a calendar is finished the moment it exists.
+ * committed as you typed would either write nonsense or fight the caret. A date
+ * picked from the calendar commits immediately, because it is finished the
+ * moment it exists.
  *
  * UNREADABLE TEXT REVERTS AND WRITES NOTHING. `lib/dateInput` returns three
  * answers rather than two for exactly this: an EMPTY box is somebody clearing
@@ -78,7 +89,7 @@ export function CalendarIcon() {
  *
  * The draft is re-seeded from the prop whenever the prop moves (adjusting state
  * during render, React's own documented pattern), so a `router.refresh()` after
- * a save, or the picker, lands in the box without an effect.
+ * a save, or a pick, lands in the box without an effect.
  */
 export function DateField({
   value,
@@ -124,16 +135,16 @@ export function DateField({
   /** Wear a bounding box in the `cell` dress — see `PickList`'s own `boxed`. */
   boxed?: boolean;
   /**
-   * The latest date offered, as `YYYY-MM-DD` — forwarded to the hidden input,
-   * so the native picker greys out everything after it.
+   * The latest date offered, as `YYYY-MM-DD` — later days are greyed out in the
+   * calendar.
    *
-   * A hint and never a guarantee: the attribute is advisory in every engine and
-   * the value can still be typed, so whoever reads the date validates it too
-   * (the order guide's `parseGuideDate` does).
+   * A hint and never a guarantee: the value can still be typed, so whoever
+   * reads the date validates it too (the order guide's `parseGuideDate` does).
    */
   max?: string;
 }) {
-  const nativeRef = useRef<HTMLInputElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const [text, setText] = useState(() => formatTypedDate(value));
   // Adjusting state during render when the PROP moves — React's documented
   // alternative to a sync effect, and what the `set-state-in-effect` lint
@@ -144,19 +155,38 @@ export function DateField({
     setText(formatTypedDate(value));
   }
 
+  const [open, setOpen] = useState(false);
+  const [month, setMonth] = useState("");
+  const [today, setToday] = useState("");
+
   const empty = value === null || value === "";
+  const current = empty ? null : value;
   const field = variant === "field";
   const title = variant === "title";
 
-  const openPicker = () => {
-    const el = nativeRef.current;
-    if (!el) return;
-    // Needs transient activation, which a click is. Not every engine has it.
-    try {
-      el.showPicker();
-    } catch {
-      // No picker to open — the text box is the fallback and is already there.
-    }
+  const close = useCallback(() => setOpen(false), []);
+  const box = useAnchoredPanel({
+    open,
+    triggerRef: buttonRef,
+    panelRef,
+    align: "right",
+    onClose: close,
+  });
+
+  const openPanel = () => {
+    // Read when opening, never at render: a server render would read the
+    // SERVER's day, and the markup would disagree with the client's.
+    const now = todayInTimeZone(Intl.DateTimeFormat().resolvedOptions().timeZone);
+    setToday(now);
+    setMonth(monthStart(current ?? now));
+    setOpen(true);
+  };
+
+  /** A date from the calendar — finished the moment it exists. */
+  const pick = (next: string | null) => {
+    setText(formatTypedDate(next));
+    if (next !== current) onChange(next);
+    close();
   };
 
   /** Read the box. Commits a date, commits a clear, or puts the value back. */
@@ -170,7 +200,7 @@ export function DateField({
     // Normalise what is shown even when nothing moved, so `9/1/26` settles to
     // `09/01/2026` rather than sitting there looking half-typed.
     setText(formatTypedDate(next));
-    if (next !== (value ?? null)) onChange(next);
+    if (next !== current) onChange(next);
   };
 
   return (
@@ -226,8 +256,8 @@ export function DateField({
           autoComplete="off"
           // NOT `inputMode="numeric"`: iOS renders that as a digits-only pad
           // with no `/`, which would make the field unusable on the device this
-          // is most typed on. The calendar button is the fast path there; this
-          // is the one for a keyboard and for a paste.
+          // is most typed on. The calendar is the fast path there; this is the
+          // one for a keyboard and for a paste.
           // THE PLACEHOLDER IS WHY `collapseWhenEmpty` IS GONE. That prop
           // existed because an empty date input was INVISIBLE, so reserving
           // 112px for one rendered as a calendar glyph floating alone in a
@@ -256,42 +286,65 @@ export function DateField({
                 : "w-28"
           } ${className}`}
         />
-        {/* THE NATIVE INPUT, KEPT ONLY TO BE OPENED. 1px and transparent rather
-            than `hidden` or `display:none`, because `showPicker()` throws on an
-            element that is not rendered — that distinction is the whole of the
-            care here, and it is the same one the previous version turned on.
-            Untabbable and aria-hidden: the text box above is the control, and
-            two focus stops for one field would be a worse keyboard than the one
-            this replaces. */}
-        <input
-          ref={nativeRef}
-          type="date"
-          tabIndex={-1}
-          aria-hidden
-          value={empty ? "" : (value as string)}
-          max={max}
-          disabled={disabled}
-          onChange={(e) => {
-            // Picked from the calendar, so it is finished the moment it exists.
-            const next = e.target.value || null;
-            setText(formatTypedDate(next));
-            if (next !== (value ?? null)) onChange(next);
-          }}
-          className="pointer-events-none absolute bottom-0 left-0 h-px w-px opacity-0"
-        />
       </span>
-      {/* Ours, not the engine's — Safari draws no indicator and Chrome's sits
-          inside the field where it can't be made to match anything. */}
       <button
+        ref={buttonRef}
         type="button"
         disabled={disabled}
         aria-label={`Choose ${ariaLabel}`}
+        aria-haspopup="dialog"
+        aria-expanded={open}
         title="Choose a date"
-        onClick={openPicker}
+        onClick={() => (open ? close() : openPanel())}
         className="shrink-0 text-muted hover:text-ink disabled:opacity-35"
       >
         <CalendarIcon />
       </button>
+
+      {open &&
+        box &&
+        createPortal(
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-label={`Choose ${ariaLabel}`}
+            // Anchored to the calendar button's right edge (`align: "right"`)
+            // and shifted left by its own width — `ColumnsMenu`'s placement —
+            // so it opens under the field rather than off past its end.
+            style={{ top: box.top, left: box.left, transform: "translateX(-100%)" }}
+            // Layout only — the colours are stated here, not inherited:
+            // `position: fixed` moves the box and not its place in the DOM, so
+            // a field sitting in a black band would otherwise paint white type
+            // into this panel (the Generate-POs lesson).
+            className="fixed z-[70] border-2 border-ink bg-white p-3 text-ink whitespace-normal"
+          >
+            <CalendarGrid
+              month={month}
+              today={today}
+              painted={current ? { from: current, to: current } : null}
+              onMonth={setMonth}
+              onTap={pick}
+              isDisabled={max ? (iso) => iso > max : undefined}
+              autoFocusIso={current ?? today}
+            />
+            <div className="mt-3 flex gap-2">
+              <button
+                type="button"
+                onClick={() => pick(today)}
+                disabled={!!max && today > max}
+                className={PANEL_BUTTON}
+              >
+                Today
+              </button>
+              {!required && current && (
+                <button type="button" onClick={() => pick(null)} className={PANEL_BUTTON}>
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>,
+          document.body
+        )}
     </span>
   );
 }

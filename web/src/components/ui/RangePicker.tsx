@@ -4,21 +4,17 @@ import { useCallback, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useAnchoredPanel } from "@/lib/anchoredPanel";
 import {
-  addMonths,
   formatRange,
-  inRange,
   matchingPreset,
-  monthGrid,
-  monthLabel,
   monthStart,
   normalizeRange,
   resolvePreset,
-  WEEKDAY_LETTERS,
   type DateRange,
   type RangePresetSpec,
 } from "@/lib/dateRange";
 import { formatTypedDate, parseTypedDate } from "@/lib/dateInput";
 import { CalendarIcon } from "@/components/ui/DateField";
+import { CalendarGrid } from "@/components/ui/CalendarGrid";
 import { BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
 
 /**
@@ -299,7 +295,7 @@ export function RangePicker({
             className="fixed z-[70] flex gap-4 border-2 border-ink bg-white p-3 text-ink whitespace-normal"
           >
             <div className="w-[15.5rem] shrink-0">
-              <Calendar
+              <CalendarGrid
                 month={month}
                 today={today}
                 painted={painted}
@@ -400,92 +396,5 @@ function TypedDate({
         className="h-9 w-full min-w-0 border border-ink bg-white px-2 text-[16px] tabular-nums outline-none placeholder:text-faint focus:ring-1 focus:ring-inset focus:ring-ink"
       />
     </span>
-  );
-}
-
-/**
- * The month grid. Six rows always (`monthGrid`), so the panel does not change
- * height as you page — and the presets beside it never move under the pointer.
- */
-function Calendar({
-  month,
-  today,
-  painted,
-  onMonth,
-  onTap,
-  onHover,
-}: {
-  month: string;
-  today: string;
-  painted: DateRange | null;
-  onMonth: (iso: string) => void;
-  onTap: (iso: string) => void;
-  onHover: (iso: string | null) => void;
-}) {
-  const weeks = monthGrid(month);
-  return (
-    <div className="select-none">
-      <div className="mb-2 flex items-center">
-        <button
-          type="button"
-          aria-label="Previous month"
-          onClick={() => onMonth(addMonths(month, -1))}
-          className="h-8 w-8 hover:bg-neutral-100"
-        >
-          ‹
-        </button>
-        <span className="flex-1 text-center text-sm font-semibold">{monthLabel(month)}</span>
-        <button
-          type="button"
-          aria-label="Next month"
-          onClick={() => onMonth(addMonths(month, 1))}
-          className="h-8 w-8 hover:bg-neutral-100"
-        >
-          ›
-        </button>
-      </div>
-      <div className="grid grid-cols-7" onMouseLeave={() => onHover(null)}>
-        {WEEKDAY_LETTERS.map((letter, i) => (
-          <span
-            key={i}
-            aria-hidden
-            className="h-6 text-center text-[11px] uppercase tracking-[0.12em] text-subtle"
-          >
-            {letter}
-          </span>
-        ))}
-        {weeks.flat().map((day) => {
-          const inside = painted !== null && inRange(day.iso, painted);
-          const edge =
-            painted !== null && (day.iso === painted.from || day.iso === painted.to);
-          return (
-            <button
-              key={day.iso}
-              type="button"
-              aria-label={day.iso}
-              aria-pressed={edge}
-              onClick={() => onTap(day.iso)}
-              onMouseEnter={() => onHover(day.iso)}
-              onFocus={() => onHover(day.iso)}
-              // The two ends are FILLED, the days between are WASHED, and a
-              // day outside the month is faint but still a target — the last
-              // week of August is a fine place to start "the week before
-              // the first". Today is bold; it is a fact, not a state.
-              className={`h-8 text-sm tabular-nums ${
-                edge
-                  ? "bg-ink text-white"
-                  : inside
-                    ? "bg-neutral-100"
-                    : "hover:bg-neutral-100"
-              } ${day.inMonth ? "" : "text-faint"} ${day.iso === today ? "font-bold" : ""}`}
-            >
-              {Number(day.iso.slice(8, 10))}
-            </button>
-          );
-        })}
-      </div>
-      {/* The "Tap the start date / end date" line is gone: the two boxes under
-          the grid say which tap comes next — a filled Start over an empty End. */}
-    </div>
   );
 }
