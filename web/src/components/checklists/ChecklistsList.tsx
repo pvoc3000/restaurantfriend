@@ -4,7 +4,8 @@ import { useMemo, useState, type ReactNode } from "react";
 import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { SHIFT_SLOT_LABEL } from "@/lib/employeeEvents";
 import { CHECKLIST_KIND_LABEL, type ChecklistKind } from "@/lib/checklists";
 
@@ -200,19 +201,23 @@ export function ChecklistsList({
 
       <div className="flex flex-wrap items-end gap-4">
         {viewTabs}
-        <TabPicker
-          ariaLabel="Which ones"
-          value={tier}
-          options={[
-            {
-              key: "open",
-              label: "Unfinished",
-              count: rows.filter((r) => r.status === "open").length,
-            },
-            { key: "all", label: "All", count: rows.length },
-          ]}
-          onChange={(v) => setTier(v as typeof tier)}
-        />
+        <ControlField label="Show">
+          <PickList
+            ariaLabel="Which ones"
+            variant="field"
+            value={tier}
+            options={[
+              {
+                value: "open",
+                label: "Unfinished",
+                hint: String(rows.filter((r) => r.status === "open").length),
+              },
+              { value: "all", label: "All", hint: String(rows.length) },
+            ]}
+            onPick={(v) => setTier(v as typeof tier)}
+            fit
+          />
+        </ControlField>
         {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 

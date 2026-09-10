@@ -4,7 +4,8 @@ import { useMemo, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { SHIFT_SLOT_LABEL } from "@/lib/employeeEvents";
@@ -33,10 +34,11 @@ const KINDS: ChecklistKind[] = ["checklist", "walkthrough", "inspection"];
 /**
  * The templates.
  *
- * ONE dimension — kind — so it is a `TabPicker` and not `ui/FilterMenus`, which
- * is for three or more ANDed together. The counts sit on the tabs and describe
- * the SEARCHED set, so searching narrows the tabs rather than leaving them
- * claiming a total the table isn't showing.
+ * ONE dimension — kind — so it is a single captioned `PickList` (a `TabPicker`
+ * until 2026-09-10) and not `ui/FilterMenus`, which is for three or more ANDed
+ * together. The counts ride as hints and describe the SEARCHED set, so
+ * searching narrows them rather than leaving them claiming a total the table
+ * isn't showing.
  *
  * Local state rather than the URL: this is one small list read in one sitting,
  * and unlike `/items` there is no detail round trip deep enough to lose.
@@ -167,19 +169,23 @@ export function ChecklistTemplatesList({
           className="w-56"
           icon={<SearchGlyph />}
         />
-        <TabPicker
-          ariaLabel="Kind"
-          value={kind}
-          options={[
-            { key: "all" as const, label: "All", count: searched.length },
-            ...KINDS.map((k) => ({
-              key: k,
-              label: CHECKLIST_KIND_LABEL[k],
-              count: searched.filter((r) => r.kind === k).length,
-            })),
-          ]}
-          onChange={(v) => setKind(v as ChecklistKind | "all")}
-        />
+        <ControlField label="Kind">
+          <PickList
+            ariaLabel="Kind"
+            variant="field"
+            value={kind}
+            options={[
+              { value: "all", label: "All", hint: String(searched.length) },
+              ...KINDS.map((k) => ({
+                value: k,
+                label: CHECKLIST_KIND_LABEL[k],
+                hint: String(searched.filter((r) => r.kind === k).length),
+              })),
+            ]}
+            onPick={(v) => setKind(v as ChecklistKind | "all")}
+            fit
+          />
+        </ControlField>
         {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 

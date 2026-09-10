@@ -1,7 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { PageHeading } from "@/components/ui/PageHeading";
 import {
   CHECKLIST_VIEWS,
@@ -20,7 +21,8 @@ import { NewChecklistTemplate } from "./NewChecklistTemplate";
  * ONE SCREEN, TWO VIEWS (Mark, 2026-08-30). They are the same subject at two
  * moments, and two adjacent nav entries made you decide which one you wanted
  * before you could look at either. `/events` is the precedent for the shape: a
- * `TabPicker` over two populations fetched under different rules.
+ * view switch (a captioned `PickList` since 2026-09-10) over two populations
+ * fetched under different rules.
  *
  * The view rides in the URL — this app's rule for view state — through a real
  * navigation rather than `history.replaceState`, because the two halves are
@@ -68,18 +70,23 @@ export function ChecklistsScreen({
 
   // Handed to whichever list is rendered, so it sits IN the filter row rather
   // than on a band above it (Mark, 2026-09-03).
+  // A captioned PICKLIST rather than tabs (Mark, 2026-09-10). Still a real
+  // navigation — the two views are different queries.
   const viewTabs = (
-    <TabPicker
-      ariaLabel="Which view"
-      value={view}
-      options={CHECKLIST_VIEWS.map((v) => ({
-        key: v,
-        label: CHECKLIST_VIEW_LABEL[v],
-        count: v === "walks" ? runs.length : templates.length,
-        href: checklistViewHref(v),
-      }))}
-      onChange={(v) => router.push(checklistViewHref(v as ChecklistView))}
-    />
+    <ControlField label="View">
+      <PickList
+        ariaLabel="Which view"
+        variant="field"
+        value={view}
+        options={CHECKLIST_VIEWS.map((v) => ({
+          value: v,
+          label: CHECKLIST_VIEW_LABEL[v],
+          hint: String(v === "walks" ? runs.length : templates.length),
+        }))}
+        onPick={(v) => router.push(checklistViewHref(v as ChecklistView))}
+        fit
+      />
+    </ControlField>
   );
 
   return (
