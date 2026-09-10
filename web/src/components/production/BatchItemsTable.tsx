@@ -3,7 +3,6 @@
 import { useMemo } from "react";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import type { SortDir } from "@/lib/tableSort";
-import { TabPicker } from "@/components/ui/TabPicker";
 import { PickList } from "@/components/ui/PickList";
 import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
@@ -516,15 +515,17 @@ export function BatchItemsTable({
           </ControlField>
           {touch ? null : (
             <ControlField label="Group by">
-              <TabPicker
+              <PickList
                 ariaLabel="Group the batches"
+                variant="field"
                 value={grouping}
-                onChange={setGrouping}
+                onPick={(next) => setGrouping(next as Grouping)}
                 options={[
-                  { key: "type" as Grouping, label: "Item type" },
-                  { key: "status" as Grouping, label: "Status" },
-                  { key: "none" as Grouping, label: "None" },
+                  { value: "type", label: "Item type" },
+                  { value: "status", label: "Status" },
+                  { value: "none", label: "None" },
                 ]}
+                fit
               />
             </ControlField>
           )}

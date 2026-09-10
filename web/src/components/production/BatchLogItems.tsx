@@ -282,7 +282,9 @@ export function BatchLogItems({
           // grew an `onSelect` mode for it because a batch has no route to link
           // to. It also buys back the ~50px row a segmented bar spent above the
           // fields, which on a divided pane is a field.
-          <div className={`flex gap-5 ${touch ? "pt-3" : "p-4"} ${wide ? "min-h-0 flex-1" : ""}`}>
+          // `gap-8` (Mark, 2026-09-10: "add some padding between columns in the
+          // bottom pane") — 20px left the fields crowding the tab column.
+          <div className={`flex gap-8 ${touch ? "pt-3" : "p-4"} ${wide ? "min-h-0 flex-1" : ""}`}>
             {/* The tab column scrolls itself like the columns beside it: at
                 the tablet's taller rows four tabs are 164px, which is more than
                 a short pane holds, and a column that cannot scroll paints its

@@ -103,8 +103,11 @@ export function BatchFields({
     //
     // The history had a third track here until it got its own tab
     // (2026-09-09); `fill` is kept for the desk's per-column scrolling.
+    //
+    // `gap-x-12` (Mark, 2026-09-10): at 32px the left column's full-width
+    // boxes ran nearly into the right column's labels.
     <div
-      className={`grid gap-x-8 gap-y-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] ${
+      className={`grid gap-x-12 gap-y-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] ${
         fill ? "min-h-0 flex-1" : ""
       }`}
     >
