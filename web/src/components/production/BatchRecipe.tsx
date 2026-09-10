@@ -243,23 +243,37 @@ export function BatchRecipe({
                     <td className={cell}>
                       {line.production_elements?.name ?? line.label ?? "—"}
                     </td>
+                    {/* THE FIGURE RIGHT, THE UNIT LEFT, A GAP BETWEEN (Mark,
+                        2026-09-09) — so the numbers line up on their ones
+                        column down the list and the units line up on their
+                        first letter, which is how a printed recipe sets them
+                        and how a baker reads down one. Two spans, never one
+                        string: `formatCell` with no unit is the bare figure. */}
                     <td className={`${cell} tabular-nums whitespace-nowrap`}>
-                      {chosen
-                        ? formatCell(
-                            columnCell(
-                              {
-                                qty: line.qty,
-                                unit: line.unit,
-                                scaleAuto: line.scale_auto ?? true,
-                                scaleAmounts: numbers(line.scale_amounts),
-                                scaleUnits: line.scale_units,
-                              },
-                              chosen,
-                              baseMultiplier,
-                              baseIndex
-                            )
-                          )
-                        : ""}
+                      {(() => {
+                        if (!chosen) return null;
+                        const amount = columnCell(
+                          {
+                            qty: line.qty,
+                            unit: line.unit,
+                            scaleAuto: line.scale_auto ?? true,
+                            scaleAmounts: numbers(line.scale_amounts),
+                            scaleUnits: line.scale_units,
+                          },
+                          chosen,
+                          baseMultiplier,
+                          baseIndex
+                        );
+                        if (amount.qty === null) return null;
+                        return (
+                          <span className="flex gap-2">
+                            <span className="flex-1 text-right">
+                              {formatCell({ qty: amount.qty, unit: null })}
+                            </span>
+                            <span className="w-12 text-left">{amount.unit ?? ""}</span>
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className={`${cell} text-muted`}>{line.note ?? ""}</td>
                   </tr>
