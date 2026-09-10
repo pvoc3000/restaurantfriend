@@ -9951,6 +9951,18 @@ weekday column, and 003 then silently made it per-vendor-item.
     magnifier sits in the clear button's slot while the box is empty
     (`TextInput`'s new opt-in `icon` prop), and the hint's words moved to
     `aria-label`, the field's only name.
+  **THE CONTROLS ARE SET IN CHICAGO, as ChicagoFLF** (Mark, 2026-09-10: "try
+  ChicagoFLF on the invoice page's controls"). Robin Casady's outline revival of
+  Susan Kare's system font, which he placed in the PUBLIC DOMAIN — his statement
+  ships beside the file as `web/public/fonts/ChicagoFLF-README.txt`. The real
+  Chicago is Apple's and never was free, so do not swap in a copy of it.
+  Self-hosted (`@font-face` in `mac-look.css`, served from `public/fonts`), and
+  scoped to `mac-control` and `mac-field` only; an open picklist's panel is
+  portalled to the body and keeps the app's font. **Chicago runs WIDER than the
+  system font** — the date window's "09/01/26 – 09/10/26" measured 161px against
+  131 and truncated in its `w-52` cell, so on /invoices that cell is `w-60`.
+  `fit` pickers size themselves from their options in the real font and needed
+  nothing. Re-measure any fixed-width cell before rolling the font out further.
   **Tried and rejected, so nobody reinvents them:** a 5px shadow (3px), the
   classic 50% checkerboard hover in both 2×2 and 1px dots (a solid light grey
   replaced it), a solid `#808080` hover (too dark), a solid-black flip on press

@@ -14,6 +14,27 @@
  * `focus:border-2` without an `!important` anywhere.
  */
 
+/* ---- the typeface ------------------------------------------------------- */
+
+/* CHICAGO, as ChicagoFLF (Mark, 2026-09-10: "try ChicagoFLF on the invoice
+   page's controls"). Robin Casady's outline revival of Susan Kare's system
+   font, placed in the PUBLIC DOMAIN by its author (fontlibrary.org lists it
+   "Public Domain (not a license)"). Self-hosted from `public/fonts` — nothing
+   loads from a font CDN. The real Chicago is Apple's and was never free.
+
+   Scoped to the two opt-in classes, like everything in this file; an open
+   picklist's PANEL is portalled to the body and keeps the app's own font. */
+@font-face {
+  font-family: "ChicagoFLF";
+  src: url("/fonts/ChicagoFLF.ttf") format("truetype");
+  font-display: swap;
+}
+
+.mac-control,
+.mac-field {
+  font-family: "ChicagoFLF", var(--rf-font-sans, system-ui), sans-serif;
+}
+
 /* ---- .mac-control: buttons and picklists -------------------------------- */
 
 /* At rest: a hard black shadow 3px down and right, no blur. State changes are
