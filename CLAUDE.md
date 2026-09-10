@@ -11097,21 +11097,31 @@ weekday column, and 003 then silently made it per-vendor-item.
   a line that has free space and does nothing to a line the search has filled,
   which is both cases at once. Where the row simply fits, neither is needed:
   the last item's right edge is already the row's.
-  **AND `flex-wrap-reverse` IS HOW COMMANDS RISE ABOVE A WRAPPED FILTER ROW**
-  (Mark, 2026-09-10: "is it possible for the action buttons to appear above the
-  filter buttons when the row wraps?"). CSS cannot ask whether a row wrapped,
-  so the alternatives are a breakpoint — right at one width, wrong at the next
-  — or a permanent command strip, a line spent even where the row fits.
-  Reversing the CROSS axis makes lines stack upward, so the LAST items are the
-  ones that rise and a width that does not wrap is untouched. Two things come
-  with it: **`items-start` is the BOTTOM alignment** (cross-start is the
-  bottom now, so `items-end` would push the fields to the top of their line),
-  and **focus order stays DOM order**, so a keyboard reaches the risen commands
-  after the filters drawn below them — tolerable for independent controls, and
-  the fix if it ever bites is a real strip above, never `order`.
-  Measured on `/invoices`: 1440 one line with the commands on the right edge;
-  1280 and 1024 commands above and right-aligned with the filters one line
-  beneath; 820 commands above, filters on two.
+  **A ROW THAT CARRIES COMMANDS GIVES THEM A STRIP OF THEIR OWN, ABOVE IT AND
+  RIGHT-ALIGNED** (Mark, 2026-09-10, on `/invoices`: "make the filter row two
+  rows, with the action buttons in the first row aligned to the right and the
+  filter buttons on the second row aligned left"). The filter row is then
+  left-aligned by construction rather than by a rule — nothing in it is pushed
+  right, and the flexible search fills what the fields leave.
+  **`flex-wrap-reverse` was tried first and is worth knowing about**: it
+  reverses the CROSS axis so lines stack upward, which makes the LAST items
+  rise only when the row actually wraps — the one pure-CSS answer to "when it
+  wraps", since CSS cannot ask. It works (`items-start` is then the BOTTOM
+  alignment, which reads like a typo and is not), and a strip beat it on two
+  counts: the same arrangement at every width rather than a change at a
+  threshold nobody sees coming, and no mismatch between focus order and
+  reading order.
+  **THE TRAP THE STRIP SPRINGS: a cluster that was a flex ITEM becomes a
+  full-width BLOCK.** `NewInvoice`'s trigger carries an `ml-auto` baked in,
+  harmless while the cluster was content-sized with no free space to give
+  away — as a row of its own it ate the whole line and put the two commands at
+  opposite ends of the screen. Keep the buttons in an INNER content-sized
+  group and put `justify-end` on the outer row. Caught by looking at it, not
+  by review.
+  Measured on `/invoices`: 1440 commands grouped at the right edge, filter row
+  one line from the left margin with a 661px search; 1024 the same at 245; 820
+  commands still right-aligned, filters on two lines — five controls cannot
+  share 757px, which is why the PO list's four can and this one's cannot.
   **THE PO LIST'S STATUS went 697px → 160**, and its row's content 1365 → 828
   at 1440 — where 1365 was one pixel inside the 1376 a 1440 window gives, so
   the row fitted on the widest screen in the building and nowhere else.
