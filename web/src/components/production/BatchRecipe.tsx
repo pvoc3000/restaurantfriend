@@ -63,6 +63,7 @@ export function BatchRecipe({
   versionId,
   elementName,
   show = "both",
+  size = "md",
 }: {
   /** The batch's version, or the element's master. Null when the element has no
    *  recipe at all — which is legitimate: generation warns about it and makes
@@ -76,7 +77,12 @@ export function BatchRecipe({
    * two-column form for anywhere with the room.
    */
   show?: "both" | "ingredients" | "instructions";
+  /** "lg" is the tablet's — 16px ingredients and steps, read at arm's length
+   *  from a bench (Mark, 2026-09-09). */
+  size?: "md" | "lg";
 }) {
+  const body = size === "lg" ? "text-[16px]" : "text-[12px]";
+  const cell = size === "lg" ? "px-3 py-2" : "px-2 py-1";
   const supabase = createClient();
   // Keyed by the version it describes, both of them — see BatchHistory for why
   // the key beats clearing in an effect. Here it also means the chosen batch
@@ -198,7 +204,7 @@ export function BatchRecipe({
         {/* -- what goes in ------------------------------------------------- */}
         {show !== "instructions" ? (
         <div className="min-h-0 overflow-y-auto border border-hairline">
-          <table className="w-full table-fixed border-collapse text-[12px]">
+          <table className={`w-full table-fixed border-collapse ${body}`}>
             {/* INGREDIENT · AMOUNT · NOTE (Mark, 2026-08-09), where FileMaker
                 prints amount first. The ingredient is what you scan down the
                 column for — the amount only means anything once you have found
@@ -214,7 +220,7 @@ export function BatchRecipe({
                 {["Ingredient", "Amount", "Note"].map((h) => (
                   <th
                     key={h}
-                    className="border-b border-hairline px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-muted"
+                    className={`border-b border-hairline ${cell} ${size === "lg" ? "text-[12px]" : "text-[10px]"} font-semibold uppercase tracking-[0.08em] text-muted`}
                   >
                     {h}
                   </th>
@@ -234,10 +240,10 @@ export function BatchRecipe({
                     {/* THE ELEMENT'S NAME LEADS; `label` is only a fallback —
                         FMP's `columnName_t` override goes stale when a version
                         is copied (2026-08-08's lesson, same order here). */}
-                    <td className="px-2 py-1">
+                    <td className={cell}>
                       {line.production_elements?.name ?? line.label ?? "—"}
                     </td>
-                    <td className="px-2 py-1 tabular-nums whitespace-nowrap">
+                    <td className={`${cell} tabular-nums whitespace-nowrap`}>
                       {chosen
                         ? formatCell(
                             columnCell(
@@ -255,7 +261,7 @@ export function BatchRecipe({
                           )
                         : ""}
                     </td>
-                    <td className="px-2 py-1 text-muted">{line.note ?? ""}</td>
+                    <td className={`${cell} text-muted`}>{line.note ?? ""}</td>
                   </tr>
                 ))
               )}
@@ -273,11 +279,11 @@ export function BatchRecipe({
             </h3>
           ) : null}
           {loaded.steps.length === 0 ? (
-            <p className="mt-1 text-[12px] text-muted">No procedure on this version.</p>
+            <p className={`mt-1 ${body} text-muted`}>No procedure on this version.</p>
           ) : (
-            <ol className="mt-1 space-y-2">
+            <ol className={`mt-1 ${size === "lg" ? "space-y-4" : "space-y-2"}`}>
               {loaded.steps.map((s, i) => (
-                <li key={s.id} className="flex gap-2 text-[12px]">
+                <li key={s.id} className={`flex gap-2 ${body}`}>
                   <span className="shrink-0 tabular-nums text-subtle">{i + 1}.</span>
                   <span className="whitespace-pre-wrap">{s.body}</span>
                 </li>

@@ -391,6 +391,7 @@ export function BatchLogItems({
                   versionId={selected.recipe_version_id ?? selected.masterVersionId ?? null}
                   elementName={selected.element_name}
                   show={pane}
+                  size={touch ? "lg" : "md"}
                 />
               </div>
             )}
