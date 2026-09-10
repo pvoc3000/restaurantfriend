@@ -4,6 +4,8 @@ import { useMemo } from "react";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import type { SortDir } from "@/lib/tableSort";
 import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { useRememberedView } from "@/lib/viewMemory";
@@ -95,11 +97,11 @@ const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
  * down (Mark, 2026-08-09), and hiding the finished half of it would make the
  * page shrink as the shift goes on.
  *
- * THERE IS NO All / To do / Done TIER, and it was built and removed the same day
- * (Mark). Every filter it offered is one the STATUS column already answers on
- * every row, and grouping by status now answers it for the whole list at once —
- * so the tier was a third way to ask a question the screen was already showing
- * you, sitting where the eye goes first.
+ * A STATUS PICKLIST SITS BESIDE THE SEARCH (Mark, 2026-09-10). An All / To do /
+ * Done tier was built and removed on 2026-08-09, on the argument that the
+ * status column and the status grouping already answer it; a captioned list of
+ * all five statuses is the version he asked back for — one tap to the rows
+ * still to do, without re-banding the list.
  *
  * The fast-moving cells edit in place. A batch's status and its yield are what
  * a baker changes twenty times a shift, and a navigation per batch at 5am would
@@ -117,8 +119,6 @@ export function BatchItemsTable({
   onSelect,
   fill,
   touch = false,
-  term: controlledTerm,
-  onTermChange,
 }: {
   rows: BatchRow[];
   /** Supervisor and up — 044's `production_batches` write policies. */
@@ -135,13 +135,6 @@ export function BatchItemsTable({
    * changes what the list SHOWS is desk furniture on a screen that narrow.
    */
   touch?: boolean;
-  /**
-   * The search, CONTROLLED, when a parent wants the box somewhere other than
-   * this table's own strip — the tablet shell puts it in the breadcrumb row.
-   * Both or neither; with neither the table keeps its own remembered term.
-   */
-  term?: string;
-  onTermChange?: (next: string) => void;
 }) {
   // REMEMBERED WHILE YOU WALK RECORDS (Mark, 2026-08-09: "when navigating using
   // the buttons in the upper right hand corner of the detail screen, I'd like
@@ -155,15 +148,15 @@ export function BatchItemsTable({
   // sort is the same class of thing set up for the same reason — leaving it out
   // would produce the identical complaint on the next pass.
   const [grouping, setGrouping] = useRememberedView<Grouping>("batch-items.grouping", "type");
-  const [ownTerm, setOwnTerm] = useRememberedView("batch-items.search", "");
-  const term = controlledTerm ?? ownTerm;
-  const setTerm = onTermChange ?? setOwnTerm;
+  const [term, setTerm] = useRememberedView("batch-items.search", "");
+  // "all" or one of BATCH_STATUSES. Remembered like the search, for the same walk.
+  const [status, setStatus] = useRememberedView<string>("batch-items.status", "all");
   const [sort, setSort] = useRememberedView<{ key: string; dir: SortDir }>(
     "batch-items.sort",
     { key: "element", dir: "asc" }
   );
 
-  const shown = useMemo(() => {
+  const searched = useMemo(() => {
     const q = term.trim().toLowerCase();
     if (!q) return rows;
     return rows.filter((r) =>
@@ -173,6 +166,20 @@ export function BatchItemsTable({
         .includes(q)
     );
   }, [rows, term]);
+
+  // The picklist's counts are taken AFTER the search and BEFORE the status
+  // filter — conditioned on the other control, never on itself, or every
+  // status but the chosen one would read 0 (lib/filterMenus' rule).
+  const statusCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const r of searched) counts[r.status] = (counts[r.status] ?? 0) + 1;
+    return counts;
+  }, [searched]);
+
+  const shown = useMemo(
+    () => (status === "all" ? searched : searched.filter((r) => r.status === status)),
+    [searched, status]
+  );
 
   // SORTING BY STATUS GROUPS BY STATUS (Mark, 2026-09-09). Grouping is the
   // primary sort, so with the bands on item type a sort by status ordered the
@@ -473,21 +480,42 @@ export function BatchItemsTable({
       sort={sort}
       onSortChange={setSort}
       empty={<p className="text-sm text-muted">No batches match.</p>}
+      // THE FILTER ROW, on the desk and the tablet alike (Mark, 2026-09-10:
+      // the search came back from the tablet's breadcrumb row). Search · Status
+      // · Group by, the purchasing lists' arrangement: the search flexes,
+      // `fullWidth` because TextInput's wrapper shrink-wraps, and `items-end`
+      // sits it on the line of the captioned fields. Group by stays desk-only.
       leading={
-        onTermChange ? undefined : (
         <div className="flex flex-wrap items-end gap-4">
-          <TextInput
-            value={term}
-            onValueChange={setTerm}
-            aria-label="Search batches"
-            className="w-64"
-            icon={<SearchGlyph />}
-          />
+          <div className="min-w-[13rem] max-w-[18rem] flex-1">
+            <TextInput
+              value={term}
+              onValueChange={setTerm}
+              aria-label="Search batches"
+              clearLabel="Clear the search"
+              fullWidth
+              icon={<SearchGlyph />}
+            />
+          </div>
+          <ControlField label="Status">
+            <PickList
+              ariaLabel="Which statuses to show"
+              variant="field"
+              value={status}
+              onPick={setStatus}
+              options={[
+                { value: "all", label: "All statuses", hint: String(searched.length) },
+                ...BATCH_STATUSES.map((s) => ({
+                  value: s,
+                  label: BATCH_STATUS_LABEL[s],
+                  hint: String(statusCounts[s] ?? 0),
+                })),
+              ]}
+              fit
+            />
+          </ControlField>
           {touch ? null : (
-            <div className="space-y-1.5">
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                Group by
-              </span>
+            <ControlField label="Group by">
               <TabPicker
                 ariaLabel="Group the batches"
                 value={grouping}
@@ -498,10 +526,9 @@ export function BatchItemsTable({
                   { key: "none" as Grouping, label: "None" },
                 ]}
               />
-            </div>
+            </ControlField>
           )}
         </div>
-        )
       }
     />
   );

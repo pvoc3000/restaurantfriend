@@ -312,9 +312,9 @@ export async function BatchLogRecord({
 
   return (
     <div className="space-y-4">
-      {/* On the tablet the crumbs share a row with the search box, which is
-          the table's own state — so `BatchLogItems` draws the row. */}
-      {touch ? null : crumbs}
+      {/* The crumbs stand alone on both shells again: the search went back to
+          the table's own filter row (Mark, 2026-09-10). */}
+      {crumbs}
 
       {touch ? null : (
       <header className="flex flex-wrap items-baseline gap-x-4">
@@ -396,7 +396,6 @@ export async function BatchLogRecord({
           editable={editable}
           removable={removable}
           touch={touch}
-          crumbs={touch ? crumbs : undefined}
           footerLeading={touch ? addBatch : undefined}
         />
       )}

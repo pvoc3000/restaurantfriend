@@ -5,9 +5,6 @@ import type { PickOption } from "@/components/ui/PickList";
 import { useExactViewportHeight } from "@/lib/tableHead";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { Switch } from "@/components/ui/Switch";
-import { TextInput } from "@/components/ui/TextInput";
-import { SearchGlyph } from "@/components/ui/SearchGlyph";
-import { useRememberedView } from "@/lib/viewMemory";
 import { clampSplit, setSplit, useSplit } from "@/lib/paneSplit";
 import { BatchItemsTable, type BatchRow } from "@/components/production/BatchItemsTable";
 import { BatchFields, type BatchFieldsRow } from "@/components/production/BatchFields";
@@ -107,7 +104,6 @@ export function BatchLogItems({
   editable,
   removable,
   touch = false,
-  crumbs,
   footerLeading,
 }: {
   rows: BatchRow[];
@@ -124,15 +120,6 @@ export function BatchLogItems({
   removable: boolean;
   /** The tablet shell — see `BatchItemsTable`'s prop of the same name. */
   touch?: boolean;
-  /**
-   * The record's breadcrumb row, handed in so the tablet can put the SEARCH
-   * BOX on the same line, right-aligned (Mark, 2026-09-09: "to save space").
-   * The two live in different components — the crumbs are the server page's,
-   * the search is this table's remembered state — so the page passes its row
-   * down rather than this component reaching up. Desk callers pass nothing
-   * and render their crumbs where they always did.
-   */
-  crumbs?: ReactNode;
   /**
    * The tablet footer's first cell — Add batch, which is the RECORD's command
    * and needs the log's ids. The footer is drawn HERE because its other cell,
@@ -154,10 +141,6 @@ export function BatchLogItems({
    * of you, and 42 hidden rounds on one flavour says nothing about the next.
    */
   const [showSkipped, setShowSkipped] = useState(false);
-  // The search, lifted out of the table so the tablet can draw it beside the
-  // crumbs. Same remembered key the table uses on its own, so walking to the
-  // next log keeps the term either way.
-  const [term, setTerm] = useRememberedView("batch-items.search", "");
   const [hiddenRounds, setHiddenRounds] = useState(0);
   const frame = useRef<HTMLDivElement>(null);
   // The tablet opens with the pane at half the frame: at 768px tall a 42% pane
@@ -205,18 +188,6 @@ export function BatchLogItems({
 
   return (
     <>
-      {crumbs ? (
-        <div className="flex items-center justify-between gap-4">
-          <div className="min-w-0 flex-1">{crumbs}</div>
-          <TextInput
-            value={term}
-            onValueChange={setTerm}
-            aria-label="Search batches"
-            className="w-64"
-            icon={<SearchGlyph />}
-          />
-        </div>
-      ) : null}
     <div ref={frame} className="flex flex-col">
       {/* `min-h-0` for the same reason the receiving columns carry `min-w-0` on
           the other axis: a flex item's automatic minimum is its CONTENT, which
@@ -234,8 +205,6 @@ export function BatchLogItems({
           onSelect={setPicked}
           fill={wide}
           touch={touch}
-          term={crumbs ? term : undefined}
-          onTermChange={crumbs ? setTerm : undefined}
         />
       </div>
 

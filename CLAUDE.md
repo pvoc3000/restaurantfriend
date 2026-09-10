@@ -9175,9 +9175,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the tablet's column set; **sorting by Status bands by status**
    (`effective` grouping in `BatchItemsTable`, used by the comparator AND the
    bands, or the bands would not match the order they band); the search box
-   shares the breadcrumb row, right-aligned — the record hands its crumbs INTO
-   `BatchLogItems`, whose remembered term the table takes as a controlled
-   `term`/`onTermChange`; the pane's tabs are `SectionNav size="lg"` in a
+   shared the breadcrumb row until **2026-09-10, when it went back to the
+   table's own filter row on both shells** (Mark) — search · **Status** (a
+   captioned `PickList` of all five statuses plus "All statuses", counts
+   conditioned on the search, remembered as `batch-items.status`) · Group by
+   (desk only), with the crumbs standing alone again; the pane's tabs are `SectionNav size="lg"` in a
    scrolling column, and the tablet's default split is half; and
    **`DataTable resetFooter={false}`** hides the reset-widths line on the iPad.
 
