@@ -6,7 +6,8 @@ import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import type { SortDir } from "@/lib/tableSort";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { Checkbox } from "@/components/ui/Checkbox";
@@ -397,33 +398,39 @@ export function SchedulesList({
           className="w-64"
           icon={<SearchGlyph />}
         />
-        <TabPicker
-          ariaLabel="Which schedules"
-          value={tier}
-          onChange={setTier}
-          options={[
-            { key: "upcoming" as Tier, label: "Upcoming", count: counts.upcoming },
-            { key: "today" as Tier, label: "Today", count: counts.today },
-            { key: "unprinted" as Tier, label: "Unprinted", count: counts.unprinted },
-            { key: "all" as Tier, label: "All", count: counts.all },
-          ]}
-        />
-        <div className="space-y-1.5">
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-            Group by
-          </span>
-          <TabPicker
-            ariaLabel="Group the schedules"
-            value={grouping}
-            onChange={setGrouping}
+        {/* Captioned PICKLISTS rather than tabs (Mark, 2026-09-10), the
+            purchasing lists' conversion: counts ride as hints, `fit` sizes
+            each trigger to its widest option. */}
+        <ControlField label="Show">
+          <PickList
+            ariaLabel="Which schedules"
+            variant="field"
+            value={tier}
+            onPick={(v) => setTier(v as Tier)}
             options={[
-              { key: "date" as Grouping, label: "Date" },
-              { key: "kitchen" as Grouping, label: "Kitchen" },
-              { key: "sells" as Grouping, label: "Shop" },
-              { key: "none" as Grouping, label: "None" },
+              { value: "upcoming", label: "Upcoming", hint: String(counts.upcoming) },
+              { value: "today", label: "Today", hint: String(counts.today) },
+              { value: "unprinted", label: "Unprinted", hint: String(counts.unprinted) },
+              { value: "all", label: "All", hint: String(counts.all) },
             ]}
+            fit
           />
-        </div>
+        </ControlField>
+        <ControlField label="Group by">
+          <PickList
+            ariaLabel="Group the schedules"
+            variant="field"
+            value={grouping}
+            onPick={(v) => setGrouping(v as Grouping)}
+            options={[
+              { value: "date", label: "Date" },
+              { value: "kitchen", label: "Kitchen" },
+              { value: "sells", label: "Shop" },
+              { value: "none", label: "None" },
+            ]}
+            fit
+          />
+        </ControlField>
         {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
