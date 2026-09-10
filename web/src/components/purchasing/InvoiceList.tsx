@@ -604,7 +604,12 @@ export function InvoiceList({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
+      {/* THE IDENTITY ROW: title, the three totals, then the commands at the far
+          right (Mark, 2026-09-10: "the invoices action buttons should move to
+          the identity row too"). `items-start`, so the buttons' top is the
+          title's top — the app's rule for a command in the title row. They had
+          their own right-aligned strip under this row. */}
+      <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
         <div>
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
             Invoices
@@ -643,43 +648,10 @@ export function InvoiceList({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* THE COMMANDS GET A ROW OF THEIR OWN, ABOVE THE FILTERS AND
-          RIGHT-ALIGNED (Mark, 2026-09-10: "make the filter row two rows, with
-          the action buttons in the first row aligned to the right and the
-          filter buttons on the second row aligned left").
-
-          This RETIRES the `flex-wrap-reverse` that stood here for an hour —
-          the trick that let these two RISE only when the row wrapped. It
-          answered the question as asked and a strip answers it better: the
-          same arrangement at every width, where the reversal moved them at a
-          threshold nobody could see coming. It takes that trick's one real
-          cost with it, since the commands are now first in the DOM as well as
-          first on the screen, so focus order and reading order agree again.
-
-          The line it costs at 1440 — where the old single row did fit — is
-          what buys the filter row a shape that never changes. It also frees
-          the search completely: with no `ml-auto` sibling left to absorb the
-          free space BEFORE flex-grow can, the two are no longer in
-          competition at all.
-
-          TWO DIVS, AND THE INNER ONE IS NOT DECORATION — caught by looking at
-          it. `NewInvoice`'s trigger carries an `ml-auto` baked in, which was
-          harmless while this cluster was a flex ITEM in the filter row, sized
-          to its own content with no free space to give away. As a row of its
-          own it is a full-width block, so that margin ate the whole line and
-          pushed New invoice to the right edge while Check QuickBooks stayed at
-          the left — two commands at opposite ends of the screen, which is not
-          a cluster. The inner group restores the content-sized box the margin
-          has always relied on finding, and `justify-end` on the outer row is
-          what puts that box on the right.
-
-          `justify-end` on the ROW rather than another `ml-auto`: it is the row
-          that is right-aligned, not one item pushed there, so a strip narrow
-          enough to wrap stays right-aligned line by line. `space-y-4` from the
-          list's own wrapper is the gap. */}
-      <div className="flex justify-end">
+        {/* The commands, last in the row. An INNER content-sized group, because
+            `NewInvoice`'s trigger carries an `ml-auto` baked in: inside a box
+            sized to its own content there is no free space for that margin to
+            take. */}
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
@@ -689,7 +661,6 @@ export function InvoiceList({
           >
             {qboBusy ? "Checking QuickBooks…" : "Check QuickBooks"}
           </button>
-          {qboError && <span className="text-[13px] text-accent">{qboError}</span>}
 
           {canEdit && (
             <NewInvoice
@@ -711,6 +682,12 @@ export function InvoiceList({
             />
           )}
         </div>
+        {/* A failed check says why beside the control that caused it — on a
+            line of its own under the row, right-aligned, so it never pushes the
+            buttons or the totals around. */}
+        {qboError && (
+          <p className="basis-full text-right text-[13px] text-accent">{qboError}</p>
+        )}
       </div>
 
       {/* THE FILTER ROW, in Mark's order (2026-09-08): search · window ·

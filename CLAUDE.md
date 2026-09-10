@@ -9742,7 +9742,9 @@ weekday column, and 003 then silently made it per-vendor-item.
   tags and batch-log command strips are gone too). **Six more followed the same
   day:** Inventory (whose Active tabs became a captioned Show picklist, every
   filter captioned), inspection logs, equipment, shop sections, employees,
-  benefits, purchase requests, special orders, customers and locations. The paragraph below still describes every other list; a NEW list
+  benefits, purchase requests, special orders, customers and locations — and
+  `/invoices`, whose Check QuickBooks and New invoice left their own strip for
+  the far right of its title row, after the three totals. The paragraph below still describes every other list; a NEW list
   follows the title-row form.
   **THE HEADER CARRIES NO COMMAND. THE CREATE BUTTON GOES IN THE FILTER ROW,
   RIGHT-ALIGNED** (Mark, 2026-09-03: they "are all over the place. Sometimes in
