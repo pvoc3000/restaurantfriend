@@ -5,7 +5,8 @@ import { PageHeading } from "@/components/ui/PageHeading";
 import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import { ActiveToggle } from "@/components/catalog/ActiveToggle";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { usePublishRecordSet } from "@/lib/recordSet";
@@ -79,7 +80,8 @@ export function RecipesList({
   action?: ReactNode;
 }) {
   /**
-   * ONE DIMENSION, so it stays a `TabPicker` — the app's rule for a single
+   * ONE DIMENSION, so it is one captioned `PickList` (a `TabPicker` until
+   * 2026-09-10) — the app's rule for a single
    * question, and `ui/FilterMenus` is for three or more. What it borrows from
    * `lib/filterMenus` is the URL contract, not the control: a dimension is just
    * a declared filter, and reusing it means this list's whole view rides in the
@@ -155,10 +157,10 @@ export function RecipesList({
     writeUrl(filters, search, next);
   }
 
-  // Search first, so the tab counts describe the list you are looking at
-  // rather than the whole catalog — `FilterMenus`' rule, applied to a
-  // TabPicker. Before this they were computed over every row, so searching
-  // "glaze" left the tabs claiming 116.
+  // Search first, so the picker's counts describe the list you are looking
+  // at rather than the whole catalog — `FilterMenus`' rule, applied to a
+  // single picker. Before this they were computed over every row, so
+  // searching "glaze" left the counts claiming 116.
   const searched = useMemo(() => {
     const q = search.trim().toLowerCase();
     if (!q) return rows;
@@ -322,16 +324,20 @@ export function RecipesList({
           clearLabel="Clear the search"
           icon={<SearchGlyph />}
         />
-        <TabPicker
-          ariaLabel="Which recipes"
-          value={filters.tier ?? "active"}
-          onChange={changeTier}
-          options={dimensions[0].options.map((o) => ({
-            key: o.value,
-            label: o.label,
-            count: counts[o.value],
-          }))}
-        />
+        <ControlField label="Show">
+          <PickList
+            ariaLabel="Which recipes"
+            variant="field"
+            value={filters.tier ?? "active"}
+            onPick={changeTier}
+            options={dimensions[0].options.map((o) => ({
+              value: o.value,
+              label: o.label,
+              hint: String(counts[o.value] ?? 0),
+            }))}
+            fit
+          />
+        </ControlField>
         {action ? <div className="ml-auto">{action}</div> : null}
       </div>
     <DataTable
