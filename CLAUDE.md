@@ -11092,11 +11092,26 @@ weekday column, and 003 then silently made it per-vendor-item.
   in a 705px row once the scrollbar is counted).
   **THE ONE THING THAT DEFEATS IT IS AN `ml-auto` SIBLING**: an auto margin
   absorbs a flex line's free space BEFORE any flex-grow does, so a `flex-1`
-  search and a right-pinned command cluster cannot both work. `/invoices` keeps
-  the `ml-auto` and a fixed search for exactly that reason — its Status
-  `TabPicker` is 478px, so that row wraps at any width and the cluster needs
-  the margin to reach the right edge. Where the row DOES fit, drop the
-  `ml-auto`: the last item's right edge is already the row's.
+  search and a right-pinned command cluster cannot both work. **The cure is
+  `justify-end` on the ROW instead of `ml-auto` on the item** — it right-aligns
+  a line that has free space and does nothing to a line the search has filled,
+  which is both cases at once. Where the row simply fits, neither is needed:
+  the last item's right edge is already the row's.
+  **AND `flex-wrap-reverse` IS HOW COMMANDS RISE ABOVE A WRAPPED FILTER ROW**
+  (Mark, 2026-09-10: "is it possible for the action buttons to appear above the
+  filter buttons when the row wraps?"). CSS cannot ask whether a row wrapped,
+  so the alternatives are a breakpoint — right at one width, wrong at the next
+  — or a permanent command strip, a line spent even where the row fits.
+  Reversing the CROSS axis makes lines stack upward, so the LAST items are the
+  ones that rise and a width that does not wrap is untouched. Two things come
+  with it: **`items-start` is the BOTTOM alignment** (cross-start is the
+  bottom now, so `items-end` would push the fields to the top of their line),
+  and **focus order stays DOM order**, so a keyboard reaches the risen commands
+  after the filters drawn below them — tolerable for independent controls, and
+  the fix if it ever bites is a real strip above, never `order`.
+  Measured on `/invoices`: 1440 one line with the commands on the right edge;
+  1280 and 1024 commands above and right-aligned with the filters one line
+  beneath; 820 commands above, filters on two.
   **THE PO LIST'S STATUS went 697px → 160**, and its row's content 1365 → 828
   at 1440 — where 1365 was one pixel inside the 1376 a 1440 window gives, so
   the row fitted on the widest screen in the building and nowhere else.
