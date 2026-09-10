@@ -203,6 +203,23 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    an **Ignore ordering days** switch lifts the day gates for lookup (FMP's
    `g_IgnoreOrderDayWhenSearching_b`), which suppresses green and disables the
    two day-scoped filters.
+   **THAT SWITCH IS DESK-ONLY SINCE 2026-09-10** (Mark: "drop the ignore
+   ordering days switch on tablets"), and what the tablet drops is the MODE
+   rather than the widget. The flag is remembered in `rf.guide.view`, so hiding
+   the control alone would let an iPad that had it on yesterday open with the
+   gates lifted and nothing on screen to put them back — a mode you cannot
+   LEAVE is worse than one you cannot enter. So `useShell()` decides the VALUE
+   (`const ignoreDays = tablet ? false : ignoreDaysSetting`) and every reader
+   sees false, the cookie write included, which settles a stale flag on first
+   open. Verified: a tablet handed `ignore=1` renders exactly what gates-on
+   renders and rewrites the cookie to `ignore=0`.
+   Shell, not viewport — a narrow desk window keeps the switch. It also
+   overrules the standing "a control that VANISHES cannot be told from a
+   feature that does not exist" rule, deliberately; what keeps that honest is
+   that **nothing left on the tablet NAMES the switch** — the empty state drops
+   its own "Turn on Ignore ordering days" instruction, checked by searching the
+   guide down to no rows under each shell. If any new copy mentions it, that
+   copy needs the same branch.
    **Broken against the live DB until 008 is applied** — the page selects the
    view's new columns.
    The status chips carry two ROLL-UPS beside the five raw statuses: `all`, and
@@ -11054,7 +11071,21 @@ weekday column, and 003 then silently made it per-vendor-item.
   **A MODE GOES ON ITS OWN ROW.** "Ignore ordering days" is neither a field nor
   a value — no vocabulary to collapse and a sentence for a label — so on the
   fields' line it was the thing that wrapped. Beneath them it costs a short
-  line and gives the four above it a row they always fit.
+  line and gives the four above it a row they always fit. **On a tablet it is
+  not there at all** — see build step 4 — so the band is one row and 80px
+  against the desk's 116.
+  **AND THE DAY PICKER CARRIES `relative top-[7.75px]`, WHICH IS `items-end`
+  LEVELS BOXES NOT TEXT FOR THE SECOND TIME** (Mark, 2026-09-10, wanting the
+  date's baseline on the sub-line's). The boxes really were level — both
+  bottoms measure 57.0 — while the type was not: a 36px input holding 20px text
+  CENTRES it, so its baseline sits 10.25px above its own bottom where a 12px
+  line in an 18px line box sits 4.5px above its own. `items-baseline` cannot
+  fix it, because a flex item's baseline is its FIRST line and that is the
+  `h1`. Measured 0.00 after, at every width.
+  **An `<input>` takes no children, so the zero-sized probe goes in an
+  OFF-SCREEN REPLICA** — a clone and the probe in one inline formatting context
+  — which is the only way to read a form control's text baseline. Worth
+  knowing: it generalises to every boxed field in the app.
   **The height, stated because it is the price:** the guide's band is 116px
   captioned and two-rowed, against 60 uncaptioned on one row and 112 for the
   original tabs. Over a 66,000px sticky walk that is real; the cheapest 20px
