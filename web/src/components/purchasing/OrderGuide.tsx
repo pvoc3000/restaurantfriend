@@ -667,9 +667,9 @@ export function OrderGuide({
     setEntries(new Map());
   }
 
-  // Is there a band above the guide at all? Both columns decide it together —
-  // `showEmpty` is what holds one open beside the other — and the title row
-  // needs the same answer, to know whether it is carrying "Add reminder".
+  // Is there a band above the guide at all? A band shows only when it holds
+  // something (Mark, 2026-09-10: "if there are no reminders or requests, you
+  // don't need to say it on screen").
   const bands = reminders.length > 0 || requests.length > 0;
 
   /**
@@ -750,13 +750,12 @@ export function OrderGuide({
           into a box of white space — these are two lists that happen to be
           side by side, not two halves of one card.
 
-          The two `showEmpty` flags are what keep it a GRID: with anything in
-          either column, both render and the empty one says so, rather than
-          leaving a hole where a column should be. With both empty neither
-          renders at all — the guide's first row should be the guide — and
-          Reminders falls back to its own quiet "Add reminder" line. */}
+          An EMPTY list renders no band (Mark, 2026-09-10): the other band takes
+          the first column, and with no reminder due "Add reminder" lives in the
+          title row instead. */}
       {bands && (
       <div className="grid gap-4 md:grid-cols-2 md:items-start">
+        {reminders.length > 0 && (
         <Reminders
           reminders={reminders}
           guideDate={guideDate}
@@ -766,13 +765,12 @@ export function OrderGuide({
           // purchase_reminders, which 001's generic policy makes purchaser+ —
           // the same gate that decides whether POs can be generated.
           canWrite={canGeneratePos}
-          showEmpty={requests.length > 0}
         />
+        )}
         <GuideRequests
           requests={requests}
           userId={userId}
           canResolve={canResolveRequests}
-          showEmpty={reminders.length > 0}
           onJumpToItem={jumpToItem}
           jumpMiss={jumpMiss}
         />
@@ -788,93 +786,33 @@ export function OrderGuide({
           (Mark, 2026-09-03) — `PurchaseOrderList`'s header, which is this
           module's model. It rode BESIDE the title from 2026-07-29 until then. */}
       <div className="space-y-3">
-        <div className="flex flex-wrap items-end gap-x-6 gap-y-1">
+        <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
           {/* The module's model header (`PurchaseOrderList`): the count sits
-              UNDER the title and leads with the shop. `items-end`, so the
-              commands bottom-align with it rather than with the first line of
-              a two-line block.
-
-              THE DAY IS INSIDE THIS BLOCK, ON THE TITLE'S OWN LINE (Mark,
-              2026-09-10: "can the page title and datepicker sit next to each
-              other — there's an awkward gap between them"). There was, and it
-              was not the gap it looked like: an `h1` is a BLOCK, so its box
-              stretched to the width of the shrink-to-fit title block, which is
-              set by whichever of its two lines is WIDER — and that is the
-              count. Measured at 1440: "Order Guide" is 179.4px of ink inside a
-              225px box, so the row's own `gap-x-6` started 24px after the
-              COUNT ended and the title's last letter sat 69.6px from the day.
-              A longer count opens it further, which is why it reads as
-              arbitrary — it is a fact about a sentence nobody is looking at.
-
-              As a flex item on the title's line the `h1` shrink-wraps to its
-              text, so the gap is between the two things it is drawn between.
-              */}
+              UNDER the title and leads with the shop. */}
           <div>
-            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-              <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-                Order Guide
-              </h1>
-              {/* `items-baseline` on the line above is what puts the day on
-                  the title's baseline now — no `self-start` and no 16.75px
-                  needed, because the two are siblings on one line rather than
-                  a block and a thing beside it.
-
-                  THE QUARTER PIXEL SURVIVES, and for a new reason: this span
-                  is itself a flex container, so as a flex ITEM its baseline is
-                  its own first item's — the weekday chip — while the number
-                  the eye reads is the input's, and the input sits 0.25px BELOW
-                  the chip — hence a quarter pixel UP, where the same stack
-                  wanted a quarter pixel down when it hung off the row's bottom.
-                  Measured, not assumed; re-measure if the day's 20px, the
-                  title's 28px, the input's `h-9` or the chip's type moves.
-
-                  The chip rides in the same span and moves with it, which is
-                  right: the two read as one line. */}
-              <span className="relative -top-[0.25px] flex items-center gap-2 text-[20px]">
-                <span
-                  className={`px-1.5 font-semibold uppercase tracking-[0.06em] ${
-                    guideDate === today ? "text-subtle" : "bg-mark-fill text-ink"
-                  }`}
-                >
-                  {WEEKDAY_LABELS[weekday - 1]}
-                </span>
-                <DateField
-                  variant="title"
-                  ariaLabel="The day this guide is showing"
-                  value={guideDate}
-                  onChange={(next) => router.push(guideHref(next ?? today, today))}
-                />
-                {guideDate !== today && (
-                  <Link
-                    href={guideHref(today, today)}
-                    className="text-[12px] uppercase tracking-[0.12em] text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-                  >
-                    Today
-                  </Link>
-                )}
-              </span>
-            </div>
+            <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+              Order Guide
+            </h1>
             <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
               {locationCode} · {visibleRows.length} of {rows.length} vendor items
             </p>
           </div>
 
-          {/* WITH NO BANDS ABOVE, "Add reminder" LIVES HERE (Mark, 2026-09-03:
-              it "should be bottom aligned. Hopefully that will get rid of the
-              extra space in the header"). It did: the fallback line was a
-              right-aligned paragraph occupying a cell of the two-column band
-              grid, so on a quiet day the guide opened with a row of white
-              space above its own title. With a band on screen the trigger is
-              in that band's header, where it belongs. */}
-          <div className="ml-auto flex flex-wrap items-baseline gap-x-6 gap-y-1">
-            {bands ? null : (
+          {/* THE DAY PICKER IS AT THE RIGHT, TOP-ALIGNED, in the Mac look
+              (Mark, 2026-09-10: "make the date picker macos style, and align it
+              to the right") — the identity row's command position. It is the
+              LAST thing in the row, and Today sits before the weekday, so the
+              box keeps its place whether or not that link is showing.
+              With no reminder due, "Add reminder" lives here too (Mark,
+              2026-09-03); with one on screen it is in that band's header. */}
+          <div className="ml-auto flex flex-wrap items-center gap-x-6 gap-y-2">
+            {reminders.length > 0 ? null : (
               <Reminders
                 reminders={reminders}
                 guideDate={guideDate}
                 locationId={locationId}
                 orgId={orgId}
                 canWrite={canGeneratePos}
-                showEmpty={false}
               />
             )}
             <button
@@ -883,6 +821,29 @@ export function OrderGuide({
             >
               Refresh
             </button>
+            <span className="flex items-center gap-2">
+              {guideDate !== today && (
+                <Link
+                  href={guideHref(today, today)}
+                  className="text-[12px] uppercase tracking-[0.12em] text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+                >
+                  Today
+                </Link>
+              )}
+              <span
+                className={`px-1.5 text-[14px] font-semibold uppercase tracking-[0.06em] ${
+                  guideDate === today ? "text-subtle" : "bg-mark-fill text-ink"
+                }`}
+              >
+                {WEEKDAY_LABELS[weekday - 1]}
+              </span>
+              <DateField
+                variant="title"
+                ariaLabel="The day this guide is showing"
+                value={guideDate}
+                onChange={(next) => router.push(guideHref(next ?? today, today))}
+              />
+            </span>
           </div>
         </div>
 
@@ -901,17 +862,11 @@ export function OrderGuide({
 
       </div>
 
-      {/* Vendor totals bar — the guide's central instrument (§4.2): square
-          boxes on a ruled bar, so it reads as an instrument panel rather
-          than a row of tags. */}
-      <div className="flex flex-wrap items-center gap-4 border-y border-ink py-4">
-        {totals.length === 0 ? (
-          <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-            Nothing ordered yet — quantities you enter total up here by
-            vendor
-          </span>
-        ) : (
-          totals.map((t) => (
+      {/* Vendor totals bar — the guide's central instrument (§4.2). No rules
+          above or below and no sentence while it is empty (Mark, 2026-09-10):
+          with nothing ordered it is just Will order $0.00 at the right. */}
+      <div className="flex flex-wrap items-center gap-4">
+        {totals.map((t) => (
             <span
               key={t.vendor_id}
               title={
@@ -933,8 +888,7 @@ export function OrderGuide({
                 {t.minimum !== null ? ` / ${money(t.minimum)}` : ""}
               </span>
             </span>
-          ))
-        )}
+        ))}
 
         <span className="ml-auto inline-flex items-baseline gap-3">
           <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">

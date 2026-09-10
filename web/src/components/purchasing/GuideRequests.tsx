@@ -1,11 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import {
-  BAND_LINK_ON_PLAIN,
-  BandEmpty,
-  GuideBand,
-} from "@/components/purchasing/GuideBand";
+import { BAND_LINK_ON_ALERT, GuideBand } from "@/components/purchasing/GuideBand";
 import { RequestActions } from "@/components/purchasing/RequestActions";
 import { REQUEST_PRIORITY_LABEL, type RequestPriority } from "@/lib/purchaseRequests";
 
@@ -17,7 +13,7 @@ import { REQUEST_PRIORITY_LABEL, type RequestPriority } from "@/lib/purchaseRequ
  * that was already there and simply did not look like one.
  */
 const ITEM_LINK_CLASS =
-  "text-muted underline decoration-neutral-400 underline-offset-[3px] hover:text-ink hover:decoration-ink";
+  "text-ink/70 underline decoration-neutral-500 underline-offset-[3px] hover:text-ink hover:decoration-ink";
 
 export type GuideRequest = {
   id: string;
@@ -58,7 +54,6 @@ export function GuideRequests({
   requests,
   userId,
   canResolve,
-  showEmpty = false,
   onJumpToItem,
   jumpMiss = null,
 }: {
@@ -66,8 +61,6 @@ export function GuideRequests({
   userId: string;
   /** Purchaser+ — 001's `preq_resolve`, via `canResolveRequests`. */
   canResolve: boolean;
-  /** Hold the column open with a sentence when nothing is outstanding. */
-  showEmpty?: boolean;
   /**
    * Take me to that item's row in THIS walk (Mark, 2026-08-22). Given, the
    * item name becomes a button that scrolls the guide; withheld, it stays a
@@ -78,26 +71,18 @@ export function GuideRequests({
   /** The item a jump could not reach, so this row can say why. */
   jumpMiss?: string | null;
 }) {
-  if (requests.length === 0 && !showEmpty) return null;
-
-  const allRequests = (
-    <Link href="/purchase-requests" className={BAND_LINK_ON_PLAIN}>
-      All requests
-    </Link>
-  );
-
-  if (requests.length === 0) {
-    return (
-      <GuideBand title="Requests" action={allRequests}>
-        <BandEmpty>Nothing outstanding.</BandEmpty>
-      </GuideBand>
-    );
-  }
+  // Nothing outstanding, nothing on screen (Mark, 2026-09-10). The band is
+  // yellow, so the link and the muted text take the inks that read on it.
+  if (requests.length === 0) return null;
 
   return (
     <GuideBand
       title={requests.length === 1 ? "Request" : `${requests.length} requests`}
-      action={allRequests}
+      action={
+        <Link href="/purchase-requests" className={BAND_LINK_ON_ALERT}>
+          All requests
+        </Link>
+      }
     >
       <ul className="space-y-1">
         {requests.map((r) => (
@@ -132,7 +117,7 @@ export function GuideRequests({
                 One span around the whole bracket, so the row's `gap-2` cannot
                 get inside it and set "( Cherries, Maraschino )". */}
             {r.inventory_item_id && r.itemName && (
-              <span className="text-muted">
+              <span className="text-ink/70">
                 {"("}
                 {onJumpToItem ? (
                   <button
@@ -156,7 +141,7 @@ export function GuideRequests({
                 The dash rides INSIDE this span, so it comes and goes with the
                 name it attributes and the row's `gap-2` cannot strand it. */}
             {r.requesterName && (
-              <span className="text-muted">- {r.requesterName}</span>
+              <span className="text-ink/70">- {r.requesterName}</span>
             )}
             {/* Said on the row you pressed rather than as a banner: it is a
                 fact about THIS request, and by the time you have read it the
@@ -166,7 +151,7 @@ export function GuideRequests({
               // simply is not orderable today — and it appears on the row you
               // just tapped, so it does not need colour to be found. Yellow
               // would also have been the same 1.5:1 the High chip just lost.
-              <span className="text-[12px] text-muted">not on today&rsquo;s guide</span>
+              <span className="text-[12px] text-ink/70">not on today&rsquo;s guide</span>
             )}
             {/* Answering one WHILE WALKING is the point of it being here: you
                 pass the shelf, you put it on the order, you say so. The same

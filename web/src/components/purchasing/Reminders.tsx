@@ -14,7 +14,6 @@ import {
 import {
   BAND_LINK_ON_ALERT,
   BAND_LINK_ON_PLAIN,
-  BandEmpty,
   GuideBand,
 } from "@/components/purchasing/GuideBand";
 
@@ -31,10 +30,9 @@ import {
  * reminder in the chrome is never seen. That shelf went on 2026-08-02 with the
  * collapse button, so the mechanism is gone and only the conclusion stands.)
  *
- * `showEmpty` is what keeps the two columns honest: with something in the other
- * one this band holds its half open and says it has nothing, rather than
- * leaving a hole where a column should be. With BOTH empty the caller renders
- * neither, and the guide's first row is the guide.
+ * With nothing due there is no band at all (Mark, 2026-09-10: "if there are no
+ * reminders or requests, you don't need to say it on screen") — only the quiet
+ * "Add reminder" line, which the guide puts in its title row.
  *
  * A note on who can dismiss: `dismissed_at` is an UPDATE, and the RLS policy
  * `purchase_reminders` inherited from 001's generic loop makes writes
@@ -48,7 +46,6 @@ export function Reminders({
   locationId,
   orgId,
   canWrite,
-  showEmpty = false,
 }: {
   reminders: Reminder[];
   /** The day being walked, from the ORG's timezone — never the host's. */
@@ -56,8 +53,6 @@ export function Reminders({
   locationId: string;
   orgId: string;
   canWrite: boolean;
-  /** Hold the column open with a sentence when there is nothing due. */
-  showEmpty?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -100,9 +95,8 @@ export function Reminders({
     router.refresh();
   }
 
-  // Nothing due, nothing to offer, and no column to hold open — take up no
-  // room at all. The guide's first row should be the guide.
-  if (reminders.length === 0 && !canWrite && !showEmpty) return null;
+  // Nothing due and nothing to offer — take up no room at all.
+  if (reminders.length === 0 && !canWrite) return null;
 
   const addReminder = canWrite ? (
     <button
@@ -118,7 +112,6 @@ export function Reminders({
     <>
       {reminders.length > 0 ? (
         <GuideBand
-          tone="alert"
           title={reminders.length === 1 ? "Reminder" : `${reminders.length} reminders`}
           action={addReminder}
         >
@@ -153,14 +146,9 @@ export function Reminders({
           </ul>
           {error && <p className="text-sm text-accent">{error}</p>}
         </GuideBand>
-      ) : showEmpty ? (
-        <GuideBand title="Reminders" action={addReminder}>
-          <BandEmpty>Nothing due today.</BandEmpty>
-        </GuideBand>
       ) : (
-        /* No band at all, and nothing in the other column either — so the way
-           to WRITE one still has to survive somewhere. A quiet line rather
-           than a second box. */
+        /* No band — so the way to WRITE one still has to survive somewhere.
+           A quiet line rather than a box. */
         canWrite && <p className="text-right">{addReminder}</p>
       )}
 

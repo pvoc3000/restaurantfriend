@@ -294,7 +294,7 @@ export function RangePicker({
             // type into this panel (the Generate-POs lesson).
             className="fixed z-[70] flex gap-4 border-2 border-ink bg-white p-3 text-ink whitespace-normal"
           >
-            <div className="w-[15.5rem] shrink-0">
+            <div className="w-[15.5rem] shrink-0 any-pointer-coarse:w-[21rem]">
               <CalendarGrid
                 month={month}
                 today={today}
@@ -334,7 +334,7 @@ export function RangePicker({
                     // The app's one button weight (`BUTTON_CLASS` at h-8 and
                     // left-aligned), with the range in force marked the way a
                     // set filter is: filled black.
-                    className={`inline-flex h-8 items-center whitespace-nowrap border border-ink px-3 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
+                    className={`inline-flex h-8 items-center whitespace-nowrap border border-ink px-3 any-pointer-coarse:h-11 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
                       current
                         ? "bg-ink text-white"
                         : "bg-white text-ink hover:bg-ink hover:text-white"
@@ -393,7 +393,7 @@ function TypedDate({
             onCommit(true);
           }
         }}
-        className="h-9 w-full min-w-0 border border-ink bg-white px-2 text-[16px] tabular-nums outline-none placeholder:text-faint focus:ring-1 focus:ring-inset focus:ring-ink"
+        className="h-9 w-full min-w-0 border border-ink bg-white px-2 any-pointer-coarse:h-11 text-[16px] tabular-nums outline-none placeholder:text-faint focus:ring-1 focus:ring-inset focus:ring-ink"
       />
     </span>
   );

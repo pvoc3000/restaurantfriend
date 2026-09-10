@@ -107,23 +107,29 @@ export function CalendarGrid({
     if (monthStart(next) !== monthStart(month)) onMonth(monthStart(next));
   }
 
+  // ON A TOUCH SCREEN EVERY TARGET IS 44px (Mark, 2026-09-10: "impossible for
+  // me to hit the next and last month buttons - they're tiny"). Keyed on the
+  // POINTER, not the shell, so the full-screen runners get it too; an iPad
+  // always has a touchscreen, hence `any-pointer` rather than `pointer`.
   return (
-    <div className="w-[15.5rem] select-none">
+    <div className="w-[15.5rem] select-none any-pointer-coarse:w-[21rem]">
       <div className="mb-2 flex items-center">
         <button
           type="button"
           aria-label="Previous month"
           onClick={() => onMonth(addMonths(month, -1))}
-          className="h-8 w-8 hover:bg-neutral-100"
+          className="h-8 w-8 text-lg hover:bg-neutral-100 any-pointer-coarse:h-11 any-pointer-coarse:w-11 any-pointer-coarse:text-3xl"
         >
           ‹
         </button>
-        <span className="flex-1 text-center text-sm font-semibold">{monthLabel(month)}</span>
+        <span className="flex-1 text-center text-sm font-semibold any-pointer-coarse:text-base">
+          {monthLabel(month)}
+        </span>
         <button
           type="button"
           aria-label="Next month"
           onClick={() => onMonth(addMonths(month, 1))}
-          className="h-8 w-8 hover:bg-neutral-100"
+          className="h-8 w-8 text-lg hover:bg-neutral-100 any-pointer-coarse:h-11 any-pointer-coarse:w-11 any-pointer-coarse:text-3xl"
         >
           ›
         </button>
@@ -169,7 +175,7 @@ export function CalendarGrid({
               // day outside the month is faint but still a target — the last
               // week of August is a fine place to start "the week before
               // the first". Today is bold; it is a fact, not a state.
-              className={`h-8 text-sm tabular-nums disabled:cursor-default disabled:opacity-30 ${
+              className={`h-8 text-sm tabular-nums disabled:cursor-default disabled:opacity-30 any-pointer-coarse:h-11 any-pointer-coarse:text-base ${
                 edge
                   ? "bg-ink text-white"
                   : inside

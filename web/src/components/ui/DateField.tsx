@@ -34,7 +34,7 @@ export function CalendarIcon() {
 
 /** A day button under the calendar — `ui/RangePicker`'s preset dress. */
 const PANEL_BUTTON =
-  "inline-flex h-8 items-center whitespace-nowrap border border-ink bg-white px-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+  "inline-flex h-8 items-center whitespace-nowrap border border-ink bg-white px-3 any-pointer-coarse:h-11 any-pointer-coarse:px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
 
 /**
  * A date box you can TYPE INTO, PASTE INTO, or pick from a calendar.
@@ -122,10 +122,9 @@ export function DateField({
    * screen's `dl`: button padding, no border, a hover wash. `field` is a
    * standalone bordered box for a FORM — 48px tall and 16px type, which is the
    * public inquiry page's dress and, for the type, the threshold below which
-   * iOS Safari zooms the whole page on focus. `title` is `cell` at heading
-   * scale, for a date that is part of a screen's IDENTITY rather than one of
-   * its fields — the order guide's day, which sits beside the `h1` and says
-   * which walk you are looking at (Mark, 2026-08-25).
+   * iOS Safari zooms the whole page on focus. `title` is the order guide's day
+   * — a date that says which walk you are looking at (Mark, 2026-08-25) — in
+   * the Mac look: a raised 36px box at 16px type, at the title row's right.
    *
    * The POINT of the prop is that the customer-facing form does not get to
    * hand-roll its own date input. Everything in this file is a bug a second
@@ -216,10 +215,12 @@ export function DateField({
       className={
         field
           ? "flex h-12 w-full items-center gap-2 border border-ink px-3 focus-within:border-2"
-          : `items-center px-1 py-0.5 hover:bg-neutral-100 ${
-              title ? "gap-2" : "gap-1"
-            } ${
-              boxed && !title
+          : title
+            ? // THE MAC LOOK (Mark, 2026-09-10: "make the date picker macos
+              // style") — the filter row's raised box, `RangePicker`'s dress.
+              "mac-control inline-flex h-9 items-center gap-2 border border-ink bg-white px-2"
+          : `items-center gap-1 px-1 py-0.5 hover:bg-neutral-100 ${
+              boxed
                 ? // A BOX MEANS THE SHARED FIELD DRESS, not just a border: one
                   // height and the width of its track, so a date lines up with
                   // the text cell above it instead of sitting 72px short in a
@@ -234,15 +235,15 @@ export function DateField({
         className={
           field
             ? "relative flex h-full flex-1 items-center"
-            : boxed && !title
+            : title
+              ? "relative inline-flex h-full w-28 items-center"
+            : boxed
               ? // FILLS THE BOX, and `min-w-0` is what lets it SHRINK.
                 // `h-6`, not `h-full`: the box is a MINIMUM height, so there is
                 // no definite height for a percentage to resolve against — the
                 // wrapper's `items-center` does the centring.
                 "relative flex h-6 min-w-0 flex-1 items-center"
-              : `relative inline-flex items-center ${title ? "h-9" : "h-6"} ${
-                  title ? "w-[9.5rem]" : "w-28"
-                }`
+              : "relative inline-flex h-6 w-28 items-center"
         }
       >
         <input
@@ -277,14 +278,8 @@ export function DateField({
             }
           }}
           className={`rf-date bg-transparent tabular-nums outline-none placeholder:text-faint disabled:opacity-35 ${
-            field ? "h-full text-[16px]" : title ? "h-9 text-[20px]" : "h-6"
-          } ${
-            field || (boxed && !title)
-              ? "w-full"
-              : title
-                ? "w-[9.5rem]"
-                : "w-28"
-          } ${className}`}
+            field || title ? "h-full text-[16px]" : "h-6"
+          } ${field || title || boxed ? "w-full" : "w-28"} ${className}`}
         />
       </span>
       <button
