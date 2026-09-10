@@ -101,6 +101,7 @@ export function BatchLogItems({
   orgId,
   operators,
   versionsByElement,
+  scaleLabelsByVersion = {},
   locationId,
   editable,
   removable,
@@ -114,6 +115,8 @@ export function BatchLogItems({
   orgId: string;
   operators: PickOption[];
   versionsByElement: Record<string, PickOption[]>;
+  /** Each recipe version's batch sizes, for the Scale picker. */
+  scaleLabelsByVersion?: Record<string, string[]>;
   locationId: string;
   editable: boolean;
   /** Purchaser+ — 044's delete policy, narrower than the edit one. */
@@ -348,6 +351,11 @@ export function BatchLogItems({
                     selected.element_id ? versionsByElement[selected.element_id] ?? [] : []
                   }
                   editable={editable}
+                  scaleLabels={
+                    scaleLabelsByVersion[
+                      selected.recipe_version_id ?? selected.masterVersionId ?? ""
+                    ] ?? []
+                  }
                 />
                 {/* On the tablet this command is a footer cell instead. */}
                 {touch ? null : (
@@ -407,6 +415,7 @@ export function BatchLogItems({
                   elementName={selected.element_name}
                   show={pane}
                   size={touch ? "lg" : "md"}
+                  scaleLabel={selected.scale_label}
                 />
               </div>
             )}

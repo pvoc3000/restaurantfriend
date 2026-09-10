@@ -64,6 +64,7 @@ export function BatchRecipe({
   elementName,
   show = "both",
   size = "md",
+  scaleLabel = null,
 }: {
   /** The batch's version, or the element's master. Null when the element has no
    *  recipe at all — which is legitimate: generation warns about it and makes
@@ -80,6 +81,9 @@ export function BatchRecipe({
   /** "lg" is the tablet's — 16px ingredients and steps, read at arm's length
    *  from a bench (Mark, 2026-09-09). */
   size?: "md" | "lg";
+  /** The size the BATCH says it made (`scale_label`) — the column the tab
+   *  opens on, so the amounts shown are the ones that were weighed. */
+  scaleLabel?: string | null;
 }) {
   const body = size === "lg" ? "text-[16px]" : "text-[12px]";
   const cell = size === "lg" ? "px-3 py-2" : "px-2 py-1";
@@ -169,7 +173,13 @@ export function BatchRecipe({
   // column beside the others; here there is only one column, and it has to be
   // one you could weigh something with.
   const columns = loaded.columns.filter((c) => !c.isPercent);
-  const chosen = columns[Math.min(column, Math.max(columns.length - 1, 0))];
+  // The batch's own size is the default column; a picked one overrides it.
+  const batchIndex = scaleLabel
+    ? columns.findIndex((c) => c.label.trim().toLowerCase() === scaleLabel.trim().toLowerCase())
+    : -1;
+  const shownIndex =
+    pickedColumn?.key === versionId ? column : batchIndex >= 0 ? batchIndex : 0;
+  const chosen = columns[Math.min(shownIndex, Math.max(columns.length - 1, 0))];
   // The base is the FIRST column rendered — not necessarily slot 0, if a label
   // has been cleared (`lib/production`'s own caveat).
   const baseMultiplier = columns[0]?.multiplier ?? 1;
@@ -185,7 +195,7 @@ export function BatchRecipe({
           <TabPicker
             ariaLabel="Which batch size"
             size="sm"
-            value={String(column)}
+            value={String(shownIndex)}
             onChange={(k) => setPickedColumn({ key: versionId, index: Number(k) })}
             options={columns.map((c, i) => ({ key: String(i), label: c.label }))}
           />

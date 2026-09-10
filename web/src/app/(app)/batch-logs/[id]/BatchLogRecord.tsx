@@ -139,12 +139,17 @@ export async function BatchLogRecord({
   const { data: versionRows } = elementIds.length
     ? await supabase
         .from("production_recipe_versions")
-        .select("id, version_label, is_master, production_recipes!inner(element_id)")
+        .select("id, version_label, is_master, scale_labels, production_recipes!inner(element_id)")
         .in("production_recipes.element_id", elementIds)
         .order("version_sort", { nullsFirst: false })
     : { data: [] };
 
   const versionsByElement: Record<string, { value: string; label: string; hint?: string }[]> = {};
+  // Each version's BATCH SIZES — its scale column labels — so the pane's
+  // Scale picker can offer the sizes that version actually has (Mark,
+  // 2026-09-09: "It should be specified what size batch was made"). The `%`
+  // column is a baker's percentage, not a size, and is left out.
+  const scaleLabelsByVersion: Record<string, string[]> = {};
   // The element's MASTER, which the pane's Recipe tab falls back to for a batch
   // that names no version of its own — see `BatchFieldsRow.masterVersionId`.
   const masterByElement = new Map<string, string>();
@@ -152,9 +157,13 @@ export async function BatchLogRecord({
     id: string;
     version_label: string;
     is_master: boolean;
+    scale_labels: (string | null)[] | null;
     production_recipes: { element_id: string };
   }[]) {
     const key = v.production_recipes.element_id;
+    scaleLabelsByVersion[v.id] = (v.scale_labels ?? []).filter(
+      (l): l is string => typeof l === "string" && l.trim() !== "" && l.trim() !== "%"
+    );
     (versionsByElement[key] ??= []).push({
       value: v.id,
       label: v.version_label,
@@ -382,6 +391,7 @@ export async function BatchLogRecord({
           orgId={session.membership.org_id}
           operators={operatorOptions}
           versionsByElement={versionsByElement}
+          scaleLabelsByVersion={scaleLabelsByVersion}
           locationId={log.location_id as string}
           editable={editable}
           removable={removable}

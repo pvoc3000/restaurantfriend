@@ -72,6 +72,7 @@ export function BatchFields({
   versions,
   editable,
   fill = false,
+  scaleLabels = [],
 }: {
   row: BatchFieldsRow;
   orgId: string;
@@ -89,6 +90,9 @@ export function BatchFields({
    * iPad three ~150px boxes inside a scrolling page.
    */
   fill?: boolean;
+  /** The batch sizes the batch's recipe version has — the Scale picker's
+   *  options. `allowNew` on top, since a size typed by hand is a real answer. */
+  scaleLabels?: string[];
 }) {
   return (
     // TWO BY TWO (Mark, 2026-09-09): what the batch IS on the left — status,
@@ -161,20 +165,38 @@ export function BatchFields({
           )}
         </Field>
 
-        <Field label="Recipe version">
-          {editable && versions.length > 0 ? (
-            <BatchVersionCell
-              boxed={BOXED_FIELDS}
-              batchId={row.id}
-              value={row.recipe_version_id}
-              options={versions}
-            />
-          ) : (
-            <span className={`${READ_ONLY_VALUE} text-muted`}>
-              {row.recipe_version_label ?? "—"}
-            </span>
-          )}
-        </Field>
+        {/* VERSION AND SCALE ON ONE LINE (Mark, 2026-09-09: "It should be
+            specified what size batch was made. Display it in line with recipe
+            version") — FileMaker's own row. The scale is `scale_label`, which
+            044 created and nothing had ever written; its options are the
+            version's own batch sizes, with a typed size allowed. */}
+        <div className="grid grid-cols-2 gap-3">
+          <Field label="Recipe version">
+            {editable && versions.length > 0 ? (
+              <BatchVersionCell
+                boxed={BOXED_FIELDS}
+                batchId={row.id}
+                value={row.recipe_version_id}
+                options={versions}
+              />
+            ) : (
+              <span className={`${READ_ONLY_VALUE} text-muted`}>
+                {row.recipe_version_label ?? "—"}
+              </span>
+            )}
+          </Field>
+          <Field label="Scale">
+            {editable ? (
+              <InlineValue
+                boxed={BOXED_FIELDS} table="production_batches" id={row.id} column="scale_label" kind="pick"
+                allowNew options={scaleLabels.map((l) => ({ value: l, label: l }))}
+                value={row.scale_label} ariaLabel="Which batch size was made"
+              />
+            ) : (
+              <span className={`${READ_ONLY_VALUE} text-muted`}>{row.scale_label ?? "—"}</span>
+            )}
+          </Field>
+        </div>
       </dl>
 
       <dl
