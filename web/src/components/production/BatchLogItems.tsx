@@ -229,7 +229,12 @@ export function BatchLogItems({
         // ONE margin class, not `mt-3` plus a conditional `mt-4`: Tailwind
         // resolves competing utilities by stylesheet order, not class-string
         // order, so having both makes the gap a coin toss.
-        className={`border border-ink ${
+        // NO BORDER ON THE TABLET (Mark, 2026-09-09: "it's eating space"). The
+        // black bar above already says where the pane begins, and the frame
+        // under it is pinned to the window, so a 1px rule plus 16px of inner
+        // padding on every side was ~34px of a 768px screen saying nothing.
+        // The desk keeps its frame.
+        className={`${touch ? "" : "border border-ink"} ${
           wide ? "mt-3 flex min-h-0 flex-1 flex-col" : "mt-4 shrink-0"
         }`}
       >
@@ -294,7 +299,7 @@ export function BatchLogItems({
           // grew an `onSelect` mode for it because a batch has no route to link
           // to. It also buys back the ~50px row a segmented bar spent above the
           // fields, which on a divided pane is a field.
-          <div className={`flex gap-5 p-4 ${wide ? "min-h-0 flex-1" : ""}`}>
+          <div className={`flex gap-5 ${touch ? "pt-3" : "p-4"} ${wide ? "min-h-0 flex-1" : ""}`}>
             {/* The tab column scrolls itself like the columns beside it: at
                 the tablet's taller rows four tabs are 164px, which is more than
                 a short pane holds, and a column that cannot scroll paints its
