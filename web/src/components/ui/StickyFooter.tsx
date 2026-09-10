@@ -41,8 +41,16 @@ const FOOTER_GAP = 16;
 export function StickyFooter({
   children,
   spacerClassName = "",
+  flush = false,
 }: {
   children: ReactNode;
+  /**
+   * No card: no white backdrop, no padding, no gap above. For a BAR that is
+   * its own backdrop — the tablet shell's black footer (Mark, 2026-09-09:
+   * "way too much padding between the bottom footer and the bottom pane").
+   * The card dress is for a bordered block that wants air around it.
+   */
+  flush?: boolean;
   /**
    * Cancels the page's own vertical rhythm above the spacer — `-mt-6` on a
    * `space-y-6` page, `-mt-8` on a `space-y-8` one. A spacer is a measurement
@@ -64,7 +72,10 @@ export function StickyFooter({
       const below =
         (parseFloat(getComputedStyle(spacer).marginBottom) || 0) +
         (parseFloat(getComputedStyle(spacer.closest("main")!).paddingBottom) || 0);
-      const target = Math.max(0, footer.getBoundingClientRect().height + FOOTER_GAP - below);
+      const target = Math.max(
+        0,
+        footer.getBoundingClientRect().height + (flush ? 0 : FOOTER_GAP) - below
+      );
       if (Math.abs(parseFloat(spacer.style.height || "0") - target) > 1) {
         spacer.style.height = `${target}px`;
         // Tell any viewport-filling pane that its floor moved.
@@ -83,7 +94,7 @@ export function StickyFooter({
     const observer = new ResizeObserver(measure);
     observer.observe(footer);
     return () => observer.disconnect();
-  }, []);
+  }, [flush]);
 
   return (
     <>
@@ -99,7 +110,11 @@ export function StickyFooter({
         //
         // z-30 is the ActionBar's rung: above tables and their sticky column
         // labels (20), below the masthead (50) and anchored panels (70).
-        className="fixed inset-x-0 bottom-0 z-30 bg-white px-4 pb-4 pt-2 xl:px-12"
+        className={
+          flush
+            ? "fixed inset-x-0 bottom-0 z-30"
+            : "fixed inset-x-0 bottom-0 z-30 bg-white px-4 pb-4 pt-2 xl:px-12"
+        }
       >
         {children}
       </div>

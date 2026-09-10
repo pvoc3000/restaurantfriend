@@ -400,9 +400,15 @@ export async function BatchLogRecord({
         // spacer's bottom EDGE, so the page overshot the window by exactly that
         // margin in both orientations. The wrapper is the last child instead,
         // carries no margin inside, and the page is one viewport tall.
-        <div>
-          <StickyFooter>
-            <div className="flex items-stretch bg-ink text-white">{commands}</div>
+        //
+        // `-mt-4` cancels the page's own rhythm above the wrapper and `flush`
+        // drops the footer's card dress, so the pane ends exactly where the bar
+        // begins (Mark: "way too much padding between the bottom footer and the
+        // bottom pane" — it was 56px). Full-bleed black, like the shift
+        // report's; the cells carry the gutter.
+        <div className="-mt-4">
+          <StickyFooter flush>
+            <div className="flex items-stretch bg-ink px-2 text-white">{commands}</div>
           </StickyFooter>
         </div>
       ) : null}
