@@ -9046,6 +9046,90 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    with no client to navigate, and has always landed where it says.
    **1678 fixtures pass**, 11 new.
 
+4p. ✅ **THE TABLET SHELL — one bar and a landing page of actions over the same
+   routes (2026-09-09).** Mark: "The interface we've designed so far is great on
+   the desktop. Next, I want to design a simple, touch focused interface for
+   tablet use … Instead of menus, maybe there are buttons that say 'Start a
+   Shift Report' or 'Print Tags' … The menu system we developed would be gone …
+   We would just need a back button … a home button … If we're in a detail view
+   the nav buttons to go to next/last would be helpful."
+   **ONE ROUTE TREE, TWO SHELLS.** `lib/shell.ts`: the `rf.shell` cookie
+   (`desk` | `tablet`) decides which chrome the `(app)` layout mounts —
+   `AppHeader` or `components/tablet/TabletBar` — and every page underneath is
+   the same page. Absent, a REGISTERED SHARED DEVICE (097's `rf.device`) is a
+   tablet and anything else a desk, so the iPad was right the day it was
+   registered; the explicit cookie is the switch on /account ("Tablet layout",
+   ungated by `pinSession` — not a credential) and is set server-side for a
+   year. **It is NOT in `clearSessionCookies`**: a device property, like
+   `rf.device`, and a lock or sign-out must leave the iPad a tablet. `/` lands
+   on **`/start`** under the tablet shell and on `homeHref` under the desk.
+   A second route tree was refused: forty thin re-exports, and a deep link
+   from an email would land in the desk shell on the iPad.
+   **THE BAR PUBLISHES `--rf-header-h`, NOT `--rf-runner-h`.** Every list's
+   sticky column labels offset against the masthead's variable, so a bar that
+   stands where the masthead stood and publishes the same name makes every
+   existing table stick correctly with no per-screen change — measured, labels
+   at exactly 64px under a 600px scroll on /vendors. 64px tall, which is also
+   the variable's seed, so the first paint is already right.
+   Back · Home · [record book] · title · shop · Switch user, every cell a 64px
+   box with a Material Symbols wght-700 icon over its word (`tablet/BarLabel`,
+   the shift report footer's idiom lifted out; `barCell.ts` states LAYOUT ONLY
+   and each caller its colour, that footer's own lesson).
+   **BACK IS DETERMINISTIC, NEVER `history.back()`** — a shared iPad's history
+   is whatever the last person left. `tabletBackHref` (`lib/tablet/landing`):
+   the breadcrumb trail's last crumb when `?from=` is present, else a detail
+   route's own list via `resolveRoute`, else home; dead in place on `/start`
+   rather than absent, so the cells never move. The title is the menu's own
+   sub-section label, which is a record's list name too.
+   **THE RECORD BOOK MOVES INTO THE BAR.** `ui/RecordNav` reads
+   `useShell()` (`components/ShellProvider`, provided by the layout): under the
+   tablet shell it PUBLISHES its props to `lib/recordNavSlot` in an effect and
+   renders nothing, and `tablet/BarRecordNav` walks the same set through the
+   same `useRecordPosition` and `carryQuery` at 64px. Under the desk shell
+   nothing changed. Verified: "1 of 30" → Next → "2 of 30", ends dead in place.
+   **THE LANDING PAGE (`/start`, `components/tablet/Landing`) IS MARK'S LIST IN
+   HIS GROUPS AND HIS WORDS**, thirteen tiles over five groups
+   (`LANDING_GROUPS`), each ≥96px, filtered by `canReachPage` on its href
+   (`tilesForRole`) so it is the Page Permissions sheet applied to doors — and
+   `/start` itself has an all-R row. "Generate Batch Logs" STAYS (Mark: "a must
+   have for tablets" — what was retired on 2026-09-09 was the shift report's
+   batch PAGE, not batch logs).
+   **EVERY TILE SAYS WHAT IS OUTSTANDING** (`lib/tablet/landingState`, pure and
+   fixture-tested; the queries are in the page). Nine probes in one wave, each
+   through the helper its own screen reads so tile and screen cannot disagree:
+   `templatesForShift`, `openTasksForRun` with the session user as viewer,
+   `isCurrentPlan`, `onPlanItemIds`, `ordersForKitchen`, `isBatchOutstanding`.
+   **ONE draft shift report or ONE open checklist run makes the tile a door
+   straight into its runner** ("Resume today's closing report"); none or
+   several go to the list. A failed probe drops its LINE, never the page.
+   **The PO probe is `status in (draft, sent)` — still to ARRIVE — not
+   `isPoOpen`'s "not closed"**: the first cut said "5751 open", which is the
+   FileMaker history of received-and-never-closed orders, where "21 awaiting
+   delivery" is the answer a supervisor at the door wants.
+   **THE LOOKUP TILES REUSE THE DESK LISTS AS THEY ARE** (Mark's choice). What
+   a role may edit is already the sheet's cell; `compactBelow` (1280) already
+   fires at iPad widths. Touch-shaped lists come later where these prove
+   awkward.
+   **PRINTING NEEDED NOTHING**: every react-pdf document already goes
+   `openWindowNow()` → `showBlob()`, which on iPad is a new Safari tab whose
+   share sheet → Print is AirPrint (Mark's chosen route). Filed documents'
+   Open is the same route; their in-page Print (hidden iframe) prints page 1
+   only on iOS and is left as is.
+   **`PickList variant="masthead"` gained `size="lg"`** (64px, 16px) and
+   `WorkingLocation`/`SwitchUser` take `size` — stated in the component, not
+   overridden from a caller, for the reason `field` states its own.
+   Verified live in the pane (a registered device, so it took the tablet shell
+   with no cookie set) at 1024×768 and 820×1180: bar and every cell 64px, no
+   horizontal overflow, tiles three-up and two-up, the toggle on /account
+   round-tripping to the masthead and back. **1786 fixtures pass**, 23 new.
+   **NOT BUILT, deliberately, and worth asking before building:** the
+   standalone web-app manifest (`app/manifest.ts`, `viewport`, icons — `web/
+   public` is empty). It is gated on a real-iPad test that a `showBlob` tab
+   still reaches the share sheet from standalone mode; if it does not, the app
+   runs from a Safari tab and the shell works either way. Also no touch-shaped
+   task or document lists, and the runners' footers carry no
+   `env(safe-area-inset-bottom)` yet.
+
 5. SwiftUI floor app (only after 4 is proven in real use)
 
 The cleanup work is specced in `docs/catalog-cleanup-brief.md` (v2 = §A
@@ -9664,6 +9748,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/buttons` `DANGER_BUTTON_CLASS` | re-typing the red class string | any destructive command out on a screen — Delete, Void, "Deactivate everywhere". Red EVEN THOUGH most only open a confirm: a reader can't tell "opens a confirm" from "destroys" by looking. Bordered, never filled. NOT the same as `DIALOG_DANGER_CLASS` (`px-5`, a dialog footer's commit) — don't merge them. Positional classes stay at the call site |
   | `ui/FileDropZone` | `onDrop` on a div | dropping files onto a region. Its OVERLAY takes the drop (a PDF `<object>` is a plugin and swallows drag events — confirmed working over a live PDF, Mark 2026-08-04), it arms off WINDOW drag events so it's up before the pointer arrives, it vets types itself (`accept` governs only the picker), and it stops a stray drop navigating the page away |
   | `ui/SectionNav` | a second sidebar, underline tabs, or a `TabPicker` turned sideways | **the sections of one detail record** — the employee screen's Info · Employment · Events · Documents · Admin. Plain text links, no box: active bold black, inactive `text-muted`. `orientation="horizontal"` is the narrow-screen form. See "A detail screen that outgrows one page" below — REUSE THIS, don't re-derive it |
+  | `tablet/TabletBar` + `tablet/BarLabel` | a hand-rolled bar, or a second masthead | the tablet shell's whole chrome (build step 4p): Back · Home · record book · title · shop · Switch user, each a 64px cell with a wght-700 Material Symbols icon over its word. Mounted by the `(app)` layout when `session.shell === "tablet"`; publishes `--rf-header-h`. `barCell.ts` is layout only — colour stays at the call site |
   | `ui/RecordNav` + `lib/recordSet` | going back to the list for the next record | FMP's book on a detail screen: the LIST publishes its found set, the detail walks it. **It carries `?tab=` by default**, so paging a tabbed record stays on the tab you are on — name a record's tab parameter `tab` and nothing else is needed |
   | `DataTable columnChooser` | a bespoke checklist, or placing `ColumnsMenu` yourself | show/hide columns on a list — the table puts it above its own last column header; pair it with `DataColumn.pinned` on the column that IS the row |
   | `ui/BackToTop` | — | long lists; already on the guide |
