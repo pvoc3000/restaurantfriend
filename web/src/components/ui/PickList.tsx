@@ -664,8 +664,8 @@ export function PickList({
                         // Grey says "retired" at a glance, so the heading is not
                         // the only thing carrying it — a panel scrolled past its
                         // rule would otherwise look like an ordinary list. Not
-                        // when the row is under the cursor: that bar is solid
-                        // black, and muted grey on it is unreadable. Same
+                        // when the row is under the cursor: that bar is dark
+                        // grey, and muted grey on it is unreadable. Same
                         // either/or the hint below already uses.
                         o.inactive && i !== active ? "text-muted" : ""
                       }`}
