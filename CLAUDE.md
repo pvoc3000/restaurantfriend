@@ -9945,7 +9945,9 @@ weekday column, and 003 then silently made it per-vendor-item.
   `PickList variant="field"` trigger (filter rows AND dialog forms), and the
   unboxed filter-row dress of `PickSet` and `RangePicker`; `mac-field` is on
   every `TextInput search`. The ~43 hand-rolled copies of the plain command
-  button were swept to carry `mac-control` too. **A NEW BUTTON uses
+  button were swept to carry `mac-control` too, and so do the tablet landing
+  page's tiles (`tablet/Landing`, Mark: "those are buttons afterall") — the bar
+  above them does not. **A NEW BUTTON uses
   `BUTTON_CLASS`, or it will not look like its neighbours.**
   **`mac-own-hover`** is on the black and red ones (`PRIMARY_*`, `DANGER_*`,
   both dialog commits): they take the shadow and the press and keep their OWN

@@ -42,7 +42,9 @@ export function Landing({
                 <li key={tile.key} className="flex">
                   <Link
                     href={s?.href ?? tile.href}
-                    className="flex min-h-24 flex-1 flex-col justify-center gap-1 border border-ink bg-white px-5 py-4 no-underline transition-colors hover:bg-neutral-100 active:bg-neutral-200"
+                    // `mac-control` — the Mac look's shadow, grey hover and
+                    // press (Mark, 2026-09-10: "those are buttons afterall").
+                    className="mac-control flex min-h-24 flex-1 flex-col justify-center gap-1 border border-ink bg-white px-5 py-4 no-underline transition-colors hover:bg-neutral-100 active:bg-neutral-200"
                   >
                     <span className="font-bold uppercase tracking-[0.04em] text-ink">{tile.label}</span>
                     {s?.note && <span className="text-[14px] text-muted">{s.note}</span>}
