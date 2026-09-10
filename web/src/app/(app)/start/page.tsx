@@ -209,12 +209,7 @@ export default async function StartPage() {
     }
   }
 
-  return (
-    <div className="space-y-8">
-      <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-        {session.activeLocation?.code ?? session.orgName}
-      </h1>
-      <Landing groups={groups} state={state} />
-    </div>
-  );
+  // No heading (Mark, 2026-09-10): the shop's code already sits in the bar's
+  // location picker, so an h1 restating it was the same fact twice.
+  return <Landing groups={groups} state={state} />;
 }
