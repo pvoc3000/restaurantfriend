@@ -52,8 +52,9 @@ export type ElementLocationRow = {
  * - **Order** is `weekly_sort`, which becomes the batch's `sort` and orders the
  *   printed log.
  * - **Round asks for** is `weekly_amount` × `weekly_unit` — "make 2 X". It lands
- *   on the batch as "Asked for" and is distinct from **Par**, which is the
- *   stock level this shop keeps and lands as the batch's Par.
+ *   on the batch's `batch_amount` (no longer shown on the batch sheet since
+ *   2026-09-10) and is distinct from **Par**, which is the stock level this
+ *   shop keeps and lands as the batch's Par.
  *
  * PAR BY WEEKDAY IS DELIBERATELY READ-ONLY. Nothing in `web/src` reads
  * `production_element_locations.par_by_weekday` — it is displayed here and

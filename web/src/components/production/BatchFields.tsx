@@ -56,9 +56,8 @@ export type BatchFieldsRow = {
  * two commands, and a hundred lines of `dl` inside it would bury all four.
  *
  * Laid out the way FileMaker lays it out, because the shape carries meaning:
- * what the round ASKED for and what the kitchen KEEPS sit above what was
- * actually there and what came out, so the two measurements read against the
- * two claims rather than against each other.
+ * what the kitchen KEEPS sits above what was actually there and what came out,
+ * so the two measurements read against the par rather than against each other.
  *
  * TWO BY TWO since 2026-09-09 (Mark): identity fields | the four amounts, then
  * notes | photograph. It was FMP's three columns — fields, photo over notes,
@@ -196,11 +195,8 @@ export function BatchFields({
           fill ? "min-h-0 overflow-y-auto pr-1" : ""
         }`}
       >
-        <Field label="Asked for">
-          <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
-            {describeAmount(row.batch_amount, null, row.batch_unit)}
-          </span>
-        </Field>
+        {/* No "Asked for" (Mark, 2026-09-10): the round's own amount is gone
+            from this sheet; Par is what the kitchen keeps. */}
         <Field label="Par">
           <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
             {describeAmount(row.par_count, row.par_size, row.par_unit)}
