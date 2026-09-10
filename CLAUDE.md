@@ -10523,6 +10523,18 @@ weekday column, and 003 then silently made it per-vendor-item.
   real minimum should do the same. Default 48. Verified live: a 600px drag on
   the item record cascaded through three payers and held Order days at 302px
   with All/None visible. 9 fixtures pin every clause.
+  **ON A TABLET THE GRIP IS FINGER-SIZED AND COLUMNS DO NOT REORDER** (Mark,
+  2026-09-10: "how can we make it easier to resize columns on a tablet? I
+  struggle to get it"). The desk grip is a 12px strip on a 1px line; under the
+  tablet SHELL (`ColumnHeader` reads `useShell()`) it is 40px, capped at half
+  the cell so a narrow column keeps its heading for sorting, with a visible
+  handle on the line. Drag-to-reorder is OFF there, because a near-miss on the
+  grip was landing on the header and moving the column instead. And **Reset
+  column widths is in the Columns (eye) menu** whenever a width has changed —
+  the footer line is off on some screens and a double-click is no touch gesture,
+  so on an iPad there was no way back from a bad drag. Desk behaviour is
+  unchanged; `OrderLines` and PO detail get the grip too, being built on
+  `ColumnHeader`.
 - **A DataTable column holding a day picker must be `WEEKDAY_PICKER_WIDTH`**
   (300px, exported from `WeekdayPicker.tsx`). The table is `table-fixed` with
   `truncate` cells, so a narrow column silently CLIPS the right-hand end rather

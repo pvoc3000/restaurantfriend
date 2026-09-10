@@ -1,6 +1,7 @@
 "use client";
 
 import type { PointerEvent, ReactNode } from "react";
+import { useShell } from "@/components/ShellProvider";
 import type { SortDir } from "@/lib/tableSort";
 
 /**
@@ -40,6 +41,20 @@ import type { SortDir } from "@/lib/tableSort";
  * list's Files column rendered "FILE/S", which reads as a rendering fault where
  * "FILE…" reads as "there's more". If you see one, the column is too narrow for
  * its name: widen the weight or shorten the label.
+ *
+ * ON A TABLET (Mark, 2026-09-10: "how can we make it easier to resize columns
+ * on a tablet? I struggle to get it"), two things change, both keyed on the
+ * SHELL rather than the pointer, like everything else the tablet does:
+ *
+ *   - THE GRIP IS FINGER-SIZED. The desk's is a 12px strip centred on a 1px
+ *     line — fine for a cursor, and a finger needs about 44. On a tablet the
+ *     strip is 40px, capped at half the cell (`max-w-[50%]`) so a narrow column
+ *     keeps most of its heading for sorting, and it carries a VISIBLE HANDLE,
+ *     since there is no hover to reveal where the line is.
+ *   - NO DRAG-TO-REORDER. A sideways drag from anywhere else in the header
+ *     picked the column up, so a touch that just missed the grip moved the
+ *     column instead of resizing it — the near-miss was the whole problem.
+ *     Reordering is rare enough on an iPad to give up; it stays on the desk.
  */
 export function ColumnHeader({
   label,
@@ -62,7 +77,7 @@ export function ColumnHeader({
   /**
    * Makes the column movable: a sideways drag from anywhere in the header
    * (except the resize grip) picks it up. A press that doesn't travel is still
-   * the sort click — see lib/columnOrder's threshold.
+   * the sort click — see lib/columnOrder's threshold. Ignored on a tablet.
    */
   onDragStart?: (event: PointerEvent) => void;
   /** This column is the one being dragged — dim it while its ghost travels. */
@@ -70,6 +85,9 @@ export function ColumnHeader({
   /** Replaces the sort button — used for the select-all checkbox column. */
   children?: ReactNode;
 }) {
+  const tablet = useShell() === "tablet";
+  // No reordering on a tablet — see the header.
+  const dragStart = tablet ? undefined : onDragStart;
   const arrow = sorted === "asc" ? "▲" : sorted === "desc" ? "▼" : "";
 
   return (
@@ -84,16 +102,16 @@ export function ColumnHeader({
         // header is sticky at the top of a list you scroll), horizontal ones
         // reach the drag as pointer moves instead of being taken for a scroll.
         onPointerDown={
-          onDragStart
+          dragStart
             ? (e) => {
                 if ((e.target as Element).closest("[data-resize-grip]")) return;
-                onDragStart(e);
+                dragStart(e);
               }
             : undefined
         }
         className={`relative flex items-center px-3 py-3 ${
           align === "right" ? "justify-end" : ""
-        } ${onDragStart ? "touch-pan-y" : ""} ${dragSource ? "opacity-40" : ""}`}
+        } ${dragStart ? "touch-pan-y" : ""} ${dragSource ? "opacity-40" : ""}`}
       >
         {children ??
           (onSort ? (
@@ -101,7 +119,7 @@ export function ColumnHeader({
               type="button"
               onClick={onSort}
               title={`Sort by ${label.toLowerCase()}${
-                onDragStart ? " · drag sideways to move the column" : ""
+                dragStart ? " · drag sideways to move the column" : ""
               }`}
               // The wrapped lines take the COLUMN's alignment, or a two-line
               // label over a money column would sit ragged against the edge its
@@ -119,7 +137,7 @@ export function ColumnHeader({
             </button>
           ) : (
             <span
-              title={onDragStart ? "Drag sideways to move the column" : undefined}
+              title={dragStart ? "Drag sideways to move the column" : undefined}
               className="block overflow-hidden text-ellipsis text-subtle"
             >
               {label}
@@ -160,7 +178,9 @@ export function ColumnHeader({
 
         {/* Resize grip: a visible divider on every column boundary so it's
             discoverable at rest, with a hit area wider than the line itself and
-            straddling the boundary. `group` drives the line's hover state. */}
+            straddling the boundary. `group` drives the line's hover state.
+            On a tablet the hit area is 40px (capped at half the cell) and a
+            handle is drawn on the line — see the header. */}
         <span
           data-resize-grip
           onPointerDown={onResizeStart}
@@ -168,10 +188,21 @@ export function ColumnHeader({
           role="separator"
           aria-orientation="vertical"
           aria-label={`Resize ${label || "select"} column`}
-          title="Drag to resize · double-click to reset this column"
-          className="group absolute inset-y-0 right-0 z-10 flex w-3 translate-x-1/2 cursor-col-resize touch-none select-none justify-center"
+          title={tablet ? "Drag to resize" : "Drag to resize · double-click to reset this column"}
+          className={`group absolute inset-y-0 right-0 z-10 flex translate-x-1/2 cursor-col-resize touch-none select-none items-center justify-center ${
+            tablet ? "w-10 max-w-[50%]" : "w-3"
+          }`}
         >
           <span className="w-px self-stretch bg-neutral-200 transition-colors group-hover:w-0.5 group-hover:bg-ink" />
+          {tablet && (
+            // THE HANDLE: a short dark bar on the line, square like everything
+            // else, darkening under the finger. It is what says "grab here" on
+            // a screen with no hover to reveal the line.
+            <span
+              aria-hidden
+              className="pointer-events-none absolute h-6 w-1.5 bg-neutral-400 group-active:bg-ink"
+            />
+          )}
         </span>
       </div>
     </th>

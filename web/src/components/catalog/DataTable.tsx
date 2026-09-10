@@ -629,7 +629,15 @@ export function DataTable<T>({
         // inside it keeps the hover wash centred on the artwork, which is
         // the thing the button's size exists to do.
         <div className="-mb-1 shrink-0">
-          <ColumnsMenu storageKey={storageKey} columns={orderedColumns} compact={compact} />
+          <ColumnsMenu
+            storageKey={storageKey}
+            columns={orderedColumns}
+            compact={compact}
+            // The menu's own Reset column widths — the only way back from a bad
+            // drag on a tablet, where the footer line is often off and a
+            // double-click is no gesture (Mark, 2026-09-10).
+            onResetWidths={customized ? reset : undefined}
+          />
         </div>
       )}
     </div>

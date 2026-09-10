@@ -29,17 +29,27 @@ import type { DataColumn } from "./DataTable";
  * nothing). A column the `compactBelow` tier is holding off shows unchecked
  * with a note saying so, and checking it genuinely brings it back — the
  * explicit choice wins (lib/columnVisibility).
+ *
+ * RESET COLUMN WIDTHS LIVES HERE TOO (Mark, 2026-09-10, making resizing easier
+ * on a tablet). The table's own "Reset column widths" line under the rows is
+ * desk furniture — off on the screens that pass `resetFooter={false}` — and a
+ * double-click on a grip is no gesture at all on a touch screen, so on an iPad
+ * there was no way back from a bad drag. Offered only while some width has
+ * actually been changed.
  */
 export function ColumnsMenu<T>({
   storageKey,
   columns,
   compact,
+  onResetWidths,
 }: {
   /** The table's own key — the same one it stores column widths under. */
   storageKey: string;
   columns: DataColumn<T>[];
   /** Whether the table is currently under its `compactBelow` width. */
   compact: boolean;
+  /** Put every column back to its declared width. Omit when none has moved. */
+  onResetWidths?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -133,6 +143,18 @@ export function ColumnsMenu<T>({
             >
               Show all
             </button>
+            {onResetWidths && (
+              <button
+                type="button"
+                onClick={() => {
+                  onResetWidths();
+                  close();
+                }}
+                className="block w-full border-t border-hairline px-3 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-ink hover:bg-neutral-100"
+              >
+                Reset column widths
+              </button>
+            )}
           </div>,
           document.body
         )}
