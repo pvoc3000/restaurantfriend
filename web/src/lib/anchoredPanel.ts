@@ -80,10 +80,11 @@ export const MENU_ITEM_CLASS =
  * one look. A menu with no cursor concept passes false and gets the hover wash.
  */
 export function menuItemState(active: boolean): string {
-  // DARK GREY, not black (Mark, 2026-09-10: "instead of solid black background
-  // on the selected option in all picklists, can we do a dark grey?").
-  // neutral-700 under white is 10.4:1, so the row stays as legible as it was.
-  return active ? "bg-neutral-700 text-white" : "hover:bg-neutral-100";
+  // YELLOW FILL, BLACK TYPE (Mark, 2026-09-10: "can we try yellow background
+  // with black text for selected options in a picklist?"), after an hour as
+  // dark grey and months as black. `bg-mark-fill` is yellow-200, and ink on it
+  // is 15.5:1 — the mark colour doing what it is for, a FILL, never an ink.
+  return active ? "bg-mark-fill text-ink" : "hover:bg-neutral-100";
 }
 
 /** A group heading inside the list — not selectable, just a label. */

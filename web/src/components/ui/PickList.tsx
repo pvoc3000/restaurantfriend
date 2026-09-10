@@ -664,9 +664,9 @@ export function PickList({
                         // Grey says "retired" at a glance, so the heading is not
                         // the only thing carrying it — a panel scrolled past its
                         // rule would otherwise look like an ordinary list. Not
-                        // when the row is under the cursor: that bar is dark
-                        // grey, and muted grey on it is unreadable. Same
-                        // either/or the hint below already uses.
+                        // when the row is under the cursor, where the fill
+                        // already marks it and the grey would read as
+                        // disabled.
                         o.inactive && i !== active ? "text-muted" : ""
                       }`}
                     >
@@ -674,7 +674,9 @@ export function PickList({
                     </span>
                     {o.hint && (
                       <span
-                        className={`text-xs ${i === active ? "text-white/70" : "text-muted"}`}
+                        // Muted on every row now the highlight is a pale
+                        // fill; white-at-70% was for the old dark bar.
+                        className="text-xs text-muted"
                       >
                         {o.hint}
                       </span>
