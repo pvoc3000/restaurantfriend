@@ -191,9 +191,20 @@ export function LocationsList({
   return (
     <div className="space-y-4">
       {/* No shop code: these rows ARE the locations, so the screen is org-wide. */}
-      <PageHeading title="Locations" visible={shown.length} total={rows.length} noun="locations" />
+      {/* The create command rides in the TITLE row, top- and right-aligned
+          (Mark, 2026-09-10), where it had sat in the filter row. */}
+      <PageHeading
+        title="Locations"
+        visible={shown.length}
+        total={rows.length}
+        noun="locations"
+        action={
+          editable ? (
+            <NewLocation orgId={orgId} existingCodes={rows.map((r) => r.code)} />
+          ) : null
+        }
+      />
 
-      {/* The command sits in the filter row, right-aligned — Facilities' rule. */}
       <div className="flex flex-wrap items-end gap-4">
         <TextInput
           value={search}
@@ -203,12 +214,6 @@ export function LocationsList({
           search
           icon={<SearchGlyph />}
         />
-        {editable ? (
-          // `flex-1 justify-end`, not `ml-auto` — `SEARCH_PEN`'s reason.
-          <div className="flex flex-1 justify-end">
-            <NewLocation orgId={orgId} existingCodes={rows.map((r) => r.code)} />
-          </div>
-        ) : null}
       </div>
 
       <DataTable
