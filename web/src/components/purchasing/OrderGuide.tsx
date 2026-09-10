@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import { useScrollMemoryKey } from "@/lib/scrollMemory";
+import { useShell } from "@/components/ShellProvider";
 import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
 import { PickSet } from "@/components/ui/PickSet";
@@ -196,7 +197,31 @@ export function OrderGuide({
   // Lifts the vendor/item ordering-day gates off the list, for looking
   // something up regardless of when you'd order it. The walked day still
   // decides which day's pars and favorites the rows carry.
-  const [ignoreDays, setIgnoreDays] = useState(initialIgnoreDays);
+  const [ignoreDaysSetting, setIgnoreDays] = useState(initialIgnoreDays);
+  /**
+   * THE DAY GATES CANNOT BE LIFTED ON A TABLET (Mark, 2026-09-10: "drop the
+   * ignore ordering days switch on tablets"), and what is dropped is the MODE
+   * rather than the widget.
+   *
+   * Hiding the switch alone would leave the flag reachable — it is remembered
+   * in `rf.guide.view`, so a tablet that had it on yesterday would open with
+   * the gates lifted and nothing on screen to put them back. A mode you cannot
+   * leave is worse than one you cannot enter. So the shell decides the VALUE
+   * and every reader below sees `false`, including the cookie write, which
+   * quietly settles that stale flag the first time the guide is opened.
+   *
+   * Shell, not viewport — "SHELL DECIDES POSTURE, VIEWPORT DECIDES DENSITY".
+   * A narrow desk window keeps the switch; the iPad does not have it at any
+   * width.
+   *
+   * Note this is the standing "a control that VANISHES cannot be told from a
+   * feature that does not exist" rule being overruled deliberately, by the
+   * person who wrote it. What keeps it honest is that nothing left on the
+   * tablet names the switch — see the empty state, which drops its own
+   * instruction to turn it on.
+   */
+  const tablet = useShell() === "tablet";
+  const ignoreDays = tablet ? false : ignoreDaysSetting;
   // Which vendors the walk is narrowed to — empty means all of them.
   const [vendors, setVendors] = useState<string[]>(initialVendors);
   // Remembered with the rest of the view since 2026-08-03 (Mark). Seeded from
@@ -762,7 +787,31 @@ export function OrderGuide({
               mark FILL when the day on screen is not today, so "these
               quantities are being filed against Monday" is a colour rather than
               a sentence. */}
-          <span className="flex items-center gap-2 text-[20px]">
+          {/* `items-end` LEVELS BOXES, NOT TEXT — so this carries
+              `relative top-[7.75px]` (Mark, 2026-09-10: "make the text
+              baseline of the datepicker in the identity block align with the
+              text baseline of the second line with the location and record
+              count").
+
+              The two boxes really were level: the row is `items-end` and both
+              bottoms measure 57.0. What is not level is the TYPE, because a
+              36px input holding 20px text centres it, so its baseline sits
+              10.25px above its own bottom edge, while the 12px sub-line in an
+              18px line box sits 4.5px above its own. Measured with a
+              zero-sized probe rather than by eye — an `<input>` takes no
+              children, so the probe goes in an off-screen replica sharing one
+              inline formatting context with a clone.
+
+              A RELATIVE OFFSET, not a margin: a margin is layout, and this row
+              wraps, so a margin would make the title block taller for a purely
+              optical correction. Re-measure if the day's 20px, the sub-line's
+              12px, the input's `h-9` or either line-height moves — the number
+              is a measurement of that particular stack and nothing else.
+
+              The weekday chip rides in the same span and moves with it, which
+              is right: the two read as one line, and their own baselines are
+              0.25px apart. */}
+          <span className="relative top-[7.75px] flex items-center gap-2 text-[20px]">
             <span
               className={`px-1.5 font-semibold uppercase tracking-[0.06em] ${
                 guideDate === today ? "text-subtle" : "bg-mark-fill text-ink"
@@ -1037,7 +1086,12 @@ export function OrderGuide({
           neither a field nor a value — a mode, with no vocabulary to collapse
           and a sentence for a label — so on the fields' line it was the thing
           that had to wrap. Beneath them it costs the band a short line and
-          gives the four above it a row they always fit. */}
+          gives the four above it a row they always fit.
+
+          AND ON A TABLET IT IS NOT HERE AT ALL (Mark, 2026-09-10) — see
+          `ignoreDays`, where the mode rather than the widget is what the shell
+          drops. The band is one row there, and 44px shorter for it. */}
+      {!tablet && (
       <div className="pt-2">
         <button
           type="button"
@@ -1064,6 +1118,7 @@ export function OrderGuide({
           Ignore ordering days
         </button>
       </div>
+      )}
       </div>
 
       {/* Deliberately OUTSIDE the shelf: a failed write is the one thing up
@@ -1077,7 +1132,12 @@ export function OrderGuide({
             ? "No favorites for this day — nothing here has it in the vendor, item, and favorite order days. Switch to All to see everything orderable this day."
             : ignoreDays
               ? "No lines match. Every orderable line is listed — check the search box."
-              : "No lines for this day — no vendor takes orders and no item is scheduled. Turn on “Ignore ordering days” to see everything orderable."}
+              : tablet
+                ? // The tablet has no switch to name (see `ignoreDays`), and a
+                  // sentence pointing at a control that is not there is worse
+                  // than no sentence at all.
+                  "No lines for this day — no vendor takes orders and no item is scheduled."
+                : "No lines for this day — no vendor takes orders and no item is scheduled. Turn on “Ignore ordering days” to see everything orderable."}
         </p>
       ) : (
         // The list is in the PAGE's flow — no pane, no second scrollbar (Mark,
