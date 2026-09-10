@@ -644,43 +644,87 @@ export function InvoiceList({
         </div>
       </div>
 
-      {/* ONE ROW, in Mark's order (2026-09-08): search · range · vendors ·
-          due · status, with the two commands at the right edge. It was two
-          rows of TabPickers under captions; the window is a `RangePicker` and
-          Due and Status are `PickList`s, and every one of them is captioned
-          again (2026-09-10) — see `ui/ControlField` for why a control that
-          shows ONE value has to name its own dimension where a row of tabs
-          did not. */}
-      {/* `flex-wrap-reverse`, WHICH IS THE WHOLE OF BOTH ANSWERS (Mark,
-          2026-09-10: "make the invoice search bar flex width too. Is it
-          possible for the action buttons to appear above the filter buttons
-          when the row wraps?").
+      {/* THE COMMANDS GET A ROW OF THEIR OWN, ABOVE THE FILTERS AND
+          RIGHT-ALIGNED (Mark, 2026-09-10: "make the filter row two rows, with
+          the action buttons in the first row aligned to the right and the
+          filter buttons on the second row aligned left").
 
-          IT IS, AND ONLY THIS WAY. CSS cannot ask whether a row wrapped, so
-          the usual answers are a breakpoint (right at one width, wrong at the
-          next) or a permanent command strip (a line spent even where the row
-          fits). `wrap-reverse` reverses the CROSS axis: lines stack upward, so
-          the LAST items — these two commands — are the ones that rise, and
-          nothing at all changes on a width where the row does not wrap.
+          This RETIRES the `flex-wrap-reverse` that stood here for an hour —
+          the trick that let these two RISE only when the row wrapped. It
+          answered the question as asked and a strip answers it better: the
+          same arrangement at every width, where the reversal moved them at a
+          threshold nobody could see coming. It takes that trick's one real
+          cost with it, since the commands are now first in the DOM as well as
+          first on the screen, so focus order and reading order agree again.
 
-          AND IT IS WHAT FREES THE SEARCH. The commands' `ml-auto` had to go
-          with it, because **an auto margin absorbs a flex line's free space
-          BEFORE any flex-grow does**, so a `flex-1` search and that margin
-          could never both work. Nothing is lost: `justify-end` right-aligns
-          the commands on the line they rise to, and on a line the search has
-          filled there is no free space for it to act on. One rule, both cases.
+          The line it costs at 1440 — where the old single row did fit — is
+          what buys the filter row a shape that never changes. It also frees
+          the search completely: with no `ml-auto` sibling left to absorb the
+          free space BEFORE flex-grow can, the two are no longer in
+          competition at all.
 
-          `items-start`, NOT `items-end`, and it is not a typo. With the cross
-          axis reversed, cross-START is the bottom — so this is the bottom
-          alignment the captioned fields want, spelled the way the reversal
-          leaves it.
+          TWO DIVS, AND THE INNER ONE IS NOT DECORATION — caught by looking at
+          it. `NewInvoice`'s trigger carries an `ml-auto` baked in, which was
+          harmless while this cluster was a flex ITEM in the filter row, sized
+          to its own content with no free space to give away. As a row of its
+          own it is a full-width block, so that margin ate the whole line and
+          pushed New invoice to the right edge while Check QuickBooks stayed at
+          the left — two commands at opposite ends of the screen, which is not
+          a cluster. The inner group restores the content-sized box the margin
+          has always relied on finding, and `justify-end` on the outer row is
+          what puts that box on the right.
 
-          KNOWN COST: focus order stays DOM order, so when the row wraps a
-          keyboard reaches the commands AFTER the filters that are drawn below
-          them. These are independent controls rather than a sequence, so it
-          reads as a mismatch and not a trap; if it ever bites, the fix is a
-          real command strip above, not `order`. */}
-      <div className="flex flex-wrap-reverse items-start justify-end gap-4">
+          `justify-end` on the ROW rather than another `ml-auto`: it is the row
+          that is right-aligned, not one item pushed there, so a strip narrow
+          enough to wrap stays right-aligned line by line. `space-y-4` from the
+          list's own wrapper is the gap. */}
+      <div className="flex justify-end">
+        <div className="flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            className={BUTTON_CLASS}
+            disabled={qboBusy}
+            onClick={() => void checkQuickBooks()}
+          >
+            {qboBusy ? "Checking QuickBooks…" : "Check QuickBooks"}
+          </button>
+          {qboError && <span className="text-[13px] text-accent">{qboError}</span>}
+
+          {canEdit && (
+            <NewInvoice
+              orgId={orgId}
+              locationId={locationId}
+              vendors={vendors}
+              today={today}
+              // The vendor's id lives on the embed, not as its own column on
+              // the row — the duplicate check only ever compares within one
+              // vendor, so that's the shape it wants.
+              existing={invoices.map((i) => ({
+                id: i.id,
+                vendor_id: i.vendors?.id ?? "",
+                invoice_number: i.invoice_number,
+                invoice_date: i.invoice_date,
+                total: i.total,
+                status: i.status,
+              }))}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* THE FILTER ROW, in Mark's order (2026-09-08): search · window ·
+          vendors · due · status. It was two rows of TabPickers under captions;
+          the window is a `RangePicker` and Due and Status are `PickList`s, and
+          every one of them is captioned again (2026-09-10) — see
+          `ui/ControlField` for why a control that shows ONE value has to name
+          its own dimension where a row of tabs did not.
+
+          LEFT-ALIGNED, which it now is by construction rather than by a rule:
+          the commands have gone up, so nothing in here is pushed right and the
+          flexible search simply fills what the four fields leave. `items-end`
+          levels the BOXES, so the uncaptioned search sits on the line of four
+          fields that each carry a caption above them. */}
+      <div className="flex flex-wrap items-end gap-4">
         {/* THE SEARCH FLEXES, the PO list's arrangement (Mark, 2026-09-10):
             it is the one control here with no natural width, so it takes the
             leftover. `fullWidth` is load-bearing — `TextInput`'s wrapper
@@ -762,50 +806,6 @@ export function InvoiceList({
           />
         </ControlField>
 
-        {/* The two commands, at the right edge (Mark, 2026-09-03). A GROUP,
-            not `NewInvoice`'s own `ml-auto`: that trigger carries one baked
-            in, and as a plain sibling Check QuickBooks read right only at a
-            width where the row happened to have little leftover space. Sized
-            to its content, so the inner `ml-auto` finds nothing to eat and the
-            pair packs at `gap-3`.
-
-            ITS `ml-auto` IS GONE (2026-09-10) and the row's `justify-end`
-            does that job now — see the row, where the same change is what
-            lets the search flex. On a line these two share with the fields,
-            the search has eaten the free space and neither has anything to
-            do; on the line they rise to alone, `justify-end` holds them at
-            the right edge exactly as the margin did. */}
-        <div className="flex flex-wrap items-center gap-3">
-          <button
-            type="button"
-            className={BUTTON_CLASS}
-            disabled={qboBusy}
-            onClick={() => void checkQuickBooks()}
-          >
-            {qboBusy ? "Checking QuickBooks…" : "Check QuickBooks"}
-          </button>
-          {qboError && <span className="text-[13px] text-accent">{qboError}</span>}
-
-          {canEdit && (
-            <NewInvoice
-              orgId={orgId}
-              locationId={locationId}
-              vendors={vendors}
-              today={today}
-              // The vendor's id lives on the embed, not as its own column on
-              // the row — the duplicate check only ever compares within one
-              // vendor, so that's the shape it wants.
-              existing={invoices.map((i) => ({
-                id: i.id,
-                vendor_id: i.vendors?.id ?? "",
-                invoice_number: i.invoice_number,
-                invoice_date: i.invoice_date,
-                total: i.total,
-                status: i.status,
-              }))}
-            />
-          )}
-        </div>
       </div>
 
       {capped && (
