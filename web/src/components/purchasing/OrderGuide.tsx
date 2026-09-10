@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -76,6 +76,28 @@ const SHOW_ITEM_PAR: boolean = false;
  * every load (design rule 4). Entries are written per line as you walk, so a
  * closed laptop loses nothing.
  */
+/**
+ * A control in the guide's sticky band, under its caption.
+ *
+ * The caption is the app's own small-caps field label — `/items`' Last-ordered
+ * rule (Mark, 2026-08-01), which put a filter's label ABOVE its control rather
+ * than beside it so that every control in a row starts on one margin. Four of
+ * these share a line, so having the stack in one place is also what keeps that
+ * line straight: a caption typed twice is a caption that drifts.
+ *
+ * VISUAL ONLY. Each control carries its own `ariaLabel`, which is longer and
+ * says more ("Which vendors to walk"), so this is not a `<label>` and nothing
+ * is announced twice.
+ */
+function ControlField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <span className="flex flex-col gap-1">
+      <span className="text-xs uppercase tracking-[0.12em] text-subtle">{label}</span>
+      {children}
+    </span>
+  );
+}
+
 export function OrderGuide({
   rows,
   lastPurchases,
@@ -880,70 +902,143 @@ export function OrderGuide({
         data-guide-controls=""
         className="sticky top-[var(--rf-header-h)] z-30 bg-white py-3"
       >
-      <div className="flex flex-wrap items-center gap-4 text-sm">
-        <TextInput
-          value={term}
-          onValueChange={setTerm}
-          placeholder="Jump to item, vendor or section…"
-          clearLabel="Clear the search"
-          className="w-72"
-        />
-        {/* A LIST RATHER THAN FOUR TABS (Mark, 2026-09-10), which is the
-            conversion `/invoices` already made for its Due tabs and is made
-            here for that one's reason: this band is the one thing on the guide
-            that must stay on screen for a 66,000px walk, and four tabs plus
-            three groupings plus a search box plus a vendor set plus a switch
-            is more than a row can hold — it already wraps at 1440, and every
-            line it wraps to is a line of walk it covers.
+      {/* ONE ROW OF CONTROLS OVER A ROW FOR THE SWITCH (Mark, 2026-09-10:
+          "make the search bar width flexible so all elements can fit in a
+          single row … except ignore ordering days - that should be on a
+          second row").
 
-            THE COUNTS RIDE AS HINTS, which is where the tabs carried them and
-            where `/invoices` put them. What that costs is the count of the
-            tier you are ON at rest — the burn-down when you are working
-            Skipped down to zero — and what it buys is that all four are still
-            one tap away, conditioned exactly as before.
+          THE SEARCH BOX IS WHAT FLEXES, and that is what makes the single row
+          a rule rather than a hope: it is the one control here with no natural
+          width — the three pickers are as wide as their vocabularies and the
+          switch is as wide as its words — so giving it the leftover is the
+          only arrangement that fits every window without a breakpoint. It is
+          `flex-1` in a pen with a floor; below that floor the row wraps, which
+          is the honest failure.
 
-            NO FIND BOX, and it needs no asking for: `PickList` grows one past
-            eight options or with `allowNew`, and this is four of a closed
-            vocabulary. Same for Group by. */}
-        <PickList
-          ariaLabel="Guide filter"
-          variant="field"
-          value={filter}
-          onPick={(next) => changeFilter(next as GuideFilter)}
-          options={GUIDE_FILTERS.map((f) => ({
-            value: f,
-            label: GUIDE_FILTER_LABEL[f],
-            hint: String(filterCounts[f]),
-          }))}
-          className="w-44"
-        />
+          `fullWidth` on the input is not decoration: `TextInput`'s wrapper
+          SHRINK-WRAPS, so a `w-full` on the input alone resolves against a
+          span that is itself sized by the input and the pair settles at ~20
+          characters. That prop is what stretches the wrapper.
+
+          `items-end` levels the BOXES, so the search sits on the same line as
+          three fields that each carry a caption above them. */}
+      <div className="flex flex-wrap items-end gap-4 text-sm">
+        <div className="min-w-[13rem] flex-1">
+          <TextInput
+            value={term}
+            onValueChange={setTerm}
+            placeholder="Jump to item, vendor or section…"
+            clearLabel="Clear the search"
+            fullWidth
+          />
+        </div>
+
+        {/* EVERY PICKER IS CAPTIONED NOW (Mark, 2026-09-10: "put labels above
+            the picklists"), which retires the argument made the day before
+            that only Group by needed one. It was right about Group by and
+            wrong to stop there: at rest these read "Favorites", "All vendors"
+            and "Shop section", three values of three different dimensions with
+            nothing on screen saying which is which, where four tabs and a
+            segmented bar had at least shown their whole vocabulary. The
+            caption is what a collapsed control gives up, so it is what a
+            collapsed control has to state.
+
+            Above rather than beside — `/items`' Last-ordered rule (Mark,
+            2026-08-01): a caption to the left starts the control 130px in, so
+            it no longer lines up with the box above it, and stacked, every
+            control in the row begins on one margin.
+
+            The captions are VISUAL. Each control keeps its own `ariaLabel`,
+            which is longer and better ("Which vendors to walk"), so nothing is
+            announced twice. */}
+        <ControlField label="Filter">
+          {/* A LIST RATHER THAN FOUR TABS (Mark, 2026-09-10), which is the
+              conversion `/invoices` already made for its Due tabs and is made
+              here for that one's reason: this band is the one thing on the
+              guide that must stay on screen for a 66,000px walk, and four tabs
+              plus three groupings plus a search box plus a vendor set plus a
+              switch is more than a row can hold.
+
+              THE COUNTS RIDE AS HINTS, which is where the tabs carried them
+              and where `/invoices` put them. What that costs is the count of
+              the tier you are ON at rest — the burn-down when you are working
+              Skipped down to zero — and what it buys is that all four are
+              still one tap away, conditioned exactly as before.
+
+              NO FIND BOX, and it needs no asking for: `PickList` grows one
+              past eight options or with `allowNew`, and this is four of a
+              closed vocabulary. Same for the two beside it. */}
+          <PickList
+            ariaLabel="Guide filter"
+            variant="field"
+            value={filter}
+            onPick={(next) => changeFilter(next as GuideFilter)}
+            options={GUIDE_FILTERS.map((f) => ({
+              value: f,
+              label: GUIDE_FILTER_LABEL[f],
+              hint: String(filterCounts[f]),
+            }))}
+            className="w-44"
+          />
+        </ControlField>
 
         {/* A SET, not a one-of-N — "BakeMark and Chefs Warehouse" is a real
             way to walk, and a day at DF01 spans dozens of vendors, so the
-            picker grows its own find box past eight. It sits with the tiers
-            because it NARROWS the list, left of the switch and of Group by.
+            picker grows its own find box past eight. It sits with the tier
+            because it NARROWS the list.
 
             IT NARROWS THE LIST AND NOTHING ELSE. The vendor totals bar and
             Generate POs read every row (`totals` is computed from `rows`), so
             a filtered walk can never quietly produce a partial order or read
             as under a minimum it has met. */}
-        <PickSet
-          options={vendorOptions}
-          value={vendors}
-          onChange={changeVendors}
-          allLabel="All vendors"
-          noun="vendors"
-          label="Which vendors to walk"
-          className="max-w-[15rem]"
-          minWidth={240}
-        />
+        <ControlField label="Vendors">
+          <PickSet
+            options={vendorOptions}
+            value={vendors}
+            onChange={changeVendors}
+            allLabel="All vendors"
+            noun="vendors"
+            label="Which vendors to walk"
+            className="max-w-[15rem]"
+            minWidth={240}
+          />
+        </ControlField>
 
-        {/* The escape hatch from the day gates (FMP's "ignore order day"):
-            every orderable line, whenever you'd normally buy it. A switch,
-            not a button — it's a mode you leave on, not an action you fire.
-            It lives with the filters it changes, and matches the app's
-            other switches: black/white, off = the exact inverse of on
-            (Mark, 2026-07-25). */}
+        {/* LAST IN THE ROW, which is where it has been since 2026-07-29:
+            everything left of it narrows the list — the search, the tier, the
+            vendors, and the switch below — and this one only rearranges what
+            survived, so it reads better as its own thing at the far end than
+            as a fourth filter. It no longer needs `ml-auto` to get there: the
+            flexible search eats the leftover, so there is none for an auto
+            margin to claim and the row's own order is what puts this at the
+            right edge. */}
+        <ControlField label="Group by">
+          <PickList
+            ariaLabel="Group by"
+            variant="field"
+            value={grouping}
+            onPick={(next) => changeGrouping(next as GuideGrouping)}
+            options={GUIDE_GROUPINGS.map((mode) => ({
+              value: mode,
+              label: GROUPING_LABEL[mode],
+            }))}
+            className="w-40"
+          />
+        </ControlField>
+      </div>
+
+      {/* The escape hatch from the day gates (FMP's "ignore order day"):
+          every orderable line, whenever you'd normally buy it. A switch,
+          not a button — it's a mode you leave on, not an action you fire,
+          and it matches the app's other switches: black/white, off = the
+          exact inverse of on (Mark, 2026-07-25).
+
+          ITS OWN ROW (Mark, 2026-09-10). It is the one control here that is
+          neither a field nor a value — a mode, with no vocabulary to collapse
+          and a sentence for a label — so on the fields' line it was the thing
+          that had to wrap. Beneath them it costs the band a short line and
+          gives the four above it a row they always fit. */}
+      <div className="pt-2">
         <button
           type="button"
           role="switch"
@@ -968,35 +1063,6 @@ export function OrderGuide({
           </span>
           Ignore ordering days
         </button>
-
-        {/* Pushed to the right edge (Mark, 2026-07-29). Everything left of
-            it narrows the list — search, the four tiers, the day gates —
-            and this one only rearranges what survived, so it reads better
-            as its own thing at the far end than as a fourth filter. ml-auto
-            eats the slack in the row; if the row wraps at a narrow width
-            this lands on its own line, still right-aligned. */}
-        <span className="ml-auto flex items-center gap-3">
-          <span className="text-xs uppercase tracking-[0.12em] text-subtle">
-            Group by
-          </span>
-          {/* IT KEEPS ITS CAPTION, where the tier picker beside it needs
-              none, and that is the one place this departs from `/invoices`'
-              "a picker's own face names what it is set to". It does not:
-              "Vendor" set at rest, three inches from a vendor filter reading
-              "All vendors", is two controls that look like one dimension and
-              are not. The caption is what tells them apart. */}
-          <PickList
-            ariaLabel="Group by"
-            variant="field"
-            value={grouping}
-            onPick={(next) => changeGrouping(next as GuideGrouping)}
-            options={GUIDE_GROUPINGS.map((mode) => ({
-              value: mode,
-              label: GROUPING_LABEL[mode],
-            }))}
-            className="w-40"
-          />
-        </span>
       </div>
       </div>
 
