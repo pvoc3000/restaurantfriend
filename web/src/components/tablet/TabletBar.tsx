@@ -53,16 +53,18 @@ export function TabletBar({
 
   return (
     <header ref={ref} className="sticky top-0 z-50 bg-ink text-white">
-      {/* RIGHT-ALIGNED (Mark, 2026-09-09): the spacer leads, so every cell
-          sits against the right edge where a thumb holding a landscape iPad
-          already is, and the landing page's shop picker and Switch user join
-          the same cluster rather than facing the nav across the bar. */}
+      {/* BACK AND HOME ON THE LEFT, THE RECORD BOOK ON THE RIGHT (Mark,
+          2026-09-09, his second arrangement): the two that leave a screen sit
+          where every browser puts them, and the four that walk a found set
+          sit together at the far end, FileMaker's own layout. The landing
+          page's shop picker and Switch user take the right end there, where
+          no record book can be. */}
       <div className="flex items-center gap-1 px-2">
-        <div className="min-w-0 flex-1" />
         <TabletBack />
         <Link href={TABLET_HOME} className={BAR_CELL}>
           <BarLabel icon={ICON_HOME} word="Home" />
         </Link>
+        <div className="min-w-0 flex-1" />
         <BarRecordNav />
         {atHome && (
           <div className="flex items-center gap-4 px-3">

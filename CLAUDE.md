@@ -9151,9 +9151,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    exactly 16px of page scroll in both orientations. The paperwork screens
    dodge it with a negative margin on the spacer; a wrapper is the general cure.
    **SIX MORE FROM MARK'S FIRST LOOK, the same evening.** Bar cells are a
-   FIXED `w-36` (144px — "Mark complete" wrapped at 128, and the word is now
-   just **Complete**); the bar's nav cells are RIGHT-ALIGNED, with the landing
-   page's shop picker and Switch user joining that cluster; Order is back in
+   FIXED `w-28` (112px; 128 wrapped "Mark complete", 144 read as too wide, and
+   the word is now just **Complete**); Back and Home sit LEFT and the record
+   book RIGHT, with the landing page's shop picker and Switch user taking the
+   right end there; Order is back in
    the tablet's column set; **sorting by Status bands by status**
    (`effective` grouping in `BatchItemsTable`, used by the comparator AND the
    bands, or the bands would not match the order they band); the search box
