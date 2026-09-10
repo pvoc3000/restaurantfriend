@@ -130,16 +130,8 @@ export function BatchFields({
           )}
         </Field>
 
-        <Field label="Batch">
-          {/* The number is the batch's IDENTITY — 044 mints it from a sequence
-              and it is unique per org. Read-only for the reason a PO number is:
-              editing it would make the record claim to be a different one. */}
-          <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
-            {row.batch_number}
-            {row.generated || row.migrated ? "" : " · by hand"}
-          </span>
-        </Field>
-
+        {/* No Batch field (Mark, 2026-09-09): the number and the "by hand" mark
+            are on the pane's black bar, directly above. */}
         <Field label="Order">
           {editable ? (
             <InlineValue
