@@ -6,7 +6,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { RowMenu } from "@/components/ui/RowMenu";
@@ -472,24 +473,28 @@ export function TasksScreen({
           className="w-72"
           icon={<SearchGlyph />}
         />
-        <TabPicker
-          ariaLabel="Which"
-          value={tier}
-          options={[
-            {
-              key: "open",
-              label: "Open",
-              count: searched.filter((r) => isTaskOpen(r)).length,
-            },
-            {
-              key: "done",
-              label: "Finished",
-              count: searched.filter((r) => !isTaskOpen(r)).length,
-            },
-            { key: "all", label: "All", count: searched.length },
-          ]}
-          onChange={(v) => setTier(v as typeof tier)}
-        />
+        <ControlField label="Show">
+          <PickList
+            ariaLabel="Which"
+            variant="field"
+            value={tier}
+            options={[
+              {
+                value: "open",
+                label: "Open",
+                hint: String(searched.filter((r) => isTaskOpen(r)).length),
+              },
+              {
+                value: "done",
+                label: "Finished",
+                hint: String(searched.filter((r) => !isTaskOpen(r)).length),
+              },
+              { value: "all", label: "All", hint: String(searched.length) },
+            ]}
+            onPick={(v) => setTier(v as typeof tier)}
+            fit
+          />
+        </ControlField>
         {action ? <div className="ml-auto">{action}</div> : null}
       </div>
 
