@@ -58,8 +58,8 @@ export type BatchRow = {
 
 /**
  * Element type, STATUS or PREPARED BY (Mark, 2026-09-10: "options: element
- * type, status, prepared by"). "None" went with that list; it was the third
- * option from 2026-08-09.
+ * type, status, prepared by"). None stays as a fourth (Mark put it back
+ * the same day, one commit after it went).
  *
  * Element itself is not one, which is the same test every grouping in this app
  * has to pass: FEW VALUES, MANY ROWS EACH, so the run a heading opens is worth
@@ -69,9 +69,9 @@ export type BatchRow = {
  * values and a log is a checklist; Prepared by is a handful of people splitting
  * a round.
  */
-type Grouping = "type" | "status" | "operator";
+type Grouping = "type" | "status" | "operator" | "none";
 
-const GROUP_LABEL: Record<Grouping, (r: BatchRow) => string> = {
+const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
   type: (r) => r.element_type ?? "No type",
   status: (r) =>
     BATCH_STATUS_LABEL[r.status as keyof typeof BATCH_STATUS_LABEL] ?? r.status,
@@ -84,7 +84,7 @@ const GROUP_LABEL: Record<Grouping, (r: BatchRow) => string> = {
  * and status bands read in the order a batch moves through them rather than
  * alphabetically, which would put Complete above To do.
  */
-const GROUP_KEY: Record<Grouping, (r: BatchRow) => string> = {
+const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
   type: (r) => r.element_type ?? "￿",
   status: (r) => {
     const at = BATCH_STATUSES.indexOf(r.status as (typeof BATCH_STATUSES)[number]);
@@ -95,7 +95,7 @@ const GROUP_KEY: Record<Grouping, (r: BatchRow) => string> = {
 };
 
 function isGrouping(value: string): value is Grouping {
-  return value in GROUP_KEY;
+  return value === "none" || value in GROUP_KEY;
 }
 
 /**
@@ -154,7 +154,6 @@ export function BatchItemsTable({
   // The SORT is remembered too. Mark named the search and the filters, and the
   // sort is the same class of thing set up for the same reason — leaving it out
   // would produce the identical complaint on the next pass.
-  // A remembered "none" from before 2026-09-10 falls back to Element type.
   const [storedGrouping, setGrouping] = useRememberedView<string>("batch-items.grouping", "type");
   const grouping: Grouping = isGrouping(storedGrouping) ? storedGrouping : "type";
   const [term, setTerm] = useRememberedView("batch-items.search", "");
@@ -236,7 +235,7 @@ export function BatchItemsTable({
       }
     };
     const dir = sort.dir === "asc" ? 1 : -1;
-    const groupOf = GROUP_KEY[effective];
+    const groupOf = effective === "none" ? null : GROUP_KEY[effective];
     // SORTING BY THE COLUMN YOU ARE GROUPED BY TURNS THE BANDS OVER — the
     // schedules/timesheets fix of 2026-09-09, which this table had missed.
     // Inside a band every row shares the grouped value, so the within-run
@@ -244,8 +243,10 @@ export function BatchItemsTable({
     // nothing. Every grouping key is also its column's sort key.
     const lead = effective === sort.key ? dir : 1;
     return [...shown].sort((a, b) => {
-      const ag = groupOf(a), bg = groupOf(b);
-      if (ag !== bg) return (ag < bg ? -1 : 1) * lead;
+      if (groupOf) {
+        const ag = groupOf(a), bg = groupOf(b);
+        if (ag !== bg) return (ag < bg ? -1 : 1) * lead;
+      }
       const av = value(a), bv = value(b);
       if (av < bv) return -1 * dir;
       if (av > bv) return 1 * dir;
@@ -457,13 +458,16 @@ export function BatchItemsTable({
     },
   ];
 
-  const group: DataGroup<BatchRow> = {
-    label: GROUP_LABEL[effective],
-    // Black caps text over a rule, not a filled band — FileMaker's own
-    // treatment for exactly this heading (Mark, 2026-08-09). See
-    // DataGroup.heading.
-    heading: true,
-  };
+  const group: DataGroup<BatchRow> | undefined =
+    effective === "none"
+      ? undefined
+      : {
+          label: GROUP_LABEL[effective],
+          // Black caps text over a rule, not a filled band — FileMaker's own
+          // treatment for exactly this heading (Mark, 2026-08-09). See
+          // DataGroup.heading.
+          heading: true,
+        };
 
   return (
     <DataTable
@@ -536,9 +540,10 @@ export function BatchItemsTable({
                 value={grouping}
                 onPick={(next) => setGrouping(next as Grouping)}
                 options={[
-                  { value: "type", label: "Element type" },
+                  { value: "type", label: "Type" },
                   { value: "status", label: "Status" },
                   { value: "operator", label: "Prepared by" },
+                  { value: "none", label: "None" },
                 ]}
                 fit
               />

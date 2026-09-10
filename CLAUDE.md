@@ -9179,8 +9179,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    table's own filter row on both shells** (Mark) — search · **Status** (a
    captioned `PickList` of all five statuses plus "All statuses", counts
    conditioned on the search, remembered as `batch-items.status`) · Group by
-   (a `PickList` too, on the tablet as well as the desk, offering **Element
-   type · Status · Prepared by** and no "None" — Mark's list, the same day;
+   (a `PickList` too, on the tablet as well as the desk, offering **Type · Status
+   · Prepared by · None** — Mark's list, the same day, None going for one
+   commit and coming back, and "Element type" shortened to "Type";
    a sort by the grouped column now turns its bands over), with the crumbs
    standing alone again; the pane's tabs are `SectionNav size="lg"` in a
    scrolling column, and the tablet's default split is half; and
