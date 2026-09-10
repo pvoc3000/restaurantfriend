@@ -6,9 +6,11 @@ import Link from "next/link";
 import { DataTable, type DataColumn, type DataGroup } from "@/components/catalog/DataTable";
 import type { SortDir } from "@/lib/tableSort";
 import { useRouter } from "next/navigation";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { RangePicker } from "@/components/ui/RangePicker";
 import { TextInput } from "@/components/ui/TextInput";
+import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { batchDate } from "@/lib/productionBatches";
@@ -83,7 +85,7 @@ export function BatchLogsIndex({
   params: Record<string, string | string[] | undefined>;
   /** The working shop, for the heading's count line. */
   locationCode?: string | null;
-  /** The screen's create command, beside the title. */
+  /** The screen's create command, on its own strip above the filters. */
   action?: ReactNode;
   /** A line under the heading — what the count alone cannot say. */
   note?: ReactNode;
@@ -283,58 +285,84 @@ export function BatchLogsIndex({
         noun="logs"
       />
 
-      {/* Its own filter row, above the table — `PlansList`'s change and reason. */}
+      {/* THE COMMAND STRIP, above the filter row and right-aligned — the
+          invoice list's arrangement (Mark, 2026-09-10). `justify-end` on the
+          row rather than `ml-auto` on the button, and the inner group keeps the
+          command content-sized. */}
+      {action ? (
+        <div className="flex justify-end">
+          <div className="flex flex-wrap items-center gap-3">{action}</div>
+        </div>
+      ) : null}
+
+      {/* THE FILTER ROW, left-aligned: search · window · show · group by.
+          The two TabPickers became captioned `PickList`s (Mark, 2026-09-10),
+          the purchasing lists' conversion — the counts ride as hints, and
+          `fit` sizes each trigger to its widest option. The search is the one
+          control with no natural width, so it flexes; `fullWidth` is
+          load-bearing, since `TextInput`'s wrapper shrink-wraps. `items-end`
+          sits the uncaptioned search on the line of the captioned fields. */}
       <div className="flex flex-wrap items-end gap-4">
-        <TextInput
-          value={term}
-          onValueChange={setTerm}
-          placeholder="Search date, kitchen, note…"
-          aria-label="Search batch logs"
-          className="w-64"
-        />
+        <div className="min-w-[13rem] max-w-[18rem] flex-1">
+          <TextInput
+            value={term}
+            onValueChange={setTerm}
+            aria-label="Search date, kitchen or note"
+            clearLabel="Clear the search"
+            fullWidth
+            icon={<SearchGlyph />}
+          />
+        </div>
+
         {/* A NAVIGATION, not local state — the rows it wants do not exist on
             the client yet (the order guide's day strip, for the same reason).
-            The Show tabs became this picker on 2026-09-08 (Mark), its presets
-            being those four. */}
-        <div className="w-64">
-          <RangePicker
-            value={batchLogWindowBounds(range, today)}
-            onChange={(picked) =>
-              router.push(batchLogRangeHref(batchLogWindowFromPicker(picked, today), params))
-            }
-            presets={BATCH_LOG_PRESETS}
-            today={today}
-            ariaLabel="How far back to look"
-            placeholder="All time"
-          />
-        </div>
-        <TabPicker
-          ariaLabel="Which logs"
-          value={tier}
-          onChange={setTier}
-          options={[
-            { key: "open" as Tier, label: "Open", count: counts.open },
-            { key: "today" as Tier, label: "Today", count: counts.today },
-            { key: "complete" as Tier, label: "Complete", count: counts.complete },
-            { key: "all" as Tier, label: "All", count: counts.all },
-          ]}
-        />
-        <div className="space-y-1.5">
-          <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-            Group by
-          </span>
-          <TabPicker
-            ariaLabel="Group the logs"
-            value={grouping}
-            onChange={setGrouping}
+            `w-52`, the purchasing lists' measured width now the face carries a
+            two-digit year. */}
+        <ControlField label="Window">
+          <div className="w-52">
+            <RangePicker
+              value={batchLogWindowBounds(range, today)}
+              onChange={(picked) =>
+                router.push(batchLogRangeHref(batchLogWindowFromPicker(picked, today), params))
+              }
+              presets={BATCH_LOG_PRESETS}
+              today={today}
+              ariaLabel="How far back to look"
+              placeholder="All time"
+            />
+          </div>
+        </ControlField>
+
+        <ControlField label="Show">
+          <PickList
+            ariaLabel="Which logs"
+            variant="field"
+            value={tier}
+            onPick={(next) => setTier(next as Tier)}
             options={[
-              { key: "none" as Grouping, label: "None" },
-              { key: "date" as Grouping, label: "Date" },
-              { key: "location" as Grouping, label: "Location" },
+              { value: "open", label: "Open", hint: String(counts.open) },
+              { value: "today", label: "Today", hint: String(counts.today) },
+              { value: "complete", label: "Complete", hint: String(counts.complete) },
+              { value: "all", label: "All", hint: String(counts.all) },
             ]}
+            fit
           />
-        </div>
-        {action ? <div className="ml-auto">{action}</div> : null}
+        </ControlField>
+
+        <ControlField label="Group by">
+          <PickList
+            ariaLabel="Group the logs"
+            variant="field"
+            value={grouping}
+            onPick={(next) => setGrouping(next as Grouping)}
+            options={[
+              { value: "none", label: "None" },
+              { value: "date", label: "Date" },
+              { value: "location", label: "Location" },
+            ]}
+            fit
+          />
+        </ControlField>
       </div>
       {note}
     <DataTable
