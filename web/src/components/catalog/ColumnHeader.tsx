@@ -49,8 +49,9 @@ import type { SortDir } from "@/lib/tableSort";
  *   - THE GRIP IS FINGER-SIZED. The desk's is a 12px strip centred on a 1px
  *     line — fine for a cursor, and a finger needs about 44. On a tablet the
  *     strip is 40px, capped at half the cell (`max-w-[50%]`) so a narrow column
- *     keeps most of its heading for sorting, and it carries a VISIBLE HANDLE,
- *     since there is no hover to reveal where the line is.
+ *     keeps most of its heading for sorting. THE LINE STAYS 1px: a 6px handle
+ *     drawn on it was tried and read as thick dividers (Mark, the same day), so
+ *     the target grew and the mark did not.
  *   - NO DRAG-TO-REORDER. A sideways drag from anywhere else in the header
  *     picked the column up, so a touch that just missed the grip moved the
  *     column instead of resizing it — the near-miss was the whole problem.
@@ -179,8 +180,8 @@ export function ColumnHeader({
         {/* Resize grip: a visible divider on every column boundary so it's
             discoverable at rest, with a hit area wider than the line itself and
             straddling the boundary. `group` drives the line's hover state.
-            On a tablet the hit area is 40px (capped at half the cell) and a
-            handle is drawn on the line — see the header. */}
+            On a tablet the hit area is 40px (capped at half the cell) while the
+            line stays 1px — see the header. */}
         <span
           data-resize-grip
           onPointerDown={onResizeStart}
@@ -193,16 +194,13 @@ export function ColumnHeader({
             tablet ? "w-10 max-w-[50%]" : "w-3"
           }`}
         >
-          <span className="w-px self-stretch bg-neutral-200 transition-colors group-hover:w-0.5 group-hover:bg-ink" />
-          {tablet && (
-            // THE HANDLE: a short dark bar on the line, square like everything
-            // else, darkening under the finger. It is what says "grab here" on
-            // a screen with no hover to reveal the line.
-            <span
-              aria-hidden
-              className="pointer-events-none absolute h-6 w-1.5 bg-neutral-400 group-active:bg-ink"
-            />
-          )}
+          <span
+            // 1px on a tablet too, and no hover thickening there: a tap can
+            // leave `:hover` stuck on, which would leave a 2px dark line.
+            className={`w-px self-stretch bg-neutral-200 ${
+              tablet ? "" : "transition-colors group-hover:w-0.5 group-hover:bg-ink"
+            }`}
+          />
         </span>
       </div>
     </th>

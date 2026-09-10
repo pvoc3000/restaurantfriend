@@ -10527,8 +10527,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   2026-09-10: "how can we make it easier to resize columns on a tablet? I
   struggle to get it"). The desk grip is a 12px strip on a 1px line; under the
   tablet SHELL (`ColumnHeader` reads `useShell()`) it is 40px, capped at half
-  the cell so a narrow column keeps its heading for sorting, with a visible
-  handle on the line. Drag-to-reorder is OFF there, because a near-miss on the
+  the cell so a narrow column keeps its heading for sorting — and the LINE
+  STAYS 1px (Mark, the same day: a visible 6px handle on each boundary was
+  tried, "works well, but aesthetically don't like the thicker dividers"). The
+  hover thickening is desk-only too, since a tap can leave a hover stuck. Drag-to-reorder is OFF there, because a near-miss on the
   grip was landing on the header and moving the column instead. And **Reset
   column widths is in the Columns (eye) menu** whenever a width has changed —
   the footer line is off on some screens and a double-click is no touch gesture,
