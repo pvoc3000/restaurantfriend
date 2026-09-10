@@ -8,7 +8,7 @@ import { money } from "@/lib/purchaseOrders";
 import { withFrom } from "@/lib/breadcrumbs";
 import { useScrollMemoryKey } from "@/lib/scrollMemory";
 import { TextInput } from "@/components/ui/TextInput";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
 import { PickSet } from "@/components/ui/PickSet";
 import {
   matchesVendorFilter,
@@ -888,17 +888,34 @@ export function OrderGuide({
           clearLabel="Clear the search"
           className="w-72"
         />
-        {/* Segmented control: these four are one choice, so they read as
-            one object rather than four loose buttons. */}
-        <TabPicker
+        {/* A LIST RATHER THAN FOUR TABS (Mark, 2026-09-10), which is the
+            conversion `/invoices` already made for its Due tabs and is made
+            here for that one's reason: this band is the one thing on the guide
+            that must stay on screen for a 66,000px walk, and four tabs plus
+            three groupings plus a search box plus a vendor set plus a switch
+            is more than a row can hold — it already wraps at 1440, and every
+            line it wraps to is a line of walk it covers.
+
+            THE COUNTS RIDE AS HINTS, which is where the tabs carried them and
+            where `/invoices` put them. What that costs is the count of the
+            tier you are ON at rest — the burn-down when you are working
+            Skipped down to zero — and what it buys is that all four are still
+            one tap away, conditioned exactly as before.
+
+            NO FIND BOX, and it needs no asking for: `PickList` grows one past
+            eight options or with `allowNew`, and this is four of a closed
+            vocabulary. Same for Group by. */}
+        <PickList
           ariaLabel="Guide filter"
+          variant="field"
           value={filter}
-          onChange={changeFilter}
+          onPick={(next) => changeFilter(next as GuideFilter)}
           options={GUIDE_FILTERS.map((f) => ({
-            key: f,
+            value: f,
             label: GUIDE_FILTER_LABEL[f],
-            count: filterCounts[f],
+            hint: String(filterCounts[f]),
           }))}
+          className="w-44"
         />
 
         {/* A SET, not a one-of-N — "BakeMark and Chefs Warehouse" is a real
@@ -962,14 +979,22 @@ export function OrderGuide({
           <span className="text-xs uppercase tracking-[0.12em] text-subtle">
             Group by
           </span>
-          <TabPicker
+          {/* IT KEEPS ITS CAPTION, where the tier picker beside it needs
+              none, and that is the one place this departs from `/invoices`'
+              "a picker's own face names what it is set to". It does not:
+              "Vendor" set at rest, three inches from a vendor filter reading
+              "All vendors", is two controls that look like one dimension and
+              are not. The caption is what tells them apart. */}
+          <PickList
             ariaLabel="Group by"
+            variant="field"
             value={grouping}
-            onChange={changeGrouping}
+            onPick={(next) => changeGrouping(next as GuideGrouping)}
             options={GUIDE_GROUPINGS.map((mode) => ({
-              key: mode,
+              value: mode,
               label: GROUPING_LABEL[mode],
             }))}
+            className="w-40"
           />
         </span>
       </div>
