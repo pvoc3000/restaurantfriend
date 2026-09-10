@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useState, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 /** Where a portalled panel should sit, in viewport coordinates. */
 export type AnchorBox = { top: number; left: number; width: number };
@@ -87,9 +87,27 @@ export function menuItemState(active: boolean): string {
 export const MENU_HEADER_CLASS =
   "border-b border-hairline bg-neutral-50 px-3 py-1 text-[11px] uppercase tracking-[0.12em] text-subtle";
 
-/** The find box pinned to the top of a long list. */
+/**
+ * The find box pinned to the top of a long list.
+ *
+ * **`text-[16px]`, and that is the threshold rather than a size** (Mark,
+ * 2026-09-10: picklists "are finicky on tablets… out of 10 taps, 8 times the
+ * keyboard won’t display"). Below sixteen pixels iOS Safari ZOOMS the whole
+ * page when a field takes focus, and the zoom then scrolls to keep the field
+ * in view — which is a scroll event, which used to close this panel out from
+ * under the keyboard that was about to appear. Every other input this app puts
+ * in front of an iPad already sits at 16 for exactly this reason (the inquiry
+ * form, the shift report’s fields, the checklist runner’s boxes); this one
+ * was missed because it is the only field the app creates rather than lays out,
+ * and because `PickList`’s `size="lg"` dresses the TRIGGER and never reaches
+ * the panel.
+ *
+ * 16 everywhere rather than only on `lg`, because the tablet shell reuses the
+ * desk lists as they are — a `md` picklist on `/vendors` is read on the iPad
+ * as often as anything built for it.
+ */
 export const MENU_SEARCH_CLASS =
-  "sticky top-0 z-10 w-full border-b border-hairline bg-white px-3 py-2 text-sm outline-none";
+  "sticky top-0 z-10 w-full border-b border-hairline bg-white px-3 py-2 text-[16px] outline-none";
 
 /**
  * Sink every retired option below the live ones, under a single heading.
@@ -163,6 +181,13 @@ export function useAnchoredPanel({
   onClose: () => void;
 }): AnchorBox | null {
   const [box, setBox] = useState<AnchorBox | null>(null);
+  /**
+   * Where the TRIGGER was when we last measured it, in layout-viewport
+   * coordinates — the reference the scroll rule below tests against. Not
+   * derived from `box`, which the fitting pass may have moved above the
+   * trigger or shifted sideways to keep the panel on screen.
+   */
+  const anchor = useRef<{ top: number; left: number } | null>(null);
 
   // Measured off the trigger at open time, and again if the trigger resizes.
   // This is the FIRST pass and it always places the panel below — where it
@@ -174,6 +199,7 @@ export function useAnchoredPanel({
       const el = triggerRef.current;
       if (!el) return;
       const r = el.getBoundingClientRect();
+      anchor.current = { top: r.top, left: r.left };
       setBox({
         top: r.bottom + 2,
         left: align === "right" ? r.right : r.left,
@@ -257,7 +283,8 @@ export function useAnchoredPanel({
     if (!open) return;
     const close = () => onClose();
     /**
-     * A scroll closes the panel — EXCEPT a scroll of the panel itself.
+     * A scroll closes the panel — EXCEPT a scroll of the panel itself, and
+     * EXCEPT one that did not actually move the trigger.
      *
      * The listener is in capture precisely so a scrolling PANE closes it, but
      * that also caught the panel's own `overflow-auto`, so a long list shut the
@@ -265,9 +292,23 @@ export function useAnchoredPanel({
      * picker, which offers 77 shelves: wheel over the list, or grab its
      * scrollbar, and it vanished.
      *
-     * The distinction is what MOVED. If the page or a pane scrolled, the
-     * trigger has moved and the fixed coordinates are stale — close. If the
-     * panel scrolled, nothing moved but the reader's eye.
+     * The distinction is what MOVED, which this said in words for a year and
+     * tested by EVENT TARGET — a proxy that is right about a pane and wrong
+     * about iOS. On iPad `window.scrollY` tracks the VISUAL viewport, so
+     * pinching, or Safari zooming to a focused field, or the keyboard sliding
+     * up to reveal it, all fire a page scroll while nothing in the layout has
+     * moved an inch. The panel closed on its own keyboard (Mark, 2026-09-10:
+     * the picker "won’t display" one), taking the field being focused with it.
+     *
+     * So the rule is now what it always claimed: re-read the trigger and close
+     * only if it has really moved. `getBoundingClientRect` is in LAYOUT
+     * viewport coordinates, so it is indifferent to zoom and to the visual
+     * viewport — which is exactly the discrimination needed. A pane or page
+     * scroll moves the trigger and still closes; a `position: fixed` trigger
+     * (the masthead’s picker) correctly no longer does.
+     *
+     * A 1px slack, matching the fitting pass above: sub-pixel jitter from a
+     * zoomed rect is not a scroll anybody performed.
      */
     const onScroll = (e: Event) => {
       const panel = panelRef.current;
@@ -278,6 +319,12 @@ export function useAnchoredPanel({
       // page scroll and the panel stayed open — which is precisely the case
       // closing on scroll exists for. Caught by testing both halves.
       if (panel && e.target instanceof Node && panel.contains(e.target)) return;
+      const el = triggerRef.current;
+      const was = anchor.current;
+      if (el && was) {
+        const r = el.getBoundingClientRect();
+        if (Math.abs(r.top - was.top) <= 1 && Math.abs(r.left - was.left) <= 1) return;
+      }
       onClose();
     };
     const onKey = (e: KeyboardEvent) => {
@@ -295,6 +342,14 @@ export function useAnchoredPanel({
       onClose();
     };
     window.addEventListener("scroll", onScroll, true);
+    // `resize` is deliberately NOT given the movement test the scroll rule
+    // above now uses: a window that changes SHAPE moves the viewport edges the
+    // fitting pass measured against, and that pass only observes the panel, so
+    // there is nothing to re-fit against and closing is the honest answer.
+    // Safe on iPad because a Safari tab’s keyboard resizes the VISUAL viewport
+    // and fires no window resize at all — what does fire one there is rotation,
+    // where closing is right. Revisit if this app is ever added to the Home
+    // Screen, where a standalone window IS resized by the keyboard.
     window.addEventListener("resize", close);
     window.addEventListener("keydown", onKey);
     document.addEventListener("mousedown", onDown);

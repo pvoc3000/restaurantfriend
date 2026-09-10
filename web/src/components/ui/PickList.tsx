@@ -6,7 +6,7 @@ import {
   BOXED_FIELD_BORDER,
   fieldPlaceholder,
 } from "@/components/ui/fieldMetrics";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import { confirmDialog } from "@/lib/confirm";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -229,6 +229,7 @@ export function PickList({
   const supabase = createClient();
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   // The DISMISS path — Escape, or a click away. `choose` closes without coming
   // through here, because a pick is not an abandonment and a caller that put
   // its button back on every close would tear the picker down mid-choice.
@@ -389,14 +390,46 @@ export function PickList({
         aria-expanded={open}
         aria-label={ariaLabel}
         onClick={() => {
-          setTerm("");
-          // `ordered`, not `listed` — the keyboard index walks what is on
-          // SCREEN, and the inactive partition moves rows.
-          setActive(Math.max(0, ordered.findIndex((o) => o.value === selected)));
           // Closing by pressing the trigger again is an abandonment like any
           // other, so it goes through `close` rather than flipping the flag.
-          if (open) close();
-          else setOpen(true);
+          if (open) {
+            close();
+            return;
+          }
+          /**
+           * OPENED SYNCHRONOUSLY, INSIDE THE TAP, so the find box can raise a
+           * keyboard (Mark, 2026-09-10: on a tablet "out of 10 taps, 8 times
+           * the keyboard won’t display").
+           *
+           * WebKit raises the software keyboard for a PROGRAMMATIC `focus()`
+           * only while it is processing a user gesture, and that flag lives on
+           * the event-dispatch call stack. React 18 flushes discrete updates in
+           * a MICROTASK rather than inside the handler, so by the time this
+           * panel mounted and React’s `autoFocus` called `focus()`, the gesture
+           * was over: the input took focus, the caret blinked, and no keyboard
+           * came. It is worse here than for an ordinary field because the panel
+           * mounts on a SECOND render — `useAnchoredPanel` has to measure the
+           * trigger before the caller may draw anything.
+           *
+           * `flushSync` puts the render, the commit, the measuring layout
+           * effect and the re-render it schedules all inside this handler’s own
+           * stack, which is where the gesture still is. The explicit `focus()`
+           * after it is insurance rather than the mechanism — `autoFocus` has
+           * normally fired by then, and focusing an already-focused element is a
+           * no-op — but it costs nothing and does not depend on React’s commit
+           * ordering staying what it is.
+           *
+           * Nothing else in the app needs this: every other `autoFocus` opens a
+           * dialog or an inline editor the reader then taps into.
+           */
+          flushSync(() => {
+            setTerm("");
+            // `ordered`, not `listed` — the keyboard index walks what is on
+            // SCREEN, and the inactive partition moves rows.
+            setActive(Math.max(0, ordered.findIndex((o) => o.value === selected)));
+            setOpen(true);
+          });
+          searchRef.current?.focus();
         }}
         onKeyDown={onTriggerKey}
         className={
@@ -536,6 +569,7 @@ export function PickList({
           >
             {searchable && (
               <input
+                ref={searchRef}
                 autoFocus
                 value={term}
                 onChange={(e) => {

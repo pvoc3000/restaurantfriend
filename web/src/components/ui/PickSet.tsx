@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { createPortal, flushSync } from "react-dom";
 import {
   MENU_CARET,
   MENU_ITEM_CLASS,
@@ -81,6 +81,7 @@ export function PickSet({
   const [term, setTerm] = useState("");
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
   const close = useCallback(() => {
     setOpen(false);
     // Cleared on the way out, so reopening is never a pre-filtered list with
@@ -129,7 +130,19 @@ export function PickSet({
         aria-expanded={open}
         aria-label={label}
         disabled={disabled}
-        onClick={() => (open ? close() : setOpen(true))}
+        // Opened inside the tap, so the find box can raise a keyboard on a
+        // tablet — the reasoning is written up in full on `ui/PickList`’s own
+        // trigger, and the two must not drift: one control raising a keyboard
+        // where its sibling does not is the "I edited this and it only changed
+        // here" complaint in another costume.
+        onClick={() => {
+          if (open) {
+            close();
+            return;
+          }
+          flushSync(() => setOpen(true));
+          searchRef.current?.focus();
+        }}
         // `boxed` is `ui/PickList`'s prop, doing PickList's job, so the two
         // read as one control when they sit in the same column: a FILTER row
         // wants the black rule its neighbours have, a detail FIELD wants the
@@ -186,6 +199,7 @@ export function PickSet({
           >
             {searchable && (
               <input
+                ref={searchRef}
                 autoFocus
                 value={term}
                 onChange={(e) => setTerm(e.target.value)}
