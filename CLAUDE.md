@@ -11025,11 +11025,40 @@ weekday column, and 003 then silently made it per-vendor-item.
   cost is the count of the tier you are ON at rest, and the gain is that all of
   them are still one tap away. **No find box comes with it** — `PickList` grows
   one past eight options or with `allowNew`, so a closed vocabulary of three or
-  four never has one. And a picker whose face does NOT name its own dimension
-  keeps its caption: "Vendor" set at rest, three inches from a vendor filter
-  reading "All vendors", is two controls that look like one dimension and are
-  not. Reach for this when a control band is over-full, NOT as a general
-  preference — the TabPicker is still the default.
+  four never has one. Reach for this when a control band is over-full, NOT as a
+  general preference — the TabPicker is still the default.
+  **AND A COLLAPSED PICKER NEEDS ITS CAPTION — every one of them** (Mark,
+  2026-09-10, the day after: "put labels above the picklists"). This shipped
+  with a caption on Group by alone, on the argument that a picker's own face
+  names what it is set to and only that one's did not. Right about Group by,
+  wrong to stop there: at rest the guide's three read "Favorites", "All
+  vendors" and "Shop section", three VALUES of three different dimensions with
+  nothing saying which is which, where a TabPicker had at least shown its whole
+  vocabulary. **The caption is what a collapsed control gives up, so it is what
+  a collapsed control has to state.** Above rather than beside — `/items`'
+  Last-ordered rule — and VISUAL only, each control keeping its own longer
+  `ariaLabel` so nothing is announced twice. One shared stack per band
+  (`ControlField` on the guide), because a caption typed four times drifts.
+  **THE FLEXIBLE CONTROL IS WHAT MAKES A SINGLE ROW A RULE** rather than a
+  hope. A band's pickers are as wide as their vocabularies and its switches as
+  wide as their words; the SEARCH BOX is the only thing in it with no natural
+  width, so giving it the leftover (`flex-1` in a pen with a floor) is the one
+  arrangement that fits every window with no breakpoint. **`fullWidth` on
+  `TextInput` is load-bearing** — its wrapper shrink-wraps, so `w-full` on the
+  input alone resolves against a span the input itself sized and the pair
+  settles at ~20 characters. `items-end` levels the boxes, so an uncaptioned
+  search sits on the line of captioned fields.
+  Measured on the guide: one row at 1440 / 1280 / 1024 / 820 / 768 with the
+  search giving up 885 → 725 → 469 → 265 → 213px, all bottoms on one pixel, no
+  overflow. **A 13rem floor rather than 15 is what buys 768.**
+  **A MODE GOES ON ITS OWN ROW.** "Ignore ordering days" is neither a field nor
+  a value — no vocabulary to collapse and a sentence for a label — so on the
+  fields' line it was the thing that wrapped. Beneath them it costs a short
+  line and gives the four above it a row they always fit.
+  **The height, stated because it is the price:** the guide's band is 116px
+  captioned and two-rowed, against 60 uncaptioned on one row and 112 for the
+  original tabs. Over a 66,000px sticky walk that is real; the cheapest 20px
+  back is the captions on the two pickers whose values are least ambiguous.
   **The selected cell is ALWAYS black — there is no per-caller colour.** The
   first cut kept an `accent` option that filled a selected last-ordered AGE
   bucket yellow, carried over from the chip dialect on the argument that a
