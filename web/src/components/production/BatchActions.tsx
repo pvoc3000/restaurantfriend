@@ -105,7 +105,7 @@ export function BatchActions({
     return (
       <>
         <button type="button" onClick={remove} disabled={busy !== null} className={BAR_CELL}>
-          <BarLabel icon={ICON_TRASH} word={busy === "delete" ? "Deleting…" : "Delete batch"} />
+          <BarLabel icon={ICON_TRASH} word={busy === "delete" ? "Deleting…" : "Batch"} />
         </button>
         {error ? <p className="self-center px-3 text-sm text-[var(--rf-red-300)]">{error}</p> : null}
       </>

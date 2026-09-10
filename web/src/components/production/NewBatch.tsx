@@ -141,7 +141,7 @@ export function NewBatch({
       {variant === "bar" ? (
         // The tablet shell's footer cell — icon over word, the runners' idiom.
         <button type="button" onClick={() => setOpen(true)} className={BAR_CELL}>
-          <BarLabel icon={ICON_ADD} word="Add batch" />
+          <BarLabel icon={ICON_ADD} word="Batch" />
         </button>
       ) : (
         <button
