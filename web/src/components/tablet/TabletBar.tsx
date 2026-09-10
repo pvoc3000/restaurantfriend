@@ -10,6 +10,7 @@ import type { Location } from "@/lib/session";
 import { TABLET_HOME } from "@/lib/shell";
 import { usePublishedHeight } from "@/lib/tableHead";
 import { BAR_CELL } from "./barCell";
+import { BarActions } from "./BarActions";
 import { BarLabel, ICON_HOME, ICON_PERSON } from "./BarLabel";
 import { BarRecordNav } from "./BarRecordNav";
 import { TabletBack } from "./TabletBack";
@@ -20,12 +21,17 @@ import { TabletBack } from "./TabletBack";
  * simple nav bar. We would just need a back button … a home button … If we're
  * in a detail view the nav buttons to go to next/last would be helpful.")
  *
- * Back · Home · [record book], and — ON THE LANDING PAGE ONLY — the shop
- * picker and Switch user (Mark, 2026-09-09: "to make room for other controls,
- * location switching and the account button only need to be on the
- * landing/home page. I don't think we need the title of the page in the menu
- * bar, either"). Every cell is a 64px box with the icon over its word, the
+ * Back · Home · [screen commands] · [record book], and — ON THE LANDING PAGE
+ * ONLY — the shop picker and Switch user (Mark, 2026-09-09: "to make room for
+ * other controls, location switching and the account button only need to be on
+ * the landing/home page. I don't think we need the title of the page in the
+ * menu bar, either"). Every cell is a 64px box with the icon over its word, the
  * runners' footer idiom. No title: the page's own heading says what it is.
+ *
+ * SCREEN COMMANDS (`lib/tabletBarActions`, 2026-09-10) are a page's own
+ * buttons seated here — the order guide's Next favorite and Next section.
+ * They take the right end, where the record book sits on a detail screen; no
+ * screen has both.
  *
  * IT PUBLISHES `--rf-header-h`, not `--rf-runner-h`. Every list in the app
  * offsets its sticky column labels against the masthead's variable
@@ -65,6 +71,7 @@ export function TabletBar({
           <BarLabel icon={ICON_HOME} word="Home" />
         </Link>
         <div className="min-w-0 flex-1" />
+        <BarActions />
         <BarRecordNav />
         {atHome && (
           <div className="flex items-center gap-4 px-3">

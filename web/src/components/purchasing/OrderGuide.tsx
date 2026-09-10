@@ -47,6 +47,8 @@ import { GeneratePos } from "./GeneratePos";
 import { Reminders } from "./Reminders";
 import { GuideRequests, type GuideRequest } from "./GuideRequests";
 import { ActionBar, ActionBarButton } from "@/components/ui/ActionBar";
+import { publishBarActions } from "@/lib/tabletBarActions";
+import { ICON_DOUBLE_CHEVRON_RIGHT } from "@/components/tablet/BarLabel";
 import { BackToTop } from "@/components/ui/BackToTop";
 import { usePublishedHeight } from "@/lib/tableHead";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
@@ -669,6 +671,50 @@ export function OrderGuide({
   // `showEmpty` is what holds one open beside the other — and the title row
   // needs the same answer, to know whether it is carrying "Add reminder".
   const bands = reminders.length > 0 || requests.length > 0;
+
+  /**
+   * ON A TABLET, NEXT FAVORITE AND NEXT SECTION LIVE IN THE TOP BAR (Mark,
+   * 2026-09-10: "should move to the upper nav bar on tablets, with an '>>'
+   * glyph for each and with text 'favorite' and 'section'"), seated through
+   * `lib/tabletBarActions` and gone from the bottom ActionBar.
+   *
+   * Published on EVERY render, because the handlers are fresh closures; the
+   * slot re-renders the bar only when a word, a disabled state or a tooltip
+   * changes, and refreshes the handlers in place otherwise. The seat is given
+   * back on unmount, or leaving the guide would leave its buttons in the bar.
+   */
+  useEffect(() => {
+    if (!tablet) return;
+    publishBarActions([
+      {
+        key: "favorite",
+        word: "Favorite",
+        icon: ICON_DOUBLE_CHEVRON_RIGHT,
+        onClick: () => scrollToNext("tr[data-untouched]"),
+        disabled: untouchedCount === 0,
+        title:
+          untouchedCount === 0
+            ? "Every line in this view has an order quantity or an explicit zero"
+            : "Scroll to the next line with an empty order box — " + untouchedCount + " left",
+      },
+      {
+        key: "section",
+        word: "Section",
+        icon: ICON_DOUBLE_CHEVRON_RIGHT,
+        onClick: () => scrollToNext("tr[data-guide-section]"),
+        disabled: sectionCount === 0,
+        title:
+          sectionCount === 0
+            ? "Nothing to jump to in this view"
+            : "Scroll to the next " +
+              (grouping === "vendor" ? "vendor" : "shop section") +
+              " — " +
+              sectionCount +
+              " in this view",
+      },
+    ]);
+  });
+  useEffect(() => (tablet ? () => publishBarActions(null) : undefined), [tablet]);
 
   return (
     // The two FIXED children — the command bar and the back-to-top disc — sit
@@ -1576,6 +1622,10 @@ export function OrderGuide({
           command bar was. */}
       <ActionBar
         trailing={
+          // ON A TABLET THESE TWO ARE IN THE TOP BAR (Mark, 2026-09-10), seated
+          // there by the effect above `return` — so the bottom bar holds only
+          // the two commands that touch anything.
+          tablet ? undefined : (
           <>
             {/* Movement only — neither of these touches anything, which is why
                 they sit at the far edge from the two that do (Mark,
@@ -1607,6 +1657,7 @@ export function OrderGuide({
               Next section
             </ActionBarButton>
           </>
+          )
         }
       >
         {/* Start the day over. Left of Generate POs — the escape hatch comes

@@ -25,6 +25,14 @@ export const ICON_HOME = "M200-160v-366L80-434l-40-70 440-336 440 336-40 70-120-
 export const ICON_FIRST_PAGE = "M240-240v-480h80v480h-80Zm440 0L440-480l240-240 56 56-184 184 184 184-56 56Z";
 export const ICON_CHEVRON_LEFT = "M560-240 320-480l240-240 56 56-184 184 184 184-56 56Z";
 export const ICON_CHEVRON_RIGHT = "m504-480-184-184 56-56 240 240-240 240-56-56 184-184Z";
+/**
+ * ">>" — two copies of `ICON_CHEVRON_RIGHT` side by side (Mark, 2026-09-10: an
+ * ">>" glyph for Next favorite and Next section). Built from the bar's own
+ * chevron rather than a typed character, so its weight and shape match every
+ * other icon here; the pair is 200 units apart and centred in the box.
+ */
+export const ICON_DOUBLE_CHEVRON_RIGHT =
+  "M416-480l-184-184 56-56 240 240-240 240-56-56 184-184ZM616-480l-184-184 56-56 240 240-240 240-56-56 184-184Z";
 export const ICON_LAST_PAGE = "m280-240-56-56 184-184-184-184 56-56 240 240-240 240Zm360 0v-480h80v480h-80Z";
 export const ICON_ADD = "M414-414H160v-132h254v-254h132v254h254v132H546v254H414v-254Z";
 export const ICON_CHECK = "M382-208 122-468l90-90 170 170 366-366 90 90-456 456Z";

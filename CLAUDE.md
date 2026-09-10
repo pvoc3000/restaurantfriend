@@ -9112,6 +9112,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    renders nothing, and `tablet/BarRecordNav` walks the same set through the
    same `useRecordPosition` and `carryQuery` at 64px. Under the desk shell
    nothing changed. Verified: "1 of 30" → Next → "2 of 30", ends dead in place.
+   **A SCREEN CAN SEAT ITS OWN COMMANDS IN THE BAR TOO** (`lib/tabletBarActions`
+   + `tablet/BarActions`, 2026-09-10) — the same slot shape. First caller: the
+   order guide's Next favorite and Next section, which on a tablet leave the
+   bottom ActionBar for the top bar's right end as **Favorite** and **Section**
+   under a ">>" (`ICON_DOUBLE_CHEVRON_RIGHT`, two copies of the bar's own
+   chevron path, not a typed character). Mark: "should move to the upper nav bar
+   on tablets" — they are pressed mid-walk, and the top bar is always on screen.
+   The page publishes on EVERY render (its handlers are fresh closures); the slot
+   re-renders the bar only when a word, a disabled state or a tooltip changes,
+   and refreshes the handlers in place otherwise. A second effect gives the seat
+   back on unmount, or leaving the guide would leave its buttons in the bar —
+   verified by opening Inventory after the guide. A disabled command dims in
+   place rather than vanishing, so the bar never changes width.
    **THE LANDING PAGE (`/start`, `components/tablet/Landing`) IS MARK'S LIST IN
    HIS GROUPS AND HIS WORDS**, thirteen tiles over five groups
    (`LANDING_GROUPS`), each ≥96px, filtered by `canReachPage` on its href
