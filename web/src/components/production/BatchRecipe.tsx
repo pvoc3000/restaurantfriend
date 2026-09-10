@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { TabPicker } from "@/components/ui/TabPicker";
@@ -65,6 +66,7 @@ export function BatchRecipe({
   show = "both",
   size = "md",
   scaleLabel = null,
+  batchId = null,
 }: {
   /** The batch's version, or the element's master. Null when the element has no
    *  recipe at all — which is legitimate: generation warns about it and makes
@@ -84,6 +86,15 @@ export function BatchRecipe({
   /** The size the BATCH says it made (`scale_label`) — the column the tab
    *  opens on, so the amounts shown are the ones that were weighed. */
   scaleLabel?: string | null;
+  /**
+   * ONE FIELD, TWO PLACES (Mark, 2026-09-09: "setting the scale on the info
+   * tab changes the scale on the ingredient tab, but not the other way around.
+   * make them the same field"). With a batch id the size picker above the
+   * ingredients WRITES `scale_label`, the same column the Info tab's Scale
+   * field writes, and the shown column is derived from it; without one — a
+   * reader with no batch — the picker is local to the tab.
+   */
+  batchId?: string | null;
 }) {
   const body = size === "lg" ? "text-[16px]" : "text-[12px]";
   const cell = size === "lg" ? "px-3 py-2" : "px-2 py-1";
@@ -98,6 +109,31 @@ export function BatchRecipe({
     failed: string | null;
   } | null>(null);
   const [pickedColumn, setPickedColumn] = useState<{ key: string; index: number } | null>(null);
+  // While the write is in flight the picker shows the size just chosen, so it
+  // does not snap back to the old column for the second before the refresh.
+  const [pendingLabel, setPendingLabel] = useState<string | null>(null);
+  const [writeError, setWriteError] = useState<string | null>(null);
+  const router = useRouter();
+
+  async function pickSize(index: number, label: string) {
+    if (!batchId) {
+      setPickedColumn({ key: versionId ?? "", index });
+      return;
+    }
+    setWriteError(null);
+    setPendingLabel(label);
+    const { data, error } = await supabase
+      .from("production_batches")
+      .update({ scale_label: label })
+      .eq("id", batchId)
+      .select("id");
+    if (error || (data ?? []).length === 0) {
+      setPendingLabel(null);
+      setWriteError(error?.message ?? "That change was not saved.");
+      return;
+    }
+    router.refresh();
+  }
 
   const current = state?.key === versionId ? state : null;
   const column = pickedColumn?.key === versionId ? pickedColumn.index : 0;
@@ -173,12 +209,21 @@ export function BatchRecipe({
   // column beside the others; here there is only one column, and it has to be
   // one you could weigh something with.
   const columns = loaded.columns.filter((c) => !c.isPercent);
-  // The batch's own size is the default column; a picked one overrides it.
-  const batchIndex = scaleLabel
-    ? columns.findIndex((c) => c.label.trim().toLowerCase() === scaleLabel.trim().toLowerCase())
+  // The batch's own size IS the column (the pending one while a write lands);
+  // only a reader with no batch keeps a local pick.
+  const effectiveLabel = pendingLabel ?? scaleLabel;
+  const batchIndex = effectiveLabel
+    ? columns.findIndex((c) => c.label.trim().toLowerCase() === effectiveLabel.trim().toLowerCase())
     : -1;
-  const shownIndex =
-    pickedColumn?.key === versionId ? column : batchIndex >= 0 ? batchIndex : 0;
+  const shownIndex = batchId
+    ? batchIndex >= 0
+      ? batchIndex
+      : 0
+    : pickedColumn?.key === versionId
+      ? column
+      : batchIndex >= 0
+        ? batchIndex
+        : 0;
   const chosen = columns[Math.min(shownIndex, Math.max(columns.length - 1, 0))];
   // The base is the FIRST column rendered — not necessarily slot 0, if a label
   // has been cleared (`lib/production`'s own caveat).
@@ -196,7 +241,7 @@ export function BatchRecipe({
             ariaLabel="Which batch size"
             size="sm"
             value={String(shownIndex)}
-            onChange={(k) => setPickedColumn({ key: versionId, index: Number(k) })}
+            onChange={(k) => void pickSize(Number(k), columns[Number(k)]?.label ?? "")}
             options={columns.map((c, i) => ({ key: String(i), label: c.label }))}
           />
         ) : null}
@@ -208,6 +253,7 @@ export function BatchRecipe({
         >
           Open recipe v{loaded.versionLabel} ↗
         </Link>
+        {writeError ? <span className="text-sm text-accent">{writeError}</span> : null}
       </div>
 
       <div className={`grid min-h-0 flex-1 gap-4 ${show === "both" ? "lg:grid-cols-2" : ""}`}>

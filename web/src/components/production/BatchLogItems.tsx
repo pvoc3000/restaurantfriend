@@ -416,6 +416,7 @@ export function BatchLogItems({
                   show={pane}
                   size={touch ? "lg" : "md"}
                   scaleLabel={selected.scale_label}
+                  batchId={selected.id}
                 />
               </div>
             )}
