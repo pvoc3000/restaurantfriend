@@ -7,6 +7,7 @@ import {
   MENU_ITEM_CLASS,
   MENU_PANEL_CLASS,
   MENU_SEARCH_CLASS,
+  menuHintClass,
   menuItemState,
   useAnchoredPanel,
 } from "@/lib/anchoredPanel";
@@ -240,7 +241,9 @@ export function PickSet({
                   className={`${MENU_ITEM_CLASS} w-full ${menuItemState(on)}`}
                 >
                   <span>{o.label}</span>
-                  {o.hint && <span className="ml-auto pl-3 text-xs text-muted">{o.hint}</span>}
+                  {o.hint && (
+                    <span className={`ml-auto pl-3 text-xs ${menuHintClass(on)}`}>{o.hint}</span>
+                  )}
                 </Checkbox>
               );
             })}

@@ -14,6 +14,7 @@ import {
   MENU_ITEM_CLASS,
   MENU_PANEL_CLASS,
   MENU_SEARCH_CLASS,
+  menuHintClass,
   menuItemState,
   sinkInactive,
   useAnchoredPanel,
@@ -674,9 +675,9 @@ export function PickList({
                     </span>
                     {o.hint && (
                       <span
-                        // Muted on every row now the highlight is a pale
-                        // fill; white-at-70% was for the old dark bar.
-                        className="text-xs text-muted"
+                        // Muted, and a shade darker on the grey-filled row
+                        // so it stays readable there (`menuHintClass`).
+                        className={`text-xs ${menuHintClass(i === active)}`}
                       >
                         {o.hint}
                       </span>

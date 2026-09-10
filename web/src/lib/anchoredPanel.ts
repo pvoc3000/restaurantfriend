@@ -80,11 +80,22 @@ export const MENU_ITEM_CLASS =
  * one look. A menu with no cursor concept passes false and gets the hover wash.
  */
 export function menuItemState(active: boolean): string {
-  // YELLOW FILL, BLACK TYPE (Mark, 2026-09-10: "can we try yellow background
-  // with black text for selected options in a picklist?"), after an hour as
-  // dark grey and months as black. `bg-mark-fill` is yellow-200, and ink on it
-  // is 15.5:1 — the mark colour doing what it is for, a FILL, never an ink.
-  return active ? "bg-mark-fill text-ink" : "hover:bg-neutral-100";
+  // LIGHT GREY FILL, BLACK TYPE — #c0c0c0, the same grey the classic-Mac
+  // controls on /invoices fill with on hover (Mark, 2026-09-10: "instead of the
+  // yellow fill for selected options in the picklists, can we use that same
+  // onHover grey?"). Before it: an hour as yellow (`bg-mark-fill`), an hour as
+  // dark grey, months as black. Ink on it is ~12.6:1; a row's muted HINT is
+  // only ~4.2:1 on it, so the callers darken the hint on this row
+  // (`menuHintClass`).
+  return active ? "bg-[#c0c0c0] text-ink" : "hover:bg-neutral-100";
+}
+
+/**
+ * A hint (a count, "inactive") on a row `menuItemState` has filled. `text-muted`
+ * is ~4.2:1 on the grey, under AA for 12px; neutral-700 is ~5.6:1.
+ */
+export function menuHintClass(active: boolean): string {
+  return active ? "text-neutral-700" : "text-muted";
 }
 
 /** A group heading inside the list — not selectable, just a label. */
