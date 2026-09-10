@@ -11172,7 +11172,12 @@ weekday column, and 003 then silently made it per-vendor-item.
   search sits on the line of captioned fields.
   Measured on the guide: one row at 1440 / 1280 / 1024 / 820 / 768 with the
   search giving up 885 → 725 → 469 → 265 → 213px, all bottoms on one pixel, no
-  overflow. **A 13rem floor rather than 15 is what buys 768.** On the PO list,
+  overflow. **A 13rem floor rather than 15 is what buys 768.** **And EVERY
+  flexing search now has an 18rem CEILING** (Mark, 2026-09-10: "there should be
+  a maximum width … what's reasonable?"). The guide's was the last without one,
+  which is where those 885 and 725px came from; 288px is the width every fixed
+  search box in the app already uses, so no search box anywhere is wider than
+  that. On the PO list,
   one row at 1440 / 1280 / 1024 / **820, the portrait iPad**, 853 → 233px; it
   wraps at 768 and a lower floor does not rescue it (524px of fields and gaps
   in a 705px row once the scrollbar is counted).

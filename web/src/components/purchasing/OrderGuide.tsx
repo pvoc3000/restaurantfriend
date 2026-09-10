@@ -940,7 +940,10 @@ export function OrderGuide({
           switch is as wide as its words — so giving it the leftover is the
           only arrangement that fits every window without a breakpoint. It is
           `flex-1` in a pen with a floor; below that floor the row wraps, which
-          is the honest failure.
+          is the honest failure. And a CEILING of 18rem (Mark, 2026-09-10:
+          "there should be a maximum width") — the width every other search
+          box in the app tops out at, so on a wide window the leftover stays
+          empty rather than becoming an 885px box for a one-word term.
 
           `fullWidth` on the input is not decoration: `TextInput`'s wrapper
           SHRINK-WRAPS, so a `w-full` on the input alone resolves against a
@@ -950,7 +953,7 @@ export function OrderGuide({
           `items-end` levels the BOXES, so the search sits on the same line as
           three fields that each carry a caption above them. */}
       <div className="flex flex-wrap items-end gap-4 text-sm">
-        <div className="min-w-[13rem] flex-1">
+        <div className="min-w-[13rem] max-w-[18rem] flex-1">
           <TextInput
             value={term}
             onValueChange={setTerm}
