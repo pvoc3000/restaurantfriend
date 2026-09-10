@@ -139,14 +139,22 @@ export function ColumnHeader({
             their resize grips (its order IS the document, so none of its
             columns sorts). It was equally wrong on every control column, which
             has never had an `onSort` either. */}
-        {onSort ? (
+        {/* AND ONLY ON THE COLUMN THAT IS SORTED (Mark, 2026-09-09: "little up
+            and down arrow icons in the table header on columns that aren't
+            currently being sorted on. Why? Those can go away"). The resting
+            `↕` said "you could sort by this", which every labelled column can,
+            so it was a mark on nearly every header saying nothing in
+            particular. The one arrow that remains says which column IS sorted
+            and which way, which is the fact worth a glyph. Its position is
+            absolute, so nothing moves when the sort does. */}
+        {onSort && sorted && arrow ? (
           <span
             aria-hidden
-            className={`pointer-events-none absolute inset-y-0 flex items-center text-[8px] ${
+            className={`pointer-events-none absolute inset-y-0 flex items-center text-[8px] text-ink ${
               align === "right" ? "left-1" : "right-1"
-            } ${sorted ? "text-ink" : "text-neutral-300"}`}
+            }`}
           >
-            {arrow || "↕"}
+            {arrow}
           </span>
         ) : null}
 

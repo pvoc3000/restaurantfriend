@@ -107,9 +107,15 @@ export function BatchFields({
       // the middle track gives up most of its share. Measured at 1512: history
       // 470px against 300, which stops Made wrapping "0 × 3 gal" onto two lines
       // and lets a note sit on one.
-      className={`grid gap-x-8 gap-y-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,0.65fr)_minmax(0,1.75fr)] ${
-        fill ? "min-h-0 flex-1" : ""
-      }`}
+      //
+      // WITHOUT A HISTORY (2026-09-09, when it got a tab of its own) the grid is
+      // the two remaining columns: an empty third track would hold half the
+      // pane open for nothing.
+      className={`grid gap-x-8 gap-y-5 ${
+        history
+          ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,0.65fr)_minmax(0,1.75fr)]"
+          : "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
+      } ${fill ? "min-h-0 flex-1" : ""}`}
     >
       {/* -- what it is, and the four amounts ------------------------------ */}
       {/* Each column carries its OWN scroll in fill mode. The fields are a
@@ -235,7 +241,7 @@ export function BatchFields({
       {/* -- every previous making of this element --------------------------
           `min-h-0` and nothing else: the history component takes the height and
           scrolls its own rows (see its `fill`). */}
-      <div className={fill ? "flex min-h-0 flex-col" : ""}>{history}</div>
+      {history ? <div className={fill ? "flex min-h-0 flex-col" : ""}>{history}</div> : null}
     </div>
   );
 }

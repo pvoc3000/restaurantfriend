@@ -62,12 +62,20 @@ type Loaded = {
 export function BatchRecipe({
   versionId,
   elementName,
+  show = "both",
 }: {
   /** The batch's version, or the element's master. Null when the element has no
    *  recipe at all — which is legitimate: generation warns about it and makes
    *  the batch anyway, because somebody will make it from memory. */
   versionId: string | null;
   elementName: string;
+  /**
+   * Which half. The pane shows them as TWO TABS — Ingredients, Instructions
+   * (Mark, 2026-09-09) — because side by side they were the widest thing in
+   * the pane and what stopped the split fitting a portrait iPad. `both` is the
+   * two-column form for anywhere with the room.
+   */
+  show?: "both" | "ingredients" | "instructions";
 }) {
   const supabase = createClient();
   // Keyed by the version it describes, both of them — see BatchHistory for why
@@ -186,8 +194,9 @@ export function BatchRecipe({
         </Link>
       </div>
 
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-2">
+      <div className={`grid min-h-0 flex-1 gap-4 ${show === "both" ? "lg:grid-cols-2" : ""}`}>
         {/* -- what goes in ------------------------------------------------- */}
+        {show !== "instructions" ? (
         <div className="min-h-0 overflow-y-auto border border-hairline">
           <table className="w-full table-fixed border-collapse text-[12px]">
             {/* INGREDIENT · AMOUNT · NOTE (Mark, 2026-08-09), where FileMaker
@@ -253,12 +262,16 @@ export function BatchRecipe({
             </tbody>
           </table>
         </div>
+        ) : null}
 
         {/* -- what to do with it -------------------------------------------- */}
+        {show !== "ingredients" ? (
         <div className="min-h-0 overflow-y-auto border border-hairline p-2">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
-            Instructions
-          </h3>
+          {show === "both" ? (
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted">
+              Instructions
+            </h3>
+          ) : null}
           {loaded.steps.length === 0 ? (
             <p className="mt-1 text-[12px] text-muted">No procedure on this version.</p>
           ) : (
@@ -272,6 +285,7 @@ export function BatchRecipe({
             </ol>
           )}
         </div>
+        ) : null}
       </div>
     </div>
   );

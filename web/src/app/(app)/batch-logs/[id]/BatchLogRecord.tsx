@@ -15,6 +15,7 @@ import { type BatchFieldsRow } from "@/components/production/BatchFields";
 import { BATCH_PHOTO_BUCKET, BATCH_PHOTO_TTL_SECONDS } from "@/lib/batchPhotos";
 import { BatchLogActions } from "@/components/production/BatchLogActions";
 import { NewBatch } from "@/components/production/NewBatch";
+import { StickyFooter } from "@/components/ui/StickyFooter";
 
 /**
  * One batch log — the MASTER record, and its batches.
@@ -256,6 +257,39 @@ export async function BatchLogRecord({
 
   const trail = parseTrail(rawParams, { href: "/batch-logs", label: "Batch Logs" });
 
+  // THE TABLET KEEPS THE CRUMB, THE LIST AND THE PANE, AND LOSES THE REST
+  // (Mark, 2026-09-09, with FileMaker's own tablet layout beside it): no
+  // heading ("It's big and takes up a lot of space. It's already in the
+  // breadcrumb"), no "0 of 2 done", no status / generated-by / not-printed
+  // strip — and the three commands go to a sticky footer like the shift
+  // report's. Every pixel above the pinned frame comes out of the list, and on
+  // a 768px-tall screen that strip and heading were a third of it.
+  const touch = session.shell === "tablet";
+  const commands = (
+    <>
+      {editable ? (
+        <NewBatch
+          orgId={session.membership.org_id}
+          logId={id}
+          locationId={log.location_id as string}
+          locationCode={kitchenCode}
+          logDate={logDate}
+          variant={touch ? "bar" : "button"}
+        />
+      ) : null}
+      <BatchLogActions
+        logId={id}
+        status={(log.status ?? "open") as string}
+        logDate={logDate}
+        kitchenCode={kitchenCode}
+        batches={rows.length}
+        outstanding={rows.length - done}
+        editable={editable}
+        variant={touch ? "bar" : "button"}
+      />
+    </>
+  );
+
   return (
     <div className="space-y-4">
       <Breadcrumbs
@@ -264,6 +298,7 @@ export async function BatchLogRecord({
         trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
       />
 
+      {touch ? null : (
       <header className="flex flex-wrap items-baseline gap-x-4">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           {kitchenCode} — {batchDate(logDate)}
@@ -272,6 +307,7 @@ export async function BatchLogRecord({
           {rows.length === 0 ? "Nothing on this log yet" : `${done} of ${rows.length} done`}
         </p>
       </header>
+      )}
 
       {/* ONE STRIP, not a field grid plus an action row.
           The pane below is pinned to the window, so every pixel above it comes
@@ -279,6 +315,7 @@ export async function BatchLogRecord({
           the list and the detail together, which is under the frame's own floor
           — so nothing pinned at all and the page scrolled. The log has four
           facts and two commands; they fit on a line. */}
+      {touch ? null : (
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-hairline py-2 text-sm">
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
           {log.status === "complete" ? "Complete" : "Open"}
@@ -318,27 +355,9 @@ export async function BatchLogRecord({
             where the row it used to share holds controls that change what the
             list SHOWS. Reading right to left the cluster is now destructive,
             terminal, additive, which is the order the PO screens already use. */}
-        <span className="ml-auto flex items-center gap-3">
-          {editable ? (
-            <NewBatch
-              orgId={session.membership.org_id}
-              logId={id}
-              locationId={log.location_id as string}
-              locationCode={kitchenCode}
-              logDate={logDate}
-            />
-          ) : null}
-          <BatchLogActions
-            logId={id}
-            status={(log.status ?? "open") as string}
-            logDate={logDate}
-            kitchenCode={kitchenCode}
-            batches={rows.length}
-            outstanding={rows.length - done}
-            editable={editable}
-          />
-        </span>
+        <span className="ml-auto flex items-center gap-3">{commands}</span>
       </div>
+      )}
 
       {itemErr ? (
         // Not folded into the page's own error: a failed item read must not
@@ -357,8 +376,29 @@ export async function BatchLogRecord({
           locationId={log.location_id as string}
           editable={editable}
           removable={removable}
+          touch={touch}
         />
       )}
+
+      {touch ? (
+        // The shift report's footer, on a record: black, pinned, icon over
+        // word. `StickyFooter` measures itself into a spacer so the pinned
+        // frame above ends where the bar begins rather than under it.
+        //
+        // WRAPPED IN A DIV, and the div is load-bearing. `StickyFooter` renders
+        // two siblings — the spacer and the fixed bar — so placed straight in
+        // this `space-y-4` column the FIXED bar is the last child and the
+        // spacer is not, which hands the spacer a 16px bottom margin that
+        // nothing above it counts: `useExactViewportHeight` measures to the
+        // spacer's bottom EDGE, so the page overshot the window by exactly that
+        // margin in both orientations. The wrapper is the last child instead,
+        // carries no margin inside, and the page is one viewport tall.
+        <div>
+          <StickyFooter>
+            <div className="flex items-stretch bg-ink text-white">{commands}</div>
+          </StickyFooter>
+        </div>
+      ) : null}
     </div>
   );
 }

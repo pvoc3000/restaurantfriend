@@ -115,6 +115,7 @@ export function BatchItemsTable({
   selectedId,
   onSelect,
   fill,
+  touch = false,
 }: {
   rows: BatchRow[];
   /** Supervisor and up — 044's `production_batches` write policies. */
@@ -124,6 +125,13 @@ export function BatchItemsTable({
   onSelect?: (id: string) => void;
   /** Fill the parent rather than capping — the pinned-pane layout. */
   fill?: boolean;
+  /**
+   * The tablet shell's dress (Mark, 2026-09-09): the compact column set at
+   * every width, no Group-by picker and no columns eye. What a supervisor does
+   * here is enter Made and a status against each batch, and a control that
+   * changes what the list SHOWS is desk furniture on a screen that narrow.
+   */
+  touch?: boolean;
 }) {
   // REMEMBERED WHILE YOU WALK RECORDS (Mark, 2026-08-09: "when navigating using
   // the buttons in the upper right hand corner of the detail screen, I'd like
@@ -243,6 +251,7 @@ export function BatchItemsTable({
   const columns: DataColumn<BatchRow>[] = [
     {
       key: "sort",
+      hideWhenCompact: true,
       label: "Order",
       // 90, not 80: at 1280 the narrower share left the LABEL 50px and it
       // rendered "ORD…", which reads as a rendering fault where the values
@@ -286,6 +295,7 @@ export function BatchItemsTable({
     },
     {
       key: "type",
+      hideWhenCompact: true,
       label: "Item type",
       width: 130,
       sortValue: (r) => r.element_type ?? "",
@@ -304,6 +314,7 @@ export function BatchItemsTable({
     },
     {
       key: "operator",
+      hideWhenCompact: true,
       label: "Prepared by",
       width: 160,
       sortValue: (r) => r.operatorName ?? "",
@@ -421,8 +432,10 @@ export function BatchItemsTable({
       columns={columns}
       rowKey={(r) => r.id}
       storageKey="production-batch-logs"
-      compactBelow={1200}
-      columnChooser
+      // A width no window has, so the compact set is the set. `compactBelow`
+      // is answered by a `matchMedia` min-width, and this keeps it a number.
+      compactBelow={touch ? 100_000 : 1200}
+      columnChooser={!touch}
       // The pane below takes a fixed slice of one viewport, so what is left is
       // all this list gets — see DataTable's `dense`.
       dense
@@ -449,21 +462,23 @@ export function BatchItemsTable({
             aria-label="Search batches"
             className="w-64"
           />
-          <div className="space-y-1.5">
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-              Group by
-            </span>
-            <TabPicker
-              ariaLabel="Group the batches"
-              value={grouping}
-              onChange={setGrouping}
-              options={[
-                { key: "type" as Grouping, label: "Item type" },
-                { key: "status" as Grouping, label: "Status" },
-                { key: "none" as Grouping, label: "None" },
-              ]}
-            />
-          </div>
+          {touch ? null : (
+            <div className="space-y-1.5">
+              <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                Group by
+              </span>
+              <TabPicker
+                ariaLabel="Group the batches"
+                value={grouping}
+                onChange={setGrouping}
+                options={[
+                  { key: "type" as Grouping, label: "Item type" },
+                  { key: "status" as Grouping, label: "Status" },
+                  { key: "none" as Grouping, label: "None" },
+                ]}
+              />
+            </div>
+          )}
         </div>
       }
     />

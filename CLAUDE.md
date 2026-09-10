@@ -9122,6 +9122,39 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    with no cookie set) at 1024×768 and 820×1180: bar and every cell 64px, no
    horizontal overflow, tiles three-up and two-up, the toggle on /account
    round-tripping to the masthead and back. **1786 fixtures pass**, 23 new.
+   **THE BATCH LOG RECORD WAS THE FIRST SCREEN REWORKED FOR IT** (Mark,
+   2026-09-09, with FileMaker's own tablet layout as the reference: "a total
+   mess on a tablet"). Measured at 1024×768 before: the pinned frame had ~500px,
+   the fields column scrolled inside a 74px box and the history showed one row.
+   **SHELL DECIDES POSTURE, VIEWPORT DECIDES DENSITY** is the rule it settled.
+   Under the tablet shell (`session.shell`, read by the server component) the
+   record loses its heading, its "0 of 2 done" and its status/generated-by/
+   not-printed strip, and its three commands — Add batch · Mark complete ·
+   Delete — go to a `ui/StickyFooter` dressed as the shift report's black bar
+   (`variant="bar"` on `NewBatch` and `BatchLogActions`); `BatchItemsTable`'s
+   `touch` drops the Group-by picker and the columns eye and forces the compact
+   set (Element · Par · On hand · Made · Status), which is also the set a narrow
+   desk window gets. Nothing about the desk changed but the tabs.
+   **THE SPLIT IS ALWAYS ON, AND THE PANE IS FOUR TABS.** It stacked below
+   1024 because the three-column detail (fields · photo+notes · history) plus
+   the two-column recipe could not fit a portrait iPad; Mark: "The sliding
+   content view is mandatory". So `BatchLogItems` is Info · Ingredients ·
+   Instructions · History — "Previously made" left `BatchFields`' third column
+   for a tab (the grid is two tracks when `history` is absent), and
+   `BatchRecipe` takes `show` to render either half alone — and the `wide`
+   gate is a constant. Verified at 1024×768 and 820×1180: split and grip live in
+   both, five columns, no sideways overflow, page exactly one viewport.
+   **`StickyFooter` INSIDE A `space-y-*` COLUMN NEEDS A WRAPPER DIV.** It
+   renders two siblings, the spacer and the FIXED bar; with the bar as last
+   child the spacer inherits the column's bottom margin, which
+   `useExactViewportHeight` (measuring to the spacer's EDGE) never counts —
+   exactly 16px of page scroll in both orientations. The paperwork screens
+   dodge it with a negative margin on the spacer; a wrapper is the general cure.
+   **THE RESTING `↕` IS GONE FROM EVERY LIST** (Mark: "Why? Those can go
+   away"). `ColumnHeader` draws the arrow on the SORTED column only; the
+   promise "you could sort by this" was true of nearly every header and so said
+   nothing.
+
    **NOT BUILT, deliberately, and worth asking before building:** the
    standalone web-app manifest (`app/manifest.ts`, `viewport`, icons — `web/
    public` is empty). It is gated on a real-iPad test that a `showBlob` tab

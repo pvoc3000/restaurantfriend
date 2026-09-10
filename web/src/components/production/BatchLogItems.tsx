@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import type { PickOption } from "@/components/ui/PickList";
-import { useExactViewportHeight, useViewportAtLeast } from "@/lib/tableHead";
+import { useExactViewportHeight } from "@/lib/tableHead";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { Switch } from "@/components/ui/Switch";
 import { clampSplit, setSplit, useSplit } from "@/lib/paneSplit";
@@ -12,11 +12,20 @@ import { BatchActions } from "@/components/production/BatchActions";
 import { BatchHistory } from "@/components/production/BatchHistory";
 import { BatchRecipe } from "@/components/production/BatchRecipe";
 
-type Pane = "info" | "recipe";
+type Pane = "info" | "ingredients" | "instructions" | "history";
 
+/**
+ * FOUR TABS, NOT TWO (Mark, 2026-09-09, with FileMaker's own tablet layout
+ * beside it): Info · Ingredients · Instructions · History. "Previously made"
+ * used to be Info's third column and the recipe's steps sat beside its
+ * ingredients — the two widest things in the pane, and what stopped the split
+ * fitting a portrait iPad. One thing per tab is what buys the width back.
+ */
 const PANE_SECTIONS = [
   { key: "info" as Pane, label: "Info" },
-  { key: "recipe" as Pane, label: "Recipe" },
+  { key: "ingredients" as Pane, label: "Ingredients" },
+  { key: "instructions" as Pane, label: "Instructions" },
+  { key: "history" as Pane, label: "History" },
 ];
 
 /**
@@ -92,6 +101,7 @@ export function BatchLogItems({
   locationId,
   editable,
   removable,
+  touch = false,
 }: {
   rows: BatchRow[];
   /** The same batches, carrying what the PANE needs. Keyed by id. */
@@ -103,6 +113,8 @@ export function BatchLogItems({
   editable: boolean;
   /** Purchaser+ — 044's delete policy, narrower than the edit one. */
   removable: boolean;
+  /** The tablet shell — see `BatchItemsTable`'s prop of the same name. */
+  touch?: boolean;
 }) {
   const [picked, setPicked] = useState<string | null>(null);
   const [pane, setPane] = useState<Pane>("info");
@@ -120,10 +132,13 @@ export function BatchLogItems({
   const frame = useRef<HTMLDivElement>(null);
   const split = useSplit(SPLIT_NAME, DEFAULT_SPLIT);
 
-  // `lg`, Tailwind's own breakpoint, through the store the rest of the app uses
-  // — a `useSyncExternalStore` rather than an effect, which is what the
-  // set-state-in-effect rule wants.
-  const wide = useViewportAtLeast(1024);
+  // THE SPLIT IS ALWAYS ON (Mark, 2026-09-09: "The sliding content view is
+  // mandatory, but it gets disabled in portrait mode"). It switched to a
+  // stacked page below `lg`, on the theory that a 1024px-wide pane was the
+  // narrowest the three-column detail could hold — which was true, and is why
+  // the pane is four tabs now rather than a page. `wide` survives as a constant
+  // so the two arrangements' classes stay legible side by side.
+  const wide = true;
   useExactViewportHeight(frame, wide, FRAME_FLOOR);
 
   /** Drag the divider. The receiving screen's handler on the other axis: the
@@ -172,6 +187,7 @@ export function BatchLogItems({
           selectedId={selectedId}
           onSelect={setPicked}
           fill={wide}
+          touch={touch}
         />
       </div>
 
@@ -260,11 +276,7 @@ export function BatchLogItems({
               // share of a definite height, and inside a single scroller there
               // is no height to share — every child is as tall as its content.
               // So this box stops scrolling and hands its height down.
-              <div
-                className={`flex min-w-0 flex-1 flex-col gap-4 ${
-                  wide ? "min-h-0" : "max-h-[46vh] overflow-y-auto"
-                }`}
-              >
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
                 <BatchFields
                   row={selected}
                   orgId={orgId}
@@ -274,23 +286,8 @@ export function BatchLogItems({
                   }
                   editable={editable}
                   fill={wide}
-                  history={
-                    <BatchHistory
-                      elementId={selected.element_id}
-                      locationId={locationId}
-                      currentBatchId={selected.id}
-                      fill={wide}
-                      showSkipped={showSkipped}
-                      onHiddenCount={setHiddenRounds}
-                    />
-                  }
                 />
-                {/* The pane's footer: the batch's own command on the left, the
-                    history's filter on the right — under the column it filters,
-                    which is what makes a switch that far from its list read as
-                    belonging to it. `justify-between` rather than a spacer, so
-                    the row still works when Delete is absent below purchaser+. */}
-                <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                <div className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2">
                   <BatchActions
                     batchId={selected.id}
                     elementName={selected.element_name}
@@ -299,42 +296,51 @@ export function BatchLogItems({
                     photoPath={selected.photo_path}
                     removable={removable}
                   />
-                  {/* NOT a `<label>`: `ui/Switch` renders a button, and a label
-                      does not forward its click to one — the caption would look
-                      associated and do nothing. The words are their own button. */}
-                  <div className="ml-auto flex items-center gap-2">
-                    <Switch
-                      size="sm"
-                      on={showSkipped}
-                      onToggle={() => setShowSkipped((v) => !v)}
-                      ariaLabel="Show rounds where nothing was made"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSkipped((v) => !v)}
-                      className="text-[11px] uppercase tracking-[0.08em] text-muted hover:text-ink"
-                    >
-                      Show skipped
-                      {/* The COUNT is what keeps the default honest: eighteen
-                          rows could read as the whole history without it. */}
-                      {hiddenRounds > 0 && !showSkipped ? (
-                        <span className="ml-1 tabular-nums text-subtle">{hiddenRounds}</span>
-                      ) : null}
-                    </button>
-                  </div>
+                </div>
+              </div>
+            ) : pane === "history" ? (
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
+                <BatchHistory
+                  elementId={selected.element_id}
+                  locationId={locationId}
+                  currentBatchId={selected.id}
+                  fill={wide}
+                  showSkipped={showSkipped}
+                  onHiddenCount={setHiddenRounds}
+                />
+                {/* The history's filter, under the list it filters. NOT a
+                    `<label>`: `ui/Switch` renders a button, and a label does not
+                    forward its click to one — the caption would look associated
+                    and do nothing. The words are their own button. */}
+                <div className="flex shrink-0 items-center gap-2">
+                  <Switch
+                    size="sm"
+                    on={showSkipped}
+                    onToggle={() => setShowSkipped((v) => !v)}
+                    ariaLabel="Show rounds where nothing was made"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowSkipped((v) => !v)}
+                    className="text-[11px] uppercase tracking-[0.08em] text-muted hover:text-ink"
+                  >
+                    Show skipped
+                    {/* The COUNT is what keeps the default honest: eighteen
+                        rows could read as the whole history without it. */}
+                    {hiddenRounds > 0 && !showSkipped ? (
+                      <span className="ml-1 tabular-nums text-subtle">{hiddenRounds}</span>
+                    ) : null}
+                  </button>
                 </div>
               </div>
             ) : (
-              // The recipe manages its own two scrollers, so this one doesn't —
-              // it hands over a definite height and gets out of the way.
-              <div
-                className={`flex min-w-0 flex-1 flex-col ${
-                  wide ? "min-h-0" : "h-[46vh]"
-                }`}
-              >
+              // The recipe manages its own scroller, so this one doesn't — it
+              // hands over a definite height and gets out of the way.
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
                 <BatchRecipe
                   versionId={selected.recipe_version_id ?? selected.masterVersionId ?? null}
                   elementName={selected.element_name}
+                  show={pane}
                 />
               </div>
             )}

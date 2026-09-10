@@ -4,6 +4,8 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { BAR_CELL } from "@/components/tablet/barCell";
+import { BarLabel, ICON_CHECK, ICON_TRASH, ICON_UNDO } from "@/components/tablet/BarLabel";
 import { batchDate } from "@/lib/productionBatches";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 
@@ -32,6 +34,7 @@ export function BatchLogActions({
   batches,
   outstanding,
   editable,
+  variant = "button",
 }: {
   logId: string;
   status: string;
@@ -40,6 +43,8 @@ export function BatchLogActions({
   batches: number;
   outstanding: number;
   editable: boolean;
+  /** `bar` is the tablet shell's footer — icon-over-word cells on black. */
+  variant?: "button" | "bar";
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -104,6 +109,26 @@ export function BatchLogActions({
     }
     router.push("/batch-logs");
     router.refresh();
+  }
+
+  if (variant === "bar") {
+    return (
+      <>
+        {status === "complete" ? (
+          <button type="button" onClick={() => setStatus("open")} disabled={busy !== null} className={BAR_CELL}>
+            <BarLabel icon={ICON_UNDO} word={busy === "open" ? "Reopening…" : "Reopen"} />
+          </button>
+        ) : (
+          <button type="button" onClick={() => setStatus("complete")} disabled={busy !== null} className={BAR_CELL}>
+            <BarLabel icon={ICON_CHECK} word={busy === "complete" ? "Closing…" : "Mark complete"} />
+          </button>
+        )}
+        <button type="button" onClick={remove} disabled={busy !== null} className={BAR_CELL}>
+          <BarLabel icon={ICON_TRASH} word={busy === "delete" ? "Deleting…" : "Delete"} />
+        </button>
+        {error ? <p className="px-3 text-sm text-[var(--rf-red-300)]">{error}</p> : null}
+      </>
+    );
   }
 
   return (

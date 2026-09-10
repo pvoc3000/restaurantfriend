@@ -7,6 +7,8 @@ import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { PickList } from "@/components/ui/PickList";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { BAR_CELL } from "@/components/tablet/barCell";
+import { BarLabel, ICON_ADD } from "@/components/tablet/BarLabel";
 
 /**
  * Log a batch that isn't on the weekly round.
@@ -37,6 +39,7 @@ export function NewBatch({
   locationId,
   locationCode,
   logDate,
+  variant = "button",
 }: {
   orgId: string;
   /** The log this batch joins. It is always known now — the command lives ON a
@@ -45,6 +48,8 @@ export function NewBatch({
   locationId: string;
   locationCode: string;
   logDate: string;
+  /** `bar` is the tablet shell's footer cell; `button` the desk's outlined one. */
+  variant?: "button" | "bar";
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -133,17 +138,24 @@ export function NewBatch({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        className={`${BUTTON_CLASS} shrink-0`}
-      >
-        {/* "Add batch", not the app's usual `New <thing>` (Mark, 2026-08-09).
-            The convention is for a command that creates a RECORD you then go
-            to; this one puts a line on the log you are already looking at, and
-            nothing navigates. Add is the honest verb for that. */}
-        Add batch
-      </button>
+      {variant === "bar" ? (
+        // The tablet shell's footer cell — icon over word, the runners' idiom.
+        <button type="button" onClick={() => setOpen(true)} className={BAR_CELL}>
+          <BarLabel icon={ICON_ADD} word="Add batch" />
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={`${BUTTON_CLASS} shrink-0`}
+        >
+          {/* "Add batch", not the app's usual `New <thing>` (Mark, 2026-08-09).
+              The convention is for a command that creates a RECORD you then go
+              to; this one puts a line on the log you are already looking at, and
+              nothing navigates. Add is the honest verb for that. */}
+          Add batch
+        </button>
+      )}
 
       {open && (
         <Dialog
