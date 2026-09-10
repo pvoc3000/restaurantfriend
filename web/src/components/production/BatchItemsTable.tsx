@@ -57,22 +57,25 @@ export type BatchRow = {
 };
 
 /**
- * Item type, STATUS, or nothing (Mark, 2026-08-09).
+ * Element type, STATUS or PREPARED BY (Mark, 2026-09-10: "options: element
+ * type, status, prepared by"). "None" went with that list; it was the third
+ * option from 2026-08-09.
  *
- * Element is gone and status replaces it, which is the same test every grouping
- * in this app has to pass: FEW VALUES, MANY ROWS EACH, so the run a heading
- * opens is worth naming. An element appears at most twice on one log — 044's
- * partial unique index allows a second hand-logged batch of the same thing and
- * nothing else — so grouping by it produced thirty headings over thirty rows.
- * Status has five values and a log is a checklist, so "what is still to do" is
- * a real run.
+ * Element itself is not one, which is the same test every grouping in this app
+ * has to pass: FEW VALUES, MANY ROWS EACH, so the run a heading opens is worth
+ * naming. An element appears at most twice on one log — 044's partial unique
+ * index allows a second hand-logged batch of the same thing and nothing else —
+ * so grouping by it produced thirty headings over thirty rows. Status has five
+ * values and a log is a checklist; Prepared by is a handful of people splitting
+ * a round.
  */
-type Grouping = "type" | "status" | "none";
+type Grouping = "type" | "status" | "operator";
 
-const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
+const GROUP_LABEL: Record<Grouping, (r: BatchRow) => string> = {
   type: (r) => r.element_type ?? "No type",
   status: (r) =>
     BATCH_STATUS_LABEL[r.status as keyof typeof BATCH_STATUS_LABEL] ?? r.status,
+  operator: (r) => r.operatorName ?? "Nobody yet",
 };
 
 /**
@@ -81,13 +84,19 @@ const GROUP_LABEL: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = 
  * and status bands read in the order a batch moves through them rather than
  * alphabetically, which would put Complete above To do.
  */
-const GROUP_KEY: Record<Exclude<Grouping, "none">, (r: BatchRow) => string> = {
+const GROUP_KEY: Record<Grouping, (r: BatchRow) => string> = {
   type: (r) => r.element_type ?? "￿",
   status: (r) => {
     const at = BATCH_STATUSES.indexOf(r.status as (typeof BATCH_STATUSES)[number]);
     return String(at < 0 ? BATCH_STATUSES.length : at);
   },
+  // Unassigned sinks last, like an unset type.
+  operator: (r) => r.operatorName ?? "￿",
 };
+
+function isGrouping(value: string): value is Grouping {
+  return value in GROUP_KEY;
+}
 
 /**
  * ONE LOG's batches, and what came out of them.
@@ -129,9 +138,8 @@ export function BatchItemsTable({
   fill?: boolean;
   /**
    * The tablet shell's dress (Mark, 2026-09-09): the compact column set at
-   * every width, no Group-by picker and no columns eye. What a supervisor does
-   * here is enter Made and a status against each batch, and a control that
-   * changes what the list SHOWS is desk furniture on a screen that narrow.
+   * every width and no columns eye. The Group-by picker went with the eye at
+   * first and came back on 2026-09-10 (Mark), beside the Status picker.
    */
   touch?: boolean;
 }) {
@@ -146,7 +154,9 @@ export function BatchItemsTable({
   // The SORT is remembered too. Mark named the search and the filters, and the
   // sort is the same class of thing set up for the same reason — leaving it out
   // would produce the identical complaint on the next pass.
-  const [grouping, setGrouping] = useRememberedView<Grouping>("batch-items.grouping", "type");
+  // A remembered "none" from before 2026-09-10 falls back to Element type.
+  const [storedGrouping, setGrouping] = useRememberedView<string>("batch-items.grouping", "type");
+  const grouping: Grouping = isGrouping(storedGrouping) ? storedGrouping : "type";
   const [term, setTerm] = useRememberedView("batch-items.search", "");
   // "all" or one of BATCH_STATUSES. Remembered like the search, for the same walk.
   const [status, setStatus] = useRememberedView<string>("batch-items.status", "all");
@@ -186,7 +196,10 @@ export function BatchItemsTable({
   // one other column that bands is read as asking for those bands — and the
   // comparator below MUST use the same answer, or the bands would not match
   // the order they band.
-  const effective: Grouping = sort.key === "status" ? "status" : grouping;
+  // Prepared by bands too since 2026-09-10, so a sort by it asks for its bands
+  // in the same way.
+  const effective: Grouping =
+    sort.key === "status" ? "status" : sort.key === "operator" ? "operator" : grouping;
 
   const visible = useMemo(() => {
     /**
@@ -223,12 +236,16 @@ export function BatchItemsTable({
       }
     };
     const dir = sort.dir === "asc" ? 1 : -1;
-    const groupOf = effective === "none" ? null : GROUP_KEY[effective];
+    const groupOf = GROUP_KEY[effective];
+    // SORTING BY THE COLUMN YOU ARE GROUPED BY TURNS THE BANDS OVER — the
+    // schedules/timesheets fix of 2026-09-09, which this table had missed.
+    // Inside a band every row shares the grouped value, so the within-run
+    // comparison is a no-op and a fixed ascending lead made the arrow do
+    // nothing. Every grouping key is also its column's sort key.
+    const lead = effective === sort.key ? dir : 1;
     return [...shown].sort((a, b) => {
-      if (groupOf) {
-        const ag = groupOf(a), bg = groupOf(b);
-        if (ag !== bg) return ag < bg ? -1 : 1;
-      }
+      const ag = groupOf(a), bg = groupOf(b);
+      if (ag !== bg) return (ag < bg ? -1 : 1) * lead;
       const av = value(a), bv = value(b);
       if (av < bv) return -1 * dir;
       if (av > bv) return 1 * dir;
@@ -440,16 +457,13 @@ export function BatchItemsTable({
     },
   ];
 
-  const group: DataGroup<BatchRow> | undefined =
-    effective === "none"
-      ? undefined
-      : {
-          label: GROUP_LABEL[effective],
-          // Black caps text over a rule, not a filled band — FileMaker's own
-          // treatment for exactly this heading (Mark, 2026-08-09). See
-          // DataGroup.heading.
-          heading: true,
-        };
+  const group: DataGroup<BatchRow> = {
+    label: GROUP_LABEL[effective],
+    // Black caps text over a rule, not a filled band — FileMaker's own
+    // treatment for exactly this heading (Mark, 2026-08-09). See
+    // DataGroup.heading.
+    heading: true,
+  };
 
   return (
     <DataTable
@@ -483,7 +497,9 @@ export function BatchItemsTable({
       // the search came back from the tablet's breadcrumb row). Search · Status
       // · Group by, the purchasing lists' arrangement: the search flexes,
       // `fullWidth` because TextInput's wrapper shrink-wraps, and `items-end`
-      // sits it on the line of the captioned fields. Group by stays desk-only.
+      // sits it on the line of the captioned fields. Group by shows on the
+      // tablet too (Mark, 2026-09-10), where it had been desk-only since
+      // 2026-09-09.
       leading={
         <div className="flex flex-wrap items-end gap-4">
           <div className="min-w-[13rem] max-w-[18rem] flex-1">
@@ -513,7 +529,6 @@ export function BatchItemsTable({
               fit
             />
           </ControlField>
-          {touch ? null : (
             <ControlField label="Group by">
               <PickList
                 ariaLabel="Group the batches"
@@ -521,14 +536,13 @@ export function BatchItemsTable({
                 value={grouping}
                 onPick={(next) => setGrouping(next as Grouping)}
                 options={[
-                  { value: "type", label: "Item type" },
+                  { value: "type", label: "Element type" },
                   { value: "status", label: "Status" },
-                  { value: "none", label: "None" },
+                  { value: "operator", label: "Prepared by" },
                 ]}
                 fit
               />
             </ControlField>
-          )}
         </div>
       }
     />
