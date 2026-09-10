@@ -1,10 +1,12 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import type { PickOption } from "@/components/ui/PickList";
 import { useExactViewportHeight } from "@/lib/tableHead";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { Switch } from "@/components/ui/Switch";
+import { TextInput } from "@/components/ui/TextInput";
+import { useRememberedView } from "@/lib/viewMemory";
 import { clampSplit, setSplit, useSplit } from "@/lib/paneSplit";
 import { BatchItemsTable, type BatchRow } from "@/components/production/BatchItemsTable";
 import { BatchFields, type BatchFieldsRow } from "@/components/production/BatchFields";
@@ -102,6 +104,7 @@ export function BatchLogItems({
   editable,
   removable,
   touch = false,
+  crumbs,
 }: {
   rows: BatchRow[];
   /** The same batches, carrying what the PANE needs. Keyed by id. */
@@ -115,6 +118,15 @@ export function BatchLogItems({
   removable: boolean;
   /** The tablet shell — see `BatchItemsTable`'s prop of the same name. */
   touch?: boolean;
+  /**
+   * The record's breadcrumb row, handed in so the tablet can put the SEARCH
+   * BOX on the same line, right-aligned (Mark, 2026-09-09: "to save space").
+   * The two live in different components — the crumbs are the server page's,
+   * the search is this table's remembered state — so the page passes its row
+   * down rather than this component reaching up. Desk callers pass nothing
+   * and render their crumbs where they always did.
+   */
+  crumbs?: ReactNode;
 }) {
   const [picked, setPicked] = useState<string | null>(null);
   const [pane, setPane] = useState<Pane>("info");
@@ -128,9 +140,16 @@ export function BatchLogItems({
    * of you, and 42 hidden rounds on one flavour says nothing about the next.
    */
   const [showSkipped, setShowSkipped] = useState(false);
+  // The search, lifted out of the table so the tablet can draw it beside the
+  // crumbs. Same remembered key the table uses on its own, so walking to the
+  // next log keeps the term either way.
+  const [term, setTerm] = useRememberedView("batch-items.search", "");
   const [hiddenRounds, setHiddenRounds] = useState(0);
   const frame = useRef<HTMLDivElement>(null);
-  const split = useSplit(SPLIT_NAME, DEFAULT_SPLIT);
+  // The tablet opens with the pane at half the frame: at 768px tall a 42% pane
+  // showed two fields and scrolled the rest (Mark, 2026-09-09). Only the
+  // DEFAULT — a dragged split is remembered either way.
+  const split = useSplit(SPLIT_NAME, touch ? 0.5 : DEFAULT_SPLIT);
 
   // THE SPLIT IS ALWAYS ON (Mark, 2026-09-09: "The sliding content view is
   // mandatory, but it gets disabled in portrait mode"). It switched to a
@@ -171,6 +190,19 @@ export function BatchLogItems({
   const selected = selectedId ? fields[selectedId] ?? null : null;
 
   return (
+    <>
+      {crumbs ? (
+        <div className="flex items-center justify-between gap-4">
+          <div className="min-w-0 flex-1">{crumbs}</div>
+          <TextInput
+            value={term}
+            onValueChange={setTerm}
+            placeholder="Search element, shift, batch…"
+            aria-label="Search batches"
+            className="w-64"
+          />
+        </div>
+      ) : null}
     <div ref={frame} className="flex flex-col">
       {/* `min-h-0` for the same reason the receiving columns carry `min-w-0` on
           the other axis: a flex item's automatic minimum is its CONTENT, which
@@ -188,6 +220,8 @@ export function BatchLogItems({
           onSelect={setPicked}
           fill={wide}
           touch={touch}
+          term={crumbs ? term : undefined}
+          onTermChange={crumbs ? setTerm : undefined}
         />
       </div>
 
@@ -261,13 +295,21 @@ export function BatchLogItems({
           // to. It also buys back the ~50px row a segmented bar spent above the
           // fields, which on a divided pane is a field.
           <div className={`flex gap-5 p-4 ${wide ? "min-h-0 flex-1" : ""}`}>
-            <SectionNav
-              items={PANE_SECTIONS}
-              value={pane}
-              onSelect={setPane}
-              ariaLabel="What to show about this batch"
-              className="w-20 shrink-0"
-            />
+            {/* The tab column scrolls itself like the columns beside it: at
+                the tablet's taller rows four tabs are 164px, which is more than
+                a short pane holds, and a column that cannot scroll paints its
+                last tab over the pane's own border. */}
+            <div className={`min-h-0 shrink-0 overflow-y-auto ${touch ? "w-36" : "w-28"}`}>
+              <SectionNav
+                items={PANE_SECTIONS}
+                value={pane}
+                onSelect={setPane}
+                ariaLabel="What to show about this batch"
+                // Wide enough for INSTRUCTIONS on one line at either size (Mark,
+                // 2026-09-09: "give more width or padding to the tabs").
+                size={touch ? "lg" : "md"}
+              />
+            </div>
 
             {pane === "info" ? (
               // EACH COLUMN SCROLLS ITSELF now, rather than the tab scrolling as
@@ -352,5 +394,6 @@ export function BatchLogItems({
         )}
       </section>
     </div>
+    </>
   );
 }

@@ -53,13 +53,17 @@ export function TabletBar({
 
   return (
     <header ref={ref} className="sticky top-0 z-50 bg-ink text-white">
+      {/* RIGHT-ALIGNED (Mark, 2026-09-09): the spacer leads, so every cell
+          sits against the right edge where a thumb holding a landscape iPad
+          already is, and the landing page's shop picker and Switch user join
+          the same cluster rather than facing the nav across the bar. */}
       <div className="flex items-center gap-1 px-2">
+        <div className="min-w-0 flex-1" />
         <TabletBack />
         <Link href={TABLET_HOME} className={BAR_CELL}>
           <BarLabel icon={ICON_HOME} word="Home" />
         </Link>
         <BarRecordNav />
-        <div className="min-w-0 flex-1" />
         {atHome && (
           <div className="flex items-center gap-4 px-3">
             <WorkingLocation locations={locations} working={working} size="lg" />

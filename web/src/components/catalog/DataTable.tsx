@@ -200,6 +200,7 @@ export function DataTable<T>({
   columnChooser = false,
   leading,
   dense = false,
+  resetFooter = true,
 }: {
   rows: T[];
   columns: DataColumn<T>[];
@@ -416,6 +417,13 @@ export function DataTable<T>({
    * reading it.
    */
   dense?: boolean;
+  /**
+   * The "Reset column widths / order" line under a table somebody has dragged.
+   * Off on the tablet shell (Mark, 2026-09-09: "don't think we need the reset
+   * column widths for the ipad") — a shared device carries whatever the last
+   * person dragged, and a line offering to undo it is desk furniture there.
+   */
+  resetFooter?: boolean;
 }) {
   const defaultWidths = useMemo<ColumnWidths>(
     () => Object.fromEntries(columns.map((c) => [c.key, c.width])),
@@ -993,7 +1001,7 @@ export function DataTable<T>({
         </table>
       </div>
 
-      {(customized || orderCustomized) && (
+      {resetFooter && (customized || orderCustomized) && (
         <div className="flex justify-end gap-4">
           {orderCustomized && (
             <button

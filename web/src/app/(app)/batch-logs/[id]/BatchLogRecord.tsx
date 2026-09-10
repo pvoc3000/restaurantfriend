@@ -290,13 +290,19 @@ export async function BatchLogRecord({
     </>
   );
 
+  const crumbs = (
+    <Breadcrumbs
+      trail={trail}
+      current={`${batchDate(logDate)} · ${kitchenCode}`}
+      trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
+    />
+  );
+
   return (
     <div className="space-y-4">
-      <Breadcrumbs
-        trail={trail}
-        current={`${batchDate(logDate)} · ${kitchenCode}`}
-        trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
-      />
+      {/* On the tablet the crumbs share a row with the search box, which is
+          the table's own state — so `BatchLogItems` draws the row. */}
+      {touch ? null : crumbs}
 
       {touch ? null : (
       <header className="flex flex-wrap items-baseline gap-x-4">
@@ -377,6 +383,7 @@ export async function BatchLogRecord({
           editable={editable}
           removable={removable}
           touch={touch}
+          crumbs={touch ? crumbs : undefined}
         />
       )}
 

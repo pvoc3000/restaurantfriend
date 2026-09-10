@@ -116,6 +116,8 @@ export function BatchItemsTable({
   onSelect,
   fill,
   touch = false,
+  term: controlledTerm,
+  onTermChange,
 }: {
   rows: BatchRow[];
   /** Supervisor and up — 044's `production_batches` write policies. */
@@ -132,6 +134,13 @@ export function BatchItemsTable({
    * changes what the list SHOWS is desk furniture on a screen that narrow.
    */
   touch?: boolean;
+  /**
+   * The search, CONTROLLED, when a parent wants the box somewhere other than
+   * this table's own strip — the tablet shell puts it in the breadcrumb row.
+   * Both or neither; with neither the table keeps its own remembered term.
+   */
+  term?: string;
+  onTermChange?: (next: string) => void;
 }) {
   // REMEMBERED WHILE YOU WALK RECORDS (Mark, 2026-08-09: "when navigating using
   // the buttons in the upper right hand corner of the detail screen, I'd like
@@ -145,7 +154,9 @@ export function BatchItemsTable({
   // sort is the same class of thing set up for the same reason — leaving it out
   // would produce the identical complaint on the next pass.
   const [grouping, setGrouping] = useRememberedView<Grouping>("batch-items.grouping", "type");
-  const [term, setTerm] = useRememberedView("batch-items.search", "");
+  const [ownTerm, setOwnTerm] = useRememberedView("batch-items.search", "");
+  const term = controlledTerm ?? ownTerm;
+  const setTerm = onTermChange ?? setOwnTerm;
   const [sort, setSort] = useRememberedView<{ key: string; dir: SortDir }>(
     "batch-items.sort",
     { key: "element", dir: "asc" }
@@ -161,6 +172,14 @@ export function BatchItemsTable({
         .includes(q)
     );
   }, [rows, term]);
+
+  // SORTING BY STATUS GROUPS BY STATUS (Mark, 2026-09-09). Grouping is the
+  // primary sort, so with the bands on item type a sort by status ordered the
+  // rows within each type and looked as if it had done nothing. A sort by the
+  // one other column that bands is read as asking for those bands — and the
+  // comparator below MUST use the same answer, or the bands would not match
+  // the order they band.
+  const effective: Grouping = sort.key === "status" ? "status" : grouping;
 
   const visible = useMemo(() => {
     /**
@@ -197,7 +216,7 @@ export function BatchItemsTable({
       }
     };
     const dir = sort.dir === "asc" ? 1 : -1;
-    const groupOf = grouping === "none" ? null : GROUP_KEY[grouping];
+    const groupOf = effective === "none" ? null : GROUP_KEY[effective];
     return [...shown].sort((a, b) => {
       if (groupOf) {
         const ag = groupOf(a), bg = groupOf(b);
@@ -213,7 +232,7 @@ export function BatchItemsTable({
       if (as !== bs) return as - bs;
       return (a.batch_label ?? "") < (b.batch_label ?? "") ? -1 : 1;
     });
-  }, [shown, sort, grouping]);
+  }, [shown, sort, effective]);
 
   // No `usePublishRecordSet`: the record book walks a LIST of records, and a
   // batch has no route to walk to — it is only ever the pane's subject.
@@ -251,7 +270,6 @@ export function BatchItemsTable({
   const columns: DataColumn<BatchRow>[] = [
     {
       key: "sort",
-      hideWhenCompact: true,
       label: "Order",
       // 90, not 80: at 1280 the narrower share left the LABEL 50px and it
       // rendered "ORD…", which reads as a rendering fault where the values
@@ -416,10 +434,10 @@ export function BatchItemsTable({
   ];
 
   const group: DataGroup<BatchRow> | undefined =
-    grouping === "none"
+    effective === "none"
       ? undefined
       : {
-          label: GROUP_LABEL[grouping],
+          label: GROUP_LABEL[effective],
           // Black caps text over a rule, not a filled band — FileMaker's own
           // treatment for exactly this heading (Mark, 2026-08-09). See
           // DataGroup.heading.
@@ -436,6 +454,7 @@ export function BatchItemsTable({
       // is answered by a `matchMedia` min-width, and this keeps it a number.
       compactBelow={touch ? 100_000 : 1200}
       columnChooser={!touch}
+      resetFooter={!touch}
       // The pane below takes a fixed slice of one viewport, so what is left is
       // all this list gets — see DataTable's `dense`.
       dense
@@ -454,6 +473,7 @@ export function BatchItemsTable({
       onSortChange={setSort}
       empty={<p className="text-sm text-muted">No batches match.</p>}
       leading={
+        onTermChange ? undefined : (
         <div className="flex flex-wrap items-end gap-4">
           <TextInput
             value={term}
@@ -480,6 +500,7 @@ export function BatchItemsTable({
             </div>
           )}
         </div>
+        )
       }
     />
   );

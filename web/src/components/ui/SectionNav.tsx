@@ -50,6 +50,7 @@ export function SectionNav<K extends string>({
   ariaLabel,
   className = "",
   onSelect,
+  size = "md",
 }: {
   items: readonly SectionNavItem<K>[];
   value: K;
@@ -74,6 +75,9 @@ export function SectionNav<K extends string>({
    * content, because a column of five costs 180px before anything is read.
    */
   orientation?: "vertical" | "horizontal";
+  /** "lg" is the tablet's — 14px and taller rows, a thumb's target (Mark,
+   *  2026-09-09: "give more width or padding to the tabs"). */
+  size?: "md" | "lg";
   ariaLabel?: string;
   className?: string;
 }) {
@@ -93,7 +97,9 @@ export function SectionNav<K extends string>({
         // vertical form — the labels have to start on the same left edge as the
         // content beside them, and 8px of padding would put them a visible step
         // to its left.
-        const className = `inline-flex items-center gap-2 whitespace-nowrap py-1 text-[12px] uppercase tracking-[0.06em] no-underline transition-colors ${
+        const className = `inline-flex items-center gap-2 whitespace-nowrap ${
+          size === "lg" ? "py-2.5 text-[14px]" : "py-1 text-[12px]"
+        } uppercase tracking-[0.06em] no-underline transition-colors ${
           on ? "font-bold text-ink" : "font-semibold text-muted hover:text-ink"
         }`;
         const body = (

@@ -9150,6 +9150,19 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    `useExactViewportHeight` (measuring to the spacer's EDGE) never counts —
    exactly 16px of page scroll in both orientations. The paperwork screens
    dodge it with a negative margin on the spacer; a wrapper is the general cure.
+   **SIX MORE FROM MARK'S FIRST LOOK, the same evening.** Bar cells are a
+   FIXED `w-36` (144px — "Mark complete" wrapped at 128, and the word is now
+   just **Complete**); the bar's nav cells are RIGHT-ALIGNED, with the landing
+   page's shop picker and Switch user joining that cluster; Order is back in
+   the tablet's column set; **sorting by Status bands by status**
+   (`effective` grouping in `BatchItemsTable`, used by the comparator AND the
+   bands, or the bands would not match the order they band); the search box
+   shares the breadcrumb row, right-aligned — the record hands its crumbs INTO
+   `BatchLogItems`, whose remembered term the table takes as a controlled
+   `term`/`onTermChange`; the pane's tabs are `SectionNav size="lg"` in a
+   scrolling `w-36` column, and the tablet's default split is half; and
+   **`DataTable resetFooter={false}`** hides the reset-widths line on the iPad.
+
    **THE RESTING `↕` IS GONE FROM EVERY LIST** (Mark: "Why? Those can go
    away"). `ColumnHeader` draws the arrow on the SORTED column only; the
    promise "you could sort by this" was true of nearly every header and so said

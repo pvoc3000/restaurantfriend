@@ -120,7 +120,7 @@ export function BatchLogActions({
           </button>
         ) : (
           <button type="button" onClick={() => setStatus("complete")} disabled={busy !== null} className={BAR_CELL}>
-            <BarLabel icon={ICON_CHECK} word={busy === "complete" ? "Closing…" : "Mark complete"} />
+            <BarLabel icon={ICON_CHECK} word={busy === "complete" ? "Closing…" : "Complete"} />
           </button>
         )}
         <button type="button" onClick={remove} disabled={busy !== null} className={BAR_CELL}>
