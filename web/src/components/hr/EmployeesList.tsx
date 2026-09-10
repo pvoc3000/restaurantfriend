@@ -7,7 +7,7 @@ import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { ControlField } from "@/components/ui/ControlField";
 import { PickList } from "@/components/ui/PickList";
 import {
   employeeDetailHref,
@@ -362,9 +362,11 @@ export function EmployeesList({
       />
 
       <div className="space-y-3">
-        {/* THE SEARCH ROW, not the tab picker under it (Mark, 2026-09-03):
-            `items-end` and `ml-auto` put the command level with the search box
-            and the two filter menus, on the page's right edge. */}
+        {/* THE SEARCH ROW (Mark, 2026-09-03): `items-end` and `ml-auto` put
+            the command level with the search box and the filter menus, on the
+            page's right edge. Every menu is captioned since 2026-09-10, and
+            Status joined them here as a PickList — it was a TabPicker on a row
+            of its own underneath. */}
         <div className="flex flex-wrap items-end gap-4">
           <TextInput
             value={search}
@@ -374,30 +376,48 @@ export function EmployeesList({
             className="w-72"
             icon={<SearchGlyph />}
           />
-          <PickList
-            value={location}
-            onPick={setLocation}
-            variant="field"
-            placeholder="All locations"
-            ariaLabel="Filter by location"
-            options={[
-              { value: "", label: "All locations" },
-              ...locationCodes.map((c) => ({ value: c, label: c })),
-            ]}
-            className="w-44"
-          />
-          <PickList
-            value={position}
-            onPick={setPosition}
-            variant="field"
-            placeholder="All positions"
-            ariaLabel="Filter by position"
-            options={[
-              { value: "", label: "All positions" },
-              ...positions.map((p) => ({ value: p, label: p })),
-            ]}
-            className="w-56"
-          />
+          <ControlField label="Location">
+            <PickList
+              value={location}
+              onPick={setLocation}
+              variant="field"
+              placeholder="All locations"
+              ariaLabel="Filter by location"
+              options={[
+                { value: "", label: "All locations" },
+                ...locationCodes.map((c) => ({ value: c, label: c })),
+              ]}
+              className="w-44"
+            />
+          </ControlField>
+          <ControlField label="Position">
+            <PickList
+              value={position}
+              onPick={setPosition}
+              variant="field"
+              placeholder="All positions"
+              ariaLabel="Filter by position"
+              options={[
+                { value: "", label: "All positions" },
+                ...positions.map((p) => ({ value: p, label: p })),
+              ]}
+              className="w-56"
+            />
+          </ControlField>
+          <ControlField label="Status">
+            <PickList
+              value={status}
+              onPick={(v) => setStatus(v as StatusFilter)}
+              variant="field"
+              ariaLabel="Filter by status"
+              options={statusTabs.map((t) => ({
+                value: t.key,
+                label: t.label,
+                hint: String(t.count),
+              }))}
+              fit
+            />
+          </ControlField>
           <div className="ml-auto">
             <NewEmployee
               orgId={orgId}
@@ -411,12 +431,6 @@ export function EmployeesList({
           </div>
         </div>
 
-        <TabPicker
-          options={statusTabs}
-          value={status}
-          onChange={setStatus}
-          ariaLabel="Filter by status"
-        />
       </div>
 
       <DataTable

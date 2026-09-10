@@ -11102,8 +11102,14 @@ weekday column, and 003 then silently made it per-vendor-item.
   cost is the count of the tier you are ON at rest, and the gain is that all of
   them are still one tap away. **No find box comes with it** — `PickList` grows
   one past eight options or with `allowNew`, so a closed vocabulary of three or
-  four never has one. Reach for this when a control band is over-full, NOT as a
-  general preference — the TabPicker is still the default.
+  four never has one. **IT IS NOW THE DEFAULT FOR A LIST'S FILTER ROW** (Mark,
+  2026-09-10, converting one list after another the same afternoon — shift
+  reports, tags, documents, checklists and their templates, tasks, plans,
+  schedules, recipes, vendors, employees, and the batch log's own table): a
+  filter row's one-of-N is a captioned `PickList` with its counts as hints and
+  `fit`, and a new list's should be one too. `TabPicker` stays right where the
+  choice is not a list filter — `SectionNav`-adjacent controls, a runner's
+  tier, a dialog.
   **AND A COLLAPSED PICKER NEEDS ITS CAPTION — every one of them** (Mark,
   2026-09-10, the day after: "put labels above the picklists", then "caption
   the filter row elements like we did the order guide" for both purchasing
