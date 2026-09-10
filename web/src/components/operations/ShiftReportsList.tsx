@@ -7,7 +7,8 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
-import { TabPicker } from "@/components/ui/TabPicker";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { RowMenu } from "@/components/ui/RowMenu";
@@ -319,16 +320,23 @@ export function ShiftReportsList({
               className="w-72"
               icon={<SearchGlyph />}
             />
-            <TabPicker
-              ariaLabel="Which shift reports"
-              value={tier}
-              onChange={setTier}
-              options={[
-                { key: "draft", label: "Drafts", count: draftCount },
-                { key: "sent", label: "Sent", count: sentCount },
-                { key: "all", label: "All", count: rows.length },
-              ]}
-            />
+            {/* A captioned PICKLIST rather than tabs (Mark, 2026-09-10), the
+                purchasing lists' conversion: counts ride as hints, `fit`
+                sizes the trigger to its widest option. */}
+            <ControlField label="Show">
+              <PickList
+                ariaLabel="Which shift reports"
+                variant="field"
+                value={tier}
+                onPick={(next) => setTier(next as typeof tier)}
+                options={[
+                  { value: "draft", label: "Drafts", hint: String(draftCount) },
+                  { value: "sent", label: "Sent", hint: String(sentCount) },
+                  { value: "all", label: "All", hint: String(rows.length) },
+                ]}
+                fit
+              />
+            </ControlField>
             <div className="ml-auto">
               <NewShiftReport
                 orgId={orgId}
