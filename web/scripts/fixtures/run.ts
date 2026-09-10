@@ -87,6 +87,7 @@ import "./scheduleSource.fixtures";
 import "./sales.fixtures";
 import "./sharedDevice.fixtures";
 import "./shell.fixtures";
+import "./landingState.fixtures";
 import "./shiftReports.fixtures";
 import "./squareSalesCsv.fixtures";
 import "./tableSort.fixtures";
