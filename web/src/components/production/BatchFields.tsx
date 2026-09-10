@@ -60,12 +60,10 @@ export type BatchFieldsRow = {
  * actually there and what came out, so the two measurements read against the
  * two claims rather than against each other.
  *
- * THREE COLUMNS, and they are FMP's own (Mark, 2026-08-09, with the screenshot):
- * the fields, then the photograph over the notes, then the element's HISTORY.
- * The amounts used to have a column to themselves and now sit with the fields,
- * which is what makes room for the third — and reads better besides, because
- * "on hand 3 × 1.5 gal" is a fact about this batch in the same way its status
- * is, not a separate register.
+ * TWO BY TWO since 2026-09-09 (Mark): identity fields | the four amounts, then
+ * notes | photograph. It was FMP's three columns — fields, photo over notes,
+ * the element's HISTORY — until the history got a tab of its own in the pane
+ * and the amounts got a column back.
  */
 export function BatchFields({
   row,
@@ -73,7 +71,6 @@ export function BatchFields({
   operators,
   versions,
   editable,
-  history,
   fill = false,
 }: {
   row: BatchFieldsRow;
@@ -82,12 +79,6 @@ export function BatchFields({
   /** The element's own recipe versions. Empty when it has none. */
   versions: PickOption[];
   editable: boolean;
-  /**
-   * The third column — every previous making of this element. Passed in rather
-   * than rendered here because it is the one part of the pane that fetches, and
-   * this component is otherwise pure props.
-   */
-  history?: React.ReactNode;
   /**
    * Take the pane's height and let each COLUMN scroll itself, rather than
    * sitting at content height inside one scroller.
@@ -100,30 +91,22 @@ export function BatchFields({
   fill?: boolean;
 }) {
   return (
+    // TWO BY TWO (Mark, 2026-09-09): what the batch IS on the left — status,
+    // number, order, who made it, which recipe — and the four AMOUNTS on the
+    // right, with the notes under the first and the photograph under the
+    // second. Two `dl`s rather than one four-track grid, so a long name in one
+    // column cannot push the other's rows out of step. `sm`, not `lg`: a
+    // portrait iPad is a tablet too and has the width for two columns.
+    //
+    // The history had a third track here until it got its own tab
+    // (2026-09-09); `fill` is kept for the desk's per-column scrolling.
     <div
-      // THE HISTORY IS THE WIDE ONE (Mark, 2026-08-09: "make the History list in
-      // the detail pane wide. There's room"). It carries five columns of figures
-      // where the photo/notes column carries a thumbnail and a line of text, so
-      // the middle track gives up most of its share. Measured at 1512: history
-      // 470px against 300, which stops Made wrapping "0 × 3 gal" onto two lines
-      // and lets a note sit on one.
-      //
-      // WITHOUT A HISTORY (2026-09-09, when it got a tab of its own) the grid is
-      // the two remaining columns: an empty third track would hold half the
-      // pane open for nothing.
-      className={`grid gap-x-8 gap-y-5 ${
-        history
-          ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,0.65fr)_minmax(0,1.75fr)]"
-          : "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]"
-      } ${fill ? "min-h-0 flex-1" : ""}`}
+      className={`grid gap-x-8 gap-y-5 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] ${
+        fill ? "min-h-0 flex-1" : ""
+      }`}
     >
-      {/* -- what it is, and the four amounts ------------------------------ */}
-      {/* Each column carries its OWN scroll in fill mode. The fields are a
-          fixed set and rarely need it; the notes and the history both can, and
-          a column that scrolls its neighbours' content is the thing this
-          layout exists to avoid. */}
       <dl
-        className={`grid grid-cols-[7.5rem_minmax(0,1fr)] items-center gap-x-3 gap-y-2 text-sm ${
+        className={`grid grid-cols-[7.5rem_minmax(0,1fr)] content-start items-center gap-x-3 gap-y-2 text-sm ${
           fill ? "min-h-0 overflow-y-auto pr-1" : ""
         }`}
       >
@@ -192,7 +175,13 @@ export function BatchFields({
             </span>
           )}
         </Field>
+      </dl>
 
+      <dl
+        className={`grid grid-cols-[7.5rem_minmax(0,1fr)] content-start items-center gap-x-3 gap-y-2 text-sm ${
+          fill ? "min-h-0 overflow-y-auto pr-1" : ""
+        }`}
+      >
         <Field label="Asked for">
           <span className={`${READ_ONLY_VALUE} tabular-nums text-muted`}>
             {describeAmount(row.batch_amount, null, row.batch_unit)}
@@ -211,17 +200,7 @@ export function BatchFields({
         </Field>
       </dl>
 
-      {/* -- the photograph, and the notes --------------------------------- */}
-      <div className={`space-y-4 ${fill ? "min-h-0 overflow-y-auto pr-1" : ""}`}>
-        <BatchPhoto
-          batchId={row.id}
-          orgId={orgId}
-          url={row.photoUrl}
-          path={row.photo_path}
-          name={row.photo_name}
-          editable={editable}
-        />
-        <div>
+      <dl className="text-sm">
           <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
             Notes
           </dt>
@@ -235,13 +214,18 @@ export function BatchFields({
               <p className="whitespace-pre-wrap text-sm text-muted">{row.notes ?? "—"}</p>
             )}
           </dd>
-        </div>
-      </div>
+      </dl>
 
-      {/* -- every previous making of this element --------------------------
-          `min-h-0` and nothing else: the history component takes the height and
-          scrolls its own rows (see its `fill`). */}
-      {history ? <div className={fill ? "flex min-h-0 flex-col" : ""}>{history}</div> : null}
+      <div className={fill ? "min-h-0 overflow-y-auto pr-1" : ""}>
+        <BatchPhoto
+          batchId={row.id}
+          orgId={orgId}
+          url={row.photoUrl}
+          path={row.photo_path}
+          name={row.photo_name}
+          editable={editable}
+        />
+      </div>
     </div>
   );
 }
