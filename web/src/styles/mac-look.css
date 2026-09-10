@@ -23,43 +23,27 @@
   transition: none;
 }
 
-/* Hover: classic Mac 50% grey — a checkerboard of single black and white
-   pixels, a 2x2 SVG tile drawn with crisp edges.
-
-   `background-attachment: fixed` pins the pattern to the SCREEN rather than
-   the control. A one-pixel checkerboard smears to flat grey whenever its box
-   starts at a fractional pixel, and a control's position is whatever the row's
-   layout gives it (measured in the preview: 549.19px and 734.41px on a 2x
-   display, one crisp and one smeared). Fixed puts every dot on one whole-pixel
-   grid, which is also how the old Mac drew it. iOS Safari IGNORES fixed
-   attachment, so on the iPad the dots can smear again — a known cost.
-
-   A 2x2-square mesh was tried and Mark preferred this finer one. */
+/* Hover: a SOLID light grey, #c0c0c0 (Mark, 2026-09-10: "instead of the
+   pixelated grey … just do a solid mid grey", then "use a lighter grey" —
+   #808080 came first). It replaced the classic 50% checkerboard of single
+   black and white pixels. Black type on it is ~12.6:1, so the white outline
+   the dots needed went with them, and so did the fixed-attachment trick that
+   kept the dots from smearing at fractional pixels (and never worked on iOS). */
 .mac-control:hover {
-  background-color: #fff;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='2' height='2' shape-rendering='crispEdges'%3E%3Crect width='1' height='1'/%3E%3Crect x='1' y='1' width='1' height='1'/%3E%3C/svg%3E");
-  background-size: 2px 2px;
-  background-attachment: fixed;
-  image-rendering: pixelated;
+  background-color: #c0c0c0;
   color: #000;
-  /* A 1px white outline so black type reads over the dots. */
-  text-shadow: 1px 0 #fff, -1px 0 #fff, 0 1px #fff, 0 -1px #fff,
-               1px 1px #fff, -1px -1px #fff, 1px -1px #fff, -1px 1px #fff;
 }
 
-/* Everything INSIDE a hovered control:
-   - `text-shadow: inherit` is for the date window, whose border sits on a box
-     AROUND a button — the browser's own style for buttons resets text-shadow
-     to none, so without this the outline never reaches the dates.
-   - `background-color: transparent` is for that same inner button, whose own
-     `hover:bg-neutral-100` would otherwise paint grey over the dots. */
+/* Everything INSIDE a hovered control. `background-color: transparent` is for
+   the date window, whose border sits on a box AROUND a button: that button's
+   own `hover:bg-neutral-100` would otherwise paint light grey over the mid
+   grey. */
 .mac-control:hover * {
   color: #000;
-  text-shadow: inherit;
   background-color: transparent;
 }
 
-/* Press: the control drops 3px into its own shadow and keeps its dots. A
+/* Press: the control drops 3px into its own shadow and keeps its grey. A
    solid-black flip, like a classic push button, was tried and Mark preferred
    this. */
 .mac-control:active {

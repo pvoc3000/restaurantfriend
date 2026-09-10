@@ -9939,10 +9939,11 @@ weekday column, and 003 then silently made it per-vendor-item.
   hand in `InvoiceList.tsx`:
   - **`mac-control`** — Check QuickBooks, New invoice (through `NewInvoice`'s
     new `triggerClassName`), and the Window, Vendors, Due and Status pickers.
-    At rest a hard 3px black shadow down and right; on hover the classic 50%
-    grey, a checkerboard of single black and white pixels with a 1px white
-    outline on the type; on press the control drops 3px into its shadow and
-    keeps the dots. Instant state changes, no transitions.
+    At rest a hard 3px black shadow down and right; on hover a SOLID light
+    grey, `#c0c0c0` (Mark, 2026-09-10 — it replaced the classic 50%
+    checkerboard of single black and white pixels, and a solid `#808080` was
+    tried first and read too dark); on press the control drops 3px into its
+    shadow and keeps the grey. Instant state changes, no transitions.
   - **`mac-field`** — the search box. Sunken: a 1px border plus a hard 2px
     black shadow inside along the top and left (the mirror of the raised
     controls), 39px tall growing DOWNWARD so its top meets theirs and its
@@ -9950,21 +9951,21 @@ weekday column, and 003 then silently made it per-vendor-item.
     magnifier sits in the clear button's slot while the box is empty
     (`TextInput`'s new opt-in `icon` prop), and the hint's words moved to
     `aria-label`, the field's only name.
-  **Tried and rejected, so nobody reinvents them:** a 5px shadow (3px), 2×2
-  dots (1px was better), a solid-black flip on press (just dropping into the
-  shadow was better), a 2px border on the search box, and a dotted hover on
-  the search box.
-  **Four traps the tuning hit, all handled in the CSS and worth knowing before
-  rolling it out:**
-  - **A one-pixel checkerboard smears to flat grey whenever its box starts at a
-    fractional pixel**, which is wherever layout puts it. `background-attachment:
-    fixed` pins the pattern to the screen's pixel grid. **iOS Safari ignores
-    fixed attachment**, so on the iPad the dots can smear again — unsolved.
+  **Tried and rejected, so nobody reinvents them:** a 5px shadow (3px), the
+  classic 50% checkerboard hover in both 2×2 and 1px dots (a solid light grey
+  replaced it), a solid `#808080` hover (too dark), a solid-black flip on press
+  (just dropping into the shadow was better), a 2px border on the search box,
+  and a dotted hover on the search box.
+  **Traps the tuning hit, handled in the CSS and worth knowing before rolling it
+  out:**
+  - **(Retired with the checkerboard.)** A one-pixel checkerboard smears to flat
+    grey whenever its box starts at a fractional pixel; `background-attachment:
+    fixed` pinned it to the screen's grid, and iOS Safari ignores that. A solid
+    fill has neither problem — worth remembering if dots ever come back.
   - **Where the border sits on a WRAPPER around a button** (the date window),
-    the class goes on the wrapper, and the inner button needs help: the
-    browser's own button style resets `text-shadow` to none (so descendants
-    `inherit` it) and the button's own hover paints grey over the dots (so
-    descendants go transparent).
+    the class goes on the wrapper, and the inner button needs help: its own
+    hover paints `neutral-100` over the wrapper's grey, so descendants of a
+    hovered control go transparent.
   - **Growing a control downward in a bottom-aligned row** takes a -3px bottom
     margin, and on the search box it has to go on `TextInput`'s wrapper (via
     `span:has(> input.mac-field)`) so the clear button and the magnifier centre
