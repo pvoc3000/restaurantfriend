@@ -5,6 +5,8 @@ import Link from "next/link";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { TextInput } from "@/components/ui/TextInput";
+import { PickList } from "@/components/ui/PickList";
+import { ControlField } from "@/components/ui/ControlField";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { sortRows, type SortDir } from "@/lib/tableSort";
@@ -21,6 +23,9 @@ export type DocumentRow = {
   file_count: number;
 };
 
+/** The Category picklist's value for a document filed under no category. */
+const NO_CATEGORY = "__none__";
+
 const LINK =
   "text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900";
 
@@ -34,6 +39,8 @@ const LINK =
 export function DocumentsList({ rows, action }: { rows: DocumentRow[]; action?: React.ReactNode }) {
   const from = { href: "/documents", label: "Documents" };
   const [q, setQ] = useState("");
+  // "all", NO_CATEGORY, or a category name (Mark, 2026-09-10).
+  const [category, setCategory] = useState<string>("all");
   const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "category", dir: "asc" });
   const href = (id: string) => withFrom(`/documents/${id}`, from);
 
@@ -106,7 +113,7 @@ export function DocumentsList({ rows, action }: { rows: DocumentRow[]; action?: 
   ];
 
   const needle = q.trim().toLowerCase();
-  const filtered = useMemo(
+  const searched = useMemo(
     () =>
       needle
         ? rows.filter((r) =>
@@ -116,6 +123,36 @@ export function DocumentsList({ rows, action }: { rows: DocumentRow[]; action?: 
           )
         : rows,
     [rows, needle]
+  );
+
+  // THE CATEGORY PICKLIST (Mark, 2026-09-10: "filter document types"). Its
+  // options are every category the org has, so a chosen one never vanishes
+  // from the list; its COUNTS follow the search and never the picker itself
+  // (lib/filterMenus' rule).
+  const categoryOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const r of searched) {
+      const key = r.category ?? NO_CATEGORY;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+    const names = [...new Set(rows.map((r) => r.category).filter((c): c is string => !!c))].sort(
+      (a, b) => a.localeCompare(b)
+    );
+    return [
+      { value: "all", label: "All categories", hint: String(searched.length) },
+      ...names.map((c) => ({ value: c, label: c, hint: String(counts.get(c) ?? 0) })),
+      ...(rows.some((r) => !r.category)
+        ? [{ value: NO_CATEGORY, label: "No category", hint: String(counts.get(NO_CATEGORY) ?? 0) }]
+        : []),
+    ];
+  }, [rows, searched]);
+
+  const filtered = useMemo(
+    () =>
+      category === "all"
+        ? searched
+        : searched.filter((r) => (r.category ?? NO_CATEGORY) === category),
+    [searched, category]
   );
   const sorted = useMemo(() => sortRows(filtered, columns, sort), [filtered, sort]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -128,7 +165,7 @@ export function DocumentsList({ rows, action }: { rows: DocumentRow[]; action?: 
     <div className="space-y-6">
       <PageHeading title="Documents" total={rows.length} visible={sorted.length} noun="documents" />
       <p className="text-sm text-muted">The forms, checklists, signs and manuals the shops print.</p>
-      <div className="flex items-end gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         <TextInput
           value={q}
           onValueChange={setQ}
@@ -136,6 +173,16 @@ export function DocumentsList({ rows, action }: { rows: DocumentRow[]; action?: 
           className="w-72"
           icon={<SearchGlyph />}
         />
+        <ControlField label="Category">
+          <PickList
+            ariaLabel="Which category of documents to show"
+            variant="field"
+            value={category}
+            onPick={setCategory}
+            options={categoryOptions}
+            fit
+          />
+        </ControlField>
         {action}
       </div>
       <DataTable
