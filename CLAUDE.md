@@ -7787,6 +7787,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    prefixes it (`v{version_label}` in `RecipeVersions`, `RecipeInfo`,
    `RecipesList` and `BatchRecipe`), so a stored "v01" renders "vv01". Caught by
    creating one and looking at it, not by reading.
+   **SUPERSEDED 2026-09-10: a command in the title row is now TOP- and
+   right-aligned everywhere** (Mark: "not only right aligned, but TOP aligned as
+   well"), through `PageHeading`'s `items-start`. Kept for the history:
    **PRODUCTION KEEPS ITS COMMANDS BESIDE THE TITLE and BOTTOM-ALIGNS them**
    (Mark, 2026-09-03, having asked for the same move and then undone it: "just
    bottom right align the existing buttons"). `items-end` on the title row, so
@@ -9732,8 +9735,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   **SUPERSEDED 2026-09-10 FOR TEN SCREENS (Mark): "move the action buttons in
   the filter row … to the identity row."** Shift reports, tags, documents,
   checklists, tasks (and maintenance), plans, schedules, recipes, batch logs and
-  vendors now pass their create command as `PageHeading`'s `action`, bottom-
-  aligned with the count line, and their filter rows hold filters only (the
+  vendors now pass their create command as `PageHeading`'s `action`, TOP- and
+  right-aligned with the title (Mark, the same day: "not only right aligned,
+  but TOP aligned as well" — `items-start`; it had been bottom-aligned with the
+  count line), and their filter rows hold filters only (the
   tags and batch-log command strips are gone too). **Six more followed the same
   day:** Inventory (whose Active tabs became a captioned Show picklist, every
   filter captioned), inspection logs, equipment, shop sections, employees,

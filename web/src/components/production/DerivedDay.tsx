@@ -325,7 +325,9 @@ export function DerivedDay({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* `items-start`: a command in the title row is top- and right-aligned
+          (Mark, 2026-09-10), `PageHeading`'s rule. */}
+      <div className="flex flex-wrap items-start justify-between gap-4">
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           The day
         </h1>

@@ -15,8 +15,13 @@ import type { ReactNode } from "react";
  * of everything the screen could show. Where a screen genuinely cannot reach
  * that number, `visible` is omitted and the line states the total alone.
  *
- * `items-end` on the row, so a create command beside the title bottom-aligns
- * with the count rather than with the first line of a two-line block.
+ * THE CREATE COMMAND IS TOP- AND RIGHT-ALIGNED (Mark, 2026-09-10: "make sure
+ * the action buttons in the identity row are not only right aligned, but TOP
+ * aligned as well"). `items-start`, so the button's top is the title's top. It
+ * was `items-end` — bottom-aligned with the count line — from 2026-09-03, when
+ * the production screens' commands were "bottom right" aligned beside a title
+ * with a description under it; the descriptions are gone and the rule now
+ * matches the detail screens, whose command rows were already `items-start`.
  */
 export function PageHeading({
   title,
@@ -34,11 +39,11 @@ export function PageHeading({
   total: number;
   /** Plural, lower case — "vendors", "inventory items", "shop sections". */
   noun: string;
-  /** The screen's create command, right-aligned and bottom-aligned. */
+  /** The screen's create command, right-aligned and TOP-aligned with the title. */
   action?: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-end justify-between gap-4">
+    <div className="flex flex-wrap items-start justify-between gap-4">
       <div>
         <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
           {title}
