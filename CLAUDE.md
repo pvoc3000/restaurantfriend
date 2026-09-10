@@ -11009,9 +11009,27 @@ weekday column, and 003 then silently made it per-vendor-item.
   state, PO status + window, cleanup's scope — and their "underline means
   filter, fill means command" rationale, which this decision supersedes) and
   the loose bordered chips (the three last-ordered rows, cleanup's problem
-  filter). Consumers: the guide's day strip (href/Link cells), tier filter
-  (counts) and grouping; ListFilters; both big lists; the PO list; cleanup ×3;
-  receiving's layout control (`size="sm"` for its fixed-height band).
+  filter). Consumers: the guide's day strip (href/Link cells); ListFilters;
+  both big lists; the PO list; cleanup ×3; receiving's layout control
+  (`size="sm"` for its fixed-height band).
+  **A ONE-OF-N GOES TO A `PickList` WHEN THE ROW CANNOT AFFORD IT**, which is
+  the only reason so far and has now been taken twice: `/invoices`' Due tabs
+  (2026-09-08) and **the order guide's tier and grouping (2026-09-10, Mark)**.
+  A TabPicker spends its width whether or not you are looking at it — the
+  guide's four tiers wanted 460px and its three groupings 373 — and that band
+  is sticky for a 66,000px walk, so it wrapped at EVERY width including 1440
+  and every wrapped line covered a line of walk. As picklists: 176 and 245, the
+  band 112px → 60 at 1440 and 1280, one line down to 1200. Below ~1150 it wraps
+  again, so a portrait iPad gains room rather than height.
+  **The counts ride as `hint`s**, which is where the tabs carried them; the
+  cost is the count of the tier you are ON at rest, and the gain is that all of
+  them are still one tap away. **No find box comes with it** — `PickList` grows
+  one past eight options or with `allowNew`, so a closed vocabulary of three or
+  four never has one. And a picker whose face does NOT name its own dimension
+  keeps its caption: "Vendor" set at rest, three inches from a vendor filter
+  reading "All vendors", is two controls that look like one dimension and are
+  not. Reach for this when a control band is over-full, NOT as a general
+  preference — the TabPicker is still the default.
   **The selected cell is ALWAYS black — there is no per-caller colour.** The
   first cut kept an `accent` option that filled a selected last-ordered AGE
   bucket yellow, carried over from the chip dialect on the argument that a
