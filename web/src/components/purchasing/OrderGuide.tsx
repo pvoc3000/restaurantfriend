@@ -787,31 +787,39 @@ export function OrderGuide({
               mark FILL when the day on screen is not today, so "these
               quantities are being filed against Monday" is a colour rather than
               a sentence. */}
-          {/* `items-end` LEVELS BOXES, NOT TEXT — so this carries
-              `relative top-[7.75px]` (Mark, 2026-09-10: "make the text
-              baseline of the datepicker in the identity block align with the
-              text baseline of the second line with the location and record
-              count").
+          {/* THE DAY SITS ON THE TITLE'S BASELINE (Mark, 2026-09-10, having
+              first asked for the sub-line's and then changed his mind: "let's
+              try aligning the datepicker with the page title instead").
 
-              The two boxes really were level: the row is `items-end` and both
-              bottoms measure 57.0. What is not level is the TYPE, because a
-              36px input holding 20px text centres it, so its baseline sits
-              10.25px above its own bottom edge, while the 12px sub-line in an
-              18px line box sits 4.5px above its own. Measured with a
-              zero-sized probe rather than by eye — an `<input>` takes no
-              children, so the probe goes in an off-screen replica sharing one
-              inline formatting context with a clone.
+              `self-start` IS THE MECHANISM AND THE OFFSET IS THE POLISH. The
+              row is `items-end` because the commands beside it bottom-align
+              with the two-line title block (Mark, 2026-09-03), and that must
+              not change — so this one item opts out and pins to the row's TOP,
+              which is the `h1`'s top. Everything below the title then stops
+              mattering: a sub-line that wraps, or a changed `mt-1`, moves the
+              row's bottom and cannot move this. A pure `relative` offset off
+              the bottom edge lands on the same pixel today (measured, −16.75)
+              and would silently drift the day off the title the first time
+              that block grew a line.
 
-              A RELATIVE OFFSET, not a margin: a margin is layout, and this row
-              wraps, so a margin would make the title block taller for a purely
-              optical correction. Re-measure if the day's 20px, the sub-line's
-              12px, the input's `h-9` or either line-height moves — the number
-              is a measurement of that particular stack and nothing else.
+              `items-end` LEVELS BOXES, NOT TEXT, which is why `self-start`
+              alone is 0.25px out: a 36px input holding 20px text centres it,
+              so its baseline sits 25.75px below its own top where the 28px
+              title in a 35px line box sits 28px below its own. Hence the
+              quarter pixel. `items-baseline` cannot do this either — a flex
+              item's baseline is its FIRST line, and the title block's first
+              line IS the `h1`, so it would work here by accident and break on
+              any block whose first line is not the one you meant.
+
+              Measured with a zero-sized probe rather than by eye, and an
+              `<input>` takes no children, so the probe goes in an off-screen
+              replica sharing one inline formatting context with a clone.
+              Re-measure if the day's 20px, the title's 28px, the input's `h-9`
+              or either line-height moves.
 
               The weekday chip rides in the same span and moves with it, which
-              is right: the two read as one line, and their own baselines are
-              0.25px apart. */}
-          <span className="relative top-[7.75px] flex items-center gap-2 text-[20px]">
+              is right: the two read as one line. */}
+          <span className="relative top-[0.25px] flex items-center gap-2 self-start text-[20px]">
             <span
               className={`px-1.5 font-semibold uppercase tracking-[0.06em] ${
                 guideDate === today ? "text-subtle" : "bg-mark-fill text-ink"
