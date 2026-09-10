@@ -928,7 +928,7 @@ export function PurchaseOrderList({
           so the search would have to drop to 176 to fit, which is a cramped
           box bought with the width the window ISN'T. */}
       <div className="flex flex-wrap items-end gap-4">
-        <div className="min-w-[13rem] flex-1">
+        <div className="min-w-[13rem] max-w-[18rem] flex-1">
           <TextInput
             value={filters.q}
             onValueChange={(q) => update({ q })}
@@ -1017,7 +1017,7 @@ export function PurchaseOrderList({
                     : statusCounts[s] ?? 0
               ),
             }))}
-            className="w-40"
+            fit
           />
         </ControlField>
       </div>

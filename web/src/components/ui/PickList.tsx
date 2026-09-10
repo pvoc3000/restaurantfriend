@@ -92,6 +92,7 @@ export function PickList({
   boxed = false,
   size = "md",
   className = "",
+  fit = false,
   panelMinWidth = 168,
   defaultOpen = false,
   onClose,
@@ -199,6 +200,28 @@ export function PickList({
    */
   size?: "md" | "lg";
   className?: string;
+  /**
+   * Size the trigger to its WIDEST OPTION — as wide as it needs to be and no
+   * wider (Mark, 2026-09-10: "can the picklists be flexible in width? they're
+   * taking more room than they need to currently").
+   *
+   * Why this rather than simply letting it shrink-wrap the current value: the
+   * face CHANGES with every pick, so a content-sized filter would resize as
+   * you used it and shove everything to its right along the row. Sized to the
+   * widest option it never wastes and never moves.
+   *
+   * NO MEASUREMENT IS INVOLVED, which is the point. Every option is rendered
+   * hidden and stacked in ONE grid cell, so the cell's max-content width is
+   * the widest of them and CSS does the arithmetic in the font actually in
+   * use — where a JS probe would have to reckon with `tracking`, which the
+   * `font` shorthand does not carry (this file's own "measure a title as
+   * rendered" lesson).
+   *
+   * OPT-IN, because it is only right where the control sits in a ROW with
+   * others. An `InlineValue` cell is `w-full` of a column that already has a
+   * width, and there this would do nothing but render N hidden spans.
+   */
+  fit?: boolean;
   /** Narrowest the PANEL may be, in px — capped at 340 like the derived width.
    *  Raise it where the trigger is much narrower than the rows it opens. */
   panelMinWidth?: number;
@@ -363,6 +386,15 @@ export function PickList({
   // string — a filter's "All categories" — is a real choice with a real label,
   // so it reads at full strength; only a value with no option behind it fades.
   const empty = !value && !current;
+  /**
+   * What the trigger is sized against when `fit` is on: every option's label,
+   * plus the clear row's word where there is one. Deliberately NOT `ordered`,
+   * which carries the "current value" fallback — a stored value the vocabulary
+   * has never heard of should TRUNCATE rather than widen the control for good.
+   */
+  const sizerLabels = fit
+    ? [...options.map((o) => o.label), ...(clearOption ? [clearOption.label] : [])]
+    : [];
 
   // Headers computed up front rather than tracked with a running variable
   // during render — the list stays flat, so one keyboard index still walks it,
@@ -515,7 +547,29 @@ export function PickList({
             caret is plainly this field's rather than the next one's.
             The label keeps `truncate` and gains `min-w-0`, or a long option
             would push the caret back out of the corner it was just put in. */}
-        <span className={`truncate ${boxed ? "min-w-0" : ""}`}>{shownLabel}</span>
+        {fit ? (
+          /* The visible face and every option in ONE grid cell: the hidden
+             ones are `h-0 overflow-hidden`, so they add no height and cannot
+             be read, while the cell's max-content width becomes the widest of
+             them. `truncate` stays on the visible face alone — the sizers must
+             contribute their FULL width or they would size nothing — and
+             `min-w-0` keeps a long stored value from pushing the caret out of
+             its corner. */
+          <span className="grid min-w-0">
+            <span className="col-start-1 row-start-1 truncate">{shownLabel}</span>
+            {sizerLabels.map((label, i) => (
+              <span
+                key={i}
+                aria-hidden
+                className="col-start-1 row-start-1 h-0 overflow-hidden whitespace-nowrap"
+              >
+                {label}
+              </span>
+            ))}
+          </span>
+        ) : (
+          <span className={`truncate ${boxed ? "min-w-0" : ""}`}>{shownLabel}</span>
+        )}
         <span
           aria-hidden
           className={`shrink-0 text-[9px] ${

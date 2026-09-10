@@ -1004,7 +1004,7 @@ export function OrderGuide({
               label: GUIDE_FILTER_LABEL[f],
               hint: String(filterCounts[f]),
             }))}
-            className="w-44"
+            fit
           />
         </ControlField>
 
@@ -1048,7 +1048,7 @@ export function OrderGuide({
               value: mode,
               label: GROUPING_LABEL[mode],
             }))}
-            className="w-40"
+            fit
           />
         </ControlField>
       </div>

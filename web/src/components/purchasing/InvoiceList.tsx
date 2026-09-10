@@ -731,7 +731,7 @@ export function InvoiceList({
             SHRINK-WRAPS, so `w-full` on the input alone resolves against a
             span the input itself sized and the pair settles at ~20
             characters. */}
-        <div className="min-w-[13rem] flex-1">
+        <div className="min-w-[13rem] max-w-[18rem] flex-1">
           <TextInput
             value={filters.q}
             onValueChange={(q) => update({ q })}
@@ -781,7 +781,7 @@ export function InvoiceList({
               label: b === "all" ? "Any due date" : AGING_LABEL[b as AgingBucket],
               hint: String(b === "all" ? invoices.length : agingCounts[b] ?? 0),
             }))}
-            className="w-44"
+            fit
           />
         </ControlField>
 
@@ -802,7 +802,7 @@ export function InvoiceList({
               label: s === "all" ? "All" : BILL_STAGE_LABEL[s],
               hint: String(s === "all" ? invoices.length : statusCounts[s] ?? 0),
             }))}
-            className="w-40"
+            fit
           />
         </ControlField>
 
