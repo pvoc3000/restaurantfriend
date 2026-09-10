@@ -764,84 +764,74 @@ export function OrderGuide({
       <div className="space-y-3">
         <div className="flex flex-wrap items-end gap-x-6 gap-y-1">
           {/* The module's model header (`PurchaseOrderList`): the count sits
-              UNDER the title and leads with the shop. `items-end`, so the day
-              picker and the commands bottom-align with it rather than with the
-              first line of a two-line block. */}
+              UNDER the title and leads with the shop. `items-end`, so the
+              commands bottom-align with it rather than with the first line of
+              a two-line block.
+
+              THE DAY IS INSIDE THIS BLOCK, ON THE TITLE'S OWN LINE (Mark,
+              2026-09-10: "can the page title and datepicker sit next to each
+              other — there's an awkward gap between them"). There was, and it
+              was not the gap it looked like: an `h1` is a BLOCK, so its box
+              stretched to the width of the shrink-to-fit title block, which is
+              set by whichever of its two lines is WIDER — and that is the
+              count. Measured at 1440: "Order Guide" is 179.4px of ink inside a
+              225px box, so the row's own `gap-x-6` started 24px after the
+              COUNT ended and the title's last letter sat 69.6px from the day.
+              A longer count opens it further, which is why it reads as
+              arbitrary — it is a fact about a sentence nobody is looking at.
+
+              As a flex item on the title's line the `h1` shrink-wraps to its
+              text, so the gap is between the two things it is drawn between.
+              */}
           <div>
-            <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-              Order Guide
-            </h1>
+            <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+              <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+                Order Guide
+              </h1>
+              {/* `items-baseline` on the line above is what puts the day on
+                  the title's baseline now — no `self-start` and no 16.75px
+                  needed, because the two are siblings on one line rather than
+                  a block and a thing beside it.
+
+                  THE QUARTER PIXEL SURVIVES, and for a new reason: this span
+                  is itself a flex container, so as a flex ITEM its baseline is
+                  its own first item's — the weekday chip — while the number
+                  the eye reads is the input's, and the input sits 0.25px BELOW
+                  the chip — hence a quarter pixel UP, where the same stack
+                  wanted a quarter pixel down when it hung off the row's bottom.
+                  Measured, not assumed; re-measure if the day's 20px, the
+                  title's 28px, the input's `h-9` or the chip's type moves.
+
+                  The chip rides in the same span and moves with it, which is
+                  right: the two read as one line. */}
+              <span className="relative -top-[0.25px] flex items-center gap-2 text-[20px]">
+                <span
+                  className={`px-1.5 font-semibold uppercase tracking-[0.06em] ${
+                    guideDate === today ? "text-subtle" : "bg-mark-fill text-ink"
+                  }`}
+                >
+                  {WEEKDAY_LABELS[weekday - 1]}
+                </span>
+                <DateField
+                  variant="title"
+                  ariaLabel="The day this guide is showing"
+                  value={guideDate}
+                  onChange={(next) => router.push(guideHref(next ?? today, today))}
+                />
+                {guideDate !== today && (
+                  <Link
+                    href={guideHref(today, today)}
+                    className="text-[12px] uppercase tracking-[0.12em] text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+                  >
+                    Today
+                  </Link>
+                )}
+              </span>
+            </div>
             <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
               {locationCode} · {visibleRows.length} of {rows.length} vendor items
             </p>
           </div>
-
-          {/* THE DAY — the screen's ONE piece of day state, and it sits in the
-              identity block after the title because that is what it is: which
-              walk you are looking at, not a filter over one (Mark, 2026-08-25).
-              Heading scale for the same reason.
-
-              The WEEKDAY is shown beside the date because it is the value doing
-              the work — order days, favorites and par are all scoped by it, and
-              "08/24/2026" says nothing about which day that is. It takes the
-              mark FILL when the day on screen is not today, so "these
-              quantities are being filed against Monday" is a colour rather than
-              a sentence. */}
-          {/* THE DAY SITS ON THE TITLE'S BASELINE (Mark, 2026-09-10, having
-              first asked for the sub-line's and then changed his mind: "let's
-              try aligning the datepicker with the page title instead").
-
-              `self-start` IS THE MECHANISM AND THE OFFSET IS THE POLISH. The
-              row is `items-end` because the commands beside it bottom-align
-              with the two-line title block (Mark, 2026-09-03), and that must
-              not change — so this one item opts out and pins to the row's TOP,
-              which is the `h1`'s top. Everything below the title then stops
-              mattering: a sub-line that wraps, or a changed `mt-1`, moves the
-              row's bottom and cannot move this. A pure `relative` offset off
-              the bottom edge lands on the same pixel today (measured, −16.75)
-              and would silently drift the day off the title the first time
-              that block grew a line.
-
-              `items-end` LEVELS BOXES, NOT TEXT, which is why `self-start`
-              alone is 0.25px out: a 36px input holding 20px text centres it,
-              so its baseline sits 25.75px below its own top where the 28px
-              title in a 35px line box sits 28px below its own. Hence the
-              quarter pixel. `items-baseline` cannot do this either — a flex
-              item's baseline is its FIRST line, and the title block's first
-              line IS the `h1`, so it would work here by accident and break on
-              any block whose first line is not the one you meant.
-
-              Measured with a zero-sized probe rather than by eye, and an
-              `<input>` takes no children, so the probe goes in an off-screen
-              replica sharing one inline formatting context with a clone.
-              Re-measure if the day's 20px, the title's 28px, the input's `h-9`
-              or either line-height moves.
-
-              The weekday chip rides in the same span and moves with it, which
-              is right: the two read as one line. */}
-          <span className="relative top-[0.25px] flex items-center gap-2 self-start text-[20px]">
-            <span
-              className={`px-1.5 font-semibold uppercase tracking-[0.06em] ${
-                guideDate === today ? "text-subtle" : "bg-mark-fill text-ink"
-              }`}
-            >
-              {WEEKDAY_LABELS[weekday - 1]}
-            </span>
-            <DateField
-              variant="title"
-              ariaLabel="The day this guide is showing"
-              value={guideDate}
-              onChange={(next) => router.push(guideHref(next ?? today, today))}
-            />
-            {guideDate !== today && (
-              <Link
-                href={guideHref(today, today)}
-                className="text-[12px] uppercase tracking-[0.12em] text-ink underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-              >
-                Today
-              </Link>
-            )}
-          </span>
 
           {/* WITH NO BANDS ABOVE, "Add reminder" LIVES HERE (Mark, 2026-09-03:
               it "should be bottom aligned. Hopefully that will get rid of the
