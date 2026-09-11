@@ -1098,7 +1098,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    and on the desk a right-aligned link above the title. `BandEmpty` is gone. The muted greys
    inside the requests band are `text-ink/70`, since `text-muted` is ~4:1 on the
    yellow. The same day the vendor totals bar lost its rules above and below and
-   its "Nothing ordered yet" sentence, and the day picker moved to the title
+   its "Nothing ordered yet" sentence, WILL ORDER hides at $0 (unless a
+   "blocked" under-minimum amount needs naming, so with nothing ordered the bar
+   is absent), and the day picker moved to the title
    row's right edge, top-aligned, in the Mac look (`DateField variant="title"`).
    **The two `showEmpty` flags keep it a GRID**: with anything in either
    column, both render and the empty one says so, rather than leaving a hole

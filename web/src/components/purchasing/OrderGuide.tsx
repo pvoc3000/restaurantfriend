@@ -871,8 +871,11 @@ export function OrderGuide({
       )}
 
       {/* Vendor totals bar — the guide's central instrument (§4.2). No rules
-          above or below and no sentence while it is empty (Mark, 2026-09-10):
-          with nothing ordered it is just Will order $0.00 at the right. */}
+          above or below and no sentence while it is empty (Mark, 2026-09-10),
+          and WILL ORDER IS HIDDEN AT $0 (Mark, the same day) — unless an
+          under-minimum vendor is holding money back, which it still names. So
+          with nothing ordered the bar is not there at all. */}
+      {(totals.length > 0 || grandTotal > 0 || shortTotal > 0) && (
       <div className="flex flex-wrap items-center gap-4">
         {totals.map((t) => (
             <span
@@ -898,6 +901,7 @@ export function OrderGuide({
             </span>
         ))}
 
+        {(grandTotal > 0 || shortTotal > 0) && (
         <span className="ml-auto inline-flex items-baseline gap-3">
           <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
             Will order
@@ -914,7 +918,9 @@ export function OrderGuide({
             </span>
           )}
         </span>
+        )}
       </div>
+      )}
 
       {/* THE CONTROLS STAY ON SCREEN FOR THE WHOLE WALK (Mark, 2026-08-03:
           "I would like to still have access to the search and filters when
