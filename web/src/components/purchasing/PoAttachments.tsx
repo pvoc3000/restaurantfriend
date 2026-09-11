@@ -132,6 +132,14 @@ export function PoAttachments({
 
         {canEdit && (
           <span className="ml-auto flex items-center gap-3">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => fileRef.current?.click()}
+              className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+            >
+              Attach&hellip;
+            </button>
             <span className="flex items-center gap-2">
               <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
                 Add as
@@ -147,14 +155,6 @@ export function PoAttachments({
                 />
               </span>
             </span>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => fileRef.current?.click()}
-              className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-            >
-              Attach&hellip;
-            </button>
             <input
               ref={fileRef}
               type="file"
