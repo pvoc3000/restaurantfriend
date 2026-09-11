@@ -3,13 +3,14 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
+import { formatTypedTime } from "@/lib/timeInput";
 import { MacCheckbox } from "@/components/ui/MacCheckbox";
-import { BOXED_FIELD, BOXED_FIELD_BORDER, BOXED_FIELDS } from "@/components/ui/fieldMetrics";
+import { TimePicker } from "@/components/ui/TimePicker";
+import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 
-/** Postgres hands back "10:00:00"; `<input type="time">` wants "10:00". */
-const toInput = (t: string | null) => (t ? t.slice(0, 5) : "");
+/** The picker hands back `HH:MM`; the column is a `time`, stored `HH:MM:SS`. */
 const fromInput = (t: string) => (t.trim() === "" ? null : `${t}:00`);
 
 /** Seven slots whatever the column held — null, or (from a hand edit) short. */
@@ -79,7 +80,8 @@ export function OperatingHours({
   function setTime(which: "open" | "close", index: number, raw: string) {
     const current = which === "open" ? opens : closes;
     const value = fromInput(raw);
-    if (current[index] === value) return;
+    // Compare on HH:MM: the column reads back `10:00:00`, the picker `10:00`.
+    if ((current[index]?.slice(0, 5) ?? null) === (value?.slice(0, 5) ?? null)) return;
     const previous = current;
     const next = [...current];
     next[index] = value;
@@ -147,9 +149,12 @@ export function OperatingHours({
   );
 }
 
-/** `<input type="time">` draws the browser's own control, which is why the
- *  hours block is the one place a raw input is right — TextInput's clear button
- *  would sit on top of it, and the picker already offers an empty state. */
+/**
+ * One opening or closing time — `ui/TimePicker` since 2026-09-10 (Mark: "use
+ * the new timepicker control on the location detail page"), where it had been
+ * the browser's own `<input type="time">`. `w-32` gives the boxed picker a
+ * track to fill; a table cell has none of its own.
+ */
 function TimeCell({
   value,
   editable,
@@ -164,23 +169,17 @@ function TimeCell({
   onCommit: (raw: string) => void;
 }) {
   if (!editable) {
-    return <span className={value ? "" : "text-faint"}>{toInput(value) || "—"}</span>;
+    return <span className={value ? "" : "text-faint"}>{formatTypedTime(value) || "—"}</span>;
   }
   return (
-    <input
-      type="time"
-      aria-label={label}
-      disabled={disabled}
-      defaultValue={toInput(value)}
-      key={toInput(value)}
-      onBlur={(e) => onCommit(e.target.value)}
-      // The record's own field height. This block already wore a box; what it
-      // did not do was wear the SAME one, so a 30px time input sat beside 36px
-      // fields two blocks down. `w-auto` because a time input has a natural
-      // width and there is no grid track here to fill.
-      className={`${
-        BOXED_FIELDS ? `rf-typed ${BOXED_FIELD} ${BOXED_FIELD_BORDER} !w-auto px-2` : "border border-hairline px-2 py-1"
-      } tabular-nums disabled:opacity-35`}
-    />
+    <div className="w-32">
+      <TimePicker
+        value={value}
+        onChange={(next) => onCommit(next ?? "")}
+        disabled={disabled}
+        ariaLabel={label}
+        boxed={BOXED_FIELDS}
+      />
+    </div>
   );
 }
