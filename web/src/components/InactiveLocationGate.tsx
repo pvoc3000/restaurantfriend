@@ -43,6 +43,8 @@ const UNSCOPED_ROUTES = [
   // Neither settings screen is about a shop: one is the org's, one is yours.
   "/settings",
   "/account",
+  // Every control on one page, with fake data — nothing on it is a shop's.
+  "/interface",
 ];
 
 function isUnscopedRoute(pathname: string): boolean {

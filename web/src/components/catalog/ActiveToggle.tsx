@@ -23,6 +23,7 @@ export function ActiveToggle({
   label,
   readOnly = false,
   appearance = "switch",
+  onWrite,
 }: {
   table: string;
   id: string;
@@ -32,6 +33,9 @@ export function ActiveToggle({
    *  Page Permissions sheet. A disabled switch would read as broken. */
   readOnly?: boolean;
   appearance?: "switch" | "mac-checkbox";
+  /** Replaces the UPDATE and nothing else — `InlineValue`'s prop of the same
+   *  name. The /interface page hands it a local write. */
+  onWrite?: (next: boolean) => Promise<{ error: string | null }>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -44,10 +48,12 @@ export function ActiveToggle({
     setOn(next);
     setFailed(false);
     startTransition(async () => {
-      const { error } = await supabase
-        .from(table)
-        .update({ is_active: next })
-        .eq("id", id);
+      const { error } = onWrite
+        ? await onWrite(next)
+        : await supabase
+            .from(table)
+            .update({ is_active: next })
+            .eq("id", id);
       if (error) {
         setOn(!next);
         setFailed(true);

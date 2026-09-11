@@ -48,6 +48,7 @@ export function WeekdayPicker({
   value,
   label,
   readOnly = false,
+  onWrite,
 }: {
   table: string;
   id: string;
@@ -57,6 +58,9 @@ export function WeekdayPicker({
   /** The seven boxes as a STATEMENT — no toggling, no All/None — for a role
    *  the Page Permissions sheet has at Read Only. */
   readOnly?: boolean;
+  /** Replaces the UPDATE and nothing else — `InlineValue`'s prop of the same
+   *  name. The /interface page hands it a local write. */
+  onWrite?: (next: number[]) => Promise<{ error: string | null }>;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -71,10 +75,12 @@ export function WeekdayPicker({
     setFailed(false);
 
     startTransition(async () => {
-      const { error } = await supabase
-        .from(table)
-        .update({ [column]: next })
-        .eq("id", id);
+      const { error } = onWrite
+        ? await onWrite(next)
+        : await supabase
+            .from(table)
+            .update({ [column]: next })
+            .eq("id", id);
       if (error) {
         setDays(previous);
         setFailed(true);

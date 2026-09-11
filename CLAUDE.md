@@ -9948,6 +9948,21 @@ weekday column, and 003 then silently made it per-vendor-item.
   If something genuinely new is needed, build it in `components/ui/` as a
   general control, use it in at least the place that prompted it, and add a row
   here — that is how this list came to exist.
+
+  **`/interface` SHOWS EVERY ONE OF THEM AT ONCE, WORKING** (Mark, 2026-09-10:
+  "put on it examples of every single UI object we have in the app … operable
+  so we can test them"). `components/interface/InterfaceShowcase` — twelve
+  blocks by kind of control, each specimen captioned with the part and its
+  variant, fake data, and a Mac-page switch that wraps the whole page in
+  `.mac-page`. **NOTHING ON IT WRITES**: `InlineValue`, and now `ActiveToggle`
+  and `WeekdayPicker`, take `onWrite`, which replaces their UPDATE with a local
+  one; `InventoryItemChooser` is the one part that touches the server, and only
+  reads. Ungoverned in `lib/pageAccess` and exempt from `InactiveLocationGate`,
+  like /account; no menu entry. **A new shared part gets a specimen there as
+  well as a row here.** Left off, because they cannot run without a real
+  record: `InventoryItemPicker`, `BaseUnitEditor` and `FavoritesEditor` (they
+  write), the order guide's quantity boxes and the tablet bar (not exported
+  parts), and `WorkingLocation` / `SwitchUser` (they change your session).
 - **The look is the `restaurantfriend-design` skill** (a user skill, outside
   this repo — read `handoff/PORT-GUIDE.md` §8 FIRST, then `readme.md`, then the
   relevant `<Name>.prompt.md`). Applied wholesale 2026-07-25: black masthead,
