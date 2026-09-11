@@ -1,6 +1,14 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useId, type ReactNode } from "react";
+import { anyAnchoredPanelOpen } from "@/lib/anchoredPanel";
+
+/**
+ * THE DIALOGS ON SCREEN, oldest first. A key belongs to the TOPMOST one only
+ * (Mark, 2026-09-11): every dialog listens on the window, so a confirm opened
+ * over a dialog used to hand one Escape to both, and one Enter too.
+ */
+const openDialogs: string[] = [];
 
 /**
  * THE floating dialog. A white rectangle with a 2px black edge, a black title
@@ -100,10 +108,25 @@ export function Dialog({
    */
   onSubmit?: () => void;
 }) {
+  const dialogId = useId();
+  useEffect(() => {
+    openDialogs.push(dialogId);
+    return () => {
+      const i = openDialogs.lastIndexOf(dialogId);
+      if (i !== -1) openDialogs.splice(i, 1);
+    };
+  }, [dialogId]);
+
   useEffect(() => {
     if (busy) return;
     const onKey = (e: KeyboardEvent) => {
+      if (openDialogs[openDialogs.length - 1] !== dialogId) return;
       if (e.key === "Escape") {
+        // AN ESCAPE SOMETHING INSIDE IS USING IS NOT THE DIALOG'S. An open
+        // picker panel closes on it (`anyAnchoredPanelOpen`), and a field
+        // reverting its own edit marks it handled (`defaultPrevented`) — either
+        // way the dialog stays, and the NEXT Escape closes it.
+        if (e.defaultPrevented || anyAnchoredPanelOpen()) return;
         e.stopPropagation();
         onClose();
         return;
@@ -131,7 +154,7 @@ export function Dialog({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [busy, onClose, onSubmit]);
+  }, [busy, onClose, onSubmit, dialogId]);
 
   return (
     <div

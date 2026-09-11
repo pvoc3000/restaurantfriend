@@ -277,6 +277,9 @@ export function DateField({
               commit();
             } else if (e.key === "Escape") {
               // Put back what is stored — the same escape `InlineValue` gives.
+              // When that undoes typing, the key is used: a dialog around the
+              // field must not close on the same press.
+              if (text !== formatTypedDate(value)) e.preventDefault();
               setText(formatTypedDate(value));
             }
           }}

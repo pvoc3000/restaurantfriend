@@ -10593,6 +10593,16 @@ weekday column, and 003 then silently made it per-vendor-item.
   **`PickList` or ⋯ menu** owns Enter for choosing, and being portalled to the
   body its own handler cannot stop this window listener seeing the same key; and
   **modifiers/IME** are somebody else's (⌘↵ saves a multiline cell).
+- **ESCAPE CLOSES ONLY THE TOPMOST THING** (Mark, 2026-09-11). A picker's panel
+  open inside a dialog closes first and the dialog stays; the next Escape closes
+  the dialog. Three mechanisms, all in shared parts, so no caller does anything:
+  `useAnchoredPanel` counts open panels and `ui/Dialog` asks
+  `anyAnchoredPanelOpen()` before acting; a field reverting its own edit
+  (`InlineValue`, `DateField`'s typed box) calls `preventDefault()` and the
+  dialog skips a `defaultPrevented` Escape; and dialogs keep a stack, so a
+  confirm over a dialog takes Escape AND Enter alone. Before this, every one of
+  those closed the whole dialog, because the dialog's window listener was added
+  first and so ran first.
 - **A dialog pins its title bar and its footer, and scrolls only the middle**
   (`max-h-[85vh] flex flex-col` + `min-h-0 flex-1 overflow-y-auto` on the body).
   The overlay is fixed, so a dialog taller than the window cannot be scrolled by

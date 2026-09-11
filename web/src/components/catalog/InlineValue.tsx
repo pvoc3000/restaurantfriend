@@ -746,6 +746,8 @@ export function InlineValue({
             // one you can't fill in from a keyboard.
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) save();
             if (e.key === "Escape") {
+              // Handled here — a dialog around the cell must not close too.
+              e.preventDefault();
               setError(null);
               setEditing(false);
             }
@@ -792,6 +794,8 @@ export function InlineValue({
           onKeyDown={(e) => {
             if (e.key === "Enter") save();
             if (e.key === "Escape") {
+              // Handled here — a dialog around the cell must not close too.
+              e.preventDefault();
               setError(null);
               setEditing(false);
             }

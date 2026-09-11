@@ -156,6 +156,25 @@ export function sinkInactive<T extends { inactive?: boolean; group?: string }>(
 }
 
 /**
+ * HOW MANY ANCHORED PANELS ARE OPEN RIGHT NOW — every PickList, PickSet, menu,
+ * columns menu, date, range and time panel goes through `useAnchoredPanel`, so
+ * one count covers them all.
+ *
+ * It exists for `ui/Dialog` (Mark, 2026-09-11: "fix the escape issue for all of
+ * them"). A dialog listens for Escape on the window and so does an open panel;
+ * the dialog's listener was added first, so it ran first and closed the whole
+ * dialog when all you meant was to close the picker inside it. The dialog now
+ * asks this before acting, and the panel takes the keystroke. A module value
+ * rather than a query for the panel's DOM: the panels carry four different
+ * roles, and a count cannot miss one.
+ */
+let openAnchoredPanels = 0;
+
+export function anyAnchoredPanelOpen(): boolean {
+  return openAnchoredPanels > 0;
+}
+
+/**
  * Position a small panel directly below the control that opened it, and take it
  * away again at the right moments.
  *
@@ -203,6 +222,16 @@ export function useAnchoredPanel({
    * trigger or shifted sideways to keep the panel on screen.
    */
   const anchor = useRef<{ top: number; left: number } | null>(null);
+
+  // Counted while open — see `anyAnchoredPanelOpen`. The cleanup runs when the
+  // panel closes or its owner unmounts, so the count cannot leak.
+  useEffect(() => {
+    if (!open) return;
+    openAnchoredPanels += 1;
+    return () => {
+      openAnchoredPanels -= 1;
+    };
+  }, [open]);
 
   // Measured off the trigger at open time, and again if the trigger resizes.
   // This is the FIRST pass and it always places the panel below — where it
