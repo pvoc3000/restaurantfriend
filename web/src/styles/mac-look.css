@@ -225,6 +225,34 @@
   border-width: 1px;
 }
 
+/* .mac-checkbox-lg: the same box a button tall, 36px (Mark, 2026-09-10, the
+   location record's Active field). The edges stay 1px and 2px on hover, the
+   rule every box on the page follows; the X is drawn at ~2px rather than
+   scaling the small one's 1.5 units, which at 36px would be a 3.4px stroke
+   heavier than the box around it. */
+.mac-checkbox-lg {
+  min-height: 36px;
+}
+
+.mac-checkbox-lg input {
+  width: 36px;
+  height: 36px;
+  margin-top: -18px;
+}
+
+.mac-checkbox-lg label {
+  gap: 12px;
+}
+
+.mac-checkbox-lg label::before {
+  width: 36px;
+  height: 36px;
+}
+
+.mac-checkbox-lg input:checked + label::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M0.5 0.5L15.5 15.5M15.5 0.5L0.5 15.5' stroke='%23b0b0b0' stroke-width='0.9'/%3E%3C/svg%3E");
+}
+
 /* ---- .mac-stipple: the calculator's desk-accessory ground ------------------ */
 
 /* The original Mac Calculator's window body (Mark, 2026-09-10: "give our

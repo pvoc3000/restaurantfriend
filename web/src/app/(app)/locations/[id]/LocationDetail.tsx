@@ -154,17 +154,6 @@ export async function LocationDetail({
               location.name
             )}
           </h1>
-          <span className="flex items-center gap-2 text-sm text-muted">
-            {editable && (
-              <ActiveToggle
-                table="locations"
-                id={location.id}
-                active={location.is_active}
-                label="Location active"
-              />
-            )}
-            {location.is_active ? "Active" : "Inactive"}
-          </span>
           {/* The same control the list carries, so a record you've just opened
               can be adopted without walking back to pick it. */}
           <WorkingHere
@@ -176,6 +165,20 @@ export async function LocationDetail({
         </div>
 
         <dl className="grid max-w-md grid-cols-[6rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+          {/* ACTIVE IS THE RECORD'S FIRST FIELD, a large Mac checkbox a button
+              tall (Mark, 2026-09-10) — it sat beside the title as a switch. Its
+              own label names it, so the label column is left empty. */}
+          <dt />
+          <dd>
+            <ActiveToggle
+              table="locations"
+              id={location.id}
+              active={location.is_active}
+              label="Active"
+              appearance="mac-checkbox"
+              readOnly={!editable}
+            />
+          </dd>
           <dt className="text-subtle">Code</dt>
           <dd>
             {/* The PO number's location segment is the trailing digits of this

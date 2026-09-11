@@ -14,19 +14,25 @@ import { useId, type ReactNode } from "react";
  * the element it expects. The input is transparent over the drawn box rather
  * than `display: none`, so it stays focusable.
  *
- * So far only the location record's hours block wears it — the `.mac-page`
- * experiment. Everywhere else is still `ui/Checkbox`.
+ * So far only the location record wears it — the `.mac-page` experiment.
+ * Everywhere else is still `ui/Checkbox`.
+ *
+ * `size="lg"` is the same box at the app's button height, 36px (Mark,
+ * 2026-09-10, for the record's Active field): a checkbox that stands in a
+ * column of 36px fields rather than in a row of days.
  */
 export function MacCheckbox({
   checked,
   onChange,
   disabled = false,
+  size = "md",
   children,
   className = "",
 }: {
   checked: boolean;
   onChange?: (next: boolean) => void;
   disabled?: boolean;
+  size?: "md" | "lg";
   /** The visible label, and the input's accessible name. */
   children: ReactNode;
   /** Classes on the row — the label inherits its colour. */
@@ -34,7 +40,7 @@ export function MacCheckbox({
 }) {
   const id = useId();
   return (
-    <div className={`mac-checkbox ${className}`}>
+    <div className={`mac-checkbox ${size === "lg" ? "mac-checkbox-lg" : ""} ${className}`}>
       <input
         id={id}
         type="checkbox"
