@@ -52,8 +52,15 @@ export function RevealPanel({
   label,
   header,
   alwaysOpen = false,
+  clickOnly = false,
   children,
 }: {
+  /**
+   * Open and close ONLY with the toggle — no hover, no focus (Mark, 2026-09-11,
+   * on PO detail's paperwork, which sits above the order's figures and lines
+   * where a pointer passing on its way down kept opening it). Still an overlay.
+   */
+  clickOnly?: boolean;
   /** Which way the body opens. `up` for a footer pinned to the window bottom. */
   direction?: "up" | "down";
   /**
@@ -86,14 +93,17 @@ export function RevealPanel({
   // this, pointing at the header of a person with no documents would open an
   // empty bordered box, which reads as a panel that failed to load.
   const hasBody = children !== null && children !== undefined && children !== false;
-  const open = hasBody && (alwaysOpen || pinned || pointerIn || focusIn);
+  const open =
+    hasBody && (alwaysOpen || pinned || (!clickOnly && (pointerIn || focusIn)));
 
   const toggle = (
     <button
       type="button"
       onClick={() => setPinned((v) => !v)}
       aria-expanded={open}
-      aria-label={pinned ? `Collapse ${label}` : `Keep ${label} open`}
+      aria-label={
+        pinned ? `Collapse ${label}` : clickOnly ? `Show ${label}` : `Keep ${label} open`
+      }
       // `DataTable`'s expander, to the pixel: a bordered box rather than a bare
       // glyph, so it reads as a control and gives a real touch target. The Mac
       // look (`mac-disclosure`, mac-look.css): raised, a 2px edge on hover;

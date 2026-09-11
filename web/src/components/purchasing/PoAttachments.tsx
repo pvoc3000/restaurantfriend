@@ -96,8 +96,8 @@ export function PoAttachments({
   return (
     /* DOWN, because the card now heads its own column beside the order's
        fields (Mark, 2026-09-11) rather than being pinned to the bottom of the
-       window. It still reveals on hover — the body is out of flow, so the
-       figures under the card never move as the pointer passes over.
+       window. It opens and closes ONLY with its toggle (Mark, 2026-09-11) —
+       the body is out of flow, so the figures under the card never move.
 
        The panel WRAPS the card rather than sitting inside it. `top-full`
        measures from the panel's own root, so a root inside the card's padding
@@ -106,6 +106,7 @@ export function PoAttachments({
        whether the panel is open or not. */
     <RevealPanel
       direction="down"
+      clickOnly
       label="the filed paperwork"
       header={(toggle) => (
         <FileDropZone
