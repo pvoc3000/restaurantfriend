@@ -239,9 +239,9 @@ export function RangePicker({
         // measured 2px taller than the PickSet beside it. 36 is the app's own
         // button height (`BUTTON_CLASS`), which is what a filter row lines up on.
         className={`flex h-9 w-full items-center ${
-          // The filter-row dress carries the Mac look (`styles/mac-look.css`);
-          // the boxed detail-field dress does not.
-          boxed ? `rf-press ${BOXED_FIELD_BORDER}` : "mac-control border border-ink"
+          // Both dresses are raised fields (`rf-press`, `styles/mac-look.css`):
+          // a 2px edge on hover, never a grey fill.
+          boxed ? `rf-press ${BOXED_FIELD_BORDER}` : "rf-press border border-ink"
         } bg-white ${
           disabled ? "opacity-35" : ""
         } ${className}`}

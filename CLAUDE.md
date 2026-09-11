@@ -10081,6 +10081,23 @@ weekday column, and 003 then silently made it per-vendor-item.
     magnifier sits in the clear button's slot while the box is empty
     (`TextInput`'s new opt-in `icon` prop), and the hint's words moved to
     `aria-label`, the field's only name.
+  **FIELDS NEVER FILL GREY ON HOVER, ON ANY SCREEN (Mark, 2026-09-11,
+  reviewing /interface).** The two field markers left `.mac-page` and apply
+  everywhere: **`rf-press`** (every picklist-like box — `PickList` field and
+  boxed, `PickSet` and `RangePicker` in both dresses, `DateField
+  variant="title"`) is a solid black border with the raised shadow, a 2px edge
+  on hover and the drop when pressed; **`rf-typed`** (`TextInput`, the boxed
+  and field date and time fields, `InlineValue` boxed, `FORM_FIELD_DRESS`) is a
+  solid black border with a 2px edge on hover. The search box keeps its sunken
+  top and left and gains the same 2px edge. The 2px is always an inset 1px
+  shadow inside the 1px border, so nothing grows. **`DANGER_BUTTON_CLASS` and
+  `DIALOG_DANGER_CLASS` cast a RED shadow** (`mac-danger`; the dialog one had
+  no Mac look at all until now) and keep their red fill on hover.
+  **`PRIMARY_BUTTON_CLASS` and `DIALOG_COMMIT_CLASS` are DARK GREY
+  (`bg-neutral-600`) with a black border, not black** (`mac-primary`): a 2px
+  edge on hover, and held they drop and fill `#c0c0c0` with black type. The
+  plain `BUTTON_CLASS` still fills grey on hover everywhere except a
+  `.mac-page`, where it takes the 2px edge.
   **Tried and rejected, so nobody reinvents them:** a 5px shadow (3px), the
   classic 50% checkerboard hover in both 2×2 and 1px dots (a solid light grey
   replaced it), a solid `#808080` hover (too dark), a solid-black flip on press

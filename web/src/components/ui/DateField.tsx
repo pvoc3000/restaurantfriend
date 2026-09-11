@@ -216,11 +216,11 @@ export function DateField({
     <span
       className={
         field
-          ? "flex h-12 w-full items-center gap-2 border border-ink px-3 focus-within:border-2"
+          ? "rf-typed flex h-12 w-full items-center gap-2 border border-ink px-3 focus-within:border-2"
           : title
             ? // THE MAC LOOK (Mark, 2026-09-10: "make the date picker macos
               // style") — the filter row's raised box, `RangePicker`'s dress.
-              "mac-control inline-flex h-9 items-center gap-2 border border-ink bg-white px-2"
+              "rf-press inline-flex h-9 items-center gap-2 border border-ink bg-white px-2"
           : `items-center gap-1 px-1 py-0.5 hover:bg-neutral-100 ${
               boxed
                 ? // A BOX MEANS THE SHARED FIELD DRESS, not just a border: one
@@ -228,7 +228,7 @@ export function DateField({
                   // the text cell above it instead of sitting 72px short in a
                   // box of its own size. `flex` rather than `inline-flex` is
                   // what lets `w-full` mean the column.
-                  // `rf-typed`: a `.mac-page` screen sinks it (mac-look.css).
+                  // `rf-typed`: a solid border, 2px on hover (mac-look.css).
                   `rf-typed flex ${BOXED_FIELD_BORDER} ${BOXED_FIELD}`
                 : "inline-flex"
             }`

@@ -153,9 +153,9 @@ export function TextInput({
         className={`border border-ink bg-white pl-3 pr-9 outline-none focus:border-2 ${
           SIZE_CLASS[size]
         } ${fullWidth || search ? "w-full" : ""} ${
-          // Every search box is the Mac look's sunken field
-          // (`styles/mac-look.css`); ordinary form fields are not.
-          search ? "mac-field" : ""
+          // Every search box is the Mac look's sunken field; every other one is
+          // a typed field (`styles/mac-look.css`). Both read 2px on hover.
+          search ? "mac-field" : "rf-typed"
         } ${className}`}
         {...rest}
       />

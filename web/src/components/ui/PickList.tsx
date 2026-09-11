@@ -471,7 +471,7 @@ export function PickList({
               // one set of controls at one height.
               `flex ${
                 size === "lg" ? "h-12 text-[16px]" : "h-9 text-sm"
-              } mac-control items-center gap-2 border border-ink bg-white px-3 text-left hover:bg-neutral-100 disabled:opacity-35 ${
+              } rf-press items-center gap-2 border border-ink bg-white px-3 text-left hover:bg-neutral-100 disabled:opacity-35 ${
                 empty ? "text-faint" : ""
               } ${className}`
             : variant === "masthead"
@@ -531,7 +531,7 @@ export function PickList({
                 // two cues for one fact, and the second reads as an artefact.
                 `flex w-full items-center gap-1 px-1 py-0.5 text-left hover:bg-neutral-100 disabled:opacity-35 ${
                   boxed
-                    ? // `rf-press`: a `.mac-page` screen raises it (mac-look.css).
+                    ? // `rf-press`: raised, 2px on hover (mac-look.css).
                       `rf-press ${BOXED_FIELD_BORDER} ${BOXED_FIELD}`
                     : "underline decoration-neutral-300 decoration-dotted underline-offset-4"
                 } ${empty ? "text-faint" : ""} ${className}`

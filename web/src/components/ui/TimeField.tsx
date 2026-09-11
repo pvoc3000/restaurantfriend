@@ -63,7 +63,7 @@ export function TimeField({
     <span
       className={
         field
-          ? "flex h-12 w-full items-center border border-ink px-3 focus-within:border-2"
+          ? "rf-typed flex h-12 w-full items-center border border-ink px-3 focus-within:border-2"
           : `items-center px-1 py-0.5 hover:bg-neutral-100 ${
               boxed
                 ? `rf-typed flex ${BOXED_FIELD_BORDER} ${BOXED_FIELD}`

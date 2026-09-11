@@ -154,8 +154,9 @@ export function fieldPlaceholder(placeholder: string, boxed: boolean): string {
  * and lets the field inherit 16px — a big writing surface for a message you are
  * about to send, and not a thing to shrink by folding a `text-sm` in here.
  */
+// `rf-typed`: a 2px edge on hover, like every bordered field (Mark, 2026-09-11).
 export const FORM_FIELD_DRESS =
-  "border border-ink bg-white px-2 py-1 outline-none focus:border-2";
+  "rf-typed border border-ink bg-white px-2 py-1 outline-none focus:border-2";
 
 /**
  * The ordinary multiline field in a create dialog: the dress, filling its

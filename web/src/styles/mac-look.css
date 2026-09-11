@@ -32,7 +32,7 @@
 /* At rest: a hard black shadow 3px down and right, no blur. State changes are
    instant, as they were on the old Mac — no fades. */
 .mac-control,
-.mac-page .rf-press {
+.rf-press {
   box-shadow: 3px 3px 0 0 #000;
   transition: none;
 }
@@ -66,12 +66,15 @@
    solid-black flip, like a classic push button, was tried and Mark preferred
    this. */
 .mac-control:active,
-.mac-page .rf-press:active {
+.rf-press:active {
   transform: translate(3px, 3px);
   box-shadow: none;
 }
 
-/* A BOXED PICKER ON A `.mac-page` DOES NOT FILL GREY: its border reads 2px on
+/* A PICKER DOES NOT FILL GREY — every `rf-press`, on every screen since
+   2026-09-11 (Mark, reviewing /interface: "All fields with a border should not
+   fill with a solid color on hover, but the border should be 2px on hover").
+   It was the `.mac-page` rule first: its border reads 2px on
    hover, as a text field's does (Mark, 2026-09-10: "instead of filling in with
    solid grey, just increase the outline of the border to 2px like text
    fields"). The same inset 1px shadow inside the 1px border, so the box does
@@ -79,12 +82,45 @@
    rest rule below is unlayered and outranks the trigger's own
    `hover:bg-neutral-100`. Held, it still drops into its shadow and keeps the
    2px edge, since the pointer is still on it. */
-.mac-page .rf-press:hover {
+.rf-press:not(:disabled):hover {
+  background-color: #fff;
   box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
 }
 
-.mac-page .rf-press:active {
+/* A button INSIDE the box keeps the box's white — `RangePicker`'s trigger
+   carries its own `hover:bg-neutral-100`. */
+.rf-press:hover * {
+  background-color: transparent;
+}
+
+.rf-press:not(:disabled):active {
   box-shadow: inset 0 0 0 1px #000;
+}
+
+/* DANGER: THE SHADOW IS RED (Mark, 2026-09-11), on `DANGER_BUTTON_CLASS` and
+   `DIALOG_DANGER_CLASS` alike, matching the red border it hangs from. Not while
+   held, or the press would keep a shadow it has dropped into. */
+.mac-control.mac-danger:not(:active) {
+  box-shadow: 3px 3px 0 0 var(--color-accent);
+}
+
+/* THE COMMIT: DARK GREY, NOT BLACK (Mark, 2026-09-11) — `PRIMARY_BUTTON_CLASS`
+   and `DIALOG_COMMIT_CLASS`. The fill is the class's own `bg-neutral-600`; this
+   is its hover and its press. Hover is the fields' 2px edge rather than a fill,
+   and held it drops into its shadow and fills the light grey every other held
+   button shows, with black type — white on #c0c0c0 would not read. */
+.mac-primary:not(:disabled):hover {
+  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
+}
+
+.mac-primary:not(:disabled):active {
+  background-color: #c0c0c0;
+  color: #000;
+  box-shadow: inset 0 0 0 1px #000;
+}
+
+.mac-primary:not(:disabled):active * {
+  color: #000;
 }
 
 /* A control you TYPE INTO does not drop when the press lands in its text — the
@@ -95,13 +131,19 @@
   box-shadow: 3px 3px 0 0 #000;
 }
 
+.rf-press:has(input:active) {
+  transform: none;
+  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
+}
+
 /* ---- .mac-page: a whole screen in the look ------------------------------ */
 
 /* THE DETAIL-FIELD DRESSES, ON ONE SCREEN AT A TIME (Mark, 2026-09-10: "let's
    try making the location detail page mac styled"). The app-wide look leaves
    the boxed record fields alone; a screen that wraps itself in `.mac-page`
-   takes them too. The shared parts carry two MARKER classes that do nothing
-   outside such a screen:
+   takes them too. The shared parts carry two MARKER classes, which since
+   2026-09-11 apply on EVERY screen (Mark, reviewing /interface) — the
+   selectors below lost their `.mac-page` for that reason:
      - `rf-typed` — a box you type into (`InlineValue` text, number and notes,
        a boxed `DateField` or `TimeField`, a raw time input). A SOLID BLACK
        1px border on all four sides, white ground, no hover. It was sunken
@@ -115,7 +157,7 @@
    the class up to the layout. */
 /* A white ground, as every `.mac-control` button has: a boxed picker's own
    dress is transparent, which on the page's off-white reads as a hole. */
-.mac-page .rf-press {
+.rf-press {
   border-color: #000;
   background-color: #fff;
 }
@@ -172,7 +214,7 @@
   gap: 8px;
 }
 
-.mac-page .rf-typed {
+.rf-typed {
   border-color: #000;
   background-color: #fff;
   transition: none;
@@ -184,10 +226,14 @@
    rather than `border-width: 2px`, which would grow the box and push the text a
    pixel. Unlayered, so it outranks the resting dress's `hover:bg-neutral-100`
    and `hover:border-ink`. */
-.mac-page .rf-typed:hover {
+.rf-typed:not(:disabled):hover {
   border-color: #000;
   background-color: #fff;
   box-shadow: inset 0 0 0 1px #000;
+}
+
+.rf-typed:hover * {
+  background-color: transparent;
 }
 
 /* WHILE TYPING it looks the same as at rest, so a click does not move a pixel
@@ -195,14 +241,14 @@
    an invisible copy of the resting box (InlineValue's Sizer), which is what
    `~` finds; an UNBOXED cell on the same screen, the title, has no such
    sibling and keeps its ordinary editor. */
-.mac-page .rf-typed ~ .rf-typed-editing {
+.rf-typed ~ .rf-typed-editing {
   outline: 1px solid #000;
   outline-offset: -1px;
 }
 
 /* …and 2px on hover while typing too. The editor has no border of its own, so
    its outline and a 2px inset shadow share the outer pixel: two pixels in all. */
-.mac-page .rf-typed ~ .rf-typed-editing:hover {
+.rf-typed ~ .rf-typed-editing:hover {
   box-shadow: inset 0 0 0 2px #000;
 }
 
@@ -355,6 +401,12 @@
   border-width: 1px;
   box-shadow: inset 2px 2px 0 0 #000;
   height: 100%;
+}
+
+/* …and the 2px edge on hover, like every other bordered field (Mark,
+   2026-09-11), laid over the sunken top and left. */
+.mac-field:not(:disabled):hover {
+  box-shadow: inset 2px 2px 0 0 #000, inset 0 0 0 1px #000;
 }
 
 /* 3px TALLER, GROWING DOWNWARD. The raised controls only look 3px taller

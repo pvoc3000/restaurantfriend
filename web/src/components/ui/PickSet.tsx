@@ -162,9 +162,9 @@ export function PickSet({
         // does. Unboxed it stays content-sized, because a filter row packs its
         // controls rather than stretching them.
         className={`flex h-9 items-center gap-2 bg-white px-3 text-[13px] hover:bg-neutral-100 disabled:opacity-40 ${
-          // The filter-row dress carries the Mac look (`styles/mac-look.css`);
-          // the boxed detail-field dress does not.
-          boxed ? `rf-press ${BOXED_FIELD_BORDER} w-full` : "mac-control border border-ink"
+          // Both dresses are raised fields (`rf-press`, `styles/mac-look.css`):
+          // a 2px edge on hover, never a grey fill.
+          boxed ? `rf-press ${BOXED_FIELD_BORDER} w-full` : "rf-press border border-ink"
         } ${className}`}
       >
         <span className="truncate">{summary}</span>
