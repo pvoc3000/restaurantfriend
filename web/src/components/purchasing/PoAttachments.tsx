@@ -17,6 +17,7 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 import { PickList } from "@/components/ui/PickList";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { DocumentChip } from "@/components/ui/DocumentChip";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { RevealPanel } from "@/components/ui/RevealPanel";
 import { useAttachmentActions } from "./useAttachmentActions";
 import type { InvoiceCreationOrder } from "@/lib/invoiceFromExtraction";
@@ -136,7 +137,8 @@ export function PoAttachments({
               type="button"
               disabled={busy}
               onClick={() => fileRef.current?.click()}
-              className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
+              // w-36: the Add as picker's width and PO detail's Actions button's.
+              className={`${BUTTON_CLASS} w-36`}
             >
               Attach&hellip;
             </button>

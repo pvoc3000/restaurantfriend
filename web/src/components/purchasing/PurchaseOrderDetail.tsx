@@ -35,7 +35,7 @@ import { AddPoLines } from "./AddPoLines";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { nextDeliveryDate } from "@/lib/poProcessing";
-import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, confirmDialogWithOption, splitConfirmMessage } from "@/lib/confirm";
 
 /**
@@ -669,6 +669,9 @@ export function PurchaseOrderDetail({
     const render = (addItems: ActionMenuItem[]) => (
       <ActionMenu
         ariaLabel={`Actions for purchase order ${order.po_number}`}
+        // w-36, the width of the paperwork card's Attach… and Add as, so the
+        // page's three commands are one size (Mark, 2026-09-11).
+        triggerClassName={`${BUTTON_CLASS} w-36`}
         items={[...addItems, ...group(processItems), ...group(receivingItems)]}
       />
     );
