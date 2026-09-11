@@ -10,10 +10,14 @@ import { BarLabel } from "./BarLabel";
  * the seat. A disabled command stays in place and dims (`BAR_CELL`'s own
  * `disabled:` state) rather than vanishing, so the bar never changes width as
  * the walk runs out of lines.
+ *
+ * Rendered twice by the bar, once per `side`: `leading` right after Home,
+ * `trailing` at the right end.
  */
-export function BarActions() {
-  const actions = useBarActions();
-  if (!actions || actions.length === 0) return null;
+export function BarActions({ side }: { side: "leading" | "trailing" }) {
+  const seated = useBarActions();
+  const actions = (seated ?? []).filter((a) => (a.side ?? "trailing") === side);
+  if (actions.length === 0) return null;
 
   return (
     <div className="flex items-center" role="group" aria-label="Screen commands">

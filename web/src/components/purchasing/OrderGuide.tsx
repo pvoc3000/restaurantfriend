@@ -48,7 +48,7 @@ import { Reminders } from "./Reminders";
 import { GuideRequests, type GuideRequest } from "./GuideRequests";
 import { ActionBar, ActionBarButton } from "@/components/ui/ActionBar";
 import { publishBarActions } from "@/lib/tabletBarActions";
-import { ICON_DOUBLE_CHEVRON_RIGHT } from "@/components/tablet/BarLabel";
+import { ICON_DOUBLE_CHEVRON_RIGHT, ICON_REFRESH } from "@/components/tablet/BarLabel";
 import { BackToTop } from "@/components/ui/BackToTop";
 import { usePublishedHeight } from "@/lib/tableHead";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
@@ -678,7 +678,11 @@ export function OrderGuide({
    * ON A TABLET, NEXT FAVORITE AND NEXT SECTION LIVE IN THE TOP BAR (Mark,
    * 2026-09-10: "should move to the upper nav bar on tablets, with an '>>'
    * glyph for each and with text 'favorite' and 'section'"), seated through
-   * `lib/tabletBarActions` and gone from the bottom ActionBar.
+   * `lib/tabletBarActions` and gone from the bottom ActionBar. REFRESH is in the
+   * bar too, right after Home (Mark, 2026-09-10: "move the refresh button into
+   * the top nav bar. use an appropriate glyph", then "next to the home button")
+   * — Material Symbols `refresh`. On the desk it stays a link above the title,
+   * the masthead having no seat for a command.
    *
    * Published on EVERY render, because the handlers are fresh closures; the
    * slot re-renders the bar only when a word, a disabled state or a tooltip
@@ -688,6 +692,14 @@ export function OrderGuide({
   useEffect(() => {
     if (!tablet) return;
     publishBarActions([
+      {
+        key: "refresh",
+        word: "Refresh",
+        icon: ICON_REFRESH,
+        onClick: () => router.refresh(),
+        title: "Reload this guide",
+        side: "leading",
+      },
       {
         key: "favorite",
         word: "Favorite",
@@ -786,17 +798,18 @@ export function OrderGuide({
           (Mark, 2026-09-03) — `PurchaseOrderList`'s header, which is this
           module's model. It rode BESIDE the title from 2026-07-29 until then. */}
       <div className="space-y-3">
-        {/* REFRESH SITS ABOVE THE TITLE ROW, right-aligned (Mark, 2026-09-10:
-            it had moved into the title row beside the day picker). "Add
-            reminder" lives in the bands row above. */}
-        <div className="flex justify-end">
-          <button
-            onClick={() => router.refresh()}
-            className="text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-          >
-            Refresh
-          </button>
-        </div>
+        {/* ON THE DESK, REFRESH SITS ABOVE THE TITLE ROW, right-aligned. On a
+            tablet it is in the top bar (see the `publishBarActions` effect). */}
+        {!tablet && (
+          <div className="flex justify-end">
+            <button
+              onClick={() => router.refresh()}
+              className="text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+            >
+              Refresh
+            </button>
+          </div>
+        )}
         <div className="flex flex-wrap items-start gap-x-6 gap-y-2">
           {/* The module's model header (`PurchaseOrderList`): the count sits
               UNDER the title and leads with the shop. */}

@@ -30,6 +30,12 @@ export type BarAction = {
   disabled?: boolean;
   /** Why it is disabled, or what it will do. */
   title?: string;
+  /**
+   * `leading` sits right after Home; `trailing` (the default) takes the right
+   * end. The order guide's Refresh is leading (Mark, 2026-09-10: "move refresh
+   * next to the home button").
+   */
+  side?: "leading" | "trailing";
 };
 
 const listeners = new Set<() => void>();
@@ -45,7 +51,12 @@ function subscribe(onChange: () => void) {
 function drawn(a: BarAction[] | null): string {
   return a === null
     ? ""
-    : a.map((x) => `${x.key}|${x.word}|${x.icon}|${x.disabled ? 1 : 0}|${x.title ?? ""}`).join("\n");
+    : a
+        .map(
+          (x) =>
+            `${x.key}|${x.word}|${x.icon}|${x.disabled ? 1 : 0}|${x.title ?? ""}|${x.side ?? "trailing"}`
+        )
+        .join("\n");
 }
 
 /** A screen seats its commands; `null` gives the seat back. */

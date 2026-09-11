@@ -9121,7 +9121,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    same `useRecordPosition` and `carryQuery` at 64px. Under the desk shell
    nothing changed. Verified: "1 of 30" → Next → "2 of 30", ends dead in place.
    **A SCREEN CAN SEAT ITS OWN COMMANDS IN THE BAR TOO** (`lib/tabletBarActions`
-   + `tablet/BarActions`, 2026-09-10) — the same slot shape. First caller: the
+   + `tablet/BarActions`, 2026-09-10) — the same slot shape. A command's `side`
+   seats it right after Home (`leading`) or at the right end (`trailing`, the
+   default); the guide's Refresh is leading, under Material Symbols `refresh`
+   (Mark, the same day), and on the desk stays a link above the title. First
+   caller: the
    order guide's Next favorite and Next section, which on a tablet leave the
    bottom ActionBar for the top bar's right end as **Favorite** and **Section**
    under a ">>" (`ICON_DOUBLE_CHEVRON_RIGHT`, two copies of the bar's own

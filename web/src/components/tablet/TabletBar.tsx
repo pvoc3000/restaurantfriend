@@ -70,8 +70,11 @@ export function TabletBar({
         <Link href={TABLET_HOME} className={BAR_CELL}>
           <BarLabel icon={ICON_HOME} word="Home" />
         </Link>
+        {/* A screen's LEADING commands sit right after Home — the order
+            guide's Refresh (Mark, 2026-09-10). */}
+        <BarActions side="leading" />
         <div className="min-w-0 flex-1" />
-        <BarActions />
+        <BarActions side="trailing" />
         <BarRecordNav />
         {atHome && (
           <div className="flex items-center gap-4 px-3">
