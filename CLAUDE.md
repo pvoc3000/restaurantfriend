@@ -9998,6 +9998,20 @@ weekday column, and 003 then silently made it per-vendor-item.
   close box is REAL: it does what a tap outside does. The ⌫ nudge moves the
   glyph, never the key, or that square would sit 3px out of the grid. Same 4×5
   grid, same keys, same focus handling.
+  **A RECORD SCREEN CAN OPT IN WHOLE: `.mac-page`** (Mark, 2026-09-10: "let's
+  try making the location detail page mac styled") — so far ONLY
+  `/locations/[id]`, as an experiment. The shared field parts carry two MARKER
+  classes that do nothing outside such a screen: **`rf-typed`** (a box you
+  type into — `InlineValue` text/number/notes, a boxed `DateField` or
+  `TimeField`, the hours block's raw time inputs) SINKS like the search box,
+  black border and an inset 2px shadow, white, no hover; **`rf-press`** (a
+  boxed `PickList`, `PickSet` or `RangePicker`, and `WorkingHere`'s button)
+  RISES and PRESSES, named beside `.mac-control` in the same rules so there is
+  one definition. While typing, `InlineValue`'s editor keeps the sunken look
+  (`.rf-typed ~ .rf-typed-editing`, the invisible Sizer being the sibling), so a
+  click moves nothing — measured 0px; the unboxed title keeps its own editor.
+  Undo is taking the class off the page; every record Mac is moving it up to the
+  layout. Switches, checkboxes and the record book are untouched.
   **`mac-own-hover`** is on the black and red ones (`PRIMARY_*`, `DANGER_*`,
   both dialog commits): they take the shadow and the press and keep their OWN
   hover, because a grey fill on a black commit reads as disabled and on a red

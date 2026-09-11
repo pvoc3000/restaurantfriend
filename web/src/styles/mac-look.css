@@ -31,7 +31,8 @@
 
 /* At rest: a hard black shadow 3px down and right, no blur. State changes are
    instant, as they were on the old Mac — no fades. */
-.mac-control {
+.mac-control,
+.mac-page .rf-press {
   box-shadow: 3px 3px 0 0 #000;
   transition: none;
 }
@@ -47,7 +48,8 @@
    Their hover is part of what they MEAN (a black cell inverting, a red one
    filling red), and a grey fill on either reads as disabled. They keep the
    shadow and the press. */
-.mac-control:not(.mac-own-hover):hover {
+.mac-control:not(.mac-own-hover):hover,
+.mac-page .rf-press:hover {
   background-color: #c0c0c0;
   color: #000;
 }
@@ -56,7 +58,8 @@
    the date window, whose border sits on a box AROUND a button: that button's
    own `hover:bg-neutral-100` would otherwise paint light grey over the mid
    grey. */
-.mac-control:not(.mac-own-hover):hover * {
+.mac-control:not(.mac-own-hover):hover *,
+.mac-page .rf-press:hover * {
   color: #000;
   background-color: transparent;
 }
@@ -64,7 +67,8 @@
 /* Press: the control drops 3px into its own shadow and keeps its grey. A
    solid-black flip, like a classic push button, was tried and Mark preferred
    this. */
-.mac-control:active {
+.mac-control:active,
+.mac-page .rf-press:active {
   transform: translate(3px, 3px);
   box-shadow: none;
 }
@@ -75,6 +79,55 @@
 .mac-control:has(input:active) {
   transform: none;
   box-shadow: 3px 3px 0 0 #000;
+}
+
+/* ---- .mac-page: a whole screen in the look ------------------------------ */
+
+/* THE DETAIL-FIELD DRESSES, ON ONE SCREEN AT A TIME (Mark, 2026-09-10: "let's
+   try making the location detail page mac styled"). The app-wide look leaves
+   the boxed record fields alone; a screen that wraps itself in `.mac-page`
+   takes them too. The shared parts carry two MARKER classes that do nothing
+   outside such a screen:
+     - `rf-typed` — a box you type into (`InlineValue` text, number and notes,
+       a boxed `DateField` or `TimeField`, a raw time input). It SINKS, the
+       search box's `mac-field`: black border, a hard 2px shadow inside along
+       the top and left, white ground, no hover.
+     - `rf-press` — a box you press (a boxed `PickList`, `PickSet` or
+       `RangePicker`, and a screen's own buttons). It RISES and PRESSES, the
+       `.mac-control` rules above, which name it beside that class so there is
+       one definition.
+   Undo a screen by taking `mac-page` off it. Making every record Mac is moving
+   the class up to the layout. */
+/* A white ground, as every `.mac-control` button has: a boxed picker's own
+   dress is transparent, which on the page's off-white reads as a hole. */
+.mac-page .rf-press {
+  border-color: #000;
+  background-color: #fff;
+}
+
+.mac-page .rf-typed {
+  border-color: #000;
+  background-color: #fff;
+  box-shadow: inset 2px 2px 0 0 #000;
+  transition: none;
+}
+
+/* No hover: a field is not a button. Unlayered, so it outranks the resting
+   dress's `hover:bg-neutral-100` and `hover:border-ink`. */
+.mac-page .rf-typed:hover {
+  border-color: #000;
+  background-color: #fff;
+}
+
+/* WHILE TYPING it looks the same as at rest, so a click does not move a pixel
+   — the caret is the focus cue, as on the search box. The editor is laid over
+   an invisible copy of the resting box (InlineValue's Sizer), which is what
+   `~` finds; an UNBOXED cell on the same screen, the title, has no such
+   sibling and keeps its ordinary editor. */
+.mac-page .rf-typed ~ .rf-typed-editing {
+  outline: 1px solid #000;
+  outline-offset: -1px;
+  box-shadow: inset 2px 2px 0 0 #000;
 }
 
 /* ---- .mac-stipple: the calculator's desk-accessory ground ------------------ */

@@ -184,11 +184,13 @@ function restLook(
   rows = 4
 ): string {
   if (!boxed) return INLINE_REST_LOOK;
+  // `rf-typed` marks a box you TYPE into, so a `.mac-page` screen can sink it
+  // (styles/mac-look.css). It does nothing anywhere else.
   // `flex items-start`: a <button> centres its content vertically, so a
   // one-line note in a 128px box sat mid-air (Mark, 2026-09-06: "top align the
   // text"). The Sizer wears the same, or the field jumps on click.
-  if (multiline) return `${INLINE_REST_BOXED} ${tallFor(rows)} flex items-start text-left`;
-  return `${INLINE_REST_BOXED} ${BOXED_FIELD} flex items-center ${
+  if (multiline) return `rf-typed ${INLINE_REST_BOXED} ${tallFor(rows)} flex items-start text-left`;
+  return `rf-typed ${INLINE_REST_BOXED} ${BOXED_FIELD} flex items-center ${
     align === "right" ? "justify-end" : "justify-start"
   }`;
 }
@@ -198,7 +200,7 @@ function restLook(
  * rather than bleeding into the column beside it, and `absolute inset-0` takes
  * the input OUT OF FLOW — see `Sizer`.
  */
-const INLINE_EDITING = `absolute inset-0 w-full bg-transparent ${INLINE_BOX} outline outline-2 -outline-offset-1 outline-ink`;
+const INLINE_EDITING = `rf-typed-editing absolute inset-0 w-full bg-transparent ${INLINE_BOX} outline outline-2 -outline-offset-1 outline-ink`;
 
 /**
  * WHY AN INVISIBLE COPY OF THE TEXT, AND NOT JUST MATCHING PADDING.

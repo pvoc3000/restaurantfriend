@@ -164,7 +164,7 @@ export function PickSet({
         className={`flex h-9 items-center gap-2 bg-white px-3 text-[13px] hover:bg-neutral-100 disabled:opacity-40 ${
           // The filter-row dress carries the Mac look (`styles/mac-look.css`);
           // the boxed detail-field dress does not.
-          boxed ? `${BOXED_FIELD_BORDER} w-full` : "mac-control border border-ink"
+          boxed ? `rf-press ${BOXED_FIELD_BORDER} w-full` : "mac-control border border-ink"
         } ${className}`}
       >
         <span className="truncate">{summary}</span>

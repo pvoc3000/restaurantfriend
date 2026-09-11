@@ -107,7 +107,7 @@ export function WorkingHere({
           await setActiveLocation(locationId);
         })
       }
-      className={`${box} h-7 w-32 border-ink text-ink hover:bg-ink hover:text-white disabled:opacity-35`}
+      className={`rf-press ${box} h-7 w-32 border-ink text-ink hover:bg-ink hover:text-white disabled:opacity-35`}
     >
       {pending ? "Switching…" : "Work here"}
     </button>

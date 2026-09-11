@@ -240,7 +240,7 @@ export function RangePicker({
         className={`flex h-9 w-full items-center ${
           // The filter-row dress carries the Mac look (`styles/mac-look.css`);
           // the boxed detail-field dress does not.
-          boxed ? BOXED_FIELD_BORDER : "mac-control border border-ink"
+          boxed ? `rf-press ${BOXED_FIELD_BORDER}` : "mac-control border border-ink"
         } bg-white ${
           disabled ? "opacity-35" : ""
         } ${className}`}

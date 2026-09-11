@@ -178,7 +178,7 @@ function TimeCell({
       // fields two blocks down. `w-auto` because a time input has a natural
       // width and there is no grid track here to fill.
       className={`${
-        BOXED_FIELDS ? `${BOXED_FIELD} ${BOXED_FIELD_BORDER} !w-auto px-2` : "border border-hairline px-2 py-1"
+        BOXED_FIELDS ? `rf-typed ${BOXED_FIELD} ${BOXED_FIELD_BORDER} !w-auto px-2` : "border border-hairline px-2 py-1"
       } tabular-nums disabled:opacity-35`}
     />
   );

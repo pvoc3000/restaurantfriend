@@ -226,7 +226,8 @@ export function DateField({
                   // the text cell above it instead of sitting 72px short in a
                   // box of its own size. `flex` rather than `inline-flex` is
                   // what lets `w-full` mean the column.
-                  `flex ${BOXED_FIELD_BORDER} ${BOXED_FIELD}`
+                  // `rf-typed`: a `.mac-page` screen sinks it (mac-look.css).
+                  `rf-typed flex ${BOXED_FIELD_BORDER} ${BOXED_FIELD}`
                 : "inline-flex"
             }`
       }
