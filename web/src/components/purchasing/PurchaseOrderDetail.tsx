@@ -740,7 +740,7 @@ export function PurchaseOrderDetail({
           <div key={s.label} className="text-right">
             <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">{s.label}</div>
             <div
-              className={`text-[22px] font-bold tabular-nums tracking-[-0.01em] ${
+              className={`text-[16px] font-bold tabular-nums ${
                 s.short ? "text-accent" : ""
               }`}
             >
