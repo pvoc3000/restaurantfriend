@@ -279,7 +279,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    GONE. Below the title the body is TWO COLUMNS: the fields (Status first,
    then the dates, Sent via, Notes) and beside them the Paperwork card —
    moved out of the pinned `StickyFooter`, opening and closing ONLY from its
-   toggle (`RevealPanel clickOnly` — no hover, no focus), DOWN over what follows — with five right-aligned figures under it:
+   toggle (`RevealPanel clickOnly` — no hover, no focus) and, since the same
+   day, PUSHING what follows down rather than covering it (`push` — closed, the
+   body is still out of flow and `invisible`, never unmounted, so its PDF
+   plugins do not reload) — with five right-aligned figures under it:
    Products Ordered, Packages Ordered, Ordered Total, Packages Received,
    Received Total. Stacked below `xl`.
    `ProcessPo` and `AddPoLines` keep their dialogs and hand their rows out

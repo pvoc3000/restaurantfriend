@@ -53,8 +53,16 @@ export function RevealPanel({
   header,
   alwaysOpen = false,
   clickOnly = false,
+  push = false,
   children,
 }: {
+  /**
+   * Open IN FLOW, pushing what follows down, instead of overlaying it (Mark,
+   * 2026-09-11, trying it on PO detail's paperwork). Closed, the body is still
+   * out of flow and `invisible` rather than unmounted, for the PDF-plugin
+   * reason below.
+   */
+  push?: boolean;
   /**
    * Open and close ONLY with the toggle — no hover, no focus (Mark, 2026-09-11,
    * on PO detail's paperwork, which sits above the order's figures and lines
@@ -140,11 +148,13 @@ export function RevealPanel({
         // nothing to avoid. It also drops the 60vh cap, which on a screen of
         // its own would scroll the documents inside a box inside the page.
         className={
-          alwaysOpen
+          alwaysOpen || (push && open)
             ? "border border-ink bg-white px-4 py-3 -mt-px"
-            : // z-30, above the sticky table heads (z-20) that follow it in
-              // the page, below the masthead (z-50).
-              `absolute inset-x-0 z-30 max-h-[60vh] overflow-y-auto border border-ink bg-white px-4 py-3 transition-opacity duration-100 ${
+            : push
+              ? "invisible absolute inset-x-0 top-full border border-ink bg-white px-4 py-3 opacity-0"
+              : // z-30, above the sticky table heads (z-20) that follow it in
+                // the page, below the masthead (z-50).
+                `absolute inset-x-0 z-30 max-h-[60vh] overflow-y-auto border border-ink bg-white px-4 py-3 transition-opacity duration-100 ${
                 direction === "up" ? "bottom-full -mb-px" : "top-full -mt-px"
               } ${open ? "visible opacity-100" : "invisible opacity-0"}`
         }

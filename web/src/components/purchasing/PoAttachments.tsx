@@ -108,6 +108,7 @@ export function PoAttachments({
     <RevealPanel
       direction="down"
       clickOnly
+      push
       label="the filed paperwork"
       header={(toggle) => (
         <FileDropZone
