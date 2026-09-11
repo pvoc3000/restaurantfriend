@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
@@ -8,6 +8,7 @@ import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { MenuButton } from "@/components/ui/MenuButton";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { TextInput } from "@/components/ui/TextInput";
 import {
   DOCUMENT_LABEL,
@@ -83,7 +84,14 @@ export function SendDocument({
   /** Today in the org's timezone — the snapshot records when the quote went
    *  out, and a browser's own idea of today is the browser's timezone. */
   today,
+  children,
 }: {
+  /**
+   * Render the three verbs as rows of an `ui/ActionMenu` instead of three
+   * buttons (`OrderCommandMenu`, Mark, 2026-09-11). The dialogs, the busy and
+   * sent lines and the workflow offer are still drawn here.
+   */
+  children?: (items: ActionMenuItem[]) => ReactNode;
   workflow: WorkflowOrder;
   orderId: string;
   orgId: string;
@@ -113,7 +121,7 @@ export function SendDocument({
   } | null>(null);
   const [offer, setOffer] = useState<Consequence[] | null>(null);
 
-  if (!canWrite) return null;
+  if (!canWrite) return children ? <>{children([])}</> : null;
 
   function closeCompose() {
     if (pending) URL.revokeObjectURL(pending.url);
@@ -300,8 +308,36 @@ export function SendDocument({
       onSelect: () => act(d.kind),
     }));
 
+  /** The same three verbs as `ActionMenu` rows, each a submenu of the four
+   *  documents. All disable together while one is rendering — one renderer,
+   *  one `busy`. */
+  const submenu = (act: (k: DocumentKind) => void): ActionMenuItem[] =>
+    DOCUMENTS.map((d) => ({
+      // Title Case inside the menu (Mark, 2026-09-11) — "Kitchen Order".
+      label: DOCUMENT_LABEL[d.kind].replace(/\b\w/g, (c) => c.toUpperCase()),
+      onSelect: () => act(d.kind),
+      disabled: busy !== null,
+    }));
+  const documentItems: ActionMenuItem[] = [
+    { label: "Preview", items: submenu(preview) },
+    { label: "Download", items: submenu(download) },
+    { label: "Email…", items: submenu(openCompose) },
+  ];
+
   return (
     <>
+      {children ? (
+        <>
+          {children(documentItems)}
+          {busy && busy !== "send" ? (
+            <p className="text-[13px] text-muted">{busy === "compose" ? "Loading…" : "Rendering…"}</p>
+          ) : null}
+          {sentNote && (
+            <p className="max-w-sm text-right text-[13px] text-[var(--rf-green-600)]">{sentNote}</p>
+          )}
+          {error && !compose && <p className="max-w-sm text-right text-[13px] text-accent">{error}</p>}
+        </>
+      ) : (
       <div className="flex flex-wrap items-center gap-3">
         {/* THE VERB IS THE LABEL AND IT NEVER CHANGES. A menu button is not a
             picker: nothing stays selected, so the bar reads the same before and
@@ -337,6 +373,7 @@ export function SendDocument({
         {sentNote && <p className="text-[13px] text-[var(--rf-green-600)]">{sentNote}</p>}
         {error && !compose && <p className="text-[13px] text-accent">{error}</p>}
       </div>
+      )}
 
       {compose && pending && (
         <Dialog

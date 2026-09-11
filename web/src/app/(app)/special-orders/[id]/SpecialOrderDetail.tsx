@@ -38,15 +38,13 @@ import { CompletionDates } from "@/components/specialOrders/CompletionDates";
 import { StatusCatchUp } from "@/components/specialOrders/StatusCatchUp";
 import { OrderTotals } from "@/components/specialOrders/OrderTotals";
 import { OrderLog, type OrderEventRow } from "@/components/specialOrders/OrderLog";
-import { OrderActions } from "@/components/specialOrders/OrderActions";
-import { ScheduleProduction } from "@/components/specialOrders/ScheduleProduction";
+import { OrderCommandMenu } from "@/components/specialOrders/OrderCommandMenu";
 import { OrderDelivery } from "@/components/specialOrders/OrderDelivery";
 import { TimeCell } from "@/components/specialOrders/TimeCell";
 import { StandingOrderBlock } from "@/components/specialOrders/StandingOrderBlock";
 import { LinkCustomer } from "@/components/specialOrders/LinkCustomer";
 import { OrderInfoLayout, OrderSplitLayout } from "@/components/specialOrders/OrderInfoLayout";
 import { OrderDocuments } from "@/components/specialOrders/OrderDocuments";
-import { SendDocument } from "@/components/specialOrders/SendDocument";
 import { PushOrderToQuickBooks } from "@/components/specialOrders/PushOrderToQuickBooks";
 import { TakenBy } from "@/components/specialOrders/TakenBy";
 import {
@@ -497,12 +495,62 @@ export async function SpecialOrderDetail({
             wrap happens between 1024 and 1280, which is where the breakpoint
             is. */}
         {canWrite ? (
-          <div className="flex shrink-0 flex-col items-start gap-3 xl:items-end">
-            {/* PRODUCE AND SEND leads, because on a live order it is the thing
-                you came to do — Duplicate and Delete are what you do TO an
-                order, this is what you do WITH one. Templates and standing
-                orders show nothing here: neither has an event, a customer
-                expecting a quote, or a kitchen to print for. */}
+          <div className="flex shrink-0 flex-col items-end gap-3">
+            {/* ONE "ACTIONS" BUTTON, level with the title at the right margin
+                (Mark, 2026-09-11: the command row's buttons were "all different
+                sizes and colors"). Preview, Download and Email… each open the
+                four documents; then Duplicate and Flag…, scheduling, and Cancel
+                order and Delete. Templates and standing orders get no document
+                rows: neither has a customer expecting a quote. */}
+            <OrderCommandMenu
+              send={
+                kind === "order"
+                  ? {
+                      orderId: id,
+                      orgId: row.org_id as string,
+                      number: row.number as string,
+                      canWrite,
+                      workflow: row as never,
+                      orgSettings: session.orgSettings,
+                      today,
+                    }
+                  : null
+              }
+              schedule={
+                kind === "order" && status !== "cancelled" && canScheduleProduction(session.membership.role)
+                  ? {
+                      orderId: id,
+                      number: row.number as string,
+                      title: (row.title as string | null) ?? null,
+                      eventDate: (row.event_date as string | null) ?? null,
+                      today,
+                      kitchenCode: codeFor(kitchenId),
+                      sellsCode: codeFor(sellsId),
+                      kitchenAssumed: orderKitchenId === null && orderSellsId !== null,
+                      sellsAssumed: orderSellsId === null && orderKitchenId !== null,
+                      // You commit the night for the kitchen you are standing in
+                      // (Mark, 2026-08-28) — the same rule /schedules generates
+                      // under. Null when the order names no shop at all, which
+                      // `ScheduleProduction` already refuses for its own reason.
+                      atThisKitchen: kitchenId !== null && kitchenId === session.activeLocation?.id,
+                      workingCode: session.activeLocation?.code ?? null,
+                      lines,
+                      scheduleId,
+                      scheduleLineCount,
+                      order: row as never,
+                    }
+                  : null
+              }
+              actions={{
+                scheduled,
+                id,
+                number: row.number as string,
+                kind,
+                status,
+                flagReason: row.flag_reason as string | null,
+                canWrite,
+              }}
+            />
             {kind === "order" ? (
               <PushOrderToQuickBooks
                 orderId={id}
@@ -519,51 +567,6 @@ export async function SpecialOrderDetail({
                 canWrite={canWrite}
               />
             ) : null}
-            {kind === "order" ? (
-              <SendDocument
-                orderId={id}
-                orgId={row.org_id as string}
-                number={row.number as string}
-                canWrite={canWrite}
-                workflow={row as never}
-                orgSettings={session.orgSettings}
-                today={today}
-              />
-            ) : null}
-            <OrderActions
-              scheduled={scheduled}
-              schedule={
-                kind === "order" && status !== "cancelled" && canScheduleProduction(session.membership.role) ? (
-                  <ScheduleProduction
-                    orderId={id}
-                    number={row.number as string}
-                    title={(row.title as string | null) ?? null}
-                    eventDate={(row.event_date as string | null) ?? null}
-                    today={today}
-                    kitchenCode={codeFor(kitchenId)}
-                    sellsCode={codeFor(sellsId)}
-                    kitchenAssumed={orderKitchenId === null && orderSellsId !== null}
-                    sellsAssumed={orderSellsId === null && orderKitchenId !== null}
-                    // You commit the night for the kitchen you are standing in
-                    // (Mark, 2026-08-28) — the same rule /schedules generates
-                    // under. Null when the order names no shop at all, which
-                    // `ScheduleProduction` already refuses for its own reason.
-                    atThisKitchen={kitchenId !== null && kitchenId === session.activeLocation?.id}
-                    workingCode={session.activeLocation?.code ?? null}
-                    lines={lines}
-                    scheduleId={scheduleId}
-                    scheduleLineCount={scheduleLineCount}
-                    order={row as never}
-                  />
-                ) : null
-              }
-              id={id}
-              number={row.number as string}
-              kind={kind}
-              status={status}
-              flagReason={row.flag_reason as string | null}
-              canWrite={canWrite}
-            />
           </div>
         ) : null}
       </div>

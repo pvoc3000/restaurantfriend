@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { TextInput } from "@/components/ui/TextInput";
@@ -25,6 +26,13 @@ import {
  * `DIALOG_COMMIT_CLASS` exception — what you came to this record to do is edit
  * the cells above.
  *
+ * SINCE 2026-09-11 THE RECORD DRAWS THEM AS ROWS OF ONE "ACTIONS" MENU
+ * (`OrderCommandMenu`): pass `children` and this hands back its rows — `edit`
+ * (Duplicate, Flag… or Resolve Flag) and `destructive` (Cancel Order, Delete),
+ * in Title Case like every menu row — while still owning the writes, the
+ * confirms, the flag dialog and
+ * the error line. Without `children` it draws the old button row.
+ *
  * Duplicate is decision 13's "one mechanism, three uses": templates, standing
  * orders and "same as last year" are all copy-this-order.
  */
@@ -37,6 +45,7 @@ export function OrderActions({
   canWrite,
   scheduled,
   schedule,
+  children,
 }: {
   id: string;
   number: string;
@@ -56,11 +65,12 @@ export function OrderActions({
   scheduled: boolean;
   /**
    * `<ScheduleProduction>`, composed upstream — `ScheduleDetail` passes
-   * `print={<PrintPacket/>}` into `ScheduleActions` the same way. It keeps this
-   * component from growing eight props it does not otherwise need, and keeps
-   * the order row a thing only `SpecialOrderDetail` reads.
+   * `print={<PrintPacket/>}` into `ScheduleActions` the same way. Used only by
+   * the button row; the Actions menu gets scheduling from `OrderCommandMenu`.
    */
   schedule?: ReactNode;
+  /** Render the commands as `ActionMenu` rows instead of a button row. */
+  children?: (groups: { edit: ActionMenuItem[]; destructive: ActionMenuItem[] }) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -69,7 +79,7 @@ export function OrderActions({
   const [flagging, setFlagging] = useState(false);
   const [reason, setReason] = useState("");
 
-  if (!canWrite) return null;
+  if (!canWrite) return children ? <>{children({ edit: [], destructive: [] })}</> : null;
 
   function flag() {
     const text = reason.trim();
@@ -120,10 +130,9 @@ export function OrderActions({
      the order's history from the columns themselves, so flag, resolve and
      cancel each stopped writing an entry that said less than the trigger's
      does — "Order cancelled" against "Status changed from Order to Cancelled".
-     The ONE entry this file still writes is `Duplicated from order N`, three
-     hundred lines down, and it writes it directly: a duplicate is a fact about
-     a row that has no column anywhere, since nothing on the new order records
-     where it came from. */
+     The ONE entry this file still writes is `Duplicated from order N`, and it
+     writes it directly: a duplicate is a fact about a row that has no column
+     anywhere, since nothing on the new order records where it came from. */
 
   async function cancel() {
     if (
@@ -216,11 +225,77 @@ export function OrderActions({
     });
   }
 
+  const flagDialog = flagging && (
+    <Dialog
+      title="Flag an issue"
+      onClose={() => { setFlagging(false); setReason(""); }}
+      busy={pending}
+      onSubmit={() => { if (reason.trim() && !pending) flag(); }}
+      width="max-w-lg"
+      footer={
+        <>
+          <button
+            type="button"
+            onClick={() => { setFlagging(false); setReason(""); }}
+            disabled={pending}
+            className={DIALOG_CANCEL_CLASS}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={flag}
+            disabled={pending || !reason.trim()}
+            className={DIALOG_COMMIT_CLASS}
+          >
+            Flag it
+          </button>
+        </>
+      }
+    >
+      <div className="space-y-3">
+        <p className="text-sm text-muted">
+          The row turns red on the list and its to-do becomes “{FLAG_TODO}”.
+          A flag outranks anything the app worked out about this order.
+        </p>
+        <TextInput
+          value={reason}
+          onValueChange={setReason}
+          placeholder="Customer disputes the flavour"
+          aria-label="What is wrong"
+          className="w-full"
+          autoFocus
+        />
+      </div>
+    </Dialog>
+  );
+
+  if (children) {
+    const edit: ActionMenuItem[] = [
+      { label: "Duplicate", onSelect: duplicate, disabled: pending },
+      flagReason
+        ? { label: "Resolve Flag", onSelect: resolve, disabled: pending }
+        : { label: "Flag…", onSelect: () => setFlagging(true), disabled: pending },
+    ];
+    const destructive: ActionMenuItem[] = [
+      ...(kind === "order" && status !== "cancelled"
+        ? [{ label: "Cancel Order", onSelect: () => void cancel(), danger: true, disabled: pending }]
+        : []),
+      { label: "Delete", onSelect: remove, danger: true, disabled: pending },
+    ];
+    return (
+      <>
+        {children({ edit, destructive })}
+        {error ? <p className="max-w-sm text-right text-[13px] text-accent">{error}</p> : null}
+        {flagDialog}
+      </>
+    );
+  }
+
   return (
-    /* NO HEADING AND NO SECTION: this lives in the record's sticky footer now
-       (FileMaker's own bottom row), where a "Commands" caption would label a
-       bar that is self-evidently a bar. The error sits at the end of the same
-       row so a refusal appears beside the button that caused it. */
+    /* NO HEADING AND NO SECTION: a "Commands" caption would label a bar that
+       is self-evidently a bar. The error sits at the end of the same row so a
+       refusal appears beside the button that caused it. */
     <div className="flex flex-wrap items-center gap-3">
       <div className="flex flex-wrap items-center gap-3">
         {/* LEADS THE ROW: scheduling is a thing you do WITH an order, where
@@ -230,11 +305,11 @@ export function OrderActions({
           Duplicate
         </button>
         {flagReason ? (
-          /* BLACK, and only while the order is flagged (Mark, 2026-08-21). A
-             flagged record is in an abnormal state with exactly one way out, so
-             this is a commit standing beside no peers — `PRIMARY_BUTTON_CLASS`
-             explains the exception in full. Unflagged, the same slot holds
-             "Flag an issue", which is an ordinary command and stays white. */
+          /* Only while the order is flagged (Mark, 2026-08-21). A flagged record
+             is in an abnormal state with exactly one way out, so this is a
+             commit standing beside no peers — `PRIMARY_BUTTON_CLASS` explains
+             the exception in full. Unflagged, the same slot holds "Flag an
+             issue", which is an ordinary command. */
           <button type="button" className={PRIMARY_BUTTON_CLASS} onClick={resolve} disabled={pending}>
             Resolve the issue
           </button>
@@ -255,50 +330,7 @@ export function OrderActions({
 
       {error ? <p className="text-[13px] text-accent">{error}</p> : null}
 
-      {flagging && (
-        <Dialog
-          title="Flag an issue"
-          onClose={() => { setFlagging(false); setReason(""); }}
-          busy={pending}
-          onSubmit={() => { if (reason.trim() && !pending) flag(); }}
-          width="max-w-lg"
-          footer={
-            <>
-              <button
-                type="button"
-                onClick={() => { setFlagging(false); setReason(""); }}
-                disabled={pending}
-                className={DIALOG_CANCEL_CLASS}
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={flag}
-                disabled={pending || !reason.trim()}
-                className={DIALOG_COMMIT_CLASS}
-              >
-                Flag it
-              </button>
-            </>
-          }
-        >
-          <div className="space-y-3">
-            <p className="text-sm text-muted">
-              The row turns red on the list and its to-do becomes “{FLAG_TODO}”.
-              A flag outranks anything the app worked out about this order.
-            </p>
-            <TextInput
-              value={reason}
-              onValueChange={setReason}
-              placeholder="Customer disputes the flavour"
-              aria-label="What is wrong"
-              className="w-full"
-              autoFocus
-            />
-          </div>
-        </Dialog>
-      )}
+      {flagDialog}
     </div>
   );
 }

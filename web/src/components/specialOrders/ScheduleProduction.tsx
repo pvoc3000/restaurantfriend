@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 import { createClient } from "@/lib/supabase/client";
 import { confirmDialog } from "@/lib/confirm";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { DateField } from "@/components/ui/DateField";
@@ -101,7 +102,15 @@ export function ScheduleProduction({
   order,
   atThisKitchen,
   workingCode,
+  children,
 }: {
+  /**
+   * Render the command as `ActionMenu` rows instead of a button
+   * (`OrderCommandMenu`, Mark, 2026-09-11) — "Schedule Production…" before, or
+   * "Open Schedule" and "Unschedule…" after, in Title Case like every menu row. The dialog, the confirm, the
+   * error line and the workflow offer are still drawn here.
+   */
+  children?: (items: ActionMenuItem[]) => ReactNode;
   orderId: string;
   number: string;
   title: string | null;
@@ -140,6 +149,47 @@ export function ScheduleProduction({
    * SCHEDULED — the only command is the way back out
    * ====================================================================== */
   if (scheduleId) {
+    const unschedule = async () => {
+      const ok = await confirmDialog({
+        title: "Unschedule this order?",
+        body:
+          `The production schedule for order ${number} is deleted, along with its ` +
+          `${scheduleLineCount} line${scheduleLineCount === 1 ? "" : "s"}, and the ` +
+          `Production scheduled date is cleared. The items unlock so you can edit them.`,
+        tone: "danger",
+      });
+      if (!ok) return;
+      setBusy(true);
+      setError(null);
+      const { error: e } = await supabase.rpc("unschedule_special_order", {
+        p_order_id: orderId,
+      });
+      setBusy(false);
+      // The function's own refusals are already worded for a person — it names
+      // the print date, or how many lines were counted — so they are shown as
+      // they arrive rather than rewritten here.
+      if (e) {
+        setError(readable(e.message, e.code));
+        return;
+      }
+      router.refresh();
+    };
+
+    if (children) {
+      return (
+        <>
+          {children([
+            {
+              label: scheduleLineCount > 0 ? `Open Schedule (${scheduleLineCount} Lines)` : "Open Schedule",
+              onSelect: () => router.push(`/schedules/${scheduleId}`),
+            },
+            { label: "Unschedule…", onSelect: () => void unschedule(), disabled: busy },
+          ])}
+          {error ? <p className="max-w-sm text-right text-sm text-accent">{error}</p> : null}
+        </>
+      );
+    }
+
     return (
       <>
         <div className="flex items-center gap-3">
@@ -155,31 +205,7 @@ export function ScheduleProduction({
             type="button"
             className={DANGER_BUTTON_CLASS}
             disabled={busy}
-            onClick={async () => {
-              const ok = await confirmDialog({
-                title: "Unschedule this order?",
-                body:
-                  `The production schedule for order ${number} is deleted, along with its ` +
-                  `${scheduleLineCount} line${scheduleLineCount === 1 ? "" : "s"}, and the ` +
-                  `Production scheduled date is cleared. The items unlock so you can edit them.`,
-                tone: "danger",
-              });
-              if (!ok) return;
-              setBusy(true);
-              setError(null);
-              const { error: e } = await supabase.rpc("unschedule_special_order", {
-                p_order_id: orderId,
-              });
-              setBusy(false);
-              // The function's own refusals are already worded for a person —
-              // it names the print date, or how many lines were counted — so
-              // they are shown as they arrive rather than rewritten here.
-              if (e) {
-                setError(readable(e.message, e.code));
-                return;
-              }
-              router.refresh();
-            }}
+            onClick={() => void unschedule()}
           >
             Unschedule
           </button>
@@ -236,20 +262,22 @@ export function ScheduleProduction({
     if (cs.length > 0) setOffer(cs);
   }
 
+  const openDialog = () => {
+    setDate(eventDate);
+    setName(scheduleTitle(number, title));
+    setError(null);
+    setOpen(true);
+  };
+
   return (
     <>
-      <button
-        type="button"
-        className={BUTTON_CLASS}
-        onClick={() => {
-          setDate(eventDate);
-          setName(scheduleTitle(number, title));
-          setError(null);
-          setOpen(true);
-        }}
-      >
-        Schedule production…
-      </button>
+      {children ? (
+        children([{ label: "Schedule Production…", onSelect: openDialog }])
+      ) : (
+        <button type="button" className={BUTTON_CLASS} onClick={openDialog}>
+          Schedule production…
+        </button>
+      )}
 
       {open ? (
         <Dialog

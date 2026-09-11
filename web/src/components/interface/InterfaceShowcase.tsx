@@ -44,6 +44,7 @@ import { FileDropZone } from "@/components/ui/FileDropZone";
 import { FilterMenus } from "@/components/ui/FilterMenus";
 import { MacTitleBar } from "@/components/ui/MacTitleBar";
 import { MenuButton } from "@/components/ui/MenuButton";
+import { ActionMenu } from "@/components/ui/ActionMenu";
 import { PageHeading } from "@/components/ui/PageHeading";
 import { PageLoading } from "@/components/ui/PageLoading";
 import { Pane, PaneHeader } from "@/components/ui/Pane";
@@ -783,6 +784,26 @@ function MenusBlock() {
         </Specimen>
         <Specimen name="MenuButton · disabled">
           <MenuButton label="Email" trigger="Email…" triggerClassName={BUTTON_CLASS} caret disabled items={commands} />
+        </Specimen>
+        <Specimen name="ActionMenu · nested submenus">
+          <ActionMenu
+            align="left"
+            ariaLabel="Actions for this record"
+            items={[
+              ...(["Preview", "Download", "Email…"] as const).map((verb) => ({
+                label: verb,
+                items: ["Quote", "Invoice", "Receipt", "Order"].map((doc) => ({
+                  label: doc,
+                  onSelect: () => setLast(`${verb.replace("…", "")} ${doc}`),
+                })),
+              })),
+              { label: "Duplicate", onSelect: () => setLast("Duplicate"), separatorBefore: true },
+              { label: "Flag…", onSelect: () => setLast("Flag") },
+              { label: "Schedule Production…", onSelect: () => setLast("Schedule"), separatorBefore: true },
+              { label: "Cancel Order", danger: true, onSelect: () => setLast("Cancel Order"), separatorBefore: true },
+              { label: "Delete", danger: true, onSelect: () => setLast("Delete") },
+            ]}
+          />
         </Specimen>
       </Grid>
       <Readout>Last command: {last}</Readout>
