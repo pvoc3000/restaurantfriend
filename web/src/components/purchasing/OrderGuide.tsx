@@ -756,39 +756,6 @@ export function OrderGuide({
     // components/ui/ActionBar.
     <>
     <div className="space-y-4 pb-22">
-      {/* THE HEADER'S TWO COLUMNS (Mark, 2026-08-22): what's due on the left,
-          what the shop has asked for on the right. Both are alerts rather than
-          view controls, which is why they sit above the shelf and not in it.
-
-          `items-start`, so the taller column does not stretch the shorter one
-          into a box of white space — these are two lists that happen to be
-          side by side, not two halves of one card.
-
-          An EMPTY list renders no band (Mark, 2026-09-10). With no reminder
-          due, the left column holds just "Add reminder", top-left, beside the
-          requests (Mark, the same day). */}
-      {bands && (
-      <div className="grid gap-4 md:grid-cols-2 md:items-start">
-        <Reminders
-          reminders={reminders}
-          guideDate={guideDate}
-          locationId={locationId}
-          orgId={orgId}
-          // Both dismissing and writing are UPDATEs/INSERTs on
-          // purchase_reminders, which 001's generic policy makes purchaser+ —
-          // the same gate that decides whether POs can be generated.
-          canWrite={canGeneratePos}
-        />
-        <GuideRequests
-          requests={requests}
-          userId={userId}
-          canResolve={canResolveRequests}
-          onJumpToItem={jumpToItem}
-          jumpMiss={jumpMiss}
-        />
-      </div>
-      )}
-
       {/* The shelf — everything above the list: the title, the day picker,
           the vendor totals and the filters. It used to hide with the
           masthead's collapse toggle, on the argument that these are all
@@ -868,6 +835,40 @@ export function OrderGuide({
         )}
 
       </div>
+
+      {/* THE HEADER'S TWO COLUMNS (Mark, 2026-08-22): what's due on the left,
+          what the shop has asked for on the right. BELOW THE TITLE ROW since
+          2026-09-10 (Mark: "can the reminder/requests row be placed below the
+          identity row?"), where they were above the whole shelf.
+
+          `items-start`, so the taller column does not stretch the shorter one
+          into a box of white space — these are two lists that happen to be
+          side by side, not two halves of one card.
+
+          An EMPTY list renders no band (Mark, 2026-09-10). With no reminder
+          due, the left column holds just "Add reminder", top-left, beside the
+          requests (Mark, the same day). */}
+      {bands && (
+      <div className="grid gap-4 md:grid-cols-2 md:items-start">
+        <Reminders
+          reminders={reminders}
+          guideDate={guideDate}
+          locationId={locationId}
+          orgId={orgId}
+          // Both dismissing and writing are UPDATEs/INSERTs on
+          // purchase_reminders, which 001's generic policy makes purchaser+ —
+          // the same gate that decides whether POs can be generated.
+          canWrite={canGeneratePos}
+        />
+        <GuideRequests
+          requests={requests}
+          userId={userId}
+          canResolve={canResolveRequests}
+          onJumpToItem={jumpToItem}
+          jumpMiss={jumpMiss}
+        />
+      </div>
+      )}
 
       {/* Vendor totals bar — the guide's central instrument (§4.2). No rules
           above or below and no sentence while it is empty (Mark, 2026-09-10):

@@ -1092,8 +1092,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    AND retires the two `showEmpty` flags described next: an empty list renders
    nothing, and with no reminder due the LEFT column holds just "Add reminder",
    top-left, beside the requests band (Mark, the same day, after trying it in
-   the title row and then in a strip above it). Refresh keeps a right-aligned
-   strip of its own above the title row. `BandEmpty` is gone. The muted greys
+   the title row and then in a strip above it). **The whole row sits BELOW the
+   title row**, above the vendor totals (Mark, the same day), where it had been
+   above the shelf since 2026-08-22. Refresh is in the tablet bar next to Home,
+   and on the desk a right-aligned link above the title. `BandEmpty` is gone. The muted greys
    inside the requests band are `text-ink/70`, since `text-muted` is ~4:1 on the
    yellow. The same day the vendor totals bar lost its rules above and below and
    its "Nothing ordered yet" sentence, and the day picker moved to the title
