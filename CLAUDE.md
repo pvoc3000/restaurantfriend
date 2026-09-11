@@ -283,7 +283,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    day, PUSHING what follows down rather than covering it (`push` — closed, the
    body is still out of flow and `invisible`, never unmounted, so its PDF
    plugins do not reload) — with six right-aligned figures ABOVE it in two rows
-   of three, ordered over received (they sat under it until later the same day):
+   of three, ordered over received, boxed in the card's own frame (they sat
+   under it until later the same day):
    Products Ordered, Packages Ordered, Ordered Total, Products Received
    (lines with a received quantity above zero), Packages Received, Received
    Total. Stacked below `xl`. Ticking lines no longer raises a band with a

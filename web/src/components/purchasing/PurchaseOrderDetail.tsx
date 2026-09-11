@@ -730,20 +730,25 @@ export function PurchaseOrderDetail({
   // of `auto` tracks sizes each column to its widest figure across BOTH rows,
   // so Products ordered sits over Products received and so on down; `w-fit
   // ml-auto` keeps the block on the right margin.
+  // In a box that matches the paperwork card below it (Mark, 2026-09-11) —
+  // the same border, ground and padding `PoAttachments` gives its drop zone,
+  // so the column reads as two cards of one kind.
   const figures = (
-    <div className="ml-auto grid w-fit grid-cols-[repeat(3,auto)] gap-x-8 gap-y-3">
-      {stats.map((s) => (
-        <div key={s.label} className="text-right">
-          <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">{s.label}</div>
-          <div
-            className={`text-[22px] font-bold tabular-nums tracking-[-0.01em] ${
-              s.short ? "text-accent" : ""
-            }`}
-          >
-            {s.value}
+    <div className="border border-ink bg-white px-4 py-3">
+      <div className="ml-auto grid w-fit grid-cols-[repeat(3,auto)] gap-x-8 gap-y-3">
+        {stats.map((s) => (
+          <div key={s.label} className="text-right">
+            <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">{s.label}</div>
+            <div
+              className={`text-[22px] font-bold tabular-nums tracking-[-0.01em] ${
+                s.short ? "text-accent" : ""
+              }`}
+            >
+              {s.value}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 
