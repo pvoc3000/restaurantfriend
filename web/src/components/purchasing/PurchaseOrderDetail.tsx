@@ -909,36 +909,29 @@ export function PurchaseOrderDetail({
           {error && <p className="text-sm text-accent">{error}</p>}
         </div>
 
-        {/* The paperwork sits at the FOOT of the column (Mark, 2026-09-11):
-            `xl:self-stretch` makes the column as tall as the row, which the
-            fields beside it usually set, and `mt-auto` takes the slack above
-            the card. Stacked below `xl` there is no row to fill, so it simply
-            follows the figures. */}
-        <div className="flex min-w-0 flex-col gap-6 xl:self-stretch">
+        <div className="min-w-0 space-y-6">
           {figures}
-          <div className="mt-auto">
-            {attachmentError ? (
-              <p className="border border-accent px-4 py-3 text-sm text-accent">
-                Could not load this order’s paperwork: {attachmentError}
-              </p>
-            ) : (
-              <PoAttachments
-                poId={order.id}
-                orgId={orgId}
-                attachments={attachments}
-                canEdit={canEditLines}
-                canFile={canFileBills}
-                // What an auto-filed invoice needs: whose vendor, whose location,
-                // and the lines to match its own against.
-                order={{
-                  id: order.id,
-                  vendor_id: order.vendor_id,
-                  location_id: order.location_id,
-                  lines,
-                }}
-              />
-            )}
-          </div>
+          {attachmentError ? (
+            <p className="border border-accent px-4 py-3 text-sm text-accent">
+              Could not load this order’s paperwork: {attachmentError}
+            </p>
+          ) : (
+            <PoAttachments
+              poId={order.id}
+              orgId={orgId}
+              attachments={attachments}
+              canEdit={canEditLines}
+              canFile={canFileBills}
+              // What an auto-filed invoice needs: whose vendor, whose location,
+              // and the lines to match its own against.
+              order={{
+                id: order.id,
+                vendor_id: order.vendor_id,
+                location_id: order.location_id,
+                lines,
+              }}
+            />
+          )}
         </div>
       </div>
 
