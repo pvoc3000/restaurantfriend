@@ -58,14 +58,25 @@ export function ActiveToggle({
   }
 
   if (readOnly) {
-    return <span className="text-sm text-muted">{active ? "Active" : "Inactive"}</span>;
+    // Beside a label column that already says "Active", the answer is a yes
+    // or a no rather than the word again.
+    return (
+      <span className="text-sm text-muted">
+        {appearance === "mac-checkbox" ? (active ? "Yes" : "No") : active ? "Active" : "Inactive"}
+      </span>
+    );
   }
 
   if (appearance === "mac-checkbox") {
+    // The visible label is the caller's — a `dt` in the record's label column
+    // (Mark, 2026-09-10) — so the word here is the accessible name only. An
+    // absolutely positioned child takes no part in the label's flex gap.
     return (
-      <span className="inline-flex items-center gap-2">
+      // `flex`, not `inline-flex`: inline, the wrapper sits on a line box whose
+      // descender space made the 36px box a 41px row.
+      <span className="flex items-center gap-2">
         <MacCheckbox size="lg" checked={on} disabled={pending} onChange={toggle}>
-          {label ?? "Active"}
+          <span className="sr-only">{label ?? "Active"}</span>
         </MacCheckbox>
         {failed && (
           <span className="text-[12px] uppercase tracking-[0.12em] text-accent">

@@ -230,7 +230,12 @@
    rule every box on the page follows; the X is drawn at ~2px rather than
    scaling the small one's 1.5 units, which at 36px would be a 3.4px stroke
    heavier than the box around it. */
+/* A BLOCK, not the small one's inline-flex. Inline, the row sits on a line
+   box and the line's descender space is added beneath it — measured, a 36px
+   box in a 41px row, 2.5px off the label beside it (Mark: "it seems
+   larger"). */
 .mac-checkbox-lg {
+  display: flex;
   min-height: 36px;
 }
 

@@ -167,8 +167,9 @@ export async function LocationDetail({
         <dl className="grid max-w-md grid-cols-[6rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
           {/* ACTIVE IS THE RECORD'S FIRST FIELD, a large Mac checkbox a button
               tall (Mark, 2026-09-10) — it sat beside the title as a switch. Its
-              own label names it, so the label column is left empty. */}
-          <dt />
+              label sits in the label column with the others; the checkbox keeps
+              the word as its accessible name only. */}
+          <dt className="text-subtle">Active</dt>
           <dd>
             <ActiveToggle
               table="locations"
