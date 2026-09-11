@@ -160,14 +160,19 @@
   user-select: none;
 }
 
+/* 2px at rest (Mark, 2026-09-10: "try 2px for the border of the checkbox and
+   3px on hover"). `background-origin: border-box` pins the X to the box's OUTER
+   edge, so the border paints over its ends and the X does not shrink a pixel
+   each time the border thickens on hover. */
 .mac-checkbox label::before {
   content: "";
   flex: none;
   box-sizing: border-box;
   width: 16px;
   height: 16px;
-  border: 1px solid #000;
+  border: 2px solid #000;
   background: #fff center / 100% 100% no-repeat;
+  background-origin: border-box;
 }
 
 /* Checked: an X from corner to corner, the System 6 mark, in GREY (Mark,
@@ -188,7 +193,7 @@
    and the words. */
 .mac-checkbox:hover label::before,
 .mac-checkbox:active label::before {
-  border-width: 2px;
+  border-width: 3px;
 }
 
 /* The input is the part under the pointer over the box, so it wants the hand
@@ -210,7 +215,7 @@
 /* A disabled box does not thicken. More specific than the row's hover rule
    (an extra element in the selector), and later, so it wins either way. */
 .mac-checkbox input:disabled + label::before {
-  border-width: 1px;
+  border-width: 2px;
 }
 
 /* ---- .mac-stipple: the calculator's desk-accessory ground ------------------ */
