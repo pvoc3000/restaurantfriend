@@ -781,7 +781,7 @@ export function PurchaseOrderDetail({
       {/* TWO COLUMNS (Mark, 2026-09-11): the order's fields, and beside them
           the six figures over its paperwork — which came out of the pinned
           footer. Stacked below `xl`. */}
-      <div className="grid items-start gap-x-8 gap-y-6 xl:grid-cols-[26rem_minmax(0,1fr)]">
+      <div className="grid items-start gap-x-16 gap-y-6 xl:grid-cols-[26rem_minmax(0,1fr)]">
         <div className="space-y-6">
           <dl className="grid max-w-[26rem] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
             {/* Status leads the fields (Mark, 2026-09-11) — it moved here out of
