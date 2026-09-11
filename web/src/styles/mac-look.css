@@ -9,8 +9,10 @@
  *     `PickList variant="field"` trigger, and the filter-row (unboxed) dress of
  *     `PickSet` and `RangePicker`, the order guide's day (`DateField
  *     variant="title"`); plus the hand-rolled copies of the plain
- *     command button, swept to carry it.
- *   - `mac-field` — every search box (`TextInput search`).
+ *     command button, swept to carry it, and every key of `ui/CalcPad`.
+ *   - `mac-field` — every search box (`TextInput search`), and the
+ *     calculator's readout.
+ *   - `mac-stipple` — the calculator's window body.
  * DELIBERATELY NOT: `TabPicker`, checkboxes and switches, the boxed detail-field
  * dresses (`InlineValue`, boxed pickers and dates), the masthead and tablet
  * bars, row ⋯ menus and the columns eye, text-only buttons, and ordinary form
@@ -73,6 +75,21 @@
 .mac-control:has(input:active) {
   transform: none;
   box-shadow: 3px 3px 0 0 #000;
+}
+
+/* ---- .mac-stipple: the calculator's desk-accessory ground ------------------ */
+
+/* The original Mac Calculator's window body (Mark, 2026-09-10: "give our
+   calculator control the classic mac look", with the 1984 Calculator as the
+   reference). A 25% dot pattern — one black pixel in every two-by-two, offset
+   on alternate rows — drawn from a 4px SVG tile so every dot is a whole CSS
+   pixel. The keys and the readout sit on it as solid white, which is what makes
+   them read as raised. `ui/CalcPad` is the only caller. */
+.mac-stipple {
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' shape-rendering='crispEdges'%3E%3Crect width='1' height='1'/%3E%3Crect x='2' y='2' width='1' height='1'/%3E%3C/svg%3E");
+  background-size: 4px 4px;
+  image-rendering: pixelated;
 }
 
 /* ---- .mac-field: the search box ---------------------------------------- */

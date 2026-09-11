@@ -113,14 +113,14 @@ export function useCalcField() {
  * gesture with one meaning: tap outside. That is also the only route that
  * commits, since every field here saves on blur.
  */
-type Key = readonly [label: string, action: string, tone: "fn" | "digit" | "op"];
+type Key = readonly [label: string, action: string];
 
 const KEYS: ReadonlyArray<Key> = [
-  ["⌫", "back", "fn"],  ["(", "(", "fn"],     [")", ")", "fn"],    ["÷", "÷", "op"],
-  ["7", "7", "digit"],  ["8", "8", "digit"],  ["9", "9", "digit"], ["×", "×", "op"],
-  ["4", "4", "digit"],  ["5", "5", "digit"],  ["6", "6", "digit"], ["−", "-", "op"],
-  ["1", "1", "digit"],  ["2", "2", "digit"],  ["3", "3", "digit"], ["+", "+", "op"],
-  ["C", "clear", "fn"], ["0", "0", "digit"],  [".", ".", "digit"], ["=", "equals", "op"],
+  ["⌫", "back"],  ["(", "("],  [")", ")"],  ["÷", "÷"],
+  ["7", "7"],     ["8", "8"],  ["9", "9"],  ["×", "×"],
+  ["4", "4"],     ["5", "5"],  ["6", "6"],  ["−", "-"],
+  ["1", "1"],     ["2", "2"],  ["3", "3"],  ["+", "+"],
+  ["C", "clear"], ["0", "0"],  [".", "."],  ["=", "equals"],
 ];
 
 /**
@@ -142,7 +142,8 @@ const KEYS: ReadonlyArray<Key> = [
  *
  * `⌫` (U+232B) needs the other kind of correction: its mass is the box on the
  * RIGHT and it tapers to a point on the left, so centring by the bounding box
- * reads as pushed right.
+ * reads as pushed right. The nudge moves the GLYPH, never the key — a key is a
+ * bordered square now, and shifting the box would put one key out of the grid.
  *
  * SIZE IS A LOOKUP, NOT AN EXTRA CLASS, and that is deliberate: Tailwind
  * resolves competing utilities by STYLESHEET order, so appending `text-[30px]`
@@ -159,12 +160,21 @@ const KEY_SIZE: Record<string, string> = {
 };
 const KEY_NUDGE: Record<string, string> = { "⌫": "-translate-x-[3px]" };
 
-/** Apple's dark-mode calculator palette. */
-const TONE: Record<Key[2], string> = {
-  fn: "bg-[#6b6b6d] text-white active:bg-[#8a8a8c]",
-  digit: "bg-[#4d4d4f] text-white active:bg-[#6b6b6d]",
-  op: "bg-[#ff9f0a] text-white active:bg-[#ffb340]",
-};
+/**
+ * EVERY KEY IS THE APP'S OWN MAC BUTTON (Mark, 2026-09-10: "give our calculator
+ * control the classic mac look using our mac styling for buttons … keeping the
+ * layout the same"): white, square, a 1px black border, `mac-control`'s hard
+ * 3px shadow, and the drop into it on press. One dress for all twenty — the
+ * 1984 Calculator told its keys apart by glyph alone, and the orange operators
+ * were the modern Mac this replaces.
+ *
+ * `mac-own-hover` because this pad only ever renders on a TOUCH screen, where a
+ * tap leaves `:hover` stuck on the last key pressed — a grey key sitting there
+ * after you have moved on reads as a key still held. The press says it instead:
+ * the drop, plus the app's hover grey for as long as the finger is down.
+ */
+const KEY_CLASS =
+  "mac-control mac-own-hover flex aspect-square items-center justify-center border border-ink bg-white font-normal leading-none text-ink active:bg-[#c0c0c0]";
 
 /**
  * Drive a controlled React input from outside React. Assigning `el.value`
@@ -422,22 +432,24 @@ export function CalcPad() {
         }}
       >
       <div
-        // THIS PANEL DELIBERATELY DOES NOT LOOK LIKE THE APP (Mark, 2026-08-10,
-        // with a screenshot of macOS Calculator: "copy this UI"). Dark, round
-        // corners, circular keys, orange operators, a drop shadow — four house
-        // rules broken at once.
+        // THE 1984 MAC CALCULATOR, IN THE APP'S OWN MAC LOOK (Mark, 2026-09-10:
+        // "the calculator looks like the modern mac right now — let's retrofy
+        // it while keeping the layout the same", with the original desk
+        // accessory as the reference). A black title bar over a stippled body,
+        // a 2px black frame, and a hard drop shadow — the same 3px-down-and-right
+        // shadow every Mac button in the app carries, one step heavier for a
+        // window.
         //
-        // The justification isn't that Mark asked, though he did. It's that
-        // this is the one element in the app that ISN'T app chrome: it stands
-        // in for the system keyboard, and a system keyboard has never matched
-        // the app it types into. Looking like the calculator everyone already
-        // owns is the whole point — nobody should have to learn this surface,
-        // and its own conventions carry more than ours would. Every other
-        // control on screen stays black and white and square.
+        // It replaced a dark, rounded, orange-keyed copy of macOS Calculator
+        // (Mark, 2026-08-10: "copy this UI"). The argument for looking like a
+        // calculator rather than like app chrome still holds — this stands in
+        // for the system keyboard — and since the Mac look went app-wide the
+        // calculator people know and the app's own buttons are the same thing.
         //
-        // Keep it self-contained: these literals are the calculator's palette,
-        // not new tokens, and nothing else in the app should reach for them.
-        className="w-[min(21rem,calc(100vw-4.5rem))] rounded-[22px] bg-[#1c1c1e] p-3 shadow-[0_10px_44px_rgba(0,0,0,0.38)] ring-1 ring-white/10"
+        // The corners are the one soft thing left, and deliberately: the
+        // original's window corners were rounded, and they are what tells a
+        // floating window from a box on the page.
+        className="w-[min(21rem,calc(100vw-4.5rem))] overflow-hidden rounded-[8px] border-2 border-ink bg-white shadow-[4px_4px_0_0_#000]"
         // A tap anywhere on the pad, including its gaps, must not move focus —
         // and must not reach the catcher, or every key press would also commit.
         onPointerDown={(e) => {
@@ -450,21 +462,49 @@ export function CalcPad() {
           e.stopPropagation();
         }}
       >
+        {/* THE TITLE BAR. Its close box is real: it does what a tap outside
+            does (`done` — blur, which is the commit), because a close box that
+            does nothing is a lie on the one surface people already know how to
+            read. 44px of target around an 18px box. */}
+        <div className="flex h-11 items-center gap-1 bg-ink pr-3 text-white">
+          <button
+            type="button"
+            tabIndex={-1}
+            aria-label="Close the calculator"
+            className="flex h-11 w-11 shrink-0 items-center justify-center"
+            onPointerDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              press("done");
+            }}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+            }}
+          >
+            <span className="block h-[18px] w-[18px] border-2 border-white" />
+          </button>
+          <span className="text-[17px] font-bold tracking-[0.02em]">Calculator</span>
+        </div>
+
+        <div className="mac-stipple p-3">
         {/* THE READOUT, Apple's way round: the expression small and grey above,
-            what it comes to large and white below, both right-aligned so the
-            digits line up as they grow.
-            
+            what it comes to large below, both right-aligned so the digits line
+            up as they grow. A sunken white well — `mac-field`, the search box's
+            own inset — so it reads as a window onto a value rather than a key.
+
             It does a second job here that a calculator's doesn't have to. The
             field being edited is somewhere behind this panel and may be off
             screen entirely, so while the pad is up this IS the field — which is
-            why it gets two lines and 40px of type rather than a caption. */}
-        <div className="px-3 pb-3 pt-2 text-right">
-          <div className="h-5 truncate font-mono text-[15px] leading-5 text-white/45">
+            why it gets two lines and 40px of type rather than a caption. A
+            refusal is red, the app's colour for something wrong. */}
+        <div className="mac-field mb-3 border border-ink bg-white px-3 pb-1.5 pt-2 text-right">
+          <div className="h-5 truncate font-mono text-[15px] leading-5 text-muted">
             {showsResult ? draft : showsRefusal ? "can’t read that" : "\u00a0"}
           </div>
           <div
-            className={`truncate font-mono text-[40px] font-light leading-tight ${
-              showsRefusal ? "text-[#ff9f0a]" : "text-white"
+            className={`truncate font-mono text-[40px] leading-tight ${
+              showsRefusal ? "text-accent" : "text-ink"
             }`}
           >
             {showsResult ? result : draft || "0"}
@@ -472,7 +512,7 @@ export function CalcPad() {
         </div>
 
         <div className="grid grid-cols-4 gap-2.5">
-          {KEYS.map(([label, action, tone]) => (
+          {KEYS.map(([label, action]) => (
             <button
               key={label}
               type="button"
@@ -511,13 +551,12 @@ export function CalcPad() {
               }}
               tabIndex={-1}
               aria-label={label}
-              className={`flex aspect-square items-center justify-center rounded-full font-normal leading-none ${
-                KEY_SIZE[label] ?? KEY_SIZE_BASE
-              } ${KEY_NUDGE[label] ?? ""} ${TONE[tone]}`}
+              className={`${KEY_CLASS} ${KEY_SIZE[label] ?? KEY_SIZE_BASE}`}
             >
-              {label}
+              <span className={KEY_NUDGE[label]}>{label}</span>
             </button>
           ))}
+        </div>
         </div>
       </div>
       </div>

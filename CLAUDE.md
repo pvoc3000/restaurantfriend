@@ -9987,6 +9987,17 @@ weekday column, and 003 then silently made it per-vendor-item.
   page's tiles (`tablet/Landing`, Mark: "those are buttons afterall") — the bar
   above them does not. **A NEW BUTTON uses
   `BUTTON_CLASS`, or it will not look like its neighbours.**
+  **`ui/CalcPad` wears it too** (Mark, 2026-09-10: "retrofy it while keeping
+  the layout the same", with the 1984 Mac Calculator as the reference). It had
+  been a dark, rounded, orange-keyed copy of macOS Calculator; now every key is
+  a white `mac-control` square (with `mac-own-hover`, because the pad is
+  touch-only and a tapped key would keep a stuck grey hover — the press drops
+  it and fills it grey instead), the readout is a `mac-field` well, and the
+  window is a 2px black frame with a 4px hard shadow, a black title bar and a
+  `mac-stipple` body (a 25% dot tile, in `mac-look.css`). The title bar's
+  close box is REAL: it does what a tap outside does. The ⌫ nudge moves the
+  glyph, never the key, or that square would sit 3px out of the grid. Same 4×5
+  grid, same keys, same focus handling.
   **`mac-own-hover`** is on the black and red ones (`PRIMARY_*`, `DANGER_*`,
   both dialog commits): they take the shadow and the press and keep their OWN
   hover, because a grey fill on a black commit reads as disabled and on a red
