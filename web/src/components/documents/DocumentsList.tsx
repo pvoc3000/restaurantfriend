@@ -17,8 +17,10 @@ import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { sortRows, type SortDir } from "@/lib/tableSort";
 import { withFrom } from "@/lib/breadcrumbs";
+import { openWindowNow } from "@/lib/poProcessing";
+import { PHOTO_URL_TTL_SECONDS } from "@/lib/facilityPhotos";
+import { DOCUMENT_BUCKET } from "@/lib/orgDocuments";
 import { NewDocument } from "./NewDocument";
-import { PreviewDocuments } from "./PreviewDocuments";
 import { deleteDocuments, duplicateDocument } from "./documentWrites";
 
 export type DocumentRow = {
@@ -45,8 +47,8 @@ const LINK =
  * look for a form: "the office forms", "the signs".
  *
  * THE COMMANDS (Mark, 2026-09-11): a checkbox column at the left, a ⋯ at the
- * right (Preview… · Duplicate · Delete), and one Actions menu in the title row
- * (New Document… · Preview Selected… · Duplicate Selected · Delete Selected).
+ * right (Open · Duplicate · Delete), and one Actions menu in the title row
+ * (New Document… · Open Selected · Duplicate Selected · Delete Selected).
  * The row menu and the Actions menu run the SAME three functions, taking the
  * rows as a parameter, so the confirm and the row-count checks cannot drift
  * between doors (`deleteOrders`' rule). Duplicate is supervisor+ and Delete is
@@ -81,8 +83,79 @@ export function DocumentsList({
   const [category, setCategory] = useState<string>("all");
   const [sort, setSort] = useState<{ key: string; dir: SortDir }>({ key: "category", dir: "asc" });
   const [checked, setChecked] = useState<Set<string>>(new Set());
-  const [preview, setPreview] = useState<DocumentRow[] | null>(null);
   const href = (id: string) => withFrom(`/documents/${id}`, from);
+
+  /**
+   * Open the files themselves in browser tabs, where printing and downloading
+   * already are (Mark, 2026-09-11: "skip the middleman and just open the pdf in
+   * a new tab so it can be printed and downloaded. I don't see the point of
+   * opening it in a separate panel first"). This replaces a preview panel whose
+   * whole job was to put a viewer, a Print and a Download in front of the same
+   * file the browser shows for nothing.
+   *
+   * THE TABS ARE OPENED BEFORE ANYTHING IS AWAITED, and the signed URLs are
+   * written into them once they arrive — a window opened after an await is
+   * silently blocked (`openWindowNow`'s rule, which every PDF in this app
+   * already follows). The row carries its own file count, so the right number
+   * of tabs is known without asking the database first.
+   */
+  function openFiles(targets: DocumentRow[]) {
+    const withFiles = targets.filter((t) => t.file_count > 0);
+    if (withFiles.length === 0) return;
+    const wanted = withFiles.reduce((n, t) => n + t.file_count, 0);
+    const windows = Array.from({ length: wanted }, () => openWindowNow());
+    const blocked = windows.filter((w) => !w).length;
+    setFailed(null);
+    startTransition(async () => {
+      const { data, error } = await supabase
+        .from("org_document_files")
+        .select("document_id, storage_path")
+        .in(
+          "document_id",
+          withFiles.map((t) => t.id)
+        )
+        .order("created_at");
+      if (error) {
+        windows.forEach((w) => w?.close());
+        setFailed(error.message);
+        return;
+      }
+      // In the order they were asked for: each document's files, oldest first.
+      const byDocument = new Map<string, string[]>();
+      for (const f of data ?? []) {
+        const list = byDocument.get(f.document_id as string) ?? [];
+        list.push(f.storage_path as string);
+        byDocument.set(f.document_id as string, list);
+      }
+      const paths = withFiles.flatMap((t) => byDocument.get(t.id) ?? []);
+      const { data: urls } = await supabase.storage
+        .from(DOCUMENT_BUCKET)
+        .createSignedUrls(paths, PHOTO_URL_TTL_SECONDS);
+      const signed = new Map<string, string>();
+      for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+
+      let used = 0;
+      for (const path of paths) {
+        const url = signed.get(path);
+        const win = windows[used++];
+        if (win && url) win.location.href = url;
+        else win?.close();
+      }
+      // A tab per file the row CLAIMED; close any the record turned out not to
+      // have, rather than leaving somebody a blank tab to wonder about.
+      windows.slice(used).forEach((w) => w?.close());
+
+      if (blocked > 0) {
+        setFailed(
+          blocked === wanted
+            ? `The browser blocked the new tab${wanted === 1 ? "" : "s"}. Allow pop-ups for this site, then try again.`
+            : `${blocked} of ${wanted} tabs were blocked. Allow pop-ups for this site to open them all.`
+        );
+      } else if (signed.size < paths.length || paths.length === 0) {
+        setFailed("Some files could not be opened. Reload the page and try again.");
+      }
+    });
+  }
 
   function toggle(id: string) {
     setChecked((prev) => {
@@ -297,7 +370,7 @@ export function DocumentsList({
         <RowMenu
           label={`Actions for ${r.title}`}
           items={[
-            { label: "Preview…", disabled: r.file_count === 0, onSelect: () => setPreview([r]) },
+            { label: "Open", disabled: r.file_count === 0 || busy, onSelect: () => openFiles([r]) },
             ...(editable ? [{ label: "Duplicate", disabled: busy, onSelect: () => duplicate([r]) }] : []),
             ...(canDelete
               ? [{ label: "Delete", danger: true, disabled: busy, onSelect: () => void remove([r]) }]
@@ -320,10 +393,10 @@ export function DocumentsList({
   const commands = (openNew?: () => void): ActionMenuItem[] => [
     ...(openNew ? [{ label: "New Document…", onSelect: openNew }] : []),
     {
-      label: "Preview Selected…",
+      label: "Open Selected",
       separatorBefore: true,
-      disabled: !selected.some((r) => r.file_count > 0),
-      onSelect: () => setPreview(selected),
+      disabled: busy || !selected.some((r) => r.file_count > 0),
+      onSelect: () => openFiles(selected),
     },
     ...(editable
       ? [{ label: "Duplicate Selected", disabled: none || busy, onSelect: () => duplicate(selected) }]
@@ -389,7 +462,6 @@ export function DocumentsList({
         group={{ label: (r) => r.category ?? "No category", sortKey: "category" }}
         empty={<p className="text-sm text-muted">No documents{needle ? " match" : " yet"}.</p>}
       />
-      {preview && <PreviewDocuments documents={preview} onClose={() => setPreview(null)} />}
     </div>
   );
 }
