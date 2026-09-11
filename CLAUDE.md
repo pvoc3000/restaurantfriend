@@ -1095,7 +1095,13 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    the title row and then in a strip above it). **The whole row sits BELOW the
    title row**, above the vendor totals (Mark, the same day), where it had been
    above the shelf since 2026-08-22. Refresh is in the tablet bar next to Home,
-   and on the desk a right-aligned link above the title. `BandEmpty` is gone. The muted greys
+   and on the desk a right-aligned link above the title. **REFRESH NOW DOES
+   SOMETHING YOU CAN SEE** (Mark: "it feels like it does nothing"): it runs in a
+   transition and reads "Refreshing", dimmed, until the fresh data renders; and
+   fresh server data RE-SEEDS the guide's counts, which were seeded once and so
+   ignored every refresh — a count entered on another device never appeared. A
+   box being typed in keeps its own draft (`GuideLine`), and a vendor item with
+   a write still in flight keeps its local value (`pendingWrites`). `BandEmpty` is gone. The muted greys
    inside the requests band are `text-ink/70`, since `text-muted` is ~4:1 on the
    yellow. The same day the vendor totals bar lost its rules above and below and
    its "Nothing ordered yet" sentence, WILL ORDER hides at $0 (unless a

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -135,6 +135,12 @@ export function OrderGuide({
   userId: string;
 }) {
   const router = useRouter();
+  // REFRESH SAYS IT IS WORKING (Mark, 2026-09-10: "it feels like it does
+  // nothing"). `router.refresh()` inside a transition keeps `refreshing` true
+  // until the fresh server data has rendered; the button reads "Refreshing"
+  // and dims until then.
+  const [refreshing, startRefresh] = useTransition();
+  const refresh = () => startRefresh(() => router.refresh());
   const supabase = createClient();
 
   // The sticky controls band publishes its own height, so the column labels
@@ -169,6 +175,34 @@ export function OrderGuide({
         ])
       )
   );
+  // Vendor items with a write still on its way to the database.
+  const [pendingWrites, setPendingWrites] = useState<ReadonlySet<string>>(() => new Set());
+
+  // FRESH SERVER DATA RE-SEEDS THE COUNTS (Mark, 2026-09-10). The state above
+  // is seeded ONCE, so a refresh used to bring back new entries and ignore
+  // them — a count entered on another device never appeared. Adjusting state
+  // during render when the prop changes is React's documented alternative to a
+  // sync effect. Two things are protected: a box being TYPED IN keeps its own
+  // draft in `GuideLine`, so its text is untouched; and a vendor item whose
+  // write is still in flight keeps its local value rather than the server's
+  // older one.
+  const [seenEntries, setSeenEntries] = useState(initialEntries);
+  if (initialEntries !== seenEntries) {
+    setSeenEntries(initialEntries);
+    setEntries((prev) => {
+      const next = new Map<string, EntryState>(
+        initialEntries.map((e) => [
+          e.vendor_item_id,
+          { on_hand: e.on_hand, qty_to_order: e.qty_to_order },
+        ])
+      );
+      for (const id of pendingWrites) {
+        const local = prev.get(id);
+        if (local) next.set(id, local);
+      }
+      return next;
+    });
+  }
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Seeded from the session cookie by the server, so you come back to the view
@@ -289,6 +323,7 @@ export function OrderGuide({
     const next: EntryState = { ...current, ...patch };
 
     setEntries((prev) => new Map(prev).set(row.vendor_item_id, next));
+    setPendingWrites((prev) => new Set(prev).add(row.vendor_item_id));
     setSaving(true);
     setError(null);
 
@@ -305,6 +340,11 @@ export function OrderGuide({
     );
 
     setSaving(false);
+    setPendingWrites((prev) => {
+      const rest = new Set(prev);
+      rest.delete(row.vendor_item_id);
+      return rest;
+    });
     if (error) {
       // Put the old value back rather than leaving a number on screen that
       // isn't in the database.
@@ -694,10 +734,11 @@ export function OrderGuide({
     publishBarActions([
       {
         key: "refresh",
-        word: "Refresh",
+        word: refreshing ? "Refreshing" : "Refresh",
         icon: ICON_REFRESH,
-        onClick: () => router.refresh(),
-        title: "Reload this guide",
+        onClick: refresh,
+        disabled: refreshing,
+        title: "Reload this guide, counts from other devices included",
         side: "leading",
       },
       {
@@ -770,10 +811,11 @@ export function OrderGuide({
         {!tablet && (
           <div className="flex justify-end">
             <button
-              onClick={() => router.refresh()}
-              className="text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
+              onClick={refresh}
+              disabled={refreshing}
+              className="text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900 disabled:no-underline disabled:opacity-60"
             >
-              Refresh
+              {refreshing ? "Refreshing…" : "Refresh"}
             </button>
           </div>
         )}
