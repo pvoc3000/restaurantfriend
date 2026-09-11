@@ -129,6 +129,71 @@
   outline-offset: -1px;
 }
 
+/* ---- .mac-checkbox: ui/MacCheckbox ------------------------------------- */
+
+/* system.css's `field-row` checkbox, in the app's terms (Mark, 2026-09-10).
+   The native input sits TRANSPARENT over the drawn box — not `display: none`,
+   which would take it out of the tab order — and the label draws the box in
+   `::before`, so the whole label is the hit target. */
+.mac-checkbox {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+.mac-checkbox input {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0;
+  opacity: 0;
+}
+
+.mac-checkbox label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.mac-checkbox label::before {
+  content: "";
+  flex: none;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #000;
+  background: #fff center / 100% 100% no-repeat;
+}
+
+/* Checked: an X from corner to corner, the System 6 mark. */
+.mac-checkbox input:checked + label::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 1L15 15M15 1L1 15' stroke='%23000' stroke-width='1.5'/%3E%3C/svg%3E");
+}
+
+/* Held down: the edge thickens, as a classic checkbox did under the mouse. */
+.mac-checkbox label:active::before {
+  border-width: 2px;
+}
+
+.mac-checkbox input:focus-visible + label::before {
+  outline: 1px dotted #000;
+  outline-offset: 2px;
+}
+
+.mac-checkbox input:disabled + label {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.mac-checkbox input:disabled + label:active::before {
+  border-width: 1px;
+}
+
 /* ---- .mac-stipple: the calculator's desk-accessory ground ------------------ */
 
 /* The original Mac Calculator's window body (Mark, 2026-09-10: "give our

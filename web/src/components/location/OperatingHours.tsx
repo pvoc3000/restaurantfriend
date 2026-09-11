@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Checkbox } from "@/components/ui/Checkbox";
+import { MacCheckbox } from "@/components/ui/MacCheckbox";
 import { BOXED_FIELD, BOXED_FIELD_BORDER, BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
@@ -96,8 +96,10 @@ export function OperatingHours({
       <table className="text-sm">
         <thead>
           <tr className="border-b-2 border-ink text-[11px] uppercase tracking-[0.12em] text-subtle">
-            <th className="py-1 pr-6 text-left font-semibold">Day</th>
-            <th className="py-1 pr-6 text-left font-semibold">Open</th>
+            {/* The day IS the checkbox's label (Mark, 2026-09-10, the Mac
+                checkbox): "Tuesday" ticked says the shop opens Tuesday, so the
+                separate Open column went. */}
+            <th className="py-1 pr-6 text-left font-semibold">Open on</th>
             <th className="py-1 pr-6 text-left font-semibold">Opens</th>
             <th className="py-1 text-left font-semibold">Closes</th>
           </tr>
@@ -108,15 +110,14 @@ export function OperatingHours({
             const on = days.includes(weekday);
             return (
               <tr key={day}>
-                <td className={`py-1 pr-6 ${on ? "" : "text-faint"}`}>{day}</td>
                 <td className="py-1 pr-6">
-                  <Checkbox
+                  <MacCheckbox
                     checked={on}
-                    size={18}
                     disabled={!editable || pending}
-                    label={`${day}: open`}
                     onChange={() => toggleDay(weekday)}
-                  />
+                  >
+                    {day}
+                  </MacCheckbox>
                 </td>
                 <td className="py-1 pr-6">
                   <TimeCell
