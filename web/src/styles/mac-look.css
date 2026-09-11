@@ -89,9 +89,10 @@
    takes them too. The shared parts carry two MARKER classes that do nothing
    outside such a screen:
      - `rf-typed` — a box you type into (`InlineValue` text, number and notes,
-       a boxed `DateField` or `TimeField`, a raw time input). It SINKS, the
-       search box's `mac-field`: black border, a hard 2px shadow inside along
-       the top and left, white ground, no hover.
+       a boxed `DateField` or `TimeField`, a raw time input). A SOLID BLACK
+       1px border on all four sides, white ground, no hover. It was sunken
+       first, the search box's inset shadow along the top and left, and Mark
+       asked for the plain border instead the same hour.
      - `rf-press` — a box you press (a boxed `PickList`, `PickSet` or
        `RangePicker`, and a screen's own buttons). It RISES and PRESSES, the
        `.mac-control` rules above, which name it beside that class so there is
@@ -108,7 +109,6 @@
 .mac-page .rf-typed {
   border-color: #000;
   background-color: #fff;
-  box-shadow: inset 2px 2px 0 0 #000;
   transition: none;
 }
 
@@ -127,7 +127,6 @@
 .mac-page .rf-typed ~ .rf-typed-editing {
   outline: 1px solid #000;
   outline-offset: -1px;
-  box-shadow: inset 2px 2px 0 0 #000;
 }
 
 /* ---- .mac-stipple: the calculator's desk-accessory ground ------------------ */

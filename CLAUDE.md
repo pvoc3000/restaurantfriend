@@ -10003,13 +10003,15 @@ weekday column, and 003 then silently made it per-vendor-item.
   `/locations/[id]`, as an experiment. The shared field parts carry two MARKER
   classes that do nothing outside such a screen: **`rf-typed`** (a box you
   type into — `InlineValue` text/number/notes, a boxed `DateField` or
-  `TimeField`, the hours block's raw time inputs) SINKS like the search box,
-  black border and an inset 2px shadow, white, no hover; **`rf-press`** (a
+  `TimeField`, the hours block's raw time inputs) gets a SOLID BLACK 1px border
+  on all four sides, white, no hover — it was sunken like the search box first,
+  and Mark asked for the plain border within the hour ("for text fields I want
+  to see a solid black 1px border on all sides"); **`rf-press`** (a
   boxed `PickList`, `PickSet` or `RangePicker`, and `WorkingHere`'s button)
   RISES and PRESSES, named beside `.mac-control` in the same rules so there is
-  one definition. While typing, `InlineValue`'s editor keeps the sunken look
+  one definition. While typing, `InlineValue`'s editor keeps the same 1px border
   (`.rf-typed ~ .rf-typed-editing`, the invisible Sizer being the sibling), so a
-  click moves nothing — measured 0px; the unboxed title keeps its own editor.
+  click moves nothing; the unboxed title keeps its own editor.
   Undo is taking the class off the page; every record Mac is moving it up to the
   layout. Switches, checkboxes and the record book are untouched.
   **`mac-own-hover`** is on the black and red ones (`PRIMARY_*`, `DANGER_*`,

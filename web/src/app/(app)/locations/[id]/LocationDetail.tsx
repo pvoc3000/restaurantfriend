@@ -126,7 +126,7 @@ export async function LocationDetail({
   return (
     // `mac-page` puts every field and button on this record in the classic Mac
     // look (Mark, 2026-09-10: "let's try making the location detail page mac
-    // styled") — typed boxes sunken, pickers and buttons raised. An experiment
+    // styled") — text fields a solid black border, pickers and buttons raised. An experiment
     // on one screen: take the class off to undo it (styles/mac-look.css).
     <div className="mac-page space-y-8">
       <Breadcrumbs
