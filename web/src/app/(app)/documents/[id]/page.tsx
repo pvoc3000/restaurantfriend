@@ -114,7 +114,7 @@ export default async function DocumentPage({
         </div>
         {canDeleteInspection(session.membership.role) && (
           <div className="ml-auto">
-            <DocumentActions documentId={id} title={row.title} filePaths={paths} />
+            <DocumentActions documentId={id} title={row.title} fileCount={paths.length} />
           </div>
         )}
       </div>

@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getAppSession } from "@/lib/session";
 import { canEditPage } from "@/lib/pageAccess";
+import { canDeleteInspection } from "@/lib/roles";
 import { serverTimeZone, todayInTimeZone } from "@/lib/today";
 import { DOCUMENT_SELECT } from "@/lib/orgDocuments";
 import { DocumentsList, type DocumentRow } from "@/components/documents/DocumentsList";
-import { NewDocument } from "@/components/documents/NewDocument";
 
 /**
  * Documents — "a place to store, retrieve, and print the documents the
@@ -51,21 +51,17 @@ export default async function DocumentsPage() {
     file_count: fileCount.get(d.id) ?? 0,
   }));
   const categories = [...new Set(rows.map((r) => r.category).filter((c): c is string => !!c))].sort();
-  const editable = canEditPage(session.membership.role, "/documents");
 
   return (
     <DocumentsList
       rows={rows}
-      action={
-        editable && (
-          <NewDocument
-            orgId={orgId}
-            today={today}
-            categories={categories}
-            locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
-          />
-        )
-      }
+      orgId={orgId}
+      today={today}
+      categories={categories}
+      locations={session.activeLocations.map((l) => ({ id: l.id, code: l.code }))}
+      editable={canEditPage(session.membership.role, "/documents")}
+      // 094: a record is deleted by owner/admin only, as on the record itself.
+      canDelete={canDeleteInspection(session.membership.role)}
     />
   );
 }

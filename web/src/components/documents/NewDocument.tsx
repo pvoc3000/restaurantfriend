@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
@@ -16,11 +16,15 @@ export function NewDocument({
   today,
   categories,
   locations,
+  children,
 }: {
   orgId: string;
   today: string;
   categories: string[];
   locations: { id: string; code: string }[];
+  /** A trigger of the caller's own — the list's Actions menu. Without one the
+   *  dialog draws its own button. */
+  children?: (open: () => void) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -65,9 +69,13 @@ export function NewDocument({
 
   return (
     <>
-      <button type="button" className={`${BUTTON_CLASS} ml-auto`} onClick={() => setOpen(true)}>
-        New document
-      </button>
+      {children ? (
+        children(() => setOpen(true))
+      ) : (
+        <button type="button" className={`${BUTTON_CLASS} ml-auto`} onClick={() => setOpen(true)}>
+          New document
+        </button>
+      )}
       {open && (
         <Dialog
           title="New document"

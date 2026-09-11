@@ -5,17 +5,18 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog } from "@/lib/confirm";
-import { DOCUMENT_BUCKET } from "@/lib/orgDocuments";
+import { deleteDocuments } from "./documentWrites";
 
-/** Delete a document — owner/admin (094). Row first, then its objects. */
+/** Delete a document — owner/admin (094). The list's Delete goes through the
+ *  same `deleteDocuments`. */
 export function DocumentActions({
   documentId,
   title,
-  filePaths,
+  fileCount,
 }: {
   documentId: string;
   title: string;
-  filePaths: string[];
+  fileCount: number;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -26,8 +27,8 @@ export function DocumentActions({
     const ok = await confirmDialog({
       title: `Delete “${title}”?`,
       body:
-        filePaths.length > 0
-          ? `Its ${filePaths.length === 1 ? "file goes" : `${filePaths.length} files go`} with it. This cannot be undone.`
+        fileCount > 0
+          ? `Its ${fileCount === 1 ? "file goes" : `${fileCount} files go`} with it. This cannot be undone.`
           : "This cannot be undone.",
       tone: "danger",
       confirmLabel: "Delete it",
@@ -35,10 +36,8 @@ export function DocumentActions({
     if (!ok) return;
     setFailed(null);
     startTransition(async () => {
-      const { data, error } = await supabase.from("org_documents").delete().eq("id", documentId).select("id");
-      if (error) return setFailed(error.message);
-      if (!data || data.length === 0) return setFailed("Nothing was deleted — you may not have permission.");
-      if (filePaths.length > 0) await supabase.storage.from(DOCUMENT_BUCKET).remove(filePaths);
+      const result = await deleteDocuments(supabase, [documentId]);
+      if (result.error) return setFailed(result.deleted === 0 ? "Nothing was deleted — you may not have permission." : result.error);
       router.push("/documents");
     });
   }
