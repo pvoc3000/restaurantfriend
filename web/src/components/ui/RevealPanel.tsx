@@ -142,7 +142,9 @@ export function RevealPanel({
         className={
           alwaysOpen
             ? "border border-ink bg-white px-4 py-3 -mt-px"
-            : `absolute inset-x-0 z-20 max-h-[60vh] overflow-y-auto border border-ink bg-white px-4 py-3 transition-opacity duration-100 ${
+            : // z-30, above the sticky table heads (z-20) that follow it in
+              // the page, below the masthead (z-50).
+              `absolute inset-x-0 z-30 max-h-[60vh] overflow-y-auto border border-ink bg-white px-4 py-3 transition-opacity duration-100 ${
                 direction === "up" ? "bottom-full -mb-px" : "top-full -mt-px"
               } ${open ? "visible opacity-100" : "invisible opacity-0"}`
         }

@@ -10988,7 +10988,8 @@ weekday column, and 003 then silently made it per-vendor-item.
   rule is now the honest one — a panel is transient and anchored to a control
   the reader just pressed, so nothing should ever cover it while it's open. It
   portals to the body, so DOM order can't establish that; only the z-index can.
-  The ladder: 20 sticky table heads · 30 ActionBar and BackToTop · 40 drawer
+  The ladder: 20 sticky table heads · 30 ActionBar, BackToTop and an open
+  `RevealPanel` body (it must clear the table heads below it) · 40 drawer
   scrim · 50 masthead and drawers · 60 dialogs · 70 anchored panels. Fixing it
   in `MENU_PANEL_CLASS` fixed all four menus at once, which is the whole reason
   they share a dress.
