@@ -10017,7 +10017,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   beside a native `<label>`, the box drawn in `.mac-checkbox` — a 1px black
   square, a GREY (#808080) X corner to corner when checked, a 2px edge on hover
   and while held (Mark, same day: "make the X inside gray and make the box 2px
-  on hover"), a dotted ring on keyboard focus. The input stays transparent OVER the box rather than
+  on hover"), a dotted ring on keyboard focus. **The hover is on the ROW, not
+  the label**: the transparent input covers the box, so `label:hover` fired
+  only on the box's edge (Mark: "the on hover only applies to being over the
+  border"), where `.mac-checkbox:hover` covers the box and the words alike. The input stays transparent OVER the box rather than
   `display: none`, which would drop it from the tab order. On the hours block
   the DAY is the label, so the Day and Open columns became one ("Open on").
   Everywhere else is still `ui/Checkbox`.

@@ -178,10 +178,23 @@
 }
 
 /* Hovered or held: the edge thickens to 2px (Mark, same day: "make the box 2px
-   on hover"). Inside the 16px box, so nothing beside it moves. */
-.mac-checkbox label:hover::before,
-.mac-checkbox label:active::before {
+   on hover"). Inside the 16px box, so nothing beside it moves.
+
+   ON THE ROW, NOT THE LABEL. The transparent input sits OVER the drawn box, so
+   a pointer inside the box is over the input and `label:hover` does not match
+   — it fired only on the edge the input did not cover (Mark: "the on hover only
+   applies to being over the border"). The row contains both, and `:active`
+   applies to the ancestors of whatever is pressed, so one rule covers the box
+   and the words. */
+.mac-checkbox:hover label::before,
+.mac-checkbox:active label::before {
   border-width: 2px;
+}
+
+/* The input is the part under the pointer over the box, so it wants the hand
+   the label already shows. */
+.mac-checkbox input:not(:disabled) {
+  cursor: pointer;
 }
 
 .mac-checkbox input:focus-visible + label::before {
@@ -194,8 +207,9 @@
   opacity: 0.35;
 }
 
-.mac-checkbox input:disabled + label:hover::before,
-.mac-checkbox input:disabled + label:active::before {
+/* A disabled box does not thicken. More specific than the row's hover rule
+   (an extra element in the selector), and later, so it wins either way. */
+.mac-checkbox input:disabled + label::before {
   border-width: 1px;
 }
 
