@@ -77,6 +77,7 @@ export function TimePicker({
   ariaLabel,
   boxed = false,
   className = "",
+  variant = "cell",
 }: {
   /** `HH:MM` or `HH:MM:SS` (what a Postgres `time` column reads back), or null. */
   value: string | null;
@@ -89,6 +90,14 @@ export function TimePicker({
   /** Wear the shared bounding box — `DateField`'s own `boxed`. */
   boxed?: boolean;
   className?: string;
+  /**
+   * `"field"` is the form box — 48px tall, 16px type — that `ui/DateField`'s
+   * own `variant="field"` wears, so a time beside a date on a public form or a
+   * tablet page reads as one pair. Since 2026-09-11 every time in the app is
+   * this control (Mark: "Make all time pickers use our own"), and
+   * `ui/TimeField` — the browser's own control — is gone.
+   */
+  variant?: "cell" | "field";
 }) {
   const triggerRef = useRef<HTMLButtonElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
@@ -196,12 +205,16 @@ export function TimePicker({
         aria-haspopup="dialog"
         aria-expanded={open}
         onClick={() => (open ? commitAndClose() : openPanel())}
-        className={`items-center gap-2 px-1 py-0.5 text-left tabular-nums hover:bg-neutral-100 disabled:opacity-35 ${
-          boxed ? `rf-typed flex ${BOXED_FIELD_BORDER} ${BOXED_FIELD}` : "inline-flex"
-        } ${className}`}
+        className={
+          variant === "field"
+            ? `rf-typed flex h-12 w-full items-center gap-2 border border-ink bg-white px-3 text-left text-[16px] tabular-nums disabled:opacity-35 ${className}`
+            : `items-center gap-2 px-1 py-0.5 text-left tabular-nums hover:bg-neutral-100 disabled:opacity-35 ${
+                boxed ? `rf-typed flex ${BOXED_FIELD_BORDER} ${BOXED_FIELD}` : "inline-flex"
+              } ${className}`
+        }
       >
         <span className={`min-w-0 flex-1 truncate ${stored ? "" : "text-faint"}`}>
-          {stored ? formatTypedTime(stored) : boxed ? " " : "—"}
+          {stored ? formatTypedTime(stored) : boxed || variant === "field" ? " " : "—"}
         </span>
         <span className="text-muted">
           <ClockIcon />

@@ -9,7 +9,7 @@ import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { TextInput } from "@/components/ui/TextInput";
 import { PickList } from "@/components/ui/PickList";
 import { DateField } from "@/components/ui/DateField";
-import { TimeField } from "@/components/ui/TimeField";
+import { TimePicker } from "@/components/ui/TimePicker";
 import { KIND_LABEL, type SpecialOrderKind } from "@/lib/specialOrders";
 import { createSpecialOrder } from "@/lib/createSpecialOrder";
 import { CustomerPicker, type CustomerChoice } from "./CustomerPicker";
@@ -238,7 +238,7 @@ export function NewSpecialOrder({
                 />
               </Field>
               <Field label="Event time" required={needsWhen}>
-                <TimeField
+                <TimePicker
                   value={eventTime}
                   onChange={setEventTime}
                   ariaLabel="Event time"

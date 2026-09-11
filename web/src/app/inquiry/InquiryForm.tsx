@@ -3,7 +3,7 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 
 import { DateField } from "@/components/ui/DateField";
-import { TimeField } from "@/components/ui/TimeField";
+import { TimePicker } from "@/components/ui/TimePicker";
 import { createClient } from "@/lib/supabase/client";
 import {
   EMPTY_INQUIRY,
@@ -56,7 +56,7 @@ import {
  * positions `fixed`, which is machinery for escaping table cells that this page
  * does not have.
  *
- * The date and time go the OTHER way, to `ui/DateField` / `ui/TimeField`, and
+ * The date and time go the OTHER way, to `ui/DateField` / `ui/TimePicker`, and
  * for a reason that is not consistency: those components carry the fix for
  * Safari painting today's date into an empty date input, which on a form whose
  * date starts empty is a customer submitting no date while believing they
@@ -298,13 +298,11 @@ export function InquiryForm({ orgId }: { orgId: string }) {
               ariaLabel="Date you need it"
             />
           </Field>
-          {/* `ui/TimeField` beside `ui/DateField` for that component's own
-              stated reason: the two sit side by side, so a bordered time next
-              to a borderless date reads as one of them being broken. It also
-              carries the seconds-slicing that stops Safari ignoring a value
-              Postgres hands back as `13:30:00`. */}
+          {/* `ui/TimePicker` beside `ui/DateField`, both in the form box, so
+              the two read as one pair (Mark, 2026-09-11: every time in the app
+              is our own picker). */}
           <Field label="Time" error={shown.eventTime}>
-            <TimeField
+            <TimePicker
               variant="field"
               value={draft.eventTime || null}
               onChange={(next) => set("eventTime", next ?? "")}

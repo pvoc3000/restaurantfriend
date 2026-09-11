@@ -58,16 +58,19 @@ export function TimeCell({
   if (!canWrite) {
     return <span className={READ_ONLY_VALUE}>{formatClock(value) ?? "—"}</span>;
   }
+  // `kind="time"` since 2026-09-11 (Mark: "Make all time pickers use our own"):
+  // the cell is `ui/TimePicker`, which shows the time the way a person writes
+  // one and offers hours, minutes and a typed field, instead of free text.
   return (
     <InlineValue
       table="special_orders"
       id={id}
       column={column}
       value={value}
+      kind="time"
       ariaLabel={label}
       placeholder={placeholder}
       boxed={boxed}
-      format={(v) => formatClock(String(v)) ?? String(v)}
     />
   );
 }

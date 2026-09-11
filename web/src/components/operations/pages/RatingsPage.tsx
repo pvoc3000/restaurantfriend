@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { PickList, type PickOption } from "@/components/ui/PickList";
 import { Checkbox } from "@/components/ui/Checkbox";
-import { TimeField } from "@/components/ui/TimeField";
+import { TimePicker } from "@/components/ui/TimePicker";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { FieldLabel, TextField } from "./fields";
 
@@ -258,11 +258,10 @@ export function RatingsPage({
             {row.gotBreak === true ? (
               <div className="w-40 space-y-1">
                 <FieldLabel>Started at</FieldLabel>
-                <TimeField
+                <TimePicker
                   value={row.breakStartedAt}
                   onChange={(next) => patch(row.id, { break_started_at: next })}
                   variant="field"
-                  boxed
                   disabled={!editable}
                   ariaLabel={`Time the break started, ${row.employeeName}`}
                 />

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { evaluateNumeric, looksLikeExpression } from "@/lib/calc";
 import { DateField } from "@/components/ui/DateField";
-import { TimeField } from "@/components/ui/TimeField";
+import { TimePicker } from "@/components/ui/TimePicker";
 import {
   BOXED_FIELD,
   BOXED_FIELD_BORDER,
@@ -654,13 +654,13 @@ export function InlineValue({
   //
   // The box itself is `ui/DateField`, which carries the Safari empty-date
   // apparatus and the reasons for it. All that's left here is the write.
-  // A `time` column, and the third kind that does NOT click-to-edit — the
-  // native control is already a box you can type into, and on an iPad it is a
-  // wheel picker where a text cell is a keyboard. Same reasoning as `date`.
+  // A `time` column, and the third kind that does NOT click-to-edit — the box
+  // is `ui/TimePicker`, our own Mac window of hours and minutes with a typed
+  // field at its foot (Mark, 2026-09-11: "Make all time pickers use our own";
+  // it was the browser's `<input type="time">` through `ui/TimeField`).
   //
-  // It writes ON CHANGE for the same reason too: `<input type="time">` emits
-  // "" until the whole value is valid, so a change event IS a finished value
-  // and there is no half-typed state to protect.
+  // It writes ON CHANGE: the picker only reports a finished `HH:MM` (Set, Enter
+  // or a click away), so there is no half-picked state to protect.
   if (kind === "time") {
     return (
       // `inline-flex` is SHRINK-TO-FIT, so a boxed control's `w-full` resolves
@@ -669,7 +669,7 @@ export function InlineValue({
       // 144.5px in a row of 214.3px fields, which is the misalignment this was
       // meant to end.
       <span className={boxed ? "flex w-full flex-col" : "inline-flex flex-col items-start"}>
-        <TimeField
+        <TimePicker
           value={value === null ? null : String(value)}
           disabled={saving}
           required={!nullable}

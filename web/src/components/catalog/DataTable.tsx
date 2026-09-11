@@ -903,17 +903,15 @@ export function DataTable<T>({
                             {expandable ? (
                               // A bordered box rather than a bare glyph: it
                               // reads as a control at a glance and gives a
-                              // real click target. Filled black when open.
+                              // real click target. The Mac look (`mac-disclosure`,
+                              // mac-look.css): raised, a 2px edge on hover.
+                              // Open and closed differ only in the arrow.
                               <button
                                 type="button"
                                 onClick={() => toggleOpen(key)}
                                 aria-expanded={isOpen}
                                 aria-label={isOpen ? "Collapse row" : "Expand row"}
-                                className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center border-[1.5px] border-ink text-[9px] leading-none transition-colors ${
-                                  isOpen
-                                    ? "bg-ink text-white"
-                                    : "bg-white text-ink hover:bg-neutral-100"
-                                }`}
+                                className="mac-disclosure flex h-[22px] w-[22px] shrink-0 items-center justify-center border border-ink bg-white text-[9px] leading-none text-ink"
                               >
                                 {isOpen ? "▼" : "▶"}
                               </button>

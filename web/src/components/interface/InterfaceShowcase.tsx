@@ -60,7 +60,6 @@ import { SectionNav } from "@/components/ui/SectionNav";
 import { StickyFooter } from "@/components/ui/StickyFooter";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
-import { TimeField } from "@/components/ui/TimeField";
 import { TimePicker } from "@/components/ui/TimePicker";
 import { evaluateNumeric } from "@/lib/calc";
 import { alertDialog, confirmDialog, confirmDialogWithOption } from "@/lib/confirm";
@@ -558,11 +557,11 @@ function DatesBlock({ today }: { today: string }) {
         <Specimen name='DateField · variant="title", max today'>
           <DateField value={title} onChange={setTitle} ariaLabel="Guide day" variant="title" max={today} />
         </Specimen>
-        <Specimen name="TimeField · cell, boxed">
-          <TimeField value={timeCell} onChange={setTimeCell} ariaLabel="Opens" boxed />
+        <Specimen name="TimePicker · cell (unboxed)">
+          <TimePicker value={timeCell} onChange={setTimeCell} ariaLabel="Opens" />
         </Specimen>
-        <Specimen name='TimeField · variant="field"'>
-          <TimeField value={timeField} onChange={setTimeField} ariaLabel="Pickup time" variant="field" />
+        <Specimen name='TimePicker · variant="field"'>
+          <TimePicker value={timeField} onChange={setTimeField} ariaLabel="Pickup time" variant="field" />
         </Specimen>
         <Specimen name="TimePicker · boxed">
           <div className="w-40">
@@ -665,6 +664,19 @@ function TogglesBlock() {
         </Specimen>
         <Specimen name="WeekdayPicker · readOnly">
           <WeekdayPicker table="demo" id="demo" column="days" label="Delivery days" value={[2, 5]} readOnly />
+        </Specimen>
+        <Specimen name="DataTable row expander (▶)">
+          <DataTable
+            rows={INITIAL_ROWS.slice(0, 3)}
+            columns={[
+              { key: "name", label: "Item", width: 220, pinned: true, render: (r) => r.name },
+              { key: "price", label: "Price", width: 90, align: "right", render: (r) => money(r.price) },
+            ]}
+            rowKey={(r) => r.id}
+            storageKey="interface.disclosure"
+            resetFooter={false}
+            expand={{ render: (r) => <p className="px-4 py-3 text-sm">{r.pack} from {r.vendor}</p> }}
+          />
         </Specimen>
       </Grid>
     </Block>
@@ -1365,7 +1377,7 @@ function PanelsBlock() {
             <span className="text-subtle">Opens</span>
             <DateField variant="field" value={date} onChange={setDate} ariaLabel="Opens" />
             <span className="text-subtle">At</span>
-            <TimeField variant="field" value={time} onChange={setTime} ariaLabel="Opening time" />
+            <TimePicker variant="field" value={time} onChange={setTime} ariaLabel="Opening time" />
           </div>
         </Dialog>
       )}

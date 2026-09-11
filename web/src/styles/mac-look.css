@@ -139,6 +139,33 @@
   color: #000;
 }
 
+/* THE DISCLOSURE BOX — `DataTable`'s row expander and `RevealPanel`'s toggle,
+   the small bordered ▶ that opens more about a row (Mark, 2026-09-11: "needs
+   the standard mac treatment - on hover 2px border no fill, drop shadow").
+   Raised at rest, a 2px edge on hover, dropped and grey while held. OPEN AND
+   CLOSED LOOK THE SAME — only the arrow turns (Mark, same day: "the only
+   difference … between normal and expanded mode should be the direction of the
+   arrow"). It was filled black when open, and latched down for an hour. */
+.mac-disclosure {
+  border-width: 1px;
+  border-color: #000;
+  background-color: #fff;
+  color: #000;
+  box-shadow: 3px 3px 0 0 #000;
+  transition: none;
+}
+
+.mac-disclosure:not(:disabled):hover {
+  background-color: #fff;
+  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
+}
+
+.mac-disclosure:not(:disabled):active {
+  transform: translate(3px, 3px);
+  background-color: #c0c0c0;
+  box-shadow: inset 0 0 0 1px #000;
+}
+
 /* A control you TYPE INTO does not drop when the press lands in its text — the
    order guide's date box, a field beside a calendar button. Pressing the
    button still drops it. */

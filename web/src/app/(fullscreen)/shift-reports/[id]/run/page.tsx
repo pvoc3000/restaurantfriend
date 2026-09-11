@@ -390,7 +390,7 @@ export default async function RunShiftReportPage({
       score: r.score === null ? null : Number(r.score),
       note: (r.note as string | null) ?? null,
       gotBreak: (r.got_break as boolean | null) ?? null,
-      // Postgres `time` arrives as HH:MM:SS; `ui/TimeField` wants HH:MM.
+      // Postgres `time` arrives as HH:MM:SS; the break time is kept as HH:MM.
       breakStartedAt: ((r.break_started_at as string | null) ?? null)?.slice(0, 5) ?? null,
       breakReason: (r.break_reason as string | null) ?? null,
     })

@@ -95,11 +95,10 @@ export function RevealPanel({
       aria-expanded={open}
       aria-label={pinned ? `Collapse ${label}` : `Keep ${label} open`}
       // `DataTable`'s expander, to the pixel: a bordered box rather than a bare
-      // glyph, so it reads as a control and gives a real touch target, filled
-      // black when it is holding the panel open.
-      className={`flex h-[22px] w-[22px] shrink-0 items-center justify-center border-[1.5px] border-ink text-[9px] leading-none transition-colors ${
-        pinned ? "bg-ink text-white" : "bg-white text-ink hover:bg-neutral-100"
-      }`}
+      // glyph, so it reads as a control and gives a real touch target. The Mac
+      // look (`mac-disclosure`, mac-look.css): raised, a 2px edge on hover;
+      // holding the panel open changes only the arrow.
+      className="mac-disclosure flex h-[22px] w-[22px] shrink-0 items-center justify-center border border-ink bg-white text-[9px] leading-none text-ink"
     >
       {open ? (direction === "up" ? "▼" : "▲") : direction === "up" ? "▲" : "▼"}
     </button>
