@@ -17,9 +17,10 @@ import { useId, type ReactNode } from "react";
  * So far only the location record wears it — the `.mac-page` experiment.
  * Everywhere else is still `ui/Checkbox`.
  *
- * `size="lg"` is the same box at the app's button height, 36px (Mark,
- * 2026-09-10, for the record's Active field): a checkbox that stands in a
- * column of 36px fields rather than in a row of days.
+ * `size="lg"` is a 24px box in a 36px row (Mark, 2026-09-10, for the record's
+ * Active field): a checkbox that stands in a column of 36px fields rather than
+ * in a row of days. The box was 36px first, then 28, and read as larger than
+ * the field.
  */
 export function MacCheckbox({
   checked,
