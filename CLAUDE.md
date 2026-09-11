@@ -10012,8 +10012,11 @@ weekday column, and 003 then silently made it per-vendor-item.
   and Mark asked for the plain border within the hour ("for text fields I want
   to see a solid black 1px border on all sides"); **`rf-press`** (a
   boxed `PickList`, `PickSet` or `RangePicker`, and `WorkingHere`'s button)
-  RISES and PRESSES, named beside `.mac-control` in the same rules so there is
-  one definition. While typing, `InlineValue`'s editor keeps the same 1px border
+  RISES and PRESSES, named beside `.mac-control` for the shadow and the drop —
+  but on HOVER it takes the text field's 2px edge, never the buttons' grey fill
+  (Mark, same day: "instead of filling in with solid grey, just increase the
+  outline of the border to 2px like text fields"), and keeps it while held.
+  While typing, `InlineValue`'s editor keeps the same 1px border
   (`.rf-typed ~ .rf-typed-editing`, the invisible Sizer being the sibling), so a
   click moves nothing; the unboxed title keeps its own editor.
   **ITS CHECKBOXES ARE `ui/MacCheckbox`** (Mark, same day, with system.css's

@@ -48,8 +48,7 @@
    Their hover is part of what they MEAN (a black cell inverting, a red one
    filling red), and a grey fill on either reads as disabled. They keep the
    shadow and the press. */
-.mac-control:not(.mac-own-hover):hover,
-.mac-page .rf-press:hover {
+.mac-control:not(.mac-own-hover):hover {
   background-color: #c0c0c0;
   color: #000;
 }
@@ -58,8 +57,7 @@
    the date window, whose border sits on a box AROUND a button: that button's
    own `hover:bg-neutral-100` would otherwise paint light grey over the mid
    grey. */
-.mac-control:not(.mac-own-hover):hover *,
-.mac-page .rf-press:hover * {
+.mac-control:not(.mac-own-hover):hover * {
   color: #000;
   background-color: transparent;
 }
@@ -71,6 +69,22 @@
 .mac-page .rf-press:active {
   transform: translate(3px, 3px);
   box-shadow: none;
+}
+
+/* A BOXED PICKER ON A `.mac-page` DOES NOT FILL GREY: its border reads 2px on
+   hover, as a text field's does (Mark, 2026-09-10: "instead of filling in with
+   solid grey, just increase the outline of the border to 2px like text
+   fields"). The same inset 1px shadow inside the 1px border, so the box does
+   not grow, laid under the raised shadow it keeps. The ground stays white — the
+   rest rule below is unlayered and outranks the trigger's own
+   `hover:bg-neutral-100`. Held, it still drops into its shadow and keeps the
+   2px edge, since the pointer is still on it. */
+.mac-page .rf-press:hover {
+  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
+}
+
+.mac-page .rf-press:active {
+  box-shadow: inset 0 0 0 1px #000;
 }
 
 /* A control you TYPE INTO does not drop when the press lands in its text — the
@@ -94,9 +108,9 @@
        first, the search box's inset shadow along the top and left, and Mark
        asked for the plain border instead the same hour.
      - `rf-press` — a box you press (a boxed `PickList`, `PickSet` or
-       `RangePicker`, and a screen's own buttons). It RISES and PRESSES, the
-       `.mac-control` rules above, which name it beside that class so there is
-       one definition.
+       `RangePicker`, and a screen's own buttons). It RISES and PRESSES with the
+       `.mac-control` rules above, but its HOVER is the text field's 2px edge
+       rather than their grey fill.
    Undo a screen by taking `mac-page` off it. Making every record Mac is moving
    the class up to the layout. */
 /* A white ground, as every `.mac-control` button has: a boxed picker's own
