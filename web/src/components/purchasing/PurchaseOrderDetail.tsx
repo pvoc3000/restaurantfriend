@@ -701,7 +701,7 @@ export function PurchaseOrderDetail({
     );
   };
 
-  /* Six figures under the paperwork, in Mark's order (2026-09-11). Packages are of
+  /* Six figures above the paperwork, in Mark's order (2026-09-11). Packages are of
      each line's own vendor item, so a case and an each both count as one — what
      you count off the truck. A product counts as received once its line has a
      quantity above zero; an explicit 0 is "none came". The three received
@@ -779,8 +779,8 @@ export function PurchaseOrderDetail({
       )}
 
       {/* TWO COLUMNS (Mark, 2026-09-11): the order's fields, and beside them
-          its paperwork — out of the pinned footer — with the five figures
-          under it. Stacked below `xl`. */}
+          the six figures over its paperwork — which came out of the pinned
+          footer. Stacked below `xl`. */}
       <div className="grid items-start gap-x-8 gap-y-6 xl:grid-cols-[26rem_minmax(0,1fr)]">
         <div className="space-y-6">
           <dl className="grid max-w-[26rem] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
@@ -910,6 +910,7 @@ export function PurchaseOrderDetail({
         </div>
 
         <div className="min-w-0 space-y-6">
+          {figures}
           {attachmentError ? (
             <p className="border border-accent px-4 py-3 text-sm text-accent">
               Could not load this order’s paperwork: {attachmentError}
@@ -931,7 +932,6 @@ export function PurchaseOrderDetail({
               }}
             />
           )}
-          {figures}
         </div>
       </div>
 

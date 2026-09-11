@@ -282,7 +282,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    toggle (`RevealPanel clickOnly` — no hover, no focus) and, since the same
    day, PUSHING what follows down rather than covering it (`push` — closed, the
    body is still out of flow and `invisible`, never unmounted, so its PDF
-   plugins do not reload) — with six right-aligned figures under it:
+   plugins do not reload) — with six right-aligned figures ABOVE it (they sat
+   under it until later the same day):
    Products Ordered, Packages Ordered, Ordered Total, Products Received
    (lines with a received quantity above zero), Packages Received, Received
    Total. Stacked below `xl`. Ticking lines no longer raises a band with a
