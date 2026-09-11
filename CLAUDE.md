@@ -1090,10 +1090,10 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    display", then "if there are no reminders or requests, you don't need to say
    it on screen"). That reverses the reminders-yellow / requests-plain split
    AND retires the two `showEmpty` flags described next: an empty list renders
-   nothing, the other band takes the first column, and with no reminder due
-   "Add reminder" sits in a right-aligned strip ABOVE the title row, beside
-   Refresh (Mark, the same day, after both had landed in the title row beside
-   the day picker). `BandEmpty` is gone. The muted greys
+   nothing, and with no reminder due the LEFT column holds just "Add reminder",
+   top-left, beside the requests band (Mark, the same day, after trying it in
+   the title row and then in a strip above it). Refresh keeps a right-aligned
+   strip of its own above the title row. `BandEmpty` is gone. The muted greys
    inside the requests band are `text-ink/70`, since `text-muted` is ~4:1 on the
    yellow. The same day the vendor totals bar lost its rules above and below and
    its "Nothing ordered yet" sentence, and the day picker moved to the title

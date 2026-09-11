@@ -148,8 +148,9 @@ export function Reminders({
         </GuideBand>
       ) : (
         /* No band — so the way to WRITE one still has to survive somewhere.
-           A quiet line rather than a box. */
-        canWrite && <p className="text-right">{addReminder}</p>
+           A quiet line rather than a box, top-left in the guide's left column
+           beside the requests (Mark, 2026-09-10). */
+        canWrite && <p>{addReminder}</p>
       )}
 
       {composing && (

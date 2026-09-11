@@ -670,7 +670,9 @@ export function OrderGuide({
   // Is there a band above the guide at all? A band shows only when it holds
   // something (Mark, 2026-09-10: "if there are no reminders or requests, you
   // don't need to say it on screen").
-  const bands = reminders.length > 0 || requests.length > 0;
+  // A purchaser always gets the row: with no reminder due, its left column is
+  // the "Add reminder" line (Mark, 2026-09-10).
+  const bands = reminders.length > 0 || requests.length > 0 || canGeneratePos;
 
   /**
    * ON A TABLET, NEXT FAVORITE AND NEXT SECTION LIVE IN THE TOP BAR (Mark,
@@ -750,12 +752,11 @@ export function OrderGuide({
           into a box of white space — these are two lists that happen to be
           side by side, not two halves of one card.
 
-          An EMPTY list renders no band (Mark, 2026-09-10): the other band takes
-          the first column, and with no reminder due "Add reminder" lives in the
-          strip above the title row instead. */}
+          An EMPTY list renders no band (Mark, 2026-09-10). With no reminder
+          due, the left column holds just "Add reminder", top-left, beside the
+          requests (Mark, the same day). */}
       {bands && (
       <div className="grid gap-4 md:grid-cols-2 md:items-start">
-        {reminders.length > 0 && (
         <Reminders
           reminders={reminders}
           guideDate={guideDate}
@@ -766,7 +767,6 @@ export function OrderGuide({
           // the same gate that decides whether POs can be generated.
           canWrite={canGeneratePos}
         />
-        )}
         <GuideRequests
           requests={requests}
           userId={userId}
@@ -786,20 +786,10 @@ export function OrderGuide({
           (Mark, 2026-09-03) — `PurchaseOrderList`'s header, which is this
           module's model. It rode BESIDE the title from 2026-07-29 until then. */}
       <div className="space-y-3">
-        {/* ADD REMINDER AND REFRESH SIT ABOVE THE TITLE ROW, right-aligned
-            (Mark, 2026-09-10: they had moved into the title row beside the day
-            picker, and belong above it). With a reminder due, "Add reminder"
-            is in that band's header instead. */}
-        <div className="flex flex-wrap items-center justify-end gap-x-6 gap-y-1">
-          {reminders.length > 0 ? null : (
-            <Reminders
-              reminders={reminders}
-              guideDate={guideDate}
-              locationId={locationId}
-              orgId={orgId}
-              canWrite={canGeneratePos}
-            />
-          )}
+        {/* REFRESH SITS ABOVE THE TITLE ROW, right-aligned (Mark, 2026-09-10:
+            it had moved into the title row beside the day picker). "Add
+            reminder" lives in the bands row above. */}
+        <div className="flex justify-end">
           <button
             onClick={() => router.refresh()}
             className="text-[12px] uppercase tracking-[0.12em] text-subtle underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
