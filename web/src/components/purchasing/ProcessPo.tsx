@@ -1,16 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { FORM_FIELD_DRESS } from "@/components/ui/fieldMetrics";
 import { TextInput } from "@/components/ui/TextInput";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import {
   Dialog,
   DIALOG_CANCEL_CLASS,
   DIALOG_COMMIT_CLASS,
 } from "@/components/ui/Dialog";
-import { OrderBar } from "./OrderBar";
 import {
   buildEmailParts,
   downloadBlob,
@@ -51,26 +52,18 @@ export type ProcessingContext = {
 export function ProcessPo({
   order,
   context,
-  statement,
-  status,
-  actionsBefore,
-  actionsAfter,
+  children,
 }: {
   order: PurchaseOrder;
   context: ProcessingContext;
   /**
-   * The order's own three slots, handed in by PurchaseOrderDetail so all of it
-   * lands in ONE box (Mark, 2026-08-02). They can't be composed the other way
-   * round: every button below lives off this component's `busy` / `compose`
-   * state, so whoever draws the frame has to be inside it. See OrderBar, which
-   * is the frame both callers share.
+   * The send commands as rows of PO detail's `ui/ActionMenu` (Mark,
+   * 2026-09-11), plus a line saying what is rendering, what was sent, or what
+   * failed. The rows are handed out rather than drawn because every one of
+   * them lives off this component's `busy` / `compose` state; the compose
+   * dialog is still drawn here.
    */
-  statement?: React.ReactNode;
-  status?: React.ReactNode;
-  /** The action groups either side of this card's own — Add item before,
-   *  Reconcile/Close after. See OrderBar for why the groups are separated. */
-  actionsBefore?: React.ReactNode;
-  actionsAfter?: React.ReactNode;
+  children: (items: ActionMenuItem[], notice: ReactNode) => ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -228,110 +221,48 @@ export function ProcessPo({
       router.refresh();
     });
 
-  // ONE button shape. `primaryBtn` — the black fill — is gone (Mark,
-  // 2026-08-02: "all buttons should be white. Only set filters are black"),
-  // which finishes what Open vendor site started a few hours earlier: against a
-  // row of outlined cells a filled one reads as a different KIND of control
-  // rather than as the important one, the same conclusion the ActionBar reached
-  // in July.
-  const btn =
-    "h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+  // The rows, in the order a PO is worked: look at the document, keep a copy,
+  // hand it to the vendor by whatever route this vendor takes, then say it went.
+  // Preview and Download are on EVERY order type (Mark, 2026-08-02): the §4.9
+  // document says what was ORDERED, which is worth reading however the order
+  // gets placed. Everything disables together while one renders — one `busy`.
+  const off = busy !== null;
+  const items: ActionMenuItem[] = [
+    { label: "Preview PDF", onSelect: () => void previewPdf(), disabled: off },
+    { label: "Download PDF", onSelect: () => void downloadPdf(), disabled: off },
+    ...(context.order_type === "email_po"
+      ? [{ label: "Email PO…", onSelect: () => void openCompose(), disabled: off || compose !== null }]
+      : []),
+    ...(context.order_type === "online"
+      ? [{ label: "Open Vendor Site", onSelect: () => void openVendorSite(), disabled: off || !context.vendor_url }]
+      : []),
+    ...(context.order_type === "in_person"
+      ? [{ label: "Shopping List PDF", onSelect: () => void shoppingList(), disabled: off }]
+      : []),
+    ...(order.status === "draft"
+      ? [{ label: "Mark as Sent", onSelect: () => void markSent(), disabled: off }]
+      : []),
+  ];
+
+  const notice = (
+    <>
+      {busy && busy !== "send" && (
+        <p className="text-[13px] text-muted">
+          {busy === "compose" ? "Loading…" : busy === "sent" ? "Saving…" : "Rendering…"}
+        </p>
+      )}
+      {sentNote && (
+        <p className="max-w-sm text-right text-[13px] text-[var(--rf-green-600)]">{sentNote}</p>
+      )}
+      {error && !compose && (
+        <p className="max-w-sm text-right text-[13px] text-accent">{error}</p>
+      )}
+    </>
+  );
 
   return (
     <>
-      {/* `trailing` is just Status: the delivery date went back under Ordered
-          in the dl (Mark, 2026-08-02) — the two dates read as a pair — and with
-          it went this card's second editor for the same column and the
-          "arrives …" chip that used to sit beside it. */}
-      <OrderBar
-        statement={
-          <>
-            <span className="text-[12px] font-semibold uppercase tracking-[0.12em] text-subtle">
-              Process · {context.order_type.replace("_", " ")}
-            </span>
-            {statement}
-          </>
-        }
-        trailing={status}
-        footer={
-          <>
-            {sentNote && (
-              <p className="text-xs text-[var(--rf-green-600)]">{sentNote}</p>
-            )}
-            {error && !compose && <p className="text-accent">{error}</p>}
-          </>
-        }
-        actionGroups={[
-          actionsBefore,
-          <>
-          {/* PREVIEW PDF ON EVERY ORDER TYPE, including in_person (Mark,
-              2026-08-02: it "should always be available even when it's a
-              shopping list"). It used to be per-branch and the in_person branch
-              omitted it, on the reasoning that a shopping list is the document
-              you want when you're the one buying. But the §4.9 vendor document
-              is what says what was ORDERED, and wanting to read that has
-              nothing to do with how the order gets placed. Unconditional here
-              rather than repeated in each branch — it was already written out
-              three times. */}
-          <button disabled={busy !== null} onClick={previewPdf} className={btn}>
-            {busy === "preview" ? "Rendering…" : "Preview PDF"}
-          </button>
-
-          {/* Beside Preview on every order type, for Preview's own reason: what
-              the vendor was told is worth having on disk whatever route the
-              order took to them. */}
-          <button
-            disabled={busy !== null}
-            onClick={downloadPdf}
-            className={btn}
-            title={`Saves as “${poDocumentFileName("po", [order.po_number])}”`}
-          >
-            {busy === "download" ? "Rendering…" : "Download PDF"}
-          </button>
-
-          {context.order_type === "email_po" && compose === null && (
-            <button
-              disabled={busy !== null}
-              onClick={openCompose}
-              className={btn}
-              title="Compose here — the PDF attaches itself on send"
-            >
-              {busy === "compose" ? "Loading…" : "Email PO…"}
-            </button>
-          )}
-
-          {context.order_type === "online" && (
-            <button
-              disabled={busy !== null || !context.vendor_url}
-              onClick={openVendorSite}
-              className={btn}
-              title={context.vendor_url ?? "No URL on the vendor record"}
-            >
-              Open vendor site
-            </button>
-          )}
-
-          {context.order_type === "in_person" && (
-            <button disabled={busy !== null} onClick={shoppingList} className={btn}>
-              {busy === "shopping" ? "Rendering…" : "Shopping list PDF"}
-            </button>
-          )}
-
-          {order.status === "draft" && (
-            <button
-              disabled={busy !== null}
-              onClick={markSent}
-              className={btn}
-              title={`Sets status to Sent, sent via ${sentVia}`}
-            >
-              {busy === "sent" ? "Saving…" : "Mark as sent"}
-            </button>
-          )}
-
-          </>,
-          actionsAfter,
-        ]}
-      />
+      {children(items, notice)}
 
       {/* The compose dialog: what you see is exactly what sends. Floats over
           the PO like the Generate POs confirm — same overlay pattern. */}
@@ -371,7 +302,7 @@ export function ProcessPo({
               <button
                 disabled={busy !== null}
                 onClick={useMailApp}
-                className={btn}
+                className={BUTTON_CLASS}
                 title="Hand this email to your mail app instead (attachment via the share sheet where supported)"
               >
                 {busy === "mailapp" ? "Rendering…" : "Use Mail app"}
@@ -451,8 +382,8 @@ export function ProcessPo({
                 className="h-[26rem] w-full border border-ink md:h-full md:min-h-[26rem]"
               >
                 <div className="flex h-full items-center justify-center p-4 text-center text-xs text-subtle">
-                  This browser can&apos;t preview PDFs inline — use the Preview
-                  PDF button to open it in its own tab.
+                  This browser can&apos;t preview PDFs inline — use Preview PDF
+                  in the Actions menu to open it in its own tab.
                 </div>
               </object>
             )}

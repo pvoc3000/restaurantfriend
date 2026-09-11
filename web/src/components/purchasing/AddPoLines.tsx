@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -137,11 +137,15 @@ export function AddPoLines({
   order,
   orgId,
   lines,
+  children,
 }: {
   order: PurchaseOrder;
   orgId: string;
   /** The PO's current lines — what's already on order, per vendor item. */
   lines: PoLine[];
+  /** Draw the trigger yourself — PO detail makes it a row of its Actions menu.
+   *  Omitted, this draws its own button (the receiving screen). */
+  children?: (openPanel: () => void) => ReactNode;
 }) {
   const vendorName = order.vendors?.name ?? "Vendor";
   const router = useRouter();
@@ -398,13 +402,17 @@ export function AddPoLines({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openPanel}
-        className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
-      >
-        Add item…
-      </button>
+      {children ? (
+        children(() => void openPanel())
+      ) : (
+        <button
+          type="button"
+          onClick={openPanel}
+          className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white"
+        >
+          Add item…
+        </button>
+      )}
 
       {open && (
         <Dialog

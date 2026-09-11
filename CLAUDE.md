@@ -271,6 +271,16 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    order history and feed "last ordered"); PO detail lines get a purchaser+
    selection column with the same confirm-gated delete (received quantities
    named).
+   **PO DETAIL'S COMMANDS ARE ONE ACTIONS MENU** (Mark, 2026-09-11) — level
+   with the title at the top right, grouped add · send · receive: Add Item… ·
+   Preview PDF · Download PDF · Email PO… / Open Vendor Site / Shopping List
+   PDF (by order type) · Mark as Sent · Reconcile PO… · File as Bill · Close
+   Order…. Beneath it five figures: Products Ordered, Packages Ordered, Ordered
+   Total, Packages Received, Received Total. The Process box (`OrderBar`, and
+   its "Process · online" line) is GONE; Status is the first row of the fields.
+   `ProcessPo` and `AddPoLines` keep their dialogs and hand their rows out
+   through render props (`OrderCommandMenu`'s shape); `AddPoLines` still draws
+   its own button when given none, which is how the receiving screen uses it.
    **THE PO LIST'S ROWS HAVE THEIR OWN ⋯ MENU** (Mark, 2026-08-31) — Preview
    purchase order · Download purchase order · Delete purchase order. All three
    existed only on the SELECTION BAR, so acting on one order meant ticking it,

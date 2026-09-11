@@ -32,10 +32,9 @@ import { SaveLineToCatalog } from "./SaveLineToCatalog";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { Checkbox } from "@/components/ui/Checkbox";
-import { PickList } from "@/components/ui/PickList";
 import { AddPoLines } from "./AddPoLines";
-import { OrderBar } from "./OrderBar";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { nextDeliveryDate } from "@/lib/poProcessing";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, confirmDialogWithOption, splitConfirmMessage } from "@/lib/confirm";
@@ -639,305 +638,242 @@ export function PurchaseOrderDetail({
       ? nextDeliveryDate(order.order_date, processing.delivery_days)
       : null;
 
-  // --- The three slots of the one box above the lines. See OrderBar. --------
+  /** The first row of a group carries the rule above it. */
+  const group = (items: ActionMenuItem[]): ActionMenuItem[] =>
+    items.map((it, i) => (i === 0 ? { ...it, separatorBefore: true } : it));
 
-  /* How many DISTINCT products, and how many packages they add up to — the
-     second is what you count off the truck, and the line count alone never told
-     you (Mark, 2026-07-27). Packages of each line's own vendor item, so a case
-     and an each both count as one; that's the intended reading for a delivery
-     check. Received is shown only once something has been, so the bar stays
-     quiet on a draft. */
-  const statement = (
-    <span className="text-subtle">
-      {lines.length} {lines.length === 1 ? "product" : "products"} ·{" "}
-      <span className="tabular-nums text-body">{qty(orderedPackages)}</span>{" "}
-      {orderedPackages === 1 ? "package" : "packages"}
-      {receivedPackages > 0 && (
-        <>
-          {" · "}
-          <span
-            className={`tabular-nums ${
-              receivedPackages < orderedPackages ? "text-accent" : "text-body"
-            }`}
-          >
-            {qty(receivedPackages)}
-          </span>{" "}
-          received
-        </>
-      )}
-    </span>
-  );
+  // Offered only while there is something to file — keyed on the PAPERWORK,
+  // never the status; see `fileUnfiled`.
+  const unfiled = canEditLines && canFileBills ? unfiledReadings(attachments) : [];
 
-  const statusControl = (
-    <label className="flex items-center gap-2">
-      <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-        Status
-      </span>
-      <PickList
-        variant="field"
-        ariaLabel="Status"
-        value={order.status}
-        disabled={busy}
-        onPick={(s) => setStatus(s as PoStatus)}
-        options={PO_STATUS_ORDER.map((s) => ({
-          value: s,
-          label: PO_STATUS_LABEL[s],
-        }))}
-        className="w-40"
+  /* What you do when it comes back. Reconcile PO… is the only route from here
+     to the receiving screen and stays on a closed order, which is exactly when
+     you go back to it (Mark, 2026-08-27). Close Order… is the only route to
+     `closed` that says what closing asserts — the Status field can set it too,
+     and says nothing. */
+  const receivingItems: ActionMenuItem[] = [
+    { label: "Reconcile PO…", onSelect: () => router.push(receiveHref) },
+    ...(unfiled.length > 0
+      ? [{ label: "File as Bill", onSelect: () => void fileUnfiled(unfiled), disabled: busy }]
+      : []),
+    ...(canEditLines && canClose(order.status)
+      ? [{ label: "Close Order…", onSelect: () => void close(), disabled: busy }]
+      : []),
+  ];
+
+  /* ONE ACTIONS MENU, level with the title at the right margin (Mark,
+     2026-09-11), in the order a PO is worked: add to it · send it · receive it.
+     The send rows are ProcessPo's and Add Item… is AddPoLines' — each keeps its
+     own dialog and hands this its rows. Below purchaser+ there is no processing
+     and no Add Item…, so the menu holds Reconcile PO… alone. */
+  const actionMenu = (processItems: ActionMenuItem[]) => {
+    const render = (addItems: ActionMenuItem[]) => (
+      <ActionMenu
+        ariaLabel={`Actions for purchase order ${order.po_number}`}
+        items={[...addItems, ...group(processItems), ...group(receivingItems)]}
       />
-    </label>
-  );
+    );
+    return canEditLines ? (
+      <AddPoLines order={order} orgId={orgId} lines={lines}>
+        {(open) => render([{ label: "Add Item…", onSelect: open }])}
+      </AddPoLines>
+    ) : (
+      render([])
+    );
+  };
 
-  /* THE ACTION ROW IS THREE GROUPS (Mark, 2026-08-02), each separated by twice
-     the gap that separates the buttons inside it: what you add to the order ·
-     what you send to the vendor · what you do when it comes back. The middle
-     group is ProcessPo's own and varies by order_type, so the two ends are
-     handed to it and it lays all three out — see OrderBar. */
-  const addItemAction = canEditLines ? (
-    <AddPoLines order={order} orgId={orgId} lines={lines} />
-  ) : null;
+  /* Five figures under the menu, in Mark's order (2026-09-11). Packages are of
+     each line's own vendor item, so a case and an each both count as one — what
+     you count off the truck. The two received figures go red while short of
+     what was ordered. */
+  const stats: { label: string; value: string; short?: boolean }[] = [
+    { label: "Products ordered", value: String(lines.length) },
+    { label: "Packages ordered", value: qty(orderedPackages) },
+    { label: "Ordered total", value: money(ordered) },
+    {
+      label: "Packages received",
+      value: qty(receivedPackages),
+      short: receivedPackages < orderedPackages - 0.005,
+    },
+    { label: "Received total", value: money(received), short: received < ordered - 0.005 },
+  ];
 
-  const closingActions = (
-    <>
-      {/* Receiving is a screen, not a button. The old "Receive all as ordered"
-          wrote the ordered quantities from here — which is what made reading an
-          invoice look pointless — and it wasn't role-gated either, so staff got
-          an enabled button whose writes RLS rejected.
+  const header = (processItems: ActionMenuItem[], notice: ReactNode) => (
+    <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
+      <div className="min-w-0">
+        <div className="flex flex-wrap items-center gap-4">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            {order.po_number}
+          </h1>
+          <span
+            className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${PO_STATUS_CLASS[order.status]}`}
+          >
+            {PO_STATUS_LABEL[order.status]}
+          </span>
+        </div>
+        <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
+          {vendorLink} · {locationCode}
+        </p>
+      </div>
 
-          Labelled "Reconcile PO" since 2026-08-02 (Mark's ordering, where it
-          takes this slot): that screen's work is the ORDER against the invoice —
-          quantities, prices, SKUs — and "Receive…" named only the first of the
-          three. Same destination, and the route keeps its own name. */}
-      <Link
-        href={receiveHref}
-        className="flex h-9 items-center mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink no-underline transition-colors hover:bg-ink hover:text-white"
-      >
-        Reconcile PO
-      </Link>
-
-      {/* Beside Reconcile PO, never instead of it (Mark, 2026-08-27, who
-          proposed replacing that link on a closed order). Two reasons to keep
-          both: Reconcile PO is the ONLY route from here to the receiving
-          screen, and a closed order is exactly when you go back to it — the
-          invoice arrived late, a price was wrong. And what this offer depends
-          on is the PAPERWORK, not the status; see `fileUnfiled`.
-
-          It shows only while there is something to file, which is the whole of
-          its state: a bill already recorded offers nothing, and an order with
-          no document has nothing to record. */}
-      {canEditLines && canFileBills && unfiledReadings(attachments).length > 0 && (
-        <button
-          disabled={busy}
-          onClick={() => void fileUnfiled(unfiledReadings(attachments))}
-          className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-          title={fileReadingsLabel(unfiledReadings(attachments))}
-        >
-          File as bill
-        </button>
-      )}
-
-      {/* The end of the order's life, and the only route to it that means
-          anything — the status menu can always set `closed`, but says nothing
-          about what closing asserts. */}
-      {canEditLines && canClose(order.status) && (
-        <button
-          disabled={busy}
-          onClick={close}
-          className="h-9 mac-control border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors hover:bg-ink hover:text-white disabled:opacity-35"
-        >
-          Close order
-        </button>
-      )}
-    </>
+      <div className="flex flex-col items-end gap-4">
+        {actionMenu(processItems)}
+        <div className="flex flex-wrap justify-end gap-x-8 gap-y-3">
+          {stats.map((s) => (
+            <div key={s.label} className="text-right">
+              <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
+                {s.label}
+              </div>
+              <div
+                className={`text-[22px] font-bold tabular-nums tracking-[-0.01em] ${
+                  s.short ? "text-accent" : ""
+                }`}
+              >
+                {s.value}
+              </div>
+            </div>
+          ))}
+        </div>
+        {notice}
+      </div>
+    </div>
   );
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-end gap-x-6 gap-y-2">
-        <div>
-          <div className="flex flex-wrap items-center gap-4">
-            <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-              {order.po_number}
-            </h1>
-            <span
-              className={`inline-flex h-6 items-center px-2 text-[12px] font-semibold uppercase tracking-[0.12em] ${PO_STATUS_CLASS[order.status]}`}
-            >
-              {PO_STATUS_LABEL[order.status]}
-            </span>
-          </div>
-          <p className="mt-1 text-[12px] uppercase tracking-[0.12em] text-subtle">
-            {vendorLink} · {locationCode}
-          </p>
-        </div>
-        {/* Ordered / Received as two Statistics: the header answers "how big
-            is this order and did it all arrive" before anything else. */}
-        <div className="ml-auto flex items-start gap-8 text-right">
-          <div>
-            <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-              Ordered total
-            </div>
-            <div className="text-[22px] font-bold tabular-nums tracking-[-0.01em]">
-              {money(ordered)}
-            </div>
-          </div>
-          <div>
-            <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-              Received total
-            </div>
-            <div
-              className={`text-[22px] font-bold tabular-nums tracking-[-0.01em] ${
-                received < ordered - 0.005 ? "text-accent" : ""
-              }`}
-            >
-              {money(received)}
-            </div>
-          </div>
-        </div>
-      </div>
+      {processing ? (
+        <ProcessPo order={order} context={processing}>
+          {header}
+        </ProcessPo>
+      ) : (
+        header([], null)
+      )}
 
-      {/* The fields and the Process box sit SIDE BY SIDE (Mark,
-          2026-08-17). Both are about the order as a whole and neither
-          fills a 1440 window on its own — the dl is four short rows and
-          the box is one band of controls — so stacking them spent ~200px
-          of height pushing the line table down for two half-empty rows.
+      <div className="space-y-6">
+        <dl className="grid max-w-[26rem] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+          {/* Status leads the fields (Mark, 2026-09-11) — it moved here out of
+              the Process box, which is gone. */}
+          <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+            Status
+          </dt>
+          <dd>
+            {canEditLines ? (
+              <InlineValue
+                boxed={BOXED_FIELDS}
+                table="purchase_orders"
+                id={order.id}
+                column="status"
+                value={order.status}
+                kind="pick"
+                nullable={false}
+                ariaLabel="Status"
+                options={PO_STATUS_ORDER.map((s) => ({
+                  value: s,
+                  label: PO_STATUS_LABEL[s],
+                }))}
+              />
+            ) : (
+              <span className={READ_ONLY_VALUE}>{PO_STATUS_LABEL[order.status]}</span>
+            )}
+          </dd>
 
-          Stacked again below `xl`: the box's second row is three groups of
-          buttons, which needs the width more than the pairing does. */}
-      <div className="grid items-start gap-x-8 gap-y-6 xl:grid-cols-[26rem_minmax(0,1fr)]">
-        <div className="space-y-6">
-          <dl className="grid max-w-2xl grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
-            <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-              Ordered
-            </dt>
-            <dd className="tabular-nums">
-              {canEditLines ? (
-                <InlineValue
-                  boxed={BOXED_FIELDS}
-                  table="purchase_orders"
-                  id={order.id}
-                  column="order_date"
-                  value={order.order_date}
-                  kind="date"
-                  nullable={false}
-                />
-              ) : (
-                <span className={READ_ONLY_VALUE}>{order.order_date}</span>
-              )}
-            </dd>
+          <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+            Ordered
+          </dt>
+          <dd className="tabular-nums">
+            {canEditLines ? (
+              <InlineValue
+                boxed={BOXED_FIELDS}
+                table="purchase_orders"
+                id={order.id}
+                column="order_date"
+                value={order.order_date}
+                kind="date"
+                nullable={false}
+              />
+            ) : (
+              <span className={READ_ONLY_VALUE}>{order.order_date}</span>
+            )}
+          </dd>
 
-            {/* Delivery sits back under Ordered (Mark, 2026-08-02) — the two dates
-                read as a pair, which is the argument that beat putting it up in the
-                bar beside Status.
+          {/* Delivery sits back under Ordered (Mark, 2026-08-02) — the two dates
+              read as a pair, which is the argument that beat putting it up in the
+              bar beside Status.
 
-                The field is always there and blank until the date is actually set,
-                with the expectation beside it (Mark, 2026-08-02: "a blank field +
-                the 'arriving on…' text to the right of it").
+              The field is always there and blank until the date is actually set,
+              with the expectation beside it (Mark, 2026-08-02: "a blank field +
+              the 'arriving on…' text to the right of it").
 
-                IT SHOWS THE COLUMN, not a version of the column. The previous cut
-                withheld the value until the order was received, and that's what
-                produced the 08/02/2026 on 132-181132-02: a control whose prop is
-                pinned to null can never be corrected by React, because a controlled
-                input only touches the DOM when the rendered value CHANGES. Every
-                guard against that had to special-case a field whose prop never
-                moves — including, once written, one that could never clear itself.
-                A field that shows what the row holds has none of those cases.
+              IT SHOWS THE COLUMN, not a version of the column. The previous cut
+              withheld the value until the order was received, and that's what
+              produced the 08/02/2026 on 132-181132-02: a control whose prop is
+              pinned to null can never be corrected by React, because a controlled
+              input only touches the DOM when the rendered value CHANGES. Every
+              guard against that had to special-case a field whose prop never
+              moves — including, once written, one that could never clear itself.
+              A field that shows what the row holds has none of those cases.
 
-                Consequence worth knowing: a PO generated since migration 016 has
-                `delivery_date` pre-filled from the vendor's delivery days, so it
-                shows that date here rather than a blank. Making it blank until the
-                delivery actually happens means generation should stop pre-filling
-                the column and the vendor PDF should derive the date instead — a
-                change to what the vendor document says, so it's Mark's call. */}
-            {/* THE EXPECTATION RIDES WITH THE LABEL, not beside the field:
-                anything hung to a field's right breaks the column's right
-                edge, and the label side has room to spare. */}
-            <dt className="flex flex-wrap items-center gap-2 text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-              Delivery
-              {expectedDelivery && (
-                <span className="border border-ink bg-[var(--rf-yellow-200)] px-1 py-0.5 text-[11px] normal-case tracking-normal text-ink">
-                  arrives {expectedDelivery}
-                </span>
-              )}
-            </dt>
-            <dd className="tabular-nums">
-              {canEditLines ? (
-                <InlineValue
-                  boxed={BOXED_FIELDS}
-                  table="purchase_orders"
-                  id={order.id}
-                  column="delivery_date"
-                  value={order.delivery_date}
-                  kind="date"
-                />
-              ) : (
-                <span className={READ_ONLY_VALUE}>{order.delivery_date ?? "—"}</span>
-              )}
-            </dd>
+              Consequence worth knowing: a PO generated since migration 016 has
+              `delivery_date` pre-filled from the vendor's delivery days, so it
+              shows that date here rather than a blank. Making it blank until the
+              delivery actually happens means generation should stop pre-filling
+              the column and the vendor PDF should derive the date instead — a
+              change to what the vendor document says, so it's Mark's call. */}
+          {/* THE EXPECTATION RIDES WITH THE LABEL, not beside the field:
+              anything hung to a field's right breaks the column's right
+              edge, and the label side has room to spare. */}
+          <dt className="flex flex-wrap items-center gap-2 text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+            Delivery
+            {expectedDelivery && (
+              <span className="border border-ink bg-[var(--rf-yellow-200)] px-1 py-0.5 text-[11px] normal-case tracking-normal text-ink">
+                arrives {expectedDelivery}
+              </span>
+            )}
+          </dt>
+          <dd className="tabular-nums">
+            {canEditLines ? (
+              <InlineValue
+                boxed={BOXED_FIELDS}
+                table="purchase_orders"
+                id={order.id}
+                column="delivery_date"
+                value={order.delivery_date}
+                kind="date"
+              />
+            ) : (
+              <span className={READ_ONLY_VALUE}>{order.delivery_date ?? "—"}</span>
+            )}
+          </dd>
 
-            <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-              Sent via
-            </dt>
-            {/* The same padding the editable cells wear. Without it a read-only
-                value starts 4px left of every value above and below it, which is
-                what Mark saw on an email order: "'email' isn't aligned with the
-                ordered date and note". */}
-            <dd>
-              <span className={READ_ONLY_VALUE}>{order.sent_via ?? "—"}</span>
-            </dd>
-            <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-              Notes
-            </dt>
-            <dd>
-              {canEditLines ? (
-                <InlineValue
-                  boxed={BOXED_FIELDS}
-                  table="purchase_orders"
-                  id={order.id}
-                  column="notes"
-                  value={order.notes}
-                />
-              ) : (
-                <span className={READ_ONLY_VALUE}>{order.notes ?? "—"}</span>
-              )}
-            </dd>
-          </dl>
+          <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+            Sent via
+          </dt>
+          {/* The same padding the editable cells wear. Without it a read-only
+              value starts 4px left of every value above and below it, which is
+              what Mark saw on an email order: "'email' isn't aligned with the
+              ordered date and note". */}
+          <dd>
+            <span className={READ_ONLY_VALUE}>{order.sent_via ?? "—"}</span>
+          </dd>
+          <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+            Notes
+          </dt>
+          <dd>
+            {canEditLines ? (
+              <InlineValue
+                boxed={BOXED_FIELDS}
+                table="purchase_orders"
+                id={order.id}
+                column="notes"
+                value={order.notes}
+              />
+            ) : (
+              <span className={READ_ONLY_VALUE}>{order.notes ?? "—"}</span>
+            )}
+          </dd>
+        </dl>
 
-          {error && <p className="text-sm text-accent">{error}</p>}
-        </div>
-
-        <div>
-          {/* ONE box above the lines (Mark, 2026-08-02). The Process card and the
-              line bar were two stacked frames saying things about the same order;
-              `OrderBar` is the shared layout and these three are its slots. When
-              there's no `processing` — i.e. below purchaser+ — the bar renders here
-              instead, without the Delivery editor or any of the send buttons. */}
-          {processing ? (
-            <ProcessPo
-              order={order}
-              context={processing}
-              statement={statement}
-              status={statusControl}
-              actionsBefore={addItemAction}
-              actionsAfter={closingActions}
-            />
-          ) : (
-            <OrderBar
-              statement={statement}
-              trailing={
-                <>
-                  <span className="flex items-center gap-2 text-muted">
-                    <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-                      Delivery
-                    </span>
-                    <span className="tabular-nums">{order.delivery_date ?? "—"}</span>
-                  </span>
-                  {statusControl}
-                </>
-              }
-              actionGroups={[addItemAction, closingActions]}
-            />
-          )}
-        </div>
+        {error && <p className="text-sm text-accent">{error}</p>}
       </div>
 
       {checkedLines.size > 0 && (
