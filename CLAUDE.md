@@ -285,7 +285,9 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    plugins do not reload) — with six right-aligned figures under it:
    Products Ordered, Packages Ordered, Ordered Total, Products Received
    (lines with a received quantity above zero), Packages Received, Received
-   Total. Stacked below `xl`.
+   Total. Stacked below `xl`. Ticking lines no longer raises a band with a
+   Delete button: **Delete Selected…** joins the Actions menu, last and red,
+   while at least one line is ticked.
    `ProcessPo` and `AddPoLines` keep their dialogs and hand their rows out
    through render props (`OrderCommandMenu`'s shape); `AddPoLines` still draws
    its own button when given none, which is how the receiving screen uses it.

@@ -35,7 +35,7 @@ import { AddPoLines } from "./AddPoLines";
 import { ProcessPo, type ProcessingContext } from "./ProcessPo";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { nextDeliveryDate } from "@/lib/poProcessing";
-import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { confirmDialog, confirmDialogWithOption, splitConfirmMessage } from "@/lib/confirm";
 
 /**
@@ -672,7 +672,24 @@ export function PurchaseOrderDetail({
         // w-36, the width of the paperwork card's Attach… and Add as, so the
         // page's three commands are one size (Mark, 2026-09-11).
         triggerClassName={`${BUTTON_CLASS} w-36`}
-        items={[...addItems, ...group(processItems), ...group(receivingItems)]}
+        items={[
+          ...addItems,
+          ...group(processItems),
+          ...group(receivingItems),
+          // The line selection's one command (Mark, 2026-09-11) — it replaced a
+          // band that held nothing but Delete. Offered only while a line is
+          // ticked; `deleteLines` still confirms and names received quantities.
+          ...(canEditLines && checkedLines.size > 0
+            ? group([
+                {
+                  label: "Delete Selected…",
+                  onSelect: () => void deleteLines(),
+                  danger: true,
+                  disabled: busy,
+                },
+              ])
+            : []),
+        ]}
       />
     );
     return canEditLines ? (
@@ -917,27 +934,6 @@ export function PurchaseOrderDetail({
           {figures}
         </div>
       </div>
-
-      {checkedLines.size > 0 && (
-        <div className="flex flex-wrap items-center gap-4 border border-ink px-4 py-3 text-sm">
-          <span>
-            {checkedLines.size} {checkedLines.size === 1 ? "line" : "lines"} selected
-          </span>
-          <button
-            disabled={busy}
-            onClick={deleteLines}
-            className={DANGER_BUTTON_CLASS}
-          >
-            {busy ? "Deleting…" : "Delete"}
-          </button>
-          <button
-            onClick={() => setCheckedLines(new Set())}
-            className="ml-auto text-muted underline decoration-neutral-400 underline-offset-[3px] hover:decoration-neutral-900"
-          >
-            Clear
-          </button>
-        </div>
-      )}
 
       <DataTable
         rows={lines}
