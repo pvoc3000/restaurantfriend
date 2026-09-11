@@ -918,7 +918,7 @@ export function PurchaseOrderDetail({
           {error && <p className="text-sm text-accent">{error}</p>}
         </div>
 
-        <div className="min-w-0 space-y-3">
+        <div className="min-w-0 space-y-[18px]">
           {figures}
           {attachmentError ? (
             <p className="border border-accent px-4 py-3 text-sm text-accent">
