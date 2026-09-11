@@ -12,8 +12,9 @@
  *
  * `onClose` is what the close box DOES, and each window says: the time picker
  * commits, like a click away; the lock screen goes back to the names. With no
- * `onClose` the close box is not drawn, but its break in the rules is kept, so
- * the bar looks the same whether or not it can close.
+ * `onClose` there is no close box and no break for one: the rules run all the
+ * way to the left edge (Mark, 2026-09-10: "there should not be a white box
+ * visible on top of them").
  */
 export function MacTitleBar({
   title,
@@ -37,7 +38,7 @@ export function MacTitleBar({
           backgroundImage: "repeating-linear-gradient(to bottom, #000 0 1px, transparent 1px 2px)",
         }}
       />
-      {onClose ? (
+      {onClose && (
         <button
           type="button"
           aria-label={closeLabel}
@@ -46,8 +47,6 @@ export function MacTitleBar({
         >
           <span className="block h-[13px] w-[13px] border-2 border-ink bg-white active:bg-ink" />
         </button>
-      ) : (
-        <span aria-hidden className="relative block h-[13px] w-[19px] bg-white" />
       )}
       <Title className="absolute left-1/2 max-w-[60%] -translate-x-1/2 truncate bg-white px-2 text-[13px] leading-[14px] font-bold text-ink">
         {title}

@@ -8,6 +8,7 @@ import { todayInTimeZone } from "@/lib/today";
 import { useAnchoredPanel } from "@/lib/anchoredPanel";
 import { CalendarGrid } from "@/components/ui/CalendarGrid";
 import { BOXED_FIELD, BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
+import { MacTitleBar } from "@/components/ui/MacTitleBar";
 
 /**
  * The calendar affordance, drawn rather than borrowed: Safari renders no icon
@@ -32,9 +33,10 @@ export function CalendarIcon() {
   );
 }
 
-/** A day button under the calendar — `ui/RangePicker`'s preset dress. */
+/** A day button under the calendar — `ui/RangePicker`'s preset dress, raised
+ *  in the Mac look. */
 const PANEL_BUTTON =
-  "inline-flex h-8 items-center whitespace-nowrap border border-ink bg-white px-3 any-pointer-coarse:h-11 any-pointer-coarse:px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";
+  "mac-control inline-flex h-8 items-center whitespace-nowrap border border-ink bg-white px-3 any-pointer-coarse:h-11 any-pointer-coarse:px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35";
 
 /**
  * A date box you can TYPE INTO, PASTE INTO, or pick from a calendar.
@@ -312,31 +314,39 @@ export function DateField({
             // `position: fixed` moves the box and not its place in the DOM, so
             // a field sitting in a black band would otherwise paint white type
             // into this panel (the Generate-POs lesson).
-            className="fixed z-[70] border-2 border-ink bg-white p-3 text-ink whitespace-normal"
+            // A Mac window (Mark, 2026-09-10): `ui/TimePicker`'s frame, hard
+            // shadow and ruled title bar. The close box closes without a pick.
+            className="fixed z-[70] border-2 border-ink bg-white text-ink whitespace-normal shadow-[4px_4px_0_0_#000]"
           >
-            <CalendarGrid
-              month={month}
-              today={today}
-              painted={current ? { from: current, to: current } : null}
-              onMonth={setMonth}
-              onTap={pick}
-              isDisabled={max ? (iso) => iso > max : undefined}
-              autoFocusIso={current ?? today}
+            <MacTitleBar
+              title={ariaLabel.charAt(0).toUpperCase() + ariaLabel.slice(1)}
+              onClose={close}
             />
-            <div className="mt-3 flex gap-2">
-              <button
-                type="button"
-                onClick={() => pick(today)}
-                disabled={!!max && today > max}
-                className={PANEL_BUTTON}
-              >
-                Today
-              </button>
-              {!required && current && (
-                <button type="button" onClick={() => pick(null)} className={PANEL_BUTTON}>
-                  Clear
+            <div className="p-3">
+              <CalendarGrid
+                month={month}
+                today={today}
+                painted={current ? { from: current, to: current } : null}
+                onMonth={setMonth}
+                onTap={pick}
+                isDisabled={max ? (iso) => iso > max : undefined}
+                autoFocusIso={current ?? today}
+              />
+              <div className="mt-3 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => pick(today)}
+                  disabled={!!max && today > max}
+                  className={PANEL_BUTTON}
+                >
+                  Today
                 </button>
-              )}
+                {!required && current && (
+                  <button type="button" onClick={() => pick(null)} className={PANEL_BUTTON}>
+                    Clear
+                  </button>
+                )}
+              </div>
             </div>
           </div>,
           document.body

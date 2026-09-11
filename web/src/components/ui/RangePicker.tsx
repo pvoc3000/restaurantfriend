@@ -16,6 +16,7 @@ import { formatTypedDate, parseTypedDate } from "@/lib/dateInput";
 import { CalendarIcon } from "@/components/ui/DateField";
 import { CalendarGrid } from "@/components/ui/CalendarGrid";
 import { BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
+import { MacTitleBar } from "@/components/ui/MacTitleBar";
 
 /**
  * A RANGE of dates, for filtering a list by them (Mark, 2026-09-08).
@@ -292,8 +293,16 @@ export function RangePicker({
             // `position: fixed` moves the box and not its place in the DOM, so
             // a trigger sitting in a black band would otherwise paint white
             // type into this panel (the Generate-POs lesson).
-            className="fixed z-[70] flex gap-4 border-2 border-ink bg-white p-3 text-ink whitespace-normal"
+            // A Mac window (Mark, 2026-09-10): `ui/TimePicker`'s frame, hard
+            // shadow and ruled title bar. The close box is a close — a
+            // half-picked range is abandoned, as on any other way out.
+            className="fixed z-[70] border-2 border-ink bg-white text-ink whitespace-normal shadow-[4px_4px_0_0_#000]"
           >
+            <MacTitleBar
+              title={ariaLabel.charAt(0).toUpperCase() + ariaLabel.slice(1)}
+              onClose={close}
+            />
+            <div className="flex gap-4 p-3">
             <div className="w-[15.5rem] shrink-0 any-pointer-coarse:w-[21rem]">
               <CalendarGrid
                 month={month}
@@ -321,7 +330,9 @@ export function RangePicker({
                 />
               </div>
             </div>
-            <div className="flex w-40 shrink-0 flex-col gap-1" role="group" aria-label="Preset ranges">
+            {/* gap-2, not gap-1: each preset is raised on a 3px shadow, and
+                4px between them left the shadow touching the next button. */}
+            <div className="flex w-40 shrink-0 flex-col gap-2" role="group" aria-label="Preset ranges">
               {presets.map((spec) => {
                 const p = resolvePreset(spec);
                 const current = preset?.key === p.key && start === null;
@@ -332,18 +343,18 @@ export function RangePicker({
                     aria-pressed={current}
                     onClick={() => apply(p.range(today))}
                     // The app's one button weight (`BUTTON_CLASS` at h-8 and
-                    // left-aligned), with the range in force marked the way a
-                    // set filter is: filled black.
-                    className={`inline-flex h-8 items-center whitespace-nowrap border border-ink px-3 any-pointer-coarse:h-11 text-[12px] font-semibold uppercase tracking-[0.06em] transition-colors ${
-                      current
-                        ? "bg-ink text-white"
-                        : "bg-white text-ink hover:bg-ink hover:text-white"
+                    // left-aligned) in the Mac look, with the range in force
+                    // marked the way a set filter is: filled black, keeping its
+                    // own hover (`mac-own-hover`) so it never greys out.
+                    className={`mac-control inline-flex h-8 items-center whitespace-nowrap border border-ink px-3 any-pointer-coarse:h-11 text-[12px] font-semibold uppercase tracking-[0.06em] ${
+                      current ? "mac-own-hover bg-ink text-white" : "bg-white text-ink"
                     }`}
                   >
                     {p.label}
                   </button>
                 );
               })}
+            </div>
             </div>
           </div>,
           document.body
@@ -393,7 +404,9 @@ function TypedDate({
             onCommit(true);
           }
         }}
-        className="h-9 w-full min-w-0 border border-ink bg-white px-2 any-pointer-coarse:h-11 text-[16px] tabular-nums outline-none placeholder:text-faint focus:ring-1 focus:ring-inset focus:ring-ink"
+        // `ui/TimePicker`'s entry-box dress: a 1px black edge that reads 2px
+        // under the pointer and while typing, drawn inside so nothing moves.
+        className="h-9 w-full min-w-0 border border-ink bg-white px-2 any-pointer-coarse:h-11 text-[16px] tabular-nums outline-none placeholder:text-faint hover:shadow-[inset_0_0_0_1px_#000] focus:shadow-[inset_0_0_0_1px_#000]"
       />
     </span>
   );

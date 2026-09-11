@@ -111,14 +111,21 @@ export function CalendarGrid({
   // me to hit the next and last month buttons - they're tiny"). Keyed on the
   // POINTER, not the shell, so the full-screen runners get it too; an iPad
   // always has a touchscreen, hence `any-pointer` rather than `pointer`.
+  // THE MAC LOOK (Mark, 2026-09-10: "mac style the rangepicker and
+  // datepicker"): the month buttons are raised `mac-control` boxes, and the days
+  // are `ui/TimePicker`'s black-ruled grid — one hairline of ink between cells,
+  // the chosen ends filled black, grey under the pointer.
+  const NAV =
+    "mac-control flex h-8 w-8 items-center justify-center border border-ink bg-white text-lg leading-none any-pointer-coarse:h-11 any-pointer-coarse:w-11 any-pointer-coarse:text-3xl";
+
   return (
     <div className="w-[15.5rem] select-none any-pointer-coarse:w-[21rem]">
-      <div className="mb-2 flex items-center">
+      <div className="mb-3 flex items-center">
         <button
           type="button"
           aria-label="Previous month"
           onClick={() => onMonth(addMonths(month, -1))}
-          className="h-8 w-8 text-lg hover:bg-neutral-100 any-pointer-coarse:h-11 any-pointer-coarse:w-11 any-pointer-coarse:text-3xl"
+          className={NAV}
         >
           ‹
         </button>
@@ -129,33 +136,44 @@ export function CalendarGrid({
           type="button"
           aria-label="Next month"
           onClick={() => onMonth(addMonths(month, 1))}
-          className="h-8 w-8 text-lg hover:bg-neutral-100 any-pointer-coarse:h-11 any-pointer-coarse:w-11 any-pointer-coarse:text-3xl"
+          className={NAV}
         >
           ›
         </button>
       </div>
-      <div
-        ref={gridRef}
-        role="grid"
-        aria-label={monthLabel(month)}
-        className="grid grid-cols-7"
-        onMouseLeave={() => onHover?.(null)}
-        onKeyDown={onKeyDown}
-      >
+      {/* The letters sit OUTSIDE the ruled grid: they label its columns and
+          are not cells you can pick. */}
+      <div aria-hidden className="grid grid-cols-7">
         {WEEKDAY_LETTERS.map((letter, i) => (
           <span
             key={i}
-            aria-hidden
             className="h-6 text-center text-[11px] uppercase tracking-[0.12em] text-subtle"
           >
             {letter}
           </span>
         ))}
+      </div>
+      <div
+        ref={gridRef}
+        role="grid"
+        aria-label={monthLabel(month)}
+        className="grid grid-cols-7 gap-px border border-ink bg-ink"
+        onMouseLeave={() => onHover?.(null)}
+        onKeyDown={onKeyDown}
+      >
         {days.map((day) => {
           const inside = painted !== null && inRange(day.iso, painted);
           const edge =
             painted !== null && (day.iso === painted.from || day.iso === painted.to);
           const disabled = isDisabled?.(day.iso) ?? false;
+          // Colour and fill are composed apart — two text colours in one class
+          // string are decided by stylesheet order, not by which came last.
+          const color = edge ? "text-white" : day.inMonth ? "text-ink" : "text-faint";
+          const fill = edge
+            ? "bg-ink font-semibold"
+            : inside
+              ? "bg-neutral-200"
+              : "bg-white hover:bg-[#c0c0c0] disabled:hover:bg-white";
           return (
             <button
               key={day.iso}
@@ -174,14 +192,12 @@ export function CalendarGrid({
               // The two ends are FILLED, the days between are WASHED, and a
               // day outside the month is faint but still a target — the last
               // week of August is a fine place to start "the week before
-              // the first". Today is bold; it is a fact, not a state.
-              className={`h-8 text-sm tabular-nums disabled:cursor-default disabled:opacity-30 any-pointer-coarse:h-11 any-pointer-coarse:text-base ${
-                edge
-                  ? "bg-ink text-white"
-                  : inside
-                    ? "bg-neutral-100"
-                    : "hover:bg-neutral-100 disabled:hover:bg-transparent"
-              } ${day.inMonth ? "" : "text-faint"} ${day.iso === today ? "font-bold" : ""}`}
+              // the first". Today is bold; it is a fact, not a state. A
+              // disabled day greys its NUMBER, never its cell: an opacity would
+              // let the black rules show through the white and read as a hole.
+              className={`h-8 text-sm tabular-nums disabled:cursor-default disabled:text-neutral-300 any-pointer-coarse:h-11 any-pointer-coarse:text-base ${fill} ${color} ${
+                day.iso === today ? "font-bold" : ""
+              }`}
             >
               {Number(day.iso.slice(8, 10))}
             </button>
