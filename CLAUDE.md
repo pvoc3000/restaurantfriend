@@ -9924,7 +9924,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   | `ui/StickyFooter` | a hand-placed `fixed bottom-0` div plus a guessed spacer | a band pinned to the foot of the window — PO paperwork, employee paperwork. MEASURES its own height into a spacer so the page's last block doesn't slide under it, minus what already follows (the layout's `py-8`), and fires a `resize` so `useFillViewportHeight` reclaims space when it SHRINKS. **`flush` drops the card** — no white backdrop, no padding, no gap — for a bar that is its own backdrop (the tablet's black footers). **Inside a `space-y-*` column it needs a wrapper div**: it renders the spacer and the FIXED bar as siblings, so with the bar last the spacer inherits a margin `useExactViewportHeight` never counts |
   | `ui/RevealPanel` | a section that is always fully open, or a hand-rolled hover-expand | a block whose body costs more screen than it earns — both paperwork areas. Header always visible (title, count, Add as, Attach, progress, errors); the body opens on hover, on focus, or from a pinning toggle, and is ABSOLUTELY POSITIONED so it never reflows the page. **`alwaysOpen`** drops the toggle and puts the body IN FLOW, for when the panel gets a screen of its own and the crowding it was hiding from is gone |
   | `ui/fieldMetrics` `FORM_TEXTAREA` (or `FORM_FIELD_DRESS`) | a hand-typed `border border-ink bg-white …` | a multiline field in a dialog. `FORM_TEXTAREA` is the whole dress at the app's 14px form size, filling its track; `FORM_FIELD_DRESS` is the same border/ground/focus/padding WITHOUT a width or a font size, for a field in a label/field grid that supplies its own (the PO and special-order compose bodies, which inherit 16px on purpose — a big writing surface for a message about to be sent). **The padding cannot be overridden** — Tailwind resolves by stylesheet order — so a field wanting different padding writes its own dress, which is what the public pages do at `px-3`/`text-[16px]` (below 16px iOS Safari zooms on focus). Extracted after seven hand-typed copies had drifted into two |
-  | `ui/buttons` `PRIMARY_BUTTON_CLASS` | a black class string you type yourself | the ONE case where a command button on a SCREEN is filled black — a record in an abnormal state with exactly one way out (a flagged order's "Resolve the issue"), or a screen whose ONE obvious next act depends on its state — the timesheets screen fills **Import timesheets** while the pay period is empty and **Close pay period…** once it has shifts, and never both (Mark, 2026-08-22), and the PO's Add-item panel moves the fill from Done onto the row being typed into (Mark, 2026-09-08). `DIALOG_COMMIT_CLASS`'s argument outside a dialog; only ever right CONDITIONALLY, never as a screen's standing "primary" |
+  | `ui/buttons` `PRIMARY_BUTTON_CLASS` | a filled class string you type yourself | the ONE case where a command button on a SCREEN is FILLED — LIGHT GREY (`#c0c0c0`) with black type and a 2px edge on hover since 2026-09-11 (`mac-primary`; it was black) — a record in an abnormal state with exactly one way out (a flagged order's "Resolve the issue"), or a screen whose ONE obvious next act depends on its state — the timesheets screen fills **Import timesheets** while the pay period is empty and **Close pay period…** once it has shifts, and never both (Mark, 2026-08-22), and the PO's Add-item panel moves the fill from Done onto the row being typed into (Mark, 2026-09-08). `DIALOG_COMMIT_CLASS`'s argument outside a dialog; only ever right CONDITIONALLY, never as a screen's standing "primary" |
   | `ui/buttons` `DANGER_BUTTON_CLASS` | re-typing the red class string | any destructive command out on a screen — Delete, Void, "Deactivate everywhere". Red EVEN THOUGH most only open a confirm: a reader can't tell "opens a confirm" from "destroys" by looking. Bordered, never filled. NOT the same as `DIALOG_DANGER_CLASS` (`px-5`, a dialog footer's commit) — don't merge them. Positional classes stay at the call site |
   | `ui/FileDropZone` | `onDrop` on a div | dropping files onto a region. Its OVERLAY takes the drop (a PDF `<object>` is a plugin and swallows drag events — confirmed working over a live PDF, Mark 2026-08-04), it arms off WINDOW drag events so it's up before the pointer arrives, it vets types itself (`accept` governs only the picker), and it stops a stray drop navigating the page away |
   | `ui/SectionNav` | a second sidebar, underline tabs, or a `TabPicker` turned sideways | **the sections of one detail record** — the employee screen's Info · Employment · Events · Documents · Admin. Plain text links, no box: active bold black, inactive `text-muted`. `orientation="horizontal"` is the narrow-screen form; **`size="lg"` is the tablet's**, and it is PADDING only — the type stayed 12px after 14 read as too big. See "A detail screen that outgrows one page" below — REUSE THIS, don't re-derive it |
@@ -10018,9 +10018,10 @@ weekday column, and 003 then silently made it per-vendor-item.
   **A RECORD SCREEN CAN OPT IN WHOLE: `.mac-page`** (Mark, 2026-09-10: "let's
   try making the location detail page mac styled") — so far ONLY
   `/locations/[id]`, as an experiment. The shared field parts carry two MARKER
-  classes that do nothing outside such a screen: **`rf-typed`** (a box you
+  classes — which did nothing outside such a screen until 2026-09-11, and now
+  apply everywhere (see FIELDS NEVER FILL GREY below): **`rf-typed`** (a box you
   type into — `InlineValue` text/number/notes, a boxed `DateField` or
-  `TimeField`, the hours block's raw time inputs) gets a SOLID BLACK 1px border
+  `TimePicker`, `TextInput`, the form textareas) gets a SOLID BLACK 1px border
   on all four sides, white, and 2px on HOVER (Mark, same day — drawn as an inset
   1px shadow inside the border, so the box does not grow and the text does not
   move; no grey fill) — it was sunken like the search box first,
@@ -10062,17 +10063,19 @@ weekday column, and 003 then silently made it per-vendor-item.
   (`mac-control`, the record book) take the fields' 2px edge on hover and fill
   #c0c0c0 only while held, with the drop. `mac-own-hover` buttons keep their
   own hover, and every other screen keeps the grey hover.
-  **`mac-own-hover`** is on the black and red ones (`PRIMARY_*`, `DANGER_*`,
-  both dialog commits): they take the shadow and the press and keep their OWN
-  hover, because a grey fill on a black commit reads as disabled and on a red
-  one loses the warning. Verified: a hovered dialog commit stays neutral-800
-  with white type while a picker beside it turns `#c0c0c0`.
-  **DELIBERATELY WITHOUT IT:** `TabPicker`, checkboxes and switches, the boxed
-  detail-field dresses (`InlineValue`, boxed pickers, dates), the masthead and
-  tablet bars, row ⋯ menus and the columns eye, text-only buttons (dialog
-  Cancel), ordinary form `TextInput`s, and ~31 denser hand-rolled buttons with
-  their own sizes (small Clear/Link buttons, table-row buttons, the public
-  login, welcome and inquiry pages).
+  **`mac-own-hover`** keeps a control's OWN hover while it takes the shadow
+  and the press. Since 2026-09-11 that means the red ones (`DANGER_*`, which
+  also cast a red shadow via `mac-danger`) and the RangePicker's current
+  preset; the primary and dialog commits carry `mac-primary` instead (light
+  grey fill, 2px edge on hover). **Superseded the same day: white buttons no
+  longer fill grey on hover either — see FIELDS NEVER FILL GREY below.**
+  **DELIBERATELY WITHOUT IT:** `TabPicker`, the masthead and tablet bars, row
+  ⋯ menus and the columns eye, text-only buttons (dialog Cancel), and ~31
+  denser hand-rolled buttons with their own sizes (small Clear/Link buttons,
+  table-row buttons, the public login, welcome and inquiry pages). Checkboxes
+  are the Mac `ui/Checkbox`, there are no switches, the boxed field dresses
+  and `TextInput` wear `rf-press`/`rf-typed`, and the row expander wears
+  `mac-disclosure` — all since 2026-09-11.
   - **`mac-control`** — at rest a hard 3px black shadow down and right; on hover a SOLID light
     grey, `#c0c0c0` (Mark, 2026-09-10 — it replaced the classic 50%
     checkerboard of single black and white pixels, and a solid `#808080` was
@@ -10182,7 +10185,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   CEILING rather than also a floor: half of a portrait iPad's content column is
   385px, which a four-track grid divides into ~20px a field.
   **ALL FOUR CONTROLS TAKE `boxed`** — `InlineValue`, and the `PickList`,
-  `DateField` and `TimeField` it hands down to — or a page boxes its typed
+  `DateField` and `TimePicker` it hands down to — or a page boxes its typed
   fields while its pickers and dates stay underlined, which reads as those not
   being editable. A caller normally touches only `InlineValue`.
   The traps are in the brief and every one of them is invisible in review; the
@@ -10309,6 +10312,14 @@ weekday column, and 003 then silently made it per-vendor-item.
   `accent`/`go-ink` are INKS. `text-go` had exactly ONE caller in the app and it
   was this bug; if a second appears, it is almost certainly the same mistake.
 
+- **SUPERSEDED 2026-09-11 FOR ANYTHING WITH A BORDER** (Mark: "All fields with
+  a border should not fill with a solid color on hover, but the border should be
+  2px on hover", then the same for white buttons). Bordered fields, white
+  buttons, the primary and dialog commits, and the row expander now take a 2px
+  edge on hover and never a fill — see the Mac look's FIELDS NEVER FILL GREY.
+  The wash below still holds for UNBORDERED controls: a `TabPicker`'s unselected
+  cell, a `WeekdayPicker` day, an unboxed `PickList` or date, `RowMenu`'s ⋯ and
+  the columns eye.
 - **A CONTROL YOU PRESS FILLS GREY ON HOVER — `hover:bg-neutral-100`** (Mark,
   2026-09-04, on the checklist template record: Kind "fills grey and the border
   becomes black", where Shifts "become[s] black with no grey fill… I think
@@ -10318,7 +10329,7 @@ weekday column, and 003 then silently made it per-vendor-item.
   says "editable"). A control that only darkens its border is answering half the
   question.
   **WHAT TAKES IT**: every `PickList` trigger (`field` and `inline`), `PickSet`,
-  `InlineValue`'s resting button, `DateField` and `TimeField` in their cell
+  `InlineValue`'s resting button, `DateField` and `TimePicker` in their cell
   dress, a `TabPicker`'s unselected cell, a `WeekdayPicker`'s unselected day,
   `DataTable`'s row expander and `RevealPanel`'s toggle (which is that expander
   to the pixel), `RowMenu`'s ⋯ and the columns eye.
@@ -10344,9 +10355,11 @@ weekday column, and 003 then silently made it per-vendor-item.
   the important one, which is the conclusion the ActionBar reached in July and
   the sweep then applied everywhere else (ProcessPo's send buttons, the cleanup
   drawer's three saves, sign-in, /welcome). Black still means SELECTED — a
-  TabPicker cell, a WeekdayPicker day, a checked box, a switch knob — and it
+  TabPicker cell, a WeekdayPicker day — and it
   still means a band that DELIMITS (masthead, ActionBar, dialog title bar, group
-  band). **The one exception is `DIALOG_COMMIT_CLASS`**, flagged and left black
+  band). **The one exception is `DIALOG_COMMIT_CLASS`** (and `PRIMARY_BUTTON_CLASS`
+  after it) — a FILLED commit, LIGHT GREY with black type since 2026-09-11,
+  where it was black; the exception is the fill, not the colour. It was flagged and left black
   on Mark's instruction to flag rather than change: a modal footer is a
   two-weight decision (a text Cancel beside the commit), not a row of peer
   buttons. Retiring the black fill also cost ProcessPo's `processed` state,
