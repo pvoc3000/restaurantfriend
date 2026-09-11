@@ -684,14 +684,23 @@ export function PurchaseOrderDetail({
     );
   };
 
-  /* Five figures under the paperwork, in Mark's order (2026-09-11). Packages are of
+  /* Six figures under the paperwork, in Mark's order (2026-09-11). Packages are of
      each line's own vendor item, so a case and an each both count as one — what
-     you count off the truck. The two received figures go red while short of
-     what was ordered. */
+     you count off the truck. A product counts as received once its line has a
+     quantity above zero; an explicit 0 is "none came". The three received
+     figures go red while short of what was ordered. */
+  const productsReceived = lines.filter(
+    (l) => l.qty_received !== null && Number(l.qty_received) > 0
+  ).length;
   const stats: { label: string; value: string; short?: boolean }[] = [
     { label: "Products ordered", value: String(lines.length) },
     { label: "Packages ordered", value: qty(orderedPackages) },
     { label: "Ordered total", value: money(ordered) },
+    {
+      label: "Products received",
+      value: String(productsReceived),
+      short: productsReceived < lines.length,
+    },
     {
       label: "Packages received",
       value: qty(receivedPackages),
