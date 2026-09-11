@@ -275,9 +275,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    with the title at the top right, grouped add · send · receive: Add Item… ·
    Preview PDF · Download PDF · Email PO… / Open Vendor Site / Shopping List
    PDF (by order type) · Mark as Sent · Reconcile PO… · File as Bill · Close
-   Order…. Beneath it five figures: Products Ordered, Packages Ordered, Ordered
-   Total, Packages Received, Received Total. The Process box (`OrderBar`, and
-   its "Process · online" line) is GONE; Status is the first row of the fields.
+   Order…. The Process box (`OrderBar`, and its "Process · online" line) is
+   GONE. Below the title the body is TWO COLUMNS: the fields (Status first,
+   then the dates, Sent via, Notes) and beside them the Paperwork card —
+   moved out of the pinned `StickyFooter`, now `RevealPanel alwaysOpen` — with
+   five figures under it: Products Ordered, Packages Ordered, Ordered Total,
+   Packages Received, Received Total. Stacked below `xl`.
    `ProcessPo` and `AddPoLines` keep their dialogs and hand their rows out
    through render props (`OrderCommandMenu`'s shape); `AddPoLines` still draws
    its own button when given none, which is how the receiving screen uses it.

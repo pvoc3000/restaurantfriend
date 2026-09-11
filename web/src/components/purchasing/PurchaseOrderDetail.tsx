@@ -26,7 +26,6 @@ import { unfiledReadings, type SignedAttachment } from "@/lib/attachments";
 import { fileReadingsLabel } from "@/lib/invoices";
 import { fileReadings } from "@/lib/invoiceFromExtraction";
 import { PoAttachments } from "./PoAttachments";
-import { StickyFooter } from "@/components/ui/StickyFooter";
 import { DataTable, type DataColumn } from "@/components/catalog/DataTable";
 import { SaveLineToCatalog } from "./SaveLineToCatalog";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
@@ -682,7 +681,7 @@ export function PurchaseOrderDetail({
     );
   };
 
-  /* Five figures under the menu, in Mark's order (2026-09-11). Packages are of
+  /* Five figures under the paperwork, in Mark's order (2026-09-11). Packages are of
      each line's own vendor item, so a case and an each both count as one — what
      you count off the truck. The two received figures go red while short of
      what was ordered. */
@@ -697,6 +696,23 @@ export function PurchaseOrderDetail({
     },
     { label: "Received total", value: money(received), short: received < ordered - 0.005 },
   ];
+
+  const figures = (
+    <div className="flex flex-wrap gap-x-8 gap-y-3">
+      {stats.map((s) => (
+        <div key={s.label}>
+          <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">{s.label}</div>
+          <div
+            className={`text-[22px] font-bold tabular-nums tracking-[-0.01em] ${
+              s.short ? "text-accent" : ""
+            }`}
+          >
+            {s.value}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
 
   const header = (processItems: ActionMenuItem[], notice: ReactNode) => (
     <div className="flex flex-wrap items-start justify-between gap-x-8 gap-y-4">
@@ -718,22 +734,6 @@ export function PurchaseOrderDetail({
 
       <div className="flex flex-col items-end gap-4">
         {actionMenu(processItems)}
-        <div className="flex flex-wrap justify-end gap-x-8 gap-y-3">
-          {stats.map((s) => (
-            <div key={s.label} className="text-right">
-              <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">
-                {s.label}
-              </div>
-              <div
-                className={`text-[22px] font-bold tabular-nums tracking-[-0.01em] ${
-                  s.short ? "text-accent" : ""
-                }`}
-              >
-                {s.value}
-              </div>
-            </div>
-          ))}
-        </div>
         {notice}
       </div>
     </div>
@@ -749,131 +749,161 @@ export function PurchaseOrderDetail({
         header([], null)
       )}
 
-      <div className="space-y-6">
-        <dl className="grid max-w-[26rem] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
-          {/* Status leads the fields (Mark, 2026-09-11) — it moved here out of
-              the Process box, which is gone. */}
-          <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-            Status
-          </dt>
-          <dd>
-            {canEditLines ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="purchase_orders"
-                id={order.id}
-                column="status"
-                value={order.status}
-                kind="pick"
-                nullable={false}
-                ariaLabel="Status"
-                options={PO_STATUS_ORDER.map((s) => ({
-                  value: s,
-                  label: PO_STATUS_LABEL[s],
-                }))}
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{PO_STATUS_LABEL[order.status]}</span>
-            )}
-          </dd>
+      {/* TWO COLUMNS (Mark, 2026-09-11): the order's fields, and beside them
+          its paperwork — out of the pinned footer — with the five figures
+          under it. Stacked below `xl`. */}
+      <div className="grid items-start gap-x-8 gap-y-6 xl:grid-cols-[26rem_minmax(0,1fr)]">
+        <div className="space-y-6">
+          <dl className="grid max-w-[26rem] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
+            {/* Status leads the fields (Mark, 2026-09-11) — it moved here out of
+                the Process box, which is gone. */}
+            <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+              Status
+            </dt>
+            <dd>
+              {canEditLines ? (
+                <InlineValue
+                  boxed={BOXED_FIELDS}
+                  table="purchase_orders"
+                  id={order.id}
+                  column="status"
+                  value={order.status}
+                  kind="pick"
+                  nullable={false}
+                  ariaLabel="Status"
+                  options={PO_STATUS_ORDER.map((s) => ({
+                    value: s,
+                    label: PO_STATUS_LABEL[s],
+                  }))}
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>{PO_STATUS_LABEL[order.status]}</span>
+              )}
+            </dd>
 
-          <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-            Ordered
-          </dt>
-          <dd className="tabular-nums">
-            {canEditLines ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="purchase_orders"
-                id={order.id}
-                column="order_date"
-                value={order.order_date}
-                kind="date"
-                nullable={false}
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{order.order_date}</span>
-            )}
-          </dd>
+            <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+              Ordered
+            </dt>
+            <dd className="tabular-nums">
+              {canEditLines ? (
+                <InlineValue
+                  boxed={BOXED_FIELDS}
+                  table="purchase_orders"
+                  id={order.id}
+                  column="order_date"
+                  value={order.order_date}
+                  kind="date"
+                  nullable={false}
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>{order.order_date}</span>
+              )}
+            </dd>
 
-          {/* Delivery sits back under Ordered (Mark, 2026-08-02) — the two dates
-              read as a pair, which is the argument that beat putting it up in the
-              bar beside Status.
+            {/* Delivery sits back under Ordered (Mark, 2026-08-02) — the two dates
+                read as a pair, which is the argument that beat putting it up in the
+                bar beside Status.
 
-              The field is always there and blank until the date is actually set,
-              with the expectation beside it (Mark, 2026-08-02: "a blank field +
-              the 'arriving on…' text to the right of it").
+                The field is always there and blank until the date is actually set,
+                with the expectation beside it (Mark, 2026-08-02: "a blank field +
+                the 'arriving on…' text to the right of it").
 
-              IT SHOWS THE COLUMN, not a version of the column. The previous cut
-              withheld the value until the order was received, and that's what
-              produced the 08/02/2026 on 132-181132-02: a control whose prop is
-              pinned to null can never be corrected by React, because a controlled
-              input only touches the DOM when the rendered value CHANGES. Every
-              guard against that had to special-case a field whose prop never
-              moves — including, once written, one that could never clear itself.
-              A field that shows what the row holds has none of those cases.
+                IT SHOWS THE COLUMN, not a version of the column. The previous cut
+                withheld the value until the order was received, and that's what
+                produced the 08/02/2026 on 132-181132-02: a control whose prop is
+                pinned to null can never be corrected by React, because a controlled
+                input only touches the DOM when the rendered value CHANGES. Every
+                guard against that had to special-case a field whose prop never
+                moves — including, once written, one that could never clear itself.
+                A field that shows what the row holds has none of those cases.
 
-              Consequence worth knowing: a PO generated since migration 016 has
-              `delivery_date` pre-filled from the vendor's delivery days, so it
-              shows that date here rather than a blank. Making it blank until the
-              delivery actually happens means generation should stop pre-filling
-              the column and the vendor PDF should derive the date instead — a
-              change to what the vendor document says, so it's Mark's call. */}
-          {/* THE EXPECTATION RIDES WITH THE LABEL, not beside the field:
-              anything hung to a field's right breaks the column's right
-              edge, and the label side has room to spare. */}
-          <dt className="flex flex-wrap items-center gap-2 text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-            Delivery
-            {expectedDelivery && (
-              <span className="border border-ink bg-[var(--rf-yellow-200)] px-1 py-0.5 text-[11px] normal-case tracking-normal text-ink">
-                arrives {expectedDelivery}
-              </span>
-            )}
-          </dt>
-          <dd className="tabular-nums">
-            {canEditLines ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="purchase_orders"
-                id={order.id}
-                column="delivery_date"
-                value={order.delivery_date}
-                kind="date"
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{order.delivery_date ?? "—"}</span>
-            )}
-          </dd>
+                Consequence worth knowing: a PO generated since migration 016 has
+                `delivery_date` pre-filled from the vendor's delivery days, so it
+                shows that date here rather than a blank. Making it blank until the
+                delivery actually happens means generation should stop pre-filling
+                the column and the vendor PDF should derive the date instead — a
+                change to what the vendor document says, so it's Mark's call. */}
+            {/* THE EXPECTATION RIDES WITH THE LABEL, not beside the field:
+                anything hung to a field's right breaks the column's right
+                edge, and the label side has room to spare. */}
+            <dt className="flex flex-wrap items-center gap-2 text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+              Delivery
+              {expectedDelivery && (
+                <span className="border border-ink bg-[var(--rf-yellow-200)] px-1 py-0.5 text-[11px] normal-case tracking-normal text-ink">
+                  arrives {expectedDelivery}
+                </span>
+              )}
+            </dt>
+            <dd className="tabular-nums">
+              {canEditLines ? (
+                <InlineValue
+                  boxed={BOXED_FIELDS}
+                  table="purchase_orders"
+                  id={order.id}
+                  column="delivery_date"
+                  value={order.delivery_date}
+                  kind="date"
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>{order.delivery_date ?? "—"}</span>
+              )}
+            </dd>
 
-          <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-            Sent via
-          </dt>
-          {/* The same padding the editable cells wear. Without it a read-only
-              value starts 4px left of every value above and below it, which is
-              what Mark saw on an email order: "'email' isn't aligned with the
-              ordered date and note". */}
-          <dd>
-            <span className={READ_ONLY_VALUE}>{order.sent_via ?? "—"}</span>
-          </dd>
-          <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
-            Notes
-          </dt>
-          <dd>
-            {canEditLines ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="purchase_orders"
-                id={order.id}
-                column="notes"
-                value={order.notes}
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{order.notes ?? "—"}</span>
-            )}
-          </dd>
-        </dl>
+            <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+              Sent via
+            </dt>
+            {/* The same padding the editable cells wear. Without it a read-only
+                value starts 4px left of every value above and below it, which is
+                what Mark saw on an email order: "'email' isn't aligned with the
+                ordered date and note". */}
+            <dd>
+              <span className={READ_ONLY_VALUE}>{order.sent_via ?? "—"}</span>
+            </dd>
+            <dt className="text-[12px] uppercase leading-6 tracking-[0.12em] text-subtle">
+              Notes
+            </dt>
+            <dd>
+              {canEditLines ? (
+                <InlineValue
+                  boxed={BOXED_FIELDS}
+                  table="purchase_orders"
+                  id={order.id}
+                  column="notes"
+                  value={order.notes}
+                />
+              ) : (
+                <span className={READ_ONLY_VALUE}>{order.notes ?? "—"}</span>
+              )}
+            </dd>
+          </dl>
 
-        {error && <p className="text-sm text-accent">{error}</p>}
+          {error && <p className="text-sm text-accent">{error}</p>}
+        </div>
+
+        <div className="min-w-0 space-y-6">
+          {attachmentError ? (
+            <p className="border border-accent px-4 py-3 text-sm text-accent">
+              Could not load this order’s paperwork: {attachmentError}
+            </p>
+          ) : (
+            <PoAttachments
+              poId={order.id}
+              orgId={orgId}
+              attachments={attachments}
+              canEdit={canEditLines}
+              canFile={canFileBills}
+              // What an auto-filed invoice needs: whose vendor, whose location,
+              // and the lines to match its own against.
+              order={{
+                id: order.id,
+                vendor_id: order.vendor_id,
+                location_id: order.location_id,
+                lines,
+              }}
+            />
+          )}
+          {figures}
+        </div>
       </div>
 
       {checkedLines.size > 0 && (
@@ -946,48 +976,6 @@ export function PurchaseOrderDetail({
         empty={<p className="text-sm text-muted">This order has no lines.</p>}
       />
 
-      {/* PINNED to the bottom of the window (Mark, 2026-08-02), and last in the
-          order of the screen (Mark, earlier the same day — declutter). It used
-          to sit with Process, on the reasoning that sending the order and
-          filing what came back are the two things you DO to an order while the
-          lines are what you read. True, but it put a card you touch once — at
-          delivery, then never again — between the Process card and the order
-          itself, so every visit paid for it.
-
-          `ui/StickyFooter` owns the position and the measured clearance; the
-          CARD draws its own frame, which is why the band has none.
-
-          Receiving is where this card is actually WORKED anyway: that screen has
-          its own document pane, and auto-read-on-attach lives in the shared
-          useAttachmentActions, so filing an invoice from there behaves exactly
-          as it does from here. This copy is for looking one up later.
-
-          Visible to everyone — the invoice is the answer to "what did we
-          actually pay" — but only purchaser+ can add or remove, matching
-          migration 018's storage policies. */}
-      <StickyFooter spacerClassName="-mt-6">
-        {attachmentError ? (
-          <p className="border border-accent px-4 py-3 text-sm text-accent">
-            Could not load this order&rsquo;s paperwork: {attachmentError}
-          </p>
-        ) : (
-          <PoAttachments
-            poId={order.id}
-            orgId={orgId}
-            attachments={attachments}
-            canEdit={canEditLines}
-            canFile={canFileBills}
-            // What an auto-filed invoice needs: whose vendor, whose location,
-            // and the lines to match its own against.
-            order={{
-              id: order.id,
-              vendor_id: order.vendor_id,
-              location_id: order.location_id,
-              lines,
-            }}
-          />
-        )}
-      </StickyFooter>
     </div>
   );
 }

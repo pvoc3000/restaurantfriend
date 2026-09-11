@@ -94,18 +94,13 @@ export function PoAttachments({
   } = useAttachmentActions({ poId, orgId, order });
 
   return (
-    /* UP, because this card is pinned to the bottom of the window — see
-       RevealPanel: the body is out of flow, so `useStickyFooterClearance` keeps
-       reserving the COLLAPSED height and the line table above never resizes as
-       the pointer passes over.
-
-       The panel WRAPS the card rather than sitting inside it. `bottom-full`
-       measures from the panel's own root, so a root inside the card's padding
-       would open the body from the header ROW and let the card's top border cut
-       across it. The drop zone stays on the card, which is the target whether
-       the panel is open or not. */
+    /* ALWAYS OPEN, IN FLOW (Mark, 2026-09-11): the card left the pinned footer
+       for its own column beside the order's fields, so the reveal — which
+       existed to keep a footer from spending a third of the screen — has
+       nothing left to hide from. `EmployeeDocuments`' page variant, same prop.
+       The drop zone stays on the header card. */
     <RevealPanel
-      direction="up"
+      alwaysOpen
       label="the filed paperwork"
       header={(toggle) => (
         <FileDropZone
