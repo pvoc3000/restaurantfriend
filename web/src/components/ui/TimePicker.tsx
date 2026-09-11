@@ -11,6 +11,7 @@ import {
   type Meridiem,
 } from "@/lib/timeInput";
 import { BOXED_FIELD, BOXED_FIELD_BORDER } from "@/components/ui/fieldMetrics";
+import { MacTitleBar } from "@/components/ui/MacTitleBar";
 
 /** A clock, drawn in `DateField`'s calendar glyph's own dress. */
 export function ClockIcon() {
@@ -218,33 +219,12 @@ export function TimePicker({
             // Colours stated, not inherited — `DateField`'s panel note.
             className="fixed z-[70] w-[17rem] whitespace-normal border-2 border-ink bg-white text-ink shadow-[4px_4px_0_0_#000] any-pointer-coarse:w-[21rem]"
           >
-            {/* THE CLASSIC MAC TITLE BAR (Mark, 2026-09-10, with the reference
-                image): six ruled lines across white, the close box and the
-                title each sitting in a white break in them. The rules are a
-                gradient on their own layer, so the close box and the title
-                break them simply by being white. The close box does what a
-                click away does — `ui/CalcPad`'s close box rule — so it commits. */}
-            <div className="relative flex h-[22px] shrink-0 items-center border-b-2 border-ink bg-white px-[5px]">
-              <div
-                aria-hidden
-                className="absolute inset-x-[3px] inset-y-[4px]"
-                style={{
-                  backgroundImage:
-                    "repeating-linear-gradient(to bottom, #000 0 1px, transparent 1px 2px)",
-                }}
-              />
-              <button
-                type="button"
-                aria-label="Close"
-                onClick={commitAndClose}
-                className="relative bg-white px-[3px]"
-              >
-                <span className="block h-[13px] w-[13px] border-2 border-ink bg-white active:bg-ink" />
-              </button>
-              <span className="absolute left-1/2 max-w-[60%] -translate-x-1/2 truncate bg-white px-2 text-[13px] leading-[14px] font-bold text-ink">
-                {ariaLabel.charAt(0).toUpperCase() + ariaLabel.slice(1)}
-              </span>
-            </div>
+            {/* The close box does what a click away does — `ui/CalcPad`'s close
+                box rule — so it commits. */}
+            <MacTitleBar
+              title={ariaLabel.charAt(0).toUpperCase() + ariaLabel.slice(1)}
+              onClose={commitAndClose}
+            />
             <div className="space-y-3 p-3">
               <div>
                 <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-subtle">

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { unlockWithPin, type LockMember } from "@/app/deviceActions";
 import { PIN_LENGTH, retryLabel } from "@/lib/sharedDevice";
+import { MacTitleBar } from "@/components/ui/MacTitleBar";
 
 /**
  * The shared iPad's picker: who are you, then four digits.
@@ -97,15 +98,32 @@ export function LockScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [who, pin, busy]);
 
+  // The Mac look (Mark, 2026-09-10: "style the panel where users enter their
+  // pin mac style"): every key and name is a `mac-control` — raised, grey on
+  // hover, dropping into its shadow on the press — so a tap is felt on glass
+  // the way a click is on a desk.
   const KEY =
-    "flex h-14 items-center justify-center border border-ink bg-white text-[22px] font-semibold tabular-nums transition-colors hover:bg-ink hover:text-white active:bg-ink active:text-white disabled:opacity-35";
+    "mac-control flex h-14 items-center justify-center border border-ink bg-white text-[22px] font-semibold tabular-nums disabled:opacity-35";
+
+  function backToNames() {
+    setWho(null);
+    setPin("");
+    setError(null);
+  }
 
   return (
     <div className="flex flex-1 items-center justify-center px-4 py-12">
-      <div className="w-full max-w-md border-2 border-ink bg-white">
-        <h1 className="bg-ink px-6 py-4 text-[15px] font-bold uppercase tracking-[0.06em] text-white">
-          {who ? who.name : "Who are you?"}
-        </h1>
+      {/* A Mac window: the 2px frame, the hard shadow, and the ruled title bar
+          `ui/TimePicker` wears. Its close box goes back to the names once a
+          person is chosen; on the names there is nothing to close, so the box
+          is not drawn and its break in the rules stays. */}
+      <div className="w-full max-w-md border-2 border-ink bg-white shadow-[4px_4px_0_0_#000]">
+        <MacTitleBar
+          titleAs="h1"
+          title={who ? who.name : "Who are you?"}
+          onClose={who && members.length > 1 ? backToNames : undefined}
+          closeLabel="Back to names"
+        />
 
         <div className="space-y-6 p-6 text-[16px]">
           {members.length === 0 && (
@@ -126,7 +144,7 @@ export function LockScreen({
                       setPin("");
                       setError(null);
                     }}
-                    className="flex h-12 w-full items-center justify-center border border-ink bg-white px-3 text-center font-semibold uppercase tracking-[0.04em] transition-colors hover:bg-ink hover:text-white"
+                    className="mac-control flex h-12 w-full items-center justify-center border border-ink bg-white px-3 text-center font-semibold uppercase tracking-[0.04em]"
                   >
                     <span className="truncate">{m.name}</span>
                   </button>
@@ -169,11 +187,7 @@ export function LockScreen({
                 <button
                   type="button"
                   disabled={busy}
-                  onClick={() => {
-                    setWho(null);
-                    setPin("");
-                    setError(null);
-                  }}
+                  onClick={backToNames}
                   className={`${KEY} text-[12px] font-semibold uppercase tracking-[0.06em]`}
                 >
                   Back
@@ -204,7 +218,7 @@ export function LockScreen({
             </>
           )}
 
-          <div className="space-y-2 border-t border-hairline pt-4 text-center">
+          <div className="space-y-2 border-t border-ink pt-4 text-center">
             <a
               href="/login"
               className="block text-[12px] uppercase tracking-[0.06em] text-muted underline hover:text-ink"
