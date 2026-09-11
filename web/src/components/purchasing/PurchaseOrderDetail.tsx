@@ -698,9 +698,9 @@ export function PurchaseOrderDetail({
   ];
 
   const figures = (
-    <div className="flex flex-wrap gap-x-8 gap-y-3">
+    <div className="flex flex-wrap justify-end gap-x-8 gap-y-3">
       {stats.map((s) => (
-        <div key={s.label}>
+        <div key={s.label} className="text-right">
           <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">{s.label}</div>
           <div
             className={`text-[22px] font-bold tabular-nums tracking-[-0.01em] ${

@@ -94,13 +94,18 @@ export function PoAttachments({
   } = useAttachmentActions({ poId, orgId, order });
 
   return (
-    /* ALWAYS OPEN, IN FLOW (Mark, 2026-09-11): the card left the pinned footer
-       for its own column beside the order's fields, so the reveal — which
-       existed to keep a footer from spending a third of the screen — has
-       nothing left to hide from. `EmployeeDocuments`' page variant, same prop.
-       The drop zone stays on the header card. */
+    /* DOWN, because the card now heads its own column beside the order's
+       fields (Mark, 2026-09-11) rather than being pinned to the bottom of the
+       window. It still reveals on hover — the body is out of flow, so the
+       figures under the card never move as the pointer passes over.
+
+       The panel WRAPS the card rather than sitting inside it. `top-full`
+       measures from the panel's own root, so a root inside the card's padding
+       would open the body from the header ROW and let the card's bottom border
+       cut across it. The drop zone stays on the card, which is the target
+       whether the panel is open or not. */
     <RevealPanel
-      alwaysOpen
+      direction="down"
       label="the filed paperwork"
       header={(toggle) => (
         <FileDropZone
@@ -132,6 +137,8 @@ export function PoAttachments({
               </span>
               <span className="w-36">
                 <PickList
+                  variant="field"
+                  className="w-full"
                   value={kind}
                   options={ATTACHMENT_KIND_OPTIONS}
                   onPick={(next) => setKind(next as AttachmentKind)}
