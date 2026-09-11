@@ -45,7 +45,6 @@ import { StandingOrderBlock } from "@/components/specialOrders/StandingOrderBloc
 import { LinkCustomer } from "@/components/specialOrders/LinkCustomer";
 import { OrderInfoLayout, OrderSplitLayout } from "@/components/specialOrders/OrderInfoLayout";
 import { OrderDocuments } from "@/components/specialOrders/OrderDocuments";
-import { PushOrderToQuickBooks } from "@/components/specialOrders/PushOrderToQuickBooks";
 import { TakenBy } from "@/components/specialOrders/TakenBy";
 import {
   SO_ATTACHMENT_BUCKET,
@@ -516,6 +515,24 @@ export async function SpecialOrderDetail({
                     }
                   : null
               }
+              quickbooks={
+                kind === "order"
+                  ? {
+                      orderId: id,
+                      orgId: row.org_id as string,
+                      number: (row.number as string | null) ?? null,
+                      kind,
+                      status: (row.status as string | null) ?? null,
+                      ignoreBalance: Boolean(row.ignore_balance),
+                      invoiceDate: (row.date_initiated as string | null) ?? null,
+                      today,
+                      customerId: (row.customer_id as string | null) ?? null,
+                      customerName: customerLabel(row.customers as never) || "this customer",
+                      totals,
+                      canWrite,
+                    }
+                  : null
+              }
               schedule={
                 kind === "order" && status !== "cancelled" && canScheduleProduction(session.membership.role)
                   ? {
@@ -551,22 +568,6 @@ export async function SpecialOrderDetail({
                 canWrite,
               }}
             />
-            {kind === "order" ? (
-              <PushOrderToQuickBooks
-                orderId={id}
-                orgId={row.org_id as string}
-                number={(row.number as string | null) ?? null}
-                kind={kind}
-                status={(row.status as string | null) ?? null}
-                ignoreBalance={Boolean(row.ignore_balance)}
-                invoiceDate={(row.date_initiated as string | null) ?? null}
-                today={today}
-                customerId={(row.customer_id as string | null) ?? null}
-                customerName={customerLabel(row.customers as never) || "this customer"}
-                totals={totals}
-                canWrite={canWrite}
-              />
-            ) : null}
           </div>
         ) : null}
       </div>

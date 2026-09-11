@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { invokeQbo } from "@/lib/qboClient";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
-import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
+import { alertDialog, confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import {
   buildInvoicePayload,
   invoicePushRefusals,
@@ -60,7 +61,15 @@ export function PushOrderToQuickBooks({
   customerName,
   totals,
   canWrite,
+  children,
 }: {
+  /**
+   * Render the command as an `ActionMenu` row instead of a button
+   * (`OrderCommandMenu`, Mark, 2026-09-11: "add Send to QuickBooks to the
+   * menu"). No row while QuickBooks is not connected. The sent line, the
+   * warnings and the error are still drawn here.
+   */
+  children?: (items: ActionMenuItem[]) => ReactNode;
   orderId: string;
   orgId: string;
   number: string | null;
@@ -124,7 +133,7 @@ export function PushOrderToQuickBooks({
 
   // Nothing at all until QuickBooks is connected — an order screen is not the
   // place to advertise a feature nobody has set up.
-  if (!ctx || !ctx.connected) return null;
+  if (!ctx || !ctx.connected) return children ? <>{children([])}</> : null;
 
   const split = invoiceSplit(totals);
   const order: InvoiceOrder = {
@@ -268,6 +277,37 @@ export function PushOrderToQuickBooks({
     // server component, and the only thing this changed — `external_ref` — is
     // read by nothing else on the screen.
     setCtx(await read());
+  }
+
+  if (children) {
+    // IN THE MENU THE ROW STAYS ENABLED, AND A REFUSAL IS A DIALOG — the
+    // pattern `ScheduleProduction` uses. The button's refusal sentence stood
+    // under it permanently, which under a single Actions button would be a line
+    // of prose on every order that is not yet an invoice.
+    const items: ActionMenuItem[] = canWrite
+      ? [
+          {
+            label: busy ? "Sending…" : already ? "Update in QuickBooks" : "Send to QuickBooks",
+            disabled: busy,
+            onSelect: () =>
+              void (refusals.length > 0
+                ? alertDialog({ title: "This order can't go to QuickBooks yet", body: refusals[0] })
+                : push()),
+          },
+        ]
+      : [];
+    return (
+      <>
+        {children(items)}
+        {sent && <p className="max-w-sm text-right text-[13px] text-muted">{sent}</p>}
+        {warnings.map((w) => (
+          <p key={w} className="max-w-sm bg-mark-fill px-2 py-1 text-[13px] text-ink">
+            {w}
+          </p>
+        ))}
+        {error && <p className="max-w-sm text-right text-[13px] text-accent">{error}</p>}
+      </>
+    );
   }
 
   return (
