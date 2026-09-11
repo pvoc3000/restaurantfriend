@@ -176,6 +176,10 @@ export function LocationsList({
       width: 170,
       // Hiding this would remove the screen's whole point.
       pinned: true,
+      // No `truncate` on this cell: it clips, and the Work here button's
+      // raised 3px shadow (the Mac look) would be cut off where the column
+      // runs narrow, a portrait iPad above all.
+      wrap: true,
       sortValue: (r) => sortValue(r, "working"),
       render: (r) => (
         <WorkingHere

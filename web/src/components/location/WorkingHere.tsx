@@ -107,7 +107,11 @@ export function WorkingHere({
           await setActiveLocation(locationId);
         })
       }
-      className={`rf-press ${box} h-7 w-32 border-ink text-ink hover:bg-ink hover:text-white disabled:opacity-35`}
+      // `mac-control` everywhere, not just on a `.mac-page` record (Mark,
+      // 2026-09-10: the list's "Work here" buttons "should be mac styled") —
+      // the raised shadow, the grey hover and the press, like every command
+      // button. The chip above stays flat: it is not a button.
+      className={`mac-control ${box} h-7 w-32 border-ink bg-white text-ink disabled:opacity-35`}
     >
       {pending ? "Switching…" : "Work here"}
     </button>
