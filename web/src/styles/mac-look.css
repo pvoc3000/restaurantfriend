@@ -138,14 +138,30 @@
   transition: none;
 }
 
-.mac-page .rf-book:hover {
-  background-color: #c0c0c0;
-  color: #000;
-}
-
 .mac-page .rf-book:active {
   transform: translate(3px, 3px);
   box-shadow: none;
+}
+
+/* ON A `.mac-page` A BUTTON'S HOVER IS THE 2px EDGE, NOT THE GREY (Mark,
+   2026-09-10: "instead of filling with grey on hover just increase the border
+   to 2px like everything else. Keep the fill on press"). The same inset 1px
+   shadow the fields and picklists use, under the raised shadow, and a white
+   ground. The grey comes back only while the button is HELD, with the drop and
+   the 2px edge. `mac-own-hover` (the black commit, the red destructive) keeps
+   its own hover here as everywhere. More specific than the app-wide rules
+   above, so they lose on this screen alone. */
+.mac-page .mac-control:not(.mac-own-hover):hover,
+.mac-page .rf-book:hover {
+  background-color: #fff;
+  color: #000;
+  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
+}
+
+.mac-page .mac-control:not(.mac-own-hover):active,
+.mac-page .rf-book:active {
+  background-color: #c0c0c0;
+  box-shadow: inset 0 0 0 1px #000;
 }
 
 .mac-page .rf-book-dead {
