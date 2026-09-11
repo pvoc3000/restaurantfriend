@@ -17,7 +17,7 @@ import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
 import { usePublishRecordSet } from "@/lib/recordSet";
 import { sortRows, type SortDir } from "@/lib/tableSort";
 import { withFrom } from "@/lib/breadcrumbs";
-import { openWindowNow } from "@/lib/poProcessing";
+import { openWindowNow, showBlob } from "@/lib/poProcessing";
 import { PHOTO_URL_TTL_SECONDS } from "@/lib/facilityPhotos";
 import { DOCUMENT_BUCKET } from "@/lib/orgDocuments";
 import { NewDocument } from "./NewDocument";
@@ -86,73 +86,97 @@ export function DocumentsList({
   const href = (id: string) => withFrom(`/documents/${id}`, from);
 
   /**
-   * Open the files themselves in browser tabs, where printing and downloading
+   * Open the files themselves in a browser tab, where printing and downloading
    * already are (Mark, 2026-09-11: "skip the middleman and just open the pdf in
-   * a new tab so it can be printed and downloaded. I don't see the point of
-   * opening it in a separate panel first"). This replaces a preview panel whose
-   * whole job was to put a viewer, a Print and a Download in front of the same
-   * file the browser shows for nothing.
+   * a new tab so it can be printed and downloaded"). This replaced a preview
+   * panel whose whole job was to put a viewer, a Print and a Download in front
+   * of the same file the browser shows for nothing.
    *
-   * THE TABS ARE OPENED BEFORE ANYTHING IS AWAITED, and the signed URLs are
-   * written into them once they arrive — a window opened after an await is
-   * silently blocked (`openWindowNow`'s rule, which every PDF in this app
-   * already follows). The row carries its own file count, so the right number
-   * of tabs is known without asking the database first.
+   * SEVERAL FILES ARE ROLLED INTO ONE PDF FIRST (Mark, same day) — so printing
+   * five signs is one tab and one print rather than five of each, and on an
+   * iPad, where Safari allows about one new tab per tap, a selection opens at
+   * all. One file is passed straight through: there is nothing to merge, and
+   * re-encoding somebody's PDF to show them their own PDF would be work that
+   * can only lose something.
+   *
+   * THE TAB IS OPENED BEFORE ANYTHING IS AWAITED and pointed at the file (or
+   * the merged blob) once it exists — a window opened after an await is
+   * silently blocked (`openWindowNow`'s rule, which every PDF here follows).
    */
   function openFiles(targets: DocumentRow[]) {
     const withFiles = targets.filter((t) => t.file_count > 0);
     if (withFiles.length === 0) return;
-    const wanted = withFiles.reduce((n, t) => n + t.file_count, 0);
-    const windows = Array.from({ length: wanted }, () => openWindowNow());
-    const blocked = windows.filter((w) => !w).length;
+    const win = openWindowNow();
     setFailed(null);
     startTransition(async () => {
+      if (!win) {
+        setFailed("The browser blocked the new tab. Allow pop-ups for this site, then try again.");
+        return;
+      }
       const { data, error } = await supabase
         .from("org_document_files")
-        .select("document_id, storage_path")
+        .select("document_id, storage_path, file_name, content_type")
         .in(
           "document_id",
           withFiles.map((t) => t.id)
         )
         .order("created_at");
       if (error) {
-        windows.forEach((w) => w?.close());
+        win.close();
         setFailed(error.message);
         return;
       }
       // In the order they were asked for: each document's files, oldest first.
-      const byDocument = new Map<string, string[]>();
+      const byDocument = new Map<string, { path: string; name: string | null; type: string | null }[]>();
       for (const f of data ?? []) {
         const list = byDocument.get(f.document_id as string) ?? [];
-        list.push(f.storage_path as string);
+        list.push({
+          path: f.storage_path as string,
+          name: (f.file_name as string | null) ?? null,
+          type: (f.content_type as string | null) ?? null,
+        });
         byDocument.set(f.document_id as string, list);
       }
-      const paths = withFiles.flatMap((t) => byDocument.get(t.id) ?? []);
+      const files = withFiles.flatMap((t) => byDocument.get(t.id) ?? []);
       const { data: urls } = await supabase.storage
         .from(DOCUMENT_BUCKET)
-        .createSignedUrls(paths, PHOTO_URL_TTL_SECONDS);
+        .createSignedUrls(
+          files.map((f) => f.path),
+          PHOTO_URL_TTL_SECONDS
+        );
       const signed = new Map<string, string>();
       for (const u of urls ?? []) if (u.path && u.signedUrl) signed.set(u.path, u.signedUrl);
+      const sources = files
+        .map((f) => ({ url: signed.get(f.path), fileName: f.name, contentType: f.type }))
+        .filter((s): s is { url: string; fileName: string | null; contentType: string | null } => !!s.url);
 
-      let used = 0;
-      for (const path of paths) {
-        const url = signed.get(path);
-        const win = windows[used++];
-        if (win && url) win.location.href = url;
-        else win?.close();
+      if (sources.length === 0) {
+        win.close();
+        setFailed("Those files could not be opened. Reload the page and try again.");
+        return;
       }
-      // A tab per file the row CLAIMED; close any the record turned out not to
-      // have, rather than leaving somebody a blank tab to wonder about.
-      windows.slice(used).forEach((w) => w?.close());
+      if (sources.length === 1) {
+        win.location.href = sources[0].url;
+        return;
+      }
 
-      if (blocked > 0) {
-        setFailed(
-          blocked === wanted
-            ? `The browser blocked the new tab${wanted === 1 ? "" : "s"}. Allow pop-ups for this site, then try again.`
-            : `${blocked} of ${wanted} tabs were blocked. Allow pop-ups for this site to open them all.`
-        );
-      } else if (signed.size < paths.length || paths.length === 0) {
-        setFailed("Some files could not be opened. Reload the page and try again.");
+      try {
+        const { mergeToSinglePdf, mergedFileName } = await import("@/lib/mergeDocuments");
+        const result = await mergeToSinglePdf(sources);
+        if (result.merged === 0) {
+          win.close();
+          setFailed("None of those files could be read, so there was nothing to open.");
+          return;
+        }
+        showBlob(win, result.blob, mergedFileName(today, result.merged));
+        // A file left out is said out loud: a merge quietly one document short
+        // is worse than one that refused.
+        if (result.skipped.length > 0) {
+          setFailed(`Left out of the merged PDF: ${result.skipped.join(", ")}.`);
+        }
+      } catch (e) {
+        win.close();
+        setFailed(e instanceof Error ? e.message : "The documents could not be merged.");
       }
     });
   }
