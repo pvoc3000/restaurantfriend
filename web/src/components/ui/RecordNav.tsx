@@ -67,7 +67,9 @@ export function RecordNav({
   return (
     <nav
       aria-label="Record navigation"
-      className="flex shrink-0 items-center gap-1 tabular-nums"
+      // `rf-book-row` / `rf-book` / `rf-book-dead`: a `.mac-page` screen raises
+      // the four (mac-look.css), and spaces them so the shadows do not crowd.
+      className="rf-book-row flex shrink-0 items-center gap-1 tabular-nums"
     >
       <Step href={step(position.first)} label="First record" glyph={FIRST_PAGE} />
       <Step href={step(position.previous)} label="Previous record" glyph={CHEVRON_LEFT} />
@@ -124,7 +126,7 @@ function Step({
   const shape = "grid h-8 w-8 place-items-center border-[1.5px]";
   if (!href) {
     return (
-      <span aria-hidden="true" className={`${shape} border-hairline text-faint`}>
+      <span aria-hidden="true" className={`rf-book-dead ${shape} border-hairline text-faint`}>
         <Glyph path={glyph} />
       </span>
     );
@@ -134,7 +136,7 @@ function Step({
       href={href}
       aria-label={label}
       title={label}
-      className={`${shape} border-ink text-ink no-underline transition-colors hover:bg-ink hover:text-white`}
+      className={`rf-book ${shape} border-ink text-ink no-underline transition-colors hover:bg-ink hover:text-white`}
     >
       <Glyph path={glyph} />
     </Link>

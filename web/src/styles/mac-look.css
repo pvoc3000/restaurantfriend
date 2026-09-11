@@ -120,6 +120,42 @@
   background-color: #fff;
 }
 
+/* THE RECORD BOOK (`ui/RecordNav`) — Mark, 2026-09-10: "mac style the nav
+   buttons in the upper right hand corner". The live four are buttons, so they
+   take `.mac-control` whole: the raised shadow, the grey hover, the drop. Both
+   states go to a 1px black border together, as they share 1.5px elsewhere, so
+   paging to an end moves nothing. A dead one reads as a DISABLED Mac button —
+   the same box at 35% — rather than a grey outline beside three raised ones.
+   The row's gap opens from 4px to 8px, or each shadow would sit against the
+   next box. */
+.mac-page .rf-book,
+.mac-page .rf-book-dead {
+  border-width: 1px;
+  border-color: #000;
+  background-color: #fff;
+  color: #000;
+  box-shadow: 3px 3px 0 0 #000;
+  transition: none;
+}
+
+.mac-page .rf-book:hover {
+  background-color: #c0c0c0;
+  color: #000;
+}
+
+.mac-page .rf-book:active {
+  transform: translate(3px, 3px);
+  box-shadow: none;
+}
+
+.mac-page .rf-book-dead {
+  opacity: 0.35;
+}
+
+.mac-page .rf-book-row {
+  gap: 8px;
+}
+
 .mac-page .rf-typed {
   border-color: #000;
   background-color: #fff;

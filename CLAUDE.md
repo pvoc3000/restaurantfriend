@@ -10033,7 +10033,12 @@ weekday column, and 003 then silently made it per-vendor-item.
   the DAY is the label, so the Day and Open columns became one ("Open on").
   Everywhere else is still `ui/Checkbox`.
   Undo is taking the class off the page; every record Mac is moving it up to the
-  layout. Switches, checkboxes and the record book are untouched.
+  layout. Switches and checkboxes are untouched. **The record book (`ui/RecordNav`)
+  joined on 2026-09-10** ("mac style the nav buttons in the upper right hand
+  corner"): markers `rf-book` / `rf-book-dead` / `rf-book-row` make the live
+  four raised Mac buttons (grey hover, drop on press), a dead one the same box
+  at 35%, both at a 1px border so paging to an end moves nothing, and the row's
+  gap 8px so the shadows do not crowd.
   **`mac-own-hover`** is on the black and red ones (`PRIMARY_*`, `DANGER_*`,
   both dialog commits): they take the shadow and the press and keep their OWN
   hover, because a grey fill on a black commit reads as disabled and on a red
