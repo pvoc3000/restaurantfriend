@@ -10015,8 +10015,9 @@ weekday column, and 003 then silently made it per-vendor-item.
   **ITS CHECKBOXES ARE `ui/MacCheckbox`** (Mark, same day, with system.css's
   `field-row` markup as the reference): a native `<input type="checkbox">`
   beside a native `<label>`, the box drawn in `.mac-checkbox` — a 1px black
-  square, an X corner to corner when checked, a 2px edge while held, a dotted
-  ring on keyboard focus. The input stays transparent OVER the box rather than
+  square, a GREY (#808080) X corner to corner when checked, a 2px edge on hover
+  and while held (Mark, same day: "make the X inside gray and make the box 2px
+  on hover"), a dotted ring on keyboard focus. The input stays transparent OVER the box rather than
   `display: none`, which would drop it from the tab order. On the hours block
   the DAY is the label, so the Day and Open columns became one ("Open on").
   Everywhere else is still `ui/Checkbox`.

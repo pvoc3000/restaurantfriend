@@ -6,8 +6,8 @@ import { useId, type ReactNode } from "react";
  * THE CLASSIC MAC CHECKBOX (Mark, 2026-09-10, with system.css's `field-row`
  * markup as the reference): a real `<input type="checkbox">` beside a real
  * `<label>`, the box drawn by `.mac-checkbox` in `styles/mac-look.css` — a 1px
- * black square, an X corner to corner when checked, a heavier edge while the
- * press is held.
+ * black square, a grey X corner to corner when checked, a 2px edge on hover
+ * and while the press is held.
  *
  * A NATIVE INPUT, where `ui/Checkbox` is a `button role="checkbox"`: the label
  * is the whole hit target for free, Space toggles it, and a screen reader gets
