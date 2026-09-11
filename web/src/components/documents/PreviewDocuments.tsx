@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 import { DocumentViewer } from "@/components/ui/DocumentViewer";
+import { printDocument } from "@/lib/printDocument";
 import { PHOTO_URL_TTL_SECONDS } from "@/lib/facilityPhotos";
 import { DOCUMENT_BUCKET } from "@/lib/orgDocuments";
 
@@ -34,6 +36,7 @@ export function PreviewDocuments({
   const [files, setFiles] = useState<PreviewFile[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
   const [picked, setPicked] = useState<string | null>(null);
+  const [printing, setPrinting] = useState(false);
 
   useEffect(() => {
     let live = true;
@@ -84,6 +87,27 @@ export function PreviewDocuments({
   const ordered = byDocument.flatMap((d) => d.files);
   const shown = ordered.find((f) => f.id === picked) ?? ordered[0] ?? null;
   const withPicker = documents.length > 1 || ordered.length > 1;
+
+  /**
+   * Printing is the point of the screen (Mark, 2026-09-11: "I need to be able
+   * to print the documents using preview"), and it needs a button of its own:
+   * on a desk the embedded PDF viewer supplies one, and on an iPad it does not
+   * — `<object>` there shows page one with no toolbar at all. `printDocument`
+   * picks the route that works on this device. Called straight from the click
+   * with nothing awaited first, because the iOS route opens a tab.
+   */
+  async function print() {
+    if (!shown?.url) return;
+    setFailed(null);
+    setPrinting(true);
+    try {
+      await printDocument(shown.url, shown.content_type);
+    } catch (e) {
+      setFailed(e instanceof Error ? e.message : "Could not print.");
+    } finally {
+      setPrinting(false);
+    }
+  }
   const pick = "block w-full truncate text-left text-sm";
   const pickClass = (id: string) =>
     shown?.id === id
@@ -99,7 +123,22 @@ export function PreviewDocuments({
       bodyClassName="p-0"
       footer={
         <>
-          {failed && <p className="mr-auto text-sm text-accent">{failed}</p>}
+          <div className="mr-auto flex flex-wrap items-center gap-3">
+            {shown?.url && (
+              <>
+                <button type="button" className={BUTTON_CLASS} disabled={printing} onClick={() => void print()}>
+                  {printing ? "Printing…" : "Print"}
+                </button>
+                <a
+                  className={BUTTON_CLASS}
+                  href={`${shown.url}&download=${encodeURIComponent(shown.file_name ?? "file")}`}
+                >
+                  Download
+                </a>
+              </>
+            )}
+            {failed && <span className="text-sm text-accent">{failed}</span>}
+          </div>
           <button type="button" className={DIALOG_COMMIT_CLASS} onClick={onClose}>
             Done
           </button>

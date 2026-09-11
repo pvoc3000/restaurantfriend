@@ -266,12 +266,13 @@ export function FiledDocuments({
                 )}
                 {d.url ? (
                   <>
-                    {/* Open shows the file in the browser's own viewer, whose
-                        print button is the whole-document route on an iPad.
-                        Print fetches the bytes and prints them from a hidden
-                        same-origin frame (`lib/printDocument`). Download
-                        appends Supabase's own `download` parameter to the
-                        signed URL, which sets the Content-Disposition. */}
+                    {/* Open shows the file in the browser's own viewer. Print
+                        fetches the bytes and prints them from a hidden
+                        same-origin frame — except on iOS, where that prints
+                        page one only and `lib/printDocument` opens a tab for
+                        the share sheet instead. Download appends Supabase's own
+                        `download` parameter to the signed URL, which sets the
+                        Content-Disposition. */}
                     <a
                       href={d.url}
                       target="_blank"
