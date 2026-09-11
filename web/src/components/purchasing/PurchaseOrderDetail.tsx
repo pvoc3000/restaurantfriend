@@ -726,8 +726,12 @@ export function PurchaseOrderDetail({
     { label: "Received total", value: money(received), short: received < ordered - 0.005 },
   ];
 
+  // TWO ROWS OF THREE (Mark, 2026-09-11): ordered above, received below. A grid
+  // of `auto` tracks sizes each column to its widest figure across BOTH rows,
+  // so Products ordered sits over Products received and so on down; `w-fit
+  // ml-auto` keeps the block on the right margin.
   const figures = (
-    <div className="flex flex-wrap justify-end gap-x-8 gap-y-3">
+    <div className="ml-auto grid w-fit grid-cols-[repeat(3,auto)] gap-x-8 gap-y-3">
       {stats.map((s) => (
         <div key={s.label} className="text-right">
           <div className="text-[12px] uppercase tracking-[0.12em] text-subtle">{s.label}</div>
