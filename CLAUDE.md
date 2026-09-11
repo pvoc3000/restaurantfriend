@@ -10004,7 +10004,9 @@ weekday column, and 003 then silently made it per-vendor-item.
   classes that do nothing outside such a screen: **`rf-typed`** (a box you
   type into — `InlineValue` text/number/notes, a boxed `DateField` or
   `TimeField`, the hours block's raw time inputs) gets a SOLID BLACK 1px border
-  on all four sides, white, no hover — it was sunken like the search box first,
+  on all four sides, white, and 2px on HOVER (Mark, same day — drawn as an inset
+  1px shadow inside the border, so the box does not grow and the text does not
+  move; no grey fill) — it was sunken like the search box first,
   and Mark asked for the plain border within the hour ("for text fields I want
   to see a solid black 1px border on all sides"); **`rf-press`** (a
   boxed `PickList`, `PickSet` or `RangePicker`, and `WorkingHere`'s button)
@@ -10014,12 +10016,11 @@ weekday column, and 003 then silently made it per-vendor-item.
   click moves nothing; the unboxed title keeps its own editor.
   **ITS CHECKBOXES ARE `ui/MacCheckbox`** (Mark, same day, with system.css's
   `field-row` markup as the reference): a native `<input type="checkbox">`
-  beside a native `<label>`, the box drawn in `.mac-checkbox` — a 16px black
-  square with a 2px border, a GREY (#808080) X corner to corner when checked, a
-  3px border on hover and while held (Mark, same day, in two passes: 1px/2px
-  first, then "try 2px for the border of the checkbox and 3px on hover"), a
-  dotted ring on keyboard focus. The X is `background-origin: border-box`, so
-  it does not shrink as the border thickens. **The hover is on the ROW, not
+  beside a native `<label>`, the box drawn in `.mac-checkbox` — a 1px black
+  square (2px/3px was tried and reverted — Mark: "1px + 2px was better"), a
+  light GREY (#b0b0b0, after #808080) X corner to corner when checked, a 2px edge on hover
+  and while held (Mark, same day: "make the X inside gray and make the box 2px
+  on hover"), a dotted ring on keyboard focus. **The hover is on the ROW, not
   the label**: the transparent input covers the box, so `label:hover` fired
   only on the box's edge (Mark: "the on hover only applies to being over the
   border"), where `.mac-checkbox:hover` covers the box and the words alike. The input stays transparent OVER the box rather than

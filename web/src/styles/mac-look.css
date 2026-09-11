@@ -112,11 +112,16 @@
   transition: none;
 }
 
-/* No hover: a field is not a button. Unlayered, so it outranks the resting
-   dress's `hover:bg-neutral-100` and `hover:border-ink`. */
+/* Hover: the border reads 2px (Mark, 2026-09-10: "make the border of text
+   fields 2px on hover"), and the ground stays white — no grey fill, a field is
+   not a button. The second pixel is an INSET 1px shadow inside the 1px border
+   rather than `border-width: 2px`, which would grow the box and push the text a
+   pixel. Unlayered, so it outranks the resting dress's `hover:bg-neutral-100`
+   and `hover:border-ink`. */
 .mac-page .rf-typed:hover {
   border-color: #000;
   background-color: #fff;
+  box-shadow: inset 0 0 0 1px #000;
 }
 
 /* WHILE TYPING it looks the same as at rest, so a click does not move a pixel
@@ -127,6 +132,12 @@
 .mac-page .rf-typed ~ .rf-typed-editing {
   outline: 1px solid #000;
   outline-offset: -1px;
+}
+
+/* …and 2px on hover while typing too. The editor has no border of its own, so
+   its outline and a 2px inset shadow share the outer pixel: two pixels in all. */
+.mac-page .rf-typed ~ .rf-typed-editing:hover {
+  box-shadow: inset 0 0 0 2px #000;
 }
 
 /* ---- .mac-checkbox: ui/MacCheckbox ------------------------------------- */
@@ -160,26 +171,22 @@
   user-select: none;
 }
 
-/* 2px at rest (Mark, 2026-09-10: "try 2px for the border of the checkbox and
-   3px on hover"). `background-origin: border-box` pins the X to the box's OUTER
-   edge, so the border paints over its ends and the X does not shrink a pixel
-   each time the border thickens on hover. */
 .mac-checkbox label::before {
   content: "";
   flex: none;
   box-sizing: border-box;
   width: 16px;
   height: 16px;
-  border: 2px solid #000;
+  border: 1px solid #000;
   background: #fff center / 100% 100% no-repeat;
-  background-origin: border-box;
 }
 
 /* Checked: an X from corner to corner, the System 6 mark, in GREY (Mark,
-   2026-09-10: "make the X inside gray") — #808080, so the black box stays the
-   strongest line and the mark reads as its content. */
+   2026-09-10: "make the X inside gray", then "even lighter") — #b0b0b0, after
+   #808080 first, so the black box stays the strongest line and the mark reads
+   as its content. */
 .mac-checkbox input:checked + label::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 1L15 15M15 1L1 15' stroke='%23808080' stroke-width='1.5'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M1 1L15 15M15 1L1 15' stroke='%23b0b0b0' stroke-width='1.5'/%3E%3C/svg%3E");
 }
 
 /* Hovered or held: the edge thickens to 2px (Mark, same day: "make the box 2px
@@ -193,7 +200,7 @@
    and the words. */
 .mac-checkbox:hover label::before,
 .mac-checkbox:active label::before {
-  border-width: 3px;
+  border-width: 2px;
 }
 
 /* The input is the part under the pointer over the box, so it wants the hand
@@ -215,7 +222,7 @@
 /* A disabled box does not thicken. More specific than the row's hover rule
    (an extra element in the selector), and later, so it wins either way. */
 .mac-checkbox input:disabled + label::before {
-  border-width: 2px;
+  border-width: 1px;
 }
 
 /* ---- .mac-stipple: the calculator's desk-accessory ground ------------------ */
