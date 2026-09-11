@@ -246,7 +246,6 @@ export function GeneratePos({
                             checked={selected.has(t.vendor_id)}
                             onChange={() => toggle(t.vendor_id)}
                             label={`Generate a PO for ${t.vendor_name}`}
-                            size={18}
                           />
                           <span className="text-[13px] font-semibold uppercase tracking-[0.06em]">
                             {t.vendor_name}

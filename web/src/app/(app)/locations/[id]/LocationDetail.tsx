@@ -176,7 +176,7 @@ export async function LocationDetail({
               id={location.id}
               active={location.is_active}
               label="Active"
-              appearance="mac-checkbox"
+              yesNo
               readOnly={!editable}
             />
           </dd>

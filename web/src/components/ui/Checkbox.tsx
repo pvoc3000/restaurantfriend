@@ -1,12 +1,34 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
 /**
- * The X-in-a-box, modernised. FileMaker used a boxed checkbox for every piece
- * of state in the system, and that directness is worth keeping: a black-ruled
- * square, filled solid black with a ✓ when set. Replaces every raw
- * `<input type="checkbox">`.
+ * THE APP'S ONE CHECKBOX — and, since 2026-09-11, its one on/off control
+ * (Mark: "merge checkbox and maccheckbox, then replace any switches in the app
+ * with it. probably size lg"). `ui/MacCheckbox` and `ui/Switch` are gone.
+ *
+ * The classic Mac checkbox (system.css's `field-row` markup): a real
+ * `<input type="checkbox">` beside a real `<label>`, the box drawn by
+ * `.mac-checkbox` in `styles/mac-look.css` — a 1px black square, a grey X
+ * corner to corner when checked, a 2px edge on hover and while held. A NATIVE
+ * INPUT, where the old Checkbox was a `button role="checkbox"`: the label is the
+ * whole hit target for free, Space toggles it, and a screen reader gets the
+ * element it expects. The input sits transparent over the drawn box rather than
+ * `display: none`, so it stays focusable.
+ *
+ * `children` is the visible label; `label` is the accessible name for a box
+ * that has none (a table's selection column), and wins over the children where
+ * both are given.
+ *
+ * `size="lg"` is a 24px box in a row a button tall (36px) — what every former
+ * switch uses, and the location record's Active field. `md` is 16px.
+ *
+ * A BARE box is block-level, which is the old Checkbox's measured rule: an
+ * inline box rides on a line box and sits high in a table cell.
+ *
+ * `className` goes on the ROW. `mac-checkbox-fill` makes the label take the
+ * row's full width, for a menu row that must be clickable edge to edge
+ * (`ui/PickSet`).
  */
 export function Checkbox({
   checked,
@@ -14,7 +36,7 @@ export function Checkbox({
   disabled = false,
   label,
   children,
-  size = 22,
+  size = "md",
   className = "",
 }: {
   checked: boolean;
@@ -23,52 +45,26 @@ export function Checkbox({
   /** Accessible name; use `children` for a visible label instead. */
   label?: string;
   children?: ReactNode;
-  size?: number;
-  /**
-   * Extra classes on the control itself.
-   *
-   * Added for `ui/PickSet`, whose rows are checkboxes that must fill an
-   * anchored panel's width and carry its hover treatment. The alternative was
-   * to draw a second checkbox by hand inside a row button — a nested button,
-   * which is invalid, and a duplicated box, which is what the parts table
-   * exists to stop.
-   */
+  size?: "md" | "lg";
   className?: string;
 }) {
+  const id = useId();
+  const bare = children === undefined || children === null || children === false;
   return (
-    <button
-      type="button"
-      role="checkbox"
-      aria-checked={checked}
-      aria-label={label}
-      disabled={disabled}
-      onClick={() => onChange?.(!checked)}
-      // A LABELLED checkbox is a line of text and stays inline; a BARE one is a
-      // control that owns its space and goes block-level (Mark, 2026-08-02: in
-      // a PO's line table the box "doesn't align with the item type").
-      //
-      // The difference is the line box. An inline-level box sits on the
-      // baseline of a line whose height comes from the CELL's strut, not from
-      // the box — so in a table cell (`vertical-align: middle` centres the
-      // LINE, not the control) an 18px box rode 3px high on a 74px row, and
-      // `vertical-align: middle` on the button only moved it 2px the other way.
-      // Block-level removes the line box entirely: the cell's content becomes
-      // the control, and centring the content centres it exactly. Measured at
-      // 662 against a cell midpoint of 662, on rows of every height.
-      className={`cursor-pointer items-center gap-3 text-left disabled:cursor-default disabled:opacity-35 ${
-        children ? "inline-flex" : "flex"
+    <span
+      className={`mac-checkbox ${size === "lg" ? "mac-checkbox-lg" : ""} ${
+        bare ? "mac-checkbox-bare" : ""
       } ${className}`}
     >
-      <span
-        aria-hidden
-        style={{ width: size, height: size, fontSize: size * 0.6 }}
-        className={`inline-flex shrink-0 items-center justify-center border-[1.5px] border-ink leading-none text-white transition-colors ${
-          checked ? "bg-ink" : "bg-white"
-        }`}
-      >
-        {checked ? "✓" : ""}
-      </span>
-      {children}
-    </button>
+      <input
+        id={id}
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        aria-label={label}
+        onChange={(e) => onChange?.(e.target.checked)}
+      />
+      <label htmlFor={id}>{children}</label>
+    </span>
   );
 }

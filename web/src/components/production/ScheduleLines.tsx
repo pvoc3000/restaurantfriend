@@ -353,7 +353,6 @@ export function ScheduleLines({
                   setChecked(allChecked ? new Set() : new Set(sorted.map((r) => r.id)))
                 }
                 label="Select every item"
-                size={18}
               />
             ),
             render: (r: ScheduleLineRow) => (
@@ -361,7 +360,6 @@ export function ScheduleLines({
                 checked={checked.has(r.id)}
                 onChange={() => toggle(r.id)}
                 label={`Select ${r.item_name}`}
-                size={18}
               />
             ),
           } as DataColumn<ScheduleLineRow>,

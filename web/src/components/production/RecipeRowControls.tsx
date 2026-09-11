@@ -17,9 +17,9 @@ import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
  * job on the same row — this and HIDE — and two shapes for one kind of answer is
  * just something else to read. The box wins on the two grounds that decide it:
  * FileMaker uses one here, and at 18px square it costs a third of the width a
- * 36×20 switch does on a grid that is already 1,300px wide. `ui/Switch` stays
- * what it is — a control for a RECORD's state, which is what `ActiveToggle` and
- * the versions list use it for.
+ * 36×20 switch does on a grid that is already 1,300px wide. (Since 2026-09-11
+ * there are no switches anywhere: `ActiveToggle` and the versions list are
+ * large checkboxes too.)
  *
  * ON: the columns to its right are the base times the multiplier above them.
  * OFF: they are whatever somebody typed, and nothing overwrites them.
@@ -95,7 +95,6 @@ export function ScaleAutoBox({
       <Checkbox
         checked={on}
         disabled={pending}
-        size={18}
         label={
           on
             ? "Scaled from the multipliers — clear to type these columns"
@@ -138,7 +137,6 @@ export function HideOnPrint({
     <Checkbox
       checked={on}
       disabled={pending}
-      size={18}
       label={on ? "Hidden when printed" : "Printed"}
       onChange={(next) => {
         setOn(next);

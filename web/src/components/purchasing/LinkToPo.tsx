@@ -243,13 +243,13 @@ export function LinkToPo({
             </ul>
 
             {chosen && (
-              <label className="flex items-start gap-3 text-sm">
-                <Checkbox
-                  checked={attributeRest}
-                  onChange={() => setAttributeRest((v) => !v)}
-                  label="Attribute the remaining lines to this PO too"
-                  size={18}
-                />
+              // The words are the checkbox's own label now — an outer `<label>`
+              // around the native input's label would nest one inside another.
+              <Checkbox
+                checked={attributeRest}
+                onChange={() => setAttributeRest((v) => !v)}
+                className="text-sm"
+              >
                 <span>
                   Attribute the other{" "}
                   {restCount === 1 ? "line" : `${restCount} lines`} to this order
@@ -260,7 +260,7 @@ export function LinkToPo({
                     right needs when no line matched.
                   </span>
                 </span>
-              </label>
+              </Checkbox>
             )}
 
             {failed && <p className="text-sm text-accent">{failed}</p>}

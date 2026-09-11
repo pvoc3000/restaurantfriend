@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { Switch } from "@/components/ui/Switch";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { money, type MoneyOrder, type OrderTotals as Totals } from "@/lib/specialOrders";
 
 /**
@@ -184,12 +184,12 @@ export function OrderTotals({
               says what it does; it is the label that names the control, and the
               control is named. */}
           <Line label="Ignore the balance">
-            <Switch
-              on={Boolean(inputs.ignore_balance)}
+            <Checkbox
+              size="lg"
+              checked={Boolean(inputs.ignore_balance)}
               disabled={!canWrite || pending}
-              onToggle={() => setIgnoreBalance(!inputs.ignore_balance)}
-              size="sm"
-              ariaLabel="Keep this order out of the unpaid queue"
+              onChange={() => setIgnoreBalance(!inputs.ignore_balance)}
+              label="Keep this order out of the unpaid queue"
             />
           </Line>
         </dl>

@@ -679,7 +679,6 @@ export function GenerateSchedules({
                             onChange={() => togglePull(c.order.id)}
                             disabled={!includeSpecial}
                             label={`Schedule order ${c.order.number}`}
-                            size={18}
                           />
                           <span className="min-w-0 flex-1">
                             <span className="font-semibold tabular-nums">#{c.order.number}</span>
@@ -717,7 +716,6 @@ export function GenerateSchedules({
                   checked={includeSpecial}
                   onChange={() => setIncludeSpecial((v) => !v)}
                   label="Include special orders"
-                  size={18}
                 />
                 <span className="text-sm">Include special orders</span>
               </div>

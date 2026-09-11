@@ -71,11 +71,12 @@ export const DANGER_BUTTON_CLASS =
  */
 // `mac-control` on all three (Mark, 2026-09-10: the Mac look app-wide) — see
 // `styles/mac-look.css`. The red one adds `mac-own-hover` (its own red fill on
-// hover) and `mac-danger` (a red shadow). The primary one is DARK GREY since
-// 2026-09-11 (Mark, reviewing /interface), not black, and `mac-primary` gives it
-// the fields' 2px edge on hover and a light grey fill with black type when held.
+// hover) and `mac-danger` (a red shadow). The primary one is filled LIGHT GREY
+// with black type since 2026-09-11 (Mark, reviewing /interface — dark grey
+// first, then "use the lighter grey to fill"), and `mac-primary` gives it the
+// fields' 2px edge on hover; held, it stays grey and drops.
 export const PRIMARY_BUTTON_CLASS =
-  "mac-control mac-own-hover mac-primary inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-neutral-600 px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-white disabled:opacity-35";
+  "mac-control mac-own-hover mac-primary inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-[#c0c0c0] px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35";
 
 export const BUTTON_CLASS =
   "mac-control inline-flex h-9 items-center justify-center whitespace-nowrap border border-ink bg-white px-4 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink transition-colors hover:bg-ink hover:text-white disabled:opacity-35";

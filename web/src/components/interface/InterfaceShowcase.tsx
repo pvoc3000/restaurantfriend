@@ -42,7 +42,6 @@ import { DocumentViewer } from "@/components/ui/DocumentViewer";
 import { FORM_TEXTAREA } from "@/components/ui/fieldMetrics";
 import { FileDropZone } from "@/components/ui/FileDropZone";
 import { FilterMenus } from "@/components/ui/FilterMenus";
-import { MacCheckbox } from "@/components/ui/MacCheckbox";
 import { MacTitleBar } from "@/components/ui/MacTitleBar";
 import { MenuButton } from "@/components/ui/MenuButton";
 import { PageHeading } from "@/components/ui/PageHeading";
@@ -59,7 +58,6 @@ import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { SectionNav } from "@/components/ui/SectionNav";
 import { StickyFooter } from "@/components/ui/StickyFooter";
-import { Switch } from "@/components/ui/Switch";
 import { TabPicker } from "@/components/ui/TabPicker";
 import { TextInput } from "@/components/ui/TextInput";
 import { TimeField } from "@/components/ui/TimeField";
@@ -232,10 +230,9 @@ export function InterfaceShowcase({ today }: { today: string }) {
           <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
             Interface
           </h1>
-          <label className="flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.06em]">
-            Mac page look
-            <Switch on={mac} onToggle={() => setMac((m) => !m)} ariaLabel="Mac page look" />
-          </label>
+          <Checkbox size="lg" checked={mac} onChange={setMac}>
+            <span className="text-[12px] font-semibold uppercase tracking-[0.06em]">Mac page look</span>
+          </Checkbox>
         </div>
         <nav aria-label="Sections" className="flex flex-wrap gap-x-5 gap-y-2 text-[12px] uppercase tracking-[0.06em]">
           {INDEX.map(([id, label]) => (
@@ -613,15 +610,13 @@ function DatesBlock({ today }: { today: string }) {
 function TogglesBlock() {
   const [check, setCheck] = useState(true);
   const [check2, setCheck2] = useState(false);
-  const [mac, setMac] = useState(true);
-  const [macLg, setMacLg] = useState(false);
-  const [sw, setSw] = useState(true);
-  const [swSm, setSwSm] = useState(false);
+  const [lg, setLg] = useState(true);
+  const [lg2, setLg2] = useState(false);
 
   return (
     <Block id="toggles" title="Toggles">
       <Grid>
-        <Specimen name="Checkbox">
+        <Specimen name='Checkbox · size="md"'>
           <div className="flex flex-col items-start gap-3">
             <Checkbox checked={check} onChange={setCheck} label="Receive as ordered">
               Receive as ordered
@@ -634,29 +629,18 @@ function TogglesBlock() {
             </Checkbox>
           </div>
         </Specimen>
-        <Specimen name="MacCheckbox">
+        <Specimen name='Checkbox · size="lg" (what every switch became)'>
           <div className="flex flex-col items-start gap-3">
-            <MacCheckbox checked={mac} onChange={setMac}>
-              Monday
-            </MacCheckbox>
-            <MacCheckbox checked={false} disabled>
+            <Checkbox size="lg" checked={lg} onChange={setLg}>
+              Ignore ordering days
+            </Checkbox>
+            <Checkbox size="lg" checked={false} disabled>
               Disabled
-            </MacCheckbox>
+            </Checkbox>
           </div>
         </Specimen>
-        <Specimen name='MacCheckbox · size="lg"'>
-          <MacCheckbox size="lg" checked={macLg} onChange={setMacLg}>
-            Active
-          </MacCheckbox>
-        </Specimen>
-        <Specimen name="Switch">
-          <div className="flex items-center gap-6">
-            <Switch on={sw} onToggle={() => setSw((v) => !v)} ariaLabel="Ignore ordering days" />
-            <Switch on={false} onToggle={() => {}} disabled ariaLabel="Disabled switch" />
-          </div>
-        </Specimen>
-        <Specimen name='Switch · size="sm"'>
-          <Switch size="sm" on={swSm} onToggle={() => setSwSm((v) => !v)} ariaLabel="Auto" />
+        <Specimen name='Checkbox · lg, no visible label'>
+          <Checkbox size="lg" checked={lg2} onChange={setLg2} label="Require a photo" />
         </Specimen>
         <Specimen name="ActiveToggle (local write)">
           <div className="flex items-center gap-6">
@@ -670,8 +654,8 @@ function TogglesBlock() {
             />
           </div>
         </Specimen>
-        <Specimen name='ActiveToggle · appearance="mac-checkbox"'>
-          <ActiveToggle table="demo" id="demo" active appearance="mac-checkbox" onWrite={async () => ({ error: null })} />
+        <Specimen name="ActiveToggle · readOnly, yesNo">
+          <ActiveToggle table="demo" id="demo" active readOnly yesNo />
         </Specimen>
         <Specimen name="ActiveToggle · readOnly">
           <ActiveToggle table="demo" id="demo" active readOnly />
@@ -849,7 +833,10 @@ function TablesBlock() {
     {
       key: "select",
       label: "",
-      width: 44,
+      // The expand arrow rides in the first cell (22px + a 12px gap), so the
+      // box needs room beyond its own 16px or it is clipped past the cell.
+      width: 90,
+      minWidth: 64,
       header: (
         <Checkbox
           checked={allSelected}
@@ -878,7 +865,7 @@ function TablesBlock() {
       width: 80,
       sortValue: (r) => (r.active ? 1 : 0),
       render: (row) => (
-        <Switch on={row.active} onToggle={() => update(row.id, { active: !row.active })} ariaLabel={`${row.name} active`} />
+        <Checkbox size="lg" checked={row.active} onChange={() => update(row.id, { active: !row.active })} label={`${row.name} active`} />
       ),
     },
     {
@@ -1079,7 +1066,7 @@ function TablesBlock() {
           leading={
             <div className="flex items-center gap-3">
               <span className="text-[12px] uppercase tracking-[0.06em] text-subtle">Bands</span>
-              <Switch size="sm" on={grouped} onToggle={() => setGrouped((g) => !g)} ariaLabel="Group by category" />
+              <Checkbox size="lg" checked={grouped} onChange={setGrouped} label="Group by category" />
               <button type="button" className="text-[12px] uppercase tracking-[0.06em] text-muted underline underline-offset-4 hover:text-ink" onClick={() => setRows(INITIAL_ROWS)}>
                 Reset rows
               </button>

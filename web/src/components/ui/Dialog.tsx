@@ -194,12 +194,12 @@ export const DIALOG_CANCEL_CLASS =
 
 // `mac-control mac-own-hover` on both commits (Mark, 2026-09-10: the Mac look
 // app-wide, `styles/mac-look.css`): the shadow and the press. Cancel is text and
-// gets neither. Since 2026-09-11 (Mark, reviewing /interface) the commit is DARK
-// GREY with a black border, and `mac-primary` gives it a 2px edge on hover and a
-// light grey fill with black type when held; the danger one wears `mac-danger`,
-// a red shadow under its red border.
+// gets neither. Since 2026-09-11 (Mark, reviewing /interface) the commit is
+// filled LIGHT GREY with black type and a black border, and `mac-primary` gives
+// it a 2px edge on hover; the danger one wears `mac-danger`, a red shadow under
+// its red border.
 export const DIALOG_COMMIT_CLASS =
-  "mac-control mac-own-hover mac-primary inline-flex h-9 items-center border border-ink bg-neutral-600 px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-white disabled:border-neutral-300 disabled:bg-neutral-300 disabled:text-white";
+  "mac-control mac-own-hover mac-primary inline-flex h-9 items-center border border-ink bg-[#c0c0c0] px-5 text-[12px] font-semibold uppercase tracking-[0.06em] text-ink disabled:opacity-35";
 
 /** A destructive commit — the accent edge, filled on hover, as everywhere else. */
 export const DIALOG_DANGER_CLASS =

@@ -195,11 +195,10 @@ export function TagsList({
             })
           }
           label="Select every tag shown"
-          size={18}
         />
       ),
       render: (r) => (
-        <Checkbox checked={checked.has(r.id)} onChange={() => toggle(r.id)} label={`Select ${r.title}`} size={18} />
+        <Checkbox checked={checked.has(r.id)} onChange={() => toggle(r.id)} label={`Select ${r.title}`} />
       ),
     },
     {

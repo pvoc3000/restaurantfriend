@@ -333,7 +333,6 @@ export function PrintPacket({
                     // told from a feature that is not there.
                     disabled={p.key === "special" && orderIds.length === 0}
                     label={`Include the ${p.label}`}
-                    size={18}
                   />
                   <span className="font-medium">{p.label}</span>
                   {/* COUNTED, because this is the one part whose size is not

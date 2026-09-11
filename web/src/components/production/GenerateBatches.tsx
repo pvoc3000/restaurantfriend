@@ -389,7 +389,6 @@ export function GenerateBatches({
                               row-wide button of my own would have been a button
                               inside a button. */}
                           <Checkbox
-                            size={18}
                             checked={on}
                             onChange={() => {
                               const next = new Set(chosen ?? []);

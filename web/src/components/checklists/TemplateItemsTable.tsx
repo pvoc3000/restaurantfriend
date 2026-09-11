@@ -9,7 +9,7 @@ import { ActiveToggle } from "@/components/catalog/ActiveToggle";
 import { WeekdayPicker } from "@/components/catalog/WeekdayPicker";
 import { SectionHeading } from "@/components/ui/SectionHeading";
 import { RowMenu } from "@/components/ui/RowMenu";
-import { Switch } from "@/components/ui/Switch";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
 import { confirmDialog } from "@/lib/confirm";
 import { weekdaySetLabel, type ResponseType } from "@/lib/checklists";
@@ -452,11 +452,11 @@ export function TemplateItemsTable({
       sortValue: (r) => (r.requires_photo ? 0 : 1),
       render: (r) =>
         editable ? (
-          <Switch
-            size="sm"
-            on={r.requires_photo}
-            ariaLabel={`Require a photo for ${r.prompt}`}
-            onToggle={() => void setPhoto(r, !r.requires_photo)}
+          <Checkbox
+            size="lg"
+            checked={r.requires_photo}
+            label={`Require a photo for ${r.prompt}`}
+            onChange={() => void setPhoto(r, !r.requires_photo)}
           />
         ) : (
           <span className="text-muted">{r.requires_photo ? "Required" : ""}</span>

@@ -7,7 +7,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { Switch } from "@/components/ui/Switch";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { WeekdayPicker } from "@/components/catalog/WeekdayPicker";
 import { addDays, standingMaterializationDates } from "@/lib/specialOrders";
 import { MaterializeNow } from "@/components/specialOrders/MaterializeNow";
@@ -152,12 +152,12 @@ export function StandingOrderBlock({
         </Row>
         <Row label="Paused">
           <span className="inline-flex items-center gap-2">
-            <Switch
-              on={paused}
+            <Checkbox
+              size="lg"
+              checked={paused}
               disabled={!canWrite || pending}
-              onToggle={() => write({ paused: !paused })}
-              size="sm"
-              ariaLabel="Pause this standing order"
+              onChange={() => write({ paused: !paused })}
+              label="Pause this standing order"
             />
             <span className="text-[12px] text-muted">
               Paused makes nothing new; days already made are untouched

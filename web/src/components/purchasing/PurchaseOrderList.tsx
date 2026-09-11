@@ -636,7 +636,6 @@ export function PurchaseOrderList({
           checked={allVisibleChecked}
           onChange={toggleAllVisible}
           label="Select all shown"
-          size={18}
         />
       ),
       render: (po) => (
@@ -644,7 +643,6 @@ export function PurchaseOrderList({
           checked={checked.has(po.id)}
           onChange={() => toggleOne(po.id)}
           label={`select ${po.po_number}`}
-          size={18}
         />
       ),
     } satisfies DataColumn<PoListRow>] : []),

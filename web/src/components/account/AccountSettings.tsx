@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { setDisplayName, setShell, signOut } from "@/app/actions";
 import { READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
-import { Switch } from "@/components/ui/Switch";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { TextInput } from "@/components/ui/TextInput";
 import { PIN_LENGTH, isValidPin } from "@/lib/sharedDevice";
 import type { Shell } from "@/lib/shell";
@@ -197,11 +197,12 @@ export function AccountSettings({
 
         <dt className="text-subtle">Tablet layout</dt>
         <dd className="flex items-center gap-3">
-          <Switch
-            on={shell === "tablet"}
-            onToggle={toggleShell}
+          <Checkbox
+            size="lg"
+            checked={shell === "tablet"}
+            onChange={() => toggleShell()}
             disabled={switching}
-            ariaLabel="Tablet layout on this device"
+            label="Tablet layout on this device"
           />
           <span className="text-muted">
             {shell === "tablet" ? "One bar and a page of actions." : "The menu, on this device."}

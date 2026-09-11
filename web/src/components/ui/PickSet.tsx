@@ -218,10 +218,9 @@ export function PickSet({
                 of its values, and typing three letters must not take away the
                 way back. */}
             <Checkbox
-              size={18}
               checked={value.length === 0}
               onChange={() => onChange([])}
-              className={`${MENU_ITEM_CLASS} w-full ${menuItemState(value.length === 0)}`}
+              className={`${MENU_ITEM_CLASS} mac-checkbox-fill w-full ${menuItemState(value.length === 0)}`}
             >
               <span>{allLabel}</span>
             </Checkbox>
@@ -237,10 +236,9 @@ export function PickSet({
               return (
                 <Checkbox
                   key={o.value}
-                  size={18}
                   checked={on}
                   onChange={() => toggle(o.value)}
-                  className={`${MENU_ITEM_CLASS} w-full ${menuItemState(on)}`}
+                  className={`${MENU_ITEM_CLASS} mac-checkbox-fill w-full ${menuItemState(on)}`}
                 >
                   <span>{o.label}</span>
                   {o.hint && (

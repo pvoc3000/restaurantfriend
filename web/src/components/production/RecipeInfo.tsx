@@ -7,7 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { Switch } from "@/components/ui/Switch";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { spaceBelow, useViewportAtLeast } from "@/lib/tableHead";
 import { recipeHref } from "@/lib/recipes";
 import { scaleColumns } from "@/lib/production";
@@ -478,12 +478,12 @@ function ActiveVersion({ id, active }: { id: string; active: boolean }) {
   const [pending, start] = useTransition();
 
   return (
-    <Switch
-      size="sm"
-      on={on}
+    <Checkbox
+      size="lg"
+      checked={on}
       disabled={pending}
-      ariaLabel={on ? "Active — click to retire this version" : "Retired — click to activate"}
-      onToggle={() => {
+      label={on ? "Active — click to retire this version" : "Retired — click to activate"}
+      onChange={() => {
         const next = !on;
         setOn(next);
         start(async () => {

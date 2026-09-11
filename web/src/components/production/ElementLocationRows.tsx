@@ -418,7 +418,6 @@ function WeeklyToggle({
 
   return (
     <Checkbox
-      size={18}
       checked={checked}
       disabled={disabled || busy}
       label={label}

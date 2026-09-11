@@ -225,7 +225,6 @@ export function SchedulesList({
             setChecked(allChecked ? new Set() : new Set(visible.map((r) => r.id)))
           }
           label="Select every schedule shown"
-          size={18}
         />
       ),
       render: (r) => (
@@ -233,7 +232,6 @@ export function SchedulesList({
           checked={checked.has(r.id)}
           onChange={() => toggle(r.id)}
           label={`Select ${r.schedule_date} ${r.sellsCode}`}
-          size={18}
         />
       ),
     } satisfies DataColumn<ScheduleRow>] : []),

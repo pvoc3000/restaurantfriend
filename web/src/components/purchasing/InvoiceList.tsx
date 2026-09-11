@@ -389,7 +389,6 @@ export function InvoiceList({
           checked={allVisibleChecked}
           onChange={toggleAllVisible}
           label="Select all shown"
-          size={18}
         />
       ),
       render: (i) => (
@@ -397,7 +396,6 @@ export function InvoiceList({
           checked={checked.has(i.id)}
           onChange={() => toggleOne(i.id)}
           label={`select ${i.invoice_number ?? "invoice"}`}
-          size={18}
         />
       ),
     } satisfies DataColumn<InvoiceListRow>] : []),

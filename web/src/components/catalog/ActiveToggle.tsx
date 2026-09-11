@@ -3,18 +3,17 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { Switch } from "@/components/ui/Switch";
-import { MacCheckbox } from "@/components/ui/MacCheckbox";
+import { Checkbox } from "@/components/ui/Checkbox";
 
 /**
- * Table-agnostic active/inactive switch — every catalog table, vendors
+ * Table-agnostic active/inactive control — every catalog table, vendors
  * included since 2026-09-04, when `VendorActiveToggle` (a hand-rolled copy
  * that predated this part and never learned `readOnly`) was deleted.
  * Optimistic, reverts on failure, then refreshes so dependent UI re-resolves.
  *
- * `appearance="mac-checkbox"` draws the same write as a large `ui/MacCheckbox`
- * with `label` beside it — the location record's Active field (Mark,
- * 2026-09-10). One component, so the optimism and the revert stay one copy.
+ * A LARGE CHECKBOX since 2026-09-11 (Mark: "replace any switches in the app
+ * with it"). It was a switch, with a Mac-checkbox appearance for the location
+ * record; now there is one appearance, so the prop went.
  */
 export function ActiveToggle({
   table,
@@ -22,17 +21,19 @@ export function ActiveToggle({
   active,
   label,
   readOnly = false,
-  appearance = "switch",
+  yesNo = false,
   onWrite,
 }: {
   table: string;
   id: string;
   active: boolean;
   label?: string;
-  /** Say the state in a word and offer no switch — a Read Only cell of the
-   *  Page Permissions sheet. A disabled switch would read as broken. */
+  /** Say the state in a word and offer no box — a Read Only cell of the
+   *  Page Permissions sheet. A disabled box would read as broken. */
   readOnly?: boolean;
-  appearance?: "switch" | "mac-checkbox";
+  /** Read-only words Yes/No rather than Active/Inactive — for a record whose
+   *  label column already says "Active" (the location record). */
+  yesNo?: boolean;
   /** Replaces the UPDATE and nothing else — `InlineValue`'s prop of the same
    *  name. The /interface page hands it a local write. */
   onWrite?: (next: boolean) => Promise<{ error: string | null }>;
@@ -64,48 +65,23 @@ export function ActiveToggle({
   }
 
   if (readOnly) {
-    // Beside a label column that already says "Active", the answer is a yes
-    // or a no rather than the word again.
     return (
       <span className="text-sm text-muted">
-        {appearance === "mac-checkbox" ? (active ? "Yes" : "No") : active ? "Active" : "Inactive"}
-      </span>
-    );
-  }
-
-  if (appearance === "mac-checkbox") {
-    // The visible label is the caller's — a `dt` in the record's label column
-    // (Mark, 2026-09-10) — so the word here is the accessible name only. An
-    // absolutely positioned child takes no part in the label's flex gap.
-    return (
-      // `flex`, not `inline-flex`: inline, the wrapper sits on a line box whose
-      // descender space made the 36px box a 41px row.
-      <span className="flex items-center gap-2">
-        <MacCheckbox size="lg" checked={on} disabled={pending} onChange={toggle}>
-          <span className="sr-only">{label ?? "Active"}</span>
-        </MacCheckbox>
-        {failed && (
-          <span className="text-[12px] uppercase tracking-[0.12em] text-accent">
-            retry
-          </span>
-        )}
+        {yesNo ? (active ? "Yes" : "No") : active ? "Active" : "Inactive"}
       </span>
     );
   }
 
   return (
-    <span className="inline-flex items-center gap-2">
-      {/* The box itself is `ui/Switch` — black when on, not green, since green
-          is spoken for by the order box, and off is the exact inverse. This was
-          the app's only switch until the recipe sheet needed one; the markup
-          moved rather than being copied. */}
-      <Switch
-        on={on}
+    // `flex`, not `inline-flex`: inline, the wrapper sits on a line box whose
+    // descender space made the 36px row a 41px one.
+    <span className="flex items-center gap-2">
+      <Checkbox
+        size="lg"
+        checked={on}
         disabled={pending}
-        onToggle={toggle}
-        ariaLabel={
-          label ?? (on ? "Active — click to deactivate" : "Inactive — click to activate")
-        }
+        onChange={toggle}
+        label={label ?? (on ? "Active — click to deactivate" : "Inactive — click to activate")}
       />
       {failed && (
         <span className="text-[12px] uppercase tracking-[0.12em] text-accent">

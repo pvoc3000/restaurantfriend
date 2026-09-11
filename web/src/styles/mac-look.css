@@ -37,7 +37,12 @@
   transition: none;
 }
 
-/* Hover: a SOLID light grey, #c0c0c0 (Mark, 2026-09-10: "instead of the
+/* HOVER IS A 2px EDGE, NOT A FILL, since 2026-09-11 (Mark: "for white buttons
+   on hover should not fill grey but increase border to 2px"), and the grey is
+   now the PRESS — the location record's rule, made app-wide. The inset 1px
+   shadow sits inside the 1px border under the raised shadow, so nothing grows;
+   the white ground outranks each button's own layered `hover:bg-ink`.
+   History: the hover was a SOLID light grey, #c0c0c0 (Mark, 2026-09-10: "instead of the
    pixelated grey … just do a solid mid grey", then "use a lighter grey" —
    #808080 came first). It replaced the classic 50% checkerboard of single
    black and white pixels. Black type on it is ~12.6:1, so the white outline
@@ -49,8 +54,12 @@
    filling red), and a grey fill on either reads as disabled. They keep the
    shadow and the press. */
 .mac-control:not(.mac-own-hover):hover {
-  background-color: #c0c0c0;
+  background-color: #fff;
   color: #000;
+}
+
+.mac-control:not(.mac-own-hover):not(:disabled):hover {
+  box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
 }
 
 /* Everything INSIDE a hovered control. `background-color: transparent` is for
@@ -69,6 +78,13 @@
 .rf-press:active {
   transform: translate(3px, 3px);
   box-shadow: none;
+}
+
+/* A white button, held: the grey fill, with the 2px edge the pointer still
+   earns. After the hover rule and as specific, so it wins while pressed. */
+.mac-control:not(.mac-own-hover):not(:disabled):active {
+  background-color: #c0c0c0;
+  box-shadow: inset 0 0 0 1px #000;
 }
 
 /* A PICKER DOES NOT FILL GREY — every `rf-press`, on every screen since
@@ -185,7 +201,8 @@
   box-shadow: none;
 }
 
-/* ON A `.mac-page` A BUTTON'S HOVER IS THE 2px EDGE, NOT THE GREY (Mark,
+/* THE RECORD BOOK'S HOVER IS THE 2px EDGE, as every white button's has been
+   since 2026-09-11. It began as the rule for every `.mac-page` button (Mark,
    2026-09-10: "instead of filling with grey on hover just increase the border
    to 2px like everything else. Keep the fill on press"). The same inset 1px
    shadow the fields and picklists use, under the raised shadow, and a white
@@ -193,14 +210,12 @@
    the 2px edge. `mac-own-hover` (the black commit, the red destructive) keeps
    its own hover here as everywhere. More specific than the app-wide rules
    above, so they lose on this screen alone. */
-.mac-page .mac-control:not(.mac-own-hover):hover,
 .mac-page .rf-book:hover {
   background-color: #fff;
   color: #000;
   box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
 }
 
-.mac-page .mac-control:not(.mac-own-hover):active,
 .mac-page .rf-book:active {
   background-color: #c0c0c0;
   box-shadow: inset 0 0 0 1px #000;
@@ -281,6 +296,18 @@
   gap: 8px;
   cursor: pointer;
   user-select: none;
+}
+
+/* A BARE box — no visible label — is block-level, the old `ui/Checkbox`'s
+   measured rule: inline, it rides a line box and sits high in a table cell. */
+.mac-checkbox.mac-checkbox-bare {
+  display: flex;
+}
+
+/* A menu row that must be clickable across its whole width (`ui/PickSet`):
+   the label, which is the hit target, takes the row. */
+.mac-checkbox-fill label {
+  flex: 1 1 auto;
 }
 
 .mac-checkbox label::before {

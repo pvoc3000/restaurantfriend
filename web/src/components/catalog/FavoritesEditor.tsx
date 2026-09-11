@@ -221,7 +221,6 @@ export function FavoritesEditor({
                             disabled={busy}
                             onChange={(next) => toggle(d.weekday, vi.id, next)}
                             label={`${vi.vendors?.name ?? "vendor"} day ${d.weekday}`}
-                            size={18}
                           />
                         </span>
                       </td>
@@ -234,7 +233,6 @@ export function FavoritesEditor({
                         disabled={busy}
                         onChange={(next) => toggleAllDays(vi.id, next)}
                         label="all days"
-                        size={18}
                       />
                     </span>
                   </td>

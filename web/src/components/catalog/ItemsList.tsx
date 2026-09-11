@@ -270,7 +270,6 @@ export function ItemsList({
           checked={allVisibleChecked}
           onChange={toggleAllVisible}
           label="select all"
-          size={18}
         />
       ),
       render: (item) => (
@@ -278,7 +277,6 @@ export function ItemsList({
           checked={checked.has(item.id)}
           onChange={() => toggleOne(item.id)}
           label={`select ${item.name}`}
-          size={18}
         />
       ),
     } satisfies DataColumn<ItemRow>] : []),

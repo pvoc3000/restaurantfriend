@@ -262,7 +262,6 @@ export function PurchaseOrderDetail({
                 checked={checkedLines.has(l.id)}
                 onChange={() => toggleLine(l.id)}
                 label={`select ${l.description ?? l.id}`}
-                size={18}
               />
             ),
           } as DataColumn<PoLine>,

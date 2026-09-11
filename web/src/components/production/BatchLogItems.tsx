@@ -4,7 +4,7 @@ import { useRef, useState, type ReactNode } from "react";
 import type { PickOption } from "@/components/ui/PickList";
 import { useExactViewportHeight } from "@/lib/tableHead";
 import { SectionNav } from "@/components/ui/SectionNav";
-import { Switch } from "@/components/ui/Switch";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { clampSplit, setSplit, useSplit } from "@/lib/paneSplit";
 import { BatchItemsTable, type BatchRow } from "@/components/production/BatchItemsTable";
 import { BatchFields, type BatchFieldsRow } from "@/components/production/BatchFields";
@@ -353,16 +353,15 @@ export function BatchLogItems({
                   showSkipped={showSkipped}
                   onHiddenCount={setHiddenRounds}
                 />
-                {/* The history's filter, under the list it filters. NOT a
-                    `<label>`: `ui/Switch` renders a button, and a label does not
-                    forward its click to one — the caption would look associated
-                    and do nothing. The words are their own button. */}
+                {/* The history's filter, under the list it filters. The words
+                    stay their own button beside the box, so the count can ride
+                    in them. */}
                 <div className="flex shrink-0 items-center gap-2">
-                  <Switch
-                    size="sm"
-                    on={showSkipped}
-                    onToggle={() => setShowSkipped((v) => !v)}
-                    ariaLabel="Show rounds where nothing was made"
+                  <Checkbox
+                    size="lg"
+                    checked={showSkipped}
+                    onChange={setShowSkipped}
+                    label="Show rounds where nothing was made"
                   />
                   <button
                     type="button"

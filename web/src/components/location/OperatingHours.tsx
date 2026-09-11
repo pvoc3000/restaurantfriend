@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { formatTypedTime } from "@/lib/timeInput";
-import { MacCheckbox } from "@/components/ui/MacCheckbox";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { TimePicker } from "@/components/ui/TimePicker";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
 
@@ -113,13 +113,13 @@ export function OperatingHours({
             return (
               <tr key={day}>
                 <td className="py-1 pr-6">
-                  <MacCheckbox
+                  <Checkbox
                     checked={on}
                     disabled={!editable || pending}
                     onChange={() => toggleDay(weekday)}
                   >
                     {day}
-                  </MacCheckbox>
+                  </Checkbox>
                 </td>
                 <td className="py-1 pr-6">
                   <TimeCell
