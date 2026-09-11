@@ -186,8 +186,8 @@
    the same box at 35% — rather than a grey outline beside three raised ones.
    The row's gap opens from 4px to 8px, or each shadow would sit against the
    next box. */
-.mac-page .rf-book,
-.mac-page .rf-book-dead {
+.rf-book,
+.rf-book-dead {
   border-width: 1px;
   border-color: #000;
   background-color: #fff;
@@ -196,7 +196,7 @@
   transition: none;
 }
 
-.mac-page .rf-book:active {
+.rf-book:active {
   transform: translate(3px, 3px);
   box-shadow: none;
 }
@@ -210,22 +210,22 @@
    the 2px edge. `mac-own-hover` (the black commit, the red destructive) keeps
    its own hover here as everywhere. More specific than the app-wide rules
    above, so they lose on this screen alone. */
-.mac-page .rf-book:hover {
+.rf-book:hover {
   background-color: #fff;
   color: #000;
   box-shadow: 3px 3px 0 0 #000, inset 0 0 0 1px #000;
 }
 
-.mac-page .rf-book:active {
+.rf-book:active {
   background-color: #c0c0c0;
   box-shadow: inset 0 0 0 1px #000;
 }
 
-.mac-page .rf-book-dead {
+.rf-book-dead {
   opacity: 0.35;
 }
 
-.mac-page .rf-book-row {
+.rf-book-row {
   gap: 8px;
 }
 

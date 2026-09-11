@@ -10052,7 +10052,11 @@ weekday column, and 003 then silently made it per-vendor-item.
   joined on 2026-09-10** ("mac style the nav buttons in the upper right hand
   corner"): markers `rf-book` / `rf-book-dead` / `rf-book-row` make the live
   four raised Mac buttons, a dead one the same box at 35%, both at a 1px border so paging to an end moves nothing, and the row's
-  gap 8px so the shadows do not crowd. **On a `.mac-page` NOTHING FILLS GREY ON
+  gap 8px so the shadows do not crowd. **On every record screen since
+  2026-09-11** (Mark: "make all the record nav buttons match what we did in the
+  location detail page") — the selectors lost their `.mac-page`. The tablet
+  bar's record book (`tablet/BarRecordNav`) is its own 64px cells and is not
+  these. **On a `.mac-page` NOTHING FILLS GREY ON
   HOVER** (Mark, same day: "instead of filling with grey on hover just increase
   the border to 2px like everything else. Keep the fill on press"): buttons
   (`mac-control`, the record book) take the fields' 2px edge on hover and fill

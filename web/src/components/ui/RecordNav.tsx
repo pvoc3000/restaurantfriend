@@ -67,8 +67,9 @@ export function RecordNav({
   return (
     <nav
       aria-label="Record navigation"
-      // `rf-book-row` / `rf-book` / `rf-book-dead`: a `.mac-page` screen raises
-      // the four (mac-look.css), and spaces them so the shadows do not crowd.
+      // `rf-book-row` / `rf-book` / `rf-book-dead`: the four are raised Mac
+      // buttons on every screen (mac-look.css), spaced so the shadows do not
+      // crowd — the location record's look, made app-wide 2026-09-11.
       className="rf-book-row flex shrink-0 items-center gap-1 tabular-nums"
     >
       <Step href={step(position.first)} label="First record" glyph={FIRST_PAGE} />
