@@ -9,6 +9,7 @@ import { withFrom } from "@/lib/breadcrumbs";
 import { useScrollMemoryKey } from "@/lib/scrollMemory";
 import { useShell } from "@/components/ShellProvider";
 import { ControlField } from "@/components/ui/ControlField";
+import { Checkbox } from "@/components/ui/Checkbox";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { PickList } from "@/components/ui/PickList";
@@ -1110,51 +1111,42 @@ export function OrderGuide({
             fit
           />
         </ControlField>
+
+        {/* The escape hatch from the day gates (FMP's "ignore order day"):
+            every orderable line, whenever you'd normally buy it. A mode you
+            leave on, not an action you fire.
+
+            A CHECKBOX, TO THE RIGHT OF GROUP BY (Mark, 2026-09-11), which
+            reverses its own row of 2026-09-10 — and what makes that reversal
+            fit is the same edit: as a 46px switch under a sentence-cased
+            "Ignore ordering days" it was the widest thing here and had to wrap,
+            where a 24px box beside "Ignore Order Days" is about half that. It
+            was also the last hand-rolled switch in the app, which the
+            2026-09-11 "there are no switches" sweep had missed because it was a
+            `role="switch"` button rather than a `ui/Switch`.
+
+            `pb-0.5` lifts it onto the FIELDS' line: `items-end` levels boxes,
+            and a 36px `PickList` in a `ControlField` sits on the row's floor
+            while a 24px box centred in its own 36px row does not.
+
+            AND ON A TABLET IT IS NOT HERE AT ALL (Mark, 2026-09-10) — see
+            `ignoreDays`, where the mode rather than the widget is what the
+            shell drops. */}
+        {!tablet && (
+          <div className="pb-0.5">
+            <Checkbox
+              size="lg"
+              checked={ignoreDays}
+              onChange={toggleIgnoreDays}
+              title="Show every orderable line, regardless of vendor or item ordering days"
+              className="text-[12px] font-semibold uppercase tracking-[0.06em] text-body hover:text-ink"
+            >
+              Ignore Order Days
+            </Checkbox>
+          </div>
+        )}
       </div>
 
-      {/* The escape hatch from the day gates (FMP's "ignore order day"):
-          every orderable line, whenever you'd normally buy it. A switch,
-          not a button — it's a mode you leave on, not an action you fire,
-          and it matches the app's other switches: black/white, off = the
-          exact inverse of on (Mark, 2026-07-25).
-
-          ITS OWN ROW (Mark, 2026-09-10). It is the one control here that is
-          neither a field nor a value — a mode, with no vocabulary to collapse
-          and a sentence for a label — so on the fields' line it was the thing
-          that had to wrap. Beneath them it costs the band a short line and
-          gives the four above it a row they always fit.
-
-          AND ON A TABLET IT IS NOT HERE AT ALL (Mark, 2026-09-10) — see
-          `ignoreDays`, where the mode rather than the widget is what the shell
-          drops. The band is one row there, and 44px shorter for it. */}
-      {!tablet && (
-      <div className="pt-2">
-        <button
-          type="button"
-          role="switch"
-          aria-checked={ignoreDays}
-          onClick={toggleIgnoreDays}
-          title="Show every orderable line, regardless of vendor or item ordering days"
-          className="inline-flex items-center gap-3 text-[12px] font-semibold uppercase tracking-[0.06em] text-body hover:text-ink"
-        >
-          <span
-            aria-hidden
-            className={`relative inline-flex h-[26px] w-[46px] shrink-0 items-center rounded-full border-[1.5px] border-ink transition-colors ${
-              ignoreDays ? "bg-ink" : "bg-white"
-            }`}
-          >
-            <span
-              className={`inline-block h-[18px] w-[18px] transform rounded-full transition-transform ${
-                ignoreDays
-                  ? "translate-x-[22px] bg-white"
-                  : "translate-x-[2px] bg-ink"
-              }`}
-            />
-          </span>
-          Ignore ordering days
-        </button>
-      </div>
-      )}
       </div>
 
       {/* Deliberately OUTSIDE the shelf: a failed write is the one thing up

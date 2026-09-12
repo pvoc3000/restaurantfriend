@@ -167,6 +167,9 @@ export function GuideRequests({
                 canResolve={canResolve}
                 isAuthor={r.requested_by === userId}
                 label={`Actions for ${r.request_text}`}
+                // This band is `bg-mark-fill`, so the ⋯ hovers by weight — a
+                // grey wash on yellow reads as a smudge (Mark, 2026-09-11).
+                onFill
               />
             </span>
           </li>

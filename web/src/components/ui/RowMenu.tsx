@@ -25,11 +25,15 @@ export function RowMenu({
   items,
   label,
   align = "right",
+  onFill = false,
 }: {
   items: RowMenuItem[];
   /** What this menu is FOR, for screen readers — "Actions for AP flour". */
   label: string;
   align?: "left" | "right";
+  /** This ⋯ stands on a COLOURED ground, so its hover is weight rather than a
+   *  grey wash — see the trigger below. */
+  onFill?: boolean;
 }) {
   return (
     <MenuButton
@@ -39,7 +43,18 @@ export function RowMenu({
       trigger="⋯"
       // 36px square: a comfortable thumb target inside a 56px row, and square
       // like every other control here.
-      triggerClassName="grid h-9 w-9 place-items-center text-[17px] leading-none text-muted hover:bg-neutral-100 hover:text-ink"
+      //
+      // ON A COLOURED BAND THE AFFORDANCE IS WEIGHT, NOT A WASH (Mark,
+      // 2026-09-11, of the order guide's requests band). The app's rule is that
+      // a control you press fills grey on hover, and that rule is written for a
+      // control standing on WHITE: over `bg-mark-fill` a `neutral-100` wash
+      // paints a grey patch on yellow, which reads as a smudge rather than a
+      // highlight. So there the ⋯ thickens and darkens instead — the same
+      // "you can press this", said with the only property a coloured ground
+      // leaves free.
+      triggerClassName={`grid h-9 w-9 place-items-center text-[17px] leading-none text-muted ${
+        onFill ? "hover:font-bold hover:text-ink" : "hover:bg-neutral-100 hover:text-ink"
+      }`}
     />
   );
 }

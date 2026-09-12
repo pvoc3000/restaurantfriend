@@ -29,6 +29,7 @@ import {
 import { useCalcField } from "@/components/ui/CalcPad";
 import { CalendarGrid } from "@/components/ui/CalendarGrid";
 import { Checkbox } from "@/components/ui/Checkbox";
+import { Switch } from "@/components/ui/Switch";
 import { ControlField } from "@/components/ui/ControlField";
 import { DateField } from "@/components/ui/DateField";
 import {
@@ -612,6 +613,8 @@ function TogglesBlock() {
   const [check2, setCheck2] = useState(false);
   const [lg, setLg] = useState(true);
   const [lg2, setLg2] = useState(false);
+  const [sw, setSw] = useState(true);
+  const [sw2, setSw2] = useState(true);
 
   return (
     <Block id="toggles" title="Toggles">
@@ -629,7 +632,7 @@ function TogglesBlock() {
             </Checkbox>
           </div>
         </Specimen>
-        <Specimen name='Checkbox · size="lg" (what every switch became)'>
+        <Specimen name={'Checkbox · size="lg" (a form’s yes/no)'}>
           <div className="flex flex-col items-start gap-3">
             <Checkbox size="lg" checked={lg} onChange={setLg}>
               Ignore ordering days
@@ -641,6 +644,26 @@ function TogglesBlock() {
         </Specimen>
         <Specimen name='Checkbox · lg, no visible label'>
           <Checkbox size="lg" checked={lg2} onChange={setLg2} label="Require a photo" />
+        </Specimen>
+        <Specimen name="Switch (a record's own state)">
+          <div className="flex flex-col items-start gap-3">
+            <Switch checked={sw} onChange={setSw}>
+              Active
+            </Switch>
+            <Switch checked={false} disabled>
+              Disabled
+            </Switch>
+          </div>
+        </Specimen>
+        <Specimen name="Switch · no visible label (the Active column)">
+          <Switch checked={sw2} onChange={setSw2} label="Vendor active" />
+        </Specimen>
+        <Specimen name="Switch · on, off, disabled">
+          <div className="flex items-center gap-6">
+            <Switch checked onChange={() => {}} label="on" />
+            <Switch checked={false} onChange={() => {}} label="off" />
+            <Switch checked disabled label="disabled" />
+          </div>
         </Specimen>
         <Specimen name="ActiveToggle (local write)">
           <div className="flex items-center gap-6">

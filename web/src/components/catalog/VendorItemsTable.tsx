@@ -151,12 +151,23 @@ export function VendorItemsTable({
       label: "Active",
       width: 95,
       sortValue: (vi) => (vi.is_active ? 0 : 1),
+      // A SWITCH, with the two Active columns beside it (Mark, 2026-09-11).
+      // This is the vendor record's OTHER Active column — its Items tab —
+      // and a page carrying one of each shape is the very confusion the
+      // switch exists to end.
+      //
+      // WHICH ALSO REACHES THE ITEM RECORD, since this is ONE table rendered
+      // on both screens, and that is the right outcome rather than a side
+      // effect: making a cell behave differently on one of the two screens it
+      // appears on is the "I edited this and it only changed here" complaint
+      // this file already warns about for this exact component.
       render: (vi) => (
         <ActiveToggle
           table="vendor_items"
           id={vi.id}
           active={vi.is_active}
           readOnly={!canEdit}
+          control="switch"
           label="Vendor item active"
         />
       ),

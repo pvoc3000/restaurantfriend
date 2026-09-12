@@ -38,6 +38,7 @@ export function Checkbox({
   children,
   size = "md",
   className = "",
+  title,
 }: {
   checked: boolean;
   onChange?: (next: boolean) => void;
@@ -47,6 +48,10 @@ export function Checkbox({
   children?: ReactNode;
   size?: "md" | "lg";
   className?: string;
+  /** A hover tooltip on the whole row, for a box whose visible label is too
+   *  short to say what the mode DOES. Never the only place a reason lives — an
+   *  iPad has no hover. */
+  title?: string;
 }) {
   const id = useId();
   const bare = children === undefined || children === null || children === false;
@@ -55,6 +60,7 @@ export function Checkbox({
       className={`mac-checkbox ${size === "lg" ? "mac-checkbox-lg" : ""} ${
         bare ? "mac-checkbox-bare" : ""
       } ${className}`}
+      title={title}
     >
       <input
         id={id}

@@ -474,3 +474,185 @@ span:has(> input.mac-field) {
   height: 39px;
   margin-bottom: -3px;
 }
+
+/* ---- .mac-switch: ui/Switch --------------------------------------------- */
+
+/* A SWITCH IN THE MAC IDIOM (Mark, 2026-09-11). The Active column's checkbox
+   had come to read as a row-SELECTION box, because selection checkboxes became
+   the norm on three lists in two days and a checkbox now meant two unrelated
+   things — "this row is ticked" and "this record is live". The way out he chose
+   is to tell them apart BY SHAPE.
+ 
+   THE CLASSIC MAC HAD NO SWITCH, so there is nothing to copy — and what it
+   settled into took three passes (Mark, 2026-09-11). First a sunken well AND a
+   raised thumb, `.mac-field`'s inset beside `.mac-control`'s drop, which is
+   what that Mac used for scroll bars and sliders; then flat, both shadows off
+   ("let's try the flat version"); then the thumb's drop back on its own ("can
+   we add back just the drop shadow").
+ 
+   WHICH IS THE RIGHT ANSWER, and the reason is worth keeping: at 22px the
+   WELL's inset does not read as depth — it paints a heavy black band down the
+   top and left of a box only 20px tall inside, so the track looks like it has
+   two line weights rather than a recess. The THUMB's drop has room to be read
+   as a drop, because the thumb is a separate box with white around it, and it
+   is the half that says which part of this control is the one that MOVES. So:
+   a flat track, a raised thumb. No rounding, no gradient, no transition — the
+   state changes the instant you press, like every other control in this look.
+ 
+   TWO CUES, NOT ONE: the thumb's POSITION and the track's GROUND. Down a column
+   of forty vendors the eye is picking out the few that are off, and position
+   alone is a 16px difference; the grey ground makes an ON switch read as filled
+   at a glance. Neither is colour, so it survives the app's rule that colour
+   means record state. */
+.mac-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+/* Transparent OVER the track, never `display: none`, which would take it out of
+   the tab order — `.mac-checkbox`'s rule and its reason. */
+.mac-switch input {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 40px;
+  height: 22px;
+  margin: -11px 0 0;
+  opacity: 0;
+}
+
+.mac-switch input:not(:disabled) {
+  cursor: pointer;
+}
+
+.mac-switch label {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* A bare switch — no visible label — is block-level: inline it rides a line box
+   and sits high in a table cell (`.mac-checkbox-bare`'s measured rule). */
+.mac-switch.mac-switch-bare {
+  display: flex;
+}
+
+/* The well. */
+.mac-switch label::before {
+  content: "";
+  flex: none;
+  box-sizing: border-box;
+  width: 40px;
+  height: 23px;
+  border: 1px solid #000;
+  background: #fff;
+}
+
+/* The thumb, drawn as the label's second pseudo-element so the whole control is
+   two boxes and no extra markup. `left` rather than a transform: there is no
+   transition to smooth, and a whole-pixel position keeps the 1px border crisp.
+ 
+   THE THUMB IS POSITIONED AGAINST THE LABEL, not the row — which is the bug
+   the third pass fixed. `::after` is the label's child, and with no `position`
+   on the label it resolved against `.mac-switch`, whose height is the ROW's;
+   the thumb was then centred on the row while the track was centred inside it,
+   so the two only agreed while both were even. `position: relative` on the
+   label makes the label's own box the frame, and the label's box IS the track
+   (its only in-flow item), so every offset below is measured from the track's
+   own top-left and holds whatever the row does.
+ 
+   THE GEOMETRY IS EXACT, and every number in it was measured rather than
+   chosen. The track is 23px — a pixel taller than the 22 it shipped at (Mark,
+   2026-09-11: "make the box 1px taller so there's room between the drop shadow
+   and the bottom of the box"), where the shadow had landed flush on the inner
+   edge. 21px of inner height now holds 2px above the thumb, 16 of thumb, 2 of
+   shadow and 1px clear beneath it — biased UP, which is what a drop shadow
+   wants, since its mass is all on the low side.
+ 
+   AND THE THUMB SITS 2px OFF THE NEAR BORDER, not 1 (Mark, the same day, of
+   the OFF position: "1 more px between the thumb and the left border"). It had
+   been 1px, which read tight beside the 2px above it — the shadow eats into
+   the far side, so the leading gap is the one the eye measures. Off: thumb at
+   3, so 2px clear on the left. On: thumb at 19, so 16 of thumb and 2 of shadow
+   end at 37 against an inner edge of 39 — 2px clear on the right, the mirror.
+   Change the track height, the thumb size or the shadow and every one of these
+   moves with it. */
+.mac-switch label::after {
+  content: "";
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border: 1px solid #000;
+  background: #fff;
+  box-shadow: 2px 2px 0 0 #000;
+}
+
+/* ON: the thumb travels and the well fills. */
+.mac-switch input:checked + label::before {
+  background: #c0c0c0;
+}
+
+.mac-switch input:checked + label::after {
+  left: 19px;
+}
+
+/* Hovered or held, the edge thickens to 2px — every bordered thing in this look
+   (Mark, 2026-09-11). Drawn as an inset ring over the sunken shadow so the box
+   does not grow and nothing beside it moves.
+
+   ON THE ROW, NOT THE LABEL: the transparent input sits over the track, so
+   `label:hover` matches only the sliver the input does not cover — the bug
+   `.mac-checkbox` already paid for. */
+.mac-switch:hover label::before,
+.mac-switch:active label::before {
+  box-shadow: inset 0 0 0 1px #000;
+}
+
+/* HELD, THE THUMB SINKS HALFWAY INTO ITS SHADOW (Mark, 2026-09-11: "can the
+   thumb 'push down' like other buttons when pressed", then — having seen the
+   full drop — "instead of the thumb moving 3px, can it move just 1px and the
+   drop shadow move 1px").
+
+   WHICH IS BETTER, AND THE ARITHMETIC IS WHY: the thumb goes down-right by 1
+   and its shadow shrinks from 2px to 1, so the shadow's OUTER corner does not
+   move at all — 3+16+2 and 4+16+1 both land on 21. The control's footprint is
+   identical held and at rest, so nothing around it shifts and the only thing
+   that reads is the thumb settling. A button's full drop is right for a button,
+   whose shadow is 3px and which has the room; at 16px in a 23px track, taking
+   the shadow away entirely made the thumb look like it had jumped.
+
+   A TRANSFORM, NOT AN OFFSET, so one rule covers both positions: the thumb's
+   `left` is 3px at OFF and 19 at ON, and translating is indifferent to which.
+
+   PRESSING ANYWHERE ON THE ROW counts, which is right — the whole label is the
+   hit target, so pressing the words presses the switch and the thumb should
+   say so. A disabled switch does not move; `:has` is already this file's idiom
+   for reaching an input's state from its row. */
+.mac-switch:not(:has(input:disabled)):active label::after {
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0 0 #000;
+}
+
+.mac-switch input:focus-visible + label::before {
+  outline: 1px dotted #000;
+  outline-offset: 2px;
+}
+
+.mac-switch input:disabled + label {
+  cursor: default;
+  opacity: 0.35;
+}
+
+/* A disabled track does not thicken — more specific than the row's hover rule,
+   and later, so it wins either way. */
+.mac-switch input:disabled + label::before {
+  box-shadow: none;
+}

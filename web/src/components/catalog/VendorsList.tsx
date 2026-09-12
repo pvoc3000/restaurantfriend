@@ -162,12 +162,24 @@ export function VendorsList({
         // this used until 2026-09-04 — a copy that predated the part and never
         // learned `readOnly`, which is how a staff account could deactivate a
         // vendor from a list the sheet has at Read Only.
+        //
+        // A SWITCH, NOT A CHECKBOX (Mark, 2026-09-11: the checkboxes "make me
+        // think they're ways to select rows like on the other pages we've been
+        // working on"). Selection checkboxes became the norm on the purchase
+        // order, invoice and inventory lists in the two days before this, so a
+        // ticked box in a row had come to mean two unrelated things. This is
+        // the durable one — a property of the vendor — taking its own shape.
+        //
+        // OPT-IN AND ONLY HERE so far (Mark: "Vendors now, then decide"); the
+        // other eleven ActiveToggle screens are still checkboxes. See the note
+        // on `ActiveToggle` before leaving it that way for long.
         render: (v) => (
           <ActiveToggle
             table="vendors"
             id={v.id}
             active={v.is_active}
             readOnly={!editable}
+            control="switch"
             label={`${v.name} active`}
           />
         ),

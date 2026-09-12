@@ -275,11 +275,16 @@ export function VendorLocationsTable({
       sortValue: (r) => (r.vl ? (r.vl.is_active ? 0 : 1) : 2),
       render: (r) =>
         r.vl ? (
+          // A SWITCH, matching the vendors LIST (Mark, 2026-09-11). The two
+          // Active columns are the same question about the same supplier a
+          // click apart — one org-wide, one per shop — so they must not be
+          // two different shapes.
           <ActiveToggle
             readOnly={!editable}
             table="vendor_locations"
             id={r.vl.id}
             active={r.vl.is_active}
+            control="switch"
             label="Vendor active at this location"
           />
         ) : !editable ? (

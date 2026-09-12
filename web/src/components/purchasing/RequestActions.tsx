@@ -48,6 +48,7 @@ export function RequestActions({
   canResolve,
   isAuthor,
   label,
+  onFill = false,
 }: {
   id: string;
   status: RequestStatus;
@@ -59,6 +60,9 @@ export function RequestActions({
   isAuthor: boolean;
   /** What this menu is for, for screen readers. */
   label: string;
+  /** True on the order guide's yellow requests band, where the ⋯ hovers by
+   *  weight rather than by a wash — see `ui/RowMenu`. */
+  onFill?: boolean;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -201,7 +205,7 @@ export function RequestActions({
 
   return (
     <>
-      <RowMenu items={items} label={label} />
+      <RowMenu items={items} label={label} onFill={onFill} />
 
       {failed && !exit && !linking ? (
         <p className="mt-1 text-xs text-accent">{failed}</p>
