@@ -353,7 +353,7 @@ export async function ScheduleDetail({
 
       {/* FOUR COLUMNS AT lg (Mark, 2026-09-12): To make · Generated · Counted ·
           Printed on one line, where three left Printed wrapping under To make.
-          Note still spans the whole row beneath. */}
+          Note spans two of them beneath (Mark, the same day). */}
       <dl className="grid gap-x-10 gap-y-3 text-sm sm:grid-cols-2 lg:grid-cols-4">
         <Field label="To make">
           <span className={`${READ_ONLY_VALUE} tabular-nums font-medium`}>
@@ -448,7 +448,7 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div className={span ? "sm:col-span-2 lg:col-span-4" : undefined}>
+    <div className={span ? "sm:col-span-2" : undefined}>
       <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{label}</dt>
       <dd className="mt-0.5">{children}</dd>
     </div>
