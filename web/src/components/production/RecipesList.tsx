@@ -202,7 +202,16 @@ export function RecipesList({
       sortValue: (r) => (r.is_active ? 0 : 1),
       render: (r) =>
         editable ? (
-          <ActiveToggle table="production_recipes" id={r.id} active={r.is_active} />
+          // A SWITCH since 2026-09-12 (Mark), the production module's lists
+          // taken one at a time. No rebalance: this table's total is 1150, so
+          // 80 buys 92.4px at 1440 and 81.3 at 1280 — 68.4 and 57.3 of
+          // content, clear of both the 40px switch and the 50.7px "ACTIVE".
+          <ActiveToggle
+            table="production_recipes"
+            id={r.id}
+            active={r.is_active}
+            control="switch"
+          />
         ) : (
           <span className="text-muted">{r.is_active ? "Yes" : "No"}</span>
         ),

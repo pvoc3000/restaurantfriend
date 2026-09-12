@@ -123,10 +123,16 @@ export function ElementLocationRows({
       sortValue: (l) => (l.row ? (l.row.is_active ? 0 : 1) : 2),
       render: (l) =>
         l.row && editable ? (
+          // A SWITCH since 2026-09-12 (Mark), following the two production
+          // lists and the vendor record's own per-location table — which this
+          // is the twin of: a shop, and a row of that shop's config for one
+          // record. `ui/Switch` is the durable state taking a shape a
+          // selection box cannot be mistaken for.
           <ActiveToggle
             table="production_element_locations"
             id={l.row.id}
             active={l.row.is_active}
+            control="switch"
             label={`Active at ${l.location.code}`}
           />
         ) : l.row ? (

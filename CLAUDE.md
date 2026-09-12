@@ -3872,6 +3872,15 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    36px button and clips by 2 — the hazard `/production-items` records when it
    took its own ⋯ to 74. Five weight off Costs from, which has 249px for a 48px
    label, would settle it.
+   **THE SWITCH THEN TOOK THE REST OF THE MODULE, one screen at a time**
+   (Mark, 2026-09-12): the ELEMENT RECORD's per-location table — the vendor
+   record's own arrangement, a shop and a row of that shop's config, its Active
+   column already 130 because it doubles as the "Make here" slot — and
+   `/recipes`, whose total of 1150 gives 80 a comfortable 68.4px of content at
+   1440 and 57.3 at 1280. **`/plans` is the one left**, still a checkbox.
+   Measured and not fixed on the element record, since nothing in the ask
+   touches it: "Make here" is 76.7px of ink in 71px of content at 1280, so it
+   clips by ~6 on the rows that have no config yet.
    Nav's Production section drops FMP's vocabulary for this module's own —
    **Recipe Items is gone entirely** (decision 2 merged it away, so a menu item
    would name a table that no longer exists) and "Item Schedules" becomes Plans.
