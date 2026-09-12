@@ -11,6 +11,7 @@ import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/u
 import { RowMenu } from "@/components/ui/RowMenu";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
+import { BUTTON_CLASS } from "@/components/ui/buttons";
 import {
   STICKY_HEAD_ROW,
   useOverflowOnlyWhenNeeded,
@@ -62,6 +63,9 @@ export type MatrixItem = {
  * `<number> · <category>`, so the seven days share everything but this.
  */
 const MENU_COLUMN = 60;
+
+/** The Actions menu and the Group by picker are one width (Mark, 2026-09-12). */
+const PLAN_CONTROL_WIDTH = "w-40";
 
 /**
  * The tray × weekday matrix — FileMaker's best idea in this module, and the one
@@ -995,7 +999,16 @@ export function PlanMatrix({
         <div className="min-w-0 flex-1">{heading}</div>
         <div className="ml-auto flex flex-col items-end gap-3">
           {commands.length > 0 ? (
-            <ActionMenu ariaLabel="Actions for this plan" minWidth={240} items={commands} />
+            <ActionMenu
+              ariaLabel="Actions for this plan"
+              minWidth={240}
+              items={commands}
+              // ONE WIDTH with the Group by picker below it (Mark, 2026-09-12),
+              // so the two boxes share a right edge AND a left one. A fixed
+              // width rather than `fit`: the two widest faces are different
+              // words, and 160px holds "Item type" and its caret.
+              triggerClassName={`${PLAN_CONTROL_WIDTH} ${BUTTON_CLASS}`}
+            />
           ) : null}
           {trays.length > 1 ? (
             // The caption to the LEFT of the control here (Mark, 2026-09-12),
@@ -1013,7 +1026,7 @@ export function PlanMatrix({
                   { value: "category", label: "Category" },
                   { value: "type", label: "Item type" },
                 ]}
-                fit
+                className={PLAN_CONTROL_WIDTH}
               />
             </div>
           ) : null}
