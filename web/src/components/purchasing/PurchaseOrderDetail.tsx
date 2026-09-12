@@ -709,17 +709,21 @@ export function PurchaseOrderDetail({
   const productsReceived = lines.filter(
     (l) => l.qty_received !== null && Number(l.qty_received) > 0
   ).length;
+  // "PRODUCTS" AND "PACKAGES", not "Products ordered" … (Mark, 2026-09-12):
+  // the row already says which — ordered on top, received below, and each row
+  // ends in its own total — and the repeated words were what made this card
+  // ~530px wide and the two columns stack early.
   const stats: { label: string; value: string; short?: boolean }[] = [
-    { label: "Products ordered", value: String(lines.length) },
-    { label: "Packages ordered", value: qty(orderedPackages) },
+    { label: "Products", value: String(lines.length) },
+    { label: "Packages", value: qty(orderedPackages) },
     { label: "Ordered total", value: money(ordered) },
     {
-      label: "Products received",
+      label: "Products",
       value: String(productsReceived),
       short: productsReceived < lines.length,
     },
     {
-      label: "Packages received",
+      label: "Packages",
       value: qty(receivedPackages),
       short: receivedPackages < orderedPackages - 0.005,
     },
@@ -789,9 +793,17 @@ export function PurchaseOrderDetail({
 
       {/* TWO COLUMNS (Mark, 2026-09-11): the order's fields, and beside them
           the six figures over its paperwork — which came out of the pinned
-          footer. Stacked below `xl`. */}
-      <div className="grid items-start gap-x-24 gap-y-6 xl:grid-cols-[26rem_minmax(0,1fr)]">
-        <div className="space-y-6">
+          footer.
+
+          THEY STACK ONLY WHEN THEY MUST (Mark, 2026-09-12: they wrapped "so
+          early"). This was a grid that went two-column at `xl`, 1280px, whatever
+          the content needed — about 1,040px, so between ~1,090 and 1,280 it
+          stacked for nothing. Now a wrapping flex row: the fields may shrink
+          from 26rem to 22rem, the right column wants at least 24rem, the gap is
+          48px (was 96), and the row breaks only when those can't share a line —
+          roughly an 830px window with the shorter figure labels. */}
+      <div className="flex flex-wrap items-start gap-x-12 gap-y-6">
+        <div className="min-w-0 max-w-[26rem] flex-[1_1_22rem] space-y-6">
           <dl className="grid max-w-[26rem] grid-cols-[8rem_1fr] items-center gap-x-4 gap-y-2 text-sm">
             {/* Status leads the fields (Mark, 2026-09-11) — it moved here out of
                 the Process box, which is gone. */}
@@ -918,7 +930,7 @@ export function PurchaseOrderDetail({
           {error && <p className="text-sm text-accent">{error}</p>}
         </div>
 
-        <div className="min-w-0 space-y-[18px]">
+        <div className="min-w-0 flex-[999_1_24rem] space-y-[18px]">
           {figures}
           {attachmentError ? (
             <p className="border border-accent px-4 py-3 text-sm text-accent">
