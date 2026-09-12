@@ -3,6 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { createClient } from "@/lib/supabase/client";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { PickList } from "@/components/ui/PickList";
@@ -40,6 +41,7 @@ export function NewBatch({
   locationCode,
   logDate,
   variant = "button",
+  children,
 }: {
   orgId: string;
   /** The log this batch joins. It is always known now — the command lives ON a
@@ -50,6 +52,8 @@ export function NewBatch({
   logDate: string;
   /** `bar` is the tablet shell's footer cell; `button` the desk's outlined one. */
   variant?: "button" | "bar";
+  /** Hand the command out as an Actions menu row instead; the dialog stays. */
+  children?: (row: ActionMenuItem) => React.ReactNode;
 }) {
   const router = useRouter();
   const supabase = createClient();
@@ -138,7 +142,9 @@ export function NewBatch({
 
   return (
     <>
-      {variant === "bar" ? (
+      {children ? (
+        children({ label: "Add Batch…", onSelect: () => setOpen(true) })
+      ) : variant === "bar" ? (
         // The tablet shell's footer cell — icon over word, the runners' idiom.
         <button type="button" onClick={() => setOpen(true)} className={BAR_CELL}>
           <BarLabel icon={ICON_ADD} word="Batch" />

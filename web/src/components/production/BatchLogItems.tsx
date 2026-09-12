@@ -105,6 +105,7 @@ export function BatchLogItems({
   removable,
   touch = false,
   footerLeading,
+  filterExtra,
 }: {
   rows: BatchRow[];
   /** The same batches, carrying what the PANE needs. Keyed by id. */
@@ -128,6 +129,8 @@ export function BatchLogItems({
    * with Complete/Reopen and Delete log gone from the tablet).
    */
   footerLeading?: ReactNode;
+  /** Handed to the table's filter row, after Group by. */
+  filterExtra?: ReactNode;
 }) {
   const [picked, setPicked] = useState<string | null>(null);
   const [pane, setPane] = useState<Pane>("info");
@@ -205,6 +208,7 @@ export function BatchLogItems({
           onSelect={setPicked}
           fill={wide}
           touch={touch}
+          filterExtra={filterExtra}
         />
       </div>
 

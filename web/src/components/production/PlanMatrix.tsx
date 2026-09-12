@@ -10,12 +10,11 @@ import { TextInput } from "@/components/ui/TextInput";
 import { Dialog, DIALOG_CANCEL_CLASS, DIALOG_COMMIT_CLASS } from "@/components/ui/Dialog";
 import { RowMenu } from "@/components/ui/RowMenu";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
-import { TabPicker } from "@/components/ui/TabPicker";
-import { BUTTON_CLASS } from "@/components/ui/buttons";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
+import { ControlField } from "@/components/ui/ControlField";
 import {
-  STICKY_HEAD_ROW_UNDER_CONTROLS,
+  STICKY_HEAD_ROW,
   useOverflowOnlyWhenNeeded,
-  usePublishedHeight,
 } from "@/lib/tableHead";
 import {
   WEEKDAYS,
@@ -101,6 +100,7 @@ export function PlanMatrix({
   kitchenOptions,
   reviewDefaults = false,
   editable,
+  heading,
 }: {
   planId: string;
   orgId: string;
@@ -134,6 +134,9 @@ export function PlanMatrix({
    */
   reviewDefaults?: boolean;
   editable: boolean;
+  /** The record's title block — the left of the title row, whose right holds
+   *  the Actions menu and Group by. Rendered by the server page. */
+  heading: React.ReactNode;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -238,12 +241,7 @@ export function PlanMatrix({
     return seeded !== null && seeded !== slot.par ? seeded : null;
   }
   const tableRef = useRef<HTMLTableElement | null>(null);
-  // The controls band publishes its own height and the weekday labels offset
-  // against the SUM of it and the masthead, so the two bands stack rather than
-  // one painting over the other.
-  const controlsRef = useRef<HTMLDivElement | null>(null);
   const scrollerRef = useRef<HTMLDivElement | null>(null);
-  usePublishedHeight(controlsRef, "--rf-controls-h");
   // A sticky cell inside an `overflow-x: auto` box pins to THAT box, which
   // never scrolls vertically — so the wrapper only becomes a scroll container
   // when the table genuinely doesn't fit, which `table-fixed` means it never
@@ -953,143 +951,97 @@ export function PlanMatrix({
     });
   }
 
+  // The screen's commands, one Actions menu in the title row (Mark,
+  // 2026-09-12). Title Case, grouped build · check the pars against the shop.
+  const commands: ActionMenuItem[] = editable
+    ? [
+        { label: "Add Tray…", onSelect: () => setNewTray(true) },
+        {
+          label: "Renumber Trays",
+          onSelect: () => void renumber(),
+          disabled: pending || trays.length === 0,
+        },
+        {
+          label: review ? "Stop Checking Pars" : "Check Pars",
+          onSelect: () => setReview((v) => !v),
+          disabled: !review && differing.length === 0,
+          separatorBefore: true,
+        },
+        {
+          label: `Use ${locationCode} Defaults`,
+          onSelect: takeAllSuggested,
+          disabled: pending || !review || differing.length === 0,
+        },
+        {
+          // The riskier direction — it writes the SHOP's catalog, which every
+          // future plan seeds from. The confirm names the blast radius.
+          label: `Update ${locationCode} Defaults`,
+          onSelect: updateAllDefaults,
+          disabled: pending || !review || differing.length === 0,
+        },
+      ]
+    : [];
+
   return (
-    <div className="space-y-3">
-
-      {/* THE COMMANDS SIT WITH THE VIEW CONTROL, AND THE BAND IS PINNED (Mark,
-          2026-09-07: move the footer's buttons "to the filter row, aligned to
-          the right… then remove the footer, and make the header sticky so the
-          filter row is always visible").
-
-          They were pinned to the FOOT of the window for exactly the reason
-          they are pinned now — a plan runs to two dozen trays, so a command
-          under the table is a scroll away from the rows you are building — and
-          at the top they arrive beside the control that changes what the list
-          SHOWS, with the weekday labels sticking directly beneath them. What
-          you need while you build is one block instead of one band at each end
-          of the screen.
-
-          THE ROW ALWAYS RENDERS, where the Group-by picker used to be the
-          whole block and appeared only past one tray: Add tray lives here now,
-          and an empty plan is precisely the one that needs it.
-
-          It publishes its measured height (`--rf-controls-h`) and the column
-          labels offset against the SUM. Measured, never a constant: this row
-          wraps the moment the pars band cannot share it. z-30 puts it over the
-          labels (20) and under the masthead (50). */}
-      <div
-        ref={controlsRef}
-        className="sticky top-[var(--rf-header-h)] z-30 bg-white py-3"
-      >
-        <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
-          {/* A control that changes what the list SHOWS goes with the list,
-              never in a command bar — and every one-of-N choice in this app is
-              a TabPicker. */}
-          {trays.length > 1 ? (
-            <div className="space-y-1.5">
-              <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-muted">
-                Group by
-              </span>
-              <TabPicker<MatrixGrouping>
-                ariaLabel="Group trays by"
-                value={grouping}
-                onChange={setGrouping}
-                options={[
-                  { key: "tray", label: "Tray" },
-                  { key: "category", label: "Category" },
-                  { key: "type", label: "Item type" },
-                ]}
-              />
-            </div>
-          ) : null}
-
-          {/* The grand total, and it has nowhere else to live: the Trays
-              heading went when the footer took this over (Mark, 2026-08-08).
-              Pinned, it is still the line that stays with you while you
-              build. */}
-          <span className="text-[13px] text-muted">
-            {trays.length} tray{trays.length === 1 ? "" : "s"} on this plan
-          </span>
-
-          {editable ? (
-            <div className="ml-auto flex flex-wrap items-end justify-end gap-x-3 gap-y-2">
-              {/* ONE button weight, `BUTTON_CLASS`. In the footer these were
-                  four hand-typed near-copies at two different heights, which
-                  reads as a divider between tiers when they sit in separate
-                  clusters and as a mistake when they stand in one row — that
-                  file's own history says what happens when they drift. */}
-              <button type="button" onClick={() => setNewTray(true)} className={BUTTON_CLASS}>
-                Add tray
-              </button>
-              <button
-                type="button"
-                onClick={() => void renumber()}
-                disabled={pending || trays.length === 0}
-                className={BUTTON_CLASS}
-              >
-                Renumber trays
-              </button>
-              {/* The pars against this shop's own defaults. Always available, so
-                  the question can be asked without a duplicate or a move to
-                  prompt it — and it says the count BEFORE you turn it on, which
-                  is what you need to decide whether to. */}
-              {differing.length > 0 || review ? (
-                <div className="flex flex-wrap items-center gap-3 border-l-2 border-mark pl-3 text-[13px]">
-                  <span className="text-muted">
-                    {differing.length === 0 ? (
-                      <>Every par matches {locationCode}&rsquo;s defaults.</>
-                    ) : (
-                      <>
-                        <span className="font-medium text-ink">
-                          {differing.length} par{differing.length === 1 ? "" : "s"}
-                        </span>{" "}
-                        differ{differing.length === 1 ? "s" : ""} from {locationCode}&rsquo;s defaults.
-                      </>
-                    )}
-                  </span>
-                  {differing.length ? (
-                    <button
-                      type="button"
-                      onClick={() => setReview((v) => !v)}
-                      className={BUTTON_CLASS}
-                    >
-                      {review ? "Stop checking" : "Check pars"}
-                    </button>
-                  ) : null}
-                  {review && differing.length ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={takeAllSuggested}
-                        disabled={pending}
-                        title={`Replace those pars with ${locationCode}'s defaults`}
-                        className={BUTTON_CLASS}
-                      >
-                        Use {locationCode} defaults
-                      </button>
-                      {/* The reverse, and the riskier direction: it writes the
-                          SHOP's catalog, which every future plan seeds from. It
-                          reads as a peer of its opposite (Mark, 2026-08-08) —
-                          the app's one button weight — so the warning lives
-                          entirely in the confirm, which names the blast
-                          radius. */}
-                      <button
-                        type="button"
-                        onClick={updateAllDefaults}
-                        disabled={pending}
-                        title={`Make this plan's pars ${locationCode}'s defaults — changes the shop's catalog`}
-                        className={BUTTON_CLASS}
-                      >
-                        Update {locationCode} defaults
-                      </button>
-                    </>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-          ) : null}
-        </div>
+    <div className="space-y-10">
+      {/* THE TITLE ROW CARRIES THE COMMANDS AND THE VIEW CONTROL (Mark,
+          2026-09-12: "move all the action buttons on the plans detail page into
+          an actionmenu … top-right aligned", and Group by "directly under the
+          actionmenu"). This retires the sticky controls band of 2026-09-07,
+          which existed only to keep those buttons in view down two dozen
+          trays; with them behind one menu at the top, the weekday labels stick
+          under the masthead alone. `items-start`, so the menu's top is the
+          h1's. */}
+      <div className="flex flex-wrap items-start gap-x-8 gap-y-4">
+        <div className="min-w-0 flex-1">{heading}</div>
+        {commands.length > 0 || trays.length > 1 ? (
+          <div className="ml-auto flex flex-col items-end gap-3">
+            {commands.length > 0 ? (
+              <ActionMenu ariaLabel="Actions for this plan" minWidth={240} items={commands} />
+            ) : null}
+            {trays.length > 1 ? (
+              <ControlField label="Group by">
+                <PickList
+                  ariaLabel="Group trays by"
+                  variant="field"
+                  value={grouping}
+                  onPick={(next) => setGrouping(next as MatrixGrouping)}
+                  options={[
+                    { value: "tray", label: "Tray" },
+                    { value: "category", label: "Category" },
+                    { value: "type", label: "Item type" },
+                  ]}
+                  fit
+                />
+              </ControlField>
+            ) : null}
+          </div>
+        ) : null}
       </div>
+
+      <div className="space-y-3">
+      {/* What the band said besides its buttons: the grand total, and how many
+          pars disagree with this shop's defaults — the count you need to decide
+          whether to Check Pars, stated BEFORE you turn it on. */}
+      <p className="text-[13px] text-muted">
+        {trays.length} tray{trays.length === 1 ? "" : "s"} on this plan
+        {editable && (differing.length > 0 || review) ? (
+          <>
+            {" · "}
+            {differing.length === 0 ? (
+              <>Every par matches {locationCode}&rsquo;s defaults.</>
+            ) : (
+              <>
+                <span className="font-medium text-ink">
+                  {differing.length} par{differing.length === 1 ? "" : "s"}
+                </span>{" "}
+                differ{differing.length === 1 ? "s" : ""} from {locationCode}&rsquo;s defaults
+                {review ? " — checking" : ""}.
+              </>
+            )}
+          </>
+        ) : null}
+      </p>
 
       <div ref={scrollerRef} className="overflow-x-auto">
         {/* `table-fixed` is what makes the widths below actual widths. Without
@@ -1108,7 +1060,7 @@ export function PlanMatrix({
                 it is a day and a shop you read and PRESS, and it matches the
                 table body's own 13px rather than the caption scale. Clear sets
                 its own smaller size; it is a command, not part of the pair. */}
-            <tr className={`text-[13px] uppercase tracking-[0.12em] ${STICKY_HEAD_ROW_UNDER_CONTROLS}`}>
+            <tr className={`text-[13px] uppercase tracking-[0.12em] ${STICKY_HEAD_ROW}`}>
               {WEEKDAYS.map((d) => {
                 const held = slots.filter((s) => s.weekday === d.iso).length;
                 const kitchen = planKitchenFor(
@@ -1603,6 +1555,7 @@ export function PlanMatrix({
           onSave={(next, currentItemId) => editTray(editing, next, currentItemId)}
         />
       ) : null}
+      </div>
     </div>
   );
 }

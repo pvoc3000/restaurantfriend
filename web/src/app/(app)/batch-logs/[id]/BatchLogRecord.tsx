@@ -7,13 +7,14 @@ import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { RecordNav } from "@/components/ui/RecordNav";
 import { InlineValue, READ_ONLY_VALUE } from "@/components/catalog/InlineValue";
 import { BOXED_FIELDS } from "@/components/ui/fieldMetrics";
+import { ControlField } from "@/components/ui/ControlField";
 import { crumbPath, parseTrail } from "@/lib/breadcrumbs";
 import { batchDate } from "@/lib/productionBatches";
 import { type BatchRow } from "@/components/production/BatchItemsTable";
 import { BatchLogItems } from "@/components/production/BatchLogItems";
 import { type BatchFieldsRow } from "@/components/production/BatchFields";
 import { BATCH_PHOTO_BUCKET, BATCH_PHOTO_TTL_SECONDS } from "@/lib/batchPhotos";
-import { BatchLogActions } from "@/components/production/BatchLogActions";
+import { BatchLogCommandMenu } from "@/components/production/BatchLogCommandMenu";
 import { NewBatch } from "@/components/production/NewBatch";
 
 /**
@@ -287,21 +288,6 @@ export async function BatchLogRecord({
   // 2026-09-09) — Complete/Reopen and Delete log are desk commands, on the
   // strip below. The pane draws that footer, since Delete batch is about the
   // batch it is showing.
-  const commands = (
-    <>
-      {addBatch}
-      <BatchLogActions
-        logId={id}
-        status={(log.status ?? "open") as string}
-        logDate={logDate}
-        kitchenCode={kitchenCode}
-        batches={rows.length}
-        outstanding={rows.length - done}
-        editable={editable}
-      />
-    </>
-  );
-
   const crumbs = (
     <Breadcrumbs
       trail={trail}
@@ -316,25 +302,47 @@ export async function BatchLogRecord({
           the table's own filter row (Mark, 2026-09-10). */}
       {crumbs}
 
+      {/* The Actions menu rides in the title row, top-right (Mark,
+          2026-09-12), where its three buttons sat at the end of the strip. */}
       {touch ? null : (
-      <header className="flex flex-wrap items-baseline gap-x-4">
-        <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-          {kitchenCode} — {batchDate(logDate)}
-        </h1>
-        <p className="text-sm text-muted">
-          {rows.length === 0 ? "Nothing on this log yet" : `${done} of ${rows.length} done`}
-        </p>
+      <header className="flex flex-wrap items-start gap-x-4 gap-y-2">
+        <div className="flex min-w-0 flex-wrap items-baseline gap-x-4">
+          <h1 className="text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+            {kitchenCode} — {batchDate(logDate)}
+          </h1>
+          <p className="text-sm text-muted">
+            {rows.length === 0 ? "Nothing on this log yet" : `${done} of ${rows.length} done`}
+          </p>
+        </div>
+        <div className="ml-auto">
+          <BatchLogCommandMenu
+            orgId={session.membership.org_id}
+            logId={id}
+            locationId={log.location_id as string}
+            kitchenCode={kitchenCode}
+            logDate={logDate}
+            status={(log.status ?? "open") as string}
+            batches={rows.length}
+            outstanding={rows.length - done}
+            editable={editable}
+          />
+        </div>
       </header>
       )}
 
-      {/* ONE STRIP, not a field grid plus an action row.
+      {/* NO RULES AND NO NOTE since 2026-09-12 (Mark: "move the note field to
+          the right of the groupby picklist … and delete the dividers between
+          the page title and the filter row"). The note is in the table's
+          filter row now; what is left here is the log's three facts.
+
+          ONE STRIP, not a field grid plus an action row.
           The pane below is pinned to the window, so every pixel above it comes
           out of the table: the first cut spent 441px on chrome and left 279 for
           the list and the detail together, which is under the frame's own floor
           — so nothing pinned at all and the page scrolled. The log has four
           facts and two commands; they fit on a line. */}
       {touch ? null : (
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 border-y border-hairline py-2 text-sm">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
         <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
           {log.status === "complete" ? "Complete" : "Open"}
         </span>
@@ -347,33 +355,6 @@ export async function BatchLogRecord({
         ) : (
           <span className="bg-mark-fill px-1">not printed</span>
         )}
-        <span className="flex min-w-0 flex-1 items-center gap-2">
-          <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-            Note
-          </span>
-          {editable ? (
-            // `flex-1` on the wrapper above: this strip is shrink-to-fit, so a
-            // boxed field's `w-full` needs a definite width to resolve against.
-            <InlineValue
-              boxed={BOXED_FIELDS}
-              table="production_batch_logs"
-              id={id}
-              column="note"
-              value={(log.note ?? null) as string | null}
-              ariaLabel="Note on this batch log"
-            />
-          ) : (
-            <span className={`${READ_ONLY_VALUE} text-muted`}>{log.note ?? "—"}</span>
-          )}
-        </span>
-
-        {/* Add batch sits to the LEFT of Mark complete (Mark, 2026-08-09), in
-            the log's own command cluster rather than in the table's filter row.
-            It is a command about the LOG — it adds a line to this document —
-            where the row it used to share holds controls that change what the
-            list SHOWS. Reading right to left the cluster is now destructive,
-            terminal, additive, which is the order the PO screens already use. */}
-        <span className="ml-auto flex items-center gap-3">{commands}</span>
       </div>
       )}
 
@@ -397,6 +378,26 @@ export async function BatchLogRecord({
           removable={removable}
           touch={touch}
           footerLeading={touch ? addBatch : undefined}
+          // THE LOG'S NOTE, beside Group by (Mark, 2026-09-12). Desk only, as
+          // the strip it came from was — the tablet shell has neither.
+          filterExtra={
+            touch ? undefined : (
+              <ControlField label="Note">
+                {editable ? (
+                  <InlineValue
+                    boxed={BOXED_FIELDS}
+                    table="production_batch_logs"
+                    id={id}
+                    column="note"
+                    value={(log.note ?? null) as string | null}
+                    ariaLabel="Note on this batch log"
+                  />
+                ) : (
+                  <span className={`${READ_ONLY_VALUE} text-muted`}>{log.note ?? "—"}</span>
+                )}
+              </ControlField>
+            )
+          }
         />
       )}
 

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { BAR_CELL } from "@/components/tablet/barCell";
@@ -35,6 +36,7 @@ export function BatchLogActions({
   outstanding,
   editable,
   variant = "button",
+  children,
 }: {
   logId: string;
   status: string;
@@ -45,13 +47,16 @@ export function BatchLogActions({
   editable: boolean;
   /** `bar` is the tablet shell's footer — icon-over-word cells on black. */
   variant?: "button" | "bar";
+  /** Hand the commands out as Actions menu rows; the confirms, the row-count
+   *  checks and the error line stay here. */
+  children?: (rows: ActionMenuItem[]) => React.ReactNode;
 }) {
   const supabase = createClient();
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  if (!editable) return null;
+  if (!editable) return children ? <>{children([])}</> : null;
 
   async function setStatus(next: "open" | "complete") {
     if (next === "complete" && outstanding > 0) {
@@ -109,6 +114,26 @@ export function BatchLogActions({
     }
     router.push("/batch-logs");
     router.refresh();
+  }
+
+  if (children) {
+    return (
+      <>
+        {children([
+          status === "complete"
+            ? { label: "Reopen Log", onSelect: () => void setStatus("open"), disabled: busy !== null }
+            : { label: "Mark Complete", onSelect: () => void setStatus("complete"), disabled: busy !== null },
+          {
+            label: "Delete Log…",
+            onSelect: () => void remove(),
+            danger: true,
+            disabled: busy !== null,
+            separatorBefore: true,
+          },
+        ])}
+        {error ? <p className="text-right text-sm text-accent">{error}</p> : null}
+      </>
+    );
   }
 
   if (variant === "bar") {

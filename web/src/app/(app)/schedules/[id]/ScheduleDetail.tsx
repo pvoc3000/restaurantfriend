@@ -17,8 +17,7 @@ import {
   type TaxonomyVocabulary,
 } from "@/components/production/ScheduleLines";
 import { ScheduleActions } from "@/components/production/ScheduleActions";
-import { AddScheduleItems, type AddableItem } from "@/components/production/AddScheduleItems";
-import { PrintPacket } from "@/components/production/PrintPacket";
+import type { AddableItem } from "@/components/production/AddScheduleItems";
 import { canEditPage } from "@/lib/pageAccess";
 
 /**
@@ -346,16 +345,9 @@ export async function ScheduleDetail({
           hasActuals={rows.some((r) => r.made !== null || r.leftover !== null)}
           lineCount={rows.length}
           editable={editable}
-          print={<PrintPacket scheduleIds={[id]} stampable={countable} label="Print…" />}
-          add={
-            editable ? (
-              <AddScheduleItems
-                scheduleId={id}
-                orgId={session.membership.org_id}
-                items={addable}
-              />
-            ) : null
-          }
+          stampable={countable}
+          orgId={session.membership.org_id}
+          addable={addable}
         />
       </header>
 

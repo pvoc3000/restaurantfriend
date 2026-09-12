@@ -383,7 +383,10 @@ export function PlansList({
       sortValue: (r) => (r.is_active ? 0 : 1),
       render: (r) =>
         editable ? (
-          <ActiveToggle table="production_plans" id={r.id} active={r.is_active} />
+          // A SWITCH since 2026-09-12 (Mark), the Active-column sweep. No
+          // rebalance: total 1040, so 80 buys 93.5px at 1280 and ~80 at the
+          // 1100 compact line — clear of the 40px switch and "ACTIVE".
+          <ActiveToggle table="production_plans" id={r.id} active={r.is_active} control="switch" />
         ) : (
           <span className="text-muted">{r.is_active ? "Yes" : "No"}</span>
         ),

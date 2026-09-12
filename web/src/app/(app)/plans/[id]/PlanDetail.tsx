@@ -148,143 +148,143 @@ export async function PlanDetail({
         trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
       />
 
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-          {/* The title is the record's own name, so it is edited where you read
-              it. NOT NULL, so clearing it asks for a value instead of handing
-              back a raw Postgres null-violation. */}
-          <h1 className="min-w-0 text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
-            {editable ? (
-              // The title keeps the underline — see `catalog/ItemFields`.
-              <InlineValue
-                table="production_plans"
-                id={id}
-                column="title"
-                nullable={false}
-                value={plan.title as string}
-                ariaLabel="Plan title"
-                // The browser reset sets `button { text-transform: none }`, so
-                // the h1's `uppercase` does NOT reach the cell inside it.
-                className="uppercase"
-              />
-            ) : (
-              (plan.title as string)
-            )}
-          </h1>
-          {/* THE DATES BESIDE THE NAME (Mark, 2026-09-09), in parentheses and
-              with no label — a plan is identified by what it is called AND when
-              it runs, and "Fall 2026 - DF02" alone does not say which autumn.
-              It is a rendering of `starts_on`/`ends_on`, which are edited two
-              rows below; putting a second editor here would be two answers to
-              one question. */}
-          <span className="text-[13px] text-muted">
-            (
-            {planRange({
-              starts_on: plan.starts_on as string,
-              ends_on: (plan.ends_on ?? null) as string | null,
-            })}
-            )
-          </span>
-          {!plan.is_active ? (
-            <span className="text-[12px] uppercase tracking-[0.12em] text-muted">Inactive</span>
-          ) : null}
-        </div>
-
-        <dl className="grid max-w-[min(46rem,max(32rem,50%))] grid-cols-[minmax(7rem,auto)_1fr] items-center gap-x-6 gap-y-3 text-[14px] sm:grid-cols-[minmax(7rem,auto)_1fr_minmax(7rem,auto)_1fr] sm:[&>*:nth-child(4n+3)]:pl-6">
-          {/* Both shops are CHOSEN from a list — a known vocabulary is never
-              typed. Enumerating over ACTIVE locations only (design rule 3): a
-              closed shop is not one you can plan a menu for. */}
-          <Row label="Sells at">
-            {editable ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="production_plans"
-                id={id}
-                column="location_id"
-                kind="pick"
-                nullable={false}
-                value={plan.location_id as string}
-                options={locationOptions}
-                ariaLabel="Sells at"
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>
-                {codeById.get(plan.location_id as string) ?? "—"}
-              </span>
-            )}
-          </Row>
-          {/* MADE AT IS A SIGNPOST, NOT A FIELD (Mark, 2026-09-09: "it's
-              unclear what the kitchen picker is doing … we put back 'Made At'
-              but with text that says 'Set Below.'").
-
-              101 moved the kitchen onto the seven day columns and took this row
-              out of the block with it, which left the record silent about
-              where anything is made — so a reader met `MON DF01 ⌄` in the
-              header with nothing having told them DF01 was a KITCHEN. The row
-              is back, in the slot beside Sells at, saying where the answer
-              lives and that there is one per day.
-
-              IT STAYS READ-ONLY, and that is the whole point of it. An editor
-              here would be the single "Made at" 101 deliberately dropped — one
-              field claiming to answer a question that now has seven answers,
-              which is 016's `nextDeliveryDate` trap. `READ_ONLY_VALUE` gives it
-              the editable cells' own padding so the column does not kink. */}
-          <Row label="Made at">
-            <span className={`${READ_ONLY_VALUE} text-muted`}>Set below, per day.</span>
-          </Row>
-          <Row label="Starts">
-            {editable ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="production_plans" id={id} column="starts_on"
-                kind="date" nullable={false} value={plan.starts_on as string}
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{plan.starts_on as string}</span>
-            )}
-          </Row>
-          <Row label="Ends">
-            {editable ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="production_plans" id={id} column="ends_on"
-                kind="date" value={(plan.ends_on ?? null) as string | null}
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{(plan.ends_on as string) ?? "—"}</span>
-            )}
-          </Row>
-          <Row label="Notes" wide>
-            {editable ? (
-              <InlineValue
-                boxed={BOXED_FIELDS}
-                table="production_plans"
-                id={id}
-                column="notes"
-                value={(plan.notes ?? null) as string | null}
-              />
-            ) : (
-              <span className={READ_ONLY_VALUE}>{(plan.notes as string) ?? "—"}</span>
-            )}
-          </Row>
-        </dl>
-
-        {overlaps.length ? (
-          // Yellow and never blocking: overlapping plans are decision 9's
-          // FEATURE. What matters is that the reader knows pars will sum.
-          <p className="max-w-[80ch] border-l-2 border-mark pl-3 text-[13px] text-muted">
-            <span className="font-medium text-ink">
-              Also active at this shop: {overlaps.join(", ")}.
-            </span>{" "}
-            That is allowed — a shop&rsquo;s menu is the union of its active
-            plans. Where the same item appears on more than one, the pars will
-            SUM when a schedule is generated.
-          </p>
-        ) : null}
-      </div>
-
-      <section className="space-y-3">
         <PlanMatrix
+          heading={
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              {/* The title is the record's own name, so it is edited where you read
+                  it. NOT NULL, so clearing it asks for a value instead of handing
+                  back a raw Postgres null-violation. */}
+              <h1 className="min-w-0 text-[28px] font-bold uppercase leading-tight tracking-[-0.02em]">
+                {editable ? (
+                  // The title keeps the underline — see `catalog/ItemFields`.
+                  <InlineValue
+                    table="production_plans"
+                    id={id}
+                    column="title"
+                    nullable={false}
+                    value={plan.title as string}
+                    ariaLabel="Plan title"
+                    // The browser reset sets `button { text-transform: none }`, so
+                    // the h1's `uppercase` does NOT reach the cell inside it.
+                    className="uppercase"
+                  />
+                ) : (
+                  (plan.title as string)
+                )}
+              </h1>
+              {/* THE DATES BESIDE THE NAME (Mark, 2026-09-09), in parentheses and
+                  with no label — a plan is identified by what it is called AND when
+                  it runs, and "Fall 2026 - DF02" alone does not say which autumn.
+                  It is a rendering of `starts_on`/`ends_on`, which are edited two
+                  rows below; putting a second editor here would be two answers to
+                  one question. */}
+              <span className="text-[13px] text-muted">
+                (
+                {planRange({
+                  starts_on: plan.starts_on as string,
+                  ends_on: (plan.ends_on ?? null) as string | null,
+                })}
+                )
+              </span>
+              {!plan.is_active ? (
+                <span className="text-[12px] uppercase tracking-[0.12em] text-muted">Inactive</span>
+              ) : null}
+            </div>
+
+            <dl className="grid max-w-[min(46rem,max(32rem,50%))] grid-cols-[minmax(7rem,auto)_1fr] items-center gap-x-6 gap-y-3 text-[14px] sm:grid-cols-[minmax(7rem,auto)_1fr_minmax(7rem,auto)_1fr] sm:[&>*:nth-child(4n+3)]:pl-6">
+              {/* Both shops are CHOSEN from a list — a known vocabulary is never
+                  typed. Enumerating over ACTIVE locations only (design rule 3): a
+                  closed shop is not one you can plan a menu for. */}
+              <Row label="Sells at">
+                {editable ? (
+                  <InlineValue
+                    boxed={BOXED_FIELDS}
+                    table="production_plans"
+                    id={id}
+                    column="location_id"
+                    kind="pick"
+                    nullable={false}
+                    value={plan.location_id as string}
+                    options={locationOptions}
+                    ariaLabel="Sells at"
+                  />
+                ) : (
+                  <span className={READ_ONLY_VALUE}>
+                    {codeById.get(plan.location_id as string) ?? "—"}
+                  </span>
+                )}
+              </Row>
+              {/* MADE AT IS A SIGNPOST, NOT A FIELD (Mark, 2026-09-09: "it's
+                  unclear what the kitchen picker is doing … we put back 'Made At'
+                  but with text that says 'Set Below.'").
+
+                  101 moved the kitchen onto the seven day columns and took this row
+                  out of the block with it, which left the record silent about
+                  where anything is made — so a reader met `MON DF01 ⌄` in the
+                  header with nothing having told them DF01 was a KITCHEN. The row
+                  is back, in the slot beside Sells at, saying where the answer
+                  lives and that there is one per day.
+
+                  IT STAYS READ-ONLY, and that is the whole point of it. An editor
+                  here would be the single "Made at" 101 deliberately dropped — one
+                  field claiming to answer a question that now has seven answers,
+                  which is 016's `nextDeliveryDate` trap. `READ_ONLY_VALUE` gives it
+                  the editable cells' own padding so the column does not kink. */}
+              <Row label="Made at">
+                <span className={`${READ_ONLY_VALUE} text-muted`}>Set below, per day.</span>
+              </Row>
+              <Row label="Starts">
+                {editable ? (
+                  <InlineValue
+                    boxed={BOXED_FIELDS}
+                    table="production_plans" id={id} column="starts_on"
+                    kind="date" nullable={false} value={plan.starts_on as string}
+                  />
+                ) : (
+                  <span className={READ_ONLY_VALUE}>{plan.starts_on as string}</span>
+                )}
+              </Row>
+              <Row label="Ends">
+                {editable ? (
+                  <InlineValue
+                    boxed={BOXED_FIELDS}
+                    table="production_plans" id={id} column="ends_on"
+                    kind="date" value={(plan.ends_on ?? null) as string | null}
+                  />
+                ) : (
+                  <span className={READ_ONLY_VALUE}>{(plan.ends_on as string) ?? "—"}</span>
+                )}
+              </Row>
+              <Row label="Notes" wide>
+                {editable ? (
+                  <InlineValue
+                    boxed={BOXED_FIELDS}
+                    table="production_plans"
+                    id={id}
+                    column="notes"
+                    value={(plan.notes ?? null) as string | null}
+                  />
+                ) : (
+                  <span className={READ_ONLY_VALUE}>{(plan.notes as string) ?? "—"}</span>
+                )}
+              </Row>
+            </dl>
+
+            {overlaps.length ? (
+              // Yellow and never blocking: overlapping plans are decision 9's
+              // FEATURE. What matters is that the reader knows pars will sum.
+              <p className="max-w-[80ch] border-l-2 border-mark pl-3 text-[13px] text-muted">
+                <span className="font-medium text-ink">
+                  Also active at this shop: {overlaps.join(", ")}.
+                </span>{" "}
+                That is allowed — a shop&rsquo;s menu is the union of its active
+                plans. Where the same item appears on more than one, the pars will
+                SUM when a schedule is generated.
+              </p>
+            ) : null}
+          </div>
+          }
           planId={id}
           orgId={session.membership.org_id}
           trays={(trays ?? []).map((t) => ({
@@ -337,7 +337,6 @@ export async function PlanDetail({
           reviewDefaults={rawParams[REVIEW_DEFAULTS_PARAM] === "review"}
           editable={editable}
         />
-      </section>
     </div>
   );
 }

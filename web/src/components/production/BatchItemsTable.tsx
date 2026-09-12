@@ -127,6 +127,7 @@ export function BatchItemsTable({
   onSelect,
   fill,
   touch = false,
+  filterExtra,
 }: {
   rows: BatchRow[];
   /** Supervisor and up — 044's `production_batches` write policies. */
@@ -142,6 +143,9 @@ export function BatchItemsTable({
    * first and came back on 2026-09-10 (Mark), beside the Status picker.
    */
   touch?: boolean;
+  /** A control after Group by — the batch log's Note (Mark, 2026-09-12).
+   *  A flexible pen, so a boxed field's `w-full` has a width to fill. */
+  filterExtra?: React.ReactNode;
 }) {
   // REMEMBERED WHILE YOU WALK RECORDS (Mark, 2026-08-09: "when navigating using
   // the buttons in the upper right hand corner of the detail screen, I'd like
@@ -546,6 +550,7 @@ export function BatchItemsTable({
                 fit
               />
             </ControlField>
+          {filterExtra ? <div className="min-w-[13rem] max-w-md flex-1">{filterExtra}</div> : null}
         </div>
       }
     />

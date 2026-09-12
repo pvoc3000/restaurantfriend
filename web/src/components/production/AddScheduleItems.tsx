@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS } from "@/components/ui/buttons";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { TextInput } from "@/components/ui/TextInput";
 import { SearchGlyph } from "@/components/ui/SearchGlyph";
 import { Dialog, DIALOG_CANCEL_CLASS } from "@/components/ui/Dialog";
@@ -33,10 +34,14 @@ export function AddScheduleItems({
   scheduleId,
   orgId,
   items,
+  children,
 }: {
   scheduleId: string;
   orgId: string;
   items: AddableItem[];
+  /** Hand the command out as an Actions menu row instead of a button; the
+   *  panel stays here either way. */
+  children?: (row: ActionMenuItem) => React.ReactNode;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -109,21 +114,23 @@ export function AddScheduleItems({
     router.refresh();
   }
 
+  function openPanel() {
+    setOpen(true);
+    setError(null);
+    setAdded(new Set());
+    setTerm("");
+    setQty({});
+  }
+
   return (
     <>
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(true);
-          setError(null);
-          setAdded(new Set());
-          setTerm("");
-          setQty({});
-        }}
-        className={`${BUTTON_CLASS} shrink-0`}
-      >
-        Add item…
-      </button>
+      {children ? (
+        children({ label: "Add Item…", onSelect: openPanel })
+      ) : (
+        <button type="button" onClick={openPanel} className={`${BUTTON_CLASS} shrink-0`}>
+          Add item…
+        </button>
+      )}
 
       {open && (
         <Dialog

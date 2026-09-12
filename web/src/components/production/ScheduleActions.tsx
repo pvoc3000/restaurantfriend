@@ -6,24 +6,24 @@ import { createClient } from "@/lib/supabase/client";
 import { loadProductionGraph, loadItemGraph } from "@/lib/productionQueries";
 import { itemCost } from "@/lib/productionCost";
 import { resolveItemPrice } from "@/lib/productionPrice";
-import { BUTTON_CLASS, DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
+import { ActionMenu, type ActionMenuItem } from "@/components/ui/ActionMenu";
+import { AddScheduleItems, type AddableItem } from "@/components/production/AddScheduleItems";
+import { PrintPacket } from "@/components/production/PrintPacket";
 import { ProgressBand } from "@/components/ui/ProgressBand";
 import { confirmDialog, splitConfirmMessage } from "@/lib/confirm";
 import { deleteSchedules, deleteSchedulesMessage } from "@/components/production/scheduleWrites";
 
-// THE SHARED CLASS, not a local copy. There were FOUR hand-typed near-copies of
-// this button in the module — here, `AddScheduleItems`, `PrintPacket` and the
-// original of this — and they had already drifted (one had lost its disabled
-// state). Harmless while they sat on different rows; since 2026-08-27 they all
-// stand in this one, where any drift is visible at a glance.
-const COMMAND = `${BUTTON_CLASS} shrink-0`;
-
 /**
- * The commands on one night: print, recost, regenerate, delete.
+ * The commands on one night — ONE ACTIONS MENU since 2026-09-12 (Mark: "move
+ * all the action buttons on the schedules detail page into an actionmenu"),
+ * where they were five buttons in the title row: Add Item… · Print… · Recost ·
+ * Regenerate… · Delete Schedule… (red), grouped build · produce · maintain ·
+ * destroy, the order the row had.
  *
- * Every button is white and bordered except Delete, which is red. There is no
- * primary here — this is a row of peers on a SCREEN, which is exactly the case
- * the design system says is not the `DIALOG_COMMIT_CLASS` exception.
+ * `AddScheduleItems` and `PrintPacket` keep their panels and hand their rows
+ * out through a render prop (`OrderCommandMenu`'s arrangement), which is why
+ * this component now composes them itself: a render prop is a function, and
+ * the server page could not pass one.
  */
 export function ScheduleActions({
   scheduleId,
@@ -35,8 +35,9 @@ export function ScheduleActions({
   hasActuals,
   lineCount,
   editable,
-  print,
-  add,
+  stampable,
+  orgId,
+  addable,
 }: {
   scheduleId: string;
   scheduleDate: string;
@@ -51,13 +52,11 @@ export function ScheduleActions({
   hasActuals: boolean;
   lineCount: number;
   editable: boolean;
-  print: React.ReactNode;
-  /**
-   * `AddScheduleItems`, composed upstream — `print` is passed the same way, and
-   * for the same reason: the slot keeps the panel's own state and query out of
-   * this component while letting the ROW decide the order.
-   */
-  add?: React.ReactNode;
+  /** Passed to `PrintPacket` — may this reader stamp the night printed (044). */
+  stampable: boolean;
+  orgId: string;
+  /** The menu `AddScheduleItems` offers. */
+  addable: AddableItem[];
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -213,47 +212,54 @@ export function ScheduleActions({
     router.refresh();
   }
 
+  // One trigger, so it is the one place left to say WHICH command is working.
+  const busyLabel =
+    busy === "recost" ? "Costing…" : busy === "regenerate" ? "Regenerating…" : busy === "delete" ? "Deleting…" : null;
+
+  const menu = (addRow: ActionMenuItem | null, printRow: ActionMenuItem) => {
+    const items: ActionMenuItem[] = [];
+    if (addRow) items.push(addRow);
+    items.push(printRow);
+    if (editable) {
+      items.push({ label: "Recost", onSelect: () => void recost(), separatorBefore: true });
+      if (source === "plan") items.push({ label: "Regenerate…", onSelect: () => void regenerate() });
+      items.push({
+        label: "Delete Schedule…",
+        onSelect: () => void remove(),
+        danger: true,
+        separatorBefore: true,
+      });
+    }
+    return (
+      <ActionMenu
+        label={busyLabel ?? "Actions"}
+        disabled={busy !== null}
+        ariaLabel={`Actions for ${sellsCode} ${scheduleDate}`}
+        minWidth={220}
+        items={items}
+      />
+    );
+  };
+
+  const withPrint = (addRow: ActionMenuItem | null) => (
+    <PrintPacket scheduleIds={[scheduleId]} stampable={stampable} label="Print…">
+      {(printRow) => menu(addRow, printRow)}
+    </PrintPacket>
+  );
+
   return (
-    /* Sized to its buttons and right-aligned, because since 2026-08-27 this
-       sits in the record's identity row rather than across the page. The
-       messages below take the cluster's full width and read left, since a
+    /* Right-aligned in the record's identity row, top-aligned with the h1.
+       The messages below take the cluster's width and read left, since a
        right-aligned sentence is hard work. */
     <div className="flex shrink-0 flex-col items-stretch gap-3 sm:items-end">
-      <div className="flex flex-wrap items-center gap-3">
-        {/* ADD LEADS, and the row then reads build - produce - maintain -
-            destroy. It is the only command here that changes what the kitchen
-            MAKES; everything after it acts on the document as a whole. */}
-        {add}
-        {print}
+      <div>
         {editable ? (
-          <>
-            <button type="button" onClick={recost} disabled={busy !== null} className={COMMAND}>
-              {busy === "recost" ? "Costing…" : "Recost"}
-            </button>
-            {source === "plan" ? (
-              <button
-                type="button"
-                onClick={regenerate}
-                disabled={busy !== null}
-                className={COMMAND}
-              >
-                {busy === "regenerate" ? "Regenerating…" : "Regenerate…"}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={remove}
-              disabled={busy !== null}
-              // `ml-auto` was pushing Delete to the far side of a full-width
-              // row. In a content-sized cluster there is no slack to push into,
-              // so it would only ever have been a no-op — and it is a lie about
-              // the arrangement.
-              className={DANGER_BUTTON_CLASS}
-            >
-              {busy === "delete" ? "Deleting…" : "Delete"}
-            </button>
-          </>
-        ) : null}
+          <AddScheduleItems scheduleId={scheduleId} orgId={orgId} items={addable}>
+            {(addRow) => withPrint(addRow)}
+          </AddScheduleItems>
+        ) : (
+          withPrint(null)
+        )}
       </div>
 
       {/* A recost walks the whole graph and can take a few seconds on a big

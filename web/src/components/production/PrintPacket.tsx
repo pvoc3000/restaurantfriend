@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { BUTTON_CLASS, PRIMARY_BUTTON_CLASS } from "@/components/ui/buttons";
 import { openWindowNow, showBlob } from "@/lib/poProcessing";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import {
   companionScheduleIds,
   fetchPacketData,
@@ -66,6 +67,7 @@ export function PrintPacket({
   printedOn,
   stampable,
   label = "Print All Documents",
+  children,
   onPrinted,
   primary = false,
 }: {
@@ -112,6 +114,11 @@ export function PrintPacket({
   onPrinted?: () => void;
   /** Fill the trigger black — see `GenerateSchedules.primary`. */
   primary?: boolean;
+  /**
+   * Hand the command out as an Actions menu row instead of drawing a button —
+   * `OrderCommandMenu`'s arrangement. The dialog stays here either way.
+   */
+  children?: (row: ActionMenuItem) => React.ReactNode;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -258,19 +265,27 @@ export function PrintPacket({
 
   return (
     <>
-      <button
-        type="button"
-        onClick={openDialog}
-        // ENABLED WHENEVER THERE IS A DOCUMENT, which since the special-orders
-        // part is no longer the same as "there is a schedule". The common night
-        // has orders and nothing generated (measured: 0 of 9 upcoming orders
-        // are scheduled), and on that night this button used to be dead while
-        // there were plainly sheets to print.
-        disabled={scheduleIds.length === 0 && orderIds.length === 0}
-        className={`${primary ? PRIMARY_BUTTON_CLASS : BUTTON_CLASS} shrink-0`}
-      >
-        {label}
-      </button>
+      {children
+        ? children({
+            label,
+            onSelect: openDialog,
+            disabled: scheduleIds.length === 0 && orderIds.length === 0,
+          })
+        : (
+        <button
+          type="button"
+          onClick={openDialog}
+          // ENABLED WHENEVER THERE IS A DOCUMENT, which since the special-orders
+          // part is no longer the same as "there is a schedule". The common night
+          // has orders and nothing generated (measured: 0 of 9 upcoming orders
+          // are scheduled), and on that night this button used to be dead while
+          // there were plainly sheets to print.
+          disabled={scheduleIds.length === 0 && orderIds.length === 0}
+          className={`${primary ? PRIMARY_BUTTON_CLASS : BUTTON_CLASS} shrink-0`}
+        >
+          {label}
+        </button>
+        )}
 
       {open && (
         <Dialog
