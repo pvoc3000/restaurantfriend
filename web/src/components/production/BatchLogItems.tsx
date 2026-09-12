@@ -1,6 +1,7 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { setSelectedBatch } from "@/lib/selectedBatch";
 import type { PickOption } from "@/components/ui/PickList";
 import { useExactViewportHeight } from "@/lib/tableHead";
 import { SectionNav } from "@/components/ui/SectionNav";
@@ -11,7 +12,6 @@ import { BatchFields, type BatchFieldsRow } from "@/components/production/BatchF
 import { BatchActions } from "@/components/production/BatchActions";
 import { BatchHistory } from "@/components/production/BatchHistory";
 import { BatchRecipe } from "@/components/production/BatchRecipe";
-import { StickyFooter } from "@/components/ui/StickyFooter";
 
 type Pane = "info" | "ingredients" | "instructions" | "history";
 
@@ -104,7 +104,6 @@ export function BatchLogItems({
   editable,
   removable,
   touch = false,
-  footerLeading,
   filterExtra,
 }: {
   rows: BatchRow[];
@@ -121,14 +120,6 @@ export function BatchLogItems({
   removable: boolean;
   /** The tablet shell — see `BatchItemsTable`'s prop of the same name. */
   touch?: boolean;
-  /**
-   * The tablet footer's first cell — Add batch, which is the RECORD's command
-   * and needs the log's ids. The footer is drawn HERE because its other cell,
-   * Delete batch, acts on the SELECTED batch, and only this component knows
-   * which that is (Mark, 2026-09-09: the footer is Add batch · Delete batch,
-   * with Complete/Reopen and Delete log gone from the tablet).
-   */
-  footerLeading?: ReactNode;
   /** Handed to the table's filter row, after Group by. */
   filterExtra?: ReactNode;
 }) {
@@ -188,6 +179,24 @@ export function BatchLogItems({
   // back during render has neither problem, and needs no state for the default.
   const selectedId = picked && fields[picked] ? picked : rows[0]?.id ?? null;
   const selected = selectedId ? fields[selectedId] ?? null : null;
+
+  // PUBLISHED for the Actions menu, which on the tablet holds Delete Batch…
+  // (Mark, 2026-09-12: the footer is gone). A module value, not state — the
+  // menu is a sibling under the server page. Cleared on unmount.
+  useEffect(() => {
+    setSelectedBatch(
+      selected
+        ? {
+            id: selected.id,
+            elementName: selected.element_name,
+            batchNumber: selected.batch_number,
+            hasYield: selected.yield_count !== null || selected.yield_size !== null,
+            photoPath: selected.photo_path,
+          }
+        : null
+    );
+  }, [selected]);
+  useEffect(() => () => setSelectedBatch(null), []);
 
   return (
     <>
@@ -333,7 +342,7 @@ export function BatchLogItems({
                     ] ?? []
                   }
                 />
-                {/* On the tablet this command is a footer cell instead. */}
+                {/* On the tablet this command is a row of the Actions menu instead. */}
                 {touch ? null : (
                   <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
                     <BatchActions
@@ -403,31 +412,6 @@ export function BatchLogItems({
         )}
       </section>
     </div>
-    {touch ? (
-      // The shift report's footer, on a record: black, pinned, icon over
-      // word, flush to the pane above and the window below. Wrapped in a div
-      // with `-mt-4` for the reason BatchLogRecord used to give: StickyFooter's
-      // spacer must be the last thing in the page's rhythm or it inherits a
-      // margin nothing above it counts.
-      <div className="-mt-4">
-        <StickyFooter flush>
-          <div className="flex items-stretch bg-ink px-2 text-white">
-            {footerLeading}
-            {selected ? (
-              <BatchActions
-                batchId={selected.id}
-                elementName={selected.element_name}
-                batchNumber={selected.batch_number}
-                hasYield={selected.yield_count !== null || selected.yield_size !== null}
-                photoPath={selected.photo_path}
-                removable={removable}
-                variant="bar"
-              />
-            ) : null}
-          </div>
-        </StickyFooter>
-      </div>
-    ) : null}
     </>
   );
 }

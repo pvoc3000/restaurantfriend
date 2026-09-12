@@ -9634,6 +9634,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    after Group by** (`BatchItemsTable`'s `filterExtra`, desk only) and the
    strip under the title **lost its two rules**. The tablet's black footer is
    unchanged.
+   **THE TABLET'S BLACK FOOTER IS GONE TOO** (Mark, 2026-09-12): Add Batch… and
+   Delete Batch… are an Actions menu in the crumb row (the tablet has no title
+   row). Delete Batch acts on the batch the pane shows, which `BatchLogItems`
+   publishes through `lib/selectedBatch` (the `lib/shiftFocus` shape);
+   `BatchActions` gained a `children` render prop. Complete/Reopen and Delete
+   Log remain desk-only. What follows about the footer is history.
    **THE BATCH LOG RECORD WAS THE FIRST SCREEN REWORKED FOR IT** (Mark,
    2026-09-09, with FileMaker's own tablet layout as the reference: "a total
    mess on a tablet"). Measured at 1024×768 before: the pinned frame had ~500px,

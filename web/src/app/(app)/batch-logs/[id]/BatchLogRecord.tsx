@@ -15,7 +15,6 @@ import { BatchLogItems } from "@/components/production/BatchLogItems";
 import { type BatchFieldsRow } from "@/components/production/BatchFields";
 import { BATCH_PHOTO_BUCKET, BATCH_PHOTO_TTL_SECONDS } from "@/lib/batchPhotos";
 import { BatchLogCommandMenu } from "@/components/production/BatchLogCommandMenu";
-import { NewBatch } from "@/components/production/NewBatch";
 
 /**
  * One batch log — the MASTER record, and its batches.
@@ -270,29 +269,39 @@ export async function BatchLogRecord({
   // (Mark, 2026-09-09, with FileMaker's own tablet layout beside it): no
   // heading ("It's big and takes up a lot of space. It's already in the
   // breadcrumb"), no "0 of 2 done", no status / generated-by / not-printed
-  // strip — and the three commands go to a sticky footer like the shift
-  // report's. Every pixel above the pinned frame comes out of the list, and on
+  // strip. Its commands went to a sticky footer on that day and, on
+  // 2026-09-12, from there into an Actions menu in the crumb row. Every pixel above the pinned frame comes out of the list, and on
   // a 768px-tall screen that strip and heading were a third of it.
   const touch = session.shell === "tablet";
-  const addBatch = editable ? (
-    <NewBatch
-      orgId={session.membership.org_id}
-      logId={id}
-      locationId={log.location_id as string}
-      locationCode={kitchenCode}
-      logDate={logDate}
-      variant={touch ? "bar" : "button"}
-    />
-  ) : null;
-  // THE TABLET FOOTER IS Add batch · Delete batch AND NOTHING ELSE (Mark,
-  // 2026-09-09) — Complete/Reopen and Delete log are desk commands, on the
-  // strip below. The pane draws that footer, since Delete batch is about the
-  // batch it is showing.
   const crumbs = (
     <Breadcrumbs
       trail={trail}
       current={`${batchDate(logDate)} · ${kitchenCode}`}
-      trailing={<RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />}
+      trailing={
+        touch ? (
+          // THE TABLET'S ACTIONS MENU, where the footer's two commands went
+          // (Mark, 2026-09-12). The crumb row, because the tablet has no title
+          // row; `RecordNav` publishes to the bar there and renders nothing.
+          <div className="flex items-center gap-3">
+            <RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />
+            <BatchLogCommandMenu
+              orgId={session.membership.org_id}
+              logId={id}
+              locationId={log.location_id as string}
+              kitchenCode={kitchenCode}
+              logDate={logDate}
+              status={(log.status ?? "open") as string}
+              batches={rows.length}
+              outstanding={rows.length - done}
+              editable={editable}
+              removable={removable}
+              touch
+            />
+          </div>
+        ) : (
+          <RecordNav listKey={crumbPath(trail[trail.length - 1])} id={id} />
+        )
+      }
     />
   );
 
@@ -377,7 +386,6 @@ export async function BatchLogRecord({
           editable={editable}
           removable={removable}
           touch={touch}
-          footerLeading={touch ? addBatch : undefined}
           // THE LOG'S NOTE, beside Group by (Mark, 2026-09-12). Desk only, as
           // the strip it came from was — the tablet shell has neither.
           filterExtra={

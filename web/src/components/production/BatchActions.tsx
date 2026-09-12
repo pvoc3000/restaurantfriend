@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import type { ActionMenuItem } from "@/components/ui/ActionMenu";
 import { createClient } from "@/lib/supabase/client";
 import { DANGER_BUTTON_CLASS } from "@/components/ui/buttons";
 import { BAR_CELL } from "@/components/tablet/barCell";
@@ -38,6 +39,7 @@ export function BatchActions({
   photoPath,
   removable,
   variant = "button",
+  children,
 }: {
   batchId: string;
   elementName: string;
@@ -51,6 +53,9 @@ export function BatchActions({
   /** `bar` is the tablet footer's cell (Mark, 2026-09-09: "Move the 'delete
    *  batch' button to the footer"). */
   variant?: "button" | "bar";
+  /** Hand the command out as an Actions menu row (Mark, 2026-09-12: Delete
+   *  batch left the tablet footer for the menu). Empty when not removable. */
+  children?: (rows: ActionMenuItem[]) => React.ReactNode;
 }) {
   const supabase = createClient();
   const router = useRouter();
@@ -99,6 +104,19 @@ export function BatchActions({
   // were its arguments and its gate, and a prop nobody reads is the kind of
   // thing that survives three refactors before somebody wires it to the wrong
   // value. Deleting is purchaser+ and is now the only command here.
+  if (children) {
+    return (
+      <>
+        {children(
+          removable
+            ? [{ label: busy === "delete" ? "Deleting…" : "Delete Batch…", onSelect: () => void remove(), danger: true, disabled: busy !== null }]
+            : []
+        )}
+        {error ? <p className="text-right text-sm text-accent">{error}</p> : null}
+      </>
+    );
+  }
+
   if (!removable) return null;
 
   if (variant === "bar") {
