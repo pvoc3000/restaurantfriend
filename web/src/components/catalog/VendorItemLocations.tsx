@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Location } from "@/lib/session";
 import { money, qty, HERE_BADGE_CLASS } from "@/lib/catalog";
 import { DataTable, type DataColumn } from "./DataTable";
-import { WEEKDAY_PICKER_WIDTH } from "./WeekdayPicker";
+import { WEEKDAY_ON_CLASS, WEEKDAY_PICKER_WIDTH } from "./WeekdayPicker";
 
 // ISO weekdays, 1 = Monday … 7 = Sunday (CLAUDE.md).
 const DAYS = [
@@ -137,7 +137,7 @@ function FavoriteDays({
           <span
             key={d.weekday}
             className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums first:border-l ${
-              on.includes(d.weekday) ? "bg-ink text-white" : "bg-white text-faint"
+              on.includes(d.weekday) ? WEEKDAY_ON_CLASS : "bg-white text-faint"
             }`}
           >
             {d.label}
@@ -160,7 +160,7 @@ function FavoriteDays({
             disabled={busy}
             onClick={() => toggle(d.weekday)}
             className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums transition-colors first:border-l disabled:opacity-35 ${
-              active ? "bg-ink text-white" : "bg-white text-faint hover:text-ink"
+              active ? WEEKDAY_ON_CLASS : "bg-white text-faint hover:text-ink"
             }`}
           >
             {d.label}

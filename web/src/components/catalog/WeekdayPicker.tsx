@@ -15,6 +15,39 @@ import { createClient } from "@/lib/supabase/client";
  */
 export const WEEKDAY_PICKER_WIDTH = 300;
 
+/**
+ * A DAY THAT IS ON — DARK GREY, NOT BLACK (Mark, 2026-09-12). One constant
+ * because the picker draws its cells twice, once live and once as a read-only
+ * statement, and the two must never disagree about what "on" looks like.
+ *
+ * `--rf-neutral-500`, #757575, AND IT IS THE END OF THIS ROAD RATHER THAN A
+ * TASTE (Mark, 2026-09-12, in two steps: "dark grey instead of black", then
+ * "can we go lighter"). It shipped at `neutral-600` (#525252, white on it
+ * 7.81:1) and this is one rung further: **the lightest grey that still carries
+ * WHITE type at AA**, measured 4.61:1 against the 4.5 the 12px labels need.
+ * The next step is not a step — #808080 measures 3.95 and fails — so anything
+ * lighter has to flip the type to BLACK, at which point the honest value is
+ * #c0c0c0, the fill every other filled control in the Mac look already uses.
+ * That is a different decision, not a lighter shade; ask before taking it.
+ *
+ * A TOKEN rather than a hex because there is one for this: the DS calls
+ * #757575 its caption grey. Written as the variable and not as `bg-subtle`,
+ * which maps to the same value under a name that means text.
+ *
+ * It is NOT the `TabPicker` rule being loosened. That control's selected cell
+ * is black and stays black — its cells abut into one segmented bar where the
+ * fill IS the answer, while these seven butted boxes are a SET you read the
+ * shape of, and a softer fill makes the on-days read as a pattern rather than
+ * as seven separate assertions.
+ *
+ * EXPORTED because there is a SECOND strip of these boxes that cannot be this
+ * component: `VendorItemLocations`' favorite days writes plan ROWS rather than
+ * an array, so it hand-rolls the markup — and the two are drawn on neighbouring
+ * records, where one black strip and one grey would read as a fault rather than
+ * as a distinction. The dress is shared even though the writer cannot be.
+ */
+export const WEEKDAY_ON_CLASS = "bg-[var(--rf-neutral-500)] text-white";
+
 // ISO weekdays, 1 = Monday … 7 = Sunday (CLAUDE.md).
 const DAYS = [
   { weekday: 1, label: "Mo" },
@@ -112,7 +145,7 @@ export function WeekdayPicker({
           <span
             key={day.weekday}
             className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums first:border-l ${
-              days.includes(day.weekday) ? "bg-ink text-white" : "bg-white text-faint"
+              days.includes(day.weekday) ? WEEKDAY_ON_CLASS : "bg-white text-faint"
             }`}
           >
             {day.label}
@@ -138,7 +171,7 @@ export function WeekdayPicker({
             onClick={() => toggle(day.weekday)}
             className={`inline-flex h-8 w-8 items-center justify-center border border-l-0 border-ink text-xs tabular-nums transition-colors first:border-l disabled:opacity-35 ${
               on
-                ? "bg-ink text-white"
+                ? WEEKDAY_ON_CLASS
                 : // The grey wash, same as `TabPicker`'s off cells — this is the
                   // app's other segmented control and it darkened the TEXT
                   // alone, which on a 32px cell is a much fainter answer to the

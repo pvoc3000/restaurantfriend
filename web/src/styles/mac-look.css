@@ -120,9 +120,11 @@
   box-shadow: 3px 3px 0 0 var(--color-accent);
 }
 
-/* THE COMMIT: DARK GREY, NOT BLACK (Mark, 2026-09-11) — `PRIMARY_BUTTON_CLASS`
-   and `DIALOG_COMMIT_CLASS`. The fill is the class's own `bg-neutral-600`; this
-   is its hover and its press. Hover is the fields' 2px edge rather than a fill,
+/* THE COMMIT: GREY, NOT BLACK (Mark, 2026-09-11) — `PRIMARY_BUTTON_CLASS`
+   and `DIALOG_COMMIT_CLASS`. The fill is the class's own `bg-[#c0c0c0]` with
+   BLACK type; this is its hover and its press. It was `bg-neutral-600` and
+   white type for the first hour, which is the name this comment kept saying
+   until 2026-09-12 — a class the button had long since stopped using. Hover is the fields' 2px edge rather than a fill,
    and held it drops into its shadow and fills the light grey every other held
    button shows, with black type — white on #c0c0c0 would not read. */
 .mac-primary:not(:disabled):hover {
