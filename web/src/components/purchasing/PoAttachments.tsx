@@ -140,8 +140,9 @@ export function PoAttachments({
               type="button"
               disabled={busy}
               onClick={() => fileRef.current?.click()}
-              // w-36: the Add as picker's width and PO detail's Actions button's.
-              className={`${BUTTON_CLASS} w-36`}
+              // Its own width, no longer a fixed 144px (Mark, 2026-09-12: "a
+              // little less wide") — the card shares its row with the figures.
+              className={BUTTON_CLASS}
             >
               Attach&hellip;
             </button>
@@ -149,16 +150,16 @@ export function PoAttachments({
               <span className="text-[12px] uppercase tracking-[0.12em] text-subtle">
                 Add as
               </span>
-              <span className="w-36">
-                <PickList
-                  variant="field"
-                  className="w-full"
-                  value={kind}
-                  options={ATTACHMENT_KIND_OPTIONS}
-                  onPick={(next) => setKind(next as AttachmentKind)}
-                  ariaLabel="Kind of attachment"
-                />
-              </span>
+              {/* `fit`: as wide as its longest kind, where a fixed w-36 was
+                  wider than any of them. */}
+              <PickList
+                variant="field"
+                value={kind}
+                options={ATTACHMENT_KIND_OPTIONS}
+                onPick={(next) => setKind(next as AttachmentKind)}
+                ariaLabel="Kind of attachment"
+                fit
+              />
             </span>
             <input
               ref={fileRef}
