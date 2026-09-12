@@ -346,7 +346,7 @@ export function VendorItemFields({
             />
           </span>
           <span className="ml-2 flex shrink-0 items-center text-subtle">
-            <span>(</span>
+            <span className="mr-1.5">(</span>
             <span className="w-16">
               <InlineValue
                 readOnly={!editable}
@@ -358,7 +358,8 @@ export function VendorItemFields({
                 kind="number"
               />
             </span>
-            {/* `ml-1.5` (Mark, 2026-09-12): the unit was touching the box. */}
+            {/* `ml-1.5`, and `mr-1.5` on the "(" (Mark, 2026-09-12): both were
+                touching the box. */}
             <span className="ml-1.5">{unit})</span>
           </span>
           <RecalcContent
