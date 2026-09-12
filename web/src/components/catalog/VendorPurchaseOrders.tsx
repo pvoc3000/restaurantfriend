@@ -21,7 +21,6 @@ export type VendorPoRow = {
   status: PoStatus;
   order_date: string;
   delivery_date: string | null;
-  location_code: string;
   line_count: number;
   ordered_total: number;
   received_total: number;
@@ -38,11 +37,15 @@ const LINK =
  * question is "what have we ordered from these people", and the answer is
  * the rows, newest first, each a link to the order where the work happens.
  *
- * The Vendor column is GONE — every row is this vendor — and a SHOP column
- * takes its place, because unlike the list this is not scoped to the working
- * location (see `lib/vendors`). Files and Sent via are dropped too: the first
- * is a Friday question about deliveries, the second a transport detail, and
- * neither is about the vendor.
+ * THE WORKING SHOP'S ORDERS ONLY (Mark, 2026-09-11), which reverses the
+ * org-wide reading this shipped with on 2026-09-05 — see `lib/vendors` for
+ * why. So there is no Vendor column (every row is this vendor) and no Shop
+ * column either (every row is this shop): the heading names the shop instead,
+ * which is `ItemPurchaseHistory`'s own way of stating a scope rather than
+ * spending a column repeating it down every row.
+ *
+ * Files and Sent via are dropped too: the first is a Friday question about
+ * deliveries, the second a transport detail, and neither is about the vendor.
  *
  * The sort is the table's own (uncontrolled) rather than in the URL: the tab
  * is already a URL parameter and a second one for a table this narrow would
@@ -53,11 +56,15 @@ export function VendorPurchaseOrders({
   orders,
   from,
   capped,
+  locationCode,
 }: {
   orders: VendorPoRow[];
   /** Where a row's link comes back to — this vendor, this tab. */
   from: Crumb;
   capped: boolean;
+  /** The working shop, whose orders these are. Null with no working shop, in
+   *  which case there is nothing to scope by and nothing is listed. */
+  locationCode: string | null;
 }) {
   const columns: DataColumn<VendorPoRow>[] = [
     {
@@ -71,13 +78,6 @@ export function VendorPurchaseOrders({
           {po.po_number}
         </Link>
       ),
-    },
-    {
-      key: "location",
-      label: "Shop",
-      width: 80,
-      sortValue: (po) => po.location_code,
-      render: (po) => <span className="text-muted">{po.location_code}</span>,
     },
     {
       key: "order_date",
@@ -158,7 +158,9 @@ export function VendorPurchaseOrders({
       compactBelow={1100}
       leading={
         <div className="space-y-1">
-          <SectionHeading count={orders.length}>Purchase orders</SectionHeading>
+          <SectionHeading count={orders.length}>
+            Purchase orders{locationCode ? ` at ${locationCode}` : ""}
+          </SectionHeading>
           {capped && (
             <p className="text-sm text-muted">
               The most recent {VENDOR_PO_CAP}. Older orders are on the purchase order list.
@@ -178,7 +180,13 @@ export function VendorPurchaseOrders({
           </span>
         ),
       })}
-      empty={<p className="text-sm text-muted">No purchase orders for this vendor.</p>}
+      empty={
+        <p className="text-sm text-muted">
+          {locationCode
+            ? `No purchase orders for this vendor at ${locationCode}.`
+            : "Pick a working shop to see this vendor's orders."}
+        </p>
+      }
     />
   );
 }

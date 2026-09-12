@@ -26,11 +26,26 @@
  * `/invoices`: no filters, no selection bar, no commands, just the rows and
  * a link into each. Not the scanned documents; those live on the order.
  *
- * ORG-WIDE, NOT SCOPED TO THE WORKING SHOP, which is the one way these differ
- * from the lists they are simplified from. A vendor is an org-level record
- * whose Info tab already lists every shop's account number side by side, so
- * "what have we bought from these people" is answered the same way — with a
- * Shop column — rather than answered for DF01 and silently not for DF02.
+ * SCOPED TO THE WORKING SHOP (Mark, 2026-09-11), which REVERSES how they
+ * shipped six days earlier. They were org-wide with a Shop column, on the
+ * argument that a vendor is an org-level record whose Info tab already lists
+ * every shop's account side by side — so "what have we bought from these
+ * people" should be answered the same way. That reasoning is about the
+ * VENDOR, and these two tabs are not about the vendor: they are about MONEY,
+ * and money is a shop's. An order is placed by a shop, a bill is addressed to
+ * one and paid out of its account, so a total summing DF01's and DF02's is a
+ * figure nobody is responsible for.
+ *
+ * Which makes `ItemPurchaseHistory` the precedent rather than the exception:
+ * it was already scoped, and its note — "a vendor is one account across
+ * shops, where what DF01 paid for its flour is DF01's fact" — was drawing the
+ * line in the right place and putting these two tabs on the wrong side of it.
+ * The Info tab is still every shop's, because an account number really is.
+ *
+ * Consequence: the Shop column is gone from both (every row is now the
+ * working shop) and each heading names the shop instead — a scope stated once
+ * rather than repeated down every row. The caps below are now per shop, so
+ * they bite later than they did.
  */
 export type VendorTab = "info" | "items" | "purchase-orders" | "invoices";
 

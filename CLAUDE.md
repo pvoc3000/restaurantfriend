@@ -638,6 +638,12 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    photograph and sometimes a PDF the vendor emailed. The PO list gained a
    narrow **Files** count: on a Friday the only question it answers is which
    delivery still has nothing filed.
+   **THE CARD'S HEADER STATES A COUNT AND NOTHING WHEN THERE IS NONE** (Mark,
+   2026-09-11: delete "Nothing attached — drop one here"). That empty state was
+   the hint rule twice over — the card is visibly empty, and the Attach button
+   beside it says what to do about that — so the span renders only where there
+   are files ("2 files"). The read-only "Nothing attached" went with it, being
+   the same claim to a reader who also has no button to press.
    Also shipped: **closing an order means something** (`closeReadiness` in
    `lib/purchaseOrders.ts`). `closed` existed in 001, sorted and badged, and
    nothing ever routed you to it. It now means "received, reconciled and filed",
@@ -11685,15 +11691,37 @@ weekday column, and 003 then silently made it per-vendor-item.
   row menu, no commands — each row a link into the record, with the list's own
   status chips (`PO_STATUS_CLASS`, the `billStage` ladder) so a bill reads Paid
   here exactly as it does there, and a closing `totals` row.
-  **ORG-WIDE WITH A SHOP COLUMN, not scoped to the working location**, which is
-  the one way they differ from `/purchase-orders` and `/invoices`: the Info tab
-  already lists every shop's account side by side, and "what have we bought
-  from these people" is the same kind of question. Newest first, capped at the
-  lists' own 500 with a sentence when the cap bites. Fetched only on their own
-  tab (the `SKIP` idiom), and the PO link on an invoice is DERIVED from its
-  lines as `/invoices` derives it. Verified live on Chefs Warehouse — 19
-  orders, 10 bills, both counts confirmed against the database — with the
-  crumb from a row returning to the tab it left.
+  Newest first, capped at the lists' own 500 with a sentence when the cap
+  bites. Fetched only on their own tab (the `SKIP` idiom), and the PO link on
+  an invoice is DERIVED from its lines as `/invoices` derives it.
+  **BOTH ARE SCOPED TO THE WORKING SHOP SINCE 2026-09-11** (Mark), which
+  REVERSES how they shipped six days earlier. They were ORG-WIDE WITH A SHOP
+  COLUMN, on the argument that a vendor is an org-level record whose Info tab
+  already lists every shop's account side by side — so "what have we bought
+  from these people" should be answered the same way. That reasoning is about
+  the VENDOR, and these two tabs are not about the vendor: they are about
+  MONEY, and money is a shop's. An order is placed by a shop, a bill is
+  addressed to one and paid out of its account, so a `totals` row summing
+  DF01's and DF02's was a figure nobody is responsible for.
+  **Which makes `ItemPurchaseHistory` the precedent rather than the
+  exception** — it was already scoped, and its own note ("a vendor is one
+  account across shops, where what DF01 paid for its flour is DF01's fact")
+  was drawing the line in the right place and putting these two on the wrong
+  side of it. The Info tab is still every shop's, because an account number
+  really is.
+  **The Shop column is GONE from both and the HEADING names the shop**
+  ("Purchase orders at DF01"), that component's way of stating a scope once
+  rather than repeating it down every row — and with no working shop neither
+  is FETCHED at all, each saying so in its own words rather than rendering an
+  empty table that reads as "we have never ordered from them". The caps are
+  now per shop, so they bite later.
+  Measured on the live database and verified in the browser at 1440: Chefs
+  Warehouse has 21 orders (DF01:11 · DF02:10) and 13 bills (DF01:6 · DF02:7),
+  and the two shops' rows INTERLEAVE week by week — which is what the org-wide
+  reading actually looked like — where the tabs now read 11 and 6, totals
+  $9,775.37 / $8,458.03 and $5,043.24. Worth knowing for scale: Dawn Foods has
+  1,554 orders org-wide, so the 500 cap had been showing an interleaved half
+  of a mixed history.
   **Invoices carries a BALANCE column with its own total** (Mark, same day).
   `balanceOwed` in `lib/invoices`: void → 0; linked and QuickBooks answered →
   what it said; anything else → the whole bill, because this app records no

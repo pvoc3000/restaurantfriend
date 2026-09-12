@@ -90,8 +90,13 @@ export async function VendorDetail({
   const tab = parseVendorTab(rawParams.tab);
   const SKIP = { data: null, error: null, count: null };
   const wantsItems = tab === "items";
-  const wantsOrders = tab === "purchase-orders";
-  const wantsInvoices = tab === "invoices";
+  // THE TWO RECORD TABS ARE SCOPED TO THE WORKING SHOP (Mark, 2026-09-11) —
+  // see `lib/vendors`. With no working shop there is nothing to scope by, so
+  // neither is fetched at all and each says so in its own words rather than
+  // rendering an empty table that reads as "we have never ordered from them".
+  const workingShop = session.activeLocation;
+  const wantsOrders = tab === "purchase-orders" && Boolean(workingShop);
+  const wantsInvoices = tab === "invoices" && Boolean(workingShop);
 
   // Every location's config is listed (not just the active one) — the vendor's
   // account number and minimum differ per shop, and seeing them together is the
@@ -140,27 +145,28 @@ export async function VendorDetail({
           "id, external_ref, expense_account_ref, expense_account_name, qbo_location_ref, qbo_location_name, qbo_class_ref, qbo_class_name"
         )
         .eq("vendor_id", id),
-      // THE VENDOR'S ORDERS, every shop (see lib/vendors for why not the
-      // working one). Newest first and capped like `/purchase-orders`;
-      // Chefs Warehouse alone has years of them.
-      wantsOrders
+      // THE VENDOR'S ORDERS AT THE WORKING SHOP. Newest first and capped like
+      // `/purchase-orders`; Chefs Warehouse alone has years of them.
+      wantsOrders && workingShop
         ? supabase
             .from("purchase_orders")
-            .select("id, po_number, status, order_date, delivery_date, location_id")
+            .select("id, po_number, status, order_date, delivery_date")
             .eq("vendor_id", id)
+            .eq("location_id", workingShop.id)
             .order("order_date", { ascending: false })
             .limit(VENDOR_PO_CAP)
         : SKIP,
       // THE VENDOR'S BILLS. `external_ref` is read for its PRESENCE only and
       // never reaches the browser (086).
-      wantsInvoices
+      wantsInvoices && workingShop
         ? supabase
             .from("vendor_invoices")
             .select(
               `id, invoice_number, invoice_date, due_date, total, is_credit, status,
-               location_id, external_ref, qbo_balance, qbo_checked_at`
+               external_ref, qbo_balance, qbo_checked_at`
             )
             .eq("vendor_id", id)
+            .eq("location_id", workingShop.id)
             .order("invoice_date", { ascending: false })
             .limit(VENDOR_INVOICE_CAP)
         : SKIP,
@@ -277,7 +283,6 @@ export async function VendorDetail({
         status: o.status,
         order_date: o.order_date,
         delivery_date: o.delivery_date,
-        location_code: codeById.get(o.location_id) ?? "—",
         line_count: t?.lines ?? 0,
         ordered_total: t?.ordered ?? 0,
         received_total: t?.received ?? 0,
@@ -324,7 +329,6 @@ export async function VendorDetail({
       total: i.total,
       is_credit: i.is_credit,
       status: i.status,
-      location_code: codeById.get(i.location_id) ?? "—",
       purchase_orders: [...(poIdsByInvoice.get(i.id) ?? [])]
         .map((pid) => ({ id: pid, po_number: poNumbers.get(pid) ?? "" }))
         .filter((p) => p.po_number)
@@ -514,6 +518,7 @@ export async function VendorDetail({
                 orders={orders}
                 from={here}
                 capped={orders.length === VENDOR_PO_CAP}
+                locationCode={workingShop?.code ?? null}
               />
             ))}
 
@@ -528,6 +533,7 @@ export async function VendorDetail({
                 from={here}
                 today={todayInTimeZone(timeZone)}
                 capped={invoices.length === VENDOR_INVOICE_CAP}
+                locationCode={workingShop?.code ?? null}
               />
             ))}
         </div>

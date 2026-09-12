@@ -26,7 +26,6 @@ export type VendorInvoiceRow = {
   total: number | null;
   is_credit: boolean;
   status: InvoiceStatus;
-  location_code: string;
   /** The orders its lines point at, derived exactly as `/invoices` derives
    *  them — never a header claim. */
   purchase_orders: { id: string; po_number: string }[];
@@ -70,23 +69,31 @@ function stageOf(i: VendorInvoiceRow) {
  * the vendor's record the question is "what have they billed us", and the
  * answer is the rows, newest first, each a link to the bill.
  *
- * Vendor column gone (every row is this vendor), Shop column in its place —
- * see `VendorPurchaseOrders` and `lib/vendors` for why this reads across
- * every shop. Files and Lines are dropped; the Status chip is the list's own
- * `billStage` ladder so Paid and Submitted read the same here as there, and
- * an overdue OPEN bill is red by the list's own rule.
+ * THE WORKING SHOP'S BILLS ONLY (Mark, 2026-09-11), reversing the org-wide
+ * reading this shipped with — see `lib/vendors`. No Vendor column (every row
+ * is this vendor) and no Shop column (every row is this shop); the heading
+ * names the shop instead, `ItemPurchaseHistory`'s way of stating a scope
+ * rather than repeating it down every row.
+ *
+ * Files and Lines are dropped; the Status chip is the list's own `billStage`
+ * ladder so Paid and Submitted read the same here as there, and an overdue
+ * OPEN bill is red by the list's own rule.
  */
 export function VendorInvoices({
   invoices,
   from,
   today,
   capped,
+  locationCode,
 }: {
   invoices: VendorInvoiceRow[];
   from: Crumb;
   /** The org's calendar day (lib/today) — the overdue test is measured from it. */
   today: string;
   capped: boolean;
+  /** The working shop, whose bills these are. Null with no working shop, in
+   *  which case there is nothing to scope by and nothing is listed. */
+  locationCode: string | null;
 }) {
   const columns: DataColumn<VendorInvoiceRow>[] = [
     {
@@ -100,13 +107,6 @@ export function VendorInvoices({
           {i.invoice_number ?? <span className="text-faint">No number</span>}
         </Link>
       ),
-    },
-    {
-      key: "location",
-      label: "Shop",
-      width: 80,
-      sortValue: (i) => i.location_code,
-      render: (i) => <span className="text-muted">{i.location_code}</span>,
     },
     {
       key: "invoice_date",
@@ -214,7 +214,9 @@ export function VendorInvoices({
       compactBelow={1100}
       leading={
         <div className="space-y-1">
-          <SectionHeading count={invoices.length}>Invoices</SectionHeading>
+          <SectionHeading count={invoices.length}>
+            Invoices{locationCode ? ` at ${locationCode}` : ""}
+          </SectionHeading>
           {capped && (
             <p className="text-sm text-muted">
               The most recent {VENDOR_INVOICE_CAP}. Older bills are on the invoice list.
@@ -234,7 +236,13 @@ export function VendorInvoices({
           </span>
         ),
       })}
-      empty={<p className="text-sm text-muted">No invoices from this vendor.</p>}
+      empty={
+        <p className="text-sm text-muted">
+          {locationCode
+            ? `No invoices from this vendor at ${locationCode}.`
+            : "Pick a working shop to see this vendor's bills."}
+        </p>
+      }
     />
   );
 }
