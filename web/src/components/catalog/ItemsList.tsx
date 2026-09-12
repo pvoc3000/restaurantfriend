@@ -427,9 +427,12 @@ export function ItemsList({
       {/* ONE "ACTIONS" MENU FOR THE SCREEN (Mark, 2026-09-11), the third in a
           day after the purchase order and invoice lists, in the TITLE row the
           create command already rode in (Mark, 2026-09-10: "move the action
-          button into the identity row top right aligned"): New Inventory Item ·
-          Deactivate Here · Deactivate Everywhere, then a rule, then Clear
-          Selection.
+          button into the identity row top right aligned"), in FOUR GROUPS
+          (Mark, 2026-09-11, adding the rules one at a time once he had it in
+          front of him): New Inventory Item, which is the only row here that
+          does not read the selection — then the two Deactivates, then
+          Duplicate and Delete Selected, then Clear Selection on its own,
+          being housekeeping rather than a command against the catalog.
 
           `NewInventoryItem` KEEPS OWNING ITS COMMAND and hands the row out
           through a render prop — `OrderCommandMenu`'s arrangement, so the
@@ -468,6 +471,7 @@ export function ItemsList({
                       ...newItem,
                       {
                         label: `Deactivate Here${activeLocationCode ? ` (${activeLocationCode})` : ""}`,
+                        separatorBefore: true,
                         disabled: nothingTicked,
                         onSelect: () => void deactivate("here"),
                       },
@@ -482,6 +486,7 @@ export function ItemsList({
                       ),
                       {
                         label: "Clear Selection",
+                        separatorBefore: true,
                         disabled: nothingTicked,
                         onSelect: () => setChecked(new Set()),
                       },

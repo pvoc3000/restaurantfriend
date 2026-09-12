@@ -46,9 +46,17 @@ feature.** `docs/master-plan.md` has the overall roadmap.
 2. ✅ Web skeleton: auth (email/password), org/location context, vendor list
 3. ✅ FMP → Postgres migration (`migration/`) loaded; web catalog admin shipped.
    **THE INVENTORY LIST'S COMMANDS ARE ONE ACTIONS MENU** (Mark, 2026-09-11,
-   the third list in a day): **New Inventory Item** · **Deactivate Here (DF01)**
-   · **Deactivate Everywhere** (red), then a rule, then **Clear Selection**, in
-   the title row where the create command already rode. The selection bar is
+   the third list in a day), in the title row where the create command already
+   rode, and in **FOUR GROUPS** — he added the rules one at a time once he had
+   it in front of him, and the shape they arrived at is the one to keep:
+   **New Inventory Item**, which is the only row here that does not read the
+   selection · **Deactivate Here (DF01)** and **Deactivate Everywhere** (red) ·
+   **Duplicate Selected** and **Delete Selected…** · **Clear Selection** alone,
+   being housekeeping rather than a command against the catalog.
+   That is three rules where the other two lists have one, and it earns them:
+   this menu holds six commands against their five and four, and its two pairs
+   are genuinely different verbs — take it off the guide, versus copy or
+   destroy the record. The selection bar is
    gone — its "N selected" only restated the ticks — and its error moved to the
    band slot, red on the mark fill, the purchasing lists' placement.
    `NewInventoryItem` hands its row out through a render prop and keeps owning
@@ -63,8 +71,8 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    so an empty one would be worse than none — and the selection column stays
    gated for the same reason, where the invoice list's had to widen.
    **DUPLICATE SELECTED AND DELETE SELECTED JOINED IT THE SAME DAY** (Mark),
-   under a rule above Clear Selection — and they are **the ROW MENU'S OWN
-   COMMANDS over the ticked rows**, not a second implementation.
+   as their own group — and they are **the ROW MENU'S OWN COMMANDS over the
+   ticked rows**, not a second implementation.
    `InventoryItemActions` took `itemId` and now takes `items: ItemTarget[]`,
    keeping its usage count, its "Deactivate instead" offer and its whole
    confirm dialog, and handing the list its two rows through the same render
@@ -83,8 +91,11 @@ feature.** `docs/master-plan.md` has the overall roadmap.
    The dialog counts the whole selection and speaks in the plural ("These items
    are stocked at 6 locations"), naming the first four so you can tell the
    selection is the one you meant. `scope="selection"` is wording only.
-   Verified live at 1440: 403 rows and 403 checkboxes, every row dead with
-   nothing ticked and live with three, the batch confirm reading "3 inventory
+   Verified live at 1440 — the panel's own DOM read in order, which is the only
+   way to see a rule (each row is WRAPPED, so measuring a row's `border-top`
+   measures its wrapper and reports 0 on every one): three `role="separator"`
+   rules in the four-group arrangement above. Plus 403 rows and 403 checkboxes,
+   every row dead with nothing ticked and live with three, the batch confirm reading "3 inventory
    items · Activated Charcoal, Advil, Agar, Powdered" over 6 per-location rows,
    15 vendor items and 2 production elements — cancelled, nothing written — the
    row menu still reading "Duplicate"/"Delete…" with its hints, and New
