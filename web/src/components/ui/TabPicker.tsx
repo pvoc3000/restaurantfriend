@@ -7,15 +7,20 @@ import type { ReactNode } from "react";
  * The app's one-of-N chooser (Mark, 2026-08-01: the order guide's filter tabs
  * "should be replicated stylistically throughout the app... the default moving
  * forward") — a segmented bar in the guide's style: one box, cells divided by
- * rules, the chosen cell filled black. One choice reads as ONE OBJECT rather
- * than a row of loose buttons, which is the reason the guide drew it this way.
+ * rules. One choice reads as ONE OBJECT rather than a row of loose buttons,
+ * which is the reason the guide drew it this way.
+ *
+ * **SINCE 2026-09-12 THEY ARE CLASSIC MAC TABS** (Mark): the selected tab is
+ * WHITE and full height, the rest GREY (#c0c0c0) and 4px shorter, bottom-
+ * aligned, all with black type. What follows about a black selected cell is
+ * history; the rule that there is no per-caller colour still holds.
  *
  * This RETIRES the underline-marker tab dialect (border-b-2 on the active
  * label) and the loose bordered-chip dialect — three lists, the PO list and
  * the cleanup queue each had their own; now they all render through here, so a
  * change lands everywhere at once, the DataTable rule.
  *
- * **The selected cell is ALWAYS black.** There is no per-caller colour, on
+ * **The selected cell is ALWAYS one colour** (black until 2026-09-12). There is no per-caller colour, on
  * purpose (Mark, 2026-08-01, spotting a yellow selected cell on Inventory:
  * "highlighted yellow instead of black like everywhere else"). The last-ordered
  * age buckets carried a yellow selected fill over from the chip dialect this
@@ -74,17 +79,20 @@ export function TabPicker<K extends string>({
   ariaLabel?: string;
   className?: string;
 }) {
-  const cell =
-    size === "sm" ? "px-3 text-[11px]" : "px-4 text-[12px]";
-  const height = size === "sm" ? "h-8" : "h-9";
+  const cell = size === "sm" ? "px-3 text-[11px]" : "px-4 text-[12px]";
+  // CLASSIC MAC TABS (Mark, 2026-09-12: "the active tab should be white with
+  // black text, the inactive tabs should be grey … the active tab should be 4px
+  // taller than the inactive tabs"). The SELECTED tab keeps the control's old
+  // full height and the others are 4px SHORTER, bottom-aligned — so the
+  // footprint is unchanged and no filter row anywhere moves.
+  const tall = size === "sm" ? "h-8" : "h-9";
+  const short = size === "sm" ? "h-7" : "h-8";
 
   return (
     <span
       role="group"
       aria-label={ariaLabel}
-      className={`flex ${height} ${
-        stretch ? "w-full" : "w-fit"
-      } items-stretch border border-ink ${className}`}
+      className={`flex ${tall} ${stretch ? "w-full" : "w-fit"} items-end ${className}`}
     >
       {options.map((o, i) => {
         const on = o.key === value;
@@ -93,14 +101,18 @@ export function TabPicker<K extends string>({
         // two lines inside a 36px bar — but a wrapped tab is wrong everywhere,
         // and with nowrap a flex cell can't shrink below its own label, so the
         // shares come out as-equal-as-the-words-allow instead.
-        const cls = `inline-flex items-center gap-2 whitespace-nowrap ${cell} font-semibold uppercase tracking-[0.06em] no-underline transition-colors ${
+        //
+        // Each tab is its OWN box now, the neighbours overlapping by one pixel
+        // (`-ml-px`) so a shared edge is one rule, not two. The selected tab
+        // sits above its neighbours (`z-10`) so its full-height border is the
+        // one you see. Hover is the Mac look's 2px edge, drawn inset so
+        // nothing grows — never a fill, since grey already means unselected.
+        const cls = `relative inline-flex ${on ? `${tall} z-10 bg-white` : `${short} bg-[#c0c0c0] hover:shadow-[inset_0_0_0_1px_#000]`} items-center gap-2 whitespace-nowrap border border-ink ${cell} font-semibold uppercase tracking-[0.06em] text-ink no-underline ${
           // Equal shares, centred — a stretched bar whose cells were sized by
           // their labels would put "Never ordered" three times the width of
           // "2+ years" and read as a mistake.
           stretch ? "flex-1 justify-center" : ""
-        } ${i > 0 ? "border-l border-ink" : ""} ${
-          on ? "bg-ink text-white" : "bg-white text-ink hover:bg-neutral-100"
-        }`;
+        } ${i > 0 ? "-ml-px" : ""}`;
         const count =
           o.count !== undefined ? (
             <span className="font-normal tabular-nums opacity-55">{o.count}</span>
