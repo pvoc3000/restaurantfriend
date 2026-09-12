@@ -315,7 +315,7 @@ export function VendorItemFields({
               alsoUpdate={(next) => recomputeContent({ pack_count: next })}
             />
           </span>
-          <span className="shrink-0 text-faint">×</span>
+          <span className="mx-1.5 shrink-0 text-faint">×</span>
           <span className="w-14 shrink-0">
             <InlineValue
               readOnly={!editable}
@@ -346,7 +346,7 @@ export function VendorItemFields({
             />
           </span>
           <span className="ml-2 flex shrink-0 items-center text-subtle">
-            <span className="mr-1.5">(</span>
+            <span className="mr-[3px]">(</span>
             <span className="w-16">
               <InlineValue
                 readOnly={!editable}
@@ -358,7 +358,7 @@ export function VendorItemFields({
                 kind="number"
               />
             </span>
-            {/* `ml-1.5`, and `mr-1.5` on the "(" (Mark, 2026-09-12): both were
+            {/* `ml-1.5`, and 3px after the "(" (Mark, 2026-09-12): both were
                 touching the box. */}
             <span className="ml-1.5">{unit})</span>
           </span>
