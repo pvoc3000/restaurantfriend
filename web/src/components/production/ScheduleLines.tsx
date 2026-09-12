@@ -645,10 +645,6 @@ export function ScheduleLines({
 
   return (
     <section className="space-y-3">
-      {/* Add item… moved up to the record's command row (Mark, 2026-08-27), so
-          this is a heading and nothing else. */}
-      <SectionHeading count={rows.length}>Items</SectionHeading>
-
       {error ? <p className="text-sm text-accent">{error}</p> : null}
 
       <DataTable
@@ -665,21 +661,27 @@ export function ScheduleLines({
             plans have changed.
           </p>
         }
+        // THE HEADING AND GROUP BY SHARE ONE LINE (Mark, 2026-09-12: move the
+        // picker "to the right of the datatable title"), in the table's
+        // `leading` — the heading-over-a-table convention. The caption sits
+        // to the LEFT of the control, the plan record's arrangement, since a
+        // caption above it would drop the picker below the heading's line.
         leading={
-          <div className="space-y-1.5">
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-              Group by
-            </span>
-            <TabPicker
-              ariaLabel="Group the items"
-              value={grouping}
-              onChange={setGrouping}
-              options={[
-                { key: "type" as Grouping, label: "Type" },
-                { key: "tray" as Grouping, label: "Tray" },
-                { key: "none" as Grouping, label: "None" },
-              ]}
-            />
+          <div className="flex flex-wrap items-center gap-x-8 gap-y-2">
+            <SectionHeading count={rows.length}>Items</SectionHeading>
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase tracking-[0.12em] text-subtle">Group by</span>
+              <TabPicker
+                ariaLabel="Group the items"
+                value={grouping}
+                onChange={setGrouping}
+                options={[
+                  { key: "type" as Grouping, label: "Type" },
+                  { key: "tray" as Grouping, label: "Tray" },
+                  { key: "none" as Grouping, label: "None" },
+                ]}
+              />
+            </div>
           </div>
         }
       />
